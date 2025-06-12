@@ -5,7 +5,7 @@ interface Customer {
   id: string
   company_name: string
   org_number: string
-  contact_email: string
+  email: string
   phone: string
   created_at: string
 }
@@ -17,7 +17,7 @@ export default function AdminDashboard() {
   const [formData, setFormData] = useState({
     company_name: '',
     org_number: '',
-    contact_email: '',
+    email: '',
     phone: ''
   })
 
@@ -51,7 +51,7 @@ export default function AdminDashboard() {
         .insert({
           company_name: formData.company_name,
           org_number: formData.org_number,
-          contact_email: formData.contact_email,
+          email: formData.email,
           phone: formData.phone
         })
 
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
       setFormData({
         company_name: '',
         org_number: '',
-        contact_email: '',
+        email: '',
         phone: ''
       })
       setShowForm(false)
@@ -161,8 +161,8 @@ export default function AdminDashboard() {
                 <input
                   type="email"
                   required
-                  value={formData.contact_email}
-                  onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="kontakt@brfskorden.se"
                 />
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
                         <div className="font-medium text-white">{customer.company_name}</div>
                       </td>
                       <td className="px-6 py-4 text-slate-300">{customer.org_number}</td>
-                      <td className="px-6 py-4 text-slate-300">{customer.contact_email}</td>
+                      <td className="px-6 py-4 text-slate-300">{customer.email}</td>
                       <td className="px-6 py-4 text-slate-300">{customer.phone}</td>
                       <td className="px-6 py-4 text-slate-300">
                         {new Date(customer.created_at).toLocaleDateString('sv-SE')}
