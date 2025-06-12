@@ -9,7 +9,6 @@ function App() {
   const { user, loading } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminLoading, setAdminLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState('dashboard')
 
   // Check if user is admin
   useEffect(() => {
@@ -20,28 +19,6 @@ function App() {
       setAdminLoading(false)
     }
   }, [user])
-
-  // Handle URL changes
-  useEffect(() => {
-    const handleRouteChange = () => {
-      const path = window.location.pathname
-      if (path === '/admin') {
-        setCurrentPage('admin')
-      } else {
-        setCurrentPage('dashboard')
-      }
-    }
-
-    // Check initial route
-    handleRouteChange()
-
-    // Listen for URL changes (back/forward buttons)
-    window.addEventListener('popstate', handleRouteChange)
-    
-    return () => {
-      window.removeEventListener('popstate', handleRouteChange)
-    }
-  }, [])
 
   const checkAdminStatus = async () => {
     try {
@@ -65,18 +42,6 @@ function App() {
     }
   }
 
-  // Navigate to admin (programmatically)
-  const navigateToAdmin = () => {
-    window.history.pushState({}, '', '/admin')
-    setCurrentPage('admin')
-  }
-
-  // Navigate to dashboard (programmatically)  
-  const navigateToDashboard = () => {
-    window.history.pushState({}, '', '/')
-    setCurrentPage('dashboard')
-  }
-
   if (loading || adminLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -92,41 +57,44 @@ function App() {
     return <Login />
   }
 
+  // Check URL for admin access
+  const isAdminPath = window.location.pathname === '/admin'
+
   // Show admin dashboard if on /admin route and user is admin
-  if (currentPage === 'admin' && isAdmin) {
+  if (isAdminPath && isAdmin) {
     return <AdminDashboard />
   } 
   
   // Show access denied if on /admin route but not admin
-  if (currentPage === 'admin' && !isAdmin) {
+  if (isAdminPath && !isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
           <p className="mb-4">Du har inte behörighet att komma åt admin-panelen.</p>
-          <button 
-            onClick={navigateToDashboard}
-            className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg"
+          <a 
+            href="/"
+            className="inline-block mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg"
           >
             Tillbaka till Dashboard
-          </button>
+          </a>
         </div>
       </div>
     )
   }
 
-  // Default: show regular dashboard
+  // Default: show regular dashboard with admin link if admin
   return (
     <div>
       {/* Add admin link for admin users */}
-      {isAdmin && currentPage === 'dashboard' && (
+      {isAdmin && (
         <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={navigateToAdmin}
+          <a
+            href="/admin"
             className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
             🔧 Admin Panel
-          </button>
+          </a>
         </div>
       )}
       <Dashboard />

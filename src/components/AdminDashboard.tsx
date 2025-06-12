@@ -106,12 +106,12 @@ export default function AdminDashboard() {
             <p className="text-slate-400 mt-2">Hantera kunder och deras åtkomst till kundportalen</p>
           </div>
           <div className="flex gap-4">
-            <button
-              onClick={() => window.location.href = '/'}
+            <a
+              href="/"
               className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
               Tillbaka till Dashboard
-            </button>
+            </a>
             <button
               onClick={() => setShowForm(!showForm)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   E-postadress *
                 </label>
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Telefonnummer *
                 </label>
