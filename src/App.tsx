@@ -10,6 +10,13 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminLoading, setAdminLoading] = useState(true)
 
+  // Debug: Log user information
+  useEffect(() => {
+    console.log('🔍 User changed:', user)
+    console.log('🔍 User email:', user?.email)
+    console.log('🔍 User ID:', user?.id)
+  }, [user])
+
   // Check if user is admin
   useEffect(() => {
     if (user) {
@@ -21,6 +28,8 @@ function App() {
   }, [user])
 
   const checkAdminStatus = async () => {
+    console.log('🔍 Checking admin status for user:', user?.id)
+    
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -28,19 +37,33 @@ function App() {
         .eq('id', user?.id)
         .single()
 
+      console.log('🔍 Admin check result:', { data, error })
+
       if (error) {
-        console.error('Error checking admin status:', error)
+        console.error('❌ Error checking admin status:', error)
         setIsAdmin(false)
       } else {
-        setIsAdmin(data?.is_admin || false)
+        const adminStatus = data?.is_admin || false
+        console.log('🔍 Setting admin status to:', adminStatus)
+        setIsAdmin(adminStatus)
       }
     } catch (error) {
-      console.error('Admin check failed:', error)
+      console.error('❌ Admin check failed:', error)
       setIsAdmin(false)
     } finally {
       setAdminLoading(false)
     }
   }
+
+  // Debug: Log current state
+  useEffect(() => {
+    console.log('🔍 Current state:', {
+      user: !!user,
+      isAdmin,
+      adminLoading,
+      pathname: window.location.pathname
+    })
+  }, [user, isAdmin, adminLoading])
 
   if (loading || adminLoading) {
     return (
@@ -59,19 +82,26 @@ function App() {
 
   // Check URL for admin access
   const isAdminPath = window.location.pathname === '/admin'
+  console.log('🔍 Is admin path:', isAdminPath)
+  console.log('🔍 User is admin:', isAdmin)
 
   // Show admin dashboard if on /admin route and user is admin
   if (isAdminPath && isAdmin) {
+    console.log('✅ Showing admin dashboard')
     return <AdminDashboard />
   } 
   
   // Show access denied if on /admin route but not admin
   if (isAdminPath && !isAdmin) {
+    console.log('🚫 Access denied to admin')
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
           <p className="mb-4">Du har inte behörighet att komma åt admin-panelen.</p>
+          <p className="text-sm text-slate-400 mb-4">
+            Debug: User ID: {user?.id}, Is Admin: {isAdmin ? 'Yes' : 'No'}
+          </p>
           <a 
             href="/"
             className="inline-block mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg"
@@ -84,6 +114,7 @@ function App() {
   }
 
   // Default: show regular dashboard with admin link if admin
+  console.log('📊 Showing regular dashboard, admin button:', isAdmin)
   return (
     <div>
       {/* Add admin link for admin users */}
@@ -97,6 +128,12 @@ function App() {
           </a>
         </div>
       )}
+      
+      {/* Temporary debug info */}
+      <div className="fixed bottom-4 left-4 bg-black text-white p-2 text-xs rounded z-50">
+        User: {user?.email} | Admin: {isAdmin ? 'Yes' : 'No'} | Path: {window.location.pathname}
+      </div>
+      
       <Dashboard />
     </div>
   )
