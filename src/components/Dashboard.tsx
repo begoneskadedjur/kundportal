@@ -1,18 +1,20 @@
+// src/components/Dashboard.tsx
 import { useAuth } from '../hooks/useAuth'
 import { useCustomerData } from '../hooks/useCustomerData'
 import { useClickUpSync } from '../hooks/useClickUpSync'
+import type { Case } from '../types'
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
   completed: 'bg-green-100 text-green-800 border-green-200'
-}
+} as const
 
 const priorityColors = {
   low: 'bg-gray-100 text-gray-700',
   medium: 'bg-orange-100 text-orange-700', 
   high: 'bg-red-100 text-red-700'
-}
+} as const
 
 export default function Dashboard() {
   const { user, signOut } = useAuth()
@@ -23,7 +25,7 @@ export default function Dashboard() {
     await signOut()
   }
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('sv-SE', {
       year: 'numeric',
       month: 'short',
@@ -33,7 +35,7 @@ export default function Dashboard() {
     })
   }
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: Case['status']) => {
     const statusMap = {
       pending: 'Väntande',
       in_progress: 'Pågående', 
@@ -78,7 +80,7 @@ export default function Dashboard() {
         `🆕 Skapade: ${result.created}\n` +
         `🔄 Uppdaterade: ${result.updated}\n` +
         `⏭️ Hoppade över: ${result.skipped}\n` +
-        `${result.errors > 0 ? `⚠️ Fel: ${result.errors}` : ''}`
+        `${result.errors && result.errors > 0 ? `⚠️ Fel: ${result.errors}` : ''}`
       
       alert(message)
       
@@ -150,7 +152,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-medium">Aktiva ärenden</p>
-                <p className="text-xl font-bold text-white">{stats.activeCases}</p>
+                <p className="text-xl font-bold text-white">{stats?.activeCases || 0}</p>
               </div>
               <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,7 +167,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-slate-400 text-xs font-medium">Nästa besök</p>
                 <p className="text-sm font-semibold text-white">
-                  {stats.nextVisit 
+                  {stats?.nextVisit && stats.nextVisit.scheduled_date
                     ? new Date(stats.nextVisit.scheduled_date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })
                     : 'Inga'}
                 </p>
@@ -182,7 +184,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-medium">Avslutade ärenden</p>
-                <p className="text-xl font-bold text-white">{stats.completedCases}</p>
+                <p className="text-xl font-bold text-white">{stats?.completedCases || 0}</p>
               </div>
               <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,27 +262,22 @@ export default function Dashboard() {
                 disabled={syncing}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors w-full disabled:opacity-50"
               >
-                {syncing ? 'Synkar...' : 'Synka ärenden'}
+                {syncing ? 'Synkar...' : 'Synka från ClickUp'}
               </button>
             </div>
           </div>
 
           <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-lg p-3 border border-emerald-500/20">
-            <h3 className="text-sm font-semibold text-white mb-1">Behöver hjälp?</h3>
-            <p className="text-slate-400 text-xs mb-2">Kontakta oss för akuta problem eller frågor.</p>
-            <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors">
-              Kontakta support
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-2 grid grid-cols-1 gap-2">
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-lg p-3 border border-blue-500/20">
-            <h3 className="text-sm font-semibold text-white mb-1">Rapporter & Dokumentation</h3>
-            <p className="text-slate-400 text-xs mb-2">Ladda ner rapporter och dokumentation.</p>
-            <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors">
-              Visa rapporter
-            </button>
+            <h3 className="text-sm font-semibold text-white mb-1">Hjälp & Support</h3>
+            <p className="text-slate-400 text-xs mb-2">Kontakta oss vid frågor</p>
+            <div className="space-y-1">
+              <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors w-full">
+                Ring oss
+              </button>
+              <button className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1 rounded text-xs font-medium transition-colors w-full">
+                Skicka meddelande
+              </button>
+            </div>
           </div>
         </div>
       </main>

@@ -1,11 +1,22 @@
 import { useState } from 'react'
+import type { SyncResult } from '../types'
+
+interface ListConfig {
+  listId: string
+  customerName?: string
+}
+
+interface SyncMultipleResult extends SyncResult {
+  listId: string
+  customerName?: string
+}
 
 export function useClickUpSync() {
   const [syncing, setSyncing] = useState(false)
   const [testing, setTesting] = useState(false)
   const [lastSync, setLastSync] = useState<Date | null>(null)
 
-  const testClickUp = async () => {
+  const testClickUp = async (): Promise<SyncResult> => {
     setTesting(true)
     try {
       console.log('Testing ClickUp connection via backend...')
@@ -16,7 +27,6 @@ export function useClickUpSync() {
           'Content-Type': 'application/json'
         }
       })
-
       const result = await response.json()
       
       if (result.success) {
@@ -28,23 +38,29 @@ export function useClickUpSync() {
         
         return {
           success: true,
-          teams: result.clickup.teams,
           lists: result.clickup.lists,
-          message: 'ClickUp connection successful! Check console for available lists.'
+          count: result.clickup.teams?.length || 0,
+          error: undefined
         }
       } else {
         console.error('❌ ClickUp Test Failed:', result.error)
-        return { success: false, error: result.error }
+        return { 
+          success: false, 
+          error: result.error 
+        }
       }
     } catch (error) {
       console.error('❌ Test error:', error)
-      return { success: false, error: error.message }
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
     } finally {
       setTesting(false)
     }
   }
 
-  const syncTasks = async (listId: string, customerName?: string) => {
+  const syncTasks = async (listId: string, customerName?: string): Promise<SyncResult> => {
     setSyncing(true)
     try {
       console.log(`Starting sync for list ${listId}${customerName ? ` (${customerName})` : ''}`)
@@ -59,7 +75,6 @@ export function useClickUpSync() {
           customerName // Optional, för debugging
         })
       })
-
       const result = await response.json()
       
       if (result.success) {
@@ -72,28 +87,33 @@ export function useClickUpSync() {
         
         return { 
           success: true, 
-          count: result.summary.totalTasks,
-          created: result.summary.created,
-          updated: result.summary.updated,
-          skipped: result.summary.skipped,
-          errors: result.summary.errors,
-          message: result.message
+          count: result.summary?.totalTasks || 0,
+          created: result.summary?.created || 0,
+          updated: result.summary?.updated || 0,
+          skipped: result.summary?.skipped || 0,
+          errors: result.summary?.errors || 0
         }
       } else {
         console.error('❌ Sync Failed:', result.error)
-        return { success: false, error: result.error }
+        return { 
+          success: false, 
+          error: result.error 
+        }
       }
     } catch (error) {
       console.error('❌ Sync error:', error)
-      return { success: false, error: error.message }
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
     } finally {
       setSyncing(false)
     }
   }
 
   // Sync multiple lists (för framtida användning)
-  const syncMultipleLists = async (listConfigs: Array<{listId: string, customerName?: string}>) => {
-    const results = []
+  const syncMultipleLists = async (listConfigs: ListConfig[]): Promise<SyncMultipleResult[]> => {
+    const results: SyncMultipleResult[] = []
     
     for (const config of listConfigs) {
       const result = await syncTasks(config.listId, config.customerName)

@@ -1,78 +1,87 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import { supabase } from '../lib/supabase'
+import type { Customer, Case, Stats } from '../types'
 
 export function useCustomerData() {
   const { user } = useAuth()
-  const [cases, setCases] = useState([])
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [cases, setCases] = useState<Case[]>([])
+  const [stats, setStats] = useState<Stats>({
+    activeCases: 0,
+    completedCases: 0,
+    nextVisit: null
+  })
   const [loading, setLoading] = useState(true)
-  const [customer, setCustomer] = useState(null)
 
   useEffect(() => {
-    if (!user) return
+    if (user?.email) {
+      loadCustomerData()
+    }
+  }, [user])
 
-    const fetchCustomerData = async () => {
-      try {
-        // 1. Hitta kundens profil
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select(`
-            customer_id,
-            customers (
-              id,
-              company_name,
-              contact_person
-            )
-          `)
-          .eq('user_id', user.id)
-          .single()
+  const loadCustomerData = async () => {
+    try {
+      setLoading(true)
 
-        if (!profile) {
-          console.log('Ingen kundprofil hittad')
-          setLoading(false)
-          return
-        }
+      // Load user profile and customer info
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          customers (*)
+        `)
+        .eq('id', user?.id)
+        .single()
 
-        setCustomer(profile.customers)
+      if (profileError) throw profileError
 
-        // 2. Hämta ärendena för denna kund
-        const { data: casesData } = await supabase
+      if (profile?.customers && Array.isArray(profile.customers) && profile.customers.length > 0) {
+        const customerData = profile.customers[0] as Customer
+        setCustomer(customerData)
+
+        // Load cases for this customer
+        const { data: casesData, error: casesError } = await supabase
           .from('cases')
           .select(`
             *,
-            visits (
-              id,
-              visit_date,
-              technician_name
-            )
+            visits (*)
           `)
-          .eq('customer_id', profile.customer_id)
+          .eq('customer_id', customerData.id)
           .order('created_date', { ascending: false })
 
-        setCases(casesData || [])
-      } catch (error) {
-        console.error('Fel vid hämtning av kunddata:', error)
-      } finally {
-        setLoading(false)
+        if (casesError) throw casesError
+        
+        const typedCases = (casesData || []) as Case[]
+        setCases(typedCases)
+
+        // Calculate stats
+        const activeCases = typedCases.filter((c: Case) => c.status === 'pending' || c.status === 'in_progress').length
+        const completedCases = typedCases.filter((c: Case) => c.status === 'completed').length
+        
+        const nextVisit = typedCases
+          .filter((c: Case) => c.scheduled_date && new Date(c.scheduled_date) > new Date())
+          .sort((a: Case, b: Case) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())[0] || null
+
+        setStats({
+          activeCases,
+          completedCases,
+          nextVisit
+        })
       }
+
+    } catch (error) {
+      console.error('Error loading customer data:', error)
+    } finally {
+      setLoading(false)
     }
-
-    fetchCustomerData()
-  }, [user])
-
-  // Beräkna statistik
-  const stats = {
-    activeCases: cases.filter(c => c.status === 'pending' || c.status === 'in_progress').length,
-    completedCases: cases.filter(c => c.status === 'completed').length,
-    nextVisit: cases
-      .filter(c => c.scheduled_date && new Date(c.scheduled_date) > new Date())
-      .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))[0]
   }
 
   return {
-    cases,
     customer,
+    cases,
     stats,
-    loading
+    loading,
+    refetch: loadCustomerData
   }
 }
