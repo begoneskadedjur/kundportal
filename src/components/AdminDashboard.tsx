@@ -46,7 +46,7 @@ export default function AdminDashboard() {
 
     try {
       // Skapa kund i Supabase
-      const { data: customer, error: customerError } = await supabase
+      const { error: customerError } = await supabase
         .from('customers')
         .insert({
           company_name: formData.company_name,
@@ -54,8 +54,6 @@ export default function AdminDashboard() {
           contact_email: formData.contact_email,
           phone: formData.phone
         })
-        .select()
-        .single()
 
       if (customerError) throw customerError
 
