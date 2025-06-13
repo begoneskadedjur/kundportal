@@ -1,4 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
+// FIX 1: Lade till .js på slutet av importerna
 import { clickupService } from '../../src/lib/clickup.js'
 import { supabaseAdminService } from '../../src/lib/supabase-admin.js'
 
@@ -23,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let createdCount = 0
     let updatedCount = 0
     let skippedCount = 0
-    let errors = []
+    let errors: { taskId: string; taskName: string; error: string }[] = []
 
     // 2. Sync each task
     for (const clickupTask of clickupTasks) {
@@ -67,10 +68,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       } catch (taskError) {
         console.error(`Error processing task ${clickupTask.id}:`, taskError)
+        
+        // FIX 2: Hantera 'unknown' typ för taskError
+        let errorMessage = 'An unknown error occurred while processing a task.'
+        if (taskError instanceof Error) {
+            errorMessage = taskError.message;
+        }
+
         errors.push({
           taskId: clickupTask.id,
           taskName: clickupTask.name,
-          error: taskError.message
+          error: errorMessage
         })
       }
     }
@@ -94,9 +102,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error) {
     console.error('Sync error:', error)
+    
+    // FIX 3: Hantera 'unknown' typ för det övergripande error-objektet
+    let errorMessage = 'An unknown sync error occurred.'
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: errorMessage,
       timestamp: new Date().toISOString()
     })
   }

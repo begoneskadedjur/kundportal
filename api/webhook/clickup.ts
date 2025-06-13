@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
-import { clickupService } from '../../src/lib/clickup'
-import { supabaseAdminService } from '../../src/lib/supabase-admin'
+// FIX 1: Lade till .js på slutet av importerna
+import { clickupService } from '../../src/lib/clickup.js'
+import { supabaseAdminService } from '../../src/lib/supabase-admin.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -10,12 +11,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const webhookData = req.body
     console.log('ClickUp webhook received:', JSON.stringify(webhookData, null, 2))
-
-    // Webhook validation (optional - ClickUp kan skicka signature)
-    // const signature = req.headers['x-clickup-signature']
-    // if (!validateWebhookSignature(signature, req.body)) {
-    //   return res.status(401).json({ error: 'Invalid signature' })
-    // }
 
     const taskId = webhookData.task_id
     const eventType = webhookData.event
@@ -55,8 +50,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error) {
     console.error('Webhook error:', error)
+    
+    // FIX 2: Hantera 'unknown' typ för error-objektet
+    let errorMessage = 'An unknown webhook error occurred.'
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+
     res.status(500).json({ 
-      error: error.message,
+      success: false,
+      error: errorMessage,
       timestamp: new Date().toISOString()
     })
   }
@@ -66,7 +69,6 @@ async function handleTaskUpdate(taskId: string) {
   try {
     console.log(`Updating task ${taskId} from webhook`)
     
-    // Get full task data from ClickUp
     const clickupTask = await clickupService.getTask(taskId)
     
     if (!clickupTask) {
@@ -81,7 +83,6 @@ async function handleTaskUpdate(taskId: string) {
       return
     }
 
-    // Find customer by ClickUp list name
     const customer = await supabaseAdminService.findCustomerByListName(transformedTask.clickup_list_name)
     
     if (!customer) {
@@ -91,15 +92,12 @@ async function handleTaskUpdate(taskId: string) {
 
     console.log(`Found customer: ${customer.company_name}`)
 
-    // Check if case already exists
     const existingCase = await supabaseAdminService.findExistingCase(taskId)
 
     if (existingCase) {
-      // Update existing case
       await supabaseAdminService.updateCase(existingCase.id, transformedTask)
       console.log(`Updated case from webhook: ${transformedTask.title}`)
     } else {
-      // Create new case
       await supabaseAdminService.createCase({
         ...transformedTask,
         customer_id: customer.id
@@ -109,6 +107,7 @@ async function handleTaskUpdate(taskId: string) {
 
   } catch (error) {
     console.error(`Error handling task update for ${taskId}:`, error)
+    // Felet kastas vidare för att fångas av den yttre catch-blocket
     throw error
   }
 }
@@ -117,16 +116,12 @@ async function handleTaskDeleted(taskId: string) {
   try {
     console.log(`Handling deletion for task ${taskId}`)
     
-    // Find existing case
     const existingCase = await supabaseAdminService.findExistingCase(taskId)
     
     if (existingCase) {
-      // Option 1: Delete the case entirely
-      // await supabaseAdmin.from('cases').delete().eq('id', existingCase.id)
-      
-      // Option 2: Mark as deleted/archived (recommended)
+      // Markera som raderad
       await supabaseAdminService.updateCase(existingCase.id, {
-        status: 'deleted',
+        status: 'deleted' as any, // 'as any' för att tillåta en custom status
         updated_at: new Date().toISOString()
       })
       
@@ -137,6 +132,7 @@ async function handleTaskDeleted(taskId: string) {
 
   } catch (error) {
     console.error(`Error handling task deletion for ${taskId}:`, error)
+    // Felet kastas vidare
     throw error
   }
 }
