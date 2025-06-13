@@ -8,13 +8,18 @@
     "allowSyntheticDefaultImports": true,
 
     /* LÖSNING FÖR IMPLICIT 'ANY' */
-    "strict": true, 
+    "strict": true,
     "noImplicitAny": true
   },
   "include": [
-    // LÖSNING FÖR "FILE NOT LISTED"
+    // Inkludera alla API-filer
     "api/**/*.ts", 
-    "src/lib/**/*.ts", // Inkludera alla TS-filer i lib som servern behöver
+    
+    // Inkludera ENDAST de lib-filer som servern använder
+    "src/lib/clickup.ts",
+    "src/lib/supabase-admin.ts",
+
+    // Inkludera Vite-konfigurationen
     "vite.config.ts"
   ]
 }
