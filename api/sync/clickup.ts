@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
-import { clickupService } from '../../src/lib/clickup'
-import { supabaseAdminService } from '../../src/lib/supabase-admin'
+import { clickupService } from '../../src/lib/clickup.js'
+import { supabaseAdminService } from '../../src/lib/supabase-admin.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
