@@ -1,25 +1,17 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "composite": true,
     "target": "ES2022",
-    "lib": ["ES2023"],
     "module": "ESNext",
+    "moduleResolution": "NodeNext", // Byt till NodeNext för server-side
     "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "outDir": "dist", // Ange en output-katalog (bra praxis)
+    "rootDir": ".",    // Ange rotkatalogen
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts", 
+    "api/**/*.ts"  // <-- DEN VIKTIGA RADEN
+  ]
 }
