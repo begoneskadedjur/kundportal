@@ -2,15 +2,19 @@
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",
-    "module": "NodeNext",          // <-- KORRIGERAD FRÅN "ESNext"
-    "moduleResolution": "NodeNext", // <-- Denna kräver ändringen ovan
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "skipLibCheck": true,
-    "strict": true,
-    "allowSyntheticDefaultImports": true
-    // Har tagit bort outDir och rootDir för att förenkla, Vercel hanterar detta bra.
+    "allowSyntheticDefaultImports": true,
+
+    /* LÖSNING FÖR IMPLICIT 'ANY' */
+    "strict": true, 
+    "noImplicitAny": true
   },
   "include": [
-    "vite.config.ts", 
-    "api/**/*.ts"
+    // LÖSNING FÖR "FILE NOT LISTED"
+    "api/**/*.ts", 
+    "src/lib/**/*.ts", // Inkludera alla TS-filer i lib som servern behöver
+    "vite.config.ts"
   ]
 }
