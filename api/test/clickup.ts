@@ -45,10 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`Found ${spaces.length} spaces. Fetching lists and folders...`);
 
     // Använder Promise.all för att göra anropen snabbare och parallellt
-    const listPromises = spaces.flatMap(space => [
+    const listPromises = spaces.flatMap((space: any) => [ // FIX: Lade till (space: any)
       clickupFetch(`/space/${space.id}/list`, token), // Hämta listor direkt i space
       clickupFetch(`/space/${space.id}/folder`, token).then(folderData => {
-        const folderPromises = (folderData.folders || []).map(folder => 
+        const folderPromises = (folderData.folders || []).map((folder: any) =>  // FIX: Lade till (folder: any)
           clickupFetch(`/folder/${folder.id}/list`, token)
         );
         return Promise.all(folderPromises);
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results = await Promise.all(listPromises);
     
     // Platta ut den nästlade arrayen av listor
-    const allLists = results.flat(2).flatMap(listData => listData.lists || []);
+    const allLists = results.flat(2).flatMap((listData: any) => listData.lists || []); // Lade till (listData: any) för säkerhets skull
 
     console.log(`Total lists found across all spaces: ${allLists.length}`);
 
@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: true,
       message: `Successfully fetched ${allLists.length} lists from ClickUp.`,
       team: { id: team.id, name: team.name },
-      lists: allLists.map((list: any) => ({ // lagt till any för att undvika type-errors på list
+      lists: allLists.map((list: any) => ({
         id: list.id,
         name: list.name,
         folder: list.folder,
@@ -78,7 +78,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('Full error in /api/test/clickup:', error);
     
-    // FIX: Hantera 'unknown' typ för error-objektet
     let errorMessage = 'An unknown error occurred.';
     if (error instanceof Error) {
       errorMessage = error.message;
