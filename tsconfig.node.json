@@ -6,16 +6,14 @@
     "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-
-    /* LÖSNING FÖR IMPLICIT 'ANY' */
     "strict": true,
     "noImplicitAny": true
   },
   "include": [
-    // Inkludera alla API-filer
-    "api/**/*.ts", 
+    // Inkludera alla API-filer med den nya filändelsen
+    "api/**/*.mts", 
     
-    // Inkludera ENDAST de lib-filer som servern använder
+    // Inkludera de lib-filer som servern använder
     "src/lib/clickup.ts",
     "src/lib/supabase-admin.ts",
 
