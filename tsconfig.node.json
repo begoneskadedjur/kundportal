@@ -2,16 +2,15 @@
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "NodeNext", // Byt till NodeNext för server-side
+    "module": "NodeNext",          // <-- KORRIGERAD FRÅN "ESNext"
+    "moduleResolution": "NodeNext", // <-- Denna kräver ändringen ovan
     "skipLibCheck": true,
     "strict": true,
-    "outDir": "dist", // Ange en output-katalog (bra praxis)
-    "rootDir": ".",    // Ange rotkatalogen
     "allowSyntheticDefaultImports": true
+    // Har tagit bort outDir och rootDir för att förenkla, Vercel hanterar detta bra.
   },
   "include": [
     "vite.config.ts", 
-    "api/**/*.ts"  // <-- DEN VIKTIGA RADEN
+    "api/**/*.ts"
   ]
 }
