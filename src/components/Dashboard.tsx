@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useCustomerData } from '../hooks/useCustomerData'
 import { useClickUpSync } from '../hooks/useClickUpSync'
-import type { Case, Visit } from '../types' // Uppdaterad import för att inkludera Visit
+import type { Case } from '../types' // FIXAD: Tog bort oanvänd Visit import
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',

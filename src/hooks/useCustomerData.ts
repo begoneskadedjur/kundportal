@@ -45,7 +45,8 @@ export function useCustomerData() {
           return
       }
 
-      const customerData = profile.customer as Customer
+      // FIXAD: Ändrade type assertion för att undvika TypeScript-fel
+      const customerData = profile.customer as any as Customer
       setCustomer(customerData)
 
       // Steg 2: Hämta alla ärenden och deras relaterade besök för kunden
