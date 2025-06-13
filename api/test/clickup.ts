@@ -25,6 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Get more detailed info for first team
     let spacesInfo = []
+    let foldersInfo = []
     let listsInfo = []
     
     if (data.teams && data.teams.length > 0) {
@@ -42,24 +43,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const spacesData = await spacesResponse.json()
         spacesInfo = spacesData.spaces || []
         
-        // Get lists from first space
+        // Get folders and lists from first space
         if (spacesInfo.length > 0) {
           const spaceId = spacesInfo[0].id
+          console.log(`Checking space: ${spacesInfo[0].name} (${spaceId})`)
           
-          // Get folderless lists
-          const listsResponse = await fetch(`https://api.clickup.com/api/v2/space/${spaceId}/list`, {
-            headers: {
-              'Authorization': process.env.CLICKUP_API_TOKEN!,
-              'Content-Type': 'application/json'
-            }
-          })
-          
-          if (listsResponse.ok) {
-            const listsData = await listsResponse.json()
-            listsInfo = listsData.lists || []
-          }
-          
-          // Get folders with lists
+          // Get folders with their lists
           const foldersResponse = await fetch(`https://api.clickup.com/api/v2/space/${spaceId}/folder`, {
             headers: {
               'Authorization': process.env.CLICKUP_API_TOKEN!,
@@ -71,16 +60,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const foldersData = await foldersResponse.json()
             const folders = foldersData.folders || []
             
-            // Add lists from folders
+            console.log(`Found ${folders.length} folders`)
+            
+            // Process each folder
             folders.forEach(folder => {
+              console.log(`Folder: ${folder.name} (${folder.id})`)
+              
+              foldersInfo.push({
+                id: folder.id,
+                name: folder.name,
+                lists: folder.lists?.map(list => ({
+                  id: list.id,
+                  name: list.name
+                })) || []
+              })
+              
+              // Add lists from folders to main lists array
               if (folder.lists) {
-                listsInfo.push(...folder.lists)
+                folder.lists.forEach(list => {
+                  listsInfo.push({
+                    id: list.id,
+                    name: list.name,
+                    folder: folder.name,
+                    folderId: folder.id
+                  })
+                })
               }
+            })
+          } else {
+            console.log('Failed to fetch folders:', await foldersResponse.text())
+          }
+          
+          // Get folderless lists
+          const listsResponse = await fetch(`https://api.clickup.com/api/v2/space/${spaceId}/list`, {
+            headers: {
+              'Authorization': process.env.CLICKUP_API_TOKEN!,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (listsResponse.ok) {
+            const listsData = await listsResponse.json()
+            const folderlessLists = listsData.lists || []
+            
+            console.log(`Found ${folderlessLists.length} folderless lists`)
+            
+            // Add folderless lists
+            folderlessLists.forEach(list => {
+              listsInfo.push({
+                id: list.id,
+                name: list.name,
+                folder: 'No folder',
+                folderId: null
+              })
             })
           }
         }
       }
     }
+    
+    // Log important information for debugging
+    console.log('\n=== FOLDER MAPPING INFORMATION ===')
+    console.log('Folders found:')
+    foldersInfo.forEach(folder => {
+      console.log(`  - ${folder.name}: ${folder.id} (${folder.lists.length} lists)`)
+    })
+    
+    console.log('\nContract types that need mapping:')
+    const contractTypes = [
+      'Avrop - 2.490kr',
+      'Betongstationer', 
+      'Betesstationer',
+      'Mekaniska råttfällor',
+      'Skadedjursavtal',
+      'Avloppsfällor',
+      'Fågelavtal'
+    ]
+    contractTypes.forEach(type => {
+      console.log(`  - ${type}`)
+    })
     
     // Return comprehensive test results
     res.status(200).json({
@@ -96,18 +154,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id: space.id,
           name: space.name
         })),
-        lists: listsInfo.map(list => ({
-          id: list.id,
-          name: list.name,
-          folder: list.folder?.name || 'No folder'
-        }))
+        folders: foldersInfo,
+        lists: listsInfo
+      },
+      mapping: {
+        contractTypes: contractTypes,
+        foldersFound: foldersInfo.map(f => ({ id: f.id, name: f.name })),
+        needsMapping: contractTypes.length > 0 && foldersInfo.length > 0
       },
       environment: {
         hasClickUpToken: !!process.env.CLICKUP_API_TOKEN,
         hasSupabaseUrl: !!process.env.VITE_SUPABASE_URL,
         hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY
       },
-      message: 'ClickUp connection test successful!'
+      message: 'ClickUp connection test successful! Check console for folder mapping information.'
     })
     
   } catch (error) {
