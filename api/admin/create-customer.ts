@@ -2,12 +2,6 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdminService, supabaseAdmin } from '../../src/lib/supabase-admin';
-import { PostgrestError } from '@supabase/supabase-js';
-
-// Definiera en typ för felet från getUserByEmail för bättre felhantering
-interface UserError extends PostgrestError {
-    status?: number;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -36,31 +30,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     console.log(`[Success] Customer created in DB: ${customer.id}`);
 
-    // --- Steg 2: Skapa Auth-användare (OM DEN INTE FINNS) och skicka lösenordslänk ---
+    // --- Steg 2: Skapa Auth-användare och hantera om den redan finns ---
     try {
-      // KORRIGERAD RAD: Byt från getUserByEmail till getUserByEmail
-      const { data: { user: existingAuthUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email) as { data: { user: any }, error: UserError | null };
+      // Försök skapa användaren.
+      const { error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        email_confirm: true,
+        user_metadata: {
+          full_name: contact_person || company_name,
+          company_name: company_name,
+          customer_id: customer.id
+        }
+      });
 
-      if (getUserError && getUserError.status !== 404) {
-          throw new Error(`Fel vid kontroll av befintlig användare: ${getUserError.message}`);
-      }
-
-      if (existingAuthUser) {
-        console.log(`[Info] Auth user for ${email} already exists. Skipping creation.`);
+      // Kontrollera felet.
+      if (authError) {
+        // Om felet är specifikt "User already exists", är det OK. Vi loggar det och fortsätter.
+        if (authError.message.includes('User already exists')) {
+          console.log(`[Info] Auth user for ${email} already exists. Continuing.`);
+        } else {
+          // Om det är något annat fel, kasta det så att processen avbryts.
+          throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`);
+        }
       } else {
-        const { error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: email,
-          email_confirm: true,
-          user_metadata: {
-            full_name: contact_person || company_name,
-            company_name: company_name,
-            customer_id: customer.id
-          }
-        });
-        if (authError) throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`);
         console.log(`[Success] Auth user created for ${email}`);
       }
 
+      // Oavsett vad, skicka en "sätt lösenord"-länk.
       const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email: email });
 
       if (resetError) {
