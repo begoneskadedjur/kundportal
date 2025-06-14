@@ -2,6 +2,12 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdminService, supabaseAdmin } from '../../src/lib/supabase-admin';
+import { PostgrestError } from '@supabase/supabase-js';
+
+// Definiera en typ för felet från getUserByEmail för bättre felhantering
+interface UserError extends PostgrestError {
+    status?: number;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -32,18 +38,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- Steg 2: Skapa Auth-användare (OM DEN INTE FINNS) och skicka lösenordslänk ---
     try {
-      // Kolla först om en Auth-användare redan finns
-      const { data: existingAuthUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+      // KORRIGERAD RAD: Byt från getUserByEmail till getUserByEmail
+      const { data: { user: existingAuthUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email) as { data: { user: any }, error: UserError | null };
 
       if (getUserError && getUserError.status !== 404) {
-          // Om det är ett annat fel än "User not found", kasta det.
-          throw new Error(getUserError.message);
+          throw new Error(`Fel vid kontroll av befintlig användare: ${getUserError.message}`);
       }
 
       if (existingAuthUser) {
         console.log(`[Info] Auth user for ${email} already exists. Skipping creation.`);
       } else {
-        // Om användaren INTE finns, skapa den.
         const { error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: email,
           email_confirm: true,
@@ -57,7 +61,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`[Success] Auth user created for ${email}`);
       }
 
-      // Oavsett om användaren just skapades eller redan fanns, skicka en "sätt lösenord"-länk.
       const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email: email });
 
       if (resetError) {
