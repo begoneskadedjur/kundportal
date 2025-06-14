@@ -1,101 +1,65 @@
-import { createClient } from '@supabase/supabase-js'
+// Lägg till dessa metoder i din supabase-admin.ts klass:
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY! // Service role key (inte anon!)
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
-
-// Helper funktioner för vanliga operationer
-export class SupabaseAdminService {
+async findCustomerByListId(listId: string) {
+  const { data, error } = await this.supabase
+    .from('customers')
+    .select('*')
+    .eq('clickup_list_id', listId)
+    .single();
   
-  // Hitta kund baserat på ClickUp list-namn
-  async findCustomerByListName(listName: string) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('customers')
-        .select('id, company_name, contact_person')
-        .eq('company_name', listName)
-        .single()
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-        throw error
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error finding customer:', error)
-      return null
-    }
+  if (error) {
+    console.error('Error finding customer by list ID:', error);
+    return null;
   }
-
-  // Hitta befintligt ärende baserat på ClickUp task ID
-  async findExistingCase(clickupTaskId: string) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('cases')
-        .select('id, updated_at')
-        .eq('clickup_task_id', clickupTaskId)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        throw error
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error finding existing case:', error)
-      return null
-    }
-  }
-
-  // Skapa nytt ärende
-  async createCase(caseData: any) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('cases')
-        .insert(caseData)
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error creating case:', error)
-      throw error
-    }
-  }
-
-  // Uppdatera befintligt ärende
-  async updateCase(caseId: string, caseData: any) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('cases')
-        .update({
-          ...caseData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', caseId)
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error updating case:', error)
-      throw error
-    }
-  }
+  
+  return data;
 }
 
-export const supabaseAdminService = new SupabaseAdminService()
+async findCustomerByListName(listName: string) {
+  // Först, försök hitta via clickup_list_name
+  let { data, error } = await this.supabase
+    .from('customers')
+    .select('*')
+    .eq('clickup_list_name', listName)
+    .single();
+  
+  if (!error && data) {
+    return data;
+  }
+  
+  // Om ingen matchning, försök med company_name
+  ({ data, error } = await this.supabase
+    .from('customers')
+    .select('*')
+    .eq('company_name', listName)
+    .single());
+  
+  if (error) {
+    console.error('Error finding customer:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+// Om du behöver hämta avtalstyp-information också:
+async getCustomerWithContractType(customerId: string) {
+  const { data, error } = await this.supabase
+    .from('customers')
+    .select(`
+      *,
+      contract_types (
+        id,
+        name
+      )
+    `)
+    .eq('id', customerId)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching customer with contract type:', error);
+    return null;
+  }
+  
+  return data;
+}

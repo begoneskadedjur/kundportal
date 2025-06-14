@@ -1,5 +1,4 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
-// FIX 1: Lade till .js på slutet av importerna
 import { clickupService } from '../../src/lib/clickup.js'
 import { supabaseAdminService } from '../../src/lib/supabase-admin.js'
 
@@ -8,56 +7,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { listId, customerName } = req.body
+  const { customerId } = req.body
 
-  if (!listId) {
-    return res.status(400).json({ error: 'Missing listId in request body' })
+  if (!customerId) {
+    return res.status(400).json({ error: 'Missing customerId in request body' })
   }
 
   try {
-    console.log(`Starting sync for list ${listId}${customerName ? `, customer: ${customerName}` : ''}`)
+    // Hämta kundens ClickUp list ID från databasen
+    const { data: customer, error: customerError } = await supabaseAdminService.supabase
+      .from('customers')
+      .select('id, company_name, clickup_list_id')
+      .eq('id', customerId)
+      .single()
+
+    if (customerError || !customer) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    if (!customer.clickup_list_id) {
+      return res.status(400).json({ error: 'Customer has no ClickUp list assigned' })
+    }
+
+    console.log(`Starting sync for customer ${customer.company_name} (${customer.id}), list ID: ${customer.clickup_list_id}`)
     
-    // 1. Fetch tasks from ClickUp
-    const clickupTasks = await clickupService.getTasks(listId)
+    // Hämta tasks från ClickUp
+    const clickupTasks = await clickupService.getTasks(customer.clickup_list_id)
     console.log(`Fetched ${clickupTasks.length} tasks from ClickUp`)
 
     let createdCount = 0
     let updatedCount = 0
-    let skippedCount = 0
     let errors: { taskId: string; taskName: string; error: string }[] = []
 
-    // 2. Sync each task
+    // Synka varje task
     for (const clickupTask of clickupTasks) {
       try {
         const transformedTask = clickupService.transformTask(clickupTask)
         
-        if (!transformedTask.clickup_list_name) {
-          console.log(`Task ${clickupTask.id} has no list name, skipping`)
-          skippedCount++
-          continue
-        }
-
-        // 3. Find customer by ClickUp list name
-        const customer = await supabaseAdminService.findCustomerByListName(transformedTask.clickup_list_name)
-        
-        if (!customer) {
-          console.log(`No customer found for list: ${transformedTask.clickup_list_name}`)
-          skippedCount++
-          continue
-        }
-
-        console.log(`Found customer: ${customer.company_name} (${customer.id})`)
-
-        // 4. Check if case already exists
+        // Kolla om ärendet redan finns
         const existingCase = await supabaseAdminService.findExistingCase(clickupTask.id)
 
         if (existingCase) {
-          // Update existing case
+          // Uppdatera befintligt ärende
           await supabaseAdminService.updateCase(existingCase.id, transformedTask)
           updatedCount++
           console.log(`Updated case: ${transformedTask.title}`)
         } else {
-          // Create new case
+          // Skapa nytt ärende
           await supabaseAdminService.createCase({
             ...transformedTask,
             customer_id: customer.id
@@ -69,50 +65,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (taskError) {
         console.error(`Error processing task ${clickupTask.id}:`, taskError)
         
-        // FIX 2: Hantera 'unknown' typ för taskError
         let errorMessage = 'An unknown error occurred while processing a task.'
         if (taskError instanceof Error) {
-            errorMessage = taskError.message;
+          errorMessage = taskError.message
         }
-
+        
         errors.push({
           taskId: clickupTask.id,
-          taskName: clickupTask.name,
+          taskName: clickupTask.name || 'Unknown',
           error: errorMessage
         })
       }
     }
 
-    const result = {
+    const summary = {
       success: true,
-      timestamp: new Date().toISOString(),
-      summary: {
-        totalTasks: clickupTasks.length,
-        created: createdCount,
-        updated: updatedCount,
-        skipped: skippedCount,
-        errors: errors.length
-      },
-      message: `Sync completed: ${createdCount} created, ${updatedCount} updated, ${skippedCount} skipped`,
-      errors: errors.length > 0 ? errors : undefined
+      customerId: customer.id,
+      customerName: customer.company_name,
+      listId: customer.clickup_list_id,
+      totalTasks: clickupTasks.length,
+      created: createdCount,
+      updated: updatedCount,
+      errors: errors.length,
+      errorDetails: errors
     }
 
-    console.log('Sync completed:', result.summary)
-    res.status(200).json(result)
+    console.log('Sync completed:', summary)
+    return res.status(200).json(summary)
 
   } catch (error) {
     console.error('Sync error:', error)
     
-    // FIX 3: Hantera 'unknown' typ för det övergripande error-objektet
-    let errorMessage = 'An unknown sync error occurred.'
+    let errorMessage = 'An unknown error occurred during sync.'
     if (error instanceof Error) {
-        errorMessage = error.message;
+      errorMessage = error.message
     }
-
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-      timestamp: new Date().toISOString()
+    
+    return res.status(500).json({ 
+      success: false, 
+      error: errorMessage 
     })
   }
 }
