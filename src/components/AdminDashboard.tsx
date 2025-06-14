@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// ÄNDRAT: Uppdaterad interface för att matcha din nya databastabell
 interface Customer {
   id: string
   company_name: string
@@ -11,10 +10,11 @@ interface Customer {
   phone: string
   address: string | null
   contract_type_id: string | null
+  clickup_list_id: string | null
+  clickup_list_name: string | null
   created_at: string
 }
 
-// NYTT: Interface för att hålla data om avtalstyper
 interface ContractType {
   id: string
   name: string
@@ -22,11 +22,11 @@ interface ContractType {
 
 export default function AdminDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [contractTypes, setContractTypes] = useState<ContractType[]>([]) // NYTT: State för avtalstyper
+  const [contractTypes, setContractTypes] = useState<ContractType[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [syncingCustomer, setSyncingCustomer] = useState<string | null>(null)
   
-  // ÄNDRAT: Uppdaterat state för formulärdata med de nya fälten
   const [formData, setFormData] = useState({
     company_name: '',
     org_number: '',
@@ -34,12 +34,12 @@ export default function AdminDashboard() {
     email: '',
     phone: '',
     address: '',
-    contract_type_id: '', // NYTT: För att hålla vald avtalstyp
+    contract_type_id: '',
   })
 
   useEffect(() => {
     loadCustomers()
-    loadContractTypes() // NYTT: Ladda avtalstyper när komponenten monteras
+    loadContractTypes()
   }, [])
 
   const loadCustomers = async () => {
@@ -57,13 +57,12 @@ export default function AdminDashboard() {
     }
   }
 
-  // NYTT: Funktion för att ladda alla tillgängliga avtalstyper
   const loadContractTypes = async () => {
     try {
       const { data, error } = await supabase
         .from('contract_types')
         .select('id, name')
-        .eq('is_active', true) // Hämta bara aktiva avtalstyper
+        .eq('is_active', true)
 
       if (error) throw error
       setContractTypes(data || [])
@@ -75,44 +74,42 @@ export default function AdminDashboard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // NYTT: Validering för att säkerställa att en avtalstyp är vald
     if (!formData.contract_type_id) {
-        alert('Du måste välja en avtalstyp.');
-        return;
+        alert('Du måste välja en avtalstyp.')
+        return
     }
 
     setLoading(true)
 
     try {
-      // ÄNDRAT: Inkludera de nya fälten i insert-anropet
-      const { error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          company_name: formData.company_name,
-          org_number: formData.org_number,
-          contact_person: formData.contact_person,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          contract_type_id: formData.contract_type_id,
-        })
-
-      if (customerError) throw customerError
-
-      alert(`✅ Kund "${formData.company_name}" skapad!`)
-
-      // ÄNDRAT: Rensa alla fält i formuläret
-      setFormData({
-        company_name: '',
-        org_number: '',
-        contact_person: '',
-        email: '',
-        phone: '',
-        address: '',
-        contract_type_id: '',
+      // Använd den nya API-endpointen som skapar kund, auth-användare och ClickUp-lista
+      const response = await fetch('/api/admin/create-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       })
-      setShowForm(false)
-      await loadCustomers()
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(`✅ Kund "${formData.company_name}" skapad!\n\n` +
+              `📧 Inbjudan skickad till ${formData.email}\n` +
+              `📋 ClickUp-lista skapad!`)
+
+        setFormData({
+          company_name: '',
+          org_number: '',
+          contact_person: '',
+          email: '',
+          phone: '',
+          address: '',
+          contract_type_id: '',
+        })
+        setShowForm(false)
+        await loadCustomers()
+      } else {
+        throw new Error(data.error || 'Okänt fel')
+      }
 
     } catch (error) {
       console.error('Error creating customer:', error)
@@ -122,9 +119,62 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleSyncClickUp = async (customerId: string) => {
+    setSyncingCustomer(customerId)
+    
+    try {
+      const response = await fetch('/api/sync/clickup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(`✅ Synkronisering klar!\n\n` +
+              `📥 ${data.created} nya ärenden\n` +
+              `🔄 ${data.updated} uppdaterade ärenden`)
+      } else {
+        throw new Error(data.error || 'Synkronisering misslyckades')
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      alert('Fel vid synkronisering: ' + (error as Error).message)
+    } finally {
+      setSyncingCustomer(null)
+    }
+  }
+
+  const handleFixMissingClickUp = async (customer: Customer) => {
+    if (!confirm(`Vill du skapa en ClickUp-lista för ${customer.company_name}?`)) return
+
+    try {
+      const response = await fetch('/api/admin/create-customer-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: customer.id,
+          customerName: customer.company_name,
+          contractTypeId: customer.contract_type_id
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(`✅ ClickUp-lista skapad!`)
+        await loadCustomers()
+      } else {
+        throw new Error(data.error || 'Kunde inte skapa lista')
+      }
+    } catch (error) {
+      console.error('Error creating ClickUp list:', error)
+      alert('Fel vid skapande av ClickUp-lista: ' + (error as Error).message)
+    }
+  }
+
   const handleDelete = async (customerId: string, companyName: string) => {
-    // VIKTIGT: Här bör du även hantera logik för att radera relaterade 'cases' och 'visits' om det behövs
-    // (Cascading delete i databasen är att föredra för detta)
     if (!confirm(`Är du säker på att du vill ta bort ${companyName}? Detta raderar även alla dess ärenden och besök.`)) return
 
     try {
@@ -145,7 +195,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
@@ -161,7 +211,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Add Customer Form (ÄNDRAT med nya fält) */}
+        {/* Add Customer Form */}
         {showForm && (
           <form onSubmit={handleSubmit} className="bg-slate-800/50 backdrop-blur-xl rounded-xl border border-slate-700/50 p-6 mb-8">
             <h2 className="text-xl font-semibold text-white mb-4">Skapa ny kund</h2>
@@ -212,7 +262,6 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                {/* NYTT: Dropdown för att välja avtalstyp */}
                 <label className="block text-sm font-medium text-slate-300 mb-2">Avtalstyp *</label>
                 <select
                   required
@@ -236,6 +285,18 @@ export default function AdminDashboard() {
                 ></textarea>
               </div>
 
+              <div className="md:col-span-2">
+                <div className="bg-slate-700/30 rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-medium text-slate-300 mb-2">Vad händer när du skapar en kund:</h3>
+                  <ul className="text-sm text-slate-400 space-y-1">
+                    <li>✅ Kunden läggs till i databasen</li>
+                    <li>📧 En inbjudan skickas till angiven e-post</li>
+                    <li>📋 En ClickUp-lista skapas i rätt folder baserat på avtalstyp</li>
+                    <li>🔐 Kunden kan logga in när de accepterat inbjudan</li>
+                  </ul>
+                </div>
+              </div>
+
               <div className="md:col-span-2 flex gap-4">
                 <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-6 py-3 rounded-lg font-medium transition-colors">
                   {loading ? 'Skapar...' : 'Skapa Kund'}
@@ -248,13 +309,16 @@ export default function AdminDashboard() {
           </form>
         )}
 
-        {/* Customers List (ÄNDRAT för att visa nya kolumner) */}
+        {/* Customers List */}
         <div className="bg-slate-800/50 backdrop-blur-xl rounded-xl border border-slate-700/50 overflow-hidden">
           <div className="p-6 border-b border-slate-700/50">
             <h2 className="text-xl font-semibold text-white">Befintliga kunder ({customers.length})</h2>
           </div>
           {customers.length === 0 ? (
-             <div className="p-12 text-center text-slate-400"> {/* ... (samma som förut) ... */} </div>
+            <div className="p-12 text-center text-slate-400">
+              <p>Inga kunder registrerade än.</p>
+              <p className="mt-2">Klicka på "+ Ny Kund" för att komma igång.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -263,6 +327,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">Bolag</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">Kontaktperson</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">E-post</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">ClickUp</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">Skapad</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">Åtgärder</th>
                   </tr>
@@ -276,6 +341,29 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 text-slate-300">{customer.contact_person || '-'}</td>
                       <td className="px-6 py-4 text-slate-300">{customer.email}</td>
+                      <td className="px-6 py-4">
+                        {customer.clickup_list_id ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
+                              ✓ Kopplad
+                            </span>
+                            <button
+                              onClick={() => handleSyncClickUp(customer.id)}
+                              disabled={syncingCustomer === customer.id}
+                              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                            >
+                              {syncingCustomer === customer.id ? 'Synkar...' : 'Synka'}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleFixMissingClickUp(customer)}
+                            className="text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"
+                          >
+                            Skapa lista
+                          </button>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-slate-300">
                         {new Date(customer.created_at).toLocaleDateString('sv-SE')}
                       </td>
