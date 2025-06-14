@@ -3,9 +3,26 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdminService, supabaseAdmin } from '../../src/lib/supabase-admin';
 
+// Hjälpfunktion för ClickUp, direkt i denna fil.
+async function clickupFetch(endpoint: string, options: RequestInit) {
+  const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN;
+  if (!CLICKUP_API_TOKEN) throw new Error("Miljövariabeln CLICKUP_API_TOKEN är inte satt.");
+
+  const response = await fetch(`https://api.clickup.com/api/v2${endpoint}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'Authorization': CLICKUP_API_TOKEN, ...options.headers },
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`ClickUp API Error (${response.status}):`, errorBody);
+    throw new Error(`ClickUp API error: ${response.status}`);
+  }
+  return response.json();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
@@ -29,75 +46,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ success: false, error: `Databasfel: ${customerError.message}` });
     }
     console.log(`[Success] Customer created in DB: ${customer.id}`);
-
-    // --- Steg 2: Skapa Auth-användare och hantera om den redan finns ---
+    
+    // --- Steg 2: Skapa ClickUp-lista (Flyttad hit för att undvika timeout) ---
     try {
-      // Försök skapa användaren.
-      const { error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        email_confirm: true,
-        user_metadata: {
-          full_name: contact_person || company_name,
-          company_name: company_name,
-          customer_id: customer.id
-        }
+      const { data: contractType } = await supabaseAdmin
+        .from('contract_types').select('clickup_folder_id').eq('id', contract_type_id).single();
+      
+      if (!contractType || !contractType.clickup_folder_id) {
+        throw new Error(`Ingen ClickUp-mapp är konfigurerad för avtalstyp ${contract_type_id}`);
+      }
+      
+      const createdList = await clickupFetch(`/folder/${contractType.clickup_folder_id}/list`, {
+        method: 'POST',
+        body: JSON.stringify({ name: customer.company_name }),
       });
 
-      // Kontrollera felet.
-      if (authError) {
-        // Om felet är specifikt "User already exists", är det OK. Vi loggar det och fortsätter.
-        if (authError.message.includes('User already exists')) {
-          console.log(`[Info] Auth user for ${email} already exists. Continuing.`);
-        } else {
-          // Om det är något annat fel, kasta det så att processen avbryts.
-          throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`);
-        }
+      console.log(`[Success] ClickUp list created: ${createdList.id}`);
+      await supabaseAdminService.updateCustomerWithClickUpInfo(customer.id, {
+        listId: createdList.id,
+        listName: createdList.name
+      });
+    } catch (clickupError: any) {
+      console.warn('[Warning] ClickUp integration error:', clickupError.message);
+      // Fortsätt ändå, admin kan skapa listan manuellt.
+    }
+
+    // --- Steg 3: Skapa Auth-användare och skicka lösenordslänk ---
+    try {
+      const { error: authError } = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name: contact_person || company_name, company_name, customer_id: customer.id } });
+
+      if (authError && authError.message.includes('User already exists')) {
+        console.log(`[Info] Auth user for ${email} already exists. Continuing.`);
+      } else if (authError) {
+        throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`);
       } else {
         console.log(`[Success] Auth user created for ${email}`);
       }
 
-      // Oavsett vad, skicka en "sätt lösenord"-länk.
-      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email: email });
+      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email });
 
       if (resetError) {
         console.warn(`[Warning] Password set email failed for ${email}:`, resetError.message);
       } else {
-        console.log(`[Success] "Set password" link sent to: ${email}`);
+        // Logga i user_invitations-tabellen
+        await supabaseAdmin.from('user_invitations').insert({ email, customer_id: customer.id });
+        console.log(`[Success] "Set password" link sent and logged for: ${email}`);
       }
     } catch (authProcessError: any) {
       console.error('[Fatal] Auth process error:', authProcessError.message);
       return res.status(500).json({ success: false, error: authProcessError.message });
     }
     
-    // --- Steg 3: Skapa ClickUp-lista ---
-    try {
-      const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
-      const response = await fetch(`${vercelUrl}/api/admin/create-customer-list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: customer.id,
-          customerName: customer.company_name,
-          contractTypeId: customer.contract_type_id
-        })
-      });
-
-      const listResult = await response.json();
-      
-      if (listResult.success) {
-        console.log(`[Success] ClickUp list created: ${listResult.listId}`);
-        await supabaseAdminService.updateCustomerWithClickUpInfo(customer.id, {
-          listId: listResult.listId,
-          listName: listResult.listName
-        });
-      } else {
-        console.warn('[Warning] ClickUp integration failed:', listResult.error);
-      }
-    } catch (clickupError: any) {
-      console.warn('[Warning] ClickUp integration error:', clickupError.message);
-    }
-    
-    // --- Steg 4: Allt klart! ---
     return res.status(200).json({ success: true, message: 'Kund skapad framgångsrikt!' });
 
   } catch (error: any) {
