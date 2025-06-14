@@ -8,13 +8,13 @@ const clickupFetch = async (endpoint: string, token: string) => {
       'Content-Type': 'application/json'
     }
   });
-
+  
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`ClickUp API Error for endpoint ${endpoint}:`, errorText);
     throw new Error(`ClickUp API error: ${response.status} - ${response.statusText}`);
   }
-
+  
   return response.json();
 };
 
@@ -22,15 +22,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
+  
   const token = process.env.CLICKUP_API_TOKEN;
   if (!token) {
     return res.status(500).json({ success: false, error: 'ClickUp API token not configured on the server.' });
   }
-
+  
   try {
     console.log('Initiating ClickUp data fetch...');
-
+    
     // Steg 1: Hämta Team ID
     const teamData = await clickupFetch('/team', token);
     const team = teamData.teams?.[0];
@@ -38,43 +38,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ success: false, error: 'No ClickUp team found.' });
     }
     console.log(`Found team: "${team.name}" (ID: ${team.id})`);
-
+    
     // Steg 2: Hämta alla Spaces i teamet
     const spacesData = await clickupFetch(`/team/${team.id}/space`, token);
     const spaces = spacesData.spaces || [];
-    console.log(`Found ${spaces.length} spaces. Fetching lists and folders...`);
-
-    // Använder Promise.all för att göra anropen snabbare och parallellt
-    const listPromises = spaces.flatMap((space: any) => [ // FIX: Lade till (space: any)
-      clickupFetch(`/space/${space.id}/list`, token), // Hämta listor direkt i space
-      clickupFetch(`/space/${space.id}/folder`, token).then(folderData => {
-        const folderPromises = (folderData.folders || []).map((folder: any) =>  // FIX: Lade till (folder: any)
-          clickupFetch(`/folder/${folder.id}/list`, token)
-        );
-        return Promise.all(folderPromises);
-      })
-    ]);
-
-    const results = await Promise.all(listPromises);
+    console.log(`Found ${spaces.length} spaces.`);
     
-    // Platta ut den nästlade arrayen av listor
-    const allLists = results.flat(2).flatMap((listData: any) => listData.lists || []); // Lade till (listData: any) för säkerhets skull
-
-    console.log(`Total lists found across all spaces: ${allLists.length}`);
-
-    return res.status(200).json({
+    // Steg 3: Hämta folders och listor för varje space
+    const spaceDetails = await Promise.all(
+      spaces.map(async (space: any) => {
+        // Hämta folders
+        const foldersData = await clickupFetch(`/space/${space.id}/folder`, token);
+        const folders = foldersData.folders || [];
+        
+        // Hämta listor direkt under space (folderless lists)
+        const folderlessListsData = await clickupFetch(`/space/${space.id}/list`, token);
+        const folderlessLists = folderlessListsData.lists || [];
+        
+        // Hämta listor för varje folder
+        const foldersWithLists = await Promise.all(
+          folders.map(async (folder: any) => {
+            const folderListsData = await clickupFetch(`/folder/${folder.id}/list`, token);
+            return {
+              id: folder.id,
+              name: folder.name,
+              lists: folderListsData.lists || []
+            };
+          })
+        );
+        
+        return {
+          id: space.id,
+          name: space.name,
+          folders: foldersWithLists,
+          folderlessLists: folderlessLists
+        };
+      })
+    );
+    
+    // Formatera resultatet för enkel läsning
+    const formattedResult = {
       success: true,
-      message: `Successfully fetched ${allLists.length} lists from ClickUp.`,
-      team: { id: team.id, name: team.name },
-      lists: allLists.map((list: any) => ({
-        id: list.id,
-        name: list.name,
-        folder: list.folder,
-        space: list.space,
+      message: 'Successfully fetched ClickUp workspace structure',
+      team: {
+        id: team.id,
+        name: team.name
+      },
+      spaces: spaceDetails.map(space => ({
+        id: space.id,
+        name: space.name,
+        folders: space.folders.map((folder: any) => ({
+          id: folder.id,
+          name: folder.name,
+          listCount: folder.lists.length,
+          lists: folder.lists.map((list: any) => ({
+            id: list.id,
+            name: list.name
+          }))
+        })),
+        folderlessLists: space.folderlessLists.map((list: any) => ({
+          id: list.id,
+          name: list.name
+        }))
       })),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
+    };
+    
+    // Lägg till en sammanfattning
+    const totalFolders = spaceDetails.reduce((sum, space) => sum + space.folders.length, 0);
+    const totalLists = spaceDetails.reduce((sum, space) => {
+      const folderLists = space.folders.reduce((folderSum: number, folder: any) => folderSum + folder.lists.length, 0);
+      return sum + folderLists + space.folderlessLists.length;
+    }, 0);
+    
+    return res.status(200).json({
+      ...formattedResult,
+      summary: {
+        totalSpaces: spaces.length,
+        totalFolders: totalFolders,
+        totalLists: totalLists
+      }
     });
-
+    
   } catch (error) {
     console.error('Full error in /api/test/clickup:', error);
     
@@ -82,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-
+    
     return res.status(500).json({
       success: false,
       error: errorMessage,
