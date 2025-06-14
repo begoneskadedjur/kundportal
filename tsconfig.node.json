@@ -7,16 +7,18 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
   },
   "include": [
-    // Inkludera alla API-filer med den nya filändelsen
-    "api/**/*.mts", 
+    // Inkludera alla API-filer med rätt filändelse
+    "api/**/*.ts", 
     
     // Inkludera de lib-filer som servern använder
     "src/lib/clickup.ts",
     "src/lib/supabase-admin.ts",
-
+    
     // Inkludera Vite-konfigurationen
     "vite.config.ts"
   ]
