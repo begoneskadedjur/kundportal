@@ -206,21 +206,56 @@ export default function AdminDashboard() {
   }
 
   const handleDelete = async (customerId: string, companyName: string) => {
-    if (!confirm(`Är du säker på att du vill ta bort ${companyName}? Detta raderar även alla dess ärenden och besök.`)) return
+    if (!confirm(`Är du säker på att du vill ta bort ${companyName}? Detta raderar även alla dess ärenden, besök och användardata.`)) return
 
     try {
-      const { error } = await supabase
+      // Först måste vi hitta och ta bort auth-användaren
+      // Hämta kundens email för att hitta auth-användaren
+      const { data: customer, error: fetchError } = await supabase
         .from('customers')
-        .delete()
+        .select('email')
         .eq('id', customerId)
+        .single()
 
-      if (error) throw error
+      if (fetchError) throw fetchError
 
-      alert('Kund borttagen!')
-      await loadCustomers()
+      // Om vi har en email, försök hitta och ta bort auth-användaren
+      if (customer?.email) {
+        // Vi behöver anropa en API-endpoint för att ta bort auth-användaren
+        // eftersom detta kräver admin-rättigheter
+        const response = await fetch('/api/admin/delete-customer', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            customerId,
+            email: customer.email 
+          })
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Kunde inte ta bort kunden')
+        }
+
+        alert('✅ Kund och all relaterad data har tagits bort!')
+        await loadCustomers()
+      } else {
+        // Om ingen email finns, ta bara bort från customers-tabellen
+        const { error } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', customerId)
+
+        if (error) throw error
+
+        alert('✅ Kund borttagen!')
+        await loadCustomers()
+      }
+
     } catch (error) {
       console.error('Error deleting customer:', error)
-      alert('Fel vid borttagning av kund')
+      alert('Fel vid borttagning av kund: ' + (error as Error).message)
     }
   }
 
