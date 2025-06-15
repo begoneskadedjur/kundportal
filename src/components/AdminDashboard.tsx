@@ -91,11 +91,41 @@ export default function AdminDashboard() {
 
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data.error || 'Något gick fel')
+      }
+      
+      // Hantera olika svar från API:et
       if (data.success) {
-        alert(`✅ Kund "${formData.company_name}" skapad!\n\n` +
-              `📧 Inbjudan skickad till ${formData.email}\n` +
-              `📋 ClickUp-lista skapad!`)
-
+        // Om e-post skickades framgångsrikt
+        if (data.emailSent) {
+          alert(`✅ Kund "${data.customer.company_name}" skapad!\n\nVälkomstmail har skickats till ${formData.email}`)
+        } 
+        // Om e-post misslyckades men vi har en recovery-länk
+        else if (data.recoveryLink) {
+          const copyToClipboard = async (text: string) => {
+            try {
+              await navigator.clipboard.writeText(text);
+              alert('Länken har kopierats till urklipp!');
+            } catch (err) {
+              console.error('Kunde inte kopiera till urklipp:', err);
+            }
+          };
+          
+          // Visa länken och erbjud att kopiera den
+          if (confirm(`✅ Kund "${data.customer.company_name}" skapad!\n\n⚠️ E-postutskick misslyckades. Vill du kopiera lösenordslänken?\n\nKlicka OK för att kopiera länken till urklipp.`)) {
+            await copyToClipboard(data.recoveryLink);
+            
+            // Visa länken också i konsolen för säkerhet
+            console.log('Recovery link för', formData.email, ':', data.recoveryLink);
+          }
+        }
+        // Om vi har en varning
+        else if (data.warning) {
+          alert(`⚠️ ${data.warning}\n\nDu kan skicka inbjudan manuellt från Supabase Dashboard.`);
+        }
+        
+        // Återställ formuläret
         setFormData({
           company_name: '',
           org_number: '',
@@ -107,8 +137,9 @@ export default function AdminDashboard() {
         })
         setShowForm(false)
         await loadCustomers()
+        
       } else {
-        throw new Error(data.error || 'Okänt fel')
+        throw new Error(data.error || 'Kunde inte skapa kund')
       }
 
     } catch (error) {

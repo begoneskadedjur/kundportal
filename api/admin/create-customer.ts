@@ -72,8 +72,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Steg 3: Skapa Auth-användare och skicka lösenordslänk ---
+    let recoveryLink: string | null = null;
+    let emailSent = false;
+
     try {
-      const { error: authError } = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name: contact_person || company_name, company_name, customer_id: customer.id } });
+      // Skapa användaren
+      const { error: authError } = await supabaseAdmin.auth.admin.createUser({ 
+        email, 
+        email_confirm: true, 
+        user_metadata: { 
+          full_name: contact_person || company_name, 
+          company_name, 
+          customer_id: customer.id 
+        } 
+      });
 
       if (authError && authError.message.includes('User already exists')) {
         console.log(`[Info] Auth user for ${email} already exists. Continuing.`);
@@ -83,24 +95,89 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`[Success] Auth user created for ${email}`);
       }
 
-      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email });
+      // Bestäm redirect URL
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'http://localhost:3000';
+      const redirectTo = `${siteUrl}/reset-password`;
+
+      console.log(`[Info] Using redirect URL: ${redirectTo}`);
+
+      // Försök först med resetPasswordForEmail (detta skickar e-post direkt)
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo
+      });
 
       if (resetError) {
-        console.warn(`[Warning] Password set email failed for ${email}:`, resetError.message);
+        console.warn(`[Warning] resetPasswordForEmail failed: ${resetError.message}`);
+        console.log('[Info] Falling back to generateLink method...');
+        
+        // Fallback: Använd generateLink som backup
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({ 
+          type: 'recovery', 
+          email,
+          options: {
+            redirectTo: redirectTo
+          }
+        });
+
+        if (linkError) {
+          console.error(`[Error] generateLink also failed: ${linkError.message}`);
+          throw new Error(`Kunde inte skapa lösenordslänk: ${linkError.message}`);
+        }
+
+        // Spara länken för manuell distribution om behövs
+        recoveryLink = linkData?.properties?.action_link || null;
+        
+        if (recoveryLink) {
+          console.log(`[Success] Recovery link generated manually`);
+          console.log(`[Debug] Recovery link: ${recoveryLink.substring(0, 50)}...`);
+        }
       } else {
-        // Logga i user_invitations-tabellen
-        await supabaseAdmin.from('user_invitations').insert({ email, customer_id: customer.id });
-        console.log(`[Success] "Set password" link sent and logged for: ${email}`);
+        emailSent = true;
+        console.log(`[Success] Password reset email sent via resetPasswordForEmail to: ${email}`);
       }
+
+      // Logga i user_invitations-tabellen
+      await supabaseAdmin.from('user_invitations').insert({ 
+        email, 
+        customer_id: customer.id,
+        invited_at: new Date().toISOString()
+      });
+      console.log(`[Success] Invitation logged in database`);
+
     } catch (authProcessError: any) {
-      console.error('[Fatal] Auth process error:', authProcessError.message);
-      return res.status(500).json({ success: false, error: authProcessError.message });
+      console.error('[Error] Auth process error:', authProcessError.message);
+      
+      // Om vi redan skapat kunden, returnera framgång men med varning
+      return res.status(200).json({ 
+        success: true, 
+        warning: `Kund skapad men e-postinbjudan misslyckades: ${authProcessError.message}`,
+        customer,
+        requiresManualInvite: true
+      });
     }
     
-    return res.status(200).json({ success: true, message: 'Kund skapad framgångsrikt!' });
+    // Returnera framgångsmeddelande med extra info om behövs
+    return res.status(200).json({ 
+      success: true, 
+      message: emailSent 
+        ? 'Kund skapad och välkomstmail skickat!' 
+        : 'Kund skapad! E-post kan vara försenat.',
+      customer,
+      emailSent,
+      recoveryLink, // Inkludera länken om e-post misslyckades
+      debugInfo: {
+        emailMethod: emailSent ? 'resetPasswordForEmail' : 'generateLink',
+        redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || 'localhost'}/reset-password`
+      }
+    });
 
   } catch (error: any) {
     console.error('[Fatal] Unhandled Create Customer Error:', error);
-    return res.status(500).json({ success: false, error: error.message || 'Ett okänt serverfel inträffade.' });
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Ett okänt serverfel inträffade.' 
+    });
   }
 }
