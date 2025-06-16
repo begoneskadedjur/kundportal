@@ -47,49 +47,32 @@ export default async function handler(
       }
     })
 
-    // Try to invite user
-    try {
-      const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          company_name: companyName,
-          invited_by: 'admin'
-        },
-        redirectTo: redirectUrl || `${req.headers.origin || 'http://localhost:3000'}/activate-account`
-      })
+    // Send invitation using custom SMTP
+    const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: {
+        company_name: companyName,
+        invited_by: 'admin',
+        invitation_date: new Date().toISOString()
+      },
+      redirectTo: redirectUrl || `${req.headers.origin || 'http://localhost:3000'}/activate-account`
+    })
 
-      if (inviteError) {
-        // If invite fails, try password reset as fallback
-        console.warn('Invite failed, trying password reset:', inviteError.message)
-        
-        const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl || `${req.headers.origin || 'http://localhost:3000'}/activate-account`
-        })
-
-        if (resetError) {
-          throw new Error(`Both invite and reset failed: ${resetError.message}`)
-        }
-
-        return res.status(200).json({ 
-          success: true, 
-          method: 'reset',
-          message: 'Activation link sent via password reset' 
-        })
-      }
-
-      return res.status(200).json({ 
-        success: true, 
-        method: 'invite',
-        message: 'Invitation sent successfully',
-        data 
-      })
-
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError)
+    if (inviteError) {
+      console.error('Invitation failed:', inviteError)
       return res.status(500).json({ 
         error: 'Failed to send invitation email',
-        details: (emailError as Error).message 
+        details: inviteError.message 
       })
     }
+
+    console.log(`✅ Invitation sent successfully to ${email} for ${companyName}`)
+
+    return res.status(200).json({ 
+      success: true, 
+      method: 'invite',
+      message: 'Invitation sent successfully via custom SMTP',
+      data 
+    })
 
   } catch (error) {
     console.error('API Error:', error)

@@ -125,14 +125,15 @@ export default function AdminDashboard() {
 
       if (customerError) throw customerError
 
-      // Steg 2: Skicka e-postinbjudan
+      // Steg 2: Skicka e-postinbjudan via custom SMTP
       try {
         const emailResult = await sendCustomerInvitation(formData.email, formData.company_name)
         
-        alert(`✅ Kund "${formData.company_name}" skapad!\n📧 ${emailResult.message}`)
+        alert(`✅ Kund "${formData.company_name}" skapad!\n📧 Inbjudan skickad till ${formData.email}`)
       } catch (emailError) {
         // Om e-posten misslyckas, visa ändå att kunden skapades
-        alert(`✅ Kund "${formData.company_name}" skapad!\n⚠️ E-postinbjudan misslyckades: ${(emailError as Error).message}\n\nDu kan skicka en manuell inbjudan senare.`)
+        console.error('Email error:', emailError)
+        alert(`✅ Kund "${formData.company_name}" skapad!\n⚠️ E-postinbjudan misslyckades: ${(emailError as Error).message}\n\nKontrollera SMTP-inställningarna i Supabase.`)
       }
 
       // Steg 3: Rensa formuläret och ladda om listan
@@ -293,8 +294,9 @@ export default function AdminDashboard() {
                 <p className="text-blue-400 text-sm">
                   <strong>Vad händer när du skapar kunden:</strong><br/>
                   1. Kunden läggs till i databasen<br/>
-                  2. En inbjudan skickas automatiskt till kundens e-post<br/>
-                  3. Kunden kan sedan aktivera sitt konto och sätta sitt lösenord
+                  2. En inbjudan skickas från kundportal@begone.se<br/>
+                  3. Kunden får ett e-postmeddelande med aktiveringsknapp<br/>
+                  4. Kunden kan sedan aktivera sitt konto och sätta sitt lösenord
                 </p>
               </div>
 
