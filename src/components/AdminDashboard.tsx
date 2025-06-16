@@ -69,18 +69,17 @@ export default function AdminDashboard() {
     }
   }
 
-  // NYTT: Funktion för att skicka inbjudan via e-post (använder API)
+  // UPPDATERAT: Funktion för att skicka inbjudan via direct SMTP
   const sendCustomerInvitation = async (email: string, companyName: string) => {
     try {
-      const response = await fetch('/api/invite-customer', {
+      const response = await fetch('/api/send-invitation-direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email,
-          companyName,
-          redirectUrl: `${window.location.origin}/activate-account`
+          companyName
         })
       })
 
@@ -125,15 +124,15 @@ export default function AdminDashboard() {
 
       if (customerError) throw customerError
 
-      // Steg 2: Skicka e-postinbjudan via custom SMTP
+      // Steg 2: Skicka e-postinbjudan via direct SMTP
       try {
         const emailResult = await sendCustomerInvitation(formData.email, formData.company_name)
         
-        alert(`✅ Kund "${formData.company_name}" skapad!\n📧 Inbjudan skickad till ${formData.email}`)
+        alert(`✅ Kund "${formData.company_name}" skapad!\n📧 Inbjudan skickad till ${formData.email} via BeGone SMTP`)
       } catch (emailError) {
         // Om e-posten misslyckas, visa ändå att kunden skapades
         console.error('Email error:', emailError)
-        alert(`✅ Kund "${formData.company_name}" skapad!\n⚠️ E-postinbjudan misslyckades: ${(emailError as Error).message}\n\nKontrollera SMTP-inställningarna i Supabase.`)
+        alert(`✅ Kund "${formData.company_name}" skapad!\n⚠️ E-postinbjudan misslyckades: ${(emailError as Error).message}\n\nKontrollera SMTP-inställningarna eller försök skicka om inbjudan.`)
       }
 
       // Steg 3: Rensa formuläret och ladda om listan
@@ -294,9 +293,10 @@ export default function AdminDashboard() {
                 <p className="text-blue-400 text-sm">
                   <strong>Vad händer när du skapar kunden:</strong><br/>
                   1. Kunden läggs till i databasen<br/>
-                  2. En inbjudan skickas från kundportal@begone.se<br/>
+                  2. En personlig inbjudan skickas direkt från kundportal@begone.se<br/>
                   3. Kunden får ett e-postmeddelande med aktiveringsknapp<br/>
-                  4. Kunden kan sedan aktivera sitt konto och sätta sitt lösenord
+                  4. Kunden klickar på knappen och sätter sitt lösenord<br/>
+                  <strong>🎯 Inga begränsningar - använder BeGone's egen SMTP!</strong>
                 </p>
               </div>
 
