@@ -71,30 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Fortsätt ändå, admin kan skapa listan manuellt.
     }
 
-    // --- Steg 3: Skapa Auth-användare och skicka lösenordslänk ---
-    let recoveryLink: string | null = null;
+    // --- Steg 3: Bjud in användare med inviteUserByEmail ---
+    let inviteLink: string | null = null;
     let emailSent = false;
 
     try {
-      // Skapa användaren
-      const { error: authError } = await supabaseAdmin.auth.admin.createUser({ 
-        email, 
-        email_confirm: true, 
-        user_metadata: { 
-          full_name: contact_person || company_name, 
-          company_name, 
-          customer_id: customer.id 
-        } 
-      });
-
-      if (authError && authError.message.includes('User already exists')) {
-        console.log(`[Info] Auth user for ${email} already exists. Continuing.`);
-      } else if (authError) {
-        throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`);
-      } else {
-        console.log(`[Success] Auth user created for ${email}`);
-      }
-
       // Bestäm redirect URL
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
         ? `https://${process.env.VERCEL_URL}` 
@@ -103,39 +84,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`[Info] Using redirect URL: ${redirectTo}`);
 
-      // Försök först med resetPasswordForEmail (detta skickar e-post direkt)
-      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectTo
-      });
-
-      if (resetError) {
-        console.warn(`[Warning] resetPasswordForEmail failed: ${resetError.message}`);
-        console.log('[Info] Falling back to generateLink method...');
-        
-        // Fallback: Använd generateLink som backup
-        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({ 
-          type: 'recovery', 
-          email,
-          options: {
-            redirectTo: redirectTo
+      // Använd inviteUserByEmail som skapar användare OCH skickar inbjudan
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        email,
+        {
+          redirectTo: redirectTo,
+          data: {
+            full_name: contact_person || company_name,
+            company_name: company_name,
+            customer_id: customer.id,
+            needs_password_setup: true
           }
-        });
-
-        if (linkError) {
-          console.error(`[Error] generateLink also failed: ${linkError.message}`);
-          throw new Error(`Kunde inte skapa lösenordslänk: ${linkError.message}`);
         }
+      );
 
-        // Spara länken för manuell distribution om behövs
-        recoveryLink = linkData?.properties?.action_link || null;
+      if (inviteError) {
+        console.error(`[Error] inviteUserByEmail failed: ${inviteError.message}`);
         
-        if (recoveryLink) {
-          console.log(`[Success] Recovery link generated manually`);
-          console.log(`[Debug] Recovery link: ${recoveryLink.substring(0, 50)}...`);
+        // Om användaren redan finns, försök med generateLink istället
+        if (inviteError.message.includes('already registered')) {
+          console.log('[Info] User already exists, generating invite link instead...');
+          
+          const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'invite',
+            email: email,
+            options: {
+              redirectTo: redirectTo,
+              data: {
+                full_name: contact_person || company_name,
+                company_name: company_name,
+                customer_id: customer.id,
+                needs_password_setup: true
+              }
+            }
+          });
+
+          if (linkError) {
+            throw new Error(`Kunde inte skapa inbjudningslänk: ${linkError.message}`);
+          }
+
+          inviteLink = linkData?.properties?.action_link || null;
+          console.log(`[Success] Invite link generated for existing user`);
+        } else {
+          throw new Error(`Kunde inte skicka inbjudan: ${inviteError.message}`);
         }
       } else {
         emailSent = true;
-        console.log(`[Success] Password reset email sent via resetPasswordForEmail to: ${email}`);
+        console.log(`[Success] Invite email sent to: ${email}`);
+        
+        // Om inviteData innehåller en länk, spara den som backup
+        if (inviteData?.user?.confirmation_token) {
+          inviteLink = `${siteUrl}/activate-account#access_token=${inviteData.user.confirmation_token}&type=invite`;
+        }
       }
 
       // Logga i user_invitations-tabellen
@@ -147,12 +147,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Success] Invitation logged in database`);
 
     } catch (authProcessError: any) {
-      console.error('[Error] Auth process error:', authProcessError.message);
+      console.error('[Error] Invite process error:', authProcessError.message);
       
       // Om vi redan skapat kunden, returnera framgång men med varning
       return res.status(200).json({ 
         success: true, 
-        warning: `Kund skapad men e-postinbjudan misslyckades: ${authProcessError.message}`,
+        warning: `Kund skapad men inbjudan misslyckades: ${authProcessError.message}`,
         customer,
         requiresManualInvite: true
       });
@@ -162,14 +162,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ 
       success: true, 
       message: emailSent 
-        ? 'Kund skapad och välkomstmail skickat!' 
-        : 'Kund skapad! E-post kan vara försenat.',
+        ? 'Kund skapad och inbjudan skickad!' 
+        : 'Kund skapad! Inbjudan kan vara försenad.',
       customer,
       emailSent,
-      recoveryLink, // Inkludera länken om e-post misslyckades
+      recoveryLink: inviteLink, // Använder samma fältnamn för bakåtkompatibilitet
       debugInfo: {
-        emailMethod: emailSent ? 'resetPasswordForEmail' : 'generateLink',
-        redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || 'localhost'}/reset-password`
+        emailMethod: 'inviteUserByEmail',
+        redirectUrl: redirectTo
       }
     });
 
