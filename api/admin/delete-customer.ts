@@ -20,22 +20,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[Delete Customer] Starting deletion for customer ${customerId}, email: ${email}`);
 
-    // Steg 1: Ta bort alla visits för kundens cases
-    const { error: visitsError } = await supabaseAdmin
-      .from('visits')
-      .delete()
-      .in('case_id', 
-        supabaseAdmin
-          .from('cases')
-          .select('id')
-          .eq('customer_id', customerId)
-      );
+    // Steg 1: Först hämta alla case IDs för kunden
+    const { data: cases, error: fetchCasesError } = await supabaseAdmin
+      .from('cases')
+      .select('id')
+      .eq('customer_id', customerId);
 
-    if (visitsError && visitsError.code !== 'PGRST116') {
-      console.error('Error deleting visits:', visitsError);
+    if (fetchCasesError && fetchCasesError.code !== 'PGRST116') {
+      console.error('Error fetching cases:', fetchCasesError);
     }
 
-    // Steg 2: Ta bort alla cases för kunden
+    // Steg 2: Om det finns cases, ta bort alla visits
+    if (cases && cases.length > 0) {
+      const caseIds = cases.map(c => c.id);
+      
+      const { error: visitsError } = await supabaseAdmin
+        .from('visits')
+        .delete()
+        .in('case_id', caseIds);
+
+      if (visitsError && visitsError.code !== 'PGRST116') {
+        console.error('Error deleting visits:', visitsError);
+      }
+      console.log(`[Success] Deleted visits for ${caseIds.length} cases`);
+    }
+
+    // Steg 3: Ta bort alla cases för kunden
     const { error: casesError } = await supabaseAdmin
       .from('cases')
       .delete()
@@ -43,9 +53,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (casesError && casesError.code !== 'PGRST116') {
       console.error('Error deleting cases:', casesError);
+    } else {
+      console.log(`[Success] Deleted cases for customer ${customerId}`);
     }
 
-    // Steg 3: Ta bort från user_invitations
+    // Steg 4: Ta bort från user_invitations
     const { error: invitationsError } = await supabaseAdmin
       .from('user_invitations')
       .delete()
@@ -53,9 +65,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (invitationsError && invitationsError.code !== 'PGRST116') {
       console.error('Error deleting invitations:', invitationsError);
+    } else {
+      console.log(`[Success] Deleted invitations for customer ${customerId}`);
     }
 
-    // Steg 4: Ta bort profile
+    // Steg 5: Ta bort profile och auth user
     // Först, hitta user_id från profiles baserat på customer_id
     const { data: profile } = await supabaseAdmin
       .from('profiles')
@@ -64,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (profile?.user_id) {
+      // Ta bort profile
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .delete()
@@ -71,9 +86,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error deleting profile:', profileError);
+      } else {
+        console.log(`[Success] Deleted profile for user ${profile.user_id}`);
       }
 
-      // Steg 5: Ta bort auth-användaren
+      // Ta bort auth-användaren
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
         profile.user_id
       );

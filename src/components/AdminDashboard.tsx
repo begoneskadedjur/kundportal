@@ -206,10 +206,20 @@ export default function AdminDashboard() {
   }
 
   const handleDelete = async (customerId: string, companyName: string) => {
-    if (!confirm(`Är du säker på att du vill ta bort ${companyName}? Detta raderar även alla dess ärenden, besök och användardata.`)) return
+    // Första bekräftelsen
+    if (!confirm(`⚠️ VARNING: Du är på väg att ta bort ${companyName}\n\nDetta kommer att PERMANENT radera:\n• Kunduppgifter\n• Alla ärenden\n• Alla besöksrapporter\n• Användarens inloggning\n\nÄr du säker på att du vill fortsätta?`)) {
+      return;
+    }
+
+    // Andra bekräftelsen för extra säkerhet
+    const userInput = prompt(`För att bekräfta, skriv in företagsnamnet exakt:\n\n${companyName}`);
+    
+    if (userInput !== companyName) {
+      alert('Borttagning avbruten. Företagsnamnet matchade inte.');
+      return;
+    }
 
     try {
-      // Först måste vi hitta och ta bort auth-användaren
       // Hämta kundens email för att hitta auth-användaren
       const { data: customer, error: fetchError } = await supabase
         .from('customers')
@@ -238,7 +248,7 @@ export default function AdminDashboard() {
           throw new Error(data.error || 'Kunde inte ta bort kunden')
         }
 
-        alert('✅ Kund och all relaterad data har tagits bort!')
+        alert(`✅ ${companyName} och all relaterad data har tagits bort permanent.`)
         await loadCustomers()
       } else {
         // Om ingen email finns, ta bara bort från customers-tabellen
@@ -255,7 +265,7 @@ export default function AdminDashboard() {
 
     } catch (error) {
       console.error('Error deleting customer:', error)
-      alert('Fel vid borttagning av kund: ' + (error as Error).message)
+      alert(`❌ Fel vid borttagning av kund:\n\n${(error as Error).message}`)
     }
   }
 
