@@ -139,9 +139,9 @@ export default function ActivateAccount() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Lösenord uppdaterat!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Konto aktiverat!</h2>
             <p className="text-gray-600">
-              Ditt lösenord har uppdaterats. Du omdirigeras till inloggningssidan...
+              Ditt konto har aktiverats. Du omdirigeras till inloggningssidan...
             </p>
           </div>
         </div>
