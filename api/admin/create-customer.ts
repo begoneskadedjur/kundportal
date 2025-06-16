@@ -169,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       recoveryLink: inviteLink, // Använder samma fältnamn för bakåtkompatibilitet
       debugInfo: {
         emailMethod: 'inviteUserByEmail',
-        redirectUrl: redirectTo
+        redirectUrl: `${siteUrl}/activate-account`
       }
     });
 
