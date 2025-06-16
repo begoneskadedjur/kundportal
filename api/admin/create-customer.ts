@@ -99,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
         ? `https://${process.env.VERCEL_URL}` 
         : 'http://localhost:3000';
-      const redirectTo = `${siteUrl}/reset-password`;
+      const redirectTo = `${siteUrl}/activate-account`;
 
       console.log(`[Info] Using redirect URL: ${redirectTo}`);
 

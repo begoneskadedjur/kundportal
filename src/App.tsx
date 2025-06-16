@@ -1,8 +1,11 @@
+// Uppdatera din App.tsx med denna kod
+
 import { useState, useEffect } from 'react'
 import { useAuth } from './hooks/useAuth'
 import Login from './components/auth/Login'
 import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
+import ActivateAccount from './components/auth/ActivateAccount'
 
 function App() {
   const { user, loading } = useAuth()
@@ -17,6 +20,10 @@ function App() {
       const path = window.location.pathname
       if (path === '/admin') {
         setCurrentPage('admin')
+      } else if (path === '/activate-account') {
+        setCurrentPage('activate-account')
+      } else if (path === '/login') {
+        setCurrentPage('login')
       } else {
         setCurrentPage('dashboard')
       }
@@ -33,13 +40,12 @@ function App() {
     }
   }, [])
 
-  // Navigate to admin (programmatically)
+  // Navigate functions
   const navigateToAdmin = () => {
     window.history.pushState({}, '', '/admin')
     setCurrentPage('admin')
   }
 
-  // Navigate to dashboard (programmatically)  
   const navigateToDashboard = () => {
     window.history.pushState({}, '', '/')
     setCurrentPage('dashboard')
@@ -56,7 +62,13 @@ function App() {
     )
   }
 
-  if (!user) {
+  // Activate account page should be accessible without login
+  if (currentPage === 'activate-account') {
+    return <ActivateAccount />
+  }
+
+  // Login page
+  if (!user || currentPage === 'login') {
     return <Login />
   }
 
@@ -97,11 +109,6 @@ function App() {
           </button>
         </div>
       )}
-      
-      {/* Debug info */}
-      <div className="fixed bottom-4 left-4 bg-black text-white p-2 text-xs rounded z-50">
-        User: {user?.email} | Admin: {isAdmin ? 'Yes' : 'No'} | Path: {currentPage}
-      </div>
       
       <Dashboard />
     </div>
