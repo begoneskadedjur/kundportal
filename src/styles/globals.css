@@ -1,33 +1,35 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
+@layer theme {
   :root {
-    --begone-green: #22c55e;
-    --begone-dark: #0f172a;
-    --begone-darker: #020617;
-  }
-
-  body {
-    @apply bg-slate-950 text-slate-100 antialiased;
+    --color-begone-green: #22c55e;
+    --color-begone-dark: #0f172a;
+    --color-begone-darker: #020617;
   }
 }
 
-@layer components {
+@layer utilities {
   .glass {
-    @apply backdrop-blur-md bg-white/5 border border-white/10;
+    backdrop-filter: blur(12px);
+    background-color: rgb(255 255 255 / 0.05);
+    border: 1px solid rgb(255 255 255 / 0.1);
   }
 
   .glass-hover {
-    @apply hover:bg-white/10 transition-all duration-200;
+    &:hover {
+      background-color: rgb(255 255 255 / 0.1);
+      transition: all 0.2s;
+    }
   }
 
   .begone-gradient {
-    @apply bg-gradient-to-r from-green-500 to-emerald-500;
+    background-image: linear-gradient(to right, #22c55e, #10b981);
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(to right, #4ade80, #10b981);
   }
 }

@@ -1,3 +1,4 @@
+// src/App.tsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -22,8 +23,8 @@ import ProtectedRoute from './components/shared/ProtectedRoute'
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <div className="min-h-screen bg-slate-950">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -66,8 +67,8 @@ function App() {
           </Routes>
           <Toaster position="top-right" />
         </div>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   )
 }
 

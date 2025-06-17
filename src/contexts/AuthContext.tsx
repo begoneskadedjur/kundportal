@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
