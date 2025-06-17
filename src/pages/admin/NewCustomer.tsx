@@ -50,11 +50,9 @@ export default function NewCustomer() {
     }
   }
 
-  // --- UPPDATERAD FUNKTION MED AUTHORIZATION-HEADER ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    console.log('--- handleSubmit startad ---');
 
     try {
       // Validera formulär
@@ -68,91 +66,46 @@ export default function NewCustomer() {
       )
       
       if (!selectedContract) {
-        throw new Error('Ogiltig avtalstyp. Kan inte hitta det valda ID:t i listan.')
+        throw new Error('Ogiltig avtalstyp')
       }
 
-      // Hämta den aktiva sessionen för att få access_token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        throw new Error("Ingen aktiv session hittades. Vänligen logga in igen.")
-      }
-
-      console.log('All validering OK. Anropar Edge Function med Authorization-header.');
-      const { data: clickupData, error: functionError } = await supabase.functions.invoke('create-clickup-list', {
-        body: {
-          customerName: formData.company_name,
-          orgNumber: formData.org_number,
-          folderId: selectedContract.clickup_folder_id,
-        },
-        // *** HÄR ÄR DEN VIKTIGA ÄNDRINGEN ***
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+      console.log('Anropar create-customer-complete med data:', {
+        ...formData,
+        clickup_folder_id: selectedContract.clickup_folder_id
       })
 
-      console.log('Svar mottaget från Edge Function:', { clickupData, functionError });
-
-      // Hantera fel från anropet till Edge Function
-      if (functionError) {
-        // Om functionError är ett Auth-fel, ge ett tydligare meddelande
-        if (functionError.message.includes('Auth') || functionError.message.includes('JWT')) {
-          throw new Error("Autentiseringsfel vid anrop av serverfunktion.")
+      // Anropa Edge Function som skapar både ClickUp-lista och kund
+      const { data, error } = await supabase.functions.invoke('create-customer-complete', {
+        body: {
+          ...formData,
+          clickup_folder_id: selectedContract.clickup_folder_id
         }
-        throw functionError
+      })
+
+      console.log('Svar från Edge Function:', { data, error })
+
+      if (error) {
+        throw error
       }
-      if (clickupData.error) {
-        throw new Error(clickupData.error)
-      }
-      if (!clickupData.id) {
-        throw new Error('Kunde inte skapa ClickUp-listan. Fick inget ID tillbaka.')
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Kunde inte skapa kund')
       }
 
-      // Spara kund i databasen med ID från ClickUp-listan
-      console.log('Sparar kund i databasen...');
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          company_name: formData.company_name,
-          org_number: formData.org_number,
-          contact_person: formData.contact_person,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          contract_type_id: formData.contract_type_id,
-          clickup_list_id: clickupData.id,
-          clickup_list_name: clickupData.name,
-          is_active: true
-        })
-        .select()
-        .single()
-
-      if (customerError) throw customerError
-      console.log('Kund sparad:', customer);
-
-      // Skapa användarkonto för kunden
-      console.log('Skapar användarinbjudan...');
-      const { data: invitation, error: inviteError } = await supabase
-        .from('user_invitations')
-        .insert({
-          email: formData.email,
-          customer_id: customer.id,
-          invited_by: (await supabase.auth.getUser()).data.user?.id,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dagar
-        })
-        .select()
-        .single()
-
-      if (inviteError) throw inviteError
-      console.log('Användarinbjudan skapad:', invitation);
-
-      toast.success('Kund skapad! En inbjudan har skickats.')
+      // Visa framgångsmeddelande
+      if (data.invitation) {
+        toast.success('Kund skapad och inbjudan skickad!')
+      } else {
+        toast.success('Kund skapad! (Inbjudan kunde inte skickas)')
+      }
+      
+      // Navigera tillbaka till kundlistan
       navigate('/admin/customers')
 
     } catch (error: any) {
-      console.error('--- FEL INTRÄFFADE I HANDLESUBMIT ---', error)
+      console.error('Fel vid kundskapande:', error)
       toast.error(error.message || 'Något gick fel')
     } finally {
-      console.log('--- handleSubmit avslutad (finally-block) ---');
       setLoading(false)
     }
   }
