@@ -50,10 +50,13 @@ export default function NewCustomer() {
     }
   }
 
-  // --- UPPDATERAD FUNKTION STARTAR HÄR ---
+  // --- UPPDATERAD FUNKTION MED FELSÖKNINGSLOGGAR ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    // LOGG 1: För att se att funktionen startar
+    console.log('--- handleSubmit startad ---');
 
     try {
       // Validera formulär
@@ -61,16 +64,24 @@ export default function NewCustomer() {
         throw new Error('Välj en avtalstyp')
       }
 
+      // LOGG 2: Se vad vi letar efter och var vi letar
+      console.log('Letar efter avtalstyp med ID:', formData.contract_type_id);
+      console.log('I denna lista av avtalstyper:', contractTypes);
+
       // Hitta vald avtalstyp
       const selectedContract = contractTypes.find(
         ct => ct.id === formData.contract_type_id
       )
       
+      // LOGG 3: Se resultatet av sökningen
+      console.log('Hittad avtalstyp:', selectedContract);
+      
       if (!selectedContract) {
-        throw new Error('Ogiltig avtalstyp')
+        throw new Error('Ogiltig avtalstyp. Kan inte hitta det valda ID:t i listan.')
       }
 
-      // Anropa din Supabase Edge Function för att skapa ClickUp-listan säkert.
+      // LOGG 4: Om vi når hit, anropar vi funktionen
+      console.log('All validering OK. Anropar Edge Function med folderId:', selectedContract.clickup_folder_id);
       const { data: clickupData, error: functionError } = await supabase.functions.invoke('create-clickup-list', {
         body: {
           customerName: formData.company_name,
@@ -78,6 +89,9 @@ export default function NewCustomer() {
           folderId: selectedContract.clickup_folder_id,
         },
       })
+
+      // LOGG 5: Se svaret från funktionen
+      console.log('Svar mottaget från Edge Function:', { clickupData, functionError });
 
       // Hantera fel från anropet till Edge Function
       if (functionError) {
@@ -91,10 +105,10 @@ export default function NewCustomer() {
       }
 
       // Spara kund i databasen med ID från ClickUp-listan
+      console.log('Sparar kund i databasen...');
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
-          // Formulärdata
           company_name: formData.company_name,
           org_number: formData.org_number,
           contact_person: formData.contact_person,
@@ -102,7 +116,6 @@ export default function NewCustomer() {
           phone: formData.phone,
           address: formData.address,
           contract_type_id: formData.contract_type_id,
-          // Data från Edge Function
           clickup_list_id: clickupData.id,
           clickup_list_name: clickupData.name,
           is_active: true
@@ -111,8 +124,10 @@ export default function NewCustomer() {
         .single()
 
       if (customerError) throw customerError
+      console.log('Kund sparad:', customer);
 
       // Skapa användarkonto för kunden
+      console.log('Skapar användarinbjudan...');
       const { data: invitation, error: inviteError } = await supabase
         .from('user_invitations')
         .insert({
@@ -125,18 +140,19 @@ export default function NewCustomer() {
         .single()
 
       if (inviteError) throw inviteError
+      console.log('Användarinbjudan skapad:', invitation);
 
       toast.success('Kund skapad! En inbjudan har skickats.')
       navigate('/admin/customers')
 
     } catch (error: any) {
-      console.error('Error creating customer:', error)
+      console.error('--- FEL INTRÄFFADE I HANDLESUBMIT ---', error)
       toast.error(error.message || 'Något gick fel')
     } finally {
+      console.log('--- handleSubmit avslutad (finally-block) ---');
       setLoading(false)
     }
   }
-  // --- UPPDATERAD FUNKTION SLUTAR HÄR ---
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
