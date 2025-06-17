@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
@@ -50,6 +50,7 @@ export default function NewCustomer() {
     }
   }
 
+  // --- UPPDATERAD FUNKTION STARTAR HÄR ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -69,43 +70,41 @@ export default function NewCustomer() {
         throw new Error('Ogiltig avtalstyp')
       }
 
-      // För tillfällig testning - vi kommer flytta detta till en Edge Function senare
-      const clickupApiToken = import.meta.env.VITE_CLICKUP_API_TOKEN // Temporärt för test
-      
-      // Skapa ClickUp-lista direkt (detta kommer vi flytta till backend senare)
-      const listName = `${formData.company_name} - ${formData.org_number}`
-      
-      const clickupResponse = await fetch(
-        `https://api.clickup.com/api/v2/folder/${selectedContract.clickup_folder_id}/list`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': clickupApiToken || '',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: listName,
-            content: `Kundportal för ${formData.company_name}`,
-            priority: 1,
-            status: 'active'
-          }),
-        }
-      )
+      // Anropa din Supabase Edge Function för att skapa ClickUp-listan säkert.
+      const { data: clickupData, error: functionError } = await supabase.functions.invoke('create-clickup-list', {
+        body: {
+          customerName: formData.company_name,
+          orgNumber: formData.org_number,
+          folderId: selectedContract.clickup_folder_id,
+        },
+      })
 
-      if (!clickupResponse.ok) {
-        const error = await clickupResponse.text()
-        throw new Error(`ClickUp API fel: ${error}`)
+      // Hantera fel från anropet till Edge Function
+      if (functionError) {
+        throw functionError
+      }
+      if (clickupData.error) {
+        throw new Error(clickupData.error)
+      }
+      if (!clickupData.id) {
+        throw new Error('Kunde inte skapa ClickUp-listan. Fick inget ID tillbaka.')
       }
 
-      const clickupList = await clickupResponse.json()
-
-      // Spara kund i databasen
+      // Spara kund i databasen med ID från ClickUp-listan
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
-          ...formData,
-          clickup_list_id: clickupList.id,
-          clickup_list_name: clickupList.name,
+          // Formulärdata
+          company_name: formData.company_name,
+          org_number: formData.org_number,
+          contact_person: formData.contact_person,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          contract_type_id: formData.contract_type_id,
+          // Data från Edge Function
+          clickup_list_id: clickupData.id,
+          clickup_list_name: clickupData.name,
           is_active: true
         })
         .select()
@@ -127,9 +126,6 @@ export default function NewCustomer() {
 
       if (inviteError) throw inviteError
 
-      // Skicka e-postinbjudan (detta gör vi i nästa steg)
-      // await sendInvitationEmail(invitation)
-
       toast.success('Kund skapad! En inbjudan har skickats.')
       navigate('/admin/customers')
 
@@ -140,6 +136,7 @@ export default function NewCustomer() {
       setLoading(false)
     }
   }
+  // --- UPPDATERAD FUNKTION SLUTAR HÄR ---
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
