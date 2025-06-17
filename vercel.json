@@ -1,11 +1,11 @@
 {
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.2.22"
-    }
-  },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
