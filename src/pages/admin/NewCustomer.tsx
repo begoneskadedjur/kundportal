@@ -50,12 +50,10 @@ export default function NewCustomer() {
     }
   }
 
-  // --- UPPDATERAD FUNKTION MED FELSÖKNINGSLOGGAR ---
+  // --- UPPDATERAD FUNKTION MED AUTHORIZATION-HEADER ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
-    // LOGG 1: För att se att funktionen startar
     console.log('--- handleSubmit startad ---');
 
     try {
@@ -64,37 +62,42 @@ export default function NewCustomer() {
         throw new Error('Välj en avtalstyp')
       }
 
-      // LOGG 2: Se vad vi letar efter och var vi letar
-      console.log('Letar efter avtalstyp med ID:', formData.contract_type_id);
-      console.log('I denna lista av avtalstyper:', contractTypes);
-
       // Hitta vald avtalstyp
       const selectedContract = contractTypes.find(
         ct => ct.id === formData.contract_type_id
       )
       
-      // LOGG 3: Se resultatet av sökningen
-      console.log('Hittad avtalstyp:', selectedContract);
-      
       if (!selectedContract) {
         throw new Error('Ogiltig avtalstyp. Kan inte hitta det valda ID:t i listan.')
       }
 
-      // LOGG 4: Om vi når hit, anropar vi funktionen
-      console.log('All validering OK. Anropar Edge Function med folderId:', selectedContract.clickup_folder_id);
+      // Hämta den aktiva sessionen för att få access_token
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error("Ingen aktiv session hittades. Vänligen logga in igen.")
+      }
+
+      console.log('All validering OK. Anropar Edge Function med Authorization-header.');
       const { data: clickupData, error: functionError } = await supabase.functions.invoke('create-clickup-list', {
         body: {
           customerName: formData.company_name,
           orgNumber: formData.org_number,
           folderId: selectedContract.clickup_folder_id,
         },
+        // *** HÄR ÄR DEN VIKTIGA ÄNDRINGEN ***
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       })
 
-      // LOGG 5: Se svaret från funktionen
       console.log('Svar mottaget från Edge Function:', { clickupData, functionError });
 
       // Hantera fel från anropet till Edge Function
       if (functionError) {
+        // Om functionError är ett Auth-fel, ge ett tydligare meddelande
+        if (functionError.message.includes('Auth') || functionError.message.includes('JWT')) {
+          throw new Error("Autentiseringsfel vid anrop av serverfunktion.")
+        }
         throw functionError
       }
       if (clickupData.error) {
