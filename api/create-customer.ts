@@ -129,29 +129,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw customerError
     }
 
-    // 5. Skapa användarkonto
+    // 5. Skapa eller uppdatera användarkonto
     const tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
     
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: customerData.email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        company_name: customerData.company_name,
-        contact_person: customerData.contact_person
+    // Först, kolla om användaren redan finns
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const existingUser = existingUsers?.users.find(u => u.email === customerData.email)
+    
+    let authData
+    
+    if (existingUser) {
+      // Användaren finns redan, uppdatera bara metadata
+      const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.id,
+        {
+          user_metadata: {
+            company_name: customerData.company_name,
+            contact_person: customerData.contact_person
+          }
+        }
+      )
+      
+      if (updateError) {
+        await supabase.from('customers').delete().eq('id', customer.id)
+        throw updateError
       }
-    })
+      
+      authData = { user: updatedUser.user }
+      
+      // Skicka lösenordsåterställning istället för nytt lösenord
+      await supabase.auth.resetPasswordForEmail(customerData.email, {
+        redirectTo: `${BASE_URL}/set-password`
+      })
+    } else {
+      // Skapa ny användare
+      const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
+        email: customerData.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          company_name: customerData.company_name,
+          contact_person: customerData.contact_person
+        }
+      })
 
-    if (authError) {
-      // Om användarskapande misslyckas, ta bort kunden
-      await supabase.from('customers').delete().eq('id', customer.id)
-      throw authError
+      if (authError) {
+        await supabase.from('customers').delete().eq('id', customer.id)
+        throw authError
+      }
+      
+      authData = newUser
     }
 
-    // 6. Skapa profil
+    // 6. Skapa eller uppdatera profil
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({
+      .upsert({
         id: authData.user.id,
         user_id: authData.user.id,
         email: customerData.email,
@@ -162,19 +195,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (profileError) {
       // Rollback om profil inte kan skapas
-      await supabase.auth.admin.deleteUser(authData.user.id)
+      if (!existingUser) {
+        await supabase.auth.admin.deleteUser(authData.user.id)
+      }
       await supabase.from('customers').delete().eq('id', customer.id)
       throw profileError
     }
 
     // 7. Skicka välkomstmail
-    const resetLink = `${BASE_URL}/set-password?token=${tempPassword}&email=${encodeURIComponent(customerData.email)}`
-
-    const mailOptions = {
-      from: 'BeGone Kundportal <noreply@begone.se>',
-      to: customerData.email,
-      subject: 'Välkommen till BeGone Kundportal',
-      html: `
+    let emailHtml
+    
+    if (existingUser) {
+      // För befintliga användare, skicka info om ny koppling
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #22c55e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Välkommen tillbaka till BeGone Kundportal!</h1>
+            </div>
+            <div class="content">
+              <p>Hej ${customerData.contact_person},</p>
+              
+              <p>Ditt konto har kopplats till företaget ${customerData.company_name}.</p>
+              
+              <p>Du kan logga in med din befintliga e-postadress och lösenord. Om du har glömt ditt lösenord har vi skickat en återställningslänk i ett separat mail.</p>
+              
+              <p style="text-align: center;">
+                <a href="${BASE_URL}/login" class="button">Logga in</a>
+              </p>
+              
+              <div class="footer">
+                <p>Med vänlig hälsning,<br>
+                BeGone Team</p>
+                
+                <p>Har du frågor? Kontakta oss på support@begone.se</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    } else {
+      // För nya användare, skicka välkomstmail med temporärt lösenord
+      const resetLink = `${BASE_URL}/set-password?token=${tempPassword}&email=${encodeURIComponent(customerData.email)}`
+      
+      emailHtml = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -227,6 +304,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         </body>
         </html>
       `
+    }
+
+    const mailOptions = {
+      from: 'BeGone Kundportal <noreply@begone.se>',
+      to: customerData.email,
+      subject: existingUser ? 'Ny företagskoppling - BeGone Kundportal' : 'Välkommen till BeGone Kundportal',
+      html: emailHtml
     }
 
     await transporter.sendMail(mailOptions)
