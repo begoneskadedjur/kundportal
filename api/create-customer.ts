@@ -4,21 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 
 // Initiera Supabase Admin Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
-
-// Debug-loggning (ta bort senare)
-console.log('Environment check:', {
-  hasUrl: !!supabaseUrl,
-  hasServiceKey: !!supabaseServiceKey,
-  urlLength: supabaseUrl?.length,
-  keyLength: supabaseServiceKey?.length
-})
+const supabaseUrl = process.env.VITE_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error(
-    `Missing environment variables: ${!supabaseUrl ? 'VITE_SUPABASE_URL' : ''} ${!supabaseServiceKey ? 'SUPABASE_SERVICE_KEY' : ''}`
-  )
+  throw new Error('Missing required environment variables')
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -77,8 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           content: `Kundlista för ${customerData.company_name}`,
           due_date: null,
           due_date_time: false,
-          priority: 3,
-          status: 'active'
+          priority: 3
         })
       }
     )
