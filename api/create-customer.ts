@@ -4,8 +4,23 @@ import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 
 // Initiera Supabase Admin Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.VITE_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
+
+// Debug-loggning (ta bort senare)
+console.log('Environment check:', {
+  hasUrl: !!supabaseUrl,
+  hasServiceKey: !!supabaseServiceKey,
+  urlLength: supabaseUrl?.length,
+  keyLength: supabaseServiceKey?.length
+})
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    `Missing environment variables: ${!supabaseUrl ? 'VITE_SUPABASE_URL' : ''} ${!supabaseServiceKey ? 'SUPABASE_SERVICE_KEY' : ''}`
+  )
+}
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Konfiguration
