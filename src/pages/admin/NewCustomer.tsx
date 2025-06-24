@@ -1,11 +1,12 @@
 // src/pages/admin/NewCustomer.tsx
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Building2, User, Mail, Phone, MapPin, FileText } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
+import { customerService } from '../../services/customerService'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 type ContractType = {
@@ -18,8 +19,6 @@ export default function NewCustomer() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [contractTypes, setContractTypes] = useState<ContractType[]>([])
-  
-  // Formulärdata
   const [formData, setFormData] = useState({
     company_name: '',
     org_number: '',
@@ -52,59 +51,19 @@ export default function NewCustomer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.contract_type_id) {
+      toast.error('Du måste välja en avtalstyp')
+      return
+    }
+
     setLoading(true)
-
+    
     try {
-      // Validera formulär
-      if (!formData.contract_type_id) {
-        throw new Error('Välj en avtalstyp')
-      }
-
-      // Hitta vald avtalstyp
-      const selectedContract = contractTypes.find(
-        ct => ct.id === formData.contract_type_id
-      )
-      
-      if (!selectedContract) {
-        throw new Error('Ogiltig avtalstyp')
-      }
-
-      console.log('Anropar create-customer-complete med data:', {
-        ...formData,
-        clickup_folder_id: selectedContract.clickup_folder_id
-      })
-
-      // Anropa Edge Function som skapar både ClickUp-lista och kund
-      const { data, error } = await supabase.functions.invoke('create-customer-complete', {
-        body: {
-          ...formData,
-          clickup_folder_id: selectedContract.clickup_folder_id
-        }
-      })
-
-      console.log('Svar från Edge Function:', { data, error })
-
-      if (error) {
-        throw error
-      }
-
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Kunde inte skapa kund')
-      }
-
-      // Visa framgångsmeddelande
-      if (data.invitation) {
-        toast.success('Kund skapad och inbjudan skickad!')
-      } else {
-        toast.success('Kund skapad! (Inbjudan kunde inte skickas)')
-      }
-      
-      // Navigera tillbaka till kundlistan
+      await customerService.createCustomer(formData)
       navigate('/admin/customers')
-
-    } catch (error: any) {
-      console.error('Fel vid kundskapande:', error)
-      toast.error(error.message || 'Något gick fel')
+    } catch (error) {
+      // Felhantering sker i service
     } finally {
       setLoading(false)
     }
@@ -126,134 +85,163 @@ export default function NewCustomer() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin/customers')}
               className="mr-4"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
             </Button>
-            <h1 className="text-xl font-semibold text-white">
-              Lägg till ny kund
-            </h1>
+            <h1 className="text-xl font-semibold">Lägg till ny kund</h1>
           </div>
         </div>
       </header>
 
       {/* Form */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6">
-            {/* Företagsinformation */}
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Företagsinformation
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Företagsnamn"
-                  name="company_name"
-                  value={formData.company_name}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  label="Organisationsnummer"
-                  name="org_number"
-                  value={formData.org_number}
-                  onChange={handleChange}
-                  placeholder="XXXXXX-XXXX"
-                  required
-                />
-              </div>
-            </Card>
-
-            {/* Kontaktinformation */}
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Kontaktinformation
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Kontaktperson"
-                  name="contact_person"
-                  value={formData.contact_person}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  label="E-postadress"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  label="Telefonnummer"
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  label="Adress"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </Card>
-
-            {/* Avtalstyp */}
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Avtalstyp
-              </h2>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-300">
-                  Välj avtalstyp <span className="text-red-400">*</span>
-                </label>
-                <select
-                  name="contract_type_id"
-                  value={formData.contract_type_id}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                  required
-                >
-                  <option value="">Välj avtalstyp...</option>
-                  {contractTypes.map(ct => (
-                    <option key={ct.id} value={ct.id}>
-                      {ct.name}
-                    </option>
-                  ))}
-                </select>
-                {formData.contract_type_id && (
-                  <p className="text-sm text-slate-400 mt-2">
-                    En ClickUp-lista kommer skapas automatiskt för denna kund
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            {/* Knappar */}
-            <div className="flex justify-end gap-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => navigate('/admin')}
-              >
-                Avbryt
-              </Button>
-              <Button
-                type="submit"
-                loading={loading}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Skapa kund
-              </Button>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Företagsinformation */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <Building2 className="w-5 h-5 text-green-500 mr-2" />
+              <h2 className="text-lg font-semibold">Företagsinformation</h2>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="Företagsnamn"
+                name="company_name"
+                value={formData.company_name}
+                onChange={handleChange}
+                required
+                placeholder="AB Exempel"
+              />
+              
+              <Input
+                label="Organisationsnummer"
+                name="org_number"
+                value={formData.org_number}
+                onChange={handleChange}
+                required
+                placeholder="556677-8899"
+              />
+            </div>
+          </Card>
+
+          {/* Kontaktinformation */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <User className="w-5 h-5 text-green-500 mr-2" />
+              <h2 className="text-lg font-semibold">Kontaktinformation</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="Kontaktperson"
+                name="contact_person"
+                value={formData.contact_person}
+                onChange={handleChange}
+                required
+                placeholder="Anna Andersson"
+              />
+              
+              <Input
+                label="E-postadress"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                placeholder="anna@exempel.se"
+              />
+              
+              <Input
+                label="Telefonnummer"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                placeholder="070-123 45 67"
+              />
+              
+              <Input
+                label="Adress"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                required
+                placeholder="Exempelgatan 1, 123 45 Stockholm"
+              />
+            </div>
+          </Card>
+
+          {/* Avtalstyp */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <FileText className="w-5 h-5 text-green-500 mr-2" />
+              <h2 className="text-lg font-semibold">Avtalstyp</h2>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Välj avtalstyp <span className="text-red-400">*</span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {contractTypes.map(type => (
+                  <label
+                    key={type.id}
+                    className={`
+                      relative flex items-center p-4 rounded-lg border cursor-pointer
+                      transition-all duration-200
+                      ${formData.contract_type_id === type.id
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                      }
+                    `}
+                  >
+                    <input
+                      type="radio"
+                      name="contract_type_id"
+                      value={type.id}
+                      checked={formData.contract_type_id === type.id}
+                      onChange={handleChange}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center">
+                      <div className={`
+                        w-4 h-4 rounded-full border-2 mr-3
+                        ${formData.contract_type_id === type.id
+                          ? 'border-green-500 bg-green-500'
+                          : 'border-slate-500'
+                        }
+                      `}>
+                        {formData.contract_type_id === type.id && (
+                          <div className="w-2 h-2 rounded-full bg-slate-950 m-0.5" />
+                        )}
+                      </div>
+                      <span className="text-white">{type.name}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          {/* Knappar */}
+          <div className="flex justify-end gap-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate('/admin/customers')}
+            >
+              Avbryt
+            </Button>
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={loading}
+            >
+              Skapa kund och skicka inbjudan
+            </Button>
           </div>
         </form>
       </main>

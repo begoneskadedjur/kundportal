@@ -1,117 +1,145 @@
 // supabase/functions/create-customer-complete/index.ts
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Hantera OPTIONS requests för CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('=== CREATE-CUSTOMER-COMPLETE FUNCTION STARTED ===')
-    
-    // Hämta miljövariabler
-    const CLICKUP_API_TOKEN = Deno.env.get('CLICKUP_API_TOKEN')
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (!CLICKUP_API_TOKEN) {
-      throw new Error('CLICKUP_API_TOKEN saknas i Supabase Edge Function Secrets')
-    }
-    
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('Supabase miljövariabler saknas')
-    }
+    // Logga request för debugging
+    console.log('Request method:', req.method)
+    console.log('Request headers:', Object.fromEntries(req.headers))
 
-    // Skapa Supabase admin-klient
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    
-    // Verifiera användaren från Authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Authorization header saknas')
+    // Kontrollera att det är POST
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }), 
+        { 
+          status: 405,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    // Hämta användaren
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError)
-      throw new Error('Ogiltig autentisering')
-    }
-
-    console.log('Användare verifierad:', user.id)
-
-    // Kontrollera att användaren är admin
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('is_admin')
-      .eq('user_id', user.id)
-      .single()
-
-    if (profileError || !profile?.is_admin) {
-      throw new Error('Endast administratörer kan skapa kunder')
-    }
-
-    // Läs request body
+    // Parse request body
     const body = await req.json()
     console.log('Request body:', body)
-    
-    const { 
+
+    const {
       company_name,
       org_number,
       contact_person,
       email,
       phone,
       address,
-      contract_type_id,
-      clickup_folder_id
+      contract_type_id
     } = body
 
-    // Validera input
-    if (!company_name || !org_number || !clickup_folder_id) {
-      throw new Error('Företagsnamn, organisationsnummer och folder ID krävs')
+    // Validera alla required fields
+    if (!company_name || !org_number || !contact_person || !email || !phone || !address || !contract_type_id) {
+      console.error('Missing required fields')
+      return new Response(
+        JSON.stringify({ error: 'Alla fält måste fyllas i' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    // STEG 1: Skapa ClickUp-lista
-    console.log('Skapar ClickUp-lista...')
-    const listName = `${company_name} - ${org_number}`
+    // Skapa Supabase admin client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase environment variables')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Hämta contract type för att få clickup_folder_id
+    console.log('Fetching contract type:', contract_type_id)
+    const { data: contractType, error: contractError } = await supabaseAdmin
+      .from('contract_types')
+      .select('clickup_folder_id, name')
+      .eq('id', contract_type_id)
+      .single()
+
+    if (contractError || !contractType) {
+      console.error('Contract type error:', contractError)
+      return new Response(
+        JSON.stringify({ error: 'Ogiltig avtalstyp' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    console.log('Contract type found:', contractType)
+
+    // 1. Skapa ClickUp lista
+    const clickupApiKey = Deno.env.get('CLICKUP_API_KEY')
+    if (!clickupApiKey) {
+      console.error('Missing ClickUp API key')
+      return new Response(
+        JSON.stringify({ error: 'ClickUp configuration missing' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    console.log('Creating ClickUp list in folder:', contractType.clickup_folder_id)
     
     const clickupResponse = await fetch(
-      `https://api.clickup.com/api/v2/folder/${clickup_folder_id}/list`,
+      `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
       {
         method: 'POST',
         headers: {
-          'Authorization': CLICKUP_API_TOKEN,
-          'Content-Type': 'application/json',
+          'Authorization': clickupApiKey,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: listName,
-          content: `Kundportal för ${company_name}`,
-          priority: 1,
-          status: 'active'
-        }),
+          name: company_name,
+          content: `Kund: ${company_name}\nOrg.nr: ${org_number}\nKontakt: ${contact_person}\nTelefon: ${phone}\nAdress: ${address}`
+        })
       }
     )
 
     if (!clickupResponse.ok) {
       const errorText = await clickupResponse.text()
-      console.error('ClickUp API fel:', errorText)
-      throw new Error(`ClickUp API fel (${clickupResponse.status}): ${errorText}`)
+      console.error('ClickUp API error:', errorText)
+      return new Response(
+        JSON.stringify({ error: 'Kunde inte skapa ClickUp lista' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const clickupList = await clickupResponse.json()
-    console.log('ClickUp-lista skapad:', clickupList.id)
+    console.log('ClickUp list created:', clickupList.id)
 
-    // STEG 2: Spara kund i databasen
-    console.log('Sparar kund i databasen...')
+    // 2. Skapa kund i databasen
     const { data: customer, error: customerError } = await supabaseAdmin
       .from('customers')
       .insert({
@@ -130,81 +158,114 @@ serve(async (req) => {
       .single()
 
     if (customerError) {
-      console.error('Fel vid kundskapande:', customerError)
-      throw customerError
-    }
-
-    console.log('Kund skapad:', customer.id)
-
-    // STEG 3: Skapa användarinbjudan
-    console.log('Skapar användarinbjudan...')
-    const { data: invitation, error: inviteError } = await supabaseAdmin
-      .from('user_invitations')
-      .insert({
-        email: email,
-        customer_id: customer.id,
-        invited_by: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      })
-      .select()
-      .single()
-
-    if (inviteError) {
-      console.error('Fel vid inbjudan:', inviteError)
-      // Vi fortsätter ändå eftersom kunden är skapad
-    }
-
-    // STEG 4: Skicka inbjudan via Supabase Auth (om inbjudan skapades)
-    if (invitation) {
-      console.log('Skickar e-postinbjudan...')
-      const { error: emailError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-        email,
-        {
-          data: { 
-            customer_id: customer.id,
-            invitation_id: invitation.id 
-          },
-          redirectTo: `${req.headers.get('origin')}/set-password?token=${invitation.token}`
+      console.error('Customer creation error:', customerError)
+      return new Response(
+        JSON.stringify({ error: 'Kunde inte skapa kund i databasen' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
-
-      if (emailError) {
-        console.error('Fel vid e-postutskick:', emailError)
-      }
     }
 
-    console.log('=== ALLT KLART! ===')
-    
-    // Returnera lyckat svar
+    console.log('Customer created:', customer.id)
+
+    // 3. Skapa användare och skicka inbjudan
+    try {
+      const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`
+      
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          company_name: company_name,
+          contact_person: contact_person
+        }
+      })
+
+      if (authError) {
+        console.error('Auth user creation error:', authError)
+        // Fortsätt ändå - kunden är skapad
+      } else if (authUser) {
+        console.log('Auth user created:', authUser.id)
+
+        // Skapa profil
+        const { error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .insert({
+            id: authUser.id,
+            user_id: authUser.id,
+            customer_id: customer.id,
+            email: email,
+            is_admin: false,
+            is_active: true
+          })
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+        }
+
+        // Skicka inbjudan
+        const resendApiKey = Deno.env.get('RESEND_API_KEY')
+        if (resendApiKey) {
+          const inviteLink = `https://begone-kundportal.vercel.app/set-password?token=${tempPassword}&email=${encodeURIComponent(email)}`
+          
+          const emailResponse = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: 'BeGone Skadedjur <no-reply@resend.dev>',
+              to: [email],
+              subject: 'Välkommen till BeGone Kundportal',
+              html: `
+                <h2>Välkommen ${contact_person}!</h2>
+                <p>Ditt företag ${company_name} har nu tillgång till BeGone Kundportal.</p>
+                <p>Klicka på länken nedan för att sätta ditt lösenord och komma igång:</p>
+                <a href="${inviteLink}" style="display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px;">Aktivera ditt konto</a>
+                <p>Om länken inte fungerar, kopiera och klistra in denna URL i din webbläsare:</p>
+                <p>${inviteLink}</p>
+                <p>Med vänliga hälsningar,<br>BeGone Skadedjur</p>
+              `
+            })
+          })
+
+          if (!emailResponse.ok) {
+            console.error('Email send error:', await emailResponse.text())
+          } else {
+            console.log('Invitation email sent')
+          }
+        }
+      }
+    } catch (inviteError) {
+      console.error('Invitation process error:', inviteError)
+      // Fortsätt ändå - kunden är skapad
+    }
+
+    // Returnera framgång
     return new Response(
       JSON.stringify({
         success: true,
-        customer,
-        invitation,
-        clickupList
+        customer: customer,
+        clickup_list_id: clickupList.id,
+        invitation: true
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 200
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
 
   } catch (error) {
-    console.error('=== FEL I EDGE FUNCTION ===', error)
+    console.error('Unexpected error:', error)
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message 
-      }),
+      JSON.stringify({ error: error.message || 'Ett oväntat fel uppstod' }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 400
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }

@@ -12,6 +12,7 @@ import SetPassword from './pages/auth/SetPassword'
 import AdminDashboard from './pages/admin/Dashboard'
 import Customers from './pages/admin/Customers'
 import NewCustomer from './pages/admin/NewCustomer'
+import TestEdgeFunction from './pages/admin/TestEdgeFunction'
 
 // Customer Pages
 import CustomerPortal from './pages/customer/Portal'
@@ -45,6 +46,11 @@ function App() {
             <Route path="/admin/customers/new" element={
               <ProtectedRoute role="admin">
                 <NewCustomer />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/test-functions" element={
+              <ProtectedRoute role="admin">
+                <TestEdgeFunction />
               </ProtectedRoute>
             } />
             
