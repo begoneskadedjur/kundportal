@@ -42,7 +42,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Customer data required' })
     }
 
-    // 1. Hämta avtalstyp för ClickUp folder ID
+    // 1. Kontrollera om kunden redan finns
+    const { data: existingCustomerByEmail } = await supabase
+      .from('customers')
+      .select('id, company_name, email')
+      .eq('email', customerData.email)
+      .single()
+
+    if (existingCustomerByEmail) {
+      return res.status(400).json({ 
+        error: `En kund med e-postadressen ${customerData.email} finns redan registrerad.` 
+      })
+    }
+
+    // Kontrollera också om företagsnamnet redan finns
+    const { data: existingCustomerByName } = await supabase
+      .from('customers')
+      .select('id, company_name, email')
+      .eq('company_name', customerData.company_name)
+      .single()
+
+    if (existingCustomerByName) {
+      return res.status(400).json({ 
+        error: `Företaget ${customerData.company_name} finns redan registrerat med e-post: ${existingCustomerByName.email}` 
+      })
+    }
+
+    // 2. Hämta avtalstyp för ClickUp folder ID
     const { data: contractType, error: contractError } = await supabase
       .from('contract_types')
       .select('clickup_folder_id, name')
@@ -53,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Kunde inte hämta avtalstyp')
     }
 
-    // 2. Skapa ClickUp lista
+    // 3. Skapa ClickUp lista
     const clickupResponse = await fetch(
       `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
       {
@@ -75,12 +101,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!clickupResponse.ok) {
       const errorData = await clickupResponse.text()
       console.error('ClickUp API error:', errorData)
+      
+      // Kontrollera om det är ett "namn upptaget" fel
+      if (errorData.includes('SUBCAT_016') || errorData.includes('List name taken')) {
+        throw new Error(`En ClickUp-lista med namnet "${customerData.company_name}" finns redan. Kontrollera om kunden redan är registrerad.`)
+      }
+      
       throw new Error('Kunde inte skapa ClickUp lista')
     }
 
     const clickupList = await clickupResponse.json()
 
-    // 3. Skapa kund i databasen
+    // 4. Skapa kund i databasen
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .insert({
@@ -97,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw customerError
     }
 
-    // 4. Skapa användarkonto
+    // 5. Skapa användarkonto
     const tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
     
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -116,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw authError
     }
 
-    // 5. Skapa profil
+    // 6. Skapa profil
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -135,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw profileError
     }
 
-    // 6. Skicka välkomstmail
+    // 7. Skicka välkomstmail
     const resetLink = `${BASE_URL}/set-password?token=${tempPassword}&email=${encodeURIComponent(customerData.email)}`
 
     const mailOptions = {
@@ -199,7 +231,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await transporter.sendMail(mailOptions)
 
-    // 7. Returnera framgång
+    // 8. Returnera framgång
     return res.status(200).json({
       success: true,
       customer: {
