@@ -329,30 +329,48 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     console.log('🔍 Processing dropdown field:', {
       name: field.name,
       type: field.type,
-      has_value: !!field.value,
+      has_value: !!field.value || field.has_value,
       value: field.value,
       type_config: field.type_config
     })
     
-    if (!field.value) return null
+    // För dropdown-fält som saknar värde men har has_value: false
+    if (!field.has_value && (field.value === 0 || field.value === null || field.value === undefined)) {
+      console.log('🔍 Field has no value (has_value: false)')
+      return null
+    }
     
     // Olika sätt att hantera dropdown-värden
     if (field.type_config?.options) {
       console.log('🔍 Options found:', field.type_config.options)
       
-      // Försök matcha med orderindex
-      let option = field.type_config.options.find((opt: any) => 
-        opt.orderindex === field.value
-      )
+      let option = null
       
-      // Om orderindex inte fungerar, försök matcha med ID eller namn
-      if (!option) {
+      // Försök först matcha med orderindex (för numeriska värden)
+      if (typeof field.value === 'number') {
         option = field.type_config.options.find((opt: any) => 
-          opt.id === field.value || opt.name === field.value
+          opt.orderindex === field.value
         )
+        console.log('🔍 Trying orderindex match:', option)
       }
       
-      console.log('🔍 Matched option:', option)
+      // Om orderindex inte fungerar, försök matcha med ID (för string-värden)
+      if (!option && typeof field.value === 'string') {
+        option = field.type_config.options.find((opt: any) => 
+          opt.id === field.value
+        )
+        console.log('🔍 Trying ID match:', option)
+      }
+      
+      // Som fallback, försök matcha med namn
+      if (!option) {
+        option = field.type_config.options.find((opt: any) => 
+          opt.name === field.value || opt.value === field.value
+        )
+        console.log('🔍 Trying name/value match:', option)
+      }
+      
+      console.log('🔍 Final matched option:', option)
       return option?.name || field.value?.toString()
     }
     
