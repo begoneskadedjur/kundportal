@@ -1,4 +1,4 @@
-// src/components/customer/CaseDetailsModal.tsx
+// src/components/customer/CaseDetailsModal.tsx - UPDATED VERSION
 import { useEffect, useState } from 'react'
 import { 
   X, 
@@ -8,8 +8,12 @@ import {
   MapPin, 
   DollarSign, 
   FileText, 
-  Paperclip,
-  AlertCircle 
+  Images,
+  AlertCircle,
+  Bug,
+  Download,
+  Eye,
+  Play
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -23,31 +27,27 @@ interface CaseDetailsModalProps {
 }
 
 interface TaskDetails {
-  id: string
-  name: string
-  description: string
-  status: string
-  statusColor: string
-  dateCreated: string
-  dateUpdated: string
-  dateClosed?: string
-  dueDate?: string
-  startDate?: string
+  success: boolean
+  task_id: string
+  task_info: {
+    name: string
+    status: string
+    description: string
+    url: string
+    created: string
+    updated: string
+  }
   assignees: Array<{
     name: string
     email: string
-    initials: string
-    profilePicture?: string
   }>
-  priority?: string
-  priorityColor?: string
-  customFields: {
-    address?: string
-    price?: string
-    files?: string[]
-    report?: string
-    [key: string]: any
-  }
+  custom_fields: Array<{
+    id: string
+    name: string
+    type: string
+    value: any
+    has_value: boolean
+  }>
 }
 
 export default function CaseDetailsModal({ 
@@ -71,7 +71,8 @@ export default function CaseDetailsModal({
     setError(null)
     
     try {
-      const response = await fetch(`/api/clickup/task/${clickupTaskId}`)
+      // Använd din befintliga test-endpoint för att hämta data
+      const response = await fetch(`/api/test-clickup?task_id=${clickupTaskId}`)
       
       if (!response.ok) {
         throw new Error('Kunde inte hämta ärendedetaljer')
@@ -87,40 +88,90 @@ export default function CaseDetailsModal({
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(parseInt(dateString)).toLocaleDateString('sv-SE', {
+  const formatDate = (timestamp: string) => {
+    return new Date(parseInt(timestamp)).toLocaleDateString('sv-SE', {
       year: 'numeric',
-      month: 'long',
+      month: 'long', 
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     })
   }
 
-  const getStatusColor = (color: string) => {
-    // Konvertera ClickUp färger till Tailwind-klasser
-    const colorMap: { [key: string]: string } = {
-      '#f9d71c': 'bg-yellow-500',
-      '#d3d3d3': 'bg-gray-500',
-      '#6bc950': 'bg-green-500',
-      '#ff6900': 'bg-orange-500',
-      '#e60073': 'bg-pink-500',
-      '#8b2635': 'bg-red-700',
+  const getStatusColor = (status: string) => {
+    const statusColors: { [key: string]: string } = {
+      'bokat': 'bg-blue-500',
+      'pågående': 'bg-yellow-500',
+      'avslutad': 'bg-green-500',
+      'försenad': 'bg-red-500',
+      'pausad': 'bg-gray-500',
     }
-    return colorMap[color.toLowerCase()] || 'bg-blue-500'
+    return statusColors[status.toLowerCase()] || 'bg-blue-500'
+  }
+
+  const getFieldValue = (fieldName: string) => {
+    return taskDetails?.custom_fields.find(field => 
+      field.name.toLowerCase() === fieldName.toLowerCase() && field.has_value
+    )
+  }
+
+  const getFileIcon = (mimetype: string) => {
+    if (mimetype.startsWith('image/')) return <Images className="w-4 h-4" />
+    if (mimetype.startsWith('video/')) return <Play className="w-4 h-4" />
+    return <FileText className="w-4 h-4" />
+  }
+
+  const getPestTypeText = (value: any) => {
+    // Här kan du mappa dropdown-värden till riktiga namn
+    const pestTypes: { [key: number]: string } = {
+      0: 'Ej specificerat',
+      1: 'Råttor',
+      2: 'Möss', 
+      3: 'Kackerlackor',
+      4: 'Myror',
+      5: 'Getingar',
+      // Lägg till fler baserat på era dropdown-värden
+    }
+    return pestTypes[value] || `Typ ${value}`
+  }
+
+  const getCaseTypeText = (value: any) => {
+    const caseTypes: { [key: number]: string } = {
+      0: 'Standardärende',
+      1: 'Akutärende',
+      2: 'Uppföljning',
+      3: 'Konsultation',
+      // Lägg till fler baserat på era dropdown-värden
+    }
+    return caseTypes[value] || `Typ ${value}`
   }
 
   if (!isOpen) return null
 
+  // Hämta alla custom fields
+  const addressField = getFieldValue('adress')
+  const pestField = getFieldValue('skadedjur')
+  const priceField = getFieldValue('pris')
+  const reportField = getFieldValue('rapport')
+  const filesField = getFieldValue('filer')
+  const caseTypeField = getFieldValue('ärende')
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         <Card className="relative">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10">
-            <h2 className="text-2xl font-bold text-white">
-              {taskDetails?.name || 'Laddar...'}
-            </h2>
+            <div>
+              <h2 className="text-2xl font-bold text-white">
+                {taskDetails?.task_info.name || 'Laddar ärende...'}
+              </h2>
+              {taskDetails && (
+                <p className="text-slate-400 text-sm mt-1">
+                  Ärende #{taskDetails.task_id}
+                </p>
+              )}
+            </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
@@ -143,164 +194,220 @@ export default function CaseDetailsModal({
 
             {taskDetails && (
               <div className="space-y-6">
-                {/* Status och prioritet */}
-                <div className="flex items-center gap-4 flex-wrap">
+                {/* Status och datum */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-400">Status:</span>
                     <span 
                       className={`px-3 py-1 rounded-full text-sm font-medium text-white ${
-                        getStatusColor(taskDetails.statusColor)
+                        getStatusColor(taskDetails.task_info.status)
                       }`}
                     >
-                      {taskDetails.status}
+                      {taskDetails.task_info.status.toUpperCase()}
                     </span>
                   </div>
                   
-                  {taskDetails.priority && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-400">Prioritet:</span>
-                      <span 
-                        className={`px-3 py-1 rounded-full text-sm font-medium text-white ${
-                          getStatusColor(taskDetails.priorityColor || '#6bc950')
-                        }`}
-                      >
-                        {taskDetails.priority}
+                  <div className="text-sm text-slate-400">
+                    Skapat: {formatDate(taskDetails.task_info.created)}
+                    {taskDetails.task_info.updated !== taskDetails.task_info.created && (
+                      <span className="ml-4">
+                        Uppdaterat: {formatDate(taskDetails.task_info.updated)}
                       </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Datum information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                    <Calendar className="w-5 h-5 text-blue-400" />
-                    <div>
-                      <p className="text-sm text-slate-400">Skapad</p>
-                      <p className="text-white font-medium">
-                        {formatDate(taskDetails.dateCreated)}
-                      </p>
-                    </div>
+                    )}
                   </div>
-
-                  {taskDetails.startDate && (
-                    <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <Clock className="w-5 h-5 text-green-400" />
-                      <div>
-                        <p className="text-sm text-slate-400">Startdatum</p>
-                        <p className="text-white font-medium">
-                          {formatDate(taskDetails.startDate)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {taskDetails.dueDate && (
-                    <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <Calendar className="w-5 h-5 text-orange-400" />
-                      <div>
-                        <p className="text-sm text-slate-400">Förfallodatum</p>
-                        <p className="text-white font-medium">
-                          {formatDate(taskDetails.dueDate)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Tilldelade tekniker */}
-                {taskDetails.assignees.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      Ansvarig tekniker
-                    </h3>
-                    <div className="flex flex-wrap gap-3">
-                      {taskDetails.assignees.map((assignee, index) => (
-                        <div 
-                          key={index}
-                          className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg"
-                        >
-                          {assignee.profilePicture ? (
-                            <img 
-                              src={assignee.profilePicture}
-                              alt={assignee.name}
-                              className="w-8 h-8 rounded-full"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                              {assignee.initials}
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-white font-medium">{assignee.name}</p>
-                            <p className="text-sm text-slate-400">{assignee.email}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Custom fields */}
-                <div className="space-y-4">
-                  {taskDetails.customFields.address && (
-                    <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm text-slate-400">Adress</p>
-                        <p className="text-white">{taskDetails.customFields.address}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {taskDetails.customFields.price && (
-                    <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <DollarSign className="w-5 h-5 text-green-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm text-slate-400">Pris</p>
-                        <p className="text-white">{taskDetails.customFields.price}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {taskDetails.customFields.files && taskDetails.customFields.files.length > 0 && (
-                    <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <Paperclip className="w-5 h-5 text-purple-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm text-slate-400">Filer</p>
-                        <div className="space-y-1">
-                          {taskDetails.customFields.files.map((file, index) => (
-                            <p key={index} className="text-white">{file}</p>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {taskDetails.customFields.report && (
-                    <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
-                      <FileText className="w-5 h-5 text-blue-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm text-slate-400">Rapport</p>
-                        <p className="text-white">{taskDetails.customFields.report}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Beskrivning */}
-                {taskDetails.description && (
+                {taskDetails.task_info.description && (
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold text-white">Beskrivning</h3>
                     <div className="p-4 bg-slate-800/50 rounded-lg">
                       <p className="text-white whitespace-pre-wrap">
-                        {taskDetails.description}
+                        {taskDetails.task_info.description}
                       </p>
                     </div>
                   </div>
                 )}
+
+                {/* Grid med information */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Vänster kolumn */}
+                  <div className="space-y-4">
+                    {/* Adress */}
+                    {addressField && (
+                      <div className="flex items-start gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <MapPin className="w-5 h-5 text-red-400 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-slate-400 mb-1">Adress</p>
+                          <p className="text-white font-medium">
+                            {addressField.value.formatted_address}
+                          </p>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="mt-2 text-blue-400 hover:text-blue-300 p-0"
+                            onClick={() => {
+                              const { lat, lng } = addressField.value.location
+                              window.open(`https://maps.google.com?q=${lat},${lng}`, '_blank')
+                            }}
+                          >
+                            Visa på karta
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Skadedjur och ärendetype */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {pestField && (
+                        <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                          <Bug className="w-5 h-5 text-orange-400" />
+                          <div>
+                            <p className="text-sm text-slate-400">Skadedjur</p>
+                            <p className="text-white font-medium">
+                              {getPestTypeText(pestField.value)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {caseTypeField && (
+                        <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                          <FileText className="w-5 h-5 text-blue-400" />
+                          <div>
+                            <p className="text-sm text-slate-400">Ärendetype</p>
+                            <p className="text-white font-medium">
+                              {getCaseTypeText(caseTypeField.value)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pris */}
+                    {priceField && priceField.has_value && (
+                      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-green-400" />
+                        <div>
+                          <p className="text-sm text-slate-400">Kostnad</p>
+                          <p className="text-white font-medium text-xl">
+                            {priceField.value} kr
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ansvarig tekniker */}
+                    {taskDetails.assignees.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Ansvarig tekniker
+                        </h4>
+                        <div className="space-y-2">
+                          {taskDetails.assignees.map((assignee, index) => (
+                            <div 
+                              key={index}
+                              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg"
+                            >
+                              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                {assignee.name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <div>
+                                <p className="text-white font-medium">{assignee.name}</p>
+                                <p className="text-sm text-slate-400">{assignee.email}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Höger kolumn */}
+                  <div className="space-y-4">
+                    {/* Teknikerrapport */}
+                    {reportField && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          Teknikerrapport
+                        </h4>
+                        <div className="p-4 bg-slate-800/50 rounded-lg">
+                          <p className="text-white whitespace-pre-wrap">
+                            {reportField.value}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Filer och bilder */}
+                    {filesField && filesField.value && Array.isArray(filesField.value) && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Images className="w-4 h-4" />
+                          Filer ({filesField.value.length})
+                        </h4>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {filesField.value.map((file: any, index: number) => (
+                            <div 
+                              key={file.id} 
+                              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors"
+                            >
+                              <div className="text-slate-400">
+                                {getFileIcon(file.mimetype)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium truncate">
+                                  {file.title}
+                                </p>
+                                <p className="text-slate-400 text-sm">
+                                  {(file.size / 1024 / 1024).toFixed(1)} MB • {file.extension.toUpperCase()}
+                                </p>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(file.url_w_query, '_blank')}
+                                  className="p-2"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const link = document.createElement('a')
+                                    link.href = file.url_w_host
+                                    link.download = file.title
+                                    document.body.appendChild(link)
+                                    link.click()
+                                    document.body.removeChild(link)
+                                  }}
+                                  className="p-2"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-white/10">
+            <div className="flex justify-end">
+              <Button onClick={onClose}>
+                Stäng
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
