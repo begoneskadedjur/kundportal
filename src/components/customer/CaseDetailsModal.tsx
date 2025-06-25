@@ -21,6 +21,7 @@ import {
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { generatePDFReport } from '../../utils/pdfReportGenerator'
 
 interface CaseDetailsModalProps {
   caseId: string
