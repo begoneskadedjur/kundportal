@@ -1,4 +1,4 @@
-// api/clickup-webhook.ts - FINAL WORKING VERSION
+// api/clickup-webhook.ts - KORRIGERAD VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
@@ -205,7 +205,8 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
       clickup_task_id: caseData.clickup_task_id,
       case_number: caseData.case_number,
       title: caseData.title,
-      status: caseData.status
+      status: caseData.status,
+      case_type: caseData.case_type // Loggar för att verifiera
     })
     
     const { error } = await supabase
@@ -310,85 +311,68 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
   const getCustomField = (name: string) => {
     return taskData.custom_fields?.find((field: any) => 
       field.name.toLowerCase() === name.toLowerCase()
-    )
-  }
+    );
+  };
 
-  const addressField = getCustomField('Adress')
-  const pestField = getCustomField('Skadedjur')
-  const caseTypeField = getCustomField('Ärende')
-  const priceField = getCustomField('Pris')
-  const reportField = getCustomField('Rapport')
-  const filesField = getCustomField('Filer')
-
-  const getDropdownText = (field: any) => {
+  // *** HÄR ÄR DEN ENDA ÄNDRINGEN - DEN KORRIGERADE FUNKTIONEN ***
+  const getDropdownText = (field: any): string | null => {
     if (!field) {
-      console.log('🔍 Field is null/undefined')
-      return null
+      return null;
     }
-    
-    console.log('🔍 Processing dropdown field:', {
-      name: field.name,
-      type: field.type,
-      has_value: !!field.value || field.has_value,
-      value: field.value,
-      type_config: field.type_config
-    })
-    
-    // För dropdown-fält som saknar värde men har has_value: false
-    if (!field.has_value && (field.value === 0 || field.value === null || field.value === undefined)) {
-      console.log('🔍 Field has no value (has_value: false)')
-      return null
-    }
-    
-    // Olika sätt att hantera dropdown-värden
-    if (field.type_config?.options) {
-      console.log('🔍 Options found:', field.type_config.options)
-      
-      let option = null
-      
-      // Försök först matcha med orderindex (för numeriska värden)
-      if (typeof field.value === 'number') {
-        option = field.type_config.options.find((opt: any) => 
-          opt.orderindex === field.value
-        )
-        console.log('🔍 Trying orderindex match:', option)
-      }
-      
-      // Om orderindex inte fungerar, försök matcha med ID (för string-värden)
-      if (!option && typeof field.value === 'string') {
-        option = field.type_config.options.find((opt: any) => 
-          opt.id === field.value
-        )
-        console.log('🔍 Trying ID match:', option)
-      }
-      
-      // Som fallback, försök matcha med namn
-      if (!option) {
-        option = field.type_config.options.find((opt: any) => 
-          opt.name === field.value || opt.value === field.value
-        )
-        console.log('🔍 Trying name/value match:', option)
-      }
-      
-      console.log('🔍 Final matched option:', option)
-      return option?.name || field.value?.toString()
-    }
-    
-    // Fallback för andra dropdown-typer
-    return field.value?.toString()
-  }
 
-  const assignee = taskData.assignees?.[0]
+    // Ett fält utan värde har oftast value: null eller value: undefined.
+    // VIKTIGT: Vi kollar INTE mot 0, eftersom 0 är ett giltigt orderindex!
+    if (field.value === null || field.value === undefined) {
+      console.log(`🔍 Field '${field.name}' has a null or undefined value.`);
+      return null;
+    }
+
+    if (field.type_config?.options && Array.isArray(field.type_config.options)) {
+      let option: any = null;
+
+      // ClickUp använder antingen ett numeriskt 'orderindex' eller en text-baserad UUID ('id') som värde.
+      if (typeof field.value === 'number') {
+        option = field.type_config.options.find(
+          (opt: any) => opt.orderindex === field.value
+        );
+      } else if (typeof field.value === 'string') {
+        option = field.type_config.options.find(
+          (opt: any) => opt.id === field.value
+        );
+      }
+      
+      if (option) {
+        console.log(`✅ Matched dropdown option for '${field.name}': '${option.name}'`);
+        return option.name;
+      } else {
+        console.warn(`⚠️ Could not find a matching dropdown option for '${field.name}' with value:`, field.value);
+      }
+    }
+
+    // Fallback om ingen option matchades eller om det inte är en standard dropdown.
+    console.log(`🔍 Fallback: returning value as string for field '${field.name}'`);
+    return field.value.toString();
+  };
+  // *** SLUT PÅ DEN KORRIGERADE FUNKTIONEN ***
+
+  const addressField = getCustomField('Adress');
+  const pestField = getCustomField('Skadedjur');
+  const caseTypeField = getCustomField('Ärende');
+  const priceField = getCustomField('Pris');
+  const reportField = getCustomField('Rapport');
+  const filesField = getCustomField('Filer');
+
+  const assignee = taskData.assignees?.[0];
 
   return {
     customer_id: customerId,
     clickup_task_id: taskData.id,
     case_number: taskData.custom_id || taskData.id,
     title: taskData.name,
-    status: mapStatusValue(taskData.status?.status || taskData.status), // FIX: Använd status-mappning
-    priority: mapPriorityValue(taskData.priority?.priority), // FIX: Använd mappningsfunktionen
+    status: mapStatusValue(taskData.status?.status || taskData.status),
+    priority: mapPriorityValue(taskData.priority?.priority),
     pest_type: getDropdownText(pestField),
-    case_type: getDropdownText(caseTypeField),
+    case_type: getDropdownText(caseTypeField), // Denna kommer nu fungera korrekt!
     description: taskData.description || '',
     
     address_formatted: addressField?.value?.formatted_address || null,
@@ -410,8 +394,9 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     completed_date: taskData.date_closed ? new Date(parseInt(taskData.date_closed)).toISOString() : null,
     
     updated_at: new Date().toISOString()
-  }
+  };
 }
+
 
 // Hantera när en task tas bort
 async function handleTaskDeleted(taskId: string, customerId: string) {
