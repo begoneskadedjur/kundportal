@@ -162,17 +162,15 @@ function verifyWebhookSignature(body: string, signature: string | null, secret: 
 }
 
 // Synkronisera task från ClickUp till vår databas
-async function syncTaskFromClickUp(taskId: string, customerId: string, taskData?: any) {
+async function syncTaskFromClickUp(taskId: string, customerId: string) {
   try {
     console.log(`🔄 Syncing task ${taskId} for customer ${customerId}`)
     
-    // Använd taskData om det redan finns, annars hämta det
+    // Hämta task-data från ClickUp
+    const taskData = await fetchClickUpTask(taskId)
     if (!taskData) {
-      taskData = await fetchClickUpTask(taskId)
-      if (!taskData) {
-        console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
-        return
-      }
+      console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
+      return
     }
 
     console.log(`📋 Task data fetched:`, {
