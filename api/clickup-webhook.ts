@@ -1,4 +1,4 @@
-// api/clickup-webhook.ts
+// api/clickup-webhook.ts - FIXAD VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
@@ -8,7 +8,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
-const CLICKUP_WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET // Vi kommer att sätta denna
+const CLICKUP_WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET
 
 interface ClickUpWebhookPayload {
   event: 'taskCreated' | 'taskUpdated' | 'taskDeleted'
@@ -22,6 +22,13 @@ interface ClickUpWebhookPayload {
   }>
 }
 
+// VIKTIGT: Disable body parsing för att hantera raw data
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -29,13 +36,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     console.log('🔔 ClickUp Webhook received')
+
+    // Läs raw body data
+    const rawBody = await getRawBody(req)
+    console.log('📦 Raw body received, length:', rawBody.length)
+
+    let payload: ClickUpWebhookPayload
     
-    const payload: ClickUpWebhookPayload = req.body
-    
+    try {
+      payload = JSON.parse(rawBody)
+      console.log('✅ Payload parsed successfully:', {
+        event: payload.event,
+        task_id: payload.task_id,
+        list_id: payload.list_id
+      })
+    } catch (parseError) {
+      console.error('❌ Failed to parse webhook payload:', parseError)
+      console.error('Raw body content:', rawBody.substring(0, 500))
+      return res.status(400).json({ error: 'Invalid JSON payload' })
+    }
+
     // 1. Verifiera webhook-signatur (säkerhet)
     if (CLICKUP_WEBHOOK_SECRET) {
       const signature = req.headers['x-signature'] as string
-      if (!verifyWebhookSignature(JSON.stringify(req.body), signature, CLICKUP_WEBHOOK_SECRET)) {
+      if (!verifyWebhookSignature(rawBody, signature, CLICKUP_WEBHOOK_SECRET)) {
         console.error('❌ Invalid webhook signature')
         return res.status(401).json({ error: 'Invalid signature' })
       }
@@ -82,9 +106,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('❌ Webhook error:', error)
     return res.status(500).json({ 
-      error: 'Internal server error' 
+      error: 'Internal server error',
+      debug: error instanceof Error ? error.message : 'Unknown error'
     })
   }
+}
+
+// Hjälpfunktion för att läsa raw body från request
+async function getRawBody(req: VercelRequest): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.setEncoding('utf8')
+    
+    req.on('data', (chunk) => {
+      data += chunk
+    })
+    
+    req.on('end', () => {
+      resolve(data)
+    })
+    
+    req.on('error', (err) => {
+      reject(err)
+    })
+  })
 }
 
 // Verifiera webhook-signatur från ClickUp
@@ -234,13 +279,7 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
 async function handleTaskDeleted(taskId: string, customerId: string) {
   console.log(`🗑️ Handling deleted task ${taskId}`)
   
-  // Alternativ 1: Ta bort från databasen
-  // const { error } = await supabase
-  //   .from('cases')
-  //   .delete()
-  //   .eq('clickup_task_id', taskId)
-
-  // Alternativ 2: Markera som borttagen (rekommenderat för historik)
+  // Markera som borttagen (rekommenderat för historik)
   const { error } = await supabase
     .from('cases')
     .update({ 
