@@ -321,15 +321,42 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
   const filesField = getCustomField('Filer')
 
   const getDropdownText = (field: any) => {
-    if (!field || !field.value) return null
+    if (!field) {
+      console.log('🔍 Field is null/undefined')
+      return null
+    }
     
+    console.log('🔍 Processing dropdown field:', {
+      name: field.name,
+      type: field.type,
+      has_value: !!field.value,
+      value: field.value,
+      type_config: field.type_config
+    })
+    
+    if (!field.value) return null
+    
+    // Olika sätt att hantera dropdown-värden
     if (field.type_config?.options) {
-      const option = field.type_config.options.find((opt: any) => 
+      console.log('🔍 Options found:', field.type_config.options)
+      
+      // Försök matcha med orderindex
+      let option = field.type_config.options.find((opt: any) => 
         opt.orderindex === field.value
       )
+      
+      // Om orderindex inte fungerar, försök matcha med ID eller namn
+      if (!option) {
+        option = field.type_config.options.find((opt: any) => 
+          opt.id === field.value || opt.name === field.value
+        )
+      }
+      
+      console.log('🔍 Matched option:', option)
       return option?.name || field.value?.toString()
     }
     
+    // Fallback för andra dropdown-typer
     return field.value?.toString()
   }
 
