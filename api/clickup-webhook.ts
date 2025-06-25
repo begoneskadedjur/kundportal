@@ -1,4 +1,4 @@
-// api/clickup-webhook.ts - FIXAD VERSION
+// api/clickup-webhook.ts - UPPDATERAD VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
@@ -11,12 +11,19 @@ const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 const CLICKUP_WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET
 
 interface ClickUpWebhookPayload {
-  event: 'taskCreated' | 'taskUpdated' | 'taskDeleted'
+  event: 'taskCreated' | 'taskUpdated' | 'taskDeleted' // m.fl.
   task_id: string
-  list_id: string
+  list_id?: string // Kan vara undefined, särskilt vid 'taskUpdated'
   webhook_id: string
   history_items?: Array<{
+    id: string
+    type: number
+    date: string
     field: string
+    parent_id: string // Detta är oftast listans ID
+    data: object
+    source: null | any
+    user: object
     before: any
     after: any
   }>
@@ -37,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('🔔 ClickUp Webhook received')
 
-    // Läs raw body data
     const rawBody = await getRawBody(req)
     console.log('📦 Raw body received, length:', rawBody.length)
 
@@ -48,11 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('✅ Payload parsed successfully:', {
         event: payload.event,
         task_id: payload.task_id,
-        list_id: payload.list_id,
+        list_id: payload.list_id, // Loggar det som kommer in från början
         webhook_id: payload.webhook_id
       })
-      
-      // Log hela payload för debugging
       console.log('📄 Full payload:', JSON.stringify(payload, null, 2))
       
     } catch (parseError) {
@@ -61,13 +65,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid JSON payload' })
     }
 
-    // Hantera ClickUp test webhook (som skickar tom data)
     if (!payload.event && rawBody.includes('test')) {
       console.log('🧪 Test webhook received from ClickUp')
       return res.status(200).json({ message: 'Test webhook received successfully' })
     }
 
-    // 1. Verifiera webhook-signatur (säkerhet)
     if (CLICKUP_WEBHOOK_SECRET) {
       const signature = req.headers['x-signature'] as string
       if (!verifyWebhookSignature(rawBody, signature, CLICKUP_WEBHOOK_SECRET)) {
@@ -76,34 +78,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 2. Kontrollera om detta är en relevant event
     const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted', 'taskStatusUpdated', 'taskAssigneeUpdated']
     if (!payload.event || !supportedEvents.includes(payload.event)) {
       console.log(`ℹ️ Ignoring event: ${payload.event || 'undefined'}`)
       return res.status(200).json({ message: `Event ${payload.event || 'undefined'} ignored` })
     }
 
-    // Validera att vi har nödvändig data
     if (!payload.task_id) {
       console.error('❌ Missing task_id in webhook payload')
       return res.status(400).json({ error: 'Missing task_id' })
     }
 
-    // 3. Kontrollera om tasken tillhör en kundlista
+    // *** NY ROBUST LOGIK FÖR ATT HANTERA LIST-ID ***
+    let listId: string | undefined = payload.list_id;
+
+    // Om list_id saknas på toppnivån (vanligt vid 'taskUpdated'), hämta från history_items
+    if (!listId && payload.history_items && payload.history_items.length > 0) {
+      // parent_id i det första history item är oftast listans ID.
+      listId = payload.history_items[0].parent_id;
+      console.log(`ℹ️ list_id saknades. Hittade parent_id i history_items: ${listId}`);
+    }
+
+    // Validera att vi nu har ett list-ID innan vi fortsätter
+    if (!listId) {
+      console.error(`❌ Kunde inte fastställa list_id för task ${payload.task_id}.`);
+      // Vi returnerar 200 OK så att ClickUp inte försöker skicka igen.
+      return res.status(200).json({ message: 'Kunde inte fastställa list_id, ignorerar.' });
+    }
+    // *** SLUT PÅ NY LOGIK ***
+
+
+    // Kontrollera om tasken tillhör en kundlista (använder den nya, pålitliga `listId`-variabeln)
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('id, company_name, clickup_list_id')
-      .eq('clickup_list_id', payload.list_id)
+      .eq('clickup_list_id', listId) // Använder den nya variabeln här!
       .single()
 
     if (customerError || !customer) {
-      console.log(`ℹ️ Task ${payload.task_id} is not in a customer list (list_id: ${payload.list_id})`)
+      console.log(`ℹ️ Task ${payload.task_id} is not in a customer list (list_id: ${listId})`)
       return res.status(200).json({ message: 'Not a customer task' })
     }
 
     console.log(`📋 Processing ${payload.event} for customer: ${customer.company_name}`)
 
-    // 4. Hantera olika event-typer
     switch (payload.event) {
       case 'taskCreated':
       case 'taskUpdated':
@@ -166,7 +184,6 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
   try {
     console.log(`🔄 Syncing task ${taskId} for customer ${customerId}`)
     
-    // Hämta task-data från ClickUp
     const taskData = await fetchClickUpTask(taskId)
     if (!taskData) {
       console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
@@ -181,7 +198,6 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
       custom_fields_count: taskData.custom_fields?.length || 0
     })
 
-    // Mappa ClickUp-data till vårt databasformat
     const caseData = mapClickUpTaskToCaseData(taskData, customerId)
     
     console.log(`💾 Saving case data:`, {
@@ -192,7 +208,6 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
       status: caseData.status
     })
     
-    // Uppdatera eller skapa case i databasen
     const { error } = await supabase
       .from('cases')
       .upsert(caseData, {
@@ -223,12 +238,14 @@ async function fetchClickUpTask(taskId: string) {
     })
 
     if (!response.ok) {
-      console.error(`ClickUp API error: ${response.status} ${response.statusText}`)
+      const errorBody = await response.text()
+      console.error(`ClickUp API error: ${response.status} ${response.statusText}`, errorBody)
       return null
     }
 
     const data = await response.json()
-    return data.task || data // Beroende på ClickUp API-struktur
+    // Vissa API-endpoints returnerar datan direkt, andra under en "task"-nyckel.
+    return data.task || data 
     
   } catch (error) {
     console.error('Error fetching task from ClickUp:', error)
@@ -238,7 +255,6 @@ async function fetchClickUpTask(taskId: string) {
 
 // Mappa ClickUp task-data till vårt cases-format
 function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
-  // Hitta custom fields
   const getCustomField = (name: string) => {
     return taskData.custom_fields?.find((field: any) => 
       field.name.toLowerCase() === name.toLowerCase()
@@ -252,9 +268,8 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
   const reportField = getCustomField('rapport')
   const filesField = getCustomField('filer')
 
-  // Mappa dropdown-värden
   const getDropdownText = (field: any) => {
-    if (!field?.has_value) return null
+    if (!field || !field.value) return null
     
     if (field.type_config?.options) {
       const option = field.type_config.options.find((opt: any) => 
@@ -266,7 +281,6 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     return field.value?.toString()
   }
 
-  // Hitta första assignee
   const assignee = taskData.assignees?.[0]
 
   return {
@@ -274,32 +288,26 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     clickup_task_id: taskData.id,
     case_number: taskData.custom_id || taskData.id,
     title: taskData.name,
-    status: taskData.status?.status || taskData.status,
+    status: taskData.status?.status || taskData.status || 'unknown',
     priority: taskData.priority?.priority || 'normal',
     pest_type: getDropdownText(pestField),
     case_type: getDropdownText(caseTypeField),
-    location_details: taskData.description || '',
     description: taskData.description || '',
     
-    // Adress-information
     address_formatted: addressField?.value?.formatted_address || null,
     address_lat: addressField?.value?.location?.lat || null,
     address_lng: addressField?.value?.location?.lng || null,
     
-    // Pris och rapport
-    price: priceField?.has_value ? priceField.value : null,
+    price: priceField?.value !== undefined ? priceField.value : null,
     technician_report: reportField?.value || null,
     
-    // Filer (spara som JSON)
     files: filesField?.value && Array.isArray(filesField.value) 
       ? JSON.stringify(filesField.value) 
       : null,
     
-    // Ansvarig tekniker
     assigned_technician_name: assignee?.username || null,
     assigned_technician_email: assignee?.email || null,
     
-    // Datum
     created_date: new Date(parseInt(taskData.date_created)).toISOString(),
     scheduled_date: taskData.due_date ? new Date(parseInt(taskData.due_date)).toISOString() : null,
     completed_date: taskData.date_closed ? new Date(parseInt(taskData.date_closed)).toISOString() : null,
@@ -312,7 +320,6 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
 async function handleTaskDeleted(taskId: string, customerId: string) {
   console.log(`🗑️ Handling deleted task ${taskId}`)
   
-  // Markera som borttagen (rekommenderat för historik)
   const { error } = await supabase
     .from('cases')
     .update({ 
