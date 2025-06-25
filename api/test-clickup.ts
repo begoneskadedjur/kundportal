@@ -1,118 +1,208 @@
-// api/test-clickup.ts - ULTRA SIMPLE VERSION
+// api/test-clickup.ts - WORKING VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN
 
-  // Sätt headers
+  // Sätt rätt headers
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Content-Type', 'application/json')
-
-  // OPTIONS request
+  
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
 
-  // Kontrollera API token
+  // Kontrollera API token först
   if (!CLICKUP_API_TOKEN) {
     return res.status(500).json({ 
-      error: 'CLICKUP_API_TOKEN saknas',
-      configured: false
+      error: 'CLICKUP_API_TOKEN saknas i environment variables'
     })
   }
 
-  // Om ingen parameter - visa enkel HTML
-  if (!req.query.list_id && !req.query.task_id) {
-    const html = `
-<!DOCTYPE html>
-<html>
+  // Om det är en GET utan parametrar - visa test-sidan
+  if (req.method === 'GET' && !req.query.list_id && !req.query.task_id) {
+    res.setHeader('Content-Type', 'text/html')
+    
+    const html = `<!DOCTYPE html>
+<html lang="sv">
 <head>
-  <title>ClickUp Test</title>
-  <style>
-    body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
-    .form { background: #f0f0f0; padding: 20px; margin: 20px 0; border-radius: 5px; }
-    input { padding: 8px; width: 200px; margin: 5px; }
-    button { padding: 8px 15px; background: #007cba; color: white; border: none; border-radius: 3px; cursor: pointer; }
-    .result { background: #f9f9f9; padding: 15px; margin: 20px 0; border: 1px solid #ddd; white-space: pre-wrap; font-family: monospace; }
-    .error { background: #ffe6e6; border-color: #ff9999; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickUp API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007cba;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #007cba;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 250px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007cba;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #005a8b;
+        }
+        #result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            color: #0c5460;
+            font-style: italic;
+        }
+    </style>
 </head>
 <body>
-  <h1>ClickUp API Test</h1>
-  
-  <div class="form">
-    <h3>Test List (hämta alla tasks)</h3>
-    <input type="text" id="listId" value="901210684656" placeholder="List ID">
-    <button onclick="testList()">Test List</button>
-  </div>
+    <div class="container">
+        <h1>🔍 ClickUp API Test</h1>
+        
+        <div class="test-section">
+            <h3>📋 Test 1: Hämta Tasks från List</h3>
+            <p>Testar att hämta alla tasks från en specifik ClickUp-lista:</p>
+            <input type="text" id="listInput" value="901210684656" placeholder="Ange List ID">
+            <button onclick="testList()">🚀 Testa List</button>
+        </div>
 
-  <div class="form">
-    <h3>Test Task (detaljerad info)</h3>
-    <input type="text" id="taskId" placeholder="Task ID">
-    <button onclick="testTask()">Test Task</button>
-  </div>
+        <div class="test-section">
+            <h3>📝 Test 2: Analysera Specifik Task</h3>
+            <p>Får detaljerad information om en task inklusive custom fields:</p>
+            <input type="text" id="taskInput" placeholder="Ange Task ID">
+            <button onclick="testTask()">🔍 Analysera Task</button>
+        </div>
 
-  <div id="result"></div>
+        <div id="result">Klicka på en test-knapp för att börja...</div>
+    </div>
 
-  <script>
-    function testList() {
-      const listId = document.getElementById('listId').value;
-      if (!listId) return alert('Ange List ID');
-      
-      document.getElementById('result').innerHTML = 'Laddar...';
-      
-      fetch('/api/test-clickup?list_id=' + listId)
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('result').className = 'result';
-          document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
-          
-          if (data.tasks && data.tasks.length > 0) {
-            let buttons = '\\n\\nTasks (klicka för att testa):';
-            data.tasks.forEach(task => {
-              buttons += '\\n<button onclick="setTask(\\''+task.id+'\\')">'+task.name+'</button>';
-            });
-            document.getElementById('result').innerHTML += buttons;
-          }
-        })
-        .catch(err => {
-          document.getElementById('result').className = 'result error';
-          document.getElementById('result').innerHTML = 'Error: ' + err.message;
-        });
-    }
+    <script>
+        function testList() {
+            const listId = document.getElementById('listInput').value.trim();
+            if (!listId) {
+                alert('❌ Vänligen ange ett List ID');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'loading';
+            resultDiv.textContent = '⏳ Hämtar data från ClickUp...';
+            
+            fetch('/api/test-clickup?list_id=' + encodeURIComponent(listId))
+                .then(response => response.json())
+                .then(data => {
+                    resultDiv.className = '';
+                    if (data.error) {
+                        resultDiv.className = 'error';
+                        resultDiv.textContent = '❌ FEL: ' + data.error;
+                    } else {
+                        resultDiv.textContent = JSON.stringify(data, null, 2);
+                        
+                        if (data.tasks && data.tasks.length > 0) {
+                            let buttonHTML = '\\n\\n=== TASKS (klicka för att analysera) ===\\n';
+                            data.tasks.forEach((task, index) => {
+                                buttonHTML += '\\n' + (index + 1) + '. ' + task.name + ' (ID: ' + task.id + ')';
+                            });
+                            resultDiv.textContent += buttonHTML;
+                            
+                            // Sätt första task ID automatiskt
+                            document.getElementById('taskInput').value = data.tasks[0].id;
+                        }
+                    }
+                })
+                .catch(error => {
+                    resultDiv.className = 'error';
+                    resultDiv.textContent = '❌ NÄTVERKSFEL: ' + error.message;
+                });
+        }
 
-    function testTask() {
-      const taskId = document.getElementById('taskId').value;
-      if (!taskId) return alert('Ange Task ID');
-      
-      document.getElementById('result').innerHTML = 'Laddar task...';
-      
-      fetch('/api/test-clickup?task_id=' + taskId)
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('result').className = 'result';
-          document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
-        })
-        .catch(err => {
-          document.getElementById('result').className = 'result error';
-          document.getElementById('result').innerHTML = 'Error: ' + err.message;
-        });
-    }
+        function testTask() {
+            const taskId = document.getElementById('taskInput').value.trim();
+            if (!taskId) {
+                alert('❌ Vänligen ange ett Task ID');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'loading';
+            resultDiv.textContent = '⏳ Analyserar task...';
+            
+            fetch('/api/test-clickup?task_id=' + encodeURIComponent(taskId))
+                .then(response => response.json())
+                .then(data => {
+                    resultDiv.className = '';
+                    if (data.error) {
+                        resultDiv.className = 'error';
+                        resultDiv.textContent = '❌ FEL: ' + data.error;
+                    } else {
+                        resultDiv.textContent = JSON.stringify(data, null, 2);
+                    }
+                })
+                .catch(error => {
+                    resultDiv.className = 'error';
+                    resultDiv.textContent = '❌ NÄTVERKSFEL: ' + error.message;
+                });
+        }
 
-    function setTask(taskId) {
-      document.getElementById('taskId').value = taskId;
-      testTask();
-    }
-  </script>
+        // Auto-test när sidan laddas
+        window.onload = function() {
+            document.getElementById('result').textContent = '✅ Sidan laddad! ClickUp API token: ' + (true ? 'KONFIGURERAD' : 'SAKNAS');
+        };
+    </script>
 </body>
 </html>`
     
     return res.status(200).send(html)
   }
 
-  // TEST TASK
+  // TEST SPECIFIK TASK
   if (req.query.task_id) {
-    const taskId = req.query.task_id
+    const taskId = req.query.task_id as string
     
     try {
       const response = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
@@ -123,43 +213,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
         return res.status(response.status).json({
-          error: `ClickUp API fel: ${response.status}`,
+          error: `ClickUp API returnerade ${response.status}: ${response.statusText}`,
+          details: errorText,
           task_id: taskId
         })
       }
 
       const taskData = await response.json()
 
-      return res.status(200).json({
+      const result = {
         success: true,
         task_id: taskId,
-        task_name: taskData.name,
-        task_status: taskData.status?.status,
-        task_description: taskData.description,
-        assignees: taskData.assignees?.length || 0,
-        custom_fields_count: taskData.custom_fields?.length || 0,
-        custom_fields: taskData.custom_fields?.map((field) => ({
+        task_info: {
+          name: taskData.name,
+          status: taskData.status?.status || 'Ingen status',
+          description: taskData.description || 'Ingen beskrivning',
+          url: taskData.url,
+          created: taskData.date_created,
+          updated: taskData.date_updated
+        },
+        assignees: taskData.assignees?.map((a: any) => ({
+          name: a.username,
+          email: a.email
+        })) || [],
+        custom_fields: taskData.custom_fields?.map((field: any) => ({
           id: field.id,
           name: field.name,
           type: field.type,
-          value: field.value
-        })) || [],
-        full_data: taskData
-      })
+          value: field.value,
+          has_value: field.value !== null && field.value !== undefined && field.value !== ''
+        })) || []
+      }
 
-    } catch (error) {
+      return res.status(200).json(result)
+
+    } catch (error: any) {
       return res.status(500).json({
-        error: 'Fel vid hämtning av task',
+        error: 'Kunde inte hämta task från ClickUp',
         details: error.message,
         task_id: taskId
       })
     }
   }
 
-  // TEST LIST
+  // TEST LIST OCH HÄMTA TASKS
   if (req.query.list_id) {
-    const listId = req.query.list_id
+    const listId = req.query.list_id as string
     
     try {
       const response = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
@@ -170,30 +271,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
         return res.status(response.status).json({
-          error: `ClickUp API fel: ${response.status}`,
+          error: `ClickUp API returnerade ${response.status}: ${response.statusText}`,
+          details: errorText,
           list_id: listId
         })
       }
 
       const data = await response.json()
 
-      return res.status(200).json({
+      const result = {
         success: true,
         list_id: listId,
-        tasks_count: data.tasks?.length || 0,
-        tasks: data.tasks?.map((task) => ({
+        tasks_found: data.tasks?.length || 0,
+        tasks: data.tasks?.map((task: any) => ({
           id: task.id,
           name: task.name,
-          status: task.status?.status,
+          status: task.status?.status || 'Ingen status',
+          description: task.description ? 'Har beskrivning' : 'Ingen beskrivning',
           custom_fields_count: task.custom_fields?.length || 0
-        })) || [],
-        full_data: data
-      })
+        })) || []
+      }
 
-    } catch (error) {
+      return res.status(200).json(result)
+
+    } catch (error: any) {
       return res.status(500).json({
-        error: 'Fel vid hämtning av lista',
+        error: 'Kunde inte hämta tasks från ClickUp',
         details: error.message,
         list_id: listId
       })
@@ -201,7 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(400).json({ 
-    error: 'Saknar parametrar',
-    usage: 'Använd ?list_id=xxx eller ?task_id=xxx'
+    error: 'Ogiltiga parametrar',
+    usage: 'Använd ?list_id=XXX för att testa lista eller ?task_id=XXX för att testa task'
   })
 }
