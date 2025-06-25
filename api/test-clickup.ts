@@ -1,27 +1,23 @@
-// api/test-clickup.ts - WORKING VERSION
+// api/test-clickup.ts - ENHANCED VERSION WITH DROPDOWN CONFIG
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN
 
-  // Sätt rätt headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
 
-  // Kontrollera API token först
   if (!CLICKUP_API_TOKEN) {
     return res.status(500).json({ 
       error: 'CLICKUP_API_TOKEN saknas i environment variables'
     })
   }
 
-  // Om det är en GET utan parametrar - visa test-sidan
-  if (req.method === 'GET' && !req.query.list_id && !req.query.task_id) {
-    res.setHeader('Content-Type', 'text/html')
-    
+  // HTML test interface (unchanged)
+  if (!req.query.list_id && !req.query.task_id) {
     const html = `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -29,80 +25,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClickUp API Test</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .test-section {
-            background: #f8f9fa;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-            border-left: 4px solid #007cba;
-        }
-        .test-section h3 {
-            margin-top: 0;
-            color: #007cba;
-        }
-        input[type="text"] {
-            padding: 10px;
-            width: 250px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-right: 10px;
-        }
-        button {
-            padding: 10px 20px;
-            background: #007cba;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        button:hover {
-            background: #005a8b;
-        }
-        #result {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 20px 0;
-            white-space: pre-wrap;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .error {
-            background: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
-        }
-        .loading {
-            color: #0c5460;
-            font-style: italic;
-        }
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; background-color: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .test-section { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #007cba; }
+        .test-section h3 { margin-top: 0; color: #007cba; }
+        input[type="text"] { padding: 10px; width: 250px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px; }
+        button { padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #005a8b; }
+        #result { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 20px 0; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; max-height: 500px; overflow-y: auto; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .loading { color: #0c5460; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔍 ClickUp API Test</h1>
+        <h1>🔍 ClickUp API Test - Enhanced</h1>
         
         <div class="test-section">
             <h3>📋 Test 1: Hämta Tasks från List</h3>
@@ -112,8 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         </div>
 
         <div class="test-section">
-            <h3>📝 Test 2: Analysera Specifik Task</h3>
-            <p>Får detaljerad information om en task inklusive custom fields:</p>
+            <h3>📝 Test 2: Analysera Specifik Task (med dropdown config)</h3>
+            <p>Får detaljerad information om en task inklusive dropdown-alternativ:</p>
             <input type="text" id="taskInput" placeholder="Ange Task ID">
             <button onclick="testTask()">🔍 Analysera Task</button>
         </div>
@@ -150,7 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             });
                             resultDiv.textContent += buttonHTML;
                             
-                            // Sätt första task ID automatiskt
                             document.getElementById('taskInput').value = data.tasks[0].id;
                         }
                     }
@@ -170,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const resultDiv = document.getElementById('result');
             resultDiv.className = 'loading';
-            resultDiv.textContent = '⏳ Analyserar task...';
+            resultDiv.textContent = '⏳ Analyserar task med dropdown config...';
             
             fetch('/api/test-clickup?task_id=' + encodeURIComponent(taskId))
                 .then(response => response.json())
@@ -189,9 +126,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 });
         }
 
-        // Auto-test när sidan laddas
         window.onload = function() {
-            document.getElementById('result').textContent = '✅ Sidan laddad! ClickUp API token: ' + (true ? 'KONFIGURERAD' : 'SAKNAS');
+            document.getElementById('result').textContent = '✅ Sidan laddad! Enhanced version med dropdown config.';
         };
     </script>
 </body>
@@ -200,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send(html)
   }
 
-  // TEST SPECIFIK TASK
+  // ENHANCED TASK DETAILS with dropdown config
   if (req.query.task_id) {
     const taskId = req.query.task_id as string
     
@@ -223,13 +159,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const taskData = await response.json()
 
+      // Enhanced custom fields with full type_config
+      const enhancedCustomFields = taskData.custom_fields?.map((field: any) => ({
+        id: field.id,
+        name: field.name,
+        type: field.type,
+        value: field.value,
+        has_value: field.value !== null && field.value !== undefined && field.value !== '',
+        type_config: field.type_config || null, // Include full dropdown config
+        raw_field: field // Include raw field for debugging
+      })) || []
+
       const result = {
         success: true,
         task_id: taskId,
         task_info: {
           name: taskData.name,
           status: taskData.status?.status || 'Ingen status',
-          description: taskData.description || 'Ingen beskrivning',
+          description: taskData.description || '',
           url: taskData.url,
           created: taskData.date_created,
           updated: taskData.date_updated
@@ -238,13 +185,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: a.username,
           email: a.email
         })) || [],
-        custom_fields: taskData.custom_fields?.map((field: any) => ({
-          id: field.id,
-          name: field.name,
-          type: field.type,
-          value: field.value,
-          has_value: field.value !== null && field.value !== undefined && field.value !== ''
-        })) || []
+        custom_fields: enhancedCustomFields,
+        // Add dropdown analysis for debugging
+        dropdown_analysis: {
+          found_dropdowns: enhancedCustomFields.filter((f: any) => f.type === 'drop_down'),
+          dropdown_configs: enhancedCustomFields
+            .filter((f: any) => f.type === 'drop_down' && f.type_config?.options)
+            .map((f: any) => ({
+              field_name: f.name,
+              field_value: f.value,
+              options: f.type_config.options
+            }))
+        }
       }
 
       return res.status(200).json(result)
@@ -258,7 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // TEST LIST OCH HÄMTA TASKS
+  // LIST TEST (unchanged)
   if (req.query.list_id) {
     const listId = req.query.list_id as string
     

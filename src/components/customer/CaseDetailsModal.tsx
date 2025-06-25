@@ -121,29 +121,59 @@ export default function CaseDetailsModal({
     return <FileText className="w-4 h-4" />
   }
 
-  const getPestTypeText = (value: any) => {
-    // Här kan du mappa dropdown-värden till riktiga namn
-    const pestTypes: { [key: number]: string } = {
-      0: 'Ej specificerat',
-      1: 'Råttor',
-      2: 'Möss', 
-      3: 'Kackerlackor',
-      4: 'Myror',
-      5: 'Getingar',
-      // Lägg till fler baserat på era dropdown-värden
+  // Mapping för skadedjur baserat på era ClickUp-alternativ
+  const getPestTypeText = (field: any) => {
+    if (!field || !field.has_value) return 'Ej specificerat'
+    
+    // Om vi har type_config med options från ClickUp
+    if (field.type_config?.options && Array.isArray(field.type_config.options)) {
+      const selectedOption = field.type_config.options.find((option: any) => 
+        option.orderindex === field.value || option.id === field.value
+      )
+      if (selectedOption) {
+        return selectedOption.name
+      }
     }
-    return pestTypes[value] || `Typ ${value}`
+    
+    // Fallback mapping baserat på era alternativ
+    const pestTypes: { [key: string]: string } = {
+      '0': 'Råttor',
+      '1': 'Möss',
+      '2': 'Kackerlackor', 
+      '3': 'Myror',
+      '4': 'Getingar',
+      '5': 'Flugor',
+      '6': 'Inspektion',
+      '7': 'Loppor',
+      '8': 'Flygande insekt',
+      '9': 'Krypande insekt', 
+      '10': 'Skadedjursavtal',
+      '11': 'Hundsök - Vägglöss',
+      '12': 'Liksanering',
+      '13': 'Övrigt'
+    }
+    return pestTypes[field.value?.toString()] || `Okänt skadedjur (${field.value})`
   }
 
-  const getCaseTypeText = (value: any) => {
-    const caseTypes: { [key: number]: string } = {
-      0: 'Standardärende',
-      1: 'Akutärende',
-      2: 'Uppföljning',
-      3: 'Konsultation',
-      // Lägg till fler baserat på era dropdown-värden
+  const getCaseTypeText = (field: any) => {
+    if (!field || !field.has_value) return 'Ej specificerat'
+    
+    // Om vi har type_config med options från ClickUp
+    if (field.type_config?.options && Array.isArray(field.type_config.options)) {
+      const selectedOption = field.type_config.options.find((option: any) => 
+        option.orderindex === field.value || option.id === field.value
+      )
+      if (selectedOption) {
+        return selectedOption.name
+      }
     }
-    return caseTypes[value] || `Typ ${value}`
+    
+    // Fallback mapping
+    const caseTypes: { [key: string]: string } = {
+      '0': 'Servicebesök',
+      '1': 'Etablering'
+    }
+    return caseTypes[field.value?.toString()] || `Okänd typ (${field.value})`
   }
 
   if (!isOpen) return null
@@ -265,7 +295,7 @@ export default function CaseDetailsModal({
                           <div>
                             <p className="text-sm text-slate-400">Skadedjur</p>
                             <p className="text-white font-medium">
-                              {getPestTypeText(pestField.value)}
+                              {getPestTypeText(pestField)}
                             </p>
                           </div>
                         </div>
@@ -275,9 +305,9 @@ export default function CaseDetailsModal({
                         <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
                           <FileText className="w-5 h-5 text-blue-400" />
                           <div>
-                            <p className="text-sm text-slate-400">Ärendetype</p>
+                            <p className="text-sm text-slate-400">Typ av ärende</p>
                             <p className="text-white font-medium">
-                              {getCaseTypeText(caseTypeField.value)}
+                              {getCaseTypeText(caseTypeField)}
                             </p>
                           </div>
                         </div>
