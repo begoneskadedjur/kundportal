@@ -1,4 +1,4 @@
-// src/components/customer/CaseDetailsModal.tsx - MED PDF-RAPPORT
+// src/components/customer/CaseDetailsModal.tsx - Med kunduppgifter för PDF
 import { useEffect, useState } from 'react'
 import { 
   X, 
@@ -16,12 +16,14 @@ import {
   Play,
   Mail,
   Phone,
-  FileDown // NY IKON
+  FileDown
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { generatePDFReport } from '../../utils/pdfReportGenerator'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 
 interface CaseDetailsModalProps {
   caseId: string
@@ -62,6 +64,12 @@ interface TaskDetails {
   }>
 }
 
+interface CustomerInfo {
+  company_name: string
+  org_number: string
+  contact_person: string
+}
+
 export default function CaseDetailsModal({ 
   caseId, 
   clickupTaskId, 
@@ -69,12 +77,15 @@ export default function CaseDetailsModal({
   onClose 
 }: CaseDetailsModalProps) {
   const [taskDetails, setTaskDetails] = useState<TaskDetails | null>(null)
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { profile } = useAuth()
 
   useEffect(() => {
     if (isOpen && clickupTaskId) {
       fetchTaskDetails()
+      fetchCustomerInfo()
     }
   }, [isOpen, clickupTaskId])
 
@@ -83,7 +94,6 @@ export default function CaseDetailsModal({
     setError(null)
     
     try {
-      // Använd din befintliga test-endpoint för att hämta data
       const response = await fetch(`/api/test-clickup?task_id=${clickupTaskId}`)
       
       if (!response.ok) {
@@ -97,6 +107,27 @@ export default function CaseDetailsModal({
       setError('Kunde inte ladda ärendedetaljer')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCustomerInfo = async () => {
+    if (!profile?.customer_id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('company_name, org_number, contact_person')
+        .eq('id', profile.customer_id)
+        .single()
+
+      if (error) {
+        console.error('Error fetching customer info:', error)
+        return
+      }
+
+      setCustomerInfo(data)
+    } catch (error) {
+      console.error('Error fetching customer info:', error)
     }
   }
 
@@ -133,11 +164,9 @@ export default function CaseDetailsModal({
     return <FileText className="w-4 h-4" />
   }
 
-  // Fallback - returnera värdet som det är
   const getDropdownText = (field: any) => {
     if (!field || !field.has_value) return 'Ej specificerat'
     
-    // Försök först med type_config.options från ClickUp
     if (field.type_config?.options && Array.isArray(field.type_config.options)) {
       const selectedOption = field.type_config.options.find((option: any) => 
         option.orderindex === field.value
@@ -147,16 +176,15 @@ export default function CaseDetailsModal({
       }
     }
     
-    // Fallback - returnera värdet som det är
     return field.value?.toString() || 'Ej specificerat'
   }
 
-  // Enkel PDF-generator som använder den separata modulen
+  // Uppdaterad PDF-generator som inkluderar kunduppgifter
   const handleGeneratePDF = async () => {
     if (!taskDetails) return
 
     try {
-      await generatePDFReport(taskDetails)
+      await generatePDFReport(taskDetails, customerInfo || undefined)
     } catch (error) {
       console.error('Error generating PDF:', error)
       alert('Kunde inte generera PDF-rapport')
@@ -188,19 +216,26 @@ export default function CaseDetailsModal({
                   Ärende #{taskDetails.task_id}
                 </p>
               )}
+              {/* Visa kundinfo i header om tillgänglig */}
+              {customerInfo && (
+                <p className="text-slate-300 text-sm mt-1">
+                  {customerInfo.company_name} • {customerInfo.org_number}
+                </p>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
-              {/* NY: PDF-rapport knapp */}
+              {/* PDF-rapport knapp med förbättrad loading state */}
               {taskDetails && (
                 <Button
                   variant="secondary" 
                   size="sm"
                   onClick={handleGeneratePDF}
                   className="flex items-center gap-2"
+                  disabled={loading}
                 >
                   <FileDown className="w-4 h-4" />
-                  Ladda ner rapport
+                  {loading ? 'Genererar...' : 'Ladda ner rapport'}
                 </Button>
               )}
               
@@ -210,7 +245,7 @@ export default function CaseDetailsModal({
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content - resten av koden förblir densamma */}
           <div className="p-6">
             {loading && (
               <div className="flex items-center justify-center py-12">
@@ -330,7 +365,7 @@ export default function CaseDetailsModal({
                       </div>
                     )}
 
-                    {/* Ansvarig tekniker - UPPDATERAD MED MAIL-IKON */}
+                    {/* Ansvarig tekniker */}
                     {taskDetails.assignees.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-md font-semibold text-white flex items-center gap-2">
@@ -350,7 +385,6 @@ export default function CaseDetailsModal({
                                 <p className="text-white font-medium">{assignee.name}</p>
                                 <p className="text-sm text-slate-400">{assignee.email}</p>
                               </div>
-                              {/* NY: Mail-ikon */}
                               <button
                                 onClick={() => window.open(`mailto:${assignee.email}?subject=Fråga om ärende ${taskDetails.task_info.name}`, '_blank')}
                                 className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
@@ -442,7 +476,7 @@ export default function CaseDetailsModal({
             )}
           </div>
 
-          {/* Footer - UPPDATERAD MED KONTAKTINFO */}
+          {/* Footer */}
           <div className="p-6 border-t border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-slate-400">
