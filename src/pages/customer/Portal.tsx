@@ -14,11 +14,13 @@ import {
   Building,
   Phone,
   Mail,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import CaseDetailsModal from '../../components/customer/CaseDetailsModal'
 
 // Types
 type Customer = {
@@ -84,6 +86,7 @@ export default function CustomerPortal() {
   const [loading, setLoading] = useState(true)
   const [tasksLoading, setTasksLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   // Hämta kunddata
   useEffect(() => {
@@ -451,14 +454,25 @@ export default function CustomerPortal() {
                             </div>
                           )}
                         </div>
-                        <a
-                          href={task.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-400 hover:text-green-300 text-xs"
-                        >
-                          Öppna i ClickUp →
-                        </a>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTaskId(task.id)}
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Visa detaljer
+                          </Button>
+                          <a
+                            href={task.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-400 hover:text-slate-300 text-xs"
+                          >
+                            ClickUp →
+                          </a>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -556,6 +570,16 @@ export default function CustomerPortal() {
           </div>
         </div>
       </main>
+
+      {/* Modal för ärendedetaljer */}
+      {selectedTaskId && (
+        <CaseDetailsModal
+          caseId="dummy-case-id" // Vi använder ClickUp task ID istället
+          clickupTaskId={selectedTaskId}
+          isOpen={!!selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
     </div>
   )
 }
