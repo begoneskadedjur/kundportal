@@ -1,4 +1,4 @@
-// src/components/customer/CaseDetailsModal.tsx - ENDAST DROPDOWN-FIX
+// src/components/customer/CaseDetailsModal.tsx - UPPDATERAD MED MAIL OCH TELEFON
 import { useEffect, useState } from 'react'
 import { 
   X, 
@@ -13,7 +13,9 @@ import {
   Bug,
   Download,
   Eye,
-  Play
+  Play,
+  Mail,
+  Phone
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -298,7 +300,7 @@ export default function CaseDetailsModal({
                       </div>
                     )}
 
-                    {/* Ansvarig tekniker */}
+                    {/* Ansvarig tekniker - UPPDATERAD MED MAIL-IKON */}
                     {taskDetails.assignees.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-md font-semibold text-white flex items-center gap-2">
@@ -314,10 +316,18 @@ export default function CaseDetailsModal({
                               <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
                                 {assignee.name.split(' ').map(n => n[0]).join('')}
                               </div>
-                              <div>
+                              <div className="flex-1">
                                 <p className="text-white font-medium">{assignee.name}</p>
                                 <p className="text-sm text-slate-400">{assignee.email}</p>
                               </div>
+                              {/* NY: Mail-ikon */}
+                              <button
+                                onClick={() => window.open(`mailto:${assignee.email}?subject=Fråga om ärende ${taskDetails.task_info.name}`, '_blank')}
+                                className="p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                                title={`Skicka e-post till ${assignee.name}`}
+                              >
+                                <Mail className="w-4 h-4" />
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -402,10 +412,19 @@ export default function CaseDetailsModal({
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer - UPPDATERAD MED KONTAKTINFO */}
           <div className="p-6 border-t border-white/10">
-            <div className="flex justify-end">
-              <Button onClick={onClose}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Phone className="w-4 h-4" />
+                <span>Har du frågor? Ring oss på <a href="tel:010-280-44-10" className="text-blue-400 hover:text-blue-300">010 280 44 10</a></span>
+              </div>
+              
+              <Button
+                variant="secondary"
+                onClick={onClose}
+                className="px-6"
+              >
                 Stäng
               </Button>
             </div>
