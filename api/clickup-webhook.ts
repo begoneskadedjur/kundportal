@@ -162,19 +162,37 @@ function verifyWebhookSignature(body: string, signature: string | null, secret: 
 }
 
 // Synkronisera task från ClickUp till vår databas
-async function syncTaskFromClickUp(taskId: string, customerId: string) {
+async function syncTaskFromClickUp(taskId: string, customerId: string, taskData?: any) {
   try {
     console.log(`🔄 Syncing task ${taskId} for customer ${customerId}`)
     
-    // Hämta task-data från ClickUp
-    const taskData = await fetchClickUpTask(taskId)
+    // Använd taskData om det redan finns, annars hämta det
     if (!taskData) {
-      console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
-      return
+      taskData = await fetchClickUpTask(taskId)
+      if (!taskData) {
+        console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
+        return
+      }
     }
+
+    console.log(`📋 Task data fetched:`, {
+      id: taskData.id,
+      name: taskData.name,
+      status: taskData.status?.status,
+      list_id: taskData.list?.id,
+      custom_fields_count: taskData.custom_fields?.length || 0
+    })
 
     // Mappa ClickUp-data till vårt databasformat
     const caseData = mapClickUpTaskToCaseData(taskData, customerId)
+    
+    console.log(`💾 Saving case data:`, {
+      customer_id: caseData.customer_id,
+      clickup_task_id: caseData.clickup_task_id,
+      case_number: caseData.case_number,
+      title: caseData.title,
+      status: caseData.status
+    })
     
     // Uppdatera eller skapa case i databasen
     const { error } = await supabase
