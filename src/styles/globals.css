@@ -32,4 +32,11 @@
     -webkit-text-fill-color: transparent;
     background-image: linear-gradient(to right, #4ade80, #10b981);
   }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
