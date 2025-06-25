@@ -1,5 +1,5 @@
 // api/clickup-webhook.ts
-import { NextRequest, NextResponse } from 'next/server'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
@@ -22,19 +22,22 @@ interface ClickUpWebhookPayload {
   }>
 }
 
-export async function POST(req: NextRequest) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
   try {
     console.log('🔔 ClickUp Webhook received')
     
-    const body = await req.text()
-    const payload: ClickUpWebhookPayload = JSON.parse(body)
+    const payload: ClickUpWebhookPayload = req.body
     
     // 1. Verifiera webhook-signatur (säkerhet)
     if (CLICKUP_WEBHOOK_SECRET) {
-      const signature = req.headers.get('x-signature')
-      if (!verifyWebhookSignature(body, signature, CLICKUP_WEBHOOK_SECRET)) {
+      const signature = req.headers['x-signature'] as string
+      if (!verifyWebhookSignature(JSON.stringify(req.body), signature, CLICKUP_WEBHOOK_SECRET)) {
         console.error('❌ Invalid webhook signature')
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+        return res.status(401).json({ error: 'Invalid signature' })
       }
     }
 
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
     const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted']
     if (!supportedEvents.includes(payload.event)) {
       console.log(`ℹ️ Ignoring event: ${payload.event}`)
-      return NextResponse.json({ message: 'Event ignored' })
+      return res.status(200).json({ message: 'Event ignored' })
     }
 
     // 3. Kontrollera om tasken tillhör en kundlista
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     if (customerError || !customer) {
       console.log(`ℹ️ Task ${payload.task_id} is not in a customer list (list_id: ${payload.list_id})`)
-      return NextResponse.json({ message: 'Not a customer task' })
+      return res.status(200).json({ message: 'Not a customer task' })
     }
 
     console.log(`📋 Processing ${payload.event} for customer: ${customer.company_name}`)
@@ -71,16 +74,16 @@ export async function POST(req: NextRequest) {
         break
     }
 
-    return NextResponse.json({ 
+    return res.status(200).json({ 
       success: true, 
       message: `${payload.event} processed for customer ${customer.company_name}` 
     })
 
   } catch (error) {
     console.error('❌ Webhook error:', error)
-    return NextResponse.json({ 
+    return res.status(500).json({ 
       error: 'Internal server error' 
-    }, { status: 500 })
+    })
   }
 }
 
