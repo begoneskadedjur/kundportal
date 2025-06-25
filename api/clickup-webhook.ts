@@ -48,12 +48,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('✅ Payload parsed successfully:', {
         event: payload.event,
         task_id: payload.task_id,
-        list_id: payload.list_id
+        list_id: payload.list_id,
+        webhook_id: payload.webhook_id
       })
+      
+      // Log hela payload för debugging
+      console.log('📄 Full payload:', JSON.stringify(payload, null, 2))
+      
     } catch (parseError) {
       console.error('❌ Failed to parse webhook payload:', parseError)
       console.error('Raw body content:', rawBody.substring(0, 500))
       return res.status(400).json({ error: 'Invalid JSON payload' })
+    }
+
+    // Hantera ClickUp test webhook (som skickar tom data)
+    if (!payload.event && rawBody.includes('test')) {
+      console.log('🧪 Test webhook received from ClickUp')
+      return res.status(200).json({ message: 'Test webhook received successfully' })
     }
 
     // 1. Verifiera webhook-signatur (säkerhet)
@@ -66,10 +77,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 2. Kontrollera om detta är en relevant event
-    const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted']
-    if (!supportedEvents.includes(payload.event)) {
-      console.log(`ℹ️ Ignoring event: ${payload.event}`)
-      return res.status(200).json({ message: 'Event ignored' })
+    const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted', 'taskStatusUpdated', 'taskAssigneeUpdated']
+    if (!payload.event || !supportedEvents.includes(payload.event)) {
+      console.log(`ℹ️ Ignoring event: ${payload.event || 'undefined'}`)
+      return res.status(200).json({ message: `Event ${payload.event || 'undefined'} ignored` })
+    }
+
+    // Validera att vi har nödvändig data
+    if (!payload.task_id) {
+      console.error('❌ Missing task_id in webhook payload')
+      return res.status(400).json({ error: 'Missing task_id' })
     }
 
     // 3. Kontrollera om tasken tillhör en kundlista
