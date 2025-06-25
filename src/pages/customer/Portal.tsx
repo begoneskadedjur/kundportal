@@ -454,25 +454,15 @@ export default function CustomerPortal() {
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedTaskId(task.id)}
-                            className="text-green-400 hover:text-green-300"
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Visa detaljer
-                          </Button>
-                          <a
-                            href={task.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-slate-300 text-xs"
-                          >
-                            ClickUp →
-                          </a>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTaskId(task.id)}
+                          className="text-green-400 hover:text-green-300"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Visa detaljer
+                        </Button>
                       </div>
                     </div>
                   ))}

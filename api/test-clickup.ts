@@ -1,39 +1,49 @@
-// api/test-clickup.ts - TEST ENDPOINT FÖR DEBUGGING
+// api/test-clickup.ts - ENHANCED TEST ENDPOINT FÖR DEBUGGING
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Returnera HTML-sida för enkel testning
-  if (req.method === 'GET' && !req.query.list_id) {
+  if (req.method === 'GET' && !req.query.list_id && !req.query.task_id) {
     return res.status(200).send(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>ClickUp API Test</title>
+        <title>ClickUp API Test - Enhanced</title>
         <style>
-          body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+          body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
           .test-form { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .result { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; white-space: pre-wrap; }
+          .result { background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
           .error { background: #ffe8e8; color: #d00; }
+          .warning { background: #fff3cd; color: #856404; }
           input, button { padding: 10px; margin: 5px; }
           button { background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; }
+          .section { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+          .custom-field { background: #f0f8ff; padding: 10px; margin: 5px 0; border-left: 4px solid #007cba; }
         </style>
       </head>
       <body>
-        <h1>ClickUp API Test</h1>
+        <h1>ClickUp API Test - Enhanced Field Discovery</h1>
         
         <div class="test-form">
-          <h3>Test med List ID från din databas:</h3>
+          <h3>Test 1: Hämta alla tasks från List ID</h3>
           <p>Ange List ID från customers tabellen (clickup_list_id):</p>
-          <input type="text" id="listId" placeholder="Ange List ID" style="width: 300px;">
-          <button onclick="testClickUp()">Testa ClickUp API</button>
+          <input type="text" id="listId" placeholder="Ange List ID" style="width: 300px;" value="901210684656">
+          <button onclick="testList()">Testa List & Tasks</button>
+        </div>
+
+        <div class="test-form">
+          <h3>Test 2: Detaljerad Task Analysis</h3>
+          <p>Ange Task ID för detaljerad analys av alla fält:</p>
+          <input type="text" id="taskId" placeholder="Ange Task ID" style="width: 300px;">
+          <button onclick="testTask()">Analysera Task</button>
         </div>
 
         <div id="result"></div>
 
         <script>
-          async function testClickUp() {
+          async function testList() {
             const listId = document.getElementById('listId').value;
             if (!listId) {
               alert('Ange ett List ID');
@@ -41,14 +51,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = 'Testing...';
+            resultDiv.innerHTML = 'Testing List & Tasks...';
 
             try {
               const response = await fetch('/api/test-clickup?list_id=' + listId);
               const data = await response.json();
               
               resultDiv.className = response.ok ? 'result' : 'result error';
-              resultDiv.innerHTML = JSON.stringify(data, null, 2);
+              
+              let html = '<h3>LIST & TASKS ANALYSIS</h3>';
+              html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+              
+              if (data.tests && data.tests.tasks_response && data.tests.tasks_response.tasks) {
+                html += '<h4>FOUND TASKS (click to analyze):</h4>';
+                data.tests.tasks_response.tasks.forEach(task => {
+                  html += \`<button onclick="document.getElementById('taskId').value='\${task.id}'; testTask();" style="margin: 5px; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">\${task.name} (ID: \${task.id})</button><br>\`;
+                });
+              }
+              
+              resultDiv.innerHTML = html;
+            } catch (error) {
+              resultDiv.className = 'result error';
+              resultDiv.innerHTML = 'Error: ' + error.message;
+            }
+          }
+
+          async function testTask() {
+            const taskId = document.getElementById('taskId').value;
+            if (!taskId) {
+              alert('Ange ett Task ID');
+              return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing Task Details...';
+
+            try {
+              const response = await fetch('/api/test-clickup?task_id=' + taskId);
+              const data = await response.json();
+              
+              resultDiv.className = response.ok ? 'result' : 'result error';
+              resultDiv.innerHTML = '<h3>DETAILED TASK ANALYSIS</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
             } catch (error) {
               resultDiv.className = 'result error';
               resultDiv.innerHTML = 'Error: ' + error.message;
@@ -60,7 +103,119 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `)
   }
 
-  // API-test med list_id
+  // Test enskild task med task_id
+  if (req.query.task_id) {
+    const { task_id } = req.query
+    
+    try {
+      console.log('Testing individual task:', task_id)
+
+      const taskResponse = await fetch(
+        \`https://api.clickup.com/api/v2/task/\${task_id}\`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': CLICKUP_API_TOKEN,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      if (!taskResponse.ok) {
+        return res.status(taskResponse.status).json({
+          error: \`ClickUp API error: \${taskResponse.status} \${taskResponse.statusText}\`,
+          task_id: task_id
+        })
+      }
+
+      const taskData = await taskResponse.json()
+
+      // Analysera alla custom fields
+      const customFieldAnalysis = taskData.custom_fields?.map((field: any) => ({
+        id: field.id,
+        name: field.name,
+        type: field.type,
+        value: field.value,
+        type_config: field.type_config,
+        raw_field: field
+      })) || []
+
+      return res.status(200).json({
+        success: true,
+        task_id: task_id,
+        task_analysis: {
+          basic_info: {
+            id: taskData.id,
+            name: taskData.name,
+            description: taskData.description,
+            status: taskData.status,
+            priority: taskData.priority,
+            due_date: taskData.due_date,
+            start_date: taskData.start_date,
+            date_created: taskData.date_created,
+            date_updated: taskData.date_updated,
+            date_closed: taskData.date_closed,
+            url: taskData.url
+          },
+          assignees: taskData.assignees?.map((a: any) => ({
+            id: a.id,
+            username: a.username,
+            email: a.email,
+            color: a.color,
+            initials: a.initials,
+            profilePicture: a.profilePicture
+          })) || [],
+          custom_fields_analysis: {
+            total_fields: customFieldAnalysis.length,
+            fields_with_values: customFieldAnalysis.filter((f: any) => f.value !== null && f.value !== undefined && f.value !== '').length,
+            field_types: [...new Set(customFieldAnalysis.map((f: any) => f.type))],
+            all_fields: customFieldAnalysis
+          },
+          potential_mappings: {
+            address_fields: customFieldAnalysis.filter((f: any) => 
+              f.name.toLowerCase().includes('address') || 
+              f.name.toLowerCase().includes('adress') ||
+              f.name.toLowerCase().includes('plats') ||
+              f.name.toLowerCase().includes('location')
+            ),
+            price_fields: customFieldAnalysis.filter((f: any) => 
+              f.name.toLowerCase().includes('price') || 
+              f.name.toLowerCase().includes('pris') ||
+              f.name.toLowerCase().includes('cost') ||
+              f.name.toLowerCase().includes('kostnad') ||
+              f.type === 'currency'
+            ),
+            file_fields: customFieldAnalysis.filter((f: any) => 
+              f.name.toLowerCase().includes('file') || 
+              f.name.toLowerCase().includes('filer') ||
+              f.name.toLowerCase().includes('attachment') ||
+              f.name.toLowerCase().includes('bilaga') ||
+              f.type === 'attachment'
+            ),
+            report_fields: customFieldAnalysis.filter((f: any) => 
+              f.name.toLowerCase().includes('report') || 
+              f.name.toLowerCase().includes('rapport') ||
+              f.name.toLowerCase().includes('beskrivning') ||
+              f.name.toLowerCase().includes('summary')
+            ),
+            dropdown_fields: customFieldAnalysis.filter((f: any) => f.type === 'drop_down'),
+            text_fields: customFieldAnalysis.filter((f: any) => f.type === 'text' || f.type === 'short_text'),
+            date_fields: customFieldAnalysis.filter((f: any) => f.type === 'date')
+          },
+          full_task_data: taskData
+        }
+      })
+
+    } catch (error: any) {
+      return res.status(500).json({
+        error: error.message,
+        stack: error.stack,
+        task_id: task_id
+      })
+    }
+  }
+
+  // Originaltest med list_id (förbättrad)
   const { list_id } = req.query
 
   if (!list_id || typeof list_id !== 'string') {
@@ -70,19 +225,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('Testing ClickUp API with list_id:', list_id)
 
-    // Test 1: Kolla API-token
     if (!CLICKUP_API_TOKEN) {
       return res.status(500).json({
         error: 'CLICKUP_API_TOKEN not configured',
-        tests: {
-          token_exists: false
-        }
+        tests: { token_exists: false }
       })
     }
 
-    // Test 2: Hämta list-information
+    // Hämta list-information
     const listResponse = await fetch(
-      `https://api.clickup.com/api/v2/list/${list_id}`,
+      \`https://api.clickup.com/api/v2/list/\${list_id}\`,
       {
         method: 'GET',
         headers: {
@@ -94,9 +246,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const listData = listResponse.ok ? await listResponse.json() : null
     
-    // Test 3: Hämta tasks
+    // Hämta tasks med alla custom fields
     const tasksResponse = await fetch(
-      `https://api.clickup.com/api/v2/list/${list_id}/task?include_closed=true`,
+      \`https://api.clickup.com/api/v2/list/\${list_id}/task?include_closed=true&include_markdown_description=true\`,
       {
         method: 'GET',
         headers: {
@@ -108,20 +260,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const tasksData = tasksResponse.ok ? await tasksResponse.json() : null
 
-    // Test 4: Om inga tasks, försök med folder
-    let folderTasksData = null
-    if (listData && listData.folder && (!tasksData || !tasksData.tasks || tasksData.tasks.length === 0)) {
-      const folderResponse = await fetch(
-        `https://api.clickup.com/api/v2/folder/${listData.folder.id}/task`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': CLICKUP_API_TOKEN,
-            'Content-Type': 'application/json',
-          },
+    // Analysera custom fields från alla tasks
+    let allCustomFields: any[] = []
+    if (tasksData?.tasks) {
+      tasksData.tasks.forEach((task: any) => {
+        if (task.custom_fields) {
+          task.custom_fields.forEach((field: any) => {
+            const existing = allCustomFields.find(f => f.id === field.id)
+            if (!existing) {
+              allCustomFields.push({
+                id: field.id,
+                name: field.name,
+                type: field.type,
+                has_values: task.custom_fields.some((f: any) => f.id === field.id && f.value),
+                sample_value: field.value,
+                type_config: field.type_config
+              })
+            }
+          })
         }
-      )
-      folderTasksData = folderResponse.ok ? await folderResponse.json() : null
+      })
     }
 
     return res.status(200).json({
@@ -150,17 +308,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           tasks: tasksData?.tasks?.map((t: any) => ({
             id: t.id,
             name: t.name,
-            status: t.status?.status
+            status: t.status?.status,
+            custom_fields_count: t.custom_fields?.length || 0,
+            has_description: !!t.description,
+            assignees_count: t.assignees?.length || 0
           })) || []
         },
-        folder_tasks_response: folderTasksData ? {
-          tasks_count: folderTasksData.tasks?.length || 0,
-          tasks: folderTasksData.tasks?.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            status: t.status?.status
-          })) || []
-        } : null
+        custom_fields_analysis: {
+          total_unique_fields: allCustomFields.length,
+          all_custom_fields: allCustomFields,
+          suggested_mappings: {
+            address: allCustomFields.filter(f => 
+              f.name.toLowerCase().includes('address') || 
+              f.name.toLowerCase().includes('adress') ||
+              f.name.toLowerCase().includes('plats')
+            ),
+            price: allCustomFields.filter(f => 
+              f.name.toLowerCase().includes('price') || 
+              f.name.toLowerCase().includes('pris') ||
+              f.type === 'currency'
+            ),
+            files: allCustomFields.filter(f => 
+              f.name.toLowerCase().includes('file') || 
+              f.name.toLowerCase().includes('filer') ||
+              f.type === 'attachment'
+            ),
+            report: allCustomFields.filter(f => 
+              f.name.toLowerCase().includes('report') || 
+              f.name.toLowerCase().includes('rapport')
+            )
+          }
+        }
       }
     })
 
