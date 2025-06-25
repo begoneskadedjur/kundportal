@@ -126,20 +126,36 @@ export default function CustomerPortal() {
     if (!customer?.clickup_list_id) return
 
     setTasksLoading(true)
+    setError(null) // Rensa tidigare fel
+    
     try {
+      console.log('Fetching tasks for list:', customer.clickup_list_id)
+      
       // Använd vår backend API för att hämta ClickUp-uppgifter
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
+      console.log('ClickUp API response status:', response.status)
+      
       if (!response.ok) {
-        throw new Error('Kunde inte hämta ärenden från ClickUp')
+        const errorData = await response.json()
+        console.error('ClickUp API error:', errorData)
+        throw new Error(errorData.error || 'Kunde inte hämta ärenden från ClickUp')
       }
 
       const data = await response.json()
+      console.log('ClickUp API data:', data)
+      
       setTasks(data.tasks || [])
       calculateTaskStats(data.tasks || [])
+      
+      // Visa debug-info om det finns
+      if (data.debug) {
+        console.log('ClickUp Debug info:', data.debug)
+      }
+      
     } catch (error: any) {
       console.error('Error fetching ClickUp tasks:', error)
-      setError('Kunde inte hämta ärenden från ClickUp')
+      setError(`ClickUp integration fel: ${error.message}`)
     } finally {
       setTasksLoading(false)
     }
@@ -353,6 +369,25 @@ export default function CustomerPortal() {
               {tasksLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <LoadingSpinner />
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                  <p className="text-red-400 font-medium mb-2">ClickUp Integration Problem</p>
+                  <p className="text-slate-400 text-sm mb-4">{error}</p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-500">Debug info:</p>
+                    <p className="text-xs text-slate-500">List ID: {customer.clickup_list_id}</p>
+                    <p className="text-xs text-slate-500">List Name: {customer.clickup_list_name}</p>
+                  </div>
+                  <Button 
+                    onClick={fetchClickUpTasks} 
+                    variant="secondary" 
+                    size="sm"
+                    className="mt-4"
+                  >
+                    Försök igen
+                  </Button>
                 </div>
               ) : tasks.length === 0 ? (
                 <div className="text-center py-8">
