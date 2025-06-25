@@ -150,7 +150,7 @@ export default function CaseDetailsModal({
     return field.value?.toString() || 'Ej specificerat'
   }
 
-  // NY FUNKTION: Generera PDF-rapport
+  // NY FUNKTION: Generera professionell PDF-rapport som liknar BeGone's design
   const generatePDFReport = async () => {
     if (!taskDetails) return
 
@@ -160,75 +160,187 @@ export default function CaseDetailsModal({
       
       const pdf = new jsPDF()
       const pageWidth = pdf.internal.pageSize.width
-      let yPosition = 20
+      const pageHeight = pdf.internal.pageSize.height
+      let yPosition = 25
 
-      // Hjälpfunktion för att lägga till text
-      const addText = (text: string, fontSize = 12, isBold = false) => {
-        pdf.setFontSize(fontSize)
-        if (isBold) pdf.setFont(undefined, 'bold')
-        else pdf.setFont(undefined, 'normal')
-        pdf.text(text, 20, yPosition)
-        yPosition += fontSize * 0.5 + 5
-      }
+      // FÄRGER (baserat på ert varumärke)
+      const primaryColor = [34, 68, 102] // Mörk blå
+      const accentColor = [52, 168, 83]  // Grön
+      const lightGray = [240, 240, 240]
+      const darkGray = [80, 80, 80]
 
-      // Titel
-      addText(`ÄRENDERAPPORT - ${taskDetails.task_info.name}`, 18, true)
-      addText(`Ärende #${taskDetails.task_id}`, 12)
-      yPosition += 10
+      // HEADER MED BEGONE BRANDING
+      pdf.setFillColor(...primaryColor)
+      pdf.rect(0, 0, pageWidth, 40, 'F')
+      
+      // BeGone text och logotyp område
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(24)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('BeGone', 20, 25)
+      
+      pdf.setFontSize(28)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('SANERINGSRAPPORT', pageWidth/2, 25, { align: 'center' })
+      
+      yPosition = 60
 
-      // Status och datum
-      addText(`Status: ${taskDetails.task_info.status.toUpperCase()}`, 12, true)
-      addText(`Skapat: ${formatDate(taskDetails.task_info.created)}`, 10)
-      if (taskDetails.task_info.updated !== taskDetails.task_info.created) {
-        addText(`Uppdaterat: ${formatDate(taskDetails.task_info.updated)}`, 10)
-      }
-      yPosition += 10
-
-      // Adress
+      // ADRESS SEKTION
       if (addressField) {
-        addText('ADRESS', 14, true)
-        addText(addressField.value.formatted_address, 11)
-        yPosition += 5
+        pdf.setTextColor(0, 0, 0)
+        pdf.setFontSize(12)
+        pdf.setFont(undefined, 'italic')
+        pdf.text(addressField.value.formatted_address, pageWidth/2, yPosition, { align: 'center' })
+        yPosition += 20
       }
 
-      // Ärendedetaljer
-      addText('ÄRENDEDETALJER', 14, true)
-      if (pestField) {
-        addText(`Skadedjur: ${getDropdownText(pestField)}`, 11)
-      }
-      if (caseTypeField) {
-        addText(`Typ av ärende: ${getDropdownText(caseTypeField)}`, 11)
-      }
-      if (priceField && priceField.has_value) {
-        addText(`Kostnad: ${priceField.value} kr`, 11, true)
-      }
+      // KUNDUPPGIFTER SEKTION
       yPosition += 10
+      pdf.setFontSize(16)
+      pdf.setFont(undefined, 'bold')
+      pdf.setTextColor(...darkGray)
+      pdf.text('Kunduppgifter', 20, yPosition)
+      yPosition += 10
+
+      // Kunduppgifter box
+      pdf.setFillColor(...lightGray)
+      pdf.rect(20, yPosition, pageWidth - 40, 40, 'F')
+      pdf.setDrawColor(200, 200, 200)
+      pdf.rect(20, yPosition, pageWidth - 40, 40, 'S')
+
+      // Kunduppgifter innehåll (2 kolumner)
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(10)
+      pdf.setFont(undefined, 'bold')
+      
+      let leftCol = 25
+      let rightCol = pageWidth/2 + 10
+      let boxY = yPosition + 8
+
+      pdf.text('Uppdragsgivare', leftCol, boxY)
+      pdf.text('Kontaktperson', rightCol, boxY)
+      
+      pdf.setFont(undefined, 'normal')
+      pdf.text('[Kundnamn]', leftCol, boxY + 8)
+      pdf.text('[Kontaktperson]', rightCol, boxY + 8)
+
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Ärende ID', leftCol, boxY + 18)
+      pdf.text('Status', rightCol, boxY + 18)
+      
+      pdf.setFont(undefined, 'normal')
+      pdf.text(taskDetails.task_id, leftCol, boxY + 26)
+      pdf.text(taskDetails.task_info.status, rightCol, boxY + 26)
+
+      yPosition += 55
+
+      // LEVERANTÖRSUPPGIFTER SEKTION
+      pdf.setFontSize(16)
+      pdf.setFont(undefined, 'bold')
+      pdf.setTextColor(...darkGray)
+      pdf.text('Leverantörsuppgifter', 20, yPosition)
+      yPosition += 10
+
+      // Leverantör box
+      pdf.setFillColor(...lightGray)
+      pdf.rect(20, yPosition, pageWidth - 40, 50, 'F')
+      pdf.setDrawColor(200, 200, 200)
+      pdf.rect(20, yPosition, pageWidth - 40, 50, 'S')
+
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(10)
+      boxY = yPosition + 8
+
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Företag', leftCol, boxY)
+      pdf.text('Org nr', rightCol, boxY)
+      pdf.setFont(undefined, 'normal')
+      pdf.text('BeGone Skadedjur & Sanering AB', leftCol, boxY + 8)
+      pdf.text('559378-9208', rightCol, boxY + 8)
+
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Adress', leftCol, boxY + 20)
+      pdf.text('Telefonnummer', rightCol, boxY + 20)
+      pdf.setFont(undefined, 'normal')
+      pdf.text('Kavlevägen 45, 141 59 Huddinge', leftCol, boxY + 28)
+      pdf.text('010 280 44 10', rightCol, boxY + 28)
 
       // Ansvarig tekniker
       if (taskDetails.assignees.length > 0) {
-        addText('ANSVARIG TEKNIKER', 14, true)
-        taskDetails.assignees.forEach(assignee => {
-          addText(`${assignee.name}`, 11, true)
-          addText(`E-post: ${assignee.email}`, 10)
-        })
-        yPosition += 10
+        pdf.setFont(undefined, 'bold')
+        pdf.text('Ansvarig tekniker', leftCol, boxY + 38)
+        pdf.text('E-post tekniker', rightCol, boxY + 38)
+        pdf.setFont(undefined, 'normal')
+        pdf.text(taskDetails.assignees[0].name, leftCol, boxY + 46)
+        pdf.text(taskDetails.assignees[0].email, rightCol, boxY + 46)
       }
 
-      // Teknikerrapport - EXTRA FOKUS
+      yPosition += 65
+
+      // ARBETSINFORMATION SEKTION (med grön header som i originalet)
+      pdf.setFillColor(...accentColor)
+      pdf.rect(20, yPosition, pageWidth - 40, 15, 'F')
+      
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(18)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('ARBETSINFORMATION', pageWidth/2, yPosition + 10, { align: 'center' })
+      
+      yPosition += 25
+
+      // Arbetsinformation box
+      pdf.setFillColor(...lightGray)
+      pdf.rect(20, yPosition, pageWidth - 40, 45, 'F')
+      pdf.setDrawColor(200, 200, 200)
+      pdf.rect(20, yPosition, pageWidth - 40, 45, 'S')
+
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(10)
+      boxY = yPosition + 8
+
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Datum för utförande', leftCol, boxY)
+      pdf.text('Utförande adress', rightCol, boxY)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(formatDate(taskDetails.task_info.created).split(' ')[0], leftCol, boxY + 8)
+      if (addressField) {
+        const addressLines = pdf.splitTextToSize(addressField.value.formatted_address, (pageWidth/2) - 20)
+        pdf.text(addressLines, rightCol, boxY + 8)
+      }
+
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Skadedjur', leftCol, boxY + 25)
+      if (caseTypeField) {
+        pdf.text('Typ av ärende', rightCol, boxY + 25)
+      }
+      pdf.setFont(undefined, 'normal')
+      pdf.text(pestField ? getDropdownText(pestField) : 'Ej specificerat', leftCol, boxY + 33)
+      if (caseTypeField) {
+        pdf.text(getDropdownText(caseTypeField), rightCol, boxY + 33)
+      }
+
+      yPosition += 60
+
+      // SANERINGSRAPPORT SEKTION (huvudinnehåll)
       if (reportField && reportField.value) {
-        addText('TEKNIKERRAPPORT', 14, true)
+        pdf.setFontSize(16)
+        pdf.setFont(undefined, 'bold')
+        pdf.setTextColor(...darkGray)
+        pdf.text('Saneringsrapport', 20, yPosition)
+        yPosition += 15
         
-        // Dela upp rapporten i rader som passar PDF:en
+        // Rapport innehåll
+        pdf.setFontSize(10)
+        pdf.setFont(undefined, 'normal')
+        pdf.setTextColor(0, 0, 0)
+        
         const reportText = reportField.value.toString()
         const lines = pdf.splitTextToSize(reportText, pageWidth - 40)
         
-        pdf.setFontSize(11)
-        pdf.setFont(undefined, 'normal')
-        
         lines.forEach((line: string) => {
-          if (yPosition > 270) {
+          if (yPosition > pageHeight - 30) {
             pdf.addPage()
-            yPosition = 20
+            yPosition = 30
           }
           pdf.text(line, 20, yPosition)
           yPosition += 6
@@ -236,40 +348,44 @@ export default function CaseDetailsModal({
         yPosition += 10
       }
 
-      // Beskrivning
-      if (taskDetails.task_info.description) {
-        if (yPosition > 250) {
+      // Kostnad (om finns)
+      if (priceField && priceField.has_value) {
+        if (yPosition > pageHeight - 40) {
           pdf.addPage()
-          yPosition = 20
+          yPosition = 30
         }
         
-        addText('BESKRIVNING', 14, true)
-        const descLines = pdf.splitTextToSize(taskDetails.task_info.description, pageWidth - 40)
-        pdf.setFontSize(11)
-        pdf.setFont(undefined, 'normal')
+        pdf.setFillColor(...accentColor)
+        pdf.rect(20, yPosition, pageWidth - 40, 20, 'F')
         
-        descLines.forEach((line: string) => {
-          if (yPosition > 270) {
-            pdf.addPage()
-            yPosition = 20
-          }
-          pdf.text(line, 20, yPosition)
-          yPosition += 6
-        })
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(14)
+        pdf.setFont(undefined, 'bold')
+        pdf.text(`Kostnad: ${priceField.value} kr`, pageWidth/2, yPosition + 12, { align: 'center' })
+        
+        yPosition += 30
       }
 
-      // Footer
+      // FOOTER på alla sidor
       const pageCount = pdf.internal.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {
         pdf.setPage(i)
+        
+        // Footer linje
+        pdf.setDrawColor(...primaryColor)
+        pdf.setLineWidth(1)
+        pdf.line(20, pageHeight - 20, pageWidth - 20, pageHeight - 20)
+        
+        pdf.setTextColor(...darkGray)
         pdf.setFontSize(8)
         pdf.setFont(undefined, 'normal')
-        pdf.text(`BeGone AB - ${new Date().toLocaleDateString('sv-SE')} - Sida ${i} av ${pageCount}`, 20, 290)
-        pdf.text('010 280 44 10 | info@begone.se', pageWidth - 20, 290, { align: 'right' })
+        pdf.text(`BeGone AB - ${new Date().toLocaleDateString('sv-SE')}`, 20, pageHeight - 10)
+        pdf.text(`010 280 44 10 | info@begone.se`, pageWidth - 20, pageHeight - 10, { align: 'right' })
+        pdf.text(`Oneflow ID ${taskDetails.task_id}    Page ${i} / ${pageCount}`, pageWidth - 20, pageHeight - 5, { align: 'right' })
       }
 
       // Ladda ner PDF
-      const fileName = `BeGone_Rapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+      const fileName = `BeGone_Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
       pdf.save(fileName)
 
     } catch (error) {
