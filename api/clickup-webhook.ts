@@ -253,6 +253,40 @@ async function fetchClickUpTask(taskId: string) {
   }
 }
 
+// Mappa ClickUp status till våra tillåtna värden
+function mapStatusValue(clickupStatus: string | undefined): string {
+  if (!clickupStatus) return 'open'
+  
+  const statusMap: { [key: string]: string } = {
+    // ClickUp svenska statusar till engelska databas-värden
+    'att göra': 'open',
+    'under hantering': 'in_progress', 
+    'bokat': 'in_progress',
+    'pågående': 'in_progress',
+    'slutförd': 'completed',
+    'klar': 'completed',
+    'avslutad': 'completed',
+    'stängd': 'closed',
+    'avbruten': 'closed',
+    
+    // Engelska ClickUp statusar
+    'to do': 'open',
+    'in progress': 'in_progress',
+    'review': 'in_progress', 
+    'done': 'completed',
+    'complete': 'completed',
+    'completed': 'completed',
+    'closed': 'closed',
+    'cancelled': 'closed',
+    
+    // Fallbacks
+    'open': 'open',
+    'pending': 'open'
+  }
+  
+  return statusMap[clickupStatus.toLowerCase()] || 'open'
+}
+
 // Mappa ClickUp priority till våra tillåtna värden
 function mapPriorityValue(clickupPriority: string | undefined): string {
   if (!clickupPriority) return 'low'
@@ -279,12 +313,12 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     )
   }
 
-  const addressField = getCustomField('adress')
-  const pestField = getCustomField('skadedjur')
-  const caseTypeField = getCustomField('ärende')
-  const priceField = getCustomField('pris')
-  const reportField = getCustomField('rapport')
-  const filesField = getCustomField('filer')
+  const addressField = getCustomField('Adress')
+  const pestField = getCustomField('Skadedjur')
+  const caseTypeField = getCustomField('Ärende')
+  const priceField = getCustomField('Pris')
+  const reportField = getCustomField('Rapport')
+  const filesField = getCustomField('Filer')
 
   const getDropdownText = (field: any) => {
     if (!field || !field.value) return null
@@ -306,7 +340,7 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     clickup_task_id: taskData.id,
     case_number: taskData.custom_id || taskData.id,
     title: taskData.name,
-    status: taskData.status?.status || taskData.status || 'unknown',
+    status: mapStatusValue(taskData.status?.status || taskData.status), // FIX: Använd status-mappning
     priority: mapPriorityValue(taskData.priority?.priority), // FIX: Använd mappningsfunktionen
     pest_type: getDropdownText(pestField),
     case_type: getDropdownText(caseTypeField),
