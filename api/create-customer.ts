@@ -19,7 +19,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const BASE_URL = process.env.VITE_APP_URL || 'https://din-app.vercel.app'
 
 // Email transporter setup
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: 'smtp.resend.com',
   port: 465,
   secure: true,
