@@ -174,16 +174,21 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      if (status === 'to do' || status === 'open' || status === 'new') {
+      // Svenska och engelska statusar
+      if (status === 'to do' || status === 'open' || status === 'new' || 
+          status === 'ny' || status === 'öppen') {
         stats.open++
-      } else if (status === 'in progress' || status === 'doing') {
+      } else if (status === 'in progress' || status === 'doing' || 
+                 status === 'bokat' || status === 'pågående' || status === 'schemalagd') {
         stats.inProgress++
-      } else if (status === 'complete' || status === 'closed' || status === 'done') {
+      } else if (status === 'complete' || status === 'closed' || status === 'done' || 
+                 status === 'klar' || status === 'avslutad') {
         stats.completed++
       }
 
       // Kontrollera om uppgiften är försenad
-      if (task.due_date && parseInt(task.due_date) < now && !status.includes('complete')) {
+      if (task.due_date && parseInt(task.due_date) < now && 
+          !status.includes('complete') && !status.includes('klar') && !status.includes('avslutad')) {
         stats.overdue++
       }
     })
@@ -207,17 +212,25 @@ export default function CustomerPortal() {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    const statusLower = status.toLowerCase()
+    switch (statusLower) {
       case 'complete':
       case 'closed':
       case 'done':
+      case 'klar':
+      case 'avslutad':
         return 'text-green-500'
       case 'in progress':
       case 'doing':
+      case 'pågående':
+      case 'bokat':
+      case 'schemalagd':
         return 'text-blue-500'
       case 'to do':
       case 'open':
       case 'new':
+      case 'ny':
+      case 'öppen':
         return 'text-orange-500'
       default:
         return 'text-slate-400'
