@@ -1,4 +1,4 @@
-// src/components/customer/CaseDetailsModal.tsx - UPPDATERAD MED MAIL OCH TELEFON
+// src/components/customer/CaseDetailsModal.tsx - MED PDF-RAPPORT
 import { useEffect, useState } from 'react'
 import { 
   X, 
@@ -15,7 +15,8 @@ import {
   Eye,
   Play,
   Mail,
-  Phone
+  Phone,
+  FileDown // NY IKON
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -131,7 +132,7 @@ export default function CaseDetailsModal({
     return <FileText className="w-4 h-4" />
   }
 
-  // ENDAST ÄNDRING: Förbättrad dropdown-hantering
+  // Fallback - returnera värdet som det är
   const getDropdownText = (field: any) => {
     if (!field || !field.has_value) return 'Ej specificerat'
     
@@ -147,6 +148,134 @@ export default function CaseDetailsModal({
     
     // Fallback - returnera värdet som det är
     return field.value?.toString() || 'Ej specificerat'
+  }
+
+  // NY FUNKTION: Generera PDF-rapport
+  const generatePDFReport = async () => {
+    if (!taskDetails) return
+
+    try {
+      // Dynamisk import av jsPDF
+      const { jsPDF } = await import('jspdf')
+      
+      const pdf = new jsPDF()
+      const pageWidth = pdf.internal.pageSize.width
+      let yPosition = 20
+
+      // Hjälpfunktion för att lägga till text
+      const addText = (text: string, fontSize = 12, isBold = false) => {
+        pdf.setFontSize(fontSize)
+        if (isBold) pdf.setFont(undefined, 'bold')
+        else pdf.setFont(undefined, 'normal')
+        pdf.text(text, 20, yPosition)
+        yPosition += fontSize * 0.5 + 5
+      }
+
+      // Titel
+      addText(`ÄRENDERAPPORT - ${taskDetails.task_info.name}`, 18, true)
+      addText(`Ärende #${taskDetails.task_id}`, 12)
+      yPosition += 10
+
+      // Status och datum
+      addText(`Status: ${taskDetails.task_info.status.toUpperCase()}`, 12, true)
+      addText(`Skapat: ${formatDate(taskDetails.task_info.created)}`, 10)
+      if (taskDetails.task_info.updated !== taskDetails.task_info.created) {
+        addText(`Uppdaterat: ${formatDate(taskDetails.task_info.updated)}`, 10)
+      }
+      yPosition += 10
+
+      // Adress
+      if (addressField) {
+        addText('ADRESS', 14, true)
+        addText(addressField.value.formatted_address, 11)
+        yPosition += 5
+      }
+
+      // Ärendedetaljer
+      addText('ÄRENDEDETALJER', 14, true)
+      if (pestField) {
+        addText(`Skadedjur: ${getDropdownText(pestField)}`, 11)
+      }
+      if (caseTypeField) {
+        addText(`Typ av ärende: ${getDropdownText(caseTypeField)}`, 11)
+      }
+      if (priceField && priceField.has_value) {
+        addText(`Kostnad: ${priceField.value} kr`, 11, true)
+      }
+      yPosition += 10
+
+      // Ansvarig tekniker
+      if (taskDetails.assignees.length > 0) {
+        addText('ANSVARIG TEKNIKER', 14, true)
+        taskDetails.assignees.forEach(assignee => {
+          addText(`${assignee.name}`, 11, true)
+          addText(`E-post: ${assignee.email}`, 10)
+        })
+        yPosition += 10
+      }
+
+      // Teknikerrapport - EXTRA FOKUS
+      if (reportField && reportField.value) {
+        addText('TEKNIKERRAPPORT', 14, true)
+        
+        // Dela upp rapporten i rader som passar PDF:en
+        const reportText = reportField.value.toString()
+        const lines = pdf.splitTextToSize(reportText, pageWidth - 40)
+        
+        pdf.setFontSize(11)
+        pdf.setFont(undefined, 'normal')
+        
+        lines.forEach((line: string) => {
+          if (yPosition > 270) {
+            pdf.addPage()
+            yPosition = 20
+          }
+          pdf.text(line, 20, yPosition)
+          yPosition += 6
+        })
+        yPosition += 10
+      }
+
+      // Beskrivning
+      if (taskDetails.task_info.description) {
+        if (yPosition > 250) {
+          pdf.addPage()
+          yPosition = 20
+        }
+        
+        addText('BESKRIVNING', 14, true)
+        const descLines = pdf.splitTextToSize(taskDetails.task_info.description, pageWidth - 40)
+        pdf.setFontSize(11)
+        pdf.setFont(undefined, 'normal')
+        
+        descLines.forEach((line: string) => {
+          if (yPosition > 270) {
+            pdf.addPage()
+            yPosition = 20
+          }
+          pdf.text(line, 20, yPosition)
+          yPosition += 6
+        })
+      }
+
+      // Footer
+      const pageCount = pdf.internal.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setFont(undefined, 'normal')
+        pdf.text(`BeGone AB - ${new Date().toLocaleDateString('sv-SE')} - Sida ${i} av ${pageCount}`, 20, 290)
+        pdf.text('010 280 44 10 | info@begone.se', pageWidth - 20, 290, { align: 'right' })
+      }
+
+      // Ladda ner PDF
+      const fileName = `BeGone_Rapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+      pdf.save(fileName)
+
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Kunde inte generera PDF-rapport')
+    }
   }
 
   if (!isOpen) return null
@@ -175,9 +304,25 @@ export default function CaseDetailsModal({
                 </p>
               )}
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
+            
+            <div className="flex items-center gap-2">
+              {/* NY: PDF-rapport knapp */}
+              {taskDetails && (
+                <Button
+                  variant="secondary" 
+                  size="sm"
+                  onClick={generatePDFReport}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Ladda ner rapport
+                </Button>
+              )}
+              
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Content */}
