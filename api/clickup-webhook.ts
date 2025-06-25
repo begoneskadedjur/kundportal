@@ -3,18 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-console.log('🔍 Environment check:')
-console.log('- SUPABASE_URL exists:', !!supabaseUrl)
-console.log('- SUPABASE_SERVICE_ROLE_KEY exists:', !!supabaseServiceKey)
-console.log('- CLICKUP_API_TOKEN exists:', !!process.env.CLICKUP_API_TOKEN)
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing required environment variables')
-}
-
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
