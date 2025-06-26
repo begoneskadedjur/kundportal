@@ -482,14 +482,9 @@ export default function CustomerPortal() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center relative">
-                <Bug className="w-6 h-6 text-slate-950" />
-                <div className="absolute inset-0 rounded-full border-2 border-red-500 transform rotate-45"></div>
-                <div className="absolute w-full h-0.5 bg-red-500 top-1/2 transform -translate-y-1/2 rotate-45"></div>
-              </div>
               <div>
-                <h1 className="text-xl font-bold">
-                  <span className="text-gradient">BeGone</span> Kundportal
+                <h1 className="text-2xl font-bold text-green-500">
+                  BeGone Skadedjur - Kundportal
                 </h1>
                 <p className="text-sm text-slate-400">{customer.company_name}</p>
               </div>
