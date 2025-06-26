@@ -16,7 +16,8 @@ import {
   Play,
   Mail,
   Phone,
-  FileDown
+  FileDown,
+  Flag
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -62,6 +63,10 @@ interface TaskDetails {
       }>
     }
   }>
+  priority?: {
+    priority: string
+    color: string
+  }
 }
 
 interface CustomerInfo {
@@ -150,6 +155,55 @@ export default function CaseDetailsModal({
       'pausad': 'bg-gray-500',
     }
     return statusColors[status.toLowerCase()] || 'bg-blue-500'
+  }
+
+  const getPriorityDisplay = (priority: string | null) => {
+    if (!priority) return null
+    
+    const priorityLower = priority.toLowerCase()
+    
+    // Prioritetskonfiguration med ClickUps färger
+    const config = {
+      'urgent': { 
+        text: 'Akut', 
+        color: '#f87171',
+        flagColor: 'text-red-500',
+        borderColor: 'border-red-500/50',
+        textColor: 'text-red-400'
+      },
+      'high': { 
+        text: 'Hög', 
+        color: '#fb923c',
+        flagColor: 'text-orange-500',
+        borderColor: 'border-orange-500/50',
+        textColor: 'text-orange-400'
+      },
+      'normal': { 
+        text: 'Normal', 
+        color: '#60a5fa',
+        flagColor: 'text-blue-500',
+        borderColor: 'border-blue-500/50',
+        textColor: 'text-blue-400'
+      },
+      'low': { 
+        text: 'Låg', 
+        color: '#9ca3af',
+        flagColor: 'text-gray-500',
+        borderColor: 'border-gray-500/50',
+        textColor: 'text-gray-400'
+      }
+    }
+    
+    const priorityConfig = config[priorityLower] || config['normal']
+    
+    return (
+      <span 
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${priorityConfig.borderColor} ${priorityConfig.textColor} bg-transparent`}
+      >
+        <Flag className={`w-3 h-3 ${priorityConfig.flagColor}`} fill="currentColor" />
+        <span>{priorityConfig.text}</span>
+      </span>
+    )
   }
 
   const getFieldValue = (fieldName: string) => {
@@ -262,17 +316,27 @@ export default function CaseDetailsModal({
 
             {taskDetails && (
               <div className="space-y-6">
-                {/* Status och datum */}
+                {/* Status, prioritet och datum */}
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-400">Status:</span>
-                    <span 
-                      className={`px-3 py-1 rounded-full text-sm font-medium text-white ${
-                        getStatusColor(taskDetails.task_info.status)
-                      }`}
-                    >
-                      {taskDetails.task_info.status.toUpperCase()}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-400">Status:</span>
+                      <span 
+                        className={`px-3 py-1 rounded-full text-sm font-medium text-white ${
+                          getStatusColor(taskDetails.task_info.status)
+                        }`}
+                      >
+                        {taskDetails.task_info.status.toUpperCase()}
+                      </span>
+                    </div>
+                    
+                    {/* PRIORITET TILL HÖGER OM STATUS */}
+                    {taskDetails.priority && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-400">Prioritet:</span>
+                        {getPriorityDisplay(taskDetails.priority.priority)}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="text-sm text-slate-400">
