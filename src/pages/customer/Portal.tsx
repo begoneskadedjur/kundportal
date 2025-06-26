@@ -104,14 +104,15 @@ export default function CustomerPortal() {
   useEffect(() => {
     if (profile?.customer_id) {
       fetchCustomerData()
-      fetchUpcomingVisits()
+      // fetchUpcomingVisits() flyttat till efter customer är satt
     }
   }, [profile])
 
-  // Hämta ClickUp-uppgifter när kunddata är hämtad
+  // Hämta ClickUp-uppgifter och kommande besök när kunddata är hämtad
   useEffect(() => {
     if (customer?.clickup_list_id) {
       fetchClickUpTasks()
+      fetchUpcomingVisits() // Hämta besök efter att customer är satt
     }
   }, [customer])
 
@@ -139,41 +140,78 @@ export default function CustomerPortal() {
   }
 
   const fetchUpcomingVisits = async () => {
-    if (!profile?.customer_id) return
+    if (!customer?.clickup_list_id) return
 
     try {
-      // Hämta kommande besök från cases.scheduled_date istället för visits-tabellen
-      const { data, error } = await supabase
-        .from('cases')
-        .select(`
-          id,
-          title,
-          scheduled_date,
-          assigned_technician_name,
-          status,
-          case_type,
-          address_formatted
-        `)
-        .eq('customer_id', profile.customer_id)
-        .not('scheduled_date', 'is', null) // Endast ärenden med schemalagda datum
-        .gte('scheduled_date', new Date().toISOString().split('T')[0]) // Endast framtida datum
-        .order('scheduled_date', { ascending: true })
-        .limit(5)
+      console.log('Fetching upcoming visits from ClickUp API...')
+      
+      // Använd samma API som för ärenden
+      const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
+      
+      if (!response.ok) {
+        throw new Error('Kunde inte hämta ärenden från ClickUp')
+      }
 
-      if (error) throw error
+      const data = await response.json()
+      const allTasks = data.tasks || []
       
-      // Konvertera cases till visit-format för UI-kompatibilitet
-      const upcomingCases = data?.map(case_ => ({
-        id: case_.id,
-        case_id: case_.id,
-        visit_date: case_.scheduled_date,
-        technician_name: case_.assigned_technician_name,
-        work_performed: `${case_.case_type || 'Ärende'}: ${case_.title}`,
-        status: case_.status,
-        created_at: case_.scheduled_date
-      })) || []
+      // Filtrera tasks som har due_date och är framtida
+      const now = new Date()
+      const upcomingTasks = allTasks.filter((task: ClickUpTask) => {
+        if (!task.due_date) return false
+        
+        const dueDate = new Date(parseInt(task.due_date))
+        return dueDate >= now
+      })
       
-      setVisits(upcomingCases)
+      // Konvertera till visit-format och sortera efter datum
+      const upcomingVisits = upcomingTasks
+        .map((task: ClickUpTask) => {
+          // Hitta custom fields för mer detaljerad info
+          const getCustomField = (name: string) => {
+            return task.custom_fields?.find((field: any) => 
+              field.name.toLowerCase() === name.toLowerCase()
+            )
+          }
+          
+          const addressField = getCustomField('adress')
+          const caseTypeField = getCustomField('ärende')
+          const pestField = getCustomField('skadedjur')
+          
+          const getDropdownText = (field: any) => {
+            if (!field?.has_value) return null
+            if (field.type_config?.options) {
+              const option = field.type_config.options.find((opt: any) => 
+                opt.orderindex === field.value
+              )
+              return option?.name || field.value?.toString()
+            }
+            return field.value?.toString()
+          }
+          
+          return {
+            id: task.id,
+            case_id: task.id,
+            visit_date: new Date(parseInt(task.due_date!)).toISOString(),
+            technician_name: task.assignees.length > 0 ? task.assignees[0].username : null,
+            work_performed: [
+              getDropdownText(caseTypeField),
+              getDropdownText(pestField),
+              task.name
+            ].filter(Boolean).join(' - '),
+            status: task.status.status,
+            created_at: task.date_created,
+            // Extra info från ClickUp
+            address: addressField?.value?.formatted_address || null,
+            clickup_url: `https://app.clickup.com/t/${task.id}`
+          }
+        })
+        .sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
+        .slice(0, 5) // Begränsa till 5 st
+      
+      setVisits(upcomingVisits)
+      console.log(`✅ Found ${upcomingVisits.length} upcoming visits`)
+      
     } catch (error) {
       console.error('Error fetching upcoming visits:', error)
     }
