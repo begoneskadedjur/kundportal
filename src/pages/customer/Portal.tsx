@@ -1,4 +1,4 @@
-const calculateTaskStats = (taskList: ClickUpTask[]) => {// src/pages/customer/Portal.tsx
+// src/pages/customer/Portal.tsx
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -138,6 +138,34 @@ export default function CustomerPortal() {
     }
   }
 
+  const fetchUpcomingVisits = async () => {
+    if (!profile?.customer_id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+          id,
+          case_id,
+          visit_date,
+          technician_name,
+          work_performed,
+          status,
+          created_at,
+          cases!inner(customer_id)
+        `)
+        .eq('cases.customer_id', profile.customer_id)
+        .gte('visit_date', new Date().toISOString().split('T')[0]) // Endast framtida besök
+        .order('visit_date', { ascending: true })
+        .limit(5)
+
+      if (error) throw error
+      setVisits(data || [])
+    } catch (error) {
+      console.error('Error fetching visits:', error)
+    }
+  }
+
   const fetchClickUpTasks = async () => {
     if (!customer?.clickup_list_id) return
 
@@ -177,40 +205,14 @@ export default function CustomerPortal() {
     }
   }
 
-  const fetchUpcomingVisits = async () => {
-    if (!profile?.customer_id) return
-
-    try {
-      const { data, error } = await supabase
-        .from('visits')
-        .select(`
-          id,
-          case_id,
-          visit_date,
-          technician_name,
-          work_performed,
-          status,
-          created_at,
-          cases!inner(customer_id)
-        `)
-        .eq('cases.customer_id', profile.customer_id)
-        .gte('visit_date', new Date().toISOString().split('T')[0]) // Endast framtida besök
-        .order('visit_date', { ascending: true })
-        .limit(5)
-
-      if (error) throw error
-      setVisits(data || [])
-    } catch (error) {
-      console.error('Error fetching visits:', error)
-    }
-  }
-
   // Filtrera tasks baserat på sökquery
   const filteredTasks = tasks.filter(task => 
     task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
+  const calculateTaskStats = (taskList: ClickUpTask[]) => {
     const stats: TaskStats = {
       total: taskList.length,
       open: 0,
@@ -535,8 +537,9 @@ export default function CustomerPortal() {
             </Card>
           </div>
 
-          {/* Företagsinformation */}
+          {/* Företagsinformation och besök */}
           <div>
+            {/* Företagsinformation */}
             <Card>
               <h3 className="text-lg font-semibold text-white mb-4">Företagsinformation</h3>
               <div className="space-y-3">
@@ -564,7 +567,7 @@ export default function CustomerPortal() {
             </Card>
 
             {/* Kommande besök */}
-            <Card>
+            <Card className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-4">Kommande besök</h3>
               {visits.length === 0 ? (
                 <div className="text-center py-6">
