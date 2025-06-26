@@ -18,7 +18,8 @@ import {
   Eye,
   Search,
   Plus,
-  Flag
+  Flag,
+  Settings
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
@@ -492,10 +493,7 @@ export default function CustomerPortal() {
             
             {/* Kundinfo till höger */}
             <div className="flex items-center space-x-3">
-              <div 
-                className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700 cursor-pointer hover:bg-slate-800/70 transition-colors"
-                onClick={() => setShowSettingsModal(true)}
-              >
+              <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
                 <div className="flex items-center space-x-3 text-sm">
                   <div className="flex items-center space-x-2">
                     <Building className="w-4 h-4 text-slate-400" />
@@ -796,7 +794,18 @@ export default function CustomerPortal() {
           <div>
             {/* Företagsinformation */}
             <Card>
-              <h3 className="text-lg font-semibold text-white mb-4">Företagsinformation</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">Företagsinformation</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSettingsModal(true)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Redigera
+                </Button>
+              </div>
               <div className="space-y-3">
                 <div className="flex items-center text-sm">
                   <Building className="w-4 h-4 text-slate-400 mr-2" />
