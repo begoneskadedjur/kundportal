@@ -85,7 +85,7 @@ export default function CaseList() {
     return priorityColors[priority.toLowerCase()] || 'text-gray-400'
   }
 
-  // LÄGG TILL DENNA FUNKTION:
+  // UPPDATERAD FUNKTION MED TRANSPARENT BAKGRUND:
   const getPriorityDisplay = (priority: string | null) => {
     if (!priority) return null
     
@@ -96,22 +96,30 @@ export default function CaseList() {
       'urgent': { 
         text: 'Akut', 
         color: '#f87171',
-        flagColor: 'text-red-500'
+        flagColor: 'text-red-500',
+        borderColor: 'border-red-500/50',
+        textColor: 'text-red-400'
       },
       'high': { 
         text: 'Hög', 
         color: '#fb923c',
-        flagColor: 'text-orange-500'
+        flagColor: 'text-orange-500',
+        borderColor: 'border-orange-500/50',
+        textColor: 'text-orange-400'
       },
       'normal': { 
         text: 'Normal', 
         color: '#60a5fa',
-        flagColor: 'text-blue-500'
+        flagColor: 'text-blue-500',
+        borderColor: 'border-blue-500/50',
+        textColor: 'text-blue-400'
       },
       'low': { 
         text: 'Låg', 
         color: '#9ca3af',
-        flagColor: 'text-gray-500'
+        flagColor: 'text-gray-500',
+        borderColor: 'border-gray-500/50',
+        textColor: 'text-gray-400'
       }
     }
     
@@ -119,8 +127,7 @@ export default function CaseList() {
     
     return (
       <span 
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white"
-        style={{ backgroundColor: priorityConfig.color }}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${priorityConfig.borderColor} ${priorityConfig.textColor} bg-transparent`}
       >
         <Flag className={`w-3 h-3 ${priorityConfig.flagColor}`} fill="currentColor" />
         <span>{priorityConfig.text}</span>
@@ -178,7 +185,7 @@ export default function CaseList() {
                     {case_.status}
                   </span>
                   
-                  {/* ERSÄTT DETTA BLOCK: */}
+                  {/* UPPDATERAD PRIORITETSVISNING: */}
                   {case_.priority && getPriorityDisplay(case_.priority)}
 
                   {case_.pest_type && (
