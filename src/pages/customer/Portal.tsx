@@ -16,12 +16,14 @@ import {
   Mail,
   RotateCcw,
   Eye,
-  Search
+  Search,
+  Plus
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import CaseDetailsModal from '../../components/customer/CaseDetailsModal'
+import CreateCaseModal from '../../components/customer/CreateCaseModal'
 
 // Types
 type Customer = {
@@ -101,6 +103,7 @@ export default function CustomerPortal() {
   const [tasksLoading, setTasksLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Hämta kunddata
   useEffect(() => {
@@ -517,15 +520,26 @@ export default function CustomerPortal() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={fetchClickUpTasks}
-                    loading={tasksLoading}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Uppdatera
-                  </Button>
+                  <div className="flex items-center space-x-3">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowCreateModal(true)}
+                      className="text-green-400 hover:text-green-300"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nytt ärende
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={fetchClickUpTasks}
+                      loading={tasksLoading}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Uppdatera
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Filter-sektion */}
@@ -833,6 +847,24 @@ export default function CustomerPortal() {
           clickupTaskId={selectedTaskId}
           isOpen={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
+        />
+      )}
+
+      {/* Create Case Modal */}
+      {showCreateModal && customer && (
+        <CreateCaseModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            fetchClickUpTasks() // Refresh case list
+            fetchUpcomingVisits() // Refresh visits
+          }}
+          customerId={customer.id}
+          customerInfo={{
+            company_name: customer.company_name,
+            contact_person: customer.contact_person,
+            email: customer.email
+          }}
         />
       )}
     </div>
