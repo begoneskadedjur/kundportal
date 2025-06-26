@@ -75,6 +75,7 @@ export default function CustomerPortal() {
   const { profile } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [tasks, setTasks] = useState<ClickUpTask[]>([])
+  const [showAllTasks, setShowAllTasks] = useState(false)
   const [taskStats, setTaskStats] = useState<TaskStats>({
     total: 0,
     open: 0,
@@ -173,8 +174,8 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      // Avslutade ärenden: endast "genomförd"
-      if (status === 'genomförd') {
+      // Avslutade ärenden: "genomförd" (obs: case insensitive)
+      if (status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
         stats.completed++
       }
       // Pågående ärenden: "bokat" eller "under hantering"
@@ -209,13 +210,20 @@ export default function CustomerPortal() {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
       case 'genomförd':
-        return 'text-green-500'
+      case 'avslutad':
+      case 'klar':
+      case 'complete':
+        return 'bg-green-500/20 text-green-400 border-green-500/30'
       case 'bokat':
       case 'under hantering':
-        return 'text-blue-500'
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       default:
-        return 'text-orange-500' // Öppna/nya ärenden
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30' // Öppna/nya ärenden
     }
+  }
+
+  const capitalizeFirst = (str: string) => {
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
   }
 
   if (loading) {
@@ -379,7 +387,7 @@ export default function CustomerPortal() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {tasks.slice(0, 5).map((task) => (
+                  {(showAllTasks ? tasks : tasks.slice(0, 5)).map((task) => (
                     <div
                       key={task.id}
                       className="border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors"
@@ -394,8 +402,8 @@ export default function CustomerPortal() {
                           )}
                         </div>
                         <div className="flex items-center space-x-2 ml-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(task.status.status)}`}>
-                            {task.status.status}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
+                            {capitalizeFirst(task.status.status)}
                           </span>
                           {task.priority && (
                             <span className={`text-xs ${getPriorityColor(task.priority.priority)}`}>
@@ -438,8 +446,12 @@ export default function CustomerPortal() {
 
                   {tasks.length > 5 && (
                     <div className="text-center pt-4">
-                      <Button variant="secondary" size="sm">
-                        Visa alla {tasks.length} ärenden
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={() => setShowAllTasks(!showAllTasks)}
+                      >
+                        {showAllTasks ? 'Visa färre ärenden' : `Visa alla ${tasks.length} ärenden`}
                       </Button>
                     </div>
                   )}
@@ -480,16 +492,6 @@ export default function CustomerPortal() {
             <Card className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-4">Snabblänkar</h3>
               <div className="space-y-2">
-                <Button 
-                  variant="ghost" 
-                  fullWidth 
-                  className="justify-start"
-                  onClick={() => window.open('https://app.clickup.com', '_blank')}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Öppna ClickUp
-                  <span className="text-xs text-slate-500 ml-auto">Se alla ärenden</span>
-                </Button>
                 <Button 
                   variant="ghost" 
                   fullWidth 
