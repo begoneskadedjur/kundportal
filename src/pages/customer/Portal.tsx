@@ -272,7 +272,7 @@ export default function CustomerPortal() {
       const taskStatus = task.status.status.toLowerCase()
       switch (statusFilter) {
         case 'genomfört':
-          if (!(taskStatus === 'genomfört' || taskStatus === 'genomförd' || taskStatus === 'avslutad' || taskStatus === 'klar')) {
+          if (!(taskStatus === 'genomfört' || taskStatus === 'genomförd' || taskStatus === 'avslutad' || taskStatus === 'klar' || taskStatus === 'complete')) {
             return false
           }
           break
@@ -310,6 +310,10 @@ export default function CustomerPortal() {
     
     return true
   })
+
+  // Debug-loggar för felsökning
+  console.log('Filter state:', { dateFilter, statusFilter, searchQuery })
+  console.log('Total tasks:', tasks.length, 'Filtered tasks:', filteredTasks.length)
 
   const calculateTaskStats = (taskList: ClickUpTask[]) => {
     const stats: TaskStats = {
@@ -374,6 +378,25 @@ export default function CustomerPortal() {
 
   const capitalizeFirst = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+  }
+
+  const getDateFilterText = (filter: string) => {
+    switch (filter) {
+      case 'last30': return 'Senaste 30 dagarna'
+      case 'last90': return 'Senaste 3 månaderna'
+      case 'thisYear': return `I år (${new Date().getFullYear()})`
+      case 'lastYear': return `Förra året (${new Date().getFullYear() - 1})`
+      default: return 'Alla datum'
+    }
+  }
+
+  const getStatusFilterText = (filter: string) => {
+    switch (filter) {
+      case 'genomfört': return 'Avslutade'
+      case 'bokat': return 'Bokade'
+      case 'under_hantering': return 'Pågående'
+      default: return 'Alla statusar'
+    }
   }
 
   if (loading) {
@@ -491,49 +514,10 @@ export default function CustomerPortal() {
           {/* Ärenden */}
           <div className="lg:col-span-2">
             <Card>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
-                <div className="flex items-center space-x-3">
-                  {/* Filter-knappar */}
-                  <div className="flex items-center space-x-2">
-                    {/* Datumfilter */}
-                    <select 
-                      value={dateFilter}
-                      onChange={(e) => setDateFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
-                    >
-                      <option value="all">Alla datum</option>
-                      <option value="last30">Senaste 30 dagarna</option>
-                      <option value="last90">Senaste 3 månaderna</option>
-                      <option value="thisYear">I år ({new Date().getFullYear()})</option>
-                      <option value="lastYear">Förra året ({new Date().getFullYear() - 1})</option>
-                    </select>
-                    
-                    {/* Statusfilter */}
-                    <select 
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
-                    >
-                      <option value="all">Alla statusar</option>
-                      <option value="genomfört">Avslutade</option>
-                      <option value="bokat">Bokade</option>
-                      <option value="under_hantering">Pågående</option>
-                    </select>
-                  </div>
-                  
-                  {/* Sökfunktion */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Sök ärenden..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 w-64"
-                    />
-                  </div>
-                  
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -543,6 +527,71 @@ export default function CustomerPortal() {
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Uppdatera
                   </Button>
+                </div>
+
+                {/* Filter-sektion */}
+                <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                  {/* Datumfilter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-slate-300">Period:</label>
+                    <select 
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 min-w-[160px]"
+                    >
+                      <option value="all">Alla datum</option>
+                      <option value="last30">Senaste 30 dagarna</option>
+                      <option value="last90">Senaste 3 månaderna</option>
+                      <option value="thisYear">I år ({new Date().getFullYear()})</option>
+                      <option value="lastYear">Förra året ({new Date().getFullYear() - 1})</option>
+                    </select>
+                  </div>
+                  
+                  {/* Statusfilter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-slate-300">Status:</label>
+                    <select 
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 min-w-[140px]"
+                    >
+                      <option value="all">Alla statusar</option>
+                      <option value="genomfört">Avslutade</option>
+                      <option value="bokat">Bokade</option>
+                      <option value="under_hantering">Pågående</option>
+                    </select>
+                  </div>
+                  
+                  {/* Sökfunktion */}
+                  <div className="flex items-center space-x-2 flex-1">
+                    <label className="text-sm text-slate-300">Sök:</label>
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Sök ärenden..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rensa filter-knapp */}
+                  {(searchQuery || dateFilter !== 'all' || statusFilter !== 'all') && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setSearchQuery('')
+                        setDateFilter('all')
+                        setStatusFilter('all')
+                      }}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      Rensa filter
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -569,17 +618,26 @@ export default function CustomerPortal() {
                     Försök igen
                   </Button>
                 </div>
-              ) : filteredTasks.length === 0 && searchQuery ? (
+              ) : filteredTasks.length === 0 && (searchQuery || dateFilter !== 'all' || statusFilter !== 'all') ? (
                 <div className="text-center py-8">
                   <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">Inga ärenden matchar sökningen "{searchQuery}"</p>
+                  <p className="text-slate-400 mb-2">Inga ärenden matchar dina filter</p>
+                  <div className="text-sm text-slate-500 space-y-1">
+                    {searchQuery && <p>Sökning: "{searchQuery}"</p>}
+                    {dateFilter !== 'all' && <p>Period: {getDateFilterText(dateFilter)}</p>}
+                    {statusFilter !== 'all' && <p>Status: {getStatusFilterText(statusFilter)}</p>}
+                  </div>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setSearchQuery('')}
-                    className="mt-2"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setDateFilter('all')
+                      setStatusFilter('all')
+                    }}
+                    className="mt-3"
                   >
-                    Rensa sökning
+                    Rensa filter
                   </Button>
                 </div>
               ) : filteredTasks.length === 0 ? (
