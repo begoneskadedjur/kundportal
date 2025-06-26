@@ -1,221 +1,298 @@
-// api/create-case.ts - Skapa nytt ärende i ClickUp + skicka email
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
+// src/components/customer/CreateCaseModal.tsx
+import { useState } from 'react'
+import { X, AlertCircle, CheckCircle, Bug, MapPin, Phone, FileText } from 'lucide-react'
+import Button from '../ui/Button'
+import Input from '../ui/Input'
+import Card from '../ui/Card'
 
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
-const RESEND_API_KEY = process.env.RESEND_API_KEY!
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  host: 'smtp.resend.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: 'resend',
-    pass: RESEND_API_KEY,
-  },
-})
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+interface CreateCaseModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  customerId: string
+  customerInfo: {
+    company_name: string
+    contact_person: string
+    email: string
   }
+}
 
-  try {
-    console.log('🔥 Create case request received:', JSON.stringify(req.body, null, 2))
+export default function CreateCaseModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  customerId,
+  customerInfo 
+}: CreateCaseModalProps) {
+  const [loading, setLoading] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'normal',
+    pest_type: '',
+    case_type: '',
+    address: '',
+    phone: ''
+  })
 
-    const { 
-      customer_id, 
-      title, 
-      description, 
-      priority, 
-      pest_type, 
-      case_type, 
-      address, 
-      phone 
-    } = req.body
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
 
-    // Validering
-    if (!customer_id || !title || !description) {
-      console.error('❌ Missing required fields:', { customer_id, title: !!title, description: !!description })
-      return res.status(400).json({ error: 'customer_id, title och description krävs' })
-    }
-
-    console.log(`📋 Creating new case for customer: ${customer_id}`)
-
-    // 1. Hämta kundinfo för ClickUp lista
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('company_name, contact_person, email, clickup_list_id, clickup_list_name')
-      .eq('id', customer_id)
-      .single()
-
-    if (customerError || !customer) {
-      console.error('❌ Customer not found:', customerError)
-      return res.status(404).json({ error: 'Kund hittades inte' })
-    }
-
-    console.log('✅ Customer found:', customer.company_name)
-
-    // 2. Skapa task i ClickUp (förenklad version först)
-    const clickupTaskData = {
-      name: title,
-      description: `${description}\n\n--- Kundinformation ---\nFöretag: ${customer.company_name}\nKontakt: ${customer.contact_person}\nEmail: ${customer.email}\nTelefon: ${phone || 'Ej angivet'}\nAdress: ${address || 'Ej angivet'}`,
-      status: 'under hantering',
-      priority: getPriorityValue(priority)
-      // Ta bort custom_fields för nu för att isolera problemet
-    }
-
-    console.log('📤 Sending to ClickUp:', JSON.stringify(clickupTaskData, null, 2))
-
-    const clickupResponse = await fetch(`https://api.clickup.com/api/v2/list/${customer.clickup_list_id}/task`, {
-      method: 'POST',
-      headers: {
-        'Authorization': CLICKUP_API_TOKEN,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(clickupTaskData)
-    })
-
-    const responseText = await clickupResponse.text()
-    console.log('📥 ClickUp response status:', clickupResponse.status)
-    console.log('📥 ClickUp response:', responseText)
-
-    if (!clickupResponse.ok) {
-      console.error('❌ ClickUp API error:', responseText)
-      throw new Error(`ClickUp API fel: ${clickupResponse.status} - ${responseText}`)
-    }
-
-    let createdTask
     try {
-      createdTask = JSON.parse(responseText)
-    } catch (parseError) {
-      console.error('❌ Failed to parse ClickUp response:', parseError)
-      throw new Error('Kunde inte läsa svar från ClickUp')
-    }
-
-    console.log(`✅ Created ClickUp task: ${createdTask.id}`)
-
-    // 3. Skicka email till arende@begone.se
-    try {
-      const emailSubject = `Nytt ärende från ${customer.company_name} - ${title}`
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #22c55e;">🆕 Nytt ärende skapat</h2>
-          
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">Ärendeinformation</h3>
-            <p><strong>Titel:</strong> ${title}</p>
-            <p><strong>Beskrivning:</strong> ${description}</p>
-            <p><strong>Prioritet:</strong> ${priority || 'Normal'}</p>
-            ${pest_type ? `<p><strong>Skadedjur:</strong> ${pest_type}</p>` : ''}
-            ${case_type ? `<p><strong>Typ av ärende:</strong> ${case_type}</p>` : ''}
-            ${address ? `<p><strong>Adress:</strong> ${address}</p>` : ''}
-            ${phone ? `<p><strong>Telefon:</strong> ${phone}</p>` : ''}
-          </div>
-
-          <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">Kundinformation</h3>
-            <p><strong>Företag:</strong> ${customer.company_name}</p>
-            <p><strong>Kontaktperson:</strong> ${customer.contact_person}</p>
-            <p><strong>Email:</strong> ${customer.email}</p>
-            <p><strong>ClickUp Lista:</strong> ${customer.clickup_list_name}</p>
-          </div>
-
-          <div style="margin: 30px 0; text-align: center;">
-            <a href="https://app.clickup.com/t/${createdTask.id}" 
-               style="background: #22c55e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              📋 Visa ärendet i ClickUp
-            </a>
-          </div>
-
-          <p style="color: #666; font-size: 14px; margin-top: 30px;">
-            Detta ärende har automatiskt fått status "Under hantering" och din koordinator kommer att tilldelas via automation.
-          </p>
-        </div>
-      `
-
-      await transporter.sendMail({
-        from: 'BeGone Kundportal <noreply@begone.se>',
-        to: 'arende@begone.se',
-        subject: emailSubject,
-        html: emailHtml
+      const response = await fetch('/api/create-case', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          ...formData
+        })
       })
 
-      console.log('✅ Email sent to arende@begone.se')
-    } catch (emailError) {
-      console.error('⚠️ Email sending failed (but task was created):', emailError)
-      // Fortsätt ändå även om email misslyckas
-    }
+      const data = await response.json()
 
-    // 4. Returnera framgång med task-info
-    return res.status(200).json({
-      success: true,
-      message: 'Ärendet har skapats framgångsrikt',
-      task: {
-        id: createdTask.id,
-        name: createdTask.name,
-        url: createdTask.url || `https://app.clickup.com/t/${createdTask.id}`,
-        status: 'under hantering'
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunde inte skapa ärendet')
       }
-    })
 
-  } catch (error: any) {
-    console.error('❌ Create case error:', error)
-    console.error('❌ Error stack:', error.stack)
-    return res.status(500).json({ 
-      error: 'Ett fel uppstod vid skapande av ärendet',
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    })
-  }
-}
+      setSubmitted(true)
+      
+      // Vänta 3 sekunder, stäng sedan modal och uppdatera listan
+      setTimeout(() => {
+        setSubmitted(false)
+        setFormData({
+          title: '',
+          description: '',
+          priority: 'normal',
+          pest_type: '',
+          case_type: '',
+          address: '',
+          phone: ''
+        })
+        onClose()
+        onSuccess() // Triggers refresh of case list
+      }, 3000)
 
-// Helper funktioner
-function getPriorityValue(priority: string): number {
-  switch (priority?.toLowerCase()) {
-    case 'urgent': return 1
-    case 'high': return 2
-    case 'normal': return 3
-    case 'low': return 4
-    default: return 3
-  }
-}
-
-function buildCustomFields(pest_type?: string, case_type?: string, address?: string, phone?: string) {
-  // Ta bort custom fields för nu tills vi vet field IDs
-  // Returnera tom array för att undvika fel
-  return []
-  
-  /* Aktivera när du har field IDs från ClickUp:
-  const fields = []
-
-  if (pest_type) {
-    fields.push({
-      id: 'PEST_TYPE_FIELD_ID', // Ersätt med verkligt field ID
-      value: pest_type
-    })
+    } catch (error: any) {
+      console.error('Error creating case:', error)
+      setError(error.message || 'Ett fel uppstod')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (case_type) {
-    fields.push({
-      id: 'CASE_TYPE_FIELD_ID', // Ersätt med verkligt field ID
-      value: case_type
-    })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }))
   }
 
-  if (address) {
-    fields.push({
-      id: 'ADDRESS_FIELD_ID', // Ersätt med verkligt field ID
-      value: address
-    })
+  if (!isOpen) return null
+
+  // Success state
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-md text-center p-8">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">
+            Ärendet har skapats!
+          </h3>
+          <p className="text-slate-400 mb-4">
+            Ditt ärende har skickats till vårt team och kommer att behandlas så snart som möjligt.
+          </p>
+          <p className="text-sm text-slate-500">
+            Status: <span className="text-blue-400">Under hantering</span>
+          </p>
+          <p className="text-xs text-slate-600 mt-4">
+            Stänger automatiskt...
+          </p>
+        </Card>
+      </div>
+    )
   }
 
-  return fields
-  */
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Skapa nytt ärende</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              {customerInfo.company_name} - {customerInfo.contact_person}
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <p className="text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Ärendeinformation */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-green-400" />
+              Ärendeinformation
+            </h3>
+            
+            <Input
+              label="Titel på ärendet"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              required
+              placeholder="T.ex. 'Akut myrorproblem i köket'"
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Beskrivning
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                required
+                rows={4}
+                placeholder="Beskriv problemet i detalj..."
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Prioritet
+                </label>
+                <div className="relative">
+                  <select
+                    name="priority"
+                    value={formData.priority}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-green-500 appearance-none"
+                  >
+                    <option value="low" className="bg-slate-800 text-slate-300">
+                      🔸 Låg prioritet
+                    </option>
+                    <option value="normal" className="bg-slate-800 text-blue-300">
+                      🔹 Normal prioritet
+                    </option>
+                    <option value="high" className="bg-slate-800 text-orange-300">
+                      🟠 Hög prioritet
+                    </option>
+                    <option value="urgent" className="bg-slate-800 text-red-300">
+                      🔴 Akut prioritet
+                    </option>
+                  </select>
+                  
+                  {/* Prioritets-indikator */}
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    {formData.priority === 'urgent' && <span className="text-red-400">🔴</span>}
+                    {formData.priority === 'high' && <span className="text-orange-400">🟠</span>}
+                    {formData.priority === 'normal' && <span className="text-blue-400">🔹</span>}
+                    {formData.priority === 'low' && <span className="text-slate-400">🔸</span>}
+                  </div>
+                  
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <Input
+                label="Typ av skadedjur (om känt)"
+                name="pest_type"
+                value={formData.pest_type}
+                onChange={handleChange}
+                placeholder="T.ex. Myror, Råttor, Kackerlackor"
+              />
+            </div>
+
+            <Input
+              label="Typ av ärende (om känt)"
+              name="case_type"
+              value={formData.case_type}
+              onChange={handleChange}
+              placeholder="T.ex. Besprutning, Servicebesök, Utredning"
+            />
+          </div>
+
+          {/* Platsinformation */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-white flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-blue-400" />
+              Platsinformation
+            </h3>
+            
+            <Input
+              label="Adress (om annat än företagsadress)"
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              placeholder="Specifik adress för ärendet"
+            />
+
+            <Input
+              label="Telefonnummer för kontakt"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              placeholder="Direkt nummer för kontakt"
+            />
+          </div>
+
+          {/* Information om processen */}
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-400 mb-2">
+              Vad händer härnäst?
+            </h4>
+            <ul className="text-sm text-slate-300 space-y-1">
+              <li>• Ärendet skapas med status "Under hantering"</li>
+              <li>• Vårt team får automatisk notifiering</li>
+              <li>• En koordinator tilldelas ditt ärende</li>
+              <li>• Ni kontaktas inom kort för vidare hantering</li>
+            </ul>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              className="flex-1"
+            >
+              Avbryt
+            </Button>
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={loading || !formData.title || !formData.description}
+              className="flex-1"
+            >
+              {loading ? 'Skapar ärende...' : 'Skapa ärende'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
 }

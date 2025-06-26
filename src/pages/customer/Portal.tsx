@@ -520,26 +520,15 @@ export default function CustomerPortal() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
-                  <div className="flex items-center space-x-3">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setShowCreateModal(true)}
-                      className="text-green-400 hover:text-green-300"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nytt ärende
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={fetchClickUpTasks}
-                      loading={tasksLoading}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Uppdatera
-                    </Button>
-                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={fetchClickUpTasks}
+                    loading={tasksLoading}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Uppdatera
+                  </Button>
                 </div>
 
                 {/* Filter-sektion */}
@@ -835,6 +824,28 @@ export default function CustomerPortal() {
                   )}
                 </div>
               )}
+            </Card>
+
+            {/* Skapa nytt ärende - Snygg box */}
+            <Card 
+              className="mt-6 cursor-pointer hover:border-green-500/50 transition-all group"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <div className="flex items-center justify-center p-6 text-center">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
+                    <Plus className="w-6 h-6 text-green-400 group-hover:text-green-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-white group-hover:text-green-100 transition-colors">
+                      Skapa nytt ärende
+                    </h4>
+                    <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                      Rapportera ett problem eller boka service
+                    </p>
+                  </div>
+                </div>
+              </div>
             </Card>
           </div>
         </div>
