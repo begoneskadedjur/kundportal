@@ -11,7 +11,7 @@ const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 
 // Email transporter setup
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: 'smtp.resend.com',
   port: 465,
   secure: true,
