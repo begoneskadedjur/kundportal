@@ -89,6 +89,8 @@ export default function CustomerPortal() {
   const [visits, setVisits] = useState<Visit[]>([])
   const [showAllTasks, setShowAllTasks] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [dateFilter, setDateFilter] = useState('all') // all, last30, last90, thisYear, lastYear
+  const [statusFilter, setStatusFilter] = useState('all') // all, genomfört, bokat, under_hantering
   const [taskStats, setTaskStats] = useState<TaskStats>({
     total: 0,
     open: 0,
@@ -256,12 +258,58 @@ export default function CustomerPortal() {
     }
   }
 
-  // Filtrera tasks baserat på sökquery
-  const filteredTasks = tasks.filter(task => 
-    task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  // Filtrera tasks baserat på sökning, datum och status
+  const filteredTasks = tasks.filter(task => {
+    // Textfiltrera
+    const matchesSearch = task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    if (!matchesSearch) return false
+    
+    // Statusfilter
+    if (statusFilter !== 'all') {
+      const taskStatus = task.status.status.toLowerCase()
+      switch (statusFilter) {
+        case 'genomfört':
+          if (!(taskStatus === 'genomfört' || taskStatus === 'genomförd' || taskStatus === 'avslutad' || taskStatus === 'klar')) {
+            return false
+          }
+          break
+        case 'bokat':
+          if (taskStatus !== 'bokat') return false
+          break
+        case 'under_hantering':
+          if (taskStatus !== 'under hantering') return false
+          break
+      }
+    }
+    
+    // Datumfilter
+    if (dateFilter !== 'all') {
+      const taskDate = new Date(parseInt(task.date_created))
+      const now = new Date()
+      
+      switch (dateFilter) {
+        case 'last30':
+          const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          if (taskDate < last30Days) return false
+          break
+        case 'last90':
+          const last90Days = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          if (taskDate < last90Days) return false
+          break
+        case 'thisYear':
+          if (taskDate.getFullYear() !== now.getFullYear()) return false
+          break
+        case 'lastYear':
+          if (taskDate.getFullYear() !== now.getFullYear() - 1) return false
+          break
+      }
+    }
+    
+    return true
+  })
 
   const calculateTaskStats = (taskList: ClickUpTask[]) => {
     const stats: TaskStats = {
@@ -446,6 +494,34 @@ export default function CustomerPortal() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
                 <div className="flex items-center space-x-3">
+                  {/* Filter-knappar */}
+                  <div className="flex items-center space-x-2">
+                    {/* Datumfilter */}
+                    <select 
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+                    >
+                      <option value="all">Alla datum</option>
+                      <option value="last30">Senaste 30 dagarna</option>
+                      <option value="last90">Senaste 3 månaderna</option>
+                      <option value="thisYear">I år ({new Date().getFullYear()})</option>
+                      <option value="lastYear">Förra året ({new Date().getFullYear() - 1})</option>
+                    </select>
+                    
+                    {/* Statusfilter */}
+                    <select 
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+                    >
+                      <option value="all">Alla statusar</option>
+                      <option value="genomfört">Avslutade</option>
+                      <option value="bokat">Bokade</option>
+                      <option value="under_hantering">Pågående</option>
+                    </select>
+                  </div>
+                  
                   {/* Sökfunktion */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -457,6 +533,7 @@ export default function CustomerPortal() {
                       className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 w-64"
                     />
                   </div>
+                  
                   <Button 
                     variant="ghost" 
                     size="sm" 
