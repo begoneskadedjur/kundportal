@@ -174,8 +174,8 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      // Avslutade ärenden: "genomförd" (obs: case insensitive)
-      if (status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
+      // Avslutade ärenden: genomfört/genomförd, avslutad, klar, complete
+      if (status === 'genomfört' || status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
         stats.completed++
       }
       // Pågående ärenden: "bokat" eller "under hantering"
@@ -209,12 +209,14 @@ export default function CustomerPortal() {
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
+      case 'genomfört':
       case 'genomförd':
       case 'avslutad':
       case 'klar':
       case 'complete':
         return 'bg-green-500/20 text-green-400 border-green-500/30'
       case 'bokat':
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
       case 'under hantering':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       default:
