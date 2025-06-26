@@ -285,19 +285,13 @@ export default function CustomerPortal() {
       }
     }
     
-    // Datumfilter
+    // Datumfilter - använd deadline istället för created date
     if (dateFilter !== 'all') {
-      const taskDate = new Date(parseInt(task.date_created))
-      const now = new Date()
+      // Om ärendet inte har deadline, skippa datumfiltrering för detta ärende
+      if (!task.due_date) return true
       
-      // Debug-logg för datum
-      console.log(`Task: ${task.name}`, {
-        date_created: task.date_created,
-        parsed_date: taskDate,
-        year: taskDate.getFullYear(),
-        current_year: now.getFullYear(),
-        filter: dateFilter
-      })
+      const taskDate = new Date(parseInt(task.due_date))
+      const now = new Date()
       
       switch (dateFilter) {
         case 'last30':
@@ -319,10 +313,6 @@ export default function CustomerPortal() {
     
     return true
   })
-
-  // Debug-loggar för felsökning
-  console.log('Filter state:', { dateFilter, statusFilter, searchQuery })
-  console.log('Total tasks:', tasks.length, 'Filtered tasks:', filteredTasks.length)
 
   const calculateTaskStats = (taskList: ClickUpTask[]) => {
     const stats: TaskStats = {
@@ -542,7 +532,7 @@ export default function CustomerPortal() {
                 <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                   {/* Datumfilter */}
                   <div className="flex items-center space-x-2">
-                    <label className="text-sm text-slate-300">Period:</label>
+                    <label className="text-sm text-slate-300">Period (deadline):</label>
                     <select 
                       value={dateFilter}
                       onChange={(e) => setDateFilter(e.target.value)}
