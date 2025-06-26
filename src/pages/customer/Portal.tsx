@@ -290,6 +290,15 @@ export default function CustomerPortal() {
       const taskDate = new Date(parseInt(task.date_created))
       const now = new Date()
       
+      // Debug-logg för datum
+      console.log(`Task: ${task.name}`, {
+        date_created: task.date_created,
+        parsed_date: taskDate,
+        year: taskDate.getFullYear(),
+        current_year: now.getFullYear(),
+        filter: dateFilter
+      })
+      
       switch (dateFilter) {
         case 'last30':
           const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
