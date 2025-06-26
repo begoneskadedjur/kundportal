@@ -1,4 +1,4 @@
-// api/test-clickup.ts - ENHANCED VERSION WITH DROPDOWN CONFIG
+// api/test-clickup.ts - ENHANCED VERSION WITH DROPDOWN CONFIG + PRIORITY
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -136,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send(html)
   }
 
-  // ENHANCED TASK DETAILS with dropdown config
+  // ENHANCED TASK DETAILS with dropdown config + PRIORITY
   if (req.query.task_id) {
     const taskId = req.query.task_id as string
     
@@ -181,6 +181,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created: taskData.date_created,
           updated: taskData.date_updated
         },
+        // LÄGG TILL PRIORITY FRÅN CLICKUP
+        priority: taskData.priority ? {
+          priority: taskData.priority.priority || taskData.priority,
+          color: taskData.priority.color || '#60a5fa'
+        } : null,
         assignees: taskData.assignees?.map((a: any) => ({
           name: a.username,
           email: a.email
@@ -196,7 +201,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               field_value: f.value,
               options: f.type_config.options
             }))
-        }
+        },
+        // DEBUG: Lägg till raw priority data för att se vad ClickUp returnerar
+        debug_priority: taskData.priority
       }
 
       return res.status(200).json(result)
@@ -242,7 +249,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: task.name,
           status: task.status?.status || 'Ingen status',
           description: task.description ? 'Har beskrivning' : 'Ingen beskrivning',
-          custom_fields_count: task.custom_fields?.length || 0
+          custom_fields_count: task.custom_fields?.length || 0,
+          // LÄGG TILL PRIORITY ÄVEN I LIST VIEW
+          priority: task.priority ? {
+            priority: task.priority.priority || task.priority,
+            color: task.priority.color || '#60a5fa'
+          } : null
         })) || []
       }
 
