@@ -650,11 +650,22 @@ export default function CustomerPortal() {
                             </div>
                           )}
                         </div>
-                        {visit.status && (
-                          <span className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                            {capitalizeFirst(visit.status)}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {visit.status && (
+                            <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(visit.status)}`}>
+                              {capitalizeFirst(visit.status)}
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTaskId(visit.id)}
+                            className="text-xs"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            Detaljer
+                          </Button>
+                        </div>
                       </div>
                       {visit.work_performed && (
                         <p className="text-xs text-slate-500 mt-2 line-clamp-2">
