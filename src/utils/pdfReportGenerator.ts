@@ -451,8 +451,17 @@ export const generatePDFReport = async (
       pdf.text(`Sida ${i} av ${pageCount}`, pageWidth - spacing.lg, pageHeight - 8, { align: 'right' })
     }
 
-    // Ladda ner PDF med tidsstämpel
-    const fileName = `BeGone_Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+    // Ladda ner PDF med filnamn: "Inspektionsrapport - Ärende ID - Kundnamn"
+    const customerName = customerInfo?.company_name || 'Okänd_kund'
+    const taskId = taskDetails.task_id
+    
+    // Rensa kundnamnet från ogiltiga tecken
+    const cleanCustomerName = customerName
+      .replace(/[^\w\s-]/g, '') // Ta bort specialtecken
+      .replace(/\s+/g, '_')      // Ersätt mellanslag med underscore
+      .substring(0, 30)          // Begränsa längden
+    
+    const fileName = `Inspektionsrapport - ${taskId} - ${cleanCustomerName}.pdf`
     pdf.save(fileName)
 
   } catch (error) {
