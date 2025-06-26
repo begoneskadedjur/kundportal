@@ -481,19 +481,32 @@ export default function CustomerPortal() {
       <header className="glass border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div>
-                <h1 className="text-2xl font-bold text-green-500">
-                  BeGone Skadedjur - Kundportal
-                </h1>
-                <p className="text-sm text-slate-400">{customer.company_name}</p>
-              </div>
+            {/* Centrerad titel */}
+            <div className="flex-1 text-center">
+              <h1 className="text-2xl font-bold text-white">
+                BeGone Skadedjur Kundportal
+              </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">{customer.contact_person}</p>
-                <p className="text-xs text-slate-400">{customer.contract_types.name}</p>
+            {/* Kundinfo till höger */}
+            <div className="flex items-center space-x-3">
+              <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <Building className="w-4 h-4 text-slate-400" />
+                    <span className="text-white font-medium">{customer.company_name}</span>
+                  </div>
+                  <div className="w-px h-4 bg-slate-600"></div>
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-300">{customer.contact_person}</span>
+                  </div>
+                  <div className="w-px h-4 bg-slate-600"></div>
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-400">{customer.contract_types.name}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
