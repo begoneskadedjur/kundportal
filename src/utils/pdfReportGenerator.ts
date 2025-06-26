@@ -113,15 +113,11 @@ const drawModernCard = (
   pdf.roundedRect(x, y, width, height, radius, radius, 'S')
 }
 
-// Modern header med gradient-effekt
+// Clean modern header - ren bakgrund
 const drawModernHeader = (pdf: jsPDF, pageWidth: number) => {
-  // Gradient bakgrund (simulerad med flera lager)
-  for (let i = 0; i < 50; i++) {
-    const alpha = 1 - (i / 50) * 0.3
-    const color = modernColors.primary.map(c => Math.min(255, c + i))
-    pdf.setFillColor(color[0], color[1], color[2])
-    pdf.rect(0, i, pageWidth, 1, 'F')
-  }
+  // Solid modern bakgrund
+  pdf.setFillColor(...modernColors.primary)
+  pdf.rect(0, 0, pageWidth, 50, 'F')
 }
 
 export const generatePDFReport = async (
@@ -192,17 +188,17 @@ export const generatePDFReport = async (
     // Elegant text fallback om bild misslyckas
     if (!headerSuccessful) {
       pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(22)
+      pdf.setFontSize(18)
       pdf.setFont(undefined, 'bold')
-      pdf.text('BeGone', pageWidth/2, 20, { align: 'center' })
+      pdf.text('BeGone', pageWidth/2, 18, { align: 'center' })
       
-      pdf.setFontSize(10)
+      pdf.setFontSize(8)
       pdf.setFont(undefined, 'normal')
-      pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 28, { align: 'center' })
+      pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 26, { align: 'center' })
       
-      pdf.setFontSize(14)
+      pdf.setFontSize(12)
       pdf.setFont(undefined, 'bold')
-      pdf.text('SANERINGSRAPPORT', pageWidth/2, 38, { align: 'center' })
+      pdf.text('SANERINGSRAPPORT', pageWidth/2, 36, { align: 'center' })
     }
 
     // === ADRESS SEKTION ===
@@ -223,16 +219,16 @@ export const generatePDFReport = async (
     yPosition += spacing.md
 
     // Modern kunduppgifter card
-    const customerBoxHeight = 42
+    const customerBoxHeight = 50  // Högre för bättre spacing
     drawModernCard(pdf, spacing.lg, yPosition, pageWidth - (spacing.lg * 2), customerBoxHeight)
 
-    // Kunduppgifter innehåll med bättre typografi
+    // Kunduppgifter innehåll med bättre spacing
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(9)
     
-    const leftCol = spacing.lg + spacing.sm
-    const rightCol = pageWidth/2 + spacing.sm
-    let boxY = yPosition + spacing.sm
+    const leftCol = spacing.lg + spacing.md  // Mer padding
+    const rightCol = pageWidth/2 + spacing.md
+    let boxY = yPosition + spacing.md  // Mer top padding
 
     // Labels med modern styling
     pdf.setFont(undefined, 'bold')
@@ -240,25 +236,25 @@ export const generatePDFReport = async (
     pdf.text('UPPDRAGSGIVARE', leftCol, boxY)
     pdf.text('KONTAKTPERSON', rightCol, boxY)
     
-    // Values
+    // Values med mer spacing
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text(customerInfo?.company_name || '[Kundnamn]', leftCol, boxY + spacing.sm)
-    pdf.text(customerInfo?.contact_person || '[Kontaktperson]', rightCol, boxY + spacing.sm)
+    pdf.text(customerInfo?.company_name || '[Kundnamn]', leftCol, boxY + 10)
+    pdf.text(customerInfo?.contact_person || '[Kontaktperson]', rightCol, boxY + 10)
 
-    // Second row
+    // Second row med mer spacing
     pdf.setFont(undefined, 'bold')
     pdf.setTextColor(...modernColors.textMuted)
     pdf.setFontSize(9)
-    pdf.text('ÄRENDE ID', leftCol, boxY + spacing.lg)
-    pdf.text('ORG NUMMER', rightCol, boxY + spacing.lg)
+    pdf.text('ÄRENDE ID', leftCol, boxY + 24)
+    pdf.text('ORG NUMMER', rightCol, boxY + 24)
     
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text(taskDetails.task_id, leftCol, boxY + spacing.lg + spacing.sm)
-    pdf.text(customerInfo?.org_number || '[Org nummer]', rightCol, boxY + spacing.lg + spacing.sm)
+    pdf.text(taskDetails.task_id, leftCol, boxY + 34)
+    pdf.text(customerInfo?.org_number || '[Org nummer]', rightCol, boxY + 34)
 
     yPosition += customerBoxHeight + spacing.lg
 
@@ -269,12 +265,12 @@ export const generatePDFReport = async (
     pdf.text('Leverantörsuppgifter', spacing.lg, yPosition)
     yPosition += spacing.md
 
-    const supplierBoxHeight = 58
+    const supplierBoxHeight = 70  // Högre för bättre spacing
     drawModernCard(pdf, spacing.lg, yPosition, pageWidth - (spacing.lg * 2), supplierBoxHeight)
 
-    boxY = yPosition + spacing.sm
+    boxY = yPosition + spacing.md  // Mer top padding
 
-    // Leverantör info med clean typography
+    // Leverantör info med bättre spacing
     pdf.setFont(undefined, 'bold')
     pdf.setTextColor(...modernColors.textMuted)
     pdf.setFontSize(9)
@@ -284,34 +280,34 @@ export const generatePDFReport = async (
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text('BeGone Skadedjur & Sanering AB', leftCol, boxY + spacing.sm)
-    pdf.text('559378-9208', rightCol, boxY + spacing.sm)
+    pdf.text('BeGone Skadedjur & Sanering AB', leftCol, boxY + 10)
+    pdf.text('559378-9208', rightCol, boxY + 10)
 
     pdf.setFont(undefined, 'bold')
     pdf.setTextColor(...modernColors.textMuted)
     pdf.setFontSize(9)
-    pdf.text('ADRESS', leftCol, boxY + spacing.lg)
-    pdf.text('TELEFONNUMMER', rightCol, boxY + spacing.lg)
+    pdf.text('ADRESS', leftCol, boxY + 24)
+    pdf.text('TELEFONNUMMER', rightCol, boxY + 24)
     
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text('Kavlevägen 45, 141 59 Huddinge', leftCol, boxY + spacing.lg + spacing.sm)
-    pdf.text('010 280 44 10', rightCol, boxY + spacing.lg + spacing.sm)
+    pdf.text('Kavlevägen 45, 141 59 Huddinge', leftCol, boxY + 34)
+    pdf.text('010 280 44 10', rightCol, boxY + 34)
 
-    // Ansvarig tekniker
+    // Ansvarig tekniker med bättre spacing
     if (taskDetails.assignees.length > 0) {
       pdf.setFont(undefined, 'bold')
       pdf.setTextColor(...modernColors.textMuted)
       pdf.setFontSize(9)
-      pdf.text('ANSVARIG TEKNIKER', leftCol, boxY + spacing.xl)
-      pdf.text('E-POST TEKNIKER', rightCol, boxY + spacing.xl)
+      pdf.text('ANSVARIG TEKNIKER', leftCol, boxY + 48)
+      pdf.text('E-POST TEKNIKER', rightCol, boxY + 48)
       
       pdf.setFont(undefined, 'normal')
       pdf.setTextColor(...modernColors.darkGray)
       pdf.setFontSize(10)
-      pdf.text(taskDetails.assignees[0].name, leftCol, boxY + spacing.xl + spacing.sm)
-      pdf.text(taskDetails.assignees[0].email, rightCol, boxY + spacing.xl + spacing.sm)
+      pdf.text(taskDetails.assignees[0].name, leftCol, boxY + 58)
+      pdf.text(taskDetails.assignees[0].email, rightCol, boxY + 58)
     }
 
     yPosition += supplierBoxHeight + spacing.lg
@@ -334,10 +330,10 @@ export const generatePDFReport = async (
     
     yPosition += 30
 
-    const workBoxHeight = 48
+    const workBoxHeight = 56  // Högre för bättre spacing
     drawModernCard(pdf, spacing.lg, yPosition, pageWidth - (spacing.lg * 2), workBoxHeight)
 
-    boxY = yPosition + spacing.sm
+    boxY = yPosition + spacing.md  // Mer top padding
 
     pdf.setFont(undefined, 'bold')
     pdf.setTextColor(...modernColors.textMuted)
@@ -348,29 +344,29 @@ export const generatePDFReport = async (
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text(formatDate(taskDetails.task_info.created), leftCol, boxY + spacing.sm)
+    pdf.text(formatDate(taskDetails.task_info.created), leftCol, boxY + 10)
     
     if (addressField) {
       const addressText = addressField.value.formatted_address
       const maxWidth = (pageWidth/2) - spacing.xl
       const addressLines = pdf.splitTextToSize(addressText, maxWidth)
-      pdf.text(addressLines.slice(0, 2), rightCol, boxY + spacing.sm)
+      pdf.text(addressLines.slice(0, 2), rightCol, boxY + 10)
     }
 
     pdf.setFont(undefined, 'bold')
     pdf.setTextColor(...modernColors.textMuted)
     pdf.setFontSize(9)
-    pdf.text('SKADEDJUR', leftCol, boxY + spacing.lg + spacing.xs)
+    pdf.text('SKADEDJUR', leftCol, boxY + 30)
     if (caseTypeField) {
-      pdf.text('TYP AV ÄRENDE', rightCol, boxY + spacing.lg + spacing.xs)
+      pdf.text('TYP AV ÄRENDE', rightCol, boxY + 30)
     }
     
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text(pestField ? getDropdownText(pestField) : 'Ej specificerat', leftCol, boxY + spacing.lg + spacing.md)
+    pdf.text(pestField ? getDropdownText(pestField) : 'Ej specificerat', leftCol, boxY + 40)
     if (caseTypeField) {
-      pdf.text(getDropdownText(caseTypeField), rightCol, boxY + spacing.lg + spacing.md)
+      pdf.text(getDropdownText(caseTypeField), rightCol, boxY + 40)
     }
 
     yPosition += workBoxHeight + spacing.lg
