@@ -69,7 +69,6 @@ type TaskStats = {
   open: number
   inProgress: number
   completed: number
-  overdue: number
 }
 
 export default function CustomerPortal() {
@@ -80,8 +79,7 @@ export default function CustomerPortal() {
     total: 0,
     open: 0,
     inProgress: 0,
-    completed: 0,
-    overdue: 0
+    completed: 0
   })
   const [loading, setLoading] = useState(true)
   const [tasksLoading, setTasksLoading] = useState(false)
@@ -165,34 +163,27 @@ export default function CustomerPortal() {
   }
 
   const calculateTaskStats = (taskList: ClickUpTask[]) => {
-    const now = Date.now()
     const stats: TaskStats = {
       total: taskList.length,
       open: 0,
       inProgress: 0,
-      completed: 0,
-      overdue: 0
+      completed: 0
     }
 
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      // Svenska och engelska statusar
-      if (status === 'to do' || status === 'open' || status === 'new' || 
-          status === 'ny' || status === 'öppen') {
-        stats.open++
-      } else if (status === 'in progress' || status === 'doing' || 
-                 status === 'bokat' || status === 'pågående' || status === 'schemalagd') {
-        stats.inProgress++
-      } else if (status === 'complete' || status === 'closed' || status === 'done' || 
-                 status === 'klar' || status === 'avslutad') {
+      // Avslutade ärenden: endast "genomförd"
+      if (status === 'genomförd') {
         stats.completed++
       }
-
-      // Kontrollera om uppgiften är försenad
-      if (task.due_date && parseInt(task.due_date) < now && 
-          !status.includes('complete') && !status.includes('klar') && !status.includes('avslutad')) {
-        stats.overdue++
+      // Pågående ärenden: "bokat" eller "under hantering"
+      else if (status === 'bokat' || status === 'under hantering') {
+        stats.inProgress++
+      }
+      // Öppna ärenden: allt annat
+      else {
+        stats.open++
       }
     })
 
@@ -217,26 +208,13 @@ export default function CustomerPortal() {
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
-      case 'complete':
-      case 'closed':
-      case 'done':
-      case 'klar':
-      case 'avslutad':
+      case 'genomförd':
         return 'text-green-500'
-      case 'in progress':
-      case 'doing':
-      case 'pågående':
       case 'bokat':
-      case 'schemalagd':
+      case 'under hantering':
         return 'text-blue-500'
-      case 'to do':
-      case 'open':
-      case 'new':
-      case 'ny':
-      case 'öppen':
-        return 'text-orange-500'
       default:
-        return 'text-slate-400'
+        return 'text-orange-500' // Öppna/nya ärenden
     }
   }
 
@@ -306,8 +284,8 @@ export default function CustomerPortal() {
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Stats Grid - Uppdaterad med 3 kort */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -346,20 +324,6 @@ export default function CustomerPortal() {
               </div>
               <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Försenade</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {tasksLoading ? '-' : taskStats.overdue}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-red-500" />
               </div>
             </div>
           </Card>
@@ -441,16 +405,22 @@ export default function CustomerPortal() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-sm text-slate-500">
+                      <div className="flex items-center justify-between text-sm text-slate-400">
                         <div className="flex items-center space-x-4">
                           <div className="flex items-center">
                             <Calendar className="w-4 h-4 mr-1" />
-                            {formatDate(task.due_date)}
+                            <span>Skapad: {formatDate(task.date_created)}</span>
                           </div>
+                          {task.due_date && (
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 mr-1" />
+                              <span>Deadline: {formatDate(task.due_date)}</span>
+                            </div>
+                          )}
                           {task.assignees.length > 0 && (
                             <div className="flex items-center">
                               <User className="w-4 h-4 mr-1" />
-                              {task.assignees[0].username}
+                              <span>{task.assignees[0].username}</span>
                             </div>
                           )}
                         </div>
@@ -458,7 +428,6 @@ export default function CustomerPortal() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setSelectedTaskId(task.id)}
-                          className="text-green-400 hover:text-green-300"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           Visa detaljer
@@ -469,7 +438,7 @@ export default function CustomerPortal() {
 
                   {tasks.length > 5 && (
                     <div className="text-center pt-4">
-                      <Button variant="ghost">
+                      <Button variant="secondary" size="sm">
                         Visa alla {tasks.length} ärenden
                       </Button>
                     </div>
@@ -480,91 +449,77 @@ export default function CustomerPortal() {
           </div>
 
           {/* Företagsinformation */}
-          <div className="space-y-6">
+          <div>
             <Card>
               <h3 className="text-lg font-semibold text-white mb-4">Företagsinformation</h3>
               <div className="space-y-3">
                 <div className="flex items-center text-sm">
-                  <Building className="w-4 h-4 text-slate-400 mr-3" />
-                  <div>
-                    <p className="text-white font-medium">{customer.company_name}</p>
-                    <p className="text-slate-400">{customer.contract_types.name}</p>
-                  </div>
+                  <Building className="w-4 h-4 text-slate-400 mr-2" />
+                  <span className="text-slate-300">{customer.company_name}</span>
                 </div>
-                
                 <div className="flex items-center text-sm">
-                  <User className="w-4 h-4 text-slate-400 mr-3" />
+                  <User className="w-4 h-4 text-slate-400 mr-2" />
                   <span className="text-slate-300">{customer.contact_person}</span>
                 </div>
-
                 <div className="flex items-center text-sm">
-                  <Mail className="w-4 h-4 text-slate-400 mr-3" />
+                  <Mail className="w-4 h-4 text-slate-400 mr-2" />
                   <span className="text-slate-300">{customer.email}</span>
                 </div>
-
-                {customer.phone && (
-                  <div className="flex items-center text-sm">
-                    <Phone className="w-4 h-4 text-slate-400 mr-3" />
-                    <span className="text-slate-300">{customer.phone}</span>
-                  </div>
-                )}
-
-                {customer.address && (
-                  <div className="flex items-center text-sm">
-                    <MapPin className="w-4 h-4 text-slate-400 mr-3" />
-                    <span className="text-slate-300">{customer.address}</span>
-                  </div>
-                )}
+                <div className="flex items-center text-sm">
+                  <Phone className="w-4 h-4 text-slate-400 mr-2" />
+                  <span className="text-slate-300">{customer.phone}</span>
+                </div>
+                <div className="flex items-start text-sm">
+                  <MapPin className="w-4 h-4 text-slate-400 mr-2 mt-0.5" />
+                  <span className="text-slate-300">{customer.address}</span>
+                </div>
               </div>
             </Card>
 
-            <Card>
+            {/* Snabblänkar */}
+            <Card className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-4">Snabblänkar</h3>
               <div className="space-y-2">
-                <a
-                  href={`https://app.clickup.com/list/${customer.clickup_list_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full text-left px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                <Button 
+                  variant="ghost" 
+                  fullWidth 
+                  className="justify-start"
+                  onClick={() => window.open('https://app.clickup.com', '_blank')}
                 >
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 text-green-500 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-white">Öppna ClickUp</p>
-                      <p className="text-xs text-slate-400">Se alla ärenden</p>
-                    </div>
-                  </div>
-                </a>
-
-                <button className="block w-full text-left px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 text-blue-500 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-white">Kommande besök</p>
-                      <p className="text-xs text-slate-400">Schemalagda datum</p>
-                    </div>
-                  </div>
-                </button>
-
-                <button className="block w-full text-left px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 text-purple-500 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-white">Rapporter</p>
-                      <p className="text-xs text-slate-400">Tidigare besök</p>
-                    </div>
-                  </div>
-                </button>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Öppna ClickUp
+                  <span className="text-xs text-slate-500 ml-auto">Se alla ärenden</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  fullWidth 
+                  className="justify-start opacity-50"
+                  disabled
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Kommande besök
+                  <span className="text-xs text-slate-500 ml-auto">Schemalagda datum</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  fullWidth 
+                  className="justify-start opacity-50"
+                  disabled
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Rapporter
+                  <span className="text-xs text-slate-500 ml-auto">Tidigare besök</span>
+                </Button>
               </div>
             </Card>
           </div>
         </div>
       </main>
 
-      {/* Modal för ärendedetaljer */}
+      {/* Case Details Modal */}
       {selectedTaskId && (
         <CaseDetailsModal
-          caseId="dummy-case-id" // Vi använder ClickUp task ID istället
+          caseId=""
           clickupTaskId={selectedTaskId}
           isOpen={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
