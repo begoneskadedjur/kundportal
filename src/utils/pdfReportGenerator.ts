@@ -297,7 +297,7 @@ export const generatePDFReport = async (
     pdf.setFont(undefined, 'normal')
     pdf.setTextColor(...modernColors.darkGray)
     pdf.setFontSize(10)
-    pdf.text('Kavlevägen 45, 141 59 Huddinge', leftCol, boxY + 20)
+    pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, boxY + 20)
     pdf.text('010 280 44 10', rightCol, boxY + 20)
 
     // Ansvarig tekniker (bara om finns)
