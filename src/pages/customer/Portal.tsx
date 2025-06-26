@@ -1,4 +1,4 @@
-// src/pages/customer/Portal.tsx
+const calculateTaskStats = (taskList: ClickUpTask[]) => {// src/pages/customer/Portal.tsx
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -15,7 +15,8 @@ import {
   Phone,
   Mail,
   RotateCcw,
-  Eye
+  Eye,
+  Search
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
@@ -64,6 +65,16 @@ type ClickUpTask = {
   url: string
 }
 
+type Visit = {
+  id: string
+  case_id: string
+  visit_date: string
+  technician_name: string | null
+  work_performed: string | null
+  status: string | null
+  created_at: string
+}
+
 type TaskStats = {
   total: number
   open: number
@@ -75,7 +86,9 @@ export default function CustomerPortal() {
   const { profile } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [tasks, setTasks] = useState<ClickUpTask[]>([])
+  const [visits, setVisits] = useState<Visit[]>([])
   const [showAllTasks, setShowAllTasks] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [taskStats, setTaskStats] = useState<TaskStats>({
     total: 0,
     open: 0,
@@ -91,6 +104,7 @@ export default function CustomerPortal() {
   useEffect(() => {
     if (profile?.customer_id) {
       fetchCustomerData()
+      fetchUpcomingVisits()
     }
   }, [profile])
 
@@ -163,7 +177,40 @@ export default function CustomerPortal() {
     }
   }
 
-  const calculateTaskStats = (taskList: ClickUpTask[]) => {
+  const fetchUpcomingVisits = async () => {
+    if (!profile?.customer_id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+          id,
+          case_id,
+          visit_date,
+          technician_name,
+          work_performed,
+          status,
+          created_at,
+          cases!inner(customer_id)
+        `)
+        .eq('cases.customer_id', profile.customer_id)
+        .gte('visit_date', new Date().toISOString().split('T')[0]) // Endast framtida besök
+        .order('visit_date', { ascending: true })
+        .limit(5)
+
+      if (error) throw error
+      setVisits(data || [])
+    } catch (error) {
+      console.error('Error fetching visits:', error)
+    }
+  }
+
+  // Filtrera tasks baserat på sökquery
+  const filteredTasks = tasks.filter(task => 
+    task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
     const stats: TaskStats = {
       total: taskList.length,
       open: 0,
@@ -345,15 +392,28 @@ export default function CustomerPortal() {
             <Card>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={fetchClickUpTasks}
-                  loading={tasksLoading}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Uppdatera
-                </Button>
+                <div className="flex items-center space-x-3">
+                  {/* Sökfunktion */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Sök ärenden..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 w-64"
+                    />
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={fetchClickUpTasks}
+                    loading={tasksLoading}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Uppdatera
+                  </Button>
+                </div>
               </div>
 
               {tasksLoading ? (
@@ -379,7 +439,20 @@ export default function CustomerPortal() {
                     Försök igen
                   </Button>
                 </div>
-              ) : tasks.length === 0 ? (
+              ) : filteredTasks.length === 0 && searchQuery ? (
+                <div className="text-center py-8">
+                  <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">Inga ärenden matchar sökningen "{searchQuery}"</p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSearchQuery('')}
+                    className="mt-2"
+                  >
+                    Rensa sökning
+                  </Button>
+                </div>
+              ) : filteredTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">Inga ärenden finns ännu</p>
@@ -389,7 +462,7 @@ export default function CustomerPortal() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {(showAllTasks ? tasks : tasks.slice(0, 5)).map((task) => (
+                  {(showAllTasks ? filteredTasks : filteredTasks.slice(0, 5)).map((task) => (
                     <div
                       key={task.id}
                       className="border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors"
@@ -446,14 +519,14 @@ export default function CustomerPortal() {
                     </div>
                   ))}
 
-                  {tasks.length > 5 && (
+                  {filteredTasks.length > 5 && (
                     <div className="text-center pt-4">
                       <Button 
                         variant="secondary" 
                         size="sm"
                         onClick={() => setShowAllTasks(!showAllTasks)}
                       >
-                        {showAllTasks ? 'Visa färre ärenden' : `Visa alla ${tasks.length} ärenden`}
+                        {showAllTasks ? 'Visa färre ärenden' : `Visa alla ${filteredTasks.length} ärenden`}
                       </Button>
                     </div>
                   )}
@@ -490,31 +563,65 @@ export default function CustomerPortal() {
               </div>
             </Card>
 
-            {/* Snabblänkar */}
-            <Card className="mt-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Snabblänkar</h3>
-              <div className="space-y-2">
-                <Button 
-                  variant="ghost" 
-                  fullWidth 
-                  className="justify-start opacity-50"
-                  disabled
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Kommande besök
-                  <span className="text-xs text-slate-500 ml-auto">Schemalagda datum</span>
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  fullWidth 
-                  className="justify-start opacity-50"
-                  disabled
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Rapporter
-                  <span className="text-xs text-slate-500 ml-auto">Tidigare besök</span>
-                </Button>
-              </div>
+            {/* Kommande besök */}
+            <Card>
+              <h3 className="text-lg font-semibold text-white mb-4">Kommande besök</h3>
+              {visits.length === 0 ? (
+                <div className="text-center py-6">
+                  <Calendar className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">Inga kommande besök planerade</p>
+                  <p className="text-slate-500 text-xs mt-1">Nya besök kommer att visas här</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {visits.map((visit) => (
+                    <div 
+                      key={visit.id}
+                      className="border border-slate-700 rounded-lg p-3 hover:border-slate-600 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center text-sm text-white font-medium mb-1">
+                            <Calendar className="w-4 h-4 mr-2 text-green-400" />
+                            {new Date(visit.visit_date).toLocaleDateString('sv-SE', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </div>
+                          {visit.technician_name && (
+                            <div className="flex items-center text-xs text-slate-400">
+                              <User className="w-3 h-3 mr-1" />
+                              {visit.technician_name}
+                            </div>
+                          )}
+                        </div>
+                        {visit.status && (
+                          <span className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                            {capitalizeFirst(visit.status)}
+                          </span>
+                        )}
+                      </div>
+                      {visit.work_performed && (
+                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+                          {visit.work_performed}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {visits.length >= 5 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      fullWidth 
+                      className="mt-3"
+                      disabled
+                    >
+                      Visa alla besök
+                    </Button>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
         </div>
