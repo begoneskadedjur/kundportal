@@ -142,27 +142,40 @@ export default function CustomerPortal() {
     if (!profile?.customer_id) return
 
     try {
+      // Hämta kommande besök från cases.scheduled_date istället för visits-tabellen
       const { data, error } = await supabase
-        .from('visits')
+        .from('cases')
         .select(`
           id,
-          case_id,
-          visit_date,
-          technician_name,
-          work_performed,
+          title,
+          scheduled_date,
+          assigned_technician_name,
           status,
-          created_at,
-          cases!inner(customer_id)
+          case_type,
+          address_formatted
         `)
-        .eq('cases.customer_id', profile.customer_id)
-        .gte('visit_date', new Date().toISOString().split('T')[0]) // Endast framtida besök
-        .order('visit_date', { ascending: true })
+        .eq('customer_id', profile.customer_id)
+        .not('scheduled_date', 'is', null) // Endast ärenden med schemalagda datum
+        .gte('scheduled_date', new Date().toISOString().split('T')[0]) // Endast framtida datum
+        .order('scheduled_date', { ascending: true })
         .limit(5)
 
       if (error) throw error
-      setVisits(data || [])
+      
+      // Konvertera cases till visit-format för UI-kompatibilitet
+      const upcomingCases = data?.map(case_ => ({
+        id: case_.id,
+        case_id: case_.id,
+        visit_date: case_.scheduled_date,
+        technician_name: case_.assigned_technician_name,
+        work_performed: `${case_.case_type || 'Ärende'}: ${case_.title}`,
+        status: case_.status,
+        created_at: case_.scheduled_date
+      })) || []
+      
+      setVisits(upcomingCases)
     } catch (error) {
-      console.error('Error fetching visits:', error)
+      console.error('Error fetching upcoming visits:', error)
     }
   }
 
