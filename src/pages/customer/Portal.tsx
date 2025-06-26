@@ -25,6 +25,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import CaseDetailsModal from '../../components/customer/CaseDetailsModal'
 import CreateCaseModal from '../../components/customer/CreateCaseModal'
+import CustomerSettingsModal from '../../components/customer/CustomerSettingsModal'
 
 // Types
 type Customer = {
@@ -105,6 +106,7 @@ export default function CustomerPortal() {
   const [error, setError] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Hämta kunddata
   useEffect(() => {
@@ -490,7 +492,10 @@ export default function CustomerPortal() {
             
             {/* Kundinfo till höger */}
             <div className="flex items-center space-x-3">
-              <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
+              <div 
+                className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700 cursor-pointer hover:bg-slate-800/70 transition-colors"
+                onClick={() => setShowSettingsModal(true)}
+              >
                 <div className="flex items-center space-x-3 text-sm">
                   <div className="flex items-center space-x-2">
                     <Building className="w-4 h-4 text-slate-400" />
@@ -923,6 +928,25 @@ export default function CustomerPortal() {
           clickupTaskId={selectedTaskId}
           isOpen={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
+        />
+      )}
+
+      {/* Customer Settings Modal */}
+      {showSettingsModal && customer && (
+        <CustomerSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          customer={{
+            id: customer.id,
+            company_name: customer.company_name,
+            org_number: customer.org_number || '',
+            contact_person: customer.contact_person,
+            email: customer.email,
+            phone: customer.phone
+          }}
+          onUpdate={(updatedCustomer) => {
+            setCustomer(prev => prev ? { ...prev, ...updatedCustomer } : null)
+          }}
         />
       )}
 
