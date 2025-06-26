@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Calendar, Clock, AlertCircle, Eye, FileText } from 'lucide-react'
+import { Calendar, Clock, AlertCircle, Eye, FileText, Flag } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -85,6 +85,49 @@ export default function CaseList() {
     return priorityColors[priority.toLowerCase()] || 'text-gray-400'
   }
 
+  // LÄGG TILL DENNA FUNKTION:
+  const getPriorityDisplay = (priority: string | null) => {
+    if (!priority) return null
+    
+    const priorityLower = priority.toLowerCase()
+    
+    // Prioritetskonfiguration med ClickUps färger
+    const config = {
+      'urgent': { 
+        text: 'Akut', 
+        color: '#f87171',
+        flagColor: 'text-red-500'
+      },
+      'high': { 
+        text: 'Hög', 
+        color: '#fb923c',
+        flagColor: 'text-orange-500'
+      },
+      'normal': { 
+        text: 'Normal', 
+        color: '#60a5fa',
+        flagColor: 'text-blue-500'
+      },
+      'low': { 
+        text: 'Låg', 
+        color: '#9ca3af',
+        flagColor: 'text-gray-500'
+      }
+    }
+    
+    const priorityConfig = config[priorityLower] || config['normal']
+    
+    return (
+      <span 
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white"
+        style={{ backgroundColor: priorityConfig.color }}
+      >
+        <Flag className={`w-3 h-3 ${priorityConfig.flagColor}`} fill="currentColor" />
+        <span>{priorityConfig.text}</span>
+      </span>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -135,12 +178,8 @@ export default function CaseList() {
                     {case_.status}
                   </span>
                   
-                  <div className="flex items-center gap-1">
-                    <AlertCircle className={`w-4 h-4 ${getPriorityColor(case_.priority)}`} />
-                    <span className={`text-sm ${getPriorityColor(case_.priority)}`}>
-                      {case_.priority}
-                    </span>
-                  </div>
+                  {/* ERSÄTT DETTA BLOCK: */}
+                  {case_.priority && getPriorityDisplay(case_.priority)}
 
                   {case_.pest_type && (
                     <span className="text-sm text-slate-400 bg-slate-700/50 px-2 py-1 rounded">

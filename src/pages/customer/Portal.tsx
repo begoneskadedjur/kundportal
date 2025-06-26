@@ -17,7 +17,8 @@ import {
   RotateCcw,
   Eye,
   Search,
-  Plus
+  Plus,
+  Flag
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
@@ -360,6 +361,48 @@ export default function CustomerPortal() {
     }
   }
 
+  const getPriorityDisplay = (priority: string | null) => {
+    if (!priority) return null
+    
+    const priorityLower = priority.toLowerCase()
+    
+    // Prioritetskonfiguration med ClickUps färger
+    const config = {
+      'urgent': { 
+        text: 'Akut', 
+        color: '#f87171',
+        flagColor: 'text-red-500'
+      },
+      'high': { 
+        text: 'Hög', 
+        color: '#fb923c',
+        flagColor: 'text-orange-500'
+      },
+      'normal': { 
+        text: 'Normal', 
+        color: '#60a5fa',
+        flagColor: 'text-blue-500'
+      },
+      'low': { 
+        text: 'Låg', 
+        color: '#9ca3af',
+        flagColor: 'text-gray-500'
+      }
+    }
+    
+    const priorityConfig = config[priorityLower] || config['normal']
+    
+    return (
+      <span 
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white"
+        style={{ backgroundColor: priorityConfig.color }}
+      >
+        <Flag className={`w-3 h-3 ${priorityConfig.flagColor}`} fill="currentColor" />
+        <span>{priorityConfig.text}</span>
+      </span>
+    )
+  }
+
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
@@ -670,11 +713,7 @@ export default function CustomerPortal() {
                           <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
                             {capitalizeFirst(task.status.status)}
                           </span>
-                          {task.priority && (
-                            <span className={`text-xs ${getPriorityColor(task.priority.priority)}`}>
-                              {task.priority.priority}
-                            </span>
-                          )}
+                          {task.priority && getPriorityDisplay(task.priority.priority)}
                         </div>
                       </div>
 
