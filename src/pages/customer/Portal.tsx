@@ -716,11 +716,19 @@ export default function CustomerPortal() {
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center space-x-2 ml-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
-                            {capitalizeFirst(task.status.status)}
-                          </span>
-                          {task.priority && getPriorityDisplay(task.priority.priority)}
+                        <div className="flex items-center space-x-4 ml-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-400">Status:</span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
+                              {capitalizeFirst(task.status.status)}
+                            </span>
+                          </div>
+                          {task.priority && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-400">Prioritet:</span>
+                              {getPriorityDisplay(task.priority.priority)}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -833,11 +841,14 @@ export default function CustomerPortal() {
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-4">
                           {visit.status && (
-                            <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(visit.status)}`}>
-                              {capitalizeFirst(visit.status)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400">Status:</span>
+                              <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(visit.status)}`}>
+                                {capitalizeFirst(visit.status)}
+                              </span>
+                            </div>
                           )}
                           <Button
                             variant="ghost"
