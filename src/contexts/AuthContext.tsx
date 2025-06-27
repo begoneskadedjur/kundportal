@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - REPAIRED AND STABILIZED VERSION
+// src/contexts/AuthContext.tsx - FIXED VERSION för siduppdateringsproblemet
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -29,42 +29,102 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Börjar alltid som true
+  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false); // NYTT: Förhindra dubbel-initialisering
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // FIX 1: DEN ENDA useEffect som behövs för att hantera auth-state.
-  // Beroendelistan är nu tom `[]`, vilket är AVGÖRANDE.
-  // Denna kod körs nu BARA EN GÅNG när appen startar.
+  // FIX 1: Säkrare initialization som körs bara en gång
   useEffect(() => {
-    // onAuthStateChange hanterar allt: initial sidladdning, inloggning, utloggning.
-    // Vi behöver inte längre den separata `initAuth`-funktionen.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 Auth state change:', event);
-        if (session?.user) {
-          // Om en session finns, sätt användaren och hämta profilen.
-          // Detta hanterar både F5-refresh och ny inloggning.
-          setUser(session.user);
-          await fetchProfile(session.user.id, session.user);
-        } else {
-          // Om ingen session finns, rensa allt och sluta ladda.
-          setUser(null);
-          setProfile(null);
+    let isMounted = true; // Förhindra state updates efter unmount
+    let authSubscription: any = null;
+
+    const initializeAuth = async () => {
+      if (initialized) return; // Förhindra dubbel-körning
+      
+      console.log('🔧 Initializing auth...');
+      
+      try {
+        // 1. Försök hämta befintlig session
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (existingSession?.user && isMounted) {
+          console.log('👤 Existing session found, loading profile...');
+          setUser(existingSession.user);
+          await fetchProfile(existingSession.user.id, existingSession.user);
+        } else if (isMounted) {
+          console.log('🚫 No existing session');
           setLoading(false);
         }
-      }
-    );
 
-    // Städa upp lyssnaren när komponenten avmonteras.
+        // 2. Sätt upp auth state listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!isMounted) return; // Ignorera om komponenten är unmounted
+            
+            console.log('🔄 Auth state change:', event);
+            
+            // Hantera olika auth events
+            switch (event) {
+              case 'SIGNED_IN':
+                if (session?.user) {
+                  setUser(session.user);
+                  await fetchProfile(session.user.id, session.user);
+                }
+                break;
+                
+              case 'SIGNED_OUT':
+                console.log('👋 User signed out');
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+                if (location.pathname !== '/login') {
+                  navigate('/login', { replace: true });
+                }
+                break;
+                
+              case 'TOKEN_REFRESHED':
+                console.log('🔄 Token refreshed');
+                // Inget att göra, sessionen är redan uppdaterad
+                break;
+                
+              default:
+                // För andra events, kontrollera bara session status
+                if (!session && isMounted) {
+                  setUser(null);
+                  setProfile(null);
+                  setLoading(false);
+                }
+            }
+          }
+        );
+
+        authSubscription = subscription;
+        setInitialized(true);
+        
+      } catch (error) {
+        console.error('💥 Auth initialization error:', error);
+        if (isMounted) {
+          setLoading(false);
+          // Försök inte navigera här, låt ProtectedRoute hantera det
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Cleanup function
     return () => {
       console.log('🧹 AuthContext cleanup');
-      subscription.unsubscribe();
+      isMounted = false;
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
-  }, []); // <-- KRITISK ÄNDRING: Tom beroendelista!
+  }, []); // Tom dependency array - körs bara en gång
 
-  // FIX 2: Förenklad fetchProfile som nu också hanterar navigation.
+  // FIX 2: Förbättrad fetchProfile med bättre error handling
   const fetchProfile = async (userId: string, authUser: User) => {
     try {
       console.log('📋 Fetching profile for user:', userId);
@@ -73,42 +133,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
-        .single(); // .single() är effektivare än .limit(1)
+        .single();
 
       if (error) throw error;
       
       if (!profileData.is_active) {
         toast.error('Ditt konto är inaktiverat.');
-        await signOut(); // Logga ut direkt
+        await signOut();
         return;
       }
       
       console.log('✅ Profile loaded:', profileData);
       setProfile(profileData);
 
-      // FIX 3: Flyttat navigationslogiken HIT.
-      // Den körs nu BARA när en profil har laddats framgångsrikt.
+      // FIX 3: Säkrare navigation som bara sker när användaren är på login/root
       const currentPath = location.pathname;
-      if (currentPath === '/login' || currentPath === '/') {
+      if (currentPath === '/login' || currentPath === '/' || currentPath === '') {
         const targetPath = profileData.is_admin ? '/admin' : '/portal';
-        console.log(`🧭 Navigating to ${targetPath}...`);
-        navigate(targetPath, { replace: true });
+        console.log(`🧭 Navigating from ${currentPath} to ${targetPath}...`);
+        
+        // Använd setTimeout för att undvika navigation under rendering
+        setTimeout(() => {
+          navigate(targetPath, { replace: true });
+        }, 0);
       }
 
     } catch (error: any) {
       console.error('💥 Profile fetch error:', error);
-      toast.error('Kunde inte hämta profilinformation. Loggar ut.');
-      await supabase.auth.signOut(); // Logga ut om profilen misslyckas
+      toast.error('Kunde inte hämta profilinformation.');
+      
+      // Om profile fetch misslyckas, logga ut för säkerhets skull
+      await supabase.auth.signOut();
     } finally {
-      // Oavsett resultat, när detta flöde är klart, slutar vi ladda.
       setLoading(false);
     }
   };
 
+  // FIX 4: Förbättrad signIn med bättre error handling
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -116,23 +181,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       
       toast.success('Inloggning lyckades!');
-      // `onAuthStateChange` kommer automatiskt att plocka upp 'SIGNED_IN'-händelsen
-      // och köra `fetchProfile`, som i sin tur hanterar navigationen.
+      // Auth state change listener kommer att hantera resten
       
     } catch (error: any) {
+      console.error('💥 Sign in error:', error);
       toast.error(error.message || 'Inloggning misslyckades');
-      setLoading(false); // Sluta ladda vid fel
+      setLoading(false);
       throw error;
     }
   };
 
+  // FIX 5: Förbättrad signOut med cleanup
   const signOut = async () => {
-    await supabase.auth.signOut();
-    // `onAuthStateChange` kommer att rensa state.
-    setUser(null);
-    setProfile(null);
-    navigate('/login', { replace: true });
-    toast.success('Du har loggats ut');
+    try {
+      console.log('👋 Signing out...');
+      
+      // Rensa local state först
+      setUser(null);
+      setProfile(null);
+      
+      // Sedan logga ut från Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Navigera till login
+      navigate('/login', { replace: true });
+      toast.success('Du har loggats ut');
+      
+    } catch (error) {
+      console.error('💥 Sign out error:', error);
+      // Även om utloggning misslyckas, rensa local state och navigera
+      navigate('/login', { replace: true });
+    }
   };
 
   const value = {
