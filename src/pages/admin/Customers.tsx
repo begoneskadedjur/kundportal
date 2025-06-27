@@ -282,7 +282,7 @@ export default function Customers() {
               const monthsLeft = getMonthsUntilExpiry(customer.contract_start_date, customer.contract_length_months)
               const expiryStatus = getExpiryStatus(monthsLeft)
               
-              return (
+                      return (
                 <Card key={customer.id} className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -430,59 +430,6 @@ export default function Customers() {
                 </Card>
               )
             })
-          )}
-        </div>
-      </main>
-    </div>
-  )
-}start_date)}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {customer.annual_premium && (
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="w-4 h-4 text-green-400" />
-                              <span className="text-slate-300">
-                                {formatCurrency(customer.annual_premium)}/år
-                              </span>
-                            </div>
-                          )}
-                          
-                          {customer.assigned_account_manager && (
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4 text-purple-400" />
-                              <span className="text-slate-300">
-                                {customer.assigned_account_manager.split('@')[0]}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleStatus(customer.id, customer.is_active)}
-                    >
-                      {customer.is_active ? 'Inaktivera' : 'Aktivera'}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/admin/customers/${customer.id}`)}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))
           )}
         </div>
       </main>
