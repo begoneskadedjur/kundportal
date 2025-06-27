@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - FÖRBÄTTRAD MED DEBUG
+// src/contexts/AuthContext.tsx - FÖRBÄTTRAD MED SESSION TIMEOUT
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -38,9 +38,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔗 Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing')
     console.log('🔑 Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing')
 
+    // Sätt en timeout för att undvika oändlig loading
+    const loadingTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('⏰ Loading timeout reached, forcing stop')
+        setLoading(false)
+      }
+    }, 5000) // 5 sekunder timeout
+
     // Hämta session vid start
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       console.log('📊 Initial session check:', session ? '✅ Found' : '❌ No session', error ? `Error: ${error.message}` : '')
+      
+      // Clear timeout since we got a response
+      clearTimeout(loadingTimeout)
       
       setUser(session?.user ?? null)
       if (session?.user) {
@@ -52,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }).catch(error => {
       console.error('💥 Session check failed:', error)
+      clearTimeout(loadingTimeout)
       setLoading(false)
     })
 
@@ -76,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       console.log('🧹 AuthContext cleanup')
+      clearTimeout(loadingTimeout)
       subscription.unsubscribe()
     }
   }, [navigate])
@@ -93,6 +106,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('📋 Profile query result:', data ? '✅ Found' : '❌ Not found', error ? `Error: ${error.message}` : '')
 
       if (error) {
+        // Om profilen inte finns, logga ut användaren
+        if (error.code === 'PGRST116') {
+          console.warn('👤 Profile not found, signing out user')
+          await signOut()
+          return
+        }
         console.error('💥 Profile fetch error:', error)
         throw error
       }
@@ -121,6 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('💥 Error in fetchProfile:', error)
       toast.error('Kunde inte hämta profilinformation')
+      // Försök inte igen, bara logga ut användaren
+      await signOut()
     } finally {
       console.log('✅ Profile fetch completed, stopping loading')
       setLoading(false)
@@ -161,11 +182,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error
       
       setProfile(null)
+      setUser(null)
+      setLoading(false)
       console.log('✅ Sign out successful')
       toast.success('Du har loggats ut')
     } catch (error: any) {
       console.error('💥 Sign out error:', error)
       toast.error('Utloggning misslyckades')
+      // Även om signOut misslyckas, rensa state lokalt
+      setProfile(null)
+      setUser(null)
+      setLoading(false)
     }
   }
 
