@@ -1,8 +1,9 @@
-// src/contexts/AuthContext.tsx - SIMPLIFIED AND STABLE VERSION
+// src/contexts/AuthContext.tsx - REPAIRED AND STABILIZED VERSION
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 type Profile = {
@@ -28,78 +29,110 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Börjar som true, sätts till false när allt är klart.
+  const [loading, setLoading] = useState(true); // Börjar alltid som true
 
-  // Denna useEffect körs BARA EN GÅNG och hanterar ALLT auth-state.
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // FIX 1: DEN ENDA useEffect som behövs för att hantera auth-state.
+  // Beroendelistan är nu tom `[]`, vilket är AVGÖRANDE.
+  // Denna kod körs nu BARA EN GÅNG när appen startar.
   useEffect(() => {
-    setLoading(true);
-    // onAuthStateChange är det enda du behöver. Den hanterar initial laddning,
-    // inloggning, utloggning och token refresh automatiskt.
+    // onAuthStateChange hanterar allt: initial sidladdning, inloggning, utloggning.
+    // Vi behöver inte längre den separata `initAuth`-funktionen.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session && session.user) {
-          // Användare är inloggad eller en session har hittats.
+        console.log('🔄 Auth state change:', event);
+        if (session?.user) {
+          // Om en session finns, sätt användaren och hämta profilen.
+          // Detta hanterar både F5-refresh och ny inloggning.
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.user);
         } else {
-          // Användare är inte inloggad. Rensa state.
+          // Om ingen session finns, rensa allt och sluta ladda.
           setUser(null);
           setProfile(null);
-          setLoading(false); // Viktigt: sluta ladda även om ingen är inloggad.
+          setLoading(false);
         }
       }
     );
 
-    // Städa upp lyssnaren när komponenten försvinner.
+    // Städa upp lyssnaren när komponenten avmonteras.
     return () => {
+      console.log('🧹 AuthContext cleanup');
       subscription.unsubscribe();
     };
-  }, []); // <-- Tom beroendelista är avgörande!
+  }, []); // <-- KRITISK ÄNDRING: Tom beroendelista!
 
-  const fetchProfile = async (userId: string) => {
+  // FIX 2: Förenklad fetchProfile som nu också hanterar navigation.
+  const fetchProfile = async (userId: string, authUser: User) => {
     try {
-      const { data, error } = await supabase
+      console.log('📋 Fetching profile for user:', userId);
+      
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
-        .single(); // .single() är effektivare.
+        .single(); // .single() är effektivare än .limit(1)
 
       if (error) throw error;
-
-      if (data) {
-        if (!data.is_active) {
-          toast.error('Ditt konto är inaktiverat.');
-          await supabase.auth.signOut(); // Logga ut inaktiv användare
-          return;
-        }
-        setProfile(data);
+      
+      if (!profileData.is_active) {
+        toast.error('Ditt konto är inaktiverat.');
+        await signOut(); // Logga ut direkt
+        return;
       }
-    } catch (error) {
-      console.error('Kunde inte hämta profil:', error);
-      toast.error('Kunde inte ladda din användarprofil.');
-      await supabase.auth.signOut();
+      
+      console.log('✅ Profile loaded:', profileData);
+      setProfile(profileData);
+
+      // FIX 3: Flyttat navigationslogiken HIT.
+      // Den körs nu BARA när en profil har laddats framgångsrikt.
+      const currentPath = location.pathname;
+      if (currentPath === '/login' || currentPath === '/') {
+        const targetPath = profileData.is_admin ? '/admin' : '/portal';
+        console.log(`🧭 Navigating to ${targetPath}...`);
+        navigate(targetPath, { replace: true });
+      }
+
+    } catch (error: any) {
+      console.error('💥 Profile fetch error:', error);
+      toast.error('Kunde inte hämta profilinformation. Loggar ut.');
+      await supabase.auth.signOut(); // Logga ut om profilen misslyckas
     } finally {
-      // Oavsett om profilhämtning lyckas eller ej, är autentiseringsflödet klart.
+      // Oavsett resultat, när detta flöde är klart, slutar vi ladda.
       setLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast.error(error.message || 'Felaktigt e-post eller lösenord.');
-      setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      toast.success('Inloggning lyckades!');
+      // `onAuthStateChange` kommer automatiskt att plocka upp 'SIGNED_IN'-händelsen
+      // och köra `fetchProfile`, som i sin tur hanterar navigationen.
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Inloggning misslyckades');
+      setLoading(false); // Sluta ladda vid fel
       throw error;
     }
-    // onAuthStateChange kommer att hantera state-uppdateringen och omdirigering.
-    toast.success('Inloggning lyckades!');
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // onAuthStateChange kommer att rensa user/profile och sätta loading till false.
-    toast.success('Du har loggats ut.');
+    // `onAuthStateChange` kommer att rensa state.
+    setUser(null);
+    setProfile(null);
+    navigate('/login', { replace: true });
+    toast.success('Du har loggats ut');
   };
 
   const value = {
@@ -112,9 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isCustomer: !profile?.is_admin && !!profile?.customer_id,
   };
 
-  // Vi renderar inte barnen förrän vi är klara med den initiala laddningen,
-  // men ProtectedRoute hanterar detta redan med sin spinner, så detta är
-  // en extra säkerhet men inte strikt nödvändigt.
   return (
     <AuthContext.Provider value={value}>
       {children}
