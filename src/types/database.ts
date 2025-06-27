@@ -1,4 +1,4 @@
-// src/types/database.ts
+// src/types/database.ts - Uppdaterad med nya fält
 export type Database = {
   public: {
     Tables: {
@@ -17,8 +17,19 @@ export type Database = {
           is_active: boolean
           created_at: string
           updated_at: string
+          
+          // Nya avtalsfält
+          contract_start_date: string | null
+          contract_length_months: number | null
+          annual_premium: number | null
+          total_contract_value: number | null
+          contract_description: string | null
+          assigned_account_manager: string | null
+          contract_status: 'active' | 'pending' | 'expired' | 'cancelled'
         }
-        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at' | 'contract_status'> & {
+          contract_status?: 'active' | 'pending' | 'expired' | 'cancelled'
+        }
         Update: Partial<Database['public']['Tables']['customers']['Insert']>
       }
       contract_types: {
@@ -50,7 +61,7 @@ export type Database = {
           completed_date: string | null
           created_at: string
           updated_at: string
-          // Nya kolumner från din utökade struktur
+          // Utökade fält
           address_formatted: string | null
           address_lat: number | null
           address_lng: number | null
@@ -114,3 +125,41 @@ export type Database = {
     }
   }
 }
+
+// Hjälptyper för kunddata
+export type Customer = Database['public']['Tables']['customers']['Row']
+export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
+export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+
+export type ContractType = Database['public']['Tables']['contract_types']['Row']
+
+// Utökade typer för avtalsinformation
+export type CustomerFormData = {
+  // Grundinformation
+  company_name: string
+  org_number: string
+  contact_person: string
+  email: string
+  phone: string
+  address: string
+  contract_type_id: string
+  
+  // Avtalsinformation
+  contract_start_date: string
+  contract_length_months: string
+  annual_premium: string
+  total_contract_value: string
+  contract_description: string
+  assigned_account_manager: string
+}
+
+// Avtalsansvariga (kan senare hämtas från databas)
+export const ACCOUNT_MANAGERS = [
+  { value: 'anna.svensson@begone.se', label: 'Anna Svensson' },
+  { value: 'erik.larsson@begone.se', label: 'Erik Larsson' },
+  { value: 'maria.andersson@begone.se', label: 'Maria Andersson' },
+  { value: 'johan.nilsson@begone.se', label: 'Johan Nilsson' },
+  { value: 'lisa.johansson@begone.se', label: 'Lisa Johansson' }
+] as const
+
+export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']

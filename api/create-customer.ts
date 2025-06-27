@@ -1,88 +1,94 @@
-// api/create-customer.ts
+// api/create-customer.ts - Uppdaterat för avancerade fält
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 
-// Initiera Supabase Admin Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing required environment variables')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-// Konfiguration
+// Environment variables
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
-const BASE_URL = process.env.VITE_APP_URL || 'https://din-app.vercel.app'
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  host: 'smtp.resend.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: 'resend',
-    pass: RESEND_API_KEY,
-  },
-})
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Endast POST tillåtet
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  console.log('=== CREATE CUSTOMER API START ===')
-  console.log('Request body:', JSON.stringify(req.body, null, 2))
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   try {
-    const { customerData } = req.body
+    console.log('=== CREATE CUSTOMER API START ===')
+    
+    const customerData = req.body
+    console.log('Customer data received:', {
+      ...customerData,
+      email: customerData.email ? 'REDACTED' : undefined
+    })
 
-    if (!customerData) {
-      return res.status(400).json({ error: 'Customer data required' })
-    }
-
-    console.log('Customer data received:', customerData)
-
-    // 1. Validera att organisationsnummer är unikt (om det finns)
-    if (customerData.org_number) {
-      const { data: existingCustomerByOrg } = await supabase
-        .from('customers')
-        .select('id, company_name, org_number')
-        .eq('org_number', customerData.org_number)
-        .single()
-
-      if (existingCustomerByOrg) {
-        console.log('Customer with org_number already exists:', existingCustomerByOrg)
-        return res.status(400).json({ 
-          error: `Ett företag med organisationsnummer ${customerData.org_number} finns redan registrerat.` 
-        })
+    // 1. Validera inkommande data
+    const requiredFields = ['company_name', 'org_number', 'contact_person', 'email', 'contract_type_id']
+    for (const field of requiredFields) {
+      if (!customerData[field]) {
+        return res.status(400).json({ error: `Fält "${field}" är obligatoriskt` })
       }
     }
 
-    // 2. Hämta avtalstyp för ClickUp folder ID
-    console.log('Fetching contract type with ID:', customerData.contract_type_id)
+    // 2. Validera e-post format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(customerData.email)) {
+      return res.status(400).json({ error: 'Ogiltig e-postadress' })
+    }
+
+    // 3. Hämta avtalstyp från databas
+    console.log('Fetching contract type:', customerData.contract_type_id)
     const { data: contractType, error: contractError } = await supabase
       .from('contract_types')
-      .select('clickup_folder_id, name')
+      .select('*')
       .eq('id', customerData.contract_type_id)
+      .eq('is_active', true)
       .single()
 
     if (contractError || !contractType) {
       console.error('Contract type error:', contractError)
-      throw new Error('Kunde inte hämta avtalstyp')
+      return res.status(400).json({ error: 'Ogiltig avtalstyp' })
     }
 
-    console.log('Contract type found:', contractType)
+    console.log('Contract type found:', contractType.name)
 
-    // 3. Skapa unikt företagsnamn för ClickUp (lägg till avtalstyp för att undvika dubletter)
+    // 4. Kolla om kund redan finns
+    const { data: existingCustomer } = await supabase
+      .from('customers')
+      .select('company_name, org_number, email')
+      .or(`company_name.eq.${customerData.company_name},org_number.eq.${customerData.org_number},email.eq.${customerData.email}`)
+      .limit(1)
+      .single()
+
+    if (existingCustomer) {
+      if (existingCustomer.company_name === customerData.company_name) {
+        return res.status(400).json({ error: `Företaget "${customerData.company_name}" finns redan` })
+      }
+      if (existingCustomer.org_number === customerData.org_number) {
+        return res.status(400).json({ error: `Organisationsnummer "${customerData.org_number}" finns redan` })
+      }
+      if (existingCustomer.email === customerData.email) {
+        return res.status(400).json({ error: `E-postadressen "${customerData.email}" används redan` })
+      }
+    }
+
+    // 5. Skapa unikt företagsnamn för ClickUp
     const uniqueListName = `${customerData.company_name} - ${contractType.name}`
     console.log('Creating ClickUp list with name:', uniqueListName)
 
-    // 4. Skapa ClickUp lista
+    // 6. Skapa ClickUp lista
     const clickupResponse = await fetch(
       `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
       {
@@ -106,31 +112,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('ClickUp API error:', errorData)
       
       if (errorData.includes('SUBCAT_016') || errorData.includes('List name taken')) {
-        throw new Error(`En ClickUp-lista med namnet "${uniqueListName}" finns redan.`)
+        return res.status(400).json({ error: `En ClickUp-lista med namnet "${uniqueListName}" finns redan.` })
       }
       
-      throw new Error(`ClickUp API fel: ${errorData}`)
+      return res.status(500).json({ error: `ClickUp API fel: ${errorData}` })
     }
 
     const clickupList = await clickupResponse.json()
     console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
 
-    // 5. Skapa kund i databasen FÖRST
+    // 7. Förbered kunddata för databas
+    const dbCustomerData = {
+      company_name: customerData.company_name.trim(),
+      org_number: customerData.org_number.trim(),
+      contact_person: customerData.contact_person.trim(),
+      email: customerData.email.trim().toLowerCase(),
+      phone: customerData.phone?.trim() || null,
+      address: customerData.address?.trim() || null,
+      contract_type_id: customerData.contract_type_id,
+      clickup_list_id: clickupList.id,
+      clickup_list_name: clickupList.name,
+      is_active: true,
+      
+      // Avancerade avtalsfält
+      contract_start_date: customerData.contract_start_date || null,
+      contract_length_months: customerData.contract_length_months ? parseInt(customerData.contract_length_months) : null,
+      annual_premium: customerData.annual_premium ? parseFloat(customerData.annual_premium) : null,
+      total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
+      contract_description: customerData.contract_description?.trim() || null,
+      assigned_account_manager: customerData.assigned_account_manager || null,
+      contract_status: 'active'
+    }
+
+    // 8. Skapa kund i databas
     console.log('Creating customer in database...')
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .insert({
-        company_name: customerData.company_name,
-        org_number: customerData.org_number || null,
-        contact_person: customerData.contact_person,
-        email: customerData.email,
-        phone: customerData.phone || null,
-        address: customerData.address || null,
-        contract_type_id: customerData.contract_type_id,
-        clickup_list_id: clickupList.id,
-        clickup_list_name: clickupList.name,
-        is_active: true
-      })
+      .insert(dbCustomerData)
       .select()
       .single()
 
@@ -145,12 +163,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (cleanupError) {
         console.error('Failed to cleanup ClickUp list:', cleanupError)
       }
-      throw new Error(`Kunde inte skapa kund: ${customerError.message}`)
+      return res.status(500).json({ error: `Kunde inte skapa kund: ${customerError.message}` })
     }
 
-    console.log('Customer created successfully:', customer)
+    console.log('Customer created successfully:', customer.id)
 
-    // 6. Kolla om det finns en befintlig användare med denna e-post
+    // 9. Hantera autentisering och profil
     console.log('Checking for existing auth user with email:', customerData.email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
     const existingAuthUser = users.find(u => u.email === customerData.email)
@@ -196,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (authError) {
           console.error('Auth creation error:', authError)
           await supabase.from('customers').delete().eq('id', customer.id)
-          throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`)
+          return res.status(500).json({ error: `Kunde inte skapa användarkonto: ${authError.message}` })
         }
         
         userId = newAuthUser.user.id
@@ -207,7 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Creating new auth user...')
       isNewUser = true
       tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
-      
+
       const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
         email: customerData.email,
         password: tempPassword,
@@ -222,14 +240,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (authError) {
         console.error('Auth creation error:', authError)
         await supabase.from('customers').delete().eq('id', customer.id)
-        throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`)
+        return res.status(500).json({ error: `Kunde inte skapa användarkonto: ${authError.message}` })
       }
       
       userId = newAuthUser.user.id
       console.log('Created new auth user:', userId)
     }
 
-    // 7. Skapa eller uppdatera profil
+    // 10. Skapa eller uppdatera profil
     console.log('Creating/updating profile for user:', userId)
     
     const { data: existingProfile } = await supabase
@@ -256,7 +274,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (isNewUser) {
           await supabase.auth.admin.deleteUser(userId)
         }
-        throw new Error(`Kunde inte uppdatera profil: ${updateError.message}`)
+        return res.status(500).json({ error: `Kunde inte uppdatera profil: ${updateError.message}` })
       }
     } else {
       console.log('Creating new profile...')
@@ -277,116 +295,100 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (isNewUser) {
           await supabase.auth.admin.deleteUser(userId)
         }
-        throw new Error(`Kunde inte skapa profil: ${profileError.message}`)
+        return res.status(500).json({ error: `Kunde inte skapa profil: ${profileError.message}` })
       }
     }
 
     console.log('Profile created/updated successfully')
 
-    // 8. Skicka välkomstmail
-    console.log('Sending welcome email...')
+    // 11. Skicka välkomstmail
+    console.log('Preparing welcome email...')
     
-    const loginUrl = `${BASE_URL}/login`
-    let emailHtml: string
+    const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
+    
+    const contractInfo = customer.contract_start_date || customer.annual_premium ? `
+      <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h3 style="color: #22c55e; margin: 0 0 12px 0;">Avtalsinformation</h3>
+        ${customer.contract_start_date ? `<p style="margin: 4px 0;"><strong>Startdatum:</strong> ${new Date(customer.contract_start_date).toLocaleDateString('sv-SE')}</p>` : ''}
+        ${customer.contract_length_months ? `<p style="margin: 4px 0;"><strong>Avtalslängd:</strong> ${customer.contract_length_months} månader</p>` : ''}
+        ${customer.annual_premium ? `<p style="margin: 4px 0;"><strong>Årspremie:</strong> ${customer.annual_premium.toLocaleString('sv-SE')} SEK</p>` : ''}
+        ${customer.assigned_account_manager ? `<p style="margin: 4px 0;"><strong>Avtalsansvarig:</strong> ${customer.assigned_account_manager}</p>` : ''}
+      </div>
+    ` : ''
 
-    if (isNewUser && tempPassword) {
-      emailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #22c55e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .credentials { background-color: #e5f3ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
-            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Välkommen till BeGone Kundportal!</h1>
-            </div>
-            <div class="content">
-              <p>Hej ${customerData.contact_person},</p>
-              
-              <p>Ditt företag <strong>${customerData.company_name}</strong> har nu tillgång till BeGone Kundportal där ni kan:</p>
-              
-              <ul>
-                <li>Se alla era aktiva ärenden</li>
-                <li>Följa status på pågående uppdrag</li>
-                <li>Se kommande besök</li>
-                <li>Ta del av besöksrapporter</li>
-              </ul>
-              
-              <div class="credentials">
-                <h3>Dina inloggningsuppgifter:</h3>
-                <p><strong>E-post:</strong> ${customerData.email}<br>
-                <strong>Temporärt lösenord:</strong> ${tempPassword}</p>
-              </div>
-              
-              <p style="text-align: center;">
-                <a href="${loginUrl}" class="button">Logga in nu</a>
-              </p>
-              
-              <p><em>Byt gärna lösenord efter första inloggningen för ökad säkerhet.</em></p>
-              
-              <div class="footer">
-                <p>Med vänlig hälsning,<br>
-                BeGone Team</p>
-                
-                <p>Har du frågor? Kontakta oss på support@begone.se</p>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    } else {
-      // För befintliga användare
-      emailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #22c55e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Ny företagskoppling - BeGone Kundportal</h1>
-            </div>
-            <div class="content">
-              <p>Hej ${customerData.contact_person},</p>
-              
-              <p>Ditt konto har nu kopplats till företaget <strong>${customerData.company_name}</strong> med avtalstyp <strong>${contractType.name}</strong>.</p>
-              
-              <p>Du kan logga in med ditt befintliga lösenord och få tillgång till alla funktioner för detta företag.</p>
-              
-              <p style="text-align: center;">
-                <a href="${loginUrl}" class="button">Logga in</a>
-              </p>
-              
-              <div class="footer">
-                <p>Med vänlig hälsning,<br>
-                BeGone Team</p>
-                
-                <p>Har du frågor? Kontakta oss på support@begone.se</p>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    }
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Välkommen till BeGone Kundportal</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #22c55e; margin: 0;">BeGone Skadedjur</h1>
+          <h2 style="color: #64748b; margin: 10px 0;">Välkommen till vår kundportal!</h2>
+        </div>
+
+        <div style="background-color: #f1f5f9; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <p>Hej <strong>${customer.contact_person}</strong>!</p>
+          
+          <p>Tack för att du valt BeGone Skadedjur. Vi har nu skapat ett konto för ditt företag <strong>${customer.company_name}</strong> i vår kundportal.</p>
+          
+          ${contractInfo}
+          
+          <p>I portalen kan du:</p>
+          <ul style="color: #475569;">
+            <li>Följa dina ärenden i realtid</li>
+            <li>Se tekniska rapporter och bilder</li>
+            <li>Skapa nya ärenden direkt</li>
+            <li>Hantera dina företagsuppgifter</li>
+          </ul>
+        </div>
+
+        ${isNewUser ? `
+        <div style="background-color: #ecfdf5; border: 1px solid #22c55e; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h3 style="color: #22c55e; margin: 0 0 10px 0;">Dina inloggningsuppgifter</h3>
+          <p><strong>E-post:</strong> ${customerData.email}</p>
+          <p><strong>Tillfälligt lösenord:</strong> ${tempPassword}</p>
+          <p style="color: #ef4444; font-size: 14px;">⚠️ Ändra ditt lösenord efter första inloggningen</p>
+        </div>
+        ` : `
+        <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h3 style="color: #f59e0b; margin: 0 0 10px 0;">Befintligt konto</h3>
+          <p>Du kan logga in med ditt befintliga lösenord.</p>
+          <p><strong>E-post:</strong> ${customerData.email}</p>
+        </div>
+        `}
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${loginLink}" 
+             style="display: inline-block; background-color: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Logga in på kundportalen
+          </a>
+        </div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
+          <p>Vid frågor, kontakta oss gärna:</p>
+          <p>📧 support@begone.se | 📞 010-123 45 67</p>
+          <p style="margin-top: 15px;">
+            Med vänliga hälsningar,<br>
+            <strong>BeGone Skadedjur Team</strong>
+          </p>
+        </div>
+      </body>
+      </html>
+    `
+
+    // Konfigurera Nodemailer med Resend
+    const transporter = nodemailer.createTransporter({
+      host: 'smtp.resend.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'resend',
+        pass: RESEND_API_KEY
+      }
+    })
 
     const mailOptions = {
       from: 'BeGone Kundportal <noreply@begone.se>',
@@ -398,7 +400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await transporter.sendMail(mailOptions)
     console.log('Welcome email sent successfully')
 
-    // 9. Returnera framgång
+    // 12. Returnera framgång
     console.log('=== CREATE CUSTOMER API SUCCESS ===')
     return res.status(200).json({
       success: true,
@@ -407,7 +409,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         company_name: customer.company_name,
         email: customer.email,
         clickup_list_id: customer.clickup_list_id,
-        contract_type: contractType.name
+        contract_type: contractType.name,
+        contract_start_date: customer.contract_start_date,
+        annual_premium: customer.annual_premium,
+        assigned_account_manager: customer.assigned_account_manager
       }
     })
 
