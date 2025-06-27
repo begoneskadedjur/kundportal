@@ -19,7 +19,9 @@ import {
   Search,
   Plus,
   Flag,
-  Settings
+  Settings,
+  LogOut,
+  Hash
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
@@ -89,7 +91,7 @@ type TaskStats = {
 }
 
 export default function CustomerPortal() {
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth() // Lägg till signOut
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [tasks, setTasks] = useState<ClickUpTask[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
@@ -513,6 +515,17 @@ export default function CustomerPortal() {
                   </div>
                 </div>
               </div>
+              
+              {/* Logga ut knapp */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => signOut()}
+                className="text-slate-400 hover:text-white hover:bg-slate-800"
+                title="Logga ut"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -811,7 +824,12 @@ export default function CustomerPortal() {
               <div className="space-y-3">
                 <div className="flex items-center text-sm">
                   <Building className="w-4 h-4 text-slate-400 mr-2" />
-                  <span className="text-slate-300">{customer.company_name}</span>
+                  <div className="flex flex-col">
+                    <span className="text-slate-300">{customer.company_name}</span>
+                    {customer.org_number && (
+                      <span className="text-xs text-slate-500">Org.nr: {customer.org_number}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center text-sm">
                   <User className="w-4 h-4 text-slate-400 mr-2" />
