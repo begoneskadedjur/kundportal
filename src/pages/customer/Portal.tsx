@@ -1,4 +1,5 @@
-// src/pages/customer/Portal.tsx
+// src/pages/customer/Portal.tsx - UPPDATERAD
+
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -36,6 +37,7 @@ type Customer = {
   email: string
   phone: string
   address: string
+  org_number: string | null
   clickup_list_id: string
   clickup_list_name: string
   contract_types: {
@@ -78,6 +80,8 @@ type Visit = {
   work_performed: string | null
   status: string | null
   created_at: string
+  address: string | null;
+  clickup_url: string;
 }
 
 type TaskStats = {
@@ -88,7 +92,8 @@ type TaskStats = {
 }
 
 export default function CustomerPortal() {
-  const { profile } = useAuth()
+  // FIX: Hämta den globala laddningsstatusen från AuthContext.
+  const { profile, loading: authLoading } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [tasks, setTasks] = useState<ClickUpTask[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
@@ -102,6 +107,7 @@ export default function CustomerPortal() {
     inProgress: 0,
     completed: 0
   })
+  // FIX: Denna lokala loading hanterar nu bara hämtning av kunddata, inte den initiala sidladdningen.
   const [loading, setLoading] = useState(true)
   const [tasksLoading, setTasksLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,13 +115,19 @@ export default function CustomerPortal() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
-  // Hämta kunddata
+  // FIX: Uppdaterad useEffect för att vänta på att AuthContext är klar.
   useEffect(() => {
-    if (profile?.customer_id) {
-      fetchCustomerData()
-      // fetchUpcomingVisits() flyttat till efter customer är satt
+    // Kör bara när AuthContext har laddat färdigt.
+    if (!authLoading && profile) {
+      if (profile.customer_id) {
+        fetchCustomerData()
+      } else {
+        // Om användaren inte är kopplad, sluta ladda och visa ett fel.
+        setLoading(false)
+        setError('Ditt konto är inte kopplat till ett företag än. Kontakta support.')
+      }
     }
-  }, [profile])
+  }, [profile, authLoading])
 
   // Hämta ClickUp-uppgifter och kommande besök när kunddata är hämtad
   useEffect(() => {
@@ -127,6 +139,7 @@ export default function CustomerPortal() {
 
   const fetchCustomerData = async () => {
     try {
+      setLoading(true) // Starta lokal laddning
       const { data, error } = await supabase
         .from('customers')
         .select(`
@@ -144,7 +157,7 @@ export default function CustomerPortal() {
       console.error('Error fetching customer:', error)
       setError('Kunde inte hämta kunddata')
     } finally {
-      setLoading(false)
+      setLoading(false) // Avsluta lokal laddning
     }
   }
 
@@ -154,7 +167,6 @@ export default function CustomerPortal() {
     try {
       console.log('Fetching upcoming visits from ClickUp API...')
       
-      // Använd samma API som för ärenden
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       if (!response.ok) {
@@ -164,7 +176,6 @@ export default function CustomerPortal() {
       const data = await response.json()
       const allTasks = data.tasks || []
       
-      // Filtrera tasks som har due_date och är framtida
       const now = new Date()
       const upcomingTasks = allTasks.filter((task: ClickUpTask) => {
         if (!task.due_date) return false
@@ -173,10 +184,8 @@ export default function CustomerPortal() {
         return dueDate >= now
       })
       
-      // Konvertera till visit-format och sortera efter datum
       const upcomingVisits = upcomingTasks
-        .map((task: ClickUpTask) => {
-          // Hitta custom fields för mer detaljerad info
+        .map((task: ClickUpTask) : Visit => {
           const getCustomField = (name: string) => {
             return task.custom_fields?.find((field: any) => 
               field.name.toLowerCase() === name.toLowerCase()
@@ -188,7 +197,7 @@ export default function CustomerPortal() {
           const pestField = getCustomField('skadedjur')
           
           const getDropdownText = (field: any) => {
-            if (!field?.has_value) return null
+            if (!field?.value) return null
             if (field.type_config?.options) {
               const option = field.type_config.options.find((opt: any) => 
                 opt.orderindex === field.value
@@ -209,14 +218,13 @@ export default function CustomerPortal() {
               task.name
             ].filter(Boolean).join(' - '),
             status: task.status.status,
-            created_at: task.date_created,
-            // Extra info från ClickUp
+            created_at: new Date(parseInt(task.date_created)).toISOString(),
             address: addressField?.value?.formatted_address || null,
             clickup_url: `https://app.clickup.com/t/${task.id}`
           }
         })
         .sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
-        .slice(0, 5) // Begränsa till 5 st
+        .slice(0, 5)
       
       setVisits(upcomingVisits)
       console.log(`✅ Found ${upcomingVisits.length} upcoming visits`)
@@ -230,12 +238,11 @@ export default function CustomerPortal() {
     if (!customer?.clickup_list_id) return
 
     setTasksLoading(true)
-    setError(null) // Rensa tidigare fel
+    setError(null)
     
     try {
       console.log('Fetching tasks for list:', customer.clickup_list_id)
       
-      // Använd vår backend API för att hämta ClickUp-uppgifter
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       console.log('ClickUp API response status:', response.status)
@@ -252,7 +259,6 @@ export default function CustomerPortal() {
       setTasks(data.tasks || [])
       calculateTaskStats(data.tasks || [])
       
-      // Visa debug-info om det finns
       if (data.debug) {
         console.log('ClickUp Debug info:', data.debug)
       }
@@ -265,16 +271,13 @@ export default function CustomerPortal() {
     }
   }
 
-  // Filtrera tasks baserat på sökning, datum och status
   const filteredTasks = tasks.filter(task => {
-    // Textfiltrera
     const matchesSearch = task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
     
     if (!matchesSearch) return false
     
-    // Statusfilter
     if (statusFilter !== 'all') {
       const taskStatus = task.status.status.toLowerCase()
       switch (statusFilter) {
@@ -292,9 +295,7 @@ export default function CustomerPortal() {
       }
     }
     
-    // Datumfilter - använd deadline istället för created date
     if (dateFilter !== 'all') {
-      // Om ärendet inte har deadline, skippa datumfiltrering för detta ärende
       if (!task.due_date) return true
       
       const taskDate = new Date(parseInt(task.due_date))
@@ -332,15 +333,12 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      // Avslutade ärenden: genomfört/genomförd, avslutad, klar, complete
       if (status === 'genomfört' || status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
         stats.completed++
       }
-      // Pågående ärenden: "bokat" eller "under hantering"
       else if (status === 'bokat' || status === 'under hantering') {
         stats.inProgress++
       }
-      // Öppna ärenden: allt annat
       else {
         stats.open++
       }
@@ -354,47 +352,32 @@ export default function CustomerPortal() {
     return new Date(parseInt(timestamp)).toLocaleDateString('sv-SE')
   }
 
-  const getPriorityColor = (priority: string | null) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return 'text-red-500'
-      case 'high': return 'text-orange-500'
-      case 'normal': return 'text-yellow-500'
-      case 'low': return 'text-green-500'
-      default: return 'text-slate-400'
-    }
-  }
-
   const getPriorityDisplay = (priority: string | null) => {
     if (!priority) return null
     
     const priorityLower = priority.toLowerCase()
     
-    // Prioritetskonfiguration med ClickUps färger
     const config = {
       'urgent': { 
         text: 'Akut', 
-        color: '#f87171',
         flagColor: 'text-red-500',
         borderColor: 'border-red-500/50',
         textColor: 'text-red-400'
       },
       'high': { 
         text: 'Hög', 
-        color: '#fb923c',
         flagColor: 'text-orange-500',
         borderColor: 'border-orange-500/50',
         textColor: 'text-orange-400'
       },
       'normal': { 
         text: 'Normal', 
-        color: '#60a5fa',
         flagColor: 'text-blue-500',
         borderColor: 'border-blue-500/50',
         textColor: 'text-blue-400'
       },
       'low': { 
         text: 'Låg', 
-        color: '#9ca3af',
         flagColor: 'text-gray-500',
         borderColor: 'border-gray-500/50',
         textColor: 'text-gray-400'
@@ -427,7 +410,7 @@ export default function CustomerPortal() {
       case 'under hantering':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       default:
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30' // Öppna/nya ärenden
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
     }
   }
 
@@ -454,7 +437,8 @@ export default function CustomerPortal() {
     }
   }
 
-  if (loading) {
+  // FIX: Använd den globala authLoading för den initiala laddningen av sidan.
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <LoadingSpinner />
@@ -484,14 +468,12 @@ export default function CustomerPortal() {
       <header className="glass border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Centrerad titel */}
             <div className="flex-1 text-center">
               <h1 className="text-2xl font-bold text-white">
                 BeGone Skadedjur Kundportal
               </h1>
             </div>
             
-            {/* Kundinfo till höger */}
             <div className="flex items-center space-x-3">
               <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
                 <div className="flex items-center space-x-3 text-sm">
@@ -518,7 +500,6 @@ export default function CustomerPortal() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-white mb-2">
             Välkommen, {customer.contact_person}!
@@ -578,7 +559,6 @@ export default function CustomerPortal() {
           <div className="lg:col-span-2">
             <Card>
               <div className="space-y-4">
-                {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
                   <Button 
@@ -592,9 +572,7 @@ export default function CustomerPortal() {
                   </Button>
                 </div>
 
-                {/* Filter-sektion */}
                 <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  {/* Datumfilter */}
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-slate-300">Period (deadline):</label>
                     <select 
@@ -610,7 +588,6 @@ export default function CustomerPortal() {
                     </select>
                   </div>
                   
-                  {/* Statusfilter */}
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-slate-300">Status:</label>
                     <select 
@@ -625,7 +602,6 @@ export default function CustomerPortal() {
                     </select>
                   </div>
                   
-                  {/* Sökfunktion */}
                   <div className="flex items-center space-x-2 flex-1">
                     <label className="text-sm text-slate-300">Sök:</label>
                     <div className="relative flex-1 max-w-xs">
@@ -640,7 +616,6 @@ export default function CustomerPortal() {
                     </div>
                   </div>
 
-                  {/* Rensa filter-knapp */}
                   {(searchQuery || dateFilter !== 'all' || statusFilter !== 'all') && (
                     <Button 
                       variant="ghost" 
