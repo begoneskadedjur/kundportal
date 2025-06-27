@@ -28,10 +28,11 @@ import CaseDetailsModal from '../../components/customer/CaseDetailsModal'
 import CreateCaseModal from '../../components/customer/CreateCaseModal'
 import CustomerSettingsModal from '../../components/customer/CustomerSettingsModal'
 
-// Types
+// Types - UPPDATERAD med org_number
 type Customer = {
   id: string
   company_name: string
+  org_number: string | null  // TILLAGD
   contact_person: string
   email: string
   phone: string
@@ -113,7 +114,6 @@ export default function CustomerPortal() {
   useEffect(() => {
     if (profile?.customer_id) {
       fetchCustomerData()
-      // fetchUpcomingVisits() flyttat till efter customer är satt
     }
   }, [profile])
 
@@ -121,7 +121,7 @@ export default function CustomerPortal() {
   useEffect(() => {
     if (customer?.clickup_list_id) {
       fetchClickUpTasks()
-      fetchUpcomingVisits() // Hämta besök efter att customer är satt
+      fetchUpcomingVisits()
     }
   }, [customer])
 
@@ -139,6 +139,8 @@ export default function CustomerPortal() {
         .single()
 
       if (error) throw error
+      
+      console.log('Customer data fetched:', data) // Debug log för att se alla fält
       setCustomer(data)
     } catch (error: any) {
       console.error('Error fetching customer:', error)
@@ -940,7 +942,7 @@ export default function CustomerPortal() {
         />
       )}
 
-      {/* Customer Settings Modal */}
+      {/* Customer Settings Modal - NU MED KORREKT ORG_NUMBER */}
       {showSettingsModal && customer && (
         <CustomerSettingsModal
           isOpen={showSettingsModal}
@@ -948,7 +950,7 @@ export default function CustomerPortal() {
           customer={{
             id: customer.id,
             company_name: customer.company_name,
-            org_number: customer.org_number || '',
+            org_number: customer.org_number || '', // Nu kommer detta finnas tack vare uppdaterad type
             contact_person: customer.contact_person,
             email: customer.email,
             phone: customer.phone
