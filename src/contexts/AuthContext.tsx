@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - FIXED: Korrekt navigering
+// src/contexts/AuthContext.tsx - KORREKT FIX
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -29,57 +29,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [shouldNavigateAfterProfile, setShouldNavigateAfterProfile] = useState(false)
   const navigate = useNavigate()
 
-  // Navigera när profile är redo efter inloggning
+  // Denna useEffect hanterar navigation baserat på auth state
   useEffect(() => {
-    if (shouldNavigateAfterProfile && profile && !loading) {
-      console.log('🧭 Navigating after profile loaded:', profile.is_admin ? 'admin' : 'customer')
-      setShouldNavigateAfterProfile(false)
+    // Navigera endast om vi har en användare och profile, men inte är på login-sidan
+    if (user && profile && !loading) {
+      const currentPath = window.location.pathname
+      const isOnLoginPage = currentPath === '/login'
+      const isOnHomePage = currentPath === '/'
       
-      if (profile.is_admin) {
-        navigate('/admin')
-      } else {
-        navigate('/portal')
+      // Navigera endast om vi är på login eller home-sidan
+      if (isOnLoginPage || isOnHomePage) {
+        console.log('🧭 User authenticated, navigating based on role:', profile.is_admin ? 'admin' : 'customer')
+        
+        if (profile.is_admin) {
+          navigate('/admin')
+        } else {
+          navigate('/portal')
+        }
       }
     }
-  }, [profile, loading, shouldNavigateAfterProfile, navigate])
+  }, [user, profile, loading, navigate])
 
   useEffect(() => {
     console.log('🔐 AuthContext: Initializing...')
     
-    // Kontrollera Supabase connection
-    console.log('🔗 Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing')
-    console.log('🔑 Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing')
-
-    // Sätt en timeout för att undvika oändlig loading
-    const loadingTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn('⏰ Loading timeout reached, forcing stop')
-        setLoading(false)
-      }
-    }, 5000) // 5 sekunder timeout
-
     // Hämta session vid start
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('📊 Initial session check:', session ? '✅ Found' : '❌ No session', error ? `Error: ${error.message}` : '')
-      
-      // Clear timeout since we got a response
-      clearTimeout(loadingTimeout)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('📊 Initial session check:', session ? '✅ Found' : '❌ No session')
       
       setUser(session?.user ?? null)
       if (session?.user) {
         console.log('👤 User found, fetching profile for:', session.user.id)
-        fetchProfile(session.user.id, false) // false = inte efter inloggning
+        fetchProfile(session.user.id)
       } else {
         console.log('❌ No user found, stopping loading')
         setLoading(false)
       }
-    }).catch(error => {
-      console.error('💥 Session check failed:', error)
-      clearTimeout(loadingTimeout)
-      setLoading(false)
     })
 
     // Lyssna på auth-ändringar
@@ -88,11 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(session?.user ?? null)
       
-      if (session?.user && event === 'SIGNED_IN') {
-        console.log('🔑 User signed in, fetching profile with navigation flag')
-        await fetchProfile(session.user.id, true) // true = efter inloggning, ska navigera
-      } else if (session?.user && event !== 'SIGNED_IN') {
-        await fetchProfile(session.user.id, false) // false = inte efter inloggning
+      if (session?.user) {
+        await fetchProfile(session.user.id)
       } else {
         setProfile(null)
         setLoading(false)
@@ -101,20 +85,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out, redirecting to login')
         setProfile(null)
-        setShouldNavigateAfterProfile(false)
         navigate('/login')
       }
     })
 
     return () => {
       console.log('🧹 AuthContext cleanup')
-      clearTimeout(loadingTimeout)
       subscription.unsubscribe()
     }
   }, [navigate])
 
-  const fetchProfile = async (userId: string, shouldNavigate: boolean = false) => {
-    console.log('📋 Fetching profile for user:', userId, shouldNavigate ? '(will navigate after)' : '(no navigation)')
+  const fetchProfile = async (userId: string) => {
+    console.log('📋 Fetching profile for user:', userId)
     
     try {
       const { data, error } = await supabase
@@ -126,12 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('📋 Profile query result:', data ? '✅ Found' : '❌ Not found', error ? `Error: ${error.message}` : '')
 
       if (error) {
-        // Om profilen inte finns, logga ut användaren
-        if (error.code === 'PGRST116') {
-          console.warn('👤 Profile not found, signing out user')
-          await signOut()
-          return
-        }
         console.error('💥 Profile fetch error:', error)
         throw error
       }
@@ -151,12 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setProfile(data)
       
-      // Sätt navigation flag om vi ska navigera efter profile är laddat
-      if (shouldNavigate) {
-        console.log('🧭 Setting navigation flag - will navigate after profile is set')
-        setShouldNavigateAfterProfile(true)
-      }
-      
       // Uppdatera last_login
       await supabase
         .from('profiles')
@@ -166,8 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('💥 Error in fetchProfile:', error)
       toast.error('Kunde inte hämta profilinformation')
-      // Försök inte igen, bara logga ut användaren
-      await signOut()
     } finally {
       console.log('✅ Profile fetch completed, stopping loading')
       setLoading(false)
@@ -185,10 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error
 
-      console.log('✅ Sign in successful - navigation will happen after profile is loaded')
+      console.log('✅ Sign in successful - navigation will happen automatically via useEffect')
       toast.success('Inloggning lyckades!')
       
-      // Navigering sker automatiskt via onAuthStateChange + useEffect när profile är redo
+      // TA BORT NAVIGATION HÄRIFRÅN - det sker automatiskt via useEffect
+      // Navigation sker automatiskt via onAuthStateChange + useEffect
+      
     } catch (error: any) {
       console.error('💥 Sign in error:', error)
       if (error.message.includes('Invalid login credentials')) {
@@ -208,19 +178,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error
       
       setProfile(null)
-      setUser(null)
-      setLoading(false)
-      setShouldNavigateAfterProfile(false)
       console.log('✅ Sign out successful')
       toast.success('Du har loggats ut')
     } catch (error: any) {
       console.error('💥 Sign out error:', error)
       toast.error('Utloggning misslyckades')
-      // Även om signOut misslyckas, rensa state lokalt
-      setProfile(null)
-      setUser(null)
-      setLoading(false)
-      setShouldNavigateAfterProfile(false)
     }
   }
 
@@ -240,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAdmin: value.isAdmin,
     isCustomer: value.isCustomer,
-    shouldNavigate: shouldNavigateAfterProfile
+    currentPath: window.location.pathname
   })
 
   return (
