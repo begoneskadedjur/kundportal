@@ -349,15 +349,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${isNewUser ? `
         <div style="background-color: #ecfdf5; border: 1px solid #22c55e; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
           <h3 style="color: #22c55e; margin: 0 0 10px 0;">Dina inloggningsuppgifter</h3>
-          <p><strong>E-post:</strong> ${customerData.email}</p>
+          <p><strong>E-post för inloggning:</strong> ${customerData.email}</p>
           <p><strong>Tillfälligt lösenord:</strong> ${tempPassword}</p>
           <p style="color: #ef4444; font-size: 14px;">⚠️ Ändra ditt lösenord efter första inloggningen</p>
+          <p style="color: #64748b; font-size: 12px;"><em>Obs: Om du har flera företag registrerade med samma e-post kan du byta mellan dem efter inloggning.</em></p>
         </div>
         ` : `
         <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
           <h3 style="color: #f59e0b; margin: 0 0 10px 0;">Befintligt konto</h3>
           <p>Du kan logga in med ditt befintliga lösenord.</p>
           <p><strong>E-post:</strong> ${customerData.email}</p>
+          <p style="color: #64748b; font-size: 12px;"><em>Ditt konto har nu tillgång till företaget ${customer.company_name}.</em></p>
         </div>
         `}
 
@@ -391,15 +393,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     })
 
+    // VIKTIGT: Skicka alltid till den email som användaren angav, även om vi skapade modifierad auth-email
     const mailOptions = {
       from: 'BeGone Kundportal <noreply@begone.se>',
-      to: customerData.email,
+      to: customerData.email, // Skicka till original-emailen som kunden angav
       subject: isNewUser ? 'Välkommen till BeGone Kundportal' : 'Ny företagskoppling - BeGone Kundportal',
       html: emailHtml
     }
 
-    await transporter.sendMail(mailOptions)
-    console.log('Welcome email sent successfully')
+    try {
+      await transporter.sendMail(mailOptions)
+      console.log('Welcome email sent successfully to:', customerData.email)
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
+      // Fortsätt ändå - kunden är skapad
+    }
 
     // 12. Returnera framgång
     console.log('=== CREATE CUSTOMER API SUCCESS ===')
