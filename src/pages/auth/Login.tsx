@@ -1,5 +1,5 @@
-// src/pages/auth/Login.tsx
-import { useState } from 'react'
+// src/pages/auth/Login.tsx - FÖRBÄTTRAD med navigation handling
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Bug } from 'lucide-react'
@@ -10,16 +10,43 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signIn, user, profile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+
+  // Navigera när användare och profil är redo
+  useEffect(() => {
+    console.log('🔍 Login: Checking if should navigate:', {
+      user: !!user,
+      profile: !!profile,
+      authLoading,
+      isAdmin: profile?.is_admin
+    })
+
+    // Om vi har både user och profile och inte laddar längre
+    if (user && profile && !authLoading) {
+      console.log('🧭 Login: Navigating based on role:', profile.is_admin ? 'admin' : 'customer')
+      
+      if (profile.is_admin) {
+        console.log('👑 Navigating to admin dashboard')
+        navigate('/admin')
+      } else {
+        console.log('👤 Navigating to customer portal')
+        navigate('/portal')
+      }
+    }
+  }, [user, profile, authLoading, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      console.log('🔐 Login: Starting sign in process')
       await signIn(email, password)
+      console.log('✅ Login: Sign in completed - waiting for navigation')
+      // Navigation hanteras av useEffect ovan
     } catch (error) {
+      console.error('❌ Login: Sign in failed:', error)
       // Felmeddelanden hanteras i AuthContext
     } finally {
       setLoading(false)
@@ -70,11 +97,11 @@ export default function Login() {
 
             <Button
               type="submit"
-              loading={loading}
+              loading={loading || authLoading}
               fullWidth
               size="lg"
             >
-              Logga in
+              {loading || authLoading ? 'Loggar in...' : 'Logga in'}
             </Button>
           </form>
 

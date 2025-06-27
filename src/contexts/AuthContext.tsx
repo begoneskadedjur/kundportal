@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - KORREKT FIX
+// src/contexts/AuthContext.tsx - ROBUST FIX med direkt navigation
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -31,27 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
-  // Denna useEffect hanterar navigation baserat på auth state
-  useEffect(() => {
-    // Navigera endast om vi har en användare och profile, men inte är på login-sidan
-    if (user && profile && !loading) {
-      const currentPath = window.location.pathname
-      const isOnLoginPage = currentPath === '/login'
-      const isOnHomePage = currentPath === '/'
-      
-      // Navigera endast om vi är på login eller home-sidan
-      if (isOnLoginPage || isOnHomePage) {
-        console.log('🧭 User authenticated, navigating based on role:', profile.is_admin ? 'admin' : 'customer')
-        
-        if (profile.is_admin) {
-          navigate('/admin')
-        } else {
-          navigate('/portal')
-        }
-      }
-    }
-  }, [user, profile, loading, navigate])
-
   useEffect(() => {
     console.log('🔐 AuthContext: Initializing...')
     
@@ -62,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         console.log('👤 User found, fetching profile for:', session.user.id)
-        fetchProfile(session.user.id)
+        fetchProfile(session.user.id, false) // false = inte efter ny inloggning
       } else {
         console.log('❌ No user found, stopping loading')
         setLoading(false)
@@ -75,8 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(session?.user ?? null)
       
-      if (session?.user) {
-        await fetchProfile(session.user.id)
+      if (session?.user && event === 'SIGNED_IN') {
+        console.log('🔑 New sign in detected, fetching profile with navigation')
+        await fetchProfile(session.user.id, true) // true = efter ny inloggning, ska navigera
+      } else if (session?.user) {
+        await fetchProfile(session.user.id, false) // false = befintlig session
       } else {
         setProfile(null)
         setLoading(false)
@@ -95,8 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [navigate])
 
-  const fetchProfile = async (userId: string) => {
-    console.log('📋 Fetching profile for user:', userId)
+  const fetchProfile = async (userId: string, shouldNavigateAfterLoad: boolean = false) => {
+    console.log('📋 Fetching profile for user:', userId, shouldNavigateAfterLoad ? '(will navigate after)' : '(no navigation)')
     
     try {
       const { data, error } = await supabase
@@ -127,6 +109,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setProfile(data)
       
+      // DIREKT NAVIGATION HÄR om vi ska navigera efter load
+      if (shouldNavigateAfterLoad) {
+        console.log('🧭 Navigating immediately after profile load...')
+        const currentPath = window.location.pathname
+        console.log('📍 Current path:', currentPath)
+        
+        if (data.is_admin) {
+          console.log('👑 Admin user - navigating to /admin')
+          navigate('/admin')
+        } else {
+          console.log('👤 Customer user - navigating to /portal')
+          navigate('/portal')
+        }
+      }
+      
       // Uppdatera last_login
       await supabase
         .from('profiles')
@@ -153,11 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error
 
-      console.log('✅ Sign in successful - navigation will happen automatically via useEffect')
+      console.log('✅ Sign in successful - onAuthStateChange will handle navigation')
       toast.success('Inloggning lyckades!')
       
-      // TA BORT NAVIGATION HÄRIFRÅN - det sker automatiskt via useEffect
-      // Navigation sker automatiskt via onAuthStateChange + useEffect
+      // Navigation hanteras av onAuthStateChange + fetchProfile med shouldNavigateAfterLoad=true
       
     } catch (error: any) {
       console.error('💥 Sign in error:', error)
