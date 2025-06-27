@@ -119,76 +119,31 @@ export default function CustomerSettingsModal({
     try {
       console.log('Uppdaterar kund med ID:', customer.id)
       
-      // 1. Uppdatera kunduppgifter i customers tabellen
-      const { data: updatedCustomer, error: customerError } = await supabase
-        .from('customers')
-        .update({
+      // Anropa vår nya update-customer API
+      const response = await fetch('/api/update-customer', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_id: customer.id,
           contact_person: formData.contact_person,
           email: formData.email,
           phone: formData.phone,
-          updated_at: new Date().toISOString()
+          new_password: formData.new_password || null
         })
-        .eq('id', customer.id)
-        .select()
-        .single()
+      })
 
-      if (customerError) {
-        console.error('Customer update error:', customerError)
-        throw new Error(`Kunde inte uppdatera kunduppgifter: ${customerError.message}`)
-      }
+      const data = await response.json()
 
-      console.log('Kunduppgifter uppdaterade:', updatedCustomer)
-
-      // 2. Uppdatera profil-tabellen också (för sync)
-      if (user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            email: formData.email,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-
-        if (profileError) {
-          console.warn('Kunde inte uppdatera profil:', profileError.message)
-          // Fortsätt ändå, detta är inte kritiskt
-        }
-      }
-
-      // 3. Om lösenord ska ändras - använd Supabase Auth
-      if (formData.new_password && user) {
-        console.log('Uppdaterar lösenord...')
-        
-        const { error: authError } = await supabase.auth.updateUser({
-          password: formData.new_password
-        })
-
-        if (authError) {
-          console.error('Password update error:', authError)
-          throw new Error(`Kunde inte uppdatera lösenord: ${authError.message}`)
-        }
-        
-        console.log('Lösenord uppdaterat')
-      }
-
-      // 4. Om e-post ändrats - uppdatera i Auth också
-      if (formData.email !== customer.email && user) {
-        console.log('Uppdaterar e-post i auth...')
-        
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: formData.email
-        })
-
-        if (emailError) {
-          console.warn('E-post uppdatering i auth misslyckades:', emailError.message)
-          // Fortsätt ändå eftersom kunddata är uppdaterat
-        }
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunde inte uppdatera kunduppgifter')
       }
 
       toast.success('Dina uppgifter har uppdaterats!')
       
-      // Uppdatera parent component
-      onUpdate(updatedCustomer)
+      // Uppdatera parent component med den uppdaterade kunden
+      onUpdate(data.customer)
       onClose()
       
       // Rensa lösenordsfälten
