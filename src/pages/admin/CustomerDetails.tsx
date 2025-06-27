@@ -235,7 +235,7 @@ export default function CustomerDetails() {
             <Card>
               <div className="flex items-center mb-6">
                 <Building2 className="w-5 h-5 text-blue-500 mr-2" />
-                <h2 className="text-lg font-semibold">Företagsinformation</h2>
+                <h2 className="text-lg font-semibold text-white">Företagsinformation</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -280,7 +280,7 @@ export default function CustomerDetails() {
             <Card>
               <div className="flex items-center mb-6">
                 <User className="w-5 h-5 text-green-500 mr-2" />
-                <h2 className="text-lg font-semibold">Kontaktinformation</h2>
+                <h2 className="text-lg font-semibold text-white">Kontaktinformation</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -322,7 +322,7 @@ export default function CustomerDetails() {
               <Card>
                 <div className="flex items-center mb-4">
                   <FileText className="w-5 h-5 text-yellow-500 mr-2" />
-                  <h2 className="text-lg font-semibold">Avtalsobjekt</h2>
+                  <h2 className="text-lg font-semibold text-white">Avtalsobjekt</h2>
                 </div>
                 <p className="text-slate-300 leading-relaxed">{customer.contract_description}</p>
               </Card>
@@ -334,7 +334,7 @@ export default function CustomerDetails() {
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
                     <Activity className="w-5 h-5 text-orange-500 mr-2" />
-                    <h2 className="text-lg font-semibold">Senaste ärenden</h2>
+                    <h2 className="text-lg font-semibold text-white">Senaste ärenden</h2>
                   </div>
                   <Button
                     variant="ghost"
@@ -380,7 +380,7 @@ export default function CustomerDetails() {
             <Card>
               <div className="flex items-center mb-4">
                 <CreditCard className="w-5 h-5 text-green-500 mr-2" />
-                <h2 className="text-lg font-semibold">Avtalsstatus</h2>
+                <h2 className="text-lg font-semibold text-white">Avtalsstatus</h2>
               </div>
               
               <div className="space-y-4">
@@ -414,7 +414,7 @@ export default function CustomerDetails() {
             <Card>
               <div className="flex items-center mb-4">
                 <TrendingUp className="w-5 h-5 text-yellow-500 mr-2" />
-                <h2 className="text-lg font-semibold">Ekonomisk översikt</h2>
+                <h2 className="text-lg font-semibold text-white">Ekonomisk översikt</h2>
               </div>
               
               <div className="space-y-4">
@@ -448,7 +448,7 @@ export default function CustomerDetails() {
               <Card>
                 <div className="flex items-center mb-4">
                   <BarChart3 className="w-5 h-5 text-blue-500 mr-2" />
-                  <h2 className="text-lg font-semibold">Ärendestatistik</h2>
+                  <h2 className="text-lg font-semibold text-white">Ärendestatistik</h2>
                 </div>
                 
                 <div className="space-y-3">
@@ -478,7 +478,7 @@ export default function CustomerDetails() {
             <Card>
               <div className="flex items-center mb-4">
                 <Activity className="w-5 h-5 text-purple-500 mr-2" />
-                <h2 className="text-lg font-semibold">Snabbåtgärder</h2>
+                <h2 className="text-lg font-semibold text-white">Snabbåtgärder</h2>
               </div>
               
               <div className="space-y-3">
