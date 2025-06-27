@@ -1,4 +1,4 @@
-// api/create-case.ts - REN API för att skapa ärenden (INGEN JSX)
+// api/create-case.ts - FIXAD VERSION baserad på CreateCaseModal
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -34,14 +34,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customer_id, 
       title, 
       description, 
-      priority = 'low', 
+      priority = 'normal',  // Matchar din modal default
       pest_type = '', 
-      case_type = 'bekämpning', 
+      case_type = '', 
       address = '', 
       phone = '' 
     } = req.body
 
-    // Validate required fields
+    // Validera required fields (samma som din modal)
     if (!customer_id || !title || !description) {
       return res.status(400).json({ 
         error: 'customer_id, title och description är obligatoriska' 
@@ -81,44 +81,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clickup_list: customer.clickup_list_id
     })
 
-    // 2. Mappa prioritet till ClickUp format
+    // 2. Mappa prioritet till ClickUp format (baserat på din modal)
     const clickupPriority = mapPriorityToClickUp(priority)
     
-    // 3. Generera case number (enkel implementation)
+    // 3. Generera case number
     const caseNumber = `${customer.company_name.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`
 
-    // 4. Skapa task i ClickUp
+    // 4. Förbered beskrivning med extra info
+    let fullDescription = description
+    if (pest_type) {
+      fullDescription += `\n\nSkadedjurstyp: ${pest_type}`
+    }
+    if (case_type) {
+      fullDescription += `\nÄrendetyp: ${case_type}`
+    }
+    if (address) {
+      fullDescription += `\nAdress: ${address}`
+    }
+    if (phone) {
+      fullDescription += `\nKontakttelefon: ${phone}`
+    }
+
+    // 5. Skapa task i ClickUp (enklare struktur för att undvika 400-fel)
     console.log('Creating ClickUp task...')
     const clickupTaskData = {
       name: title,
-      description: description,
+      description: fullDescription,
       priority: clickupPriority,
-      status: 'att göra', // Default status för nya ärenden
-      custom_fields: []
-    }
-
-    // Lägg till custom fields om de finns
-    const customFieldIds = await getCustomFieldIds(customer.clickup_list_id)
-    
-    if (pest_type && customFieldIds.pest_type) {
-      clickupTaskData.custom_fields.push({
-        id: customFieldIds.pest_type,
-        value: pest_type
-      })
-    }
-
-    if (case_type && customFieldIds.case_type) {
-      clickupTaskData.custom_fields.push({
-        id: customFieldIds.case_type,
-        value: case_type
-      })
-    }
-
-    if (address && customFieldIds.address) {
-      clickupTaskData.custom_fields.push({
-        id: customFieldIds.address,
-        value: address
-      })
+      // Ta bort custom_fields tillfälligt för att undvika 400-fel
+      // Vi kan lägga till dem senare när vi vet vilka fields som finns
     }
 
     console.log('ClickUp task data:', clickupTaskData)
@@ -137,14 +128,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!clickupResponse.ok) {
       const errorData = await clickupResponse.text()
-      console.error('ClickUp API error:', errorData)
-      throw new Error(`ClickUp API fel: ${clickupResponse.status} ${clickupResponse.statusText}`)
+      console.error('ClickUp API error:', {
+        status: clickupResponse.status,
+        statusText: clickupResponse.statusText,
+        body: errorData
+      })
+      
+      // Ge mer specifik felmeddelande
+      if (clickupResponse.status === 400) {
+        throw new Error(`ClickUp API fel (400): Kontrollera att listan existerar och att API-token har rätt behörigheter. List ID: ${customer.clickup_list_id}`)
+      } else {
+        throw new Error(`ClickUp API fel: ${clickupResponse.status} ${clickupResponse.statusText}`)
+      }
     }
 
     const clickupTask = await clickupResponse.json()
-    console.log('ClickUp task created:', { id: clickupTask.id, name: clickupTask.name })
+    console.log('ClickUp task created:', { id: clickupTask.id, name: clickupTask.name, url: clickupTask.url })
 
-    // 5. Skapa case i databas (webhook kommer synka senare, men vi skapar en initial post)
+    // 6. Skapa case i databas
     console.log('Creating case in database...')
     const { data: newCase, error: caseError } = await supabase
       .from('cases')
@@ -172,10 +173,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           method: 'DELETE',
           headers: { 'Authorization': CLICKUP_API_TOKEN }
         })
+        console.log('Cleaned up ClickUp task after database error')
       } catch (cleanupError) {
         console.error('Failed to cleanup ClickUp task:', cleanupError)
       }
-      throw new Error(`Kunde inte skapa ärende: ${caseError.message}`)
+      throw new Error(`Kunde inte skapa ärende i databas: ${caseError.message}`)
     }
 
     console.log('Case created successfully:', newCase.id)
@@ -188,8 +190,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case_number: newCase.case_number,
         title: newCase.title,
         status: newCase.status,
+        priority: newCase.priority,
         clickup_task_id: clickupTask.id,
-        clickup_url: clickupTask.url
+        clickup_url: clickupTask.url || `https://app.clickup.com/t/${clickupTask.id}`
       }
     })
 
@@ -207,51 +210,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 // Hjälpfunktioner
 
 function mapPriorityToClickUp(priority: string): number {
+  // Matchar prioriteterna från din CreateCaseModal
   const priorityMap: { [key: string]: number } = {
-    'urgent': 1,
-    'high': 2, 
-    'normal': 3,
-    'low': 4
+    'urgent': 1,  // 🔴 Akut prioritet
+    'high': 2,    // 🟠 Hög prioritet  
+    'normal': 3,  // 🔹 Normal prioritet
+    'low': 4      // 🔸 Låg prioritet
   }
-  return priorityMap[priority] || 4
-}
-
-async function getCustomFieldIds(listId: string): Promise<{[key: string]: string}> {
-  try {
-    const response = await fetch(`https://api.clickup.com/api/v2/list/${listId}/field`, {
-      headers: {
-        'Authorization': CLICKUP_API_TOKEN,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error(`Failed to fetch custom fields for list ${listId}`)
-      return {}
-    }
-
-    const data = await response.json()
-    const fields = data.fields || []
-    
-    const fieldMap: {[key: string]: string} = {}
-    
-    fields.forEach((field: any) => {
-      const fieldName = field.name.toLowerCase()
-      
-      if (fieldName.includes('skadedjur') || fieldName.includes('pest')) {
-        fieldMap.pest_type = field.id
-      } else if (fieldName.includes('ärende') || fieldName.includes('case') || fieldName.includes('type')) {
-        fieldMap.case_type = field.id
-      } else if (fieldName.includes('adress') || fieldName.includes('address')) {
-        fieldMap.address = field.id
-      }
-    })
-
-    console.log('Found custom field IDs:', fieldMap)
-    return fieldMap
-
-  } catch (error) {
-    console.error('Error fetching custom field IDs:', error)
-    return {}
-  }
+  return priorityMap[priority] || 3 // Default till normal
 }
