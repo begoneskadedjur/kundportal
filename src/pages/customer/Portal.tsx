@@ -1,4 +1,4 @@
-// src/pages/customer/Portal.tsx - SIMPLIFIED AND STABILIZED VERSION
+// src/pages/customer/Portal.tsx
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -103,7 +103,7 @@ export default function CustomerPortal() {
     inProgress: 0,
     completed: 0
   })
-  // const [loading, setLoading] = useState(true) // <-- BORTTAGEN. ProtectedRoute hanterar detta.
+  const [loading, setLoading] = useState(true)
   const [tasksLoading, setTasksLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -112,14 +112,10 @@ export default function CustomerPortal() {
 
   // Hämta kunddata
   useEffect(() => {
-    // Endast kör om vi har ett giltigt profil-objekt med ett customer_id
-    if (profile && profile.customer_id) {
-      fetchCustomerData();
-    } else if (profile && !profile.customer_id) {
-      // Om profilen laddats men saknar customer_id, sätt ett fel.
-      setError("Användarprofilen är inte kopplad till en kund.");
+    if (profile?.customer_id) {
+      fetchCustomerData()
     }
-  }, [profile]); // Lyssna på när profil-objektet blir tillgängligt.
+  }, [profile])
 
   // Hämta ClickUp-uppgifter och kommande besök när kunddata är hämtad
   useEffect(() => {
@@ -130,10 +126,7 @@ export default function CustomerPortal() {
   }, [customer])
 
   const fetchCustomerData = async () => {
-    // Inget setLoading(true) behövs här
     try {
-      if (!profile?.customer_id) return; // Dubbelkolla för säkerhets skull
-
       const { data, error } = await supabase
         .from('customers')
         .select(`
@@ -142,7 +135,7 @@ export default function CustomerPortal() {
             name
           )
         `)
-        .eq('id', profile.customer_id)
+        .eq('id', profile!.customer_id)
         .single()
 
       if (error) throw error
@@ -152,8 +145,9 @@ export default function CustomerPortal() {
     } catch (error: any) {
       console.error('Error fetching customer:', error)
       setError('Kunde inte hämta kunddata')
-    } 
-    // INGET finally { setLoading(false) } behövs här.
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchUpcomingVisits = async () => {
@@ -162,6 +156,7 @@ export default function CustomerPortal() {
     try {
       console.log('Fetching upcoming visits from ClickUp API...')
       
+      // Använd samma API som för ärenden
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       if (!response.ok) {
@@ -171,6 +166,7 @@ export default function CustomerPortal() {
       const data = await response.json()
       const allTasks = data.tasks || []
       
+      // Filtrera tasks som har due_date och är framtida
       const now = new Date()
       const upcomingTasks = allTasks.filter((task: ClickUpTask) => {
         if (!task.due_date) return false
@@ -179,8 +175,10 @@ export default function CustomerPortal() {
         return dueDate >= now
       })
       
+      // Konvertera till visit-format och sortera efter datum
       const upcomingVisits = upcomingTasks
         .map((task: ClickUpTask) => {
+          // Hitta custom fields för mer detaljerad info
           const getCustomField = (name: string) => {
             return task.custom_fields?.find((field: any) => 
               field.name.toLowerCase() === name.toLowerCase()
@@ -214,12 +212,13 @@ export default function CustomerPortal() {
             ].filter(Boolean).join(' - '),
             status: task.status.status,
             created_at: task.date_created,
+            // Extra info från ClickUp
             address: addressField?.value?.formatted_address || null,
             clickup_url: `https://app.clickup.com/t/${task.id}`
           }
         })
         .sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
-        .slice(0, 5)
+        .slice(0, 5) // Begränsa till 5 st
       
       setVisits(upcomingVisits)
       console.log(`✅ Found ${upcomingVisits.length} upcoming visits`)
@@ -233,11 +232,12 @@ export default function CustomerPortal() {
     if (!customer?.clickup_list_id) return
 
     setTasksLoading(true)
-    setError(null)
+    setError(null) // Rensa tidigare fel
     
     try {
       console.log('Fetching tasks for list:', customer.clickup_list_id)
       
+      // Använd vår backend API för att hämta ClickUp-uppgifter
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       console.log('ClickUp API response status:', response.status)
@@ -254,6 +254,7 @@ export default function CustomerPortal() {
       setTasks(data.tasks || [])
       calculateTaskStats(data.tasks || [])
       
+      // Visa debug-info om det finns
       if (data.debug) {
         console.log('ClickUp Debug info:', data.debug)
       }
@@ -266,13 +267,16 @@ export default function CustomerPortal() {
     }
   }
 
+  // Filtrera tasks baserat på sökning, datum och status
   const filteredTasks = tasks.filter(task => {
+    // Textfiltrera
     const matchesSearch = task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
     
     if (!matchesSearch) return false
     
+    // Statusfilter
     if (statusFilter !== 'all') {
       const taskStatus = task.status.status.toLowerCase()
       switch (statusFilter) {
@@ -290,7 +294,9 @@ export default function CustomerPortal() {
       }
     }
     
+    // Datumfilter - använd deadline istället för created date
     if (dateFilter !== 'all') {
+      // Om ärendet inte har deadline, skippa datumfiltrering för detta ärende
       if (!task.due_date) return true
       
       const taskDate = new Date(parseInt(task.due_date))
@@ -328,12 +334,15 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
+      // Avslutade ärenden: genomfört/genomförd, avslutad, klar, complete
       if (status === 'genomfört' || status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
         stats.completed++
       }
+      // Pågående ärenden: "bokat" eller "under hantering"
       else if (status === 'bokat' || status === 'under hantering') {
         stats.inProgress++
       }
+      // Öppna ärenden: allt annat
       else {
         stats.open++
       }
@@ -362,6 +371,7 @@ export default function CustomerPortal() {
     
     const priorityLower = priority.toLowerCase()
     
+    // Prioritetskonfiguration med ClickUps färger
     const config = {
       'urgent': { 
         text: 'Akut', 
@@ -419,7 +429,7 @@ export default function CustomerPortal() {
       case 'under hantering':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       default:
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30' // Öppna/nya ärenden
     }
   }
 
@@ -446,33 +456,28 @@ export default function CustomerPortal() {
     }
   }
 
-  // Denna kontroll hanterar nu fallet där data ännu inte har laddats.
-  // Om antingen ett fel har inträffat ELLER kunddata inte finns, visa felmeddelande.
-  // Detta fångar upp både nätverksfel och fallet där `profile` inte leder till en kund.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
   if (error || !customer) {
-    // Om inget fel har satts men customer saknas, visa ett standardmeddelande.
-    const errorMessage = error || "Hämtar kundinformation...";
-    
-    // Undvik att visa felmeddelandet om det bara är den initiala laddningen.
-    // Vi vet att laddningen är klar om `profile` finns (men customer inte gör det).
-    if (profile && !customer) {
-      return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-          <Card className="text-center p-8">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">Ett fel uppstod</h2>
-            <p className="text-slate-400 mb-4">{error || 'Kunde inte hämta kunddata.'}</p>
-            <Button onClick={() => window.location.reload()}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Försök igen
-            </Button>
-          </Card>
-        </div>
-      )
-    }
-    // Om `profile` inte finns än, betyder det att ProtectedRoute fortfarande kör,
-    // så vi visar ingenting (eftersom ProtectedRoute visar sin spinner).
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="text-center p-8">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-white mb-2">Ett fel uppstod</h2>
+          <p className="text-slate-400 mb-4">{error || 'Kunde inte hämta kunddata'}</p>
+          <Button onClick={() => window.location.reload()}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Försök igen
+          </Button>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -481,12 +486,14 @@ export default function CustomerPortal() {
       <header className="glass border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            {/* Centrerad titel */}
             <div className="flex-1 text-center">
               <h1 className="text-2xl font-bold text-white">
                 BeGone Skadedjur Kundportal
               </h1>
             </div>
             
+            {/* Kundinfo till höger */}
             <div className="flex items-center space-x-3">
               <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
                 <div className="flex items-center space-x-3 text-sm">
@@ -513,6 +520,7 @@ export default function CustomerPortal() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-white mb-2">
             Välkommen, {customer.contact_person}!
@@ -522,6 +530,7 @@ export default function CustomerPortal() {
           </p>
         </div>
 
+        {/* Stats Grid - Uppdaterad med 3 kort */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <div className="flex items-center justify-between">
@@ -567,9 +576,11 @@ export default function CustomerPortal() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Ärenden */}
           <div className="lg:col-span-2">
             <Card>
               <div className="space-y-4">
+                {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
                   <Button 
@@ -583,7 +594,9 @@ export default function CustomerPortal() {
                   </Button>
                 </div>
 
+                {/* Filter-sektion */}
                 <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                  {/* Datumfilter */}
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-slate-300">Period (deadline):</label>
                     <select 
@@ -599,6 +612,7 @@ export default function CustomerPortal() {
                     </select>
                   </div>
                   
+                  {/* Statusfilter */}
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-slate-300">Status:</label>
                     <select 
@@ -613,6 +627,7 @@ export default function CustomerPortal() {
                     </select>
                   </div>
                   
+                  {/* Sökfunktion */}
                   <div className="flex items-center space-x-2 flex-1">
                     <label className="text-sm text-slate-300">Sök:</label>
                     <div className="relative flex-1 max-w-xs">
@@ -627,6 +642,7 @@ export default function CustomerPortal() {
                     </div>
                   </div>
 
+                  {/* Rensa filter-knapp */}
                   {(searchQuery || dateFilter !== 'all' || statusFilter !== 'all') && (
                     <Button 
                       variant="ghost" 
@@ -776,7 +792,9 @@ export default function CustomerPortal() {
             </Card>
           </div>
 
+          {/* Företagsinformation och besök */}
           <div>
+            {/* Företagsinformation */}
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">Företagsinformation</h3>
@@ -814,6 +832,7 @@ export default function CustomerPortal() {
               </div>
             </Card>
 
+            {/* Kommande besök */}
             <Card className="mt-6">
               <h3 className="text-lg font-semibold text-white mb-4">Kommande besök</h3>
               {visits.length === 0 ? (
@@ -888,6 +907,7 @@ export default function CustomerPortal() {
               )}
             </Card>
 
+            {/* Skapa nytt ärende - Snygg box */}
             <Card 
               className="mt-6 cursor-pointer hover:border-green-500/50 transition-all group"
               onClick={() => setShowCreateModal(true)}
@@ -912,6 +932,7 @@ export default function CustomerPortal() {
         </div>
       </main>
 
+      {/* Case Details Modal */}
       {selectedTaskId && (
         <CaseDetailsModal
           caseId=""
@@ -921,6 +942,7 @@ export default function CustomerPortal() {
         />
       )}
 
+      {/* Customer Settings Modal - NU MED KORREKT ORG_NUMBER */}
       {showSettingsModal && customer && (
         <CustomerSettingsModal
           isOpen={showSettingsModal}
@@ -928,7 +950,7 @@ export default function CustomerPortal() {
           customer={{
             id: customer.id,
             company_name: customer.company_name,
-            org_number: customer.org_number || '',
+            org_number: customer.org_number || '', // Nu kommer detta finnas tack vare uppdaterad type
             contact_person: customer.contact_person,
             email: customer.email,
             phone: customer.phone
@@ -939,13 +961,14 @@ export default function CustomerPortal() {
         />
       )}
 
+      {/* Create Case Modal */}
       {showCreateModal && customer && (
         <CreateCaseModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
-            fetchClickUpTasks()
-            fetchUpcomingVisits()
+            fetchClickUpTasks() // Refresh case list
+            fetchUpcomingVisits() // Refresh visits
           }}
           customerId={customer.id}
           customerInfo={{
