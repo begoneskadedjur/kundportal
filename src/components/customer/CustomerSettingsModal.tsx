@@ -1,4 +1,4 @@
-// src/components/customer/CustomerSettingsModal.tsx
+// src/components/customer/CustomerSettingsModal.tsx - FIXAD för uppdateringsproblem
 import { useState } from 'react'
 import { 
   X, 
@@ -10,13 +10,12 @@ import {
   Hash,
   Save,
   Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle
+  EyeOff
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 interface CustomerSettingsModalProps {
@@ -25,7 +24,7 @@ interface CustomerSettingsModalProps {
   customer: {
     id: string
     company_name: string
-    org_number: string
+    org_number: string | null
     contact_person: string
     email: string
     phone: string
@@ -48,6 +47,7 @@ export default function CustomerSettingsModal({
   customer,
   onUpdate 
 }: CustomerSettingsModalProps) {
+  const { user } = useAuth() // Hämta current user för auth updates
   const [loading, setLoading] = useState(false)
   const [showPasswords, setShowPasswords] = useState({
     current: false,
@@ -117,7 +117,9 @@ export default function CustomerSettingsModal({
     setLoading(true)
     
     try {
-      // Uppdatera kunduppgifter i databasen
+      console.log('Uppdaterar kund med ID:', customer.id)
+      
+      // 1. Uppdatera kunduppgifter i customers tabellen
       const { data: updatedCustomer, error: customerError } = await supabase
         .from('customers')
         .update({
@@ -130,33 +132,62 @@ export default function CustomerSettingsModal({
         .select()
         .single()
 
-      if (customerError) throw customerError
+      if (customerError) {
+        console.error('Customer update error:', customerError)
+        throw new Error(`Kunde inte uppdatera kunduppgifter: ${customerError.message}`)
+      }
 
-      // Om lösenord ska ändras
-      if (formData.new_password) {
+      console.log('Kunduppgifter uppdaterade:', updatedCustomer)
+
+      // 2. Uppdatera profil-tabellen också (för sync)
+      if (user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            email: formData.email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+
+        if (profileError) {
+          console.warn('Kunde inte uppdatera profil:', profileError.message)
+          // Fortsätt ändå, detta är inte kritiskt
+        }
+      }
+
+      // 3. Om lösenord ska ändras - använd Supabase Auth
+      if (formData.new_password && user) {
+        console.log('Uppdaterar lösenord...')
+        
         const { error: authError } = await supabase.auth.updateUser({
           password: formData.new_password
         })
 
         if (authError) {
-          // Om lösenordsändring misslyckas, rulla tillbaka kunduppdateringen
-          throw new Error('Kunde inte uppdatera lösenord: ' + authError.message)
+          console.error('Password update error:', authError)
+          throw new Error(`Kunde inte uppdatera lösenord: ${authError.message}`)
         }
+        
+        console.log('Lösenord uppdaterat')
       }
 
-      // Uppdatera även auth.users e-post om den ändrats
-      if (formData.email !== customer.email) {
+      // 4. Om e-post ändrats - uppdatera i Auth också
+      if (formData.email !== customer.email && user) {
+        console.log('Uppdaterar e-post i auth...')
+        
         const { error: emailError } = await supabase.auth.updateUser({
           email: formData.email
         })
 
         if (emailError) {
-          console.warn('Kunde inte uppdatera e-post i auth:', emailError.message)
+          console.warn('E-post uppdatering i auth misslyckades:', emailError.message)
           // Fortsätt ändå eftersom kunddata är uppdaterat
         }
       }
 
       toast.success('Dina uppgifter har uppdaterats!')
+      
+      // Uppdatera parent component
       onUpdate(updatedCustomer)
       onClose()
       
@@ -204,25 +235,27 @@ export default function CustomerSettingsModal({
                 type="text"
                 value={customer.company_name}
                 disabled
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-500 cursor-not-allowed"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 cursor-not-allowed"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-2">
-                <Hash className="w-4 h-4 inline mr-2" />
-                Organisationsnummer
-              </label>
-              <input
-                type="text"
-                value={customer.org_number}
-                disabled
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-500 cursor-not-allowed"
-              />
-            </div>
+            {customer.org_number && (
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  <Hash className="w-4 h-4 inline mr-2" />
+                  Organisationsnummer
+                </label>
+                <input
+                  type="text"
+                  value={customer.org_number}
+                  disabled
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 cursor-not-allowed"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Redigerbara fält */}
+          {/* Redigerbara kontaktuppgifter */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-slate-300 border-b border-slate-700 pb-2">
               Kontaktuppgifter
@@ -348,21 +381,17 @@ export default function CustomerSettingsModal({
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Info text */}
-          <div className="flex items-start space-x-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-300">
-              <p>Lämna lösenordsfälten tomma om du inte vill ändra ditt lösenord.</p>
+            <div className="text-xs text-slate-500">
+              Lämna lösenordsfälten tomma om du inte vill ändra lösenord
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex space-x-3 pt-6 border-t border-slate-700">
+          <div className="flex gap-3 pt-4">
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               onClick={onClose}
               className="flex-1"
             >
@@ -371,10 +400,11 @@ export default function CustomerSettingsModal({
             <Button
               type="submit"
               loading={loading}
+              disabled={loading}
               className="flex-1"
             >
               <Save className="w-4 h-4 mr-2" />
-              Spara ändringar
+              {loading ? 'Sparar...' : 'Spara ändringar'}
             </Button>
           </div>
         </form>
