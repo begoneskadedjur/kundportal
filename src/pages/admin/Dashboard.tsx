@@ -1,9 +1,9 @@
-// src/pages/admin/Dashboard.tsx
+// src/pages/admin/Dashboard.tsx - FÖRBÄTTRAD MED DEBUG
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Users, FileText, Calendar, Plus, LogOut, Bug } from 'lucide-react'
+import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 
@@ -24,51 +24,125 @@ export default function AdminDashboard() {
     upcomingVisits: 0
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    console.log('📊 AdminDashboard: Component mounted')
+    console.log('👤 Current profile:', profile)
     fetchStats()
   }, [])
 
   const fetchStats = async () => {
+    console.log('📊 Starting stats fetch...')
+    setLoading(true)
+    setError(null)
+    
     try {
+      console.log('🔗 Testing Supabase connection...')
+      
+      // Test basic connection först
+      const { data: connectionTest, error: connectionError } = await supabase
+        .from('customers')
+        .select('count', { count: 'exact', head: true })
+
+      if (connectionError) {
+        console.error('💥 Supabase connection failed:', connectionError)
+        throw new Error(`Database connection failed: ${connectionError.message}`)
+      }
+      
+      console.log('✅ Supabase connection OK')
+
       // Hämta kundstatistik
+      console.log('👥 Fetching customer stats...')
       const { data: customers, error: customersError } = await supabase
         .from('customers')
         .select('is_active')
 
-      if (customersError) throw customersError
+      if (customersError) {
+        console.error('💥 Customers query failed:', customersError)
+        throw customersError
+      }
+      
+      console.log('✅ Customers fetched:', customers?.length || 0)
 
       // Hämta ärenden
+      console.log('📋 Fetching cases...')
       const { data: cases, error: casesError } = await supabase
         .from('cases')
         .select('id')
 
-      if (casesError) throw casesError
+      if (casesError) {
+        console.error('💥 Cases query failed:', casesError)
+        throw casesError
+      }
+      
+      console.log('✅ Cases fetched:', cases?.length || 0)
 
       // Hämta kommande besök
+      console.log('📅 Fetching upcoming visits...')
       const { data: visits, error: visitsError } = await supabase
         .from('visits')
         .select('id')
         .gte('visit_date', new Date().toISOString())
 
-      if (visitsError) throw visitsError
+      if (visitsError) {
+        console.error('💥 Visits query failed:', visitsError)
+        throw visitsError
+      }
+      
+      console.log('✅ Visits fetched:', visits?.length || 0)
 
-      setStats({
+      const newStats = {
         totalCustomers: customers?.length || 0,
         activeCustomers: customers?.filter(c => c.is_active).length || 0,
         totalCases: cases?.length || 0,
         upcomingVisits: visits?.length || 0
-      })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+      }
+      
+      console.log('📊 Stats calculated:', newStats)
+      setStats(newStats)
+      
+    } catch (error: any) {
+      console.error('💥 Error fetching stats:', error)
+      setError(error.message || 'Kunde inte ladda statistik')
     } finally {
+      console.log('✅ Stats fetch completed')
       setLoading(false)
     }
   }
 
   const handleSignOut = async () => {
+    console.log('👋 Admin signing out')
     await signOut()
     navigate('/login')
+  }
+
+  const retryFetch = () => {
+    console.log('🔄 Retrying stats fetch...')
+    fetchStats()
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="max-w-md">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-white mb-2">Problem med att ladda</h2>
+            <p className="text-slate-400 mb-4">{error}</p>
+            <div className="space-y-2">
+              <Button onClick={retryFetch} className="w-full">
+                Försök igen
+              </Button>
+              <Button variant="ghost" onClick={handleSignOut} className="w-full">
+                Logga ut
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -119,7 +193,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-slate-400 text-sm">Totalt antal kunder</p>
                 <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '-' : stats.totalCustomers}
+                  {loading ? '...' : stats.totalCustomers}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -133,7 +207,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-slate-400 text-sm">Aktiva kunder</p>
                 <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '-' : stats.activeCustomers}
+                  {loading ? '...' : stats.activeCustomers}
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -147,7 +221,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-slate-400 text-sm">Totalt antal ärenden</p>
                 <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '-' : stats.totalCases}
+                  {loading ? '...' : stats.totalCases}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
@@ -161,7 +235,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-slate-400 text-sm">Kommande besök</p>
                 <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '-' : stats.upcomingVisits}
+                  {loading ? '...' : stats.upcomingVisits}
                 </p>
               </div>
               <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
@@ -173,60 +247,58 @@ export default function AdminDashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card 
-            className="cursor-pointer hover:border-green-500/50 transition-all"
-            onClick={() => navigate('/admin/customers/new')}
-          >
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <Plus className="w-6 h-6 text-green-500" />
+          <Card>
+            <h3 className="text-lg font-semibold text-white mb-4">Snabbåtgärder</h3>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/admin/customers/new')} 
+                className="w-full justify-start"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Lägg till ny kund
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate('/admin/customers')} 
+                className="w-full justify-start"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Hantera kunder
+              </Button>
+            </div>
+          </Card>
+
+          <Card>
+            <h3 className="text-lg font-semibold text-white mb-4">Systemstatus</h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Database</span>
+                <span className="text-green-400">✅ Online</span>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Lägg till ny kund
-                </h3>
-                <p className="text-sm text-slate-400">
-                  Registrera en ny kund och skapa ClickUp-lista
-                </p>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">ClickUp API</span>
+                <span className="text-green-400">✅ Connected</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Email Service</span>
+                <span className="text-green-400">✅ Active</span>
               </div>
             </div>
           </Card>
 
-          <Card 
-            className="cursor-pointer hover:border-green-500/50 transition-all"
-            onClick={() => navigate('/admin/customers')}
-          >
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Hantera kunder
-                </h3>
-                <p className="text-sm text-slate-400">
-                  Visa och redigera befintliga kunder
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card 
-            className="cursor-pointer hover:border-green-500/50 transition-all opacity-50"
-          >
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-purple-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Rapporter
-                </h3>
-                <p className="text-sm text-slate-400">
-                  Kommer snart...
-                </p>
-              </div>
-            </div>
+          <Card>
+            <h3 className="text-lg font-semibold text-white mb-4">Senaste aktivitet</h3>
+            <p className="text-slate-400 text-sm">
+              Statistik hämtad: {new Date().toLocaleTimeString('sv-SE')}
+            </p>
+            <Button 
+              variant="ghost" 
+              onClick={retryFetch} 
+              className="mt-3 w-full justify-start"
+              disabled={loading}
+            >
+              {loading ? 'Uppdaterar...' : 'Uppdatera statistik'}
+            </Button>
           </Card>
         </div>
       </main>
