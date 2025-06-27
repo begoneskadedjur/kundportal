@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx - Uppdaterad med CustomerDetails route
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -11,8 +11,8 @@ import SetPassword from './pages/auth/SetPassword'
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard'
 import Customers from './pages/admin/Customers'
+import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
-import TestEdgeFunction from './pages/admin/TestEdgeFunction'
 
 // Customer Pages
 import CustomerPortal from './pages/customer/Portal'
@@ -48,9 +48,9 @@ function App() {
                 <NewCustomer />
               </ProtectedRoute>
             } />
-            <Route path="/admin/test-functions" element={
+            <Route path="/admin/customers/:id" element={
               <ProtectedRoute role="admin">
-                <TestEdgeFunction />
+                <CustomerDetails />
               </ProtectedRoute>
             } />
             
