@@ -26,6 +26,9 @@ export type Database = {
           contract_description: string | null
           assigned_account_manager: string | null
           contract_status: 'active' | 'pending' | 'expired' | 'cancelled'
+          
+          // Verksamhetstyp
+          business_type: string | null
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at' | 'contract_status'> & {
           contract_status?: 'active' | 'pending' | 'expired' | 'cancelled'
@@ -133,7 +136,7 @@ export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 
 export type ContractType = Database['public']['Tables']['contract_types']['Row']
 
-// Utökade typer för avtalsinformation
+// Utökad type med alla nya fält inklusive verksamhetstyp
 export type CustomerFormData = {
   // Grundinformation
   company_name: string
@@ -143,6 +146,7 @@ export type CustomerFormData = {
   phone: string
   address: string
   contract_type_id: string
+  business_type: string
   
   // Avtalsinformation
   contract_start_date: string

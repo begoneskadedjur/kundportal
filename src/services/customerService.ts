@@ -12,6 +12,7 @@ export type CreateCustomerData = {
   phone: string
   address: string
   contract_type_id: string
+  business_type: string
   
   // Nya avtalsfält
   contract_start_date?: string

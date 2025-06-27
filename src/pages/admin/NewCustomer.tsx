@@ -3,13 +3,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Building2, User, Mail, Phone, MapPin, 
-  FileText, Calendar, DollarSign, Clock, Users
+  FileText, Calendar, DollarSign, Clock, Users, Briefcase
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import { customerService } from '../../services/customerService'
 import { supabase } from '../../lib/supabase'
+import { BUSINESS_TYPES, getBusinessTypeIcon } from '../../constants/businessTypes'
 import toast from 'react-hot-toast'
 
 type ContractType = {
@@ -31,6 +32,7 @@ export default function NewCustomer() {
     phone: '',
     address: '',
     contract_type_id: '',
+    business_type: '',
     
     // Avtalsinformation
     contract_start_date: '',
@@ -167,6 +169,43 @@ export default function NewCustomer() {
                 required
                 placeholder="556677-8899"
               />
+            </div>
+
+            {/* Verksamhetstyp */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-4">
+                <Briefcase className="w-4 h-4 inline mr-1" />
+                Verksamhetstyp *
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {BUSINESS_TYPES.map(type => (
+                  <label
+                    key={type.value}
+                    className="flex items-center p-3 border border-slate-600 rounded-lg cursor-pointer hover:border-green-400 transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="business_type"
+                      value={type.value}
+                      checked={formData.business_type === type.value}
+                      onChange={handleChange}
+                      className="sr-only"
+                      required
+                    />
+                    <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
+                      formData.business_type === type.value 
+                        ? 'border-green-500 bg-green-500'
+                        : 'border-slate-500'
+                      }`}>
+                      {formData.business_type === type.value && (
+                        <div className="w-2 h-2 rounded-full bg-slate-950 m-0.5" />
+                      )}
+                    </div>
+                    <span className="text-sm mr-2">{type.icon}</span>
+                    <span className="text-white text-sm">{type.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </Card>
 
@@ -375,7 +414,7 @@ export default function NewCustomer() {
           </Card>
 
           {/* Sammanfattning */}
-          {formData.company_name && formData.contract_type_id && (
+          {formData.company_name && formData.contract_type_id && formData.business_type && (
             <Card className="bg-green-500/10 border-green-500/20">
               <div className="flex items-center mb-4">
                 <FileText className="w-5 h-5 text-green-400 mr-2" />
@@ -388,6 +427,9 @@ export default function NewCustomer() {
                   </p>
                   <p className="text-slate-300">
                     <strong>Kontakt:</strong> {formData.contact_person}
+                  </p>
+                  <p className="text-slate-300">
+                    <strong>Verksamhet:</strong> {BUSINESS_TYPES.find(t => t.value === formData.business_type)?.label}
                   </p>
                   <p className="text-slate-300">
                     <strong>Avtalstyp:</strong> {contractTypes.find(t => t.id === formData.contract_type_id)?.name}

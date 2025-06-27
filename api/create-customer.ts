@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     // 1. Validera inkommande data
-    const requiredFields = ['company_name', 'org_number', 'contact_person', 'email', 'contract_type_id']
+    const requiredFields = ['company_name', 'org_number', 'contact_person', 'email', 'contract_type_id', 'business_type']
     for (const field of requiredFields) {
       if (!customerData[field]) {
         return res.status(400).json({ error: `Fält "${field}" är obligatoriskt` })
@@ -130,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       phone: customerData.phone?.trim() || null,
       address: customerData.address?.trim() || null,
       contract_type_id: customerData.contract_type_id,
+      business_type: customerData.business_type,
       clickup_list_id: clickupList.id,
       clickup_list_name: clickupList.name,
       is_active: true,
