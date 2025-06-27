@@ -1,6 +1,7 @@
-// src/pages/auth/Login.tsx - FÖRBÄTTRAD med navigation handling
-import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+// src/pages/auth/Login.tsx - UPPDATERAD
+
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Bug } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -9,47 +10,22 @@ import Input from '../../components/ui/Input'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const { signIn, user, profile, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
-
-  // Navigera när användare och profil är redo
-  useEffect(() => {
-    console.log('🔍 Login: Checking if should navigate:', {
-      user: !!user,
-      profile: !!profile,
-      authLoading,
-      isAdmin: profile?.is_admin
-    })
-
-    // Om vi har både user och profile och inte laddar längre
-    if (user && profile && !authLoading) {
-      console.log('🧭 Login: Navigating based on role:', profile.is_admin ? 'admin' : 'customer')
-      
-      if (profile.is_admin) {
-        console.log('👑 Navigating to admin dashboard')
-        navigate('/admin')
-      } else {
-        console.log('👤 Navigating to customer portal')
-        navigate('/portal')
-      }
-    }
-  }, [user, profile, authLoading, navigate])
+  
+  // FIX: Hämta 'loading' direkt från AuthContext.
+  // Det lokala loading-tillståndet är borttaget.
+  const { signIn, loading } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
 
+    // FIX: Förenklad hantering. AuthContext sköter nu hela
+    // loading-tillståndet och felmeddelanden.
     try {
-      console.log('🔐 Login: Starting sign in process')
       await signIn(email, password)
-      console.log('✅ Login: Sign in completed - waiting for navigation')
-      // Navigation hanteras av useEffect ovan
     } catch (error) {
-      console.error('❌ Login: Sign in failed:', error)
-      // Felmeddelanden hanteras i AuthContext
-    } finally {
-      setLoading(false)
+      // Tomt catch-block eftersom AuthContext redan visar ett toast-fel.
+      // Detta förhindrar bara att en okänd "unhandled rejection" loggas i konsolen.
+      console.error("Login component caught error, but AuthContext handles UI.")
     }
   }
 
@@ -97,11 +73,13 @@ export default function Login() {
 
             <Button
               type="submit"
-              loading={loading || authLoading}
+              // FIX: Denna 'loading' kommer nu från AuthContext och speglar
+              // hela inloggningsprocessen.
+              loading={loading}
               fullWidth
               size="lg"
             >
-              {loading || authLoading ? 'Loggar in...' : 'Logga in'}
+              Logga in
             </Button>
           </form>
 
