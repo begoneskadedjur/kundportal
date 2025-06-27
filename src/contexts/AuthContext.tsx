@@ -1,9 +1,9 @@
-// src/contexts/AuthContext.tsx - UPPDATERAD
+// src/contexts/AuthContext.tsx - FIXAD VERSION SOM LÖSER F5-PROBLEMET
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 type Profile = {
@@ -30,28 +30,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialLoad, setInitialLoad] = useState(true) // Ny state för första laddningen
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // Denna useEffect hanterar navigation baserat på auth state
+  // FIXAD: Navigation som endast triggas vid första laddningen eller efter inloggning
   useEffect(() => {
-    // Navigera endast om vi har en användare och profile, men inte är på login-sidan
+    // Navigera endast vid första laddningen ELLER när vi är på login/home-sidan
     if (user && profile && !loading) {
-      const currentPath = window.location.pathname
+      const currentPath = location.pathname
       const isOnLoginPage = currentPath === '/login'
       const isOnHomePage = currentPath === '/'
       
-      // Navigera endast om vi är på login eller home-sidan
-      if (isOnLoginPage || isOnHomePage) {
-        console.log('🧭 User authenticated, navigating based on role:', profile.is_admin ? 'admin' : 'customer')
+      // Navigera endast vid första laddningen eller om vi är på login/home
+      if (initialLoad || isOnLoginPage || isOnHomePage) {
+        console.log('🧭 Navigating user to appropriate dashboard')
         
         if (profile.is_admin) {
-          navigate('/admin')
+          navigate('/admin', { replace: true })
         } else {
-          navigate('/portal')
+          navigate('/portal', { replace: true })
+        }
+        
+        // Markera att första navigationen är klar
+        if (initialLoad) {
+          setInitialLoad(false)
         }
       }
     }
-  }, [user, profile, loading, navigate])
+  }, [user, profile, loading, navigate, location.pathname, initialLoad])
 
   useEffect(() => {
     console.log('🔐 AuthContext: Initializing...')
@@ -67,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log('❌ No user found, stopping loading')
         setLoading(false)
+        setInitialLoad(false) // Viktig: Markera att initial load är klar även utan användare
       }
     })
 
@@ -86,7 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out, redirecting to login')
         setProfile(null)
-        navigate('/login')
+        setInitialLoad(true) // Reset för nästa inloggning
+        navigate('/login', { replace: true })
       }
     })
 
@@ -94,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🧹 AuthContext cleanup')
       subscription.unsubscribe()
     }
-  }, [navigate])
+  }, [navigate]) // Ta bort location från dependencies
 
   const fetchProfile = async (userId: string) => {
     console.log('📋 Fetching profile for user:', userId)
@@ -143,11 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // --- START PÅ ÄNDRINGAR ---
   const signIn = async (email: string, password: string) => {
     console.log('🔐 Attempting sign in for:', email)
-    
-    // FIX: Sätt loading till true för att signalera att en inloggning påbörjats.
     setLoading(true)
 
     try {
@@ -161,9 +167,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Sign in successful - navigation will happen automatically via useEffect')
       toast.success('Inloggning lyckades!')
       
-      // Laddningstillståndet avslutas i fetchProfile's finally-block efter att
-      // onAuthStateChange har kört klart.
-      
     } catch (error: any) {
       console.error('💥 Sign in error:', error)
       if (error.message.includes('Invalid login credentials')) {
@@ -172,13 +175,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.error(error.message || 'Inloggning misslyckades')
       }
       
-      // FIX: Sätt loading till false vid fel så att användaren kan försöka igen.
       setLoading(false)
-
       throw error
     }
   }
-  // --- SLUT PÅ ÄNDRINGAR ---
 
   const signOut = async () => {
     console.log('👋 Signing out user')
@@ -188,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error
       
       setProfile(null)
+      setInitialLoad(true) // Reset för nästa session
       console.log('✅ Sign out successful')
       toast.success('Du har loggats ut')
     } catch (error: any) {
@@ -210,9 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: !!user,
     profile: !!profile,
     loading,
+    initialLoad,
     isAdmin: value.isAdmin,
     isCustomer: value.isCustomer,
-    currentPath: window.location.pathname,
+    currentPath: location.pathname,
   })
 
   return (
