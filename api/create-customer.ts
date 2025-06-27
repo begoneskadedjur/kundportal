@@ -1,4 +1,4 @@
-// api/create-customer.ts - Uppdaterat för avancerade fält
+// api/create-customer.ts - Fixad nodemailer
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
@@ -380,8 +380,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       </html>
     `
 
-    // Konfigurera Nodemailer med Resend
-    const transporter = nodemailer.createTransporter({
+    // Konfigurera Nodemailer med Resend - KORREKT FUNKTIONSNAMN
+    const transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 587,
       secure: false,
