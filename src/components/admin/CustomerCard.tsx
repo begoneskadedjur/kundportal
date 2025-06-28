@@ -1,4 +1,4 @@
-// src/components/admin/CustomerCard.tsx - Ny förbättrad kundkortkomponent
+// src/components/admin/CustomerCard.tsx - Uppdaterad med AdminCreateCaseModal
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
@@ -6,6 +6,7 @@ import {
   Users, FileText, Mail, Phone, Plus, Trash2, Power
 } from 'lucide-react'
 import Button from '../ui/Button'
+import AdminCreateCaseModal from './AdminCreateCaseModal'
 import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/businessTypes'
 
 interface Customer {
@@ -39,12 +40,14 @@ interface CustomerCardProps {
   customer: Customer
   onToggleStatus: (id: string, currentStatus: boolean) => void
   onDelete?: (id: string) => void
+  onCaseCreated?: () => void // Ny prop för att refresha data efter ärendeskapande
 }
 
-export default function CustomerCard({ customer, onToggleStatus, onDelete }: CustomerCardProps) {
+export default function CustomerCard({ customer, onToggleStatus, onDelete, onCaseCreated }: CustomerCardProps) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [showCreateCaseModal, setShowCreateCaseModal] = useState(false)
 
   // Beräkna månader kvar på avtal
   const getMonthsLeft = () => {
@@ -160,7 +163,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete }: Cus
               <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-10">
                 <button
                   onClick={(e) => handleActionClick(e, () => {
-                    navigate(`/admin/customers/${customer.id}/create-case`)
+                    setShowCreateCaseModal(true)
                     setShowDropdown(false)
                   })}
                   className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
@@ -298,6 +301,24 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete }: Cus
         <div 
           className="fixed inset-0 z-[5]" 
           onClick={() => setShowDropdown(false)}
+        />
+      )}
+
+      {/* Create Case Modal */}
+      {showCreateCaseModal && (
+        <AdminCreateCaseModal
+          isOpen={showCreateCaseModal}
+          onClose={() => setShowCreateCaseModal(false)}
+          onSuccess={() => {
+            onCaseCreated?.() // Trigga refresh av data
+          }}
+          customer={{
+            id: customer.id,
+            company_name: customer.company_name,
+            contact_person: customer.contact_person,
+            email: customer.email,
+            phone: customer.phone
+          }}
         />
       )}
     </div>

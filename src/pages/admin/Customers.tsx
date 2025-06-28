@@ -371,6 +371,7 @@ export default function Customers() {
               customer={customer}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDeleteCustomer}
+              onCaseCreated={fetchCustomers} // Refresh lista när ärende skapas
             />
           ))}
         </div>
