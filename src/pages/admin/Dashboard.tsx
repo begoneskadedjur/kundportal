@@ -1,9 +1,9 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED TEKNIKER-LÄNK
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED STATISTIK-LÄNK
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck } from 'lucide-react'
+import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, BarChart3 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 
@@ -239,7 +239,6 @@ export default function AdminDashboard() {
                 <Users className="w-4 h-4 mr-2" />
                 Hantera kunder
               </Button>
-              {/* NYA TEKNIKER-LÄNK */}
               <Button 
                 variant="secondary" 
                 className="w-full justify-start"
@@ -247,6 +246,15 @@ export default function AdminDashboard() {
               >
                 <UserCheck className="w-4 h-4 mr-2" />
                 Hantera tekniker
+              </Button>
+              {/* NYA STATISTIK-LÄNK */}
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-green-500/10 to-blue-500/10 border-green-500/20 hover:from-green-500/20 hover:to-blue-500/20"
+                onClick={() => navigate('/admin/statistics')}
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Avancerad Statistik
               </Button>
             </div>
           </Card>

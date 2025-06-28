@@ -1,4 +1,4 @@
-// src/App.tsx - Komplett uppdaterad med Tekniker-rutt
+// src/App.tsx - Uppdaterad med Statistics-rutt
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -13,7 +13,8 @@ import AdminDashboard from './pages/admin/Dashboard'
 import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
-import Technicians from './pages/admin/Technicians' // NYA TEKNIKER-SIDAN
+import Technicians from './pages/admin/Technicians'
+import Statistics from './pages/admin/Statistics' // NYA STATISTIK-SIDAN
 
 // Customer Pages
 import CustomerPortal from './pages/customer/Portal'
@@ -54,38 +55,43 @@ function App() {
                 <CustomerDetails />
               </ProtectedRoute>
             } />
-            {/* NYA TEKNIKER-RUTTEN */}
             <Route path="/admin/technicians" element={
               <ProtectedRoute role="admin">
                 <Technicians />
               </ProtectedRoute>
             } />
+            {/* NYA STATISTIK-RUTTEN */}
+            <Route path="/admin/statistics" element={
+              <ProtectedRoute role="admin">
+                <Statistics />
+              </ProtectedRoute>
+            } />
             
             {/* Customer Routes */}
-            <Route path="/portal" element={
+            <Route path="/customer" element={
               <ProtectedRoute role="customer">
                 <CustomerPortal />
               </ProtectedRoute>
             } />
-            <Route path="/portal/cases" element={
+            <Route path="/customer/cases" element={
               <ProtectedRoute role="customer">
                 <Cases />
               </ProtectedRoute>
             } />
-            <Route path="/portal/schedule" element={
+            <Route path="/customer/schedule" element={
               <ProtectedRoute role="customer">
                 <Schedule />
               </ProtectedRoute>
             } />
           </Routes>
           
-          <Toaster 
+          <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
               style: {
                 background: '#1e293b',
-                color: '#f1f5f9',
+                color: '#fff',
                 border: '1px solid #475569'
               }
             }}
