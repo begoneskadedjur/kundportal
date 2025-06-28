@@ -1,6 +1,6 @@
 // src/services/economicStatisticsService.ts - UPPGRADERAD MED PRESTANDA-STATS
-import { supabase } from '@/lib/supabase';
-import { technicianStatisticsService, TechnicianStats } from '@/services/technicianStatisticsService';
+import { supabase } from '../lib/supabase';
+import { technicianStatisticsService, TechnicianStats } from './technicianStatisticsService';
 
 // --- NYA INTERFACES FÖR PRESTANDA ---
 export interface TechnicianPerformance {
