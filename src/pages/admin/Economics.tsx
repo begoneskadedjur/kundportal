@@ -1,16 +1,15 @@
-// src/pages/admin/Economics.tsx - UPPGRADERAD MED TILLVÄXT-INSIGHTS
+// src/pages/admin/Economics.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Download, Activity, Gift, Zap,
+  Activity, Gift, Zap,
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
-// ❗ KONTROLLERA DENNA RAD! Filnamnet måste vara exakt "economicStatisticsService.ts"
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType } from '../../services/economicStatisticsService';
 
@@ -135,9 +134,7 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
 
 const BusinessTypeTable = ({ data }: { data: ARRByBusinessType[] }) => {
   const [sortKey, setSortKey] = useState<keyof ARRByBusinessType>('arr');
-
   const sortedData = [...data].sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number));
-
   const SortableHeader = ({ label, a_key }: { label: string; a_key: keyof ARRByBusinessType }) => (
       <th onClick={() => setSortKey(a_key)} className="text-right py-3 px-2 text-slate-400 font-medium cursor-pointer hover:text-white">
           {label} {sortKey === a_key && '▼'}
@@ -193,10 +190,10 @@ export default function Economics() {
   }, []);
 
   useEffect(() => {
-    if(!loading) { // Undvik att köra vid första sidladdningen
+    if(!loading) { 
         fetchChartData(contractsChartYear, caseRevenueChartYear);
     }
-  }, [contractsChartYear, caseRevenueChartYear]);
+  }, [contractsChartYear, caseRevenueChartYear, loading]);
 
   const fetchEconomicData = async () => {
     setLoading(true);
@@ -204,8 +201,6 @@ export default function Economics() {
     try {
       const stats = await economicStatisticsService.getDashboardStats(30);
       setDashboardStats(stats);
-      // Hämta initial grafdata
-      await fetchChartData(new Date().getFullYear(), new Date().getFullYear());
     } catch (error: any) {
       setError(error.message || 'Kunde inte hämta ekonomisk data');
     } finally {
@@ -275,18 +270,16 @@ export default function Economics() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {error && <Card className="bg-red-500/10 border-red-500/50"><AlertTriangle className="inline w-6 h-6 text-red-400 mr-2"/>{error}</Card>}
 
-        {/* --- RAD 1: ÖVERSIKT & TILLVÄXTMOTOR --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <MetricCard title="ARR (Avtal)" value={formatCurrency(arr.currentARR)} icon={DollarSign} color="green" tooltip="Årlig återkommande intäkt från aktiva avtal."/>
             <MetricCard title="Ärende-intäkter" value={formatCurrency(arr.additionalCaseRevenue)} icon={TrendingUp} color="cyan" tooltip="Totala intäkter från extra-ärenden."/>
             <MetricCard title="MRR" value={formatCurrency(arr.monthlyRecurringRevenue)} icon={Calendar} color="blue" tooltip="Månatlig återkommande intäkt (ARR / 12)."/>
-            <MetricCard title="Total Intäkt" value={formatCurrency(arr.totalRevenue)} icon={Calculator} color="purple" tooltip="Total intäkt (ARR + Ärenden)."/>
+            <MetricCard title="Total Intäkt" value={formatCurrency(arr.totalRevenue)} icon={TrendingUp} color="purple" tooltip="Total intäkt (ARR + Ärenden)."/>
           </div>
           <MonthlyGrowthAnalysisCard analysis={growthAnalysis} />
         </div>
         
-        {/* --- RAD 2: SEGMENTERING & ACTION --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <BusinessTypeTable data={arrByBusinessType} />
@@ -294,13 +287,11 @@ export default function Economics() {
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
 
-        {/* --- RAD 3: GRAFER & TRENDER --- */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
             <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
         </div>
         
-        {/* --- RAD 4: FÖRNYELSER & NYCKELTAL --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card>
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Clock className="w-6 h-6 text-yellow-500" />Kommande Avtalsförnyelser</h2>
