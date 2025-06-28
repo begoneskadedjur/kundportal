@@ -6,8 +6,8 @@ import {
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck
 } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import { supabase } from '@/lib/supabase';
 import { economicStatisticsService } from '@/services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '@/services/economicStatisticsService';
