@@ -82,7 +82,7 @@ export default function Customers() {
       setLoading(true)
       setError(null)
       
-      const customersData = await customerService.getAllCustomers()
+      const customersData = await customerService.getCustomers()
       
       // Beräkna extra fält för varje kund
       const enrichedCustomers = customersData.map(customer => ({

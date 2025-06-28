@@ -1,4 +1,4 @@
-// src/services/customerService.ts - Utökad befintlig version
+// src/services/customerService.ts - Utökad med getAllCustomers och deleteCustomer
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -64,6 +64,11 @@ export const customerService = {
     
     if (error) throw error
     return data
+  },
+
+  // TILLÄGD: Alias för getAllCustomers för bakåtkompatibilitet
+  async getAllCustomers() {
+    return this.getCustomers()
   },
 
   async getCustomer(id: string) {
@@ -142,6 +147,32 @@ export const customerService = {
     if (profileError) throw profileError
     
     toast.success(`Kund ${isActive ? 'aktiverad' : 'inaktiverad'}`)
+  },
+
+  // TILLÄGD: deleteCustomer funktion
+  async deleteCustomer(id: string) {
+    try {
+      // Först, hämta kundens ClickUp lista för att kunna radera den
+      const customer = await this.getCustomer(id)
+      
+      // Radera kunden från databas
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // TODO: Radera även ClickUp lista om det behövs
+      // Detta kräver ClickUp API-anrop
+      
+      toast.success('Kund raderad')
+      return true
+    } catch (error: any) {
+      console.error('Error deleting customer:', error)
+      toast.error(error.message || 'Kunde inte radera kund')
+      throw error
+    }
   },
 
   // Nya funktioner för avancerad kundhantering
@@ -230,30 +261,5 @@ export const customerService = {
     }) || []
     
     return expiringCustomers
-  },
-
-  async deleteCustomer(id: string) {
-    try {
-      // Först, hämta kundens ClickUp lista för att kunna radera den
-      const customer = await this.getCustomer(id)
-      
-      // Radera kunden från databas
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', id)
-      
-      if (error) throw error
-      
-      // TODO: Radera även ClickUp lista om det behövs
-      // Detta kräver ClickUp API-anrop
-      
-      toast.success('Kund raderad')
-      return true
-    } catch (error: any) {
-      console.error('Error deleting customer:', error)
-      toast.error(error.message || 'Kunde inte radera kund')
-      return false
-    }
   }
 }
