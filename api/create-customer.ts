@@ -1,4 +1,4 @@
-// api/create-customer.ts - Fixad nodemailer
+// api/create-customer.ts - DIN BEFINTLIGA AVANCERADE VERSION + contract_end_date
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
@@ -121,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clickupList = await clickupResponse.json()
     console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
 
-    // 7. Förbered kunddata för databas
+    // 7. Förbered kunddata för databas - UPPDATERAD med contract_end_date
     const dbCustomerData = {
       company_name: customerData.company_name.trim(),
       org_number: customerData.org_number.trim(),
@@ -135,9 +135,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clickup_list_name: clickupList.name,
       is_active: true,
       
-      // Avancerade avtalsfält
+      // Avancerade avtalsfält - UPPDATERAD med contract_end_date
       contract_start_date: customerData.contract_start_date || null,
       contract_length_months: customerData.contract_length_months ? parseInt(customerData.contract_length_months) : null,
+      contract_end_date: customerData.contract_end_date || null, // 🆕 NYA FÄLTET
       annual_premium: customerData.annual_premium ? parseFloat(customerData.annual_premium) : null,
       total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
       contract_description: customerData.contract_description?.trim() || null,
@@ -169,7 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Customer created successfully:', customer.id)
 
-    // 9. Hantera autentisering och profil
+    // 9. Hantera autentisering och profil (BEHÅLLS OFÖRÄNDRAD)
     console.log('Checking for existing auth user with email:', customerData.email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
     const existingAuthUser = users.find(u => u.email === customerData.email)
@@ -248,7 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Created new auth user:', userId)
     }
 
-    // 10. Skapa eller uppdatera profil
+    // 10. Skapa eller uppdatera profil (BEHÅLLS OFÖRÄNDRAD)
     console.log('Creating/updating profile for user:', userId)
     
     const { data: existingProfile } = await supabase
@@ -302,18 +303,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Profile created/updated successfully')
 
-    // 11. Skicka välkomstmail
+    // 11. Skicka välkomstmail - UPPDATERAD med contract_end_date
     console.log('Preparing welcome email...')
     
     const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
     
+    // 🆕 Förbättrat avtalsinformation med slutdatum
     const contractInfo = customer.contract_start_date || customer.annual_premium ? `
       <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <h3 style="color: #22c55e; margin: 0 0 12px 0;">Avtalsinformation</h3>
-        ${customer.contract_start_date ? `<p style="margin: 4px 0;"><strong>Startdatum:</strong> ${new Date(customer.contract_start_date).toLocaleDateString('sv-SE')}</p>` : ''}
-        ${customer.contract_length_months ? `<p style="margin: 4px 0;"><strong>Avtalslängd:</strong> ${customer.contract_length_months} månader</p>` : ''}
-        ${customer.annual_premium ? `<p style="margin: 4px 0;"><strong>Årspremie:</strong> ${customer.annual_premium.toLocaleString('sv-SE')} SEK</p>` : ''}
-        ${customer.assigned_account_manager ? `<p style="margin: 4px 0;"><strong>Avtalsansvarig:</strong> ${customer.assigned_account_manager}</p>` : ''}
+        <h3 style="color: #22c55e; margin: 0 0 12px 0;">📋 Avtalsinformation</h3>
+        ${customer.contract_start_date ? `
+          <p style="margin: 4px 0;"><strong>📅 Startdatum:</strong> ${new Date(customer.contract_start_date).toLocaleDateString('sv-SE')}</p>
+        ` : ''}
+        ${customer.contract_end_date ? `
+          <p style="margin: 4px 0;"><strong>🏁 Slutdatum:</strong> ${new Date(customer.contract_end_date).toLocaleDateString('sv-SE')}</p>
+        ` : ''}
+        ${customer.contract_length_months ? `
+          <p style="margin: 4px 0;"><strong>⏱️ Avtalslängd:</strong> ${customer.contract_length_months} månader</p>
+        ` : ''}
+        ${customer.annual_premium ? `
+          <p style="margin: 4px 0;"><strong>💰 Årspremie:</strong> ${customer.annual_premium.toLocaleString('sv-SE')} SEK</p>
+        ` : ''}
+        ${customer.total_contract_value ? `
+          <p style="margin: 4px 0;"><strong>💎 Totalt avtalsvärde:</strong> ${customer.total_contract_value.toLocaleString('sv-SE')} SEK</p>
+        ` : ''}
+        ${customer.assigned_account_manager ? `
+          <p style="margin: 4px 0;"><strong>👤 Avtalsansvarig:</strong> ${customer.assigned_account_manager}</p>
+        ` : ''}
       </div>
     ` : ''
 
@@ -326,7 +342,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #22c55e; margin: 0;">BeGone Skadedjur</h1>
+          <h1 style="color: #22c55e; margin: 0;">🐛 BeGone Skadedjur</h1>
           <h2 style="color: #64748b; margin: 10px 0;">Välkommen till vår kundportal!</h2>
         </div>
 
@@ -339,10 +355,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
           <p>I portalen kan du:</p>
           <ul style="color: #475569;">
-            <li>Följa dina ärenden i realtid</li>
-            <li>Se tekniska rapporter och bilder</li>
-            <li>Skapa nya ärenden direkt</li>
-            <li>Hantera dina företagsuppgifter</li>
+            <li>📊 Följa dina ärenden i realtid</li>
+            <li>📷 Se tekniska rapporter och bilder</li>
+            <li>➕ Skapa nya ärenden direkt</li>
+            <li>⚙️ Hantera dina företagsuppgifter</li>
+            <li>📈 Få översikt över avtalet och dess status</li>
           </ul>
         </div>
 
@@ -366,7 +383,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <div style="text-align: center; margin: 30px 0;">
           <a href="${loginLink}" 
              style="display: inline-block; background-color: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Logga in på kundportalen
+            🚀 Logga in på kundportalen
           </a>
         </div>
 
@@ -382,7 +399,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       </html>
     `
 
-    // Konfigurera Nodemailer med Resend - KORREKT FUNKTIONSNAMN
+    // Konfigurera Nodemailer med Resend - BEHÅLLS OFÖRÄNDRAD
     const transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 587,
@@ -397,7 +414,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const mailOptions = {
       from: 'BeGone Kundportal <noreply@begone.se>',
       to: customerData.email, // Skicka till original-emailen som kunden angav
-      subject: isNewUser ? 'Välkommen till BeGone Kundportal' : 'Ny företagskoppling - BeGone Kundportal',
+      subject: isNewUser ? 'Välkommen till BeGone Kundportal - Avtal aktiverat' : 'Ny företagskoppling - BeGone Kundportal',
       html: emailHtml
     }
 
@@ -409,7 +426,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Fortsätt ändå - kunden är skapad
     }
 
-    // 12. Returnera framgång
+    // 12. Returnera framgång - UPPDATERAD med contract_end_date
     console.log('=== CREATE CUSTOMER API SUCCESS ===')
     return res.status(200).json({
       success: true,
@@ -420,7 +437,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         clickup_list_id: customer.clickup_list_id,
         contract_type: contractType.name,
         contract_start_date: customer.contract_start_date,
+        contract_end_date: customer.contract_end_date, // 🆕 Inkludera slutdatum
+        contract_length_months: customer.contract_length_months,
         annual_premium: customer.annual_premium,
+        total_contract_value: customer.total_contract_value,
         assigned_account_manager: customer.assigned_account_manager
       }
     })

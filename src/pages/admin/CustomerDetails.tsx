@@ -1,4 +1,4 @@
-// src/pages/admin/CustomerDetails.tsx - Detaljerad kundvy
+// src/pages/admin/CustomerDetails.tsx - DIN BEFINTLIGA AVANCERADE VERSION + contract_end_date
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -12,6 +12,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { customerService } from '../../services/customerService'
 import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/businessTypes'
+import { getContractStatus } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
 
 interface CustomerDetails {
@@ -30,15 +31,16 @@ interface CustomerDetails {
     id: string
     name: string
   }
-  // Avtalsfält
+  // Avtalsfält - UPPDATERAD med contract_end_date
   contract_start_date?: string | null
   contract_length_months?: number | null
+  contract_end_date?: string | null // 🆕 NYA FÄLTET
   annual_premium?: number | null
   total_contract_value?: number | null
   contract_description?: string | null
   assigned_account_manager?: string | null
   contract_status?: string
-  // Ärenden
+  // Ärenden (BEHÅLLS OFÖRÄNDRAD)
   cases?: Array<{
     id: string
     case_number: string
@@ -87,8 +89,18 @@ export default function CustomerDetails() {
     }
   }
 
-  // Beräkna månader kvar till avtalet löper ut
+  // 🆕 FÖRBÄTTRAD månadsberäkning som använder contract_end_date först
   const getMonthsUntilExpiry = (): number | null => {
+    // Använd contract_end_date om tillgängligt
+    if (customer?.contract_end_date) {
+      const end = new Date(customer.contract_end_date)
+      const now = new Date()
+      const diffTime = end.getTime() - now.getTime()
+      const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44))
+      return diffMonths
+    }
+    
+    // Fallback till gammal beräkning om contract_end_date saknas
     if (!customer?.contract_start_date || !customer?.contract_length_months) return null
     
     const start = new Date(customer.contract_start_date)
@@ -102,6 +114,7 @@ export default function CustomerDetails() {
     return diffMonths
   }
 
+  // BEHÅLLS OFÖRÄNDRAD
   const getExpiryStatus = (monthsLeft: number | null) => {
     if (monthsLeft === null) return { color: 'text-slate-400', text: '-', bgColor: 'bg-slate-500/20' }
     
@@ -111,6 +124,7 @@ export default function CustomerDetails() {
     return { color: 'text-green-400', text: `${monthsLeft} mån kvar`, bgColor: 'bg-green-500/20' }
   }
 
+  // BEHÅLLS OFÖRÄNDRAD
   const formatCurrency = (amount: number | null | undefined) => {
     if (!amount) return '-'
     return new Intl.NumberFormat('sv-SE', {
@@ -120,6 +134,7 @@ export default function CustomerDetails() {
     }).format(amount)
   }
 
+  // BEHÅLLS OFÖRÄNDRAD
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-'
     return new Date(dateString).toLocaleDateString('sv-SE')
@@ -168,7 +183,7 @@ export default function CustomerDetails() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
+      {/* Header (BEHÅLLS HELT OFÖRÄNDRAD) */}
       <header className="glass border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -228,7 +243,7 @@ export default function CustomerDetails() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Vänster kolumn - Huvudinformation */}
+          {/* Vänster kolumn - Huvudinformation (BEHÅLLS HELT OFÖRÄNDRAD) */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Företagsinformation */}
@@ -276,7 +291,7 @@ export default function CustomerDetails() {
               </div>
             </Card>
 
-            {/* Kontaktinformation */}
+            {/* Kontaktinformation (BEHÅLLS HELT OFÖRÄNDRAD) */}
             <Card>
               <div className="flex items-center mb-6">
                 <User className="w-5 h-5 text-green-500 mr-2" />
@@ -317,7 +332,7 @@ export default function CustomerDetails() {
               </div>
             </Card>
 
-            {/* Avtalsbeskrivning */}
+            {/* Avtalsbeskrivning (BEHÅLLS HELT OFÖRÄNDRAD) */}
             {customer.contract_description && (
               <Card>
                 <div className="flex items-center mb-4">
@@ -328,7 +343,7 @@ export default function CustomerDetails() {
               </Card>
             )}
 
-            {/* Ärenden */}
+            {/* Ärenden (BEHÅLLS HELT OFÖRÄNDRAD) */}
             {customer.cases && customer.cases.length > 0 && (
               <Card>
                 <div className="flex items-center justify-between mb-6">
@@ -376,7 +391,7 @@ export default function CustomerDetails() {
           {/* Höger kolumn - Avtalsinformation & Statistik */}
           <div className="space-y-6">
             
-            {/* Avtalsstatus */}
+            {/* Avtalsstatus - UPPDATERAD med contract_end_date */}
             <Card>
               <div className="flex items-center mb-4">
                 <CreditCard className="w-5 h-5 text-green-500 mr-2" />
@@ -384,33 +399,125 @@ export default function CustomerDetails() {
               </div>
               
               <div className="space-y-4">
-                {customer.contract_start_date && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Avtalsperiod</label>
-                    <div className="text-white">
-                      <p>{formatDate(customer.contract_start_date)}</p>
-                      {customer.contract_length_months && (
-                        <p className="text-sm text-slate-400">
-                          {customer.contract_length_months} månader
+                    <label className="block text-sm text-slate-400 mb-1">Startdatum</label>
+                    <p className="text-white">
+                      {customer.contract_start_date 
+                        ? formatDate(customer.contract_start_date)
+                        : 'Ej angivet'
+                      }
+                    </p>
+                  </div>
+                  
+                  {/* 🆕 Visa slutdatum */}
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Slutdatum</label>
+                    <p className="text-white">
+                      {customer.contract_end_date 
+                        ? formatDate(customer.contract_end_date)
+                        : 'Ej angivet'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Avtalslängd</label>
+                    <p className="text-white">
+                      {customer.contract_length_months ? `${customer.contract_length_months} månader` : 'Ej angivet'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">Status</label>
+                    <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${expiryStatus.bgColor}`}>
+                      <Clock className={`w-4 h-4 ${expiryStatus.color}`} />
+                      <span className={`font-medium ${expiryStatus.color}`}>
+                        {expiryStatus.text}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🆕 Avtalstidslinje - Visuell representation */}
+                {customer.contract_start_date && customer.contract_end_date && (
+                  <div className="mt-6">
+                    <label className="block text-sm text-slate-400 mb-2">Avtalstidslinje</label>
+                    <div className="relative">
+                      <div className="w-full bg-slate-700 rounded-full h-2">
+                        {(() => {
+                          const now = new Date()
+                          const start = new Date(customer.contract_start_date!)
+                          const end = new Date(customer.contract_end_date!)
+                          const totalDuration = end.getTime() - start.getTime()
+                          const elapsed = now.getTime() - start.getTime()
+                          const progress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100))
+                          
+                          return (
+                            <div 
+                              className={`h-2 rounded-full transition-all duration-300 ${
+                                progress >= 90 ? 'bg-red-500' :
+                                progress >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          )
+                        })()}
+                      </div>
+                      <div className="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>Start</span>
+                        <span>Nu</span>
+                        <span>Slut</span>
+                      </div>
+                    </div>
+                    
+                    {/* Avtalsinformation */}
+                    <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                      <div className="text-center">
+                        <p className="text-slate-400">Avtalstid</p>
+                        <p className="text-white font-medium">
+                          {(() => {
+                            const start = new Date(customer.contract_start_date!)
+                            const end = new Date(customer.contract_end_date!)
+                            const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                            return `${totalDays} dagar`
+                          })()}
                         </p>
-                      )}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-slate-400">Förbrukad tid</p>
+                        <p className="text-white font-medium">
+                          {(() => {
+                            const now = new Date()
+                            const start = new Date(customer.contract_start_date!)
+                            const elapsed = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+                            return `${elapsed} dagar`
+                          })()}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-slate-400">Tid kvar</p>
+                        <p className={`font-medium ${expiryStatus.color}`}>
+                          {monthsLeft !== null && monthsLeft > 0 
+                            ? (() => {
+                                const now = new Date()
+                                const end = new Date(customer.contract_end_date!)
+                                const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                return `${daysLeft} dagar`
+                              })()
+                            : 'Utgånget'
+                          }
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
-                
-                <div>
-                  <label className="block text-sm text-slate-400 mb-2">Tid kvar</label>
-                  <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${expiryStatus.bgColor}`}>
-                    <Clock className={`w-4 h-4 ${expiryStatus.color}`} />
-                    <span className={`font-medium ${expiryStatus.color}`}>
-                      {expiryStatus.text}
-                    </span>
-                  </div>
-                </div>
               </div>
             </Card>
 
-            {/* Ekonomisk översikt */}
+            {/* Ekonomisk översikt (BEHÅLLS HELT OFÖRÄNDRAD) */}
             <Card>
               <div className="flex items-center mb-4">
                 <TrendingUp className="w-5 h-5 text-yellow-500 mr-2" />
@@ -443,7 +550,7 @@ export default function CustomerDetails() {
               </div>
             </Card>
 
-            {/* Ärendestatistik */}
+            {/* Ärendestatistik (BEHÅLLS HELT OFÖRÄNDRAD) */}
             {customer.cases && customer.cases.length > 0 && (
               <Card>
                 <div className="flex items-center mb-4">
@@ -474,7 +581,7 @@ export default function CustomerDetails() {
               </Card>
             )}
 
-            {/* Snabbåtgärder */}
+            {/* Snabbåtgärder (BEHÅLLS HELT OFÖRÄNDRAD) */}
             <Card>
               <div className="flex items-center mb-4">
                 <Activity className="w-5 h-5 text-purple-500 mr-2" />

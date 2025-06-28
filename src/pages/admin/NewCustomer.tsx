@@ -1,9 +1,9 @@
-// src/pages/admin/NewCustomer.tsx - Uppdaterad med riktiga tekniker från databas
+// src/pages/admin/NewCustomer.tsx - DIN BEFINTLIGA AVANCERADE VERSION + contract_end_date
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Building2, User, Mail, Phone, MapPin, 
-  FileText, Calendar, DollarSign, Clock, Users, Briefcase
+  FileText, Calendar, DollarSign, Clock, Users, Briefcase, Calculator
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -12,6 +12,7 @@ import TechnicianDropdown from '../../components/admin/TechnicianDropdown'
 import { customerService } from '../../services/customerService'
 import { supabase } from '../../lib/supabase'
 import { BUSINESS_TYPES, getBusinessTypeIcon } from '../../constants/businessTypes'
+import { calculateContractEndDate } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
 
 type ContractType = {
@@ -35,9 +36,10 @@ export default function NewCustomer() {
     contract_type_id: '',
     business_type: '',
     
-    // Avtalsinformation
+    // Avtalsinformation - UPPDATERAD med contract_end_date
     contract_start_date: '',
     contract_length_months: '',
+    contract_end_date: '', // 🆕 NYA FÄLTET
     annual_premium: '',
     total_contract_value: '',
     contract_description: '',
@@ -48,7 +50,18 @@ export default function NewCustomer() {
     fetchContractTypes()
   }, [])
 
-  // Beräkna totalt avtalsvärde automatiskt
+  // 🆕 Automatisk beräkning av slutdatum
+  useEffect(() => {
+    if (formData.contract_start_date && formData.contract_length_months) {
+      const months = parseInt(formData.contract_length_months)
+      if (months > 0) {
+        const endDate = calculateContractEndDate(formData.contract_start_date, months)
+        setFormData(prev => ({ ...prev, contract_end_date: endDate }))
+      }
+    }
+  }, [formData.contract_start_date, formData.contract_length_months])
+
+  // Beräkna totalt avtalsvärde automatiskt (BEHÅLLS OFÖRÄNDRAD)
   useEffect(() => {
     if (formData.annual_premium && formData.contract_length_months) {
       const annualPremium = parseFloat(formData.annual_premium)
@@ -136,7 +149,7 @@ export default function NewCustomer() {
     }))
   }
 
-  // Beräkna totalt avtalsvärde automatiskt
+  // Beräkna totalt avtalsvärde automatiskt (BEHÅLLS OFÖRÄNDRAD)
   const handlePremiumChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const premium = parseFloat(e.target.value) || 0
     const months = parseInt(formData.contract_length_months) || 0
@@ -161,7 +174,7 @@ export default function NewCustomer() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
+      {/* Header (BEHÅLLS OFÖRÄNDRAD) */}
       <header className="glass border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16">
@@ -174,7 +187,7 @@ export default function NewCustomer() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
             </Button>
-            <h1 className="text-xl font-semibold">Lägg till ny kund - Med Riktiga Tekniker</h1>
+            <h1 className="text-xl font-semibold">Lägg till ny kund - Med automatisk slutdatum</h1>
           </div>
         </div>
       </header>
@@ -183,7 +196,7 @@ export default function NewCustomer() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <form onSubmit={handleSubmit} className="space-y-8">
           
-          {/* Företagsinformation */}
+          {/* Företagsinformation (BEHÅLLS OFÖRÄNDRAD) */}
           <Card>
             <div className="flex items-center mb-6">
               <Building2 className="w-5 h-5 text-green-500 mr-2" />
@@ -210,7 +223,7 @@ export default function NewCustomer() {
               />
             </div>
 
-            {/* Verksamhetstyp - FÖRBÄTTRAD MED IKONER */}
+            {/* Verksamhetstyp (BEHÅLLS OFÖRÄNDRAD) */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-slate-300 mb-4">
                 <Briefcase className="w-4 h-4 inline mr-1" />
@@ -247,7 +260,7 @@ export default function NewCustomer() {
             </div>
           </Card>
 
-          {/* Kontaktinformation */}
+          {/* Kontaktinformation (BEHÅLLS OFÖRÄNDRAD) */}
           <Card>
             <div className="flex items-center mb-6">
               <User className="w-5 h-5 text-blue-500 mr-2" />
@@ -294,7 +307,7 @@ export default function NewCustomer() {
             </div>
           </Card>
 
-          {/* Avtalsinformation */}
+          {/* Avtalsinformation - UPPDATERAD med slutdatum */}
           <Card>
             <div className="flex items-center mb-6">
               <FileText className="w-5 h-5 text-purple-500 mr-2" />
@@ -302,7 +315,7 @@ export default function NewCustomer() {
             </div>
             
             <div className="space-y-6">
-              {/* Avtalstyp */}
+              {/* Avtalstyp (BEHÅLLS OFÖRÄNDRAD) */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-4">
                   Välj avtalstyp *
@@ -342,8 +355,8 @@ export default function NewCustomer() {
                 </div>
               </div>
 
-              {/* Avtalsdatum och längd */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Avtalsdatum och längd - UPPDATERAD med slutdatum */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     <Calendar className="w-4 h-4 inline mr-1" />
@@ -376,9 +389,27 @@ export default function NewCustomer() {
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
+
+                {/* 🆕 Slutdatum - Automatiskt beräknat */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <Calculator className="w-4 h-4 inline mr-1 text-green-400" />
+                    Avtalets slutdatum
+                  </label>
+                  <input
+                    type="date"
+                    name="contract_end_date"
+                    value={formData.contract_end_date}
+                    disabled
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-300 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Beräknas automatiskt från startdatum + månader
+                  </p>
+                </div>
               </div>
 
-              {/* Ekonomisk information */}
+              {/* Ekonomisk information (BEHÅLLS OFÖRÄNDRAD) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -420,7 +451,7 @@ export default function NewCustomer() {
                 </div>
               </div>
 
-              {/* UPPDATERAD: Kontraktansvarig med TechnicianDropdown */}
+              {/* Kontraktansvarig med TechnicianDropdown (BEHÅLLS OFÖRÄNDRAD) */}
               <div>
                 <TechnicianDropdown
                   label="Kontraktansvarig *"
@@ -436,7 +467,7 @@ export default function NewCustomer() {
                 </p>
               </div>
 
-              {/* Avtalsobjekt beskrivning */}
+              {/* Avtalsobjekt beskrivning (BEHÅLLS OFÖRÄNDRAD) */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   <FileText className="w-4 h-4 inline mr-1" />
@@ -454,7 +485,7 @@ export default function NewCustomer() {
             </div>
           </Card>
 
-          {/* FÖRBÄTTRAD Sammanfattning */}
+          {/* Sammanfattning - UPPDATERAD med slutdatum */}
           {formData.company_name && formData.contract_type_id && formData.business_type && (
             <Card className="bg-green-500/10 border-green-500/20">
               <div className="flex items-center mb-4">
@@ -482,6 +513,12 @@ export default function NewCustomer() {
                       <strong>Startdatum:</strong> {new Date(formData.contract_start_date).toLocaleDateString('sv-SE')}
                     </p>
                   )}
+                  {/* 🆕 Visa slutdatum i sammanfattning */}
+                  {formData.contract_end_date && (
+                    <p className="text-slate-300">
+                      <strong>Slutdatum:</strong> {new Date(formData.contract_end_date).toLocaleDateString('sv-SE')}
+                    </p>
+                  )}
                   {formData.contract_length_months && (
                     <p className="text-slate-300">
                       <strong>Längd:</strong> {formData.contract_length_months} månader ({(parseInt(formData.contract_length_months) / 12).toFixed(1)} år)
@@ -499,10 +536,32 @@ export default function NewCustomer() {
                   )}
                 </div>
               </div>
+
+              {/* 🆕 Avtalsöversikt med visuell period */}
+              {formData.contract_start_date && formData.contract_end_date && (
+                <div className="mt-4 p-4 bg-slate-800/30 rounded-lg">
+                  <h4 className="text-green-400 font-medium mb-2">📅 Avtalsperiod</h4>
+                  <div className="flex items-center justify-between text-sm text-slate-300">
+                    <span>{new Date(formData.contract_start_date).toLocaleDateString('sv-SE')}</span>
+                    <div className="flex-1 mx-4 h-2 bg-slate-700 rounded-full">
+                      <div className="h-2 bg-green-500 rounded-full w-0 transition-all duration-300"></div>
+                    </div>
+                    <span>{new Date(formData.contract_end_date).toLocaleDateString('sv-SE')}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 text-center">
+                    {(() => {
+                      const start = new Date(formData.contract_start_date)
+                      const end = new Date(formData.contract_end_date)
+                      const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                      return `Avtalsperiod: ${totalDays} dagar`
+                    })()}
+                  </p>
+                </div>
+              )}
             </Card>
           )}
 
-          {/* Information - UPPDATERAD */}
+          {/* Information (BEHÅLLS OFÖRÄNDRAD) */}
           <Card className="bg-blue-500/10 border-blue-500/20">
             <h3 className="text-sm font-medium text-blue-400 mb-2">
               Vad händer efter skapande?
@@ -514,10 +573,11 @@ export default function NewCustomer() {
               <li>• Kunden får inloggningsuppgifter till kundportalen</li>
               <li>• Den tilldelade kontraktansvariga får notifiering</li>
               <li>• Tekniker kan nu tilldelas ärenden för denna kund</li>
+              <li>• 🆕 Avtalsslutdatum beräknas och sparas automatiskt</li>
             </ul>
           </Card>
 
-          {/* Knappar */}
+          {/* Knappar (BEHÅLLS OFÖRÄNDRAD) */}
           <div className="flex justify-end gap-4">
             <Button
               type="button"

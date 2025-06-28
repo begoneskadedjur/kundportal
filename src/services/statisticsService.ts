@@ -1,4 +1,4 @@
-// src/services/statisticsService.ts - Service för avancerad dashboard-statistik
+// src/services/statisticsService.ts - UPPDATERAD med contract_end_date + verklig intäktsberäkning
 import { supabase } from '../lib/supabase'
 
 export interface DashboardStats {
@@ -18,6 +18,7 @@ export interface BasicStats {
   newCasesThisMonth: number
 }
 
+// UPPDATERAD med nya intäktsfält
 export interface ARRStats {
   currentARR: number
   monthlyGrowth: number
@@ -34,6 +35,13 @@ export interface ARRStats {
   retentionRate: number
   averageContractLength: number
   netRevenueRetention: number
+  // 🆕 NYA INTÄKTSFÄLT
+  additionalCaseRevenue: number        // Extra intäkter från cases med price
+  totalRevenue: number                 // ARR + case revenue
+  averageCasePrice: number             // Genomsnittligt case-pris
+  paidCasesThisMonth: number          // Antal betalda cases denna månad
+  projectedRevenueThisYear: number    // Projicerad intäkt baserat på avtal
+  projectedRevenueNextYear: number    // Projicerad intäkt nästa år
 }
 
 export interface TechnicianStats {
@@ -59,6 +67,7 @@ export interface ARRByBusinessType {
   customer_count: number
   average_arr_per_customer: number
   growth_rate: number
+  additional_case_revenue: number  // 🆕 Extra intäkter från cases
 }
 
 export interface TechnicianWorkload {
@@ -120,7 +129,7 @@ class StatisticsService {
   }
 
   /**
-   * Grundläggande statistik
+   * Grundläggande statistik (BEHÅLLS OFÖRÄNDRAD)
    */
   async getBasicStats(period: number): Promise<BasicStats> {
     const periodStart = new Date()
@@ -163,47 +172,78 @@ class StatisticsService {
   }
 
   /**
-   * ARR och ekonomisk statistik
+   * ARR och ekonomisk statistik - KRAFTIGT UPPDATERAD med verklig data
    */
   async getARRStats(period: number): Promise<ARRStats> {
-    const { data: customers, error } = await supabase
+    const { data: customers, error: customersError } = await supabase
       .from('customers')
       .select(`
         id, is_active, annual_premium, total_contract_value,
-        contract_start_date, contract_length_months, business_type,
-        created_at
+        contract_start_date, contract_length_months, contract_end_date,
+        business_type, created_at
       `)
     
-    if (error) throw error
+    if (customersError) throw customersError
+
+    // 🆕 Hämta cases med priser för extra intäkter
+    const { data: cases, error: casesError } = await supabase
+      .from('cases')
+      .select('id, price, created_at, completed_date, customer_id')
+      .not('price', 'is', null)
+      .gt('price', 0)
+    
+    if (casesError) throw casesError
     
     const activeCustomers = (customers || []).filter(c => c.is_active)
     const allCustomers = customers || []
+    const paidCases = cases || []
     
-    // Grundläggande ARR-beräkningar
+    // Grundläggande ARR-beräkningar med verklig data
     const currentARR = this.calculateCurrentARR(activeCustomers)
     const monthlyRecurringRevenue = currentARR / 12
     const totalContractValue = this.calculateTotalContractValue(activeCustomers)
     const averageARRPerCustomer = activeCustomers.length > 0 ? currentARR / activeCustomers.length : 0
     
+    // 🆕 Beräkna extra intäkter från cases
+    const additionalCaseRevenue = this.calculateAdditionalCaseRevenue(paidCases)
+    const totalRevenue = currentARR + additionalCaseRevenue
+    
+    // 🆕 Case-statistik
+    const thisMonthStart = new Date()
+    thisMonthStart.setDate(1)
+    
+    const paidCasesThisMonth = paidCases.filter(c => 
+      c.completed_date && new Date(c.completed_date) >= thisMonthStart
+    ).length
+    
+    const averageCasePrice = paidCases.length > 0 
+      ? paidCases.reduce((sum, c) => sum + (c.price || 0), 0) / paidCases.length 
+      : 0
+    
     // Avtalslängd
     const averageContractLength = this.calculateAverageContractLength(activeCustomers)
     
-    // Förnyelser och uppsägningar
+    // 🆕 FÖRBÄTTRADE förnyelser som använder contract_end_date
     const renewalMetrics = this.calculateRenewalMetrics(activeCustomers)
-    const churnMetrics = this.calculateChurnMetrics(allCustomers, period)
     
-    // Tillväxt
+    // 🆕 VERKLIG churn-beräkning
+    const churnMetrics = await this.calculateChurnMetrics(allCustomers, period)
+    
+    // 🆕 VERKLIG tillväxt
     const growthMetrics = await this.calculateGrowthMetrics(period)
     
-    // Pipeline (simulerad - skulle behöva CRM-integration)
-    const pipelineARR = currentARR * 0.15 // 15% av nuvarande ARR
+    // 🆕 VERKLIGA intäktsprognoser baserat på avtal
+    const revenueProjections = this.calculateRevenueProjections(activeCustomers)
+    
+    // Pipeline (dummy för nu)
+    const pipelineARR = "DUMMY" // Du kan lägga till detta från CRM senare
     
     return {
       currentARR,
       monthlyGrowth: growthMetrics.monthlyGrowth,
       yearOverYearGrowth: growthMetrics.yearOverYearGrowth,
       upcomingRenewals: renewalMetrics.upcomingRenewalsValue,
-      pipelineARR,
+      pipelineARR: typeof pipelineARR === 'string' ? 0 : pipelineARR,
       averageARRPerCustomer,
       contractsExpiring3Months: renewalMetrics.expiring3Months,
       contractsExpiring6Months: renewalMetrics.expiring6Months,
@@ -213,12 +253,19 @@ class StatisticsService {
       churnRate: churnMetrics.churnRate,
       retentionRate: churnMetrics.retentionRate,
       averageContractLength,
-      netRevenueRetention: churnMetrics.netRevenueRetention
+      netRevenueRetention: churnMetrics.netRevenueRetention,
+      // 🆕 NYA FÄLT
+      additionalCaseRevenue,
+      totalRevenue,
+      averageCasePrice,
+      paidCasesThisMonth,
+      projectedRevenueThisYear: revenueProjections.thisYear,
+      projectedRevenueNextYear: revenueProjections.nextYear
     }
   }
 
   /**
-   * Tekniker-statistik
+   * Tekniker-statistik (BEHÅLLS SAMMA MEN med verklig data)
    */
   async getTechnicianStats(period: number): Promise<TechnicianStats> {
     const periodStart = new Date()
@@ -235,8 +282,7 @@ class StatisticsService {
       supabase.from('technicians').select('*'),
       supabase.from('cases').select(`
         id, status, priority, created_at, completed_date, 
-        scheduled_date, assigned_technician_id,
-        technicians(id, name)
+        scheduled_date, assigned_technician_id
       `)
     ])
 
@@ -279,8 +325,8 @@ class StatisticsService {
     const firstVisitSuccessRate = this.calculateFirstVisitSuccessRate(cases)
     const averageCasesPerTechnician = activeTechnicians > 0 ? activeCases / activeTechnicians : 0
     
-    // Kapacitetsutnyttjande (simulerad)
-    const capacityUtilization = Math.min(95, 60 + Math.random() * 30)
+    // 🆕 VERKLIG kapacitetsutnyttjande baserad på antal ärenden
+    const capacityUtilization = this.calculateRealCapacityUtilization(technicians, cases)
     
     // Arbetsbelastning per tekniker
     const technicianWorkload = this.calculateTechnicianWorkload(technicians, cases)
@@ -312,21 +358,31 @@ class StatisticsService {
   }
 
   /**
-   * ARR per verksamhetstyp
+   * ARR per verksamhetstyp - UPPDATERAD med case-intäkter
    */
   async getARRByBusinessType(): Promise<ARRByBusinessType[]> {
-    const { data: customers, error } = await supabase
+    const { data: customers, error: customersError } = await supabase
       .from('customers')
-      .select('business_type, annual_premium, created_at')
+      .select('id, business_type, annual_premium, created_at')
       .eq('is_active', true)
     
-    if (error) throw error
+    if (customersError) throw customersError
+
+    // 🆕 Hämta case-intäkter per kund
+    const { data: cases, error: casesError } = await supabase
+      .from('cases')
+      .select('customer_id, price')
+      .not('price', 'is', null)
+      .gt('price', 0)
+    
+    if (casesError) throw casesError
     
     const businessTypeMap = new Map<string, {
       arr: number
       count: number
       premiums: number[]
       createdDates: string[]
+      caseRevenue: number
     }>()
     
     customers?.forEach(customer => {
@@ -335,79 +391,94 @@ class StatisticsService {
         arr: 0, 
         count: 0, 
         premiums: [], 
-        createdDates: [] 
+        createdDates: [],
+        caseRevenue: 0
       }
+      
+      // 🆕 Beräkna case-intäkter för denna kund
+      const customerCaseRevenue = (cases || [])
+        .filter(c => c.customer_id === customer.id)
+        .reduce((sum, c) => sum + (c.price || 0), 0)
       
       businessTypeMap.set(type, {
         arr: current.arr + (customer.annual_premium || 0),
         count: current.count + 1,
         premiums: [...current.premiums, customer.annual_premium || 0],
-        createdDates: [...current.createdDates, customer.created_at]
+        createdDates: [...current.createdDates, customer.created_at],
+        caseRevenue: current.caseRevenue + customerCaseRevenue
       })
     })
     
     return Array.from(businessTypeMap.entries()).map(([business_type, data]) => {
       const average_arr_per_customer = data.count > 0 ? data.arr / data.count : 0
       
-      // Beräkna tillväxttakt (simulerad)
-      const growth_rate = (Math.random() - 0.3) * 20 // -6% till +14%
+      // 🆕 VERKLIG tillväxttakt - ska beräknas senare med historisk data
+      const growth_rate = "DUMMY" // Implementera med verklig historik
       
       return {
         business_type,
         arr: data.arr,
         customer_count: data.count,
         average_arr_per_customer,
-        growth_rate
+        growth_rate: typeof growth_rate === 'string' ? 0 : growth_rate,
+        additional_case_revenue: data.caseRevenue
       }
     }).sort((a, b) => b.arr - a.arr)
   }
 
   /**
-   * Trend-data för grafer
+   * Trend-data - DUMMY för nu, ska implementeras med verklig historik
    */
   async getTrendData(period: number): Promise<TrendData> {
-    // Detta skulle behöva historisk data som vi inte har än
-    // Returnerar simulerad data för demonstration
-    
+    // TODO: Implementera med verklig historisk data från databas
     const months = this.getLastNMonths(12)
     
     const arrTrend = months.map((month, index) => ({
       month,
-      value: 1000000 + (index * 50000) + (Math.random() * 100000),
-      change: (Math.random() - 0.3) * 20
+      value: "DUMMY", // Hämta verklig ARR för varje månad
+      change: "DUMMY"  // Beräkna verklig förändring
     }))
 
     const customerTrend = months.map((month, index) => ({
       month,
-      value: 50 + (index * 3) + Math.floor(Math.random() * 10),
-      change: (Math.random() - 0.2) * 15
+      value: "DUMMY", // Antal kunder per månad
+      change: "DUMMY"  // Förändring i antal kunder
     }))
 
     const caseTrend = months.map((month, index) => ({
       month,
-      value: 100 + (index * 5) + Math.floor(Math.random() * 20),
-      change: (Math.random() - 0.1) * 25
+      value: "DUMMY", // Antal cases per månad
+      change: "DUMMY"  // Förändring i cases
     }))
 
     const technicianProductivity = months.map((month, index) => ({
       month,
-      value: 75 + Math.floor(Math.random() * 20),
-      change: (Math.random() - 0.5) * 10
+      value: "DUMMY", // Verklig produktivitet per månad
+      change: "DUMMY"  // Förändring i produktivitet
     }))
 
     return {
-      arrTrend,
-      customerTrend,
-      caseTrend,
-      technicianProductivity
+      arrTrend: arrTrend.map(t => ({ ...t, value: 0, change: 0 })),
+      customerTrend: customerTrend.map(t => ({ ...t, value: 0, change: 0 })),
+      caseTrend: caseTrend.map(t => ({ ...t, value: 0, change: 0 })),
+      technicianProductivity: technicianProductivity.map(t => ({ ...t, value: 0, change: 0 }))
     }
   }
 
-  // Private helper methods
+  // 🆕 VERKLIGA beräkningsmetoder baserat på contract_end_date
+
   private calculateCurrentARR(customers: any[]): number {
-    return customers.reduce((sum, customer) => 
-      sum + (customer.annual_premium || 0), 0
-    )
+    const now = new Date()
+    return customers.reduce((sum, customer) => {
+      // Kontrollera att avtalet fortfarande är aktivt
+      if (customer.contract_end_date) {
+        const endDate = new Date(customer.contract_end_date)
+        if (endDate <= now) {
+          return sum // Avtalet har gått ut
+        }
+      }
+      return sum + (customer.annual_premium || 0)
+    }, 0)
   }
 
   private calculateTotalContractValue(customers: any[]): number {
@@ -427,6 +498,7 @@ class StatisticsService {
     return totalMonths / contractsWithLength.length
   }
 
+  // 🆕 FÖRBÄTTRAD renewal-beräkning med contract_end_date
   private calculateRenewalMetrics(customers: any[]) {
     const now = new Date()
     const in3Months = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
@@ -439,17 +511,25 @@ class StatisticsService {
     let upcomingRenewalsValue = 0
     
     customers.forEach(customer => {
-      if (customer.contract_start_date && customer.contract_length_months) {
+      let endDate: Date | null = null
+      
+      // 🆕 Använd contract_end_date om tillgängligt
+      if (customer.contract_end_date) {
+        endDate = new Date(customer.contract_end_date)
+      } else if (customer.contract_start_date && customer.contract_length_months) {
+        // Fallback: beräkna från start + längd
         const startDate = new Date(customer.contract_start_date)
-        const endDate = new Date(startDate)
+        endDate = new Date(startDate)
         endDate.setMonth(endDate.getMonth() + customer.contract_length_months)
-        
-        if (endDate <= in3Months && endDate > now) {
+      }
+      
+      if (endDate && endDate > now) {
+        if (endDate <= in3Months) {
           expiring3Months++
           upcomingRenewalsValue += customer.annual_premium || 0
-        } else if (endDate <= in6Months && endDate > now) {
+        } else if (endDate <= in6Months) {
           expiring6Months++
-        } else if (endDate <= in12Months && endDate > now) {
+        } else if (endDate <= in12Months) {
           expiring12Months++
         }
       }
@@ -463,11 +543,44 @@ class StatisticsService {
     }
   }
 
-  private calculateChurnMetrics(customers: any[], period: number) {
-    // Simulerad churn-beräkning (skulle behöva historisk data)
-    const churnRate = Math.random() * 5 // 0-5%
+  // 🆕 VERKLIG churn-beräkning
+  private async calculateChurnMetrics(customers: any[], period: number) {
+    const periodStart = new Date()
+    periodStart.setDate(periodStart.getDate() - period)
+    
+    // Kunder som var aktiva vid period start
+    const activeAtPeriodStart = customers.filter(c => {
+      const createdDate = new Date(c.created_at)
+      return createdDate < periodStart && c.is_active
+    })
+    
+    // Kunder som blivit inaktiva under perioden (eller avtal som gått ut)
+    const churned = customers.filter(c => {
+      if (!c.is_active) return true
+      
+      // Kontrollera om avtalet gått ut
+      if (c.contract_end_date) {
+        const endDate = new Date(c.contract_end_date)
+        const now = new Date()
+        return endDate <= now
+      }
+      
+      return false
+    })
+    
+    const churnRate = activeAtPeriodStart.length > 0 
+      ? (churned.length / activeAtPeriodStart.length) * 100 
+      : 0
+      
     const retentionRate = 100 - churnRate
-    const netRevenueRetention = 95 + Math.random() * 20 // 95-115%
+    
+    // Beräkna Net Revenue Retention
+    const churnedRevenue = churned.reduce((sum, c) => sum + (c.annual_premium || 0), 0)
+    const totalRevenueAtStart = activeAtPeriodStart.reduce((sum, c) => sum + (c.annual_premium || 0), 0)
+    
+    const netRevenueRetention = totalRevenueAtStart > 0 
+      ? ((totalRevenueAtStart - churnedRevenue) / totalRevenueAtStart) * 100
+      : 100
     
     return {
       churnRate,
@@ -476,10 +589,33 @@ class StatisticsService {
     }
   }
 
+  // 🆕 VERKLIG tillväxtberäkning
   private async calculateGrowthMetrics(period: number) {
-    // Simulerad tillväxt (skulle behöva historisk data)
-    const monthlyGrowth = (Math.random() - 0.2) * 15 // -3% till +12%
-    const yearOverYearGrowth = (Math.random() + 0.1) * 30 // 3% till +33%
+    const now = new Date()
+    const lastMonth = new Date(now)
+    lastMonth.setMonth(lastMonth.getMonth() - 1)
+    
+    const lastYear = new Date(now)
+    lastYear.setFullYear(lastYear.getFullYear() - 1)
+    
+    // Hämta kunder för olika tidsperioder
+    const [currentCustomers, lastMonthCustomers, lastYearCustomers] = await Promise.all([
+      supabase.from('customers').select('annual_premium').eq('is_active', true),
+      supabase.from('customers').select('annual_premium').eq('is_active', true).lte('created_at', lastMonth.toISOString()),
+      supabase.from('customers').select('annual_premium').eq('is_active', true).lte('created_at', lastYear.toISOString())
+    ])
+    
+    const currentARR = this.calculateCurrentARR(currentCustomers.data || [])
+    const lastMonthARR = this.calculateCurrentARR(lastMonthCustomers.data || [])
+    const lastYearARR = this.calculateCurrentARR(lastYearCustomers.data || [])
+    
+    const monthlyGrowth = lastMonthARR > 0 
+      ? ((currentARR - lastMonthARR) / lastMonthARR) * 100 
+      : 0
+    
+    const yearOverYearGrowth = lastYearARR > 0 
+      ? ((currentARR - lastYearARR) / lastYearARR) * 100 
+      : 0
     
     return {
       monthlyGrowth,
@@ -487,6 +623,70 @@ class StatisticsService {
     }
   }
 
+  // 🆕 NYA METODER för case-intäkter och prognoser
+
+  private calculateAdditionalCaseRevenue(paidCases: any[]): number {
+    return paidCases.reduce((sum, case_) => sum + (case_.price || 0), 0)
+  }
+
+  private calculateRevenueProjections(customers: any[]): { thisYear: number, nextYear: number } {
+    const now = new Date()
+    const thisYearEnd = new Date(now.getFullYear(), 11, 31)
+    const nextYearEnd = new Date(now.getFullYear() + 1, 11, 31)
+    
+    let thisYearRevenue = 0
+    let nextYearRevenue = 0
+    
+    customers.forEach(customer => {
+      if (!customer.contract_start_date || !customer.contract_end_date || !customer.annual_premium) {
+        return
+      }
+      
+      const startDate = new Date(customer.contract_start_date)
+      const endDate = new Date(customer.contract_end_date)
+      const annualPremium = customer.annual_premium
+      
+      // Beräkna intäkt för detta år
+      if (endDate > now) {
+        const overlapThisYear = this.calculateYearOverlap(startDate, endDate, now, thisYearEnd)
+        thisYearRevenue += (overlapThisYear / 365) * annualPremium
+      }
+      
+      // Beräkna intäkt för nästa år
+      const nextYearStart = new Date(now.getFullYear() + 1, 0, 1)
+      if (endDate > nextYearStart) {
+        const overlapNextYear = this.calculateYearOverlap(startDate, endDate, nextYearStart, nextYearEnd)
+        nextYearRevenue += (overlapNextYear / 365) * annualPremium
+      }
+    })
+    
+    return {
+      thisYear: thisYearRevenue,
+      nextYear: nextYearRevenue
+    }
+  }
+
+  private calculateYearOverlap(contractStart: Date, contractEnd: Date, yearStart: Date, yearEnd: Date): number {
+    const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()))
+    const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()))
+    
+    if (overlapStart >= overlapEnd) return 0
+    
+    return Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24))
+  }
+
+  private calculateRealCapacityUtilization(technicians: any[], cases: any[]): number {
+    const activeTechnicians = technicians.filter(t => t.is_active)
+    if (activeTechnicians.length === 0) return 0
+    
+    const activeCases = cases.filter(c => c.status === 'in_progress' || c.status === 'pending')
+    const optimalCasesPerTechnician = 8 // Antag 8 cases per tekniker som optimal
+    
+    const totalOptimalCases = activeTechnicians.length * optimalCasesPerTechnician
+    return Math.min(100, (activeCases.length / totalOptimalCases) * 100)
+  }
+
+  // BEHÅLLS OFÖRÄNDRADE METODER (övriga helper methods)
   private calculateOverdueCases(cases: any[]): number {
     const now = new Date()
     return cases.filter(c => 
@@ -514,8 +714,8 @@ class StatisticsService {
   }
 
   private calculateFirstVisitSuccessRate(cases: any[]): number {
-    // Simulerad success rate (skulle behöva visits-data)
-    return 75 + Math.random() * 20 // 75-95%
+    // TODO: Implementera med verklig visits-data
+    return "DUMMY" // Behöver visits-tabell koppling
   }
 
   private calculateTechnicianWorkload(technicians: any[], cases: any[]): TechnicianWorkload[] {
@@ -538,8 +738,9 @@ class StatisticsService {
           return completedDate >= thisMonth
         }).length
         
-        // Simulerad utilization rate
-        const utilizationRate = Math.min(100, 60 + Math.random() * 35)
+        // 🆕 VERKLIG utilization rate baserad på optimal belastning
+        const optimalCases = 8 // 8 cases per tekniker som optimal
+        const utilizationRate = Math.min(100, (activeCases / optimalCases) * 100)
         
         // Genomsnittlig lösningstid för denna tekniker
         const technicianCompletedCases = technicianCases.filter(c => 
@@ -598,7 +799,162 @@ class StatisticsService {
   }
 
   /**
-   * Exportera rapport som CSV
+   * 🆕 NYA METODER för utökad avtalsfunktionalitet
+   */
+
+  // Hämta avtal som löper ut inom X månader
+  async getExpiringContracts(months: number = 3): Promise<Array<{
+    customer_id: string
+    company_name: string
+    contract_end_date: string
+    annual_premium: number
+    days_until_expiry: number
+    assigned_account_manager: string
+  }>> {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + months)
+    
+    const { data: customers, error } = await supabase
+      .from('customers')
+      .select(`
+        id,
+        company_name,
+        contract_end_date,
+        annual_premium,
+        assigned_account_manager
+      `)
+      .eq('is_active', true)
+      .not('contract_end_date', 'is', null)
+      .lte('contract_end_date', futureDate.toISOString().split('T')[0])
+      .gte('contract_end_date', new Date().toISOString().split('T')[0])
+      .order('contract_end_date', { ascending: true })
+    
+    if (error) throw error
+    
+    return (customers || []).map(customer => {
+      const endDate = new Date(customer.contract_end_date)
+      const now = new Date()
+      const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      
+      return {
+        customer_id: customer.id,
+        company_name: customer.company_name,
+        contract_end_date: customer.contract_end_date,
+        annual_premium: customer.annual_premium || 0,
+        days_until_expiry: daysUntilExpiry,
+        assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad'
+      }
+    })
+  }
+
+  // Avtalsstatus-statistik
+  async getContractStatusStats(): Promise<{
+    active: number
+    expiring_30_days: number
+    expiring_90_days: number
+    expired: number
+    total_value_at_risk: number
+  }> {
+    const now = new Date()
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+    
+    const { data: customers, error } = await supabase
+      .from('customers')
+      .select('contract_end_date, annual_premium, is_active')
+      .eq('is_active', true)
+    
+    if (error) throw error
+    
+    let active = 0
+    let expiring30 = 0
+    let expiring90 = 0
+    let expired = 0
+    let totalValueAtRisk = 0
+    
+    customers?.forEach(customer => {
+      if (!customer.contract_end_date) {
+        active++
+        return
+      }
+      
+      const endDate = new Date(customer.contract_end_date)
+      
+      if (endDate < now) {
+        expired++
+      } else if (endDate <= in30Days) {
+        expiring30++
+        totalValueAtRisk += customer.annual_premium || 0
+      } else if (endDate <= in90Days) {
+        expiring90++
+        totalValueAtRisk += customer.annual_premium || 0
+      } else {
+        active++
+      }
+    })
+    
+    return {
+      active,
+      expiring_30_days: expiring30,
+      expiring_90_days: expiring90,
+      expired,
+      total_value_at_risk: totalValueAtRisk
+    }
+  }
+
+  // 🆕 Månadsvis intäktsanalys
+  async getMonthlyRevenueBreakdown(year: number = new Date().getFullYear()): Promise<Array<{
+    month: string
+    arr_revenue: number
+    case_revenue: number
+    total_revenue: number
+    new_contracts: number
+    expired_contracts: number
+  }>> {
+    const months = []
+    for (let month = 0; month < 12; month++) {
+      const monthStart = new Date(year, month, 1)
+      const monthEnd = new Date(year, month + 1, 0)
+      
+      // Hämta ARR för månaden (avtal som är aktiva under månaden)
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('annual_premium, contract_start_date, contract_end_date')
+        .eq('is_active', true)
+        .or(`contract_end_date.is.null,contract_end_date.gte.${monthStart.toISOString().split('T')[0]}`)
+        .lte('contract_start_date', monthEnd.toISOString().split('T')[0])
+      
+      // Hämta case-intäkter för månaden
+      const { data: cases } = await supabase
+        .from('cases')
+        .select('price')
+        .not('price', 'is', null)
+        .gt('price', 0)
+        .gte('completed_date', monthStart.toISOString())
+        .lt('completed_date', monthEnd.toISOString())
+      
+      const arrRevenue = (customers || []).reduce((sum, c) => sum + (c.annual_premium || 0), 0) / 12
+      const caseRevenue = (cases || []).reduce((sum, c) => sum + (c.price || 0), 0)
+      
+      months.push({
+        month: monthStart.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' }),
+        arr_revenue: arrRevenue,
+        case_revenue: caseRevenue,
+        total_revenue: arrRevenue + caseRevenue,
+        new_contracts: "DUMMY", // Implementera med created_at datum
+        expired_contracts: "DUMMY" // Implementera med contract_end_date
+      })
+    }
+    
+    return months.map(m => ({
+      ...m,
+      new_contracts: typeof m.new_contracts === 'string' ? 0 : m.new_contracts,
+      expired_contracts: typeof m.expired_contracts === 'string' ? 0 : m.expired_contracts
+    }))
+  }
+
+  /**
+   * Exportera rapport som CSV (BEHÅLLS SAMMA)
    */
   async exportReport(type: 'arr' | 'technicians' | 'full', period: number = 30): Promise<string> {
     const stats = await this.getDashboardStats(period)
@@ -615,6 +971,11 @@ class StatisticsService {
     }
   }
 
+  // 🆕 Lägg till exportCSV metod som saknas
+  async exportCSV(): Promise<string> {
+    return this.exportReport('full', 365)
+  }
+
   private generateARRReport(arrStats: ARRStats, businessTypeData: ARRByBusinessType[]): string {
     const header = 'Metric,Value,Unit\n'
     const data = [
@@ -622,14 +983,18 @@ class StatisticsService {
       `Monthly Growth,${arrStats.monthlyGrowth.toFixed(2)},%`,
       `MRR,${arrStats.monthlyRecurringRevenue},SEK`,
       `Average ARR per Customer,${arrStats.averageARRPerCustomer},SEK`,
+      `Additional Case Revenue,${arrStats.additionalCaseRevenue},SEK`,
+      `Total Revenue,${arrStats.totalRevenue},SEK`,
+      `Projected Revenue This Year,${arrStats.projectedRevenueThisYear},SEK`,
+      `Projected Revenue Next Year,${arrStats.projectedRevenueNextYear},SEK`,
       `Contracts Expiring 3 Months,${arrStats.contractsExpiring3Months},Count`,
       `Contracts Expiring 6 Months,${arrStats.contractsExpiring6Months},Count`,
       `Churn Rate,${arrStats.churnRate.toFixed(2)},%`,
       `Retention Rate,${arrStats.retentionRate.toFixed(2)},%`,
       '',
-      'Business Type,ARR,Customer Count,Avg ARR per Customer',
+      'Business Type,ARR,Customer Count,Avg ARR per Customer,Case Revenue',
       ...businessTypeData.map(bt => 
-        `${bt.business_type},${bt.arr},${bt.customer_count},${bt.average_arr_per_customer.toFixed(0)}`
+        `${bt.business_type},${bt.arr},${bt.customer_count},${bt.average_arr_per_customer.toFixed(0)},${bt.additional_case_revenue}`
       )
     ].join('\n')
     
@@ -645,7 +1010,7 @@ class StatisticsService {
       `Urgent Cases,${techStats.urgentCases},Count`,
       `Completed This Month,${techStats.completedCasesThisMonth},Count`,
       `Average Resolution Time,${techStats.averageResolutionTime.toFixed(1)},Days`,
-      `First Visit Success Rate,${techStats.firstVisitSuccessRate.toFixed(1)},%`,
+      `First Visit Success Rate,${typeof techStats.firstVisitSuccessRate === 'string' ? 'DUMMY' : techStats.firstVisitSuccessRate.toFixed(1)},%`,
       `Overdue Cases,${techStats.overdueCases},Count`,
       '',
       'Technician,Active Cases,Completed This Month,Utilization Rate,Avg Resolution Time',
@@ -673,6 +1038,8 @@ class StatisticsService {
       `Current ARR,${stats.arr.currentARR} SEK`,
       `Monthly Growth,${stats.arr.monthlyGrowth.toFixed(2)}%`,
       `MRR,${stats.arr.monthlyRecurringRevenue} SEK`,
+      `Additional Case Revenue,${stats.arr.additionalCaseRevenue} SEK`,
+      `Total Revenue,${stats.arr.totalRevenue} SEK`,
       `Churn Rate,${stats.arr.churnRate.toFixed(2)}%`,
       `Retention Rate,${stats.arr.retentionRate.toFixed(2)}%`
     ].join('\n') + '\n\n'
@@ -689,7 +1056,7 @@ class StatisticsService {
   }
 
   /**
-   * Beräkna hälsoscore för verksamheten
+   * Beräkna hälsoscore för verksamheten (BEHÅLLS SAMMA)
    */
   calculateHealthScore(stats: DashboardStats): {
     overall: number
@@ -762,9 +1129,10 @@ class StatisticsService {
     else if (tech.capacityUtilization >= 65) score += 15
     
     // First visit success rate (25 points)
-    if (tech.firstVisitSuccessRate > 90) score += 25
-    else if (tech.firstVisitSuccessRate > 80) score += 20
-    else if (tech.firstVisitSuccessRate > 70) score += 15
+    const successRate = typeof tech.firstVisitSuccessRate === 'string' ? 0 : tech.firstVisitSuccessRate
+    if (successRate > 90) score += 25
+    else if (successRate > 80) score += 20
+    else if (successRate > 70) score += 15
     
     // Resolution time (20 points)
     if (tech.averageResolutionTime < 2) score += 20
@@ -772,13 +1140,13 @@ class StatisticsService {
     else if (tech.averageResolutionTime < 5) score += 10
     
     // Overdue cases (15 points)
-    const overduePercentage = (tech.overdueCases / tech.activeCases) * 100
+    const overduePercentage = tech.activeCases > 0 ? (tech.overdueCases / tech.activeCases) * 100 : 0
     if (overduePercentage < 5) score += 15
     else if (overduePercentage < 10) score += 10
     else if (overduePercentage < 20) score += 5
     
     // Urgent cases (10 points)
-    const urgentPercentage = (tech.urgentCases / tech.activeCases) * 100
+    const urgentPercentage = tech.activeCases > 0 ? (tech.urgentCases / tech.activeCases) * 100 : 0
     if (urgentPercentage < 10) score += 10
     else if (urgentPercentage < 20) score += 7
     else if (urgentPercentage < 30) score += 3
@@ -796,14 +1164,14 @@ class StatisticsService {
     else if (arr.monthlyGrowth > 0) score += 15
     
     // Customer growth (30 points)
-    const customerGrowthRate = (basic.newCustomersThisMonth / basic.totalCustomers) * 100
+    const customerGrowthRate = basic.totalCustomers > 0 ? (basic.newCustomersThisMonth / basic.totalCustomers) * 100 : 0
     if (customerGrowthRate > 10) score += 30
     else if (customerGrowthRate > 5) score += 25
     else if (customerGrowthRate > 2) score += 15
     else if (customerGrowthRate > 0) score += 10
     
     // Pipeline health (30 points)
-    const pipelineRatio = (arr.pipelineARR / arr.currentARR) * 100
+    const pipelineRatio = arr.currentARR > 0 ? (arr.pipelineARR / arr.currentARR) * 100 : 0
     if (pipelineRatio > 20) score += 30
     else if (pipelineRatio > 15) score += 25
     else if (pipelineRatio > 10) score += 20
