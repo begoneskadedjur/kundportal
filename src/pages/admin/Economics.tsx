@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - SLUTGILTIG VERSION MED ARR-PROGNOS OCH RELATIVA SÖKVÄGAR
+// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,7 +7,6 @@ import {
   Activity, Gift, Zap, Bug, UserCheck,
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
-// FIX: Använder ENDAST relativa sökvägar för alla lokala moduler
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
@@ -136,49 +135,17 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
           <Button size="sm" variant={activeTab === 'pest' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('pest')} className="flex items-center gap-2"><Bug className="w-4 h-4" />Per Skadedjurstyp</Button>
         </div>
       </div>
-      
       <div className="overflow-x-auto">
         {activeTab === 'technician' && (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-2 text-slate-400 font-medium">Tekniker</th>
-                <th className="text-right py-3 px-2 text-green-400 font-medium">Avtalsintäkt (#)</th>
-                <th className="text-right py-3 px-2 text-cyan-400 font-medium">Ärende-intäkt (#)</th>
-                <th className="text-right py-3 px-2 text-purple-400 font-medium">Total Intäkt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.byTechnician.map(tech => (
-                <tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30">
-                  <td className="py-3 px-2 text-white font-medium capitalize">{tech.name}</td>
-                  <td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td>
-                  <td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td>
-                  <td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Tekniker</th><th className="text-right py-3 px-2 text-green-400 font-medium">Avtalsintäkt (#)</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Ärende-intäkt (#)</th><th className="text-right py-3 px-2 text-purple-400 font-medium">Total Intäkt</th></tr></thead>
+            <tbody>{data.byTechnician.map(tech => (<tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium capitalize">{tech.name}</td><td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td><td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td><td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td></tr>))}</tbody>
           </table>
         )}
-        
         {activeTab === 'pest' && (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-2 text-slate-400 font-medium">Skadedjurstyp</th>
-                <th className="text-right py-3 px-2 text-slate-400 font-medium">Antal Ärenden</th>
-                <th className="text-right py-3 px-2 text-cyan-400 font-medium">Total Intäkt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.byPestType.map(pest => (
-                <tr key={pest.pestType} className="border-b border-slate-800 hover:bg-slate-800/30">
-                  <td className="py-3 px-2 text-white font-medium">{pest.pestType}</td>
-                  <td className="py-3 px-2 text-right">{pest.caseCount}</td>
-                  <td className="py-3 px-2 text-right text-cyan-400 font-bold">{formatCurrency(pest.revenue)}</td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Skadedjurstyp</th><th className="text-right py-3 px-2 text-slate-400 font-medium">Antal Ärenden</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Total Intäkt</th></tr></thead>
+            <tbody>{data.byPestType.map(pest => (<tr key={pest.pestType} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium">{pest.pestType}</td><td className="py-3 px-2 text-right">{pest.caseCount}</td><td className="py-3 px-2 text-right text-cyan-400 font-bold">{formatCurrency(pest.revenue)}</td></tr>))}</tbody>
           </table>
         )}
       </div>
@@ -186,20 +153,24 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   )
 }
 
+// ✨ NY, FÖRBÄTTRAD ARR-PROGNOSKOMPONENT
 const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
   const maxValue = Math.max(...data.map(d => d.projectedARR), 1);
   return (
-    <Card className="col-span-1 xl:col-span-2">
-      <h2 className="text-xl font-bold text-white mb-6">ARR Prognos (baserat på aktiva avtal)</h2>
-      <div className="h-72 flex items-end justify-between gap-4">
+    <Card>
+      <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+        <TrendingUp className="w-5 h-5 text-blue-500"/>
+        ARR - Aktiva avtal
+      </h2>
+      <div className="h-64 flex items-end justify-between gap-4">
         {data.map(yearData => {
-          const height = maxValue > 0 ? (yearData.projectedARR / maxValue) * 250 : 0;
+          const height = maxValue > 0 ? (yearData.projectedARR / maxValue) * 230 : 0;
           return (
             <div key={yearData.year} className="flex flex-col items-center flex-1 group">
-              <div className="text-sm text-blue-400 font-semibold mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="text-sm text-blue-400 font-semibold mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 {formatCurrency(yearData.projectedARR)}
               </div>
-              <div className="w-full bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400" style={{ height: `${height}px` }}/>
+              <div className="w-full max-w-12 bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400" style={{ height: `${height}px` }}/>
               <div className="mt-2 text-center font-bold text-white">{yearData.year}</div>
             </div>
           );
@@ -210,7 +181,6 @@ const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
 };
 
 // --- HUVUDKOMPONENT ---
-
 export default function Economics() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -222,15 +192,8 @@ export default function Economics() {
   const [contractsChartData, setContractsChartData] = useState<Array<{ month: string, value: number }>>([]);
   const [caseRevenueChartData, setCaseRevenueChartData] = useState<Array<{ month: string, value: number }>>([]);
   
-  useEffect(() => {
-    fetchEconomicData();
-  }, []);
-
-  useEffect(() => {
-    if(!loading) { 
-        fetchChartData(contractsChartYear, caseRevenueChartYear);
-    }
-  }, [contractsChartYear, caseRevenueChartYear, loading]);
+  useEffect(() => { fetchEconomicData(); }, []);
+  useEffect(() => { if(!loading) fetchChartData(contractsChartYear, caseRevenueChartYear); }, [contractsChartYear, caseRevenueChartYear, loading]);
 
   const fetchEconomicData = async () => {
     setLoading(true);
@@ -253,21 +216,16 @@ export default function Economics() {
         ]);
         setContractsChartData(contracts);
         setCaseRevenueChartData(caseRevenue);
-    } catch (error) {
-        console.error("Error fetching chart data", error);
-    }
+    } catch (error) { console.error("Error fetching chart data", error); }
   };
 
   const getYearlyChartData = async (table: string, date_col: string, year: number, aggregation: 'count' | 'sum', sum_col?: string) => {
     const select_cols = aggregation === 'sum' ? `${date_col}, ${sum_col}` : date_col;
     let query = supabase.from(table).select(select_cols)
         .gte(date_col, `${year}-01-01T00:00:00Z`).lt(date_col, `${year + 1}-01-01T00:00:00Z`);
-    if(sum_col) {
-        query = query.not(sum_col, 'is', null).gt(sum_col, 0);
-    }
+    if(sum_col) { query = query.not(sum_col, 'is', null).gt(sum_col, 0); }
     const { data, error } = await query;
     if(error) throw error;
-    
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({ month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), value: 0 }));
     data.forEach((row: any) => {
         if (!row[date_col]) return;
@@ -279,11 +237,7 @@ export default function Economics() {
   }
 
   if (loading || !dashboardStats) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" />
-      </div>
-    );
+    return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
 
   const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities, performanceStats, arrProjections } = dashboardStats;
@@ -292,10 +246,7 @@ export default function Economics() {
     <div className="min-h-screen bg-slate-950">
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button>
-            <h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1>
-          </div>
+          <div className="flex items-center space-x-4"><Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button><h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1></div>
           <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={loading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
@@ -320,9 +271,11 @@ export default function Economics() {
         
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
-          <ARRProjectionChart data={arrProjections} />
+          <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
         </div>
 
+        <ARRProjectionChart data={arrProjections} />
+        
         <PerformanceAndRevenueCard data={performanceStats} />
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
