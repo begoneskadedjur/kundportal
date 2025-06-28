@@ -1,4 +1,4 @@
-// src/App.tsx - Uppdaterad med Statistics-rutt
+// src/App.tsx - Uppdaterad med separata statistik-rutter
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -14,7 +14,8 @@ import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
 import Technicians from './pages/admin/Technicians'
-import Statistics from './pages/admin/Statistics' // NYA STATISTIK-SIDAN
+import Economics from './pages/admin/Economics'                    // NYA EKONOMISK STATISTIK-SIDAN
+import TechniciansStatistics from './pages/admin/TechniciansStatistics'  // NYA TEKNIKER-STATISTIK-SIDAN
 
 // Customer Pages
 import CustomerPortal from './pages/customer/Portal'
@@ -60,10 +61,16 @@ function App() {
                 <Technicians />
               </ProtectedRoute>
             } />
-            {/* NYA STATISTIK-RUTTEN */}
-            <Route path="/admin/statistics" element={
+            
+            {/* NYA STATISTIK-RUTTER */}
+            <Route path="/admin/economics" element={
               <ProtectedRoute role="admin">
-                <Statistics />
+                <Economics />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/technicians-statistics" element={
+              <ProtectedRoute role="admin">
+                <TechniciansStatistics />
               </ProtectedRoute>
             } />
             

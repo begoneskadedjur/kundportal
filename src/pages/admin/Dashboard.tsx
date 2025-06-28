@@ -1,9 +1,12 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED STATISTIK-LÄNK
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA STATISTIK-LÄNKAR
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, BarChart3 } from 'lucide-react'
+import { 
+  Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, 
+  BarChart3, DollarSign, Activity
+} from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 
@@ -151,7 +154,7 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Välkommen tillbaka!</h1>
-          <p className="text-slate-400">Här är en översikt över din verksamhet</p>
+          <p className="text-slate-400">Här är en snabb översikt över din verksamhet</p>
         </div>
 
         {error && (
@@ -217,11 +220,12 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions & Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Snabbåtgärder */}
+          
+          {/* Hantering */}
           <Card>
-            <h3 className="text-lg font-semibold text-white mb-4">Snabbåtgärder</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Hantering</h3>
             <div className="space-y-2">
               <Button 
                 variant="secondary" 
@@ -247,14 +251,36 @@ export default function AdminDashboard() {
                 <UserCheck className="w-4 h-4 mr-2" />
                 Hantera tekniker
               </Button>
-              {/* NYA STATISTIK-LÄNK */}
+            </div>
+          </Card>
+
+          {/* Avancerad Statistik - NYA SEPARATA LÄNKAR */}
+          <Card>
+            <h3 className="text-lg font-semibold text-white mb-4">Avancerad Statistik</h3>
+            <div className="space-y-2">
               <Button 
                 variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-green-500/10 to-blue-500/10 border-green-500/20 hover:from-green-500/20 hover:to-blue-500/20"
-                onClick={() => navigate('/admin/statistics')}
+                className="w-full justify-start bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 hover:from-green-500/20 hover:to-emerald-500/20"
+                onClick={() => navigate('/admin/economics')}
+              >
+                <DollarSign className="w-4 h-4 mr-2" />
+                Ekonomisk Statistik & ARR
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
+                onClick={() => navigate('/admin/technicians-statistics')}
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Tekniker-prestanda
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:from-purple-500/20 hover:to-pink-500/20"
+                onClick={() => navigate('/admin/customers')}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
-                Avancerad Statistik
+                Kundanalys & Avtal
               </Button>
             </div>
           </Card>
@@ -284,26 +310,23 @@ export default function AdminDashboard() {
                   Active
                 </span>
               </div>
-            </div>
-          </Card>
-
-          {/* Senaste aktivitet */}
-          <Card>
-            <h3 className="text-lg font-semibold text-white mb-4">Senaste aktivitet</h3>
-            <div className="text-sm text-slate-400">
-              <p>Statistik hämtad: {new Date().toLocaleTimeString('sv-SE', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-              })}</p>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={fetchStats}
-                className="mt-2 text-green-400 hover:text-green-300"
-              >
-                Uppdatera statistik
-              </Button>
+              <div className="pt-3 border-t border-slate-700">
+                <p className="text-xs text-slate-500">
+                  Statistik uppdaterad: {new Date().toLocaleTimeString('sv-SE', { 
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                  })}
+                </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={fetchStats}
+                  className="mt-2 text-green-400 hover:text-green-300 w-full"
+                >
+                  <Activity className="w-4 h-4 mr-2" />
+                  Uppdatera översikt
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
