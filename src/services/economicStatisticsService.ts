@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FIX: Synkroniserar datumfilter för prestanda-stats
+// src/services/economicStatisticsService.ts - FIX: Synkroniserar datumfilter för alla komponenter
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -129,24 +129,20 @@ class EconomicStatisticsService {
     const getDisplayName = (currentName: string, newName: string): string => {
       if (!newName) return currentName;
       if (!currentName) return newName;
-      // Prefer the non-email, properly cased name
       return !newName.includes('@') ? newName : currentName;
     };
 
-    // ❗ FIX: Tittar bara på ärenden från de senaste 12 månaderna
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const [customersRes, casesRes] = await Promise.all([
-      // Kunddata (kontrakt) är alltid "live"
       supabase.from('customers').select('annual_premium, assigned_account_manager').eq('is_active', true),
-      // Ärendedata filtreras nu för att vara mer relevant
       supabase.from('cases')
         .select('price, assigned_technician_name, pest_type, completed_date')
         .not('price', 'is', null)
         .gt('price', 0)
-        .not('completed_date', 'is', null) // Måste vara slutfört
-        .gte('completed_date', oneYearAgo.toISOString()) // Inom det senaste året
+        .not('completed_date', 'is', null)
+        .gte('completed_date', oneYearAgo.toISOString())
     ]);
 
     if (customersRes.error) throw customersRes.error;
@@ -269,7 +265,7 @@ class EconomicStatisticsService {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const [customerRes, caseRes] = await Promise.all([
         supabase.from('customers').select('id, company_name, annual_premium').eq('is_active', true),
-        supabase.from('cases').select('customer_id, price').gt('price', 0).gte('completed_date', sixMonthsAgo.toISOString())
+        supabase.from('cases').select('customer_id, price, completed_date').gt('price', 0).not('completed_date', 'is', null).gte('completed_date', sixMonthsAgo.toISOString())
     ]);
     if (customerRes.error) throw customerRes.error;
     if (caseRes.error) throw caseRes.error;
@@ -303,7 +299,7 @@ class EconomicStatisticsService {
     if (customersRes.error) throw customersRes.error;
     if (casesRes.error) throw casesRes.error;
     const allCustomers = customersRes.data || [];
-    const paidCases = casesRes.data || [];
+    const paidCases = (casesRes.data || []).filter(c => c.completed_date);
     const activeCustomers = allCustomers.filter(c => c.is_active);
     const currentARR = activeCustomers.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
     const monthlyRecurringRevenue = currentARR / 12;
@@ -312,7 +308,7 @@ class EconomicStatisticsService {
     const churnMetrics = await this.calculateChurnMetrics(allCustomers, periodInDays);
     const renewalMetrics = this.calculateRenewalMetrics(activeCustomers);
     const thisMonthStart = new Date(); thisMonthStart.setDate(1);
-    const paidCasesThisMonth = paidCases.filter(c => c.completed_date && new Date(c.completed_date) >= thisMonthStart).length;
+    const paidCasesThisMonth = paidCases.filter(c => new Date(c.completed_date!) >= thisMonthStart).length;
     return {
       currentARR,
       monthlyGrowth: growthMetrics.monthlyGrowth,
@@ -334,7 +330,7 @@ class EconomicStatisticsService {
   async getARRByBusinessType(): Promise<ARRByBusinessType[]> {
     const [customersRes, casesRes] = await Promise.all([
       supabase.from('customers').select('id, business_type, annual_premium').eq('is_active', true),
-      supabase.from('cases').select('customer_id, price').not('price', 'is', null).gt('price', 0)
+      supabase.from('cases').select('customer_id, price, completed_date').not('price', 'is', null).gt('price', 0).not('completed_date', 'is', null)
     ]);
     if (customersRes.error) throw customersRes.error;
     if (casesRes.error) throw casesRes.error;
