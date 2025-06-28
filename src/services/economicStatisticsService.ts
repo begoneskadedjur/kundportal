@@ -1,8 +1,9 @@
-// src/services/economicStatisticsService.ts - UPPGRADERAD MED PRESTANDA-STATS
+// src/services/economicStatisticsService.ts - UPPGRADERAD MED ARR-PROGNOS OCH FIXAR
 import { supabase } from '../lib/supabase';
-import { technicianStatisticsService, TechnicianStats } from './technicianStatisticsService';
+import { technicianStatisticsService } from './technicianStatisticsService';
+import type { TechnicianStats } from './technicianStatisticsService';
 
-// --- NYA INTERFACES FÖR PRESTANDA ---
+// --- INTERFACES ---
 export interface TechnicianPerformance {
   name: string;
   contractRevenue: number;
@@ -23,7 +24,6 @@ export interface PerformanceStats {
   byPestType: PestTypePerformance[];
 }
 
-// --- BEFINTLIGA INTERFACES ---
 export interface MonthlyGrowthAnalysis {
   startMRR: number;
   newMRR: number;
@@ -65,23 +65,19 @@ export interface ARRByBusinessType {
   additional_case_revenue: number;
 }
 
-export interface YearlyRevenueProjection {
+export interface ARRProjection {
   year: number;
-  yearLabel: string;
-  contractRevenue: number;
-  estimatedCaseRevenue: number;
-  totalRevenue: number;
-  confidence: 'high' | 'medium' | 'low';
+  projectedARR: number;
 }
 
 export interface DashboardStats {
   arr: ARRStats;
   arrByBusinessType: ARRByBusinessType[];
-  yearlyRevenue: YearlyRevenueProjection[];
   technicians: TechnicianStats;
   growthAnalysis: MonthlyGrowthAnalysis;
   upsellOpportunities: UpsellOpportunity[];
-  performanceStats: PerformanceStats; // Inkluderar ny data
+  performanceStats: PerformanceStats;
+  arrProjections: ARRProjection[];
 }
 
 class EconomicStatisticsService {
@@ -91,29 +87,29 @@ class EconomicStatisticsService {
       const [
         arr,
         arrByBusinessType,
-        yearlyRevenue,
         technicians,
         growthAnalysis,
         upsellOpportunities,
-        performanceStats
+        performanceStats,
+        arrProjections
       ] = await Promise.all([
         this.getARRStats(periodInDays),
         this.getARRByBusinessType(),
-        this.getYearlyRevenueProjections(),
         technicianStatisticsService.getTechnicianStats(periodInDays),
         this.getMonthlyGrowthAnalysis(),
         this.getUpsellOpportunities(5),
-        this.getPerformanceStats() // Anropar ny funktion
+        this.getPerformanceStats(),
+        this.getARRProjections()
       ]);
 
       return {
         arr,
         arrByBusinessType,
-        yearlyRevenue,
         technicians,
         growthAnalysis,
         upsellOpportunities,
-        performanceStats
+        performanceStats,
+        arrProjections,
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -122,6 +118,19 @@ class EconomicStatisticsService {
   }
 
   async getPerformanceStats(): Promise<PerformanceStats> {
+    const normalizeName = (name: string): string => {
+      if (!name) return 'Okänd';
+      if (name.includes('@')) {
+        return name.split('@')[0].replace(/[._]/g, ' ').toLowerCase();
+      }
+      return name.toLowerCase();
+    };
+
+    const getDisplayName = (currentName: string, newName: string): string => {
+      if (!newName) return currentName;
+      return !newName.includes('@') ? newName : currentName;
+    };
+
     const [customersRes, casesRes] = await Promise.all([
       supabase.from('customers').select('annual_premium, assigned_account_manager').eq('is_active', true),
       supabase.from('cases').select('price, assigned_technician_name, pest_type').not('price', 'is', null).gt('price', 0)
@@ -130,34 +139,39 @@ class EconomicStatisticsService {
     if (customersRes.error) throw customersRes.error;
     if (casesRes.error) throw casesRes.error;
 
-    // --- Beräkna per tekniker ---
-    const techMap = new Map<string, { contractRevenue: number; caseRevenue: number; contractCount: number; caseCount: number }>();
+    const techMap = new Map<string, { displayName: string, contractRevenue: number; caseRevenue: number; contractCount: number; caseCount: number }>();
 
     (customersRes.data || []).forEach(customer => {
       const name = customer.assigned_account_manager;
       if (!name) return;
-      const current = techMap.get(name) || { contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
+      const key = normalizeName(name);
+      const current = techMap.get(key) || { displayName: name, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
       current.contractRevenue += customer.annual_premium || 0;
       current.contractCount++;
-      techMap.set(name, current);
+      current.displayName = getDisplayName(current.displayName, name);
+      techMap.set(key, current);
     });
 
     (casesRes.data || []).forEach(c => {
       const name = c.assigned_technician_name;
       if (!name) return;
-      const current = techMap.get(name) || { contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
+      const key = normalizeName(name);
+      const current = techMap.get(key) || { displayName: name, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
       current.caseRevenue += c.price || 0;
       current.caseCount++;
-      techMap.set(name, current);
+      current.displayName = getDisplayName(current.displayName, name);
+      techMap.set(key, current);
     });
     
-    const byTechnician = Array.from(techMap.entries()).map(([name, data]) => ({
-      name,
-      ...data,
+    const byTechnician = Array.from(techMap.values()).map(data => ({
+      name: data.displayName,
+      contractRevenue: data.contractRevenue,
+      caseRevenue: data.caseRevenue,
+      contractCount: data.contractCount,
+      caseCount: data.caseCount,
       totalRevenue: data.contractRevenue + data.caseRevenue
     })).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-    // --- Beräkna per skadedjurstyp ---
     const pestMap = new Map<string, { revenue: number, caseCount: number }>();
     (casesRes.data || []).forEach(c => {
       const pestType = c.pest_type || 'Okänt';
@@ -167,12 +181,48 @@ class EconomicStatisticsService {
       pestMap.set(pestType, current);
     });
     
-    const byPestType = Array.from(pestMap.entries()).map(([pestType, data]) => ({
-      pestType,
-      ...data
-    })).sort((a, b) => b.revenue - a.revenue);
-
+    const byPestType = Array.from(pestMap.entries()).map(([pestType, data]) => ({ pestType, ...data })).sort((a, b) => b.revenue - a.revenue);
+    
     return { byTechnician, byPestType };
+  }
+
+  async getARRProjections(): Promise<ARRProjection[]> {
+    const { data: customers, error } = await supabase
+        .from('customers')
+        .select('annual_premium, contract_start_date, contract_end_date')
+        .eq('is_active', true)
+        .not('annual_premium', 'is', null)
+        .not('contract_start_date', 'is', null)
+        .not('contract_end_date', 'is', null);
+
+    if (error) throw error;
+    if (!customers) return [];
+
+    const projections: ARRProjection[] = [];
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i < 6; i++) {
+        const targetYear = currentYear + i;
+        const yearStart = new Date(targetYear, 0, 1);
+        const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
+        let totalProjectedRevenueForYear = 0;
+
+        for (const customer of customers) {
+            const contractStart = new Date(customer.contract_start_date);
+            const contractEnd = new Date(customer.contract_end_date);
+            const dailyRate = (customer.annual_premium || 0) / 365.25;
+
+            const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()));
+            const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()));
+
+            if (overlapStart < overlapEnd) {
+                const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
+                totalProjectedRevenueForYear += overlapDays * dailyRate;
+            }
+        }
+        projections.push({ year: targetYear, projectedARR: totalProjectedRevenueForYear });
+    }
+    return projections;
   }
 
   async getMonthlyGrowthAnalysis(): Promise<MonthlyGrowthAnalysis> {
@@ -295,18 +345,6 @@ class EconomicStatisticsService {
       average_arr_per_customer: data.count > 0 ? data.arr / data.count : 0,
       additional_case_revenue: data.caseRevenue
     })).sort((a, b) => b.arr - a.arr);
-  }
-
-  async getYearlyRevenueProjections(): Promise<YearlyRevenueProjection[]> {
-    const currentYear = new Date().getFullYear();
-    const { data: customers, error } = await supabase.from('customers').select('annual_premium').eq('is_active', true);
-    if (error) throw error;
-    const currentARR = (customers || []).reduce((sum, c) => sum + (c.annual_premium || 0), 0);
-    return [
-      { year: currentYear, yearLabel: `${currentYear}`, contractRevenue: currentARR, estimatedCaseRevenue: currentARR * 0.2, totalRevenue: currentARR * 1.2, confidence: 'high' as const },
-      { year: currentYear + 1, yearLabel: `${currentYear + 1}`, contractRevenue: currentARR * 1.1, estimatedCaseRevenue: currentARR * 0.22, totalRevenue: currentARR * 1.32, confidence: 'medium' as const },
-      { year: currentYear + 2, yearLabel: `${currentYear + 2}`, contractRevenue: currentARR * 1.21, estimatedCaseRevenue: currentARR * 0.24, totalRevenue: currentARR * 1.45, confidence: 'low' as const }
-    ];
   }
 
   private async calculateGrowthMetrics(currentARR: number): Promise<{ monthlyGrowth: number }> {

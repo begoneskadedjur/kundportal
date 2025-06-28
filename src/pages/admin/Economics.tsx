@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - KORRIGERAD MED ENDAST RELATIVA SÖKVÄGAR
+// src/pages/admin/Economics.tsx - SLUTGILTIG VERSION MED ARR-PROGNOS OCH RELATIVA SÖKVÄGAR
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,12 +7,12 @@ import {
   Activity, Gift, Zap, Bug, UserCheck,
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
-// ❗ FIX: Byt tillbaka till relativa sökvägar för ALLA lokala importer
+// FIX: Använder ENDAST relativa sökvägar för alla lokala moduler
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
-import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '../../services/economicStatisticsService';
+import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection } from '../../services/economicStatisticsService';
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -151,7 +151,7 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
             <tbody>
               {data.byTechnician.map(tech => (
                 <tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30">
-                  <td className="py-3 px-2 text-white font-medium">{tech.name}</td>
+                  <td className="py-3 px-2 text-white font-medium capitalize">{tech.name}</td>
                   <td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td>
                   <td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td>
                   <td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td>
@@ -185,6 +185,29 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
     </Card>
   )
 }
+
+const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
+  const maxValue = Math.max(...data.map(d => d.projectedARR), 1);
+  return (
+    <Card className="col-span-1 xl:col-span-2">
+      <h2 className="text-xl font-bold text-white mb-6">ARR Prognos (baserat på aktiva avtal)</h2>
+      <div className="h-72 flex items-end justify-between gap-4">
+        {data.map(yearData => {
+          const height = maxValue > 0 ? (yearData.projectedARR / maxValue) * 250 : 0;
+          return (
+            <div key={yearData.year} className="flex flex-col items-center flex-1 group">
+              <div className="text-sm text-blue-400 font-semibold mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {formatCurrency(yearData.projectedARR)}
+              </div>
+              <div className="w-full bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400" style={{ height: `${height}px` }}/>
+              <div className="mt-2 text-center font-bold text-white">{yearData.year}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
 
 // --- HUVUDKOMPONENT ---
 
@@ -263,7 +286,7 @@ export default function Economics() {
     );
   }
 
-  const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities, performanceStats } = dashboardStats;
+  const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities, performanceStats, arrProjections } = dashboardStats;
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -297,7 +320,7 @@ export default function Economics() {
         
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
-          <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
+          <ARRProjectionChart data={arrProjections} />
         </div>
 
         <PerformanceAndRevenueCard data={performanceStats} />
