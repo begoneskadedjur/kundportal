@@ -1,4 +1,4 @@
-// src/types/database.ts - Uppdaterad med nya fält
+// src/types/database.ts - Uppdaterad med tekniker-tabell
 export type Database = {
   public: {
     Tables: {
@@ -18,7 +18,7 @@ export type Database = {
           created_at: string
           updated_at: string
           
-          // Nya avtalsfält
+          // Avtalsfält
           contract_start_date: string | null
           contract_length_months: number | null
           annual_premium: number | null
@@ -48,6 +48,23 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contract_types']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contract_types']['Insert']>
       }
+      // NYA TEKNIKER-TABELL
+      technicians: {
+        Row: {
+          id: string
+          name: string
+          role: string
+          email: string
+          direct_phone: string | null
+          office_phone: string | null
+          address: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['technicians']['Insert']>
+      }
       cases: {
         Row: {
           id: string
@@ -74,6 +91,8 @@ export type Database = {
           files: any | null // jsonb
           assigned_technician_name: string | null
           assigned_technician_email: string | null
+          // NYA TEKNIKER-RELATIONER
+          assigned_technician_id: string | null // FK till technicians
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
@@ -103,11 +122,13 @@ export type Database = {
           findings: string | null
           recommendations: string | null
           next_visit_date: string | null
-          photos: string | null // _text array
+          photos: string | null
           report_pdf_url: string | null
           status: string | null
           created_at: string
           updated_at: string
+          // NYA TEKNIKER-RELATIONER
+          technician_id: string | null // FK till technicians
         }
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['visits']['Insert']>
@@ -129,14 +150,31 @@ export type Database = {
   }
 }
 
-// Hjälptyper för kunddata
+// Hjälptyper
 export type Customer = Database['public']['Tables']['customers']['Row']
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 
 export type ContractType = Database['public']['Tables']['contract_types']['Row']
 
-// Utökad type med alla nya fält inklusive verksamhetstyp
+// NYA TEKNIKER-TYPER
+export type Technician = Database['public']['Tables']['technicians']['Row']
+export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
+export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
+
+// Tekniker-roller
+export const TECHNICIAN_ROLES = [
+  'Skadedjurstekniker',
+  'VD',
+  'Marknad & Försäljningschef',
+  'Regionchef Dalarna',
+  'Koordinator/kundtjänst',
+  'Annan'
+] as const
+
+export type TechnicianRole = typeof TECHNICIAN_ROLES[number]
+
+// Utökad kunddata
 export type CustomerFormData = {
   // Grundinformation
   company_name: string
@@ -157,13 +195,22 @@ export type CustomerFormData = {
   assigned_account_manager: string
 }
 
-// Avtalsansvariga (kan senare hämtas från databas)
+// Tekniker-formulärdata
+export type TechnicianFormData = {
+  name: string
+  role: TechnicianRole
+  email: string
+  direct_phone: string
+  office_phone: string
+  address: string
+}
+
+// Avtalsansvariga - uppdaterade med verkliga tekniker
 export const ACCOUNT_MANAGERS = [
-  { value: 'anna.svensson@begone.se', label: 'Anna Svensson' },
-  { value: 'erik.larsson@begone.se', label: 'Erik Larsson' },
-  { value: 'maria.andersson@begone.se', label: 'Maria Andersson' },
-  { value: 'johan.nilsson@begone.se', label: 'Johan Nilsson' },
-  { value: 'lisa.johansson@begone.se', label: 'Lisa Johansson' }
+  { value: 'christian.karlsson@begone.se', label: 'Christian Karlsson' },
+  { value: 'kristian.agnevik@begone.se', label: 'Kristian Agnevik' },
+  { value: 'sofia.palshagen@begone.se', label: 'Sofia Pålshagen' },
+  { value: 'hans.norman@begone.se', label: 'Hans Norman' }
 ] as const
 
 export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']

@@ -1,4 +1,4 @@
-// src/App.tsx - Uppdaterad med CustomerDetails route
+// src/App.tsx - Komplett uppdaterad med Tekniker-rutt
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -13,6 +13,7 @@ import AdminDashboard from './pages/admin/Dashboard'
 import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
+import Technicians from './pages/admin/Technicians' // NYA TEKNIKER-SIDAN
 
 // Customer Pages
 import CustomerPortal from './pages/customer/Portal'
@@ -53,6 +54,12 @@ function App() {
                 <CustomerDetails />
               </ProtectedRoute>
             } />
+            {/* NYA TEKNIKER-RUTTEN */}
+            <Route path="/admin/technicians" element={
+              <ProtectedRoute role="admin">
+                <Technicians />
+              </ProtectedRoute>
+            } />
             
             {/* Customer Routes */}
             <Route path="/portal" element={
@@ -71,7 +78,18 @@ function App() {
               </ProtectedRoute>
             } />
           </Routes>
-          <Toaster position="top-right" />
+          
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#1e293b',
+                color: '#f1f5f9',
+                border: '1px solid #475569'
+              }
+            }}
+          />
         </div>
       </AuthProvider>
     </Router>

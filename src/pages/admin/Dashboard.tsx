@@ -1,9 +1,9 @@
-// src/pages/admin/Dashboard.tsx - FÖRBÄTTRAD MED DEBUG
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED TEKNIKER-LÄNK
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle } from 'lucide-react'
+import { Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 
@@ -94,79 +94,51 @@ export default function AdminDashboard() {
 
       const newStats = {
         totalCustomers: customers?.length || 0,
-        activeCustomers: customers?.filter(c => c.is_active).length || 0,
+        activeCustomers: customers?.filter(c => c.is_active)?.length || 0,
         totalCases: cases?.length || 0,
         upcomingVisits: visits?.length || 0
       }
-      
-      console.log('📊 Stats calculated:', newStats)
+
+      console.log('📊 Final stats:', newStats)
       setStats(newStats)
-      
+
     } catch (error: any) {
-      console.error('💥 Error fetching stats:', error)
-      setError(error.message || 'Kunde inte ladda statistik')
+      console.error('💥 Stats fetch failed:', error)
+      setError(error.message || 'Kunde inte hämta statistik')
     } finally {
-      console.log('✅ Stats fetch completed')
       setLoading(false)
     }
   }
 
-  const handleSignOut = async () => {
-    console.log('👋 Admin signing out')
-    await signOut()
-    navigate('/login')
-  }
-
-  const retryFetch = () => {
-    console.log('🔄 Retrying stats fetch...')
-    fetchStats()
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Card className="max-w-md">
-          <div className="text-center">
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Problem med att ladda</h2>
-            <p className="text-slate-400 mb-4">{error}</p>
-            <div className="space-y-2">
-              <Button onClick={retryFetch} className="w-full">
-                Försök igen
-              </Button>
-              <Button variant="ghost" onClick={handleSignOut} className="w-full">
-                Logga ut
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-    )
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      navigate('/auth/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
-      <header className="glass border-b border-white/10">
+      <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center relative">
-                <Bug className="w-6 h-6 text-slate-950" />
-                <div className="absolute inset-0 rounded-full border-2 border-red-500 transform rotate-45"></div>
-                <div className="absolute w-full h-0.5 bg-red-500 top-1/2 transform -translate-y-1/2 rotate-45"></div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                  <Bug className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xl font-bold text-white">BeGone Admin</span>
               </div>
-              <h1 className="text-2xl font-bold">
-                <span className="text-gradient">BeGone</span> Admin
-              </h1>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-4">
               <span className="text-sm text-slate-400">
-                Inloggad som: {profile?.email}
+                Inloggad som: <span className="text-white">{profile?.email}</span>
               </span>
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Logga ut
               </Button>
@@ -178,27 +150,39 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">
-            Välkommen tillbaka!
-          </h2>
-          <p className="text-slate-400">
-            Här är en översikt över din verksamhet
-          </p>
+          <h1 className="text-3xl font-bold text-white mb-2">Välkommen tillbaka!</h1>
+          <p className="text-slate-400">Här är en översikt över din verksamhet</p>
         </div>
 
-        {/* Stats Grid */}
+        {error && (
+          <Card className="mb-8 bg-red-500/10 border-red-500/50">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
+              <div>
+                <h3 className="text-red-400 font-medium">Kunde inte ladda statistik</h3>
+                <p className="text-red-300 text-sm mt-1">{error}</p>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={fetchStats}
+                  className="mt-2"
+                >
+                  Försök igen
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Totalt antal kunder</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '...' : stats.totalCustomers}
-                </p>
+                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.totalCustomers}</p>
               </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-500" />
-              </div>
+              <Users className="w-8 h-8 text-blue-500" />
             </div>
           </Card>
 
@@ -206,13 +190,9 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Aktiva kunder</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '...' : stats.activeCustomers}
-                </p>
+                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.activeCustomers}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
+              <UserCheck className="w-8 h-8 text-green-500" />
             </div>
           </Card>
 
@@ -220,13 +200,9 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Totalt antal ärenden</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '...' : stats.totalCases}
-                </p>
+                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.totalCases}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-purple-500" />
-              </div>
+              <FileText className="w-8 h-8 text-purple-500" />
             </div>
           </Card>
 
@@ -234,71 +210,93 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Kommande besök</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {loading ? '...' : stats.upcomingVisits}
-                </p>
+                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.upcomingVisits}</p>
               </div>
-              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-orange-500" />
-              </div>
+              <Calendar className="w-8 h-8 text-orange-500" />
             </div>
           </Card>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Snabbåtgärder */}
           <Card>
             <h3 className="text-lg font-semibold text-white mb-4">Snabbåtgärder</h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Button 
-                onClick={() => navigate('/admin/customers/new')} 
+                variant="secondary" 
                 className="w-full justify-start"
+                onClick={() => navigate('/admin/customers/new')}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Lägg till ny kund
               </Button>
               <Button 
-                variant="ghost" 
-                onClick={() => navigate('/admin/customers')} 
+                variant="secondary" 
                 className="w-full justify-start"
+                onClick={() => navigate('/admin/customers')}
               >
                 <Users className="w-4 h-4 mr-2" />
                 Hantera kunder
               </Button>
+              {/* NYA TEKNIKER-LÄNK */}
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start"
+                onClick={() => navigate('/admin/technicians')}
+              >
+                <UserCheck className="w-4 h-4 mr-2" />
+                Hantera tekniker
+              </Button>
             </div>
           </Card>
 
+          {/* Systemstatus */}
           <Card>
             <h3 className="text-lg font-semibold text-white mb-4">Systemstatus</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Database</span>
-                <span className="text-green-400">✅ Online</span>
+                <span className="text-slate-300">Database</span>
+                <span className="flex items-center text-green-400 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  Online
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">ClickUp API</span>
-                <span className="text-green-400">✅ Connected</span>
+                <span className="text-slate-300">ClickUp API</span>
+                <span className="flex items-center text-green-400 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  Connected
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Email Service</span>
-                <span className="text-green-400">✅ Active</span>
+                <span className="text-slate-300">Email Service</span>
+                <span className="flex items-center text-green-400 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  Active
+                </span>
               </div>
             </div>
           </Card>
 
+          {/* Senaste aktivitet */}
           <Card>
             <h3 className="text-lg font-semibold text-white mb-4">Senaste aktivitet</h3>
-            <p className="text-slate-400 text-sm">
-              Statistik hämtad: {new Date().toLocaleTimeString('sv-SE')}
-            </p>
-            <Button 
-              variant="ghost" 
-              onClick={retryFetch} 
-              className="mt-3 w-full justify-start"
-              disabled={loading}
-            >
-              {loading ? 'Uppdaterar...' : 'Uppdatera statistik'}
-            </Button>
+            <div className="text-sm text-slate-400">
+              <p>Statistik hämtad: {new Date().toLocaleTimeString('sv-SE', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+              })}</p>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={fetchStats}
+                className="mt-2 text-green-400 hover:text-green-300"
+              >
+                Uppdatera statistik
+              </Button>
+            </div>
           </Card>
         </div>
       </main>
