@@ -1,4 +1,4 @@
-// src/pages/admin/NewCustomer.tsx - Avancerat formulär
+// src/pages/admin/NewCustomer.tsx - Uppdaterad med riktiga tekniker från databas
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
@@ -8,6 +8,7 @@ import {
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
+import TechnicianDropdown from '../../components/admin/TechnicianDropdown'
 import { customerService } from '../../services/customerService'
 import { supabase } from '../../lib/supabase'
 import { BUSINESS_TYPES, getBusinessTypeIcon } from '../../constants/businessTypes'
@@ -40,12 +41,26 @@ export default function NewCustomer() {
     annual_premium: '',
     total_contract_value: '',
     contract_description: '',
-    assigned_account_manager: ''
+    assigned_account_manager: '' // Kommer att vara tekniker-email från TechnicianDropdown
   })
 
   useEffect(() => {
     fetchContractTypes()
   }, [])
+
+  // Beräkna totalt avtalsvärde automatiskt
+  useEffect(() => {
+    if (formData.annual_premium && formData.contract_length_months) {
+      const annualPremium = parseFloat(formData.annual_premium)
+      const lengthYears = parseInt(formData.contract_length_months) / 12
+      const totalValue = annualPremium * lengthYears
+      
+      setFormData(prev => ({
+        ...prev,
+        total_contract_value: totalValue.toFixed(2)
+      }))
+    }
+  }, [formData.annual_premium, formData.contract_length_months])
 
   const fetchContractTypes = async () => {
     try {
@@ -76,6 +91,16 @@ export default function NewCustomer() {
       return
     }
 
+    if (!formData.business_type) {
+      toast.error('Du måste välja verksamhetstyp')
+      return
+    }
+
+    if (!formData.assigned_account_manager) {
+      toast.error('Du måste välja kontraktansvarig')
+      return
+    }
+
     setLoading(true)
     
     try {
@@ -94,6 +119,20 @@ export default function NewCustomer() {
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleBusinessTypeChange = (businessType: string) => {
+    setFormData(prev => ({
+      ...prev,
+      business_type: businessType
+    }))
+  }
+
+  const handleAccountManagerChange = (email: string) => {
+    setFormData(prev => ({
+      ...prev,
+      assigned_account_manager: email
     }))
   }
 
@@ -135,7 +174,7 @@ export default function NewCustomer() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
             </Button>
-            <h1 className="text-xl font-semibold">Lägg till ny kund - Avancerat</h1>
+            <h1 className="text-xl font-semibold">Lägg till ny kund - Med Riktiga Tekniker</h1>
           </div>
         </div>
       </header>
@@ -153,7 +192,7 @@ export default function NewCustomer() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
-                label="Företagsnamn"
+                label="Företagsnamn *"
                 name="company_name"
                 value={formData.company_name}
                 onChange={handleChange}
@@ -162,7 +201,7 @@ export default function NewCustomer() {
               />
               
               <Input
-                label="Organisationsnummer"
+                label="Organisationsnummer *"
                 name="org_number"
                 value={formData.org_number}
                 onChange={handleChange}
@@ -171,17 +210,23 @@ export default function NewCustomer() {
               />
             </div>
 
-            {/* Verksamhetstyp */}
-            <div>
+            {/* Verksamhetstyp - FÖRBÄTTRAD MED IKONER */}
+            <div className="mt-6">
               <label className="block text-sm font-medium text-slate-300 mb-4">
                 <Briefcase className="w-4 h-4 inline mr-1" />
                 Verksamhetstyp *
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {BUSINESS_TYPES.map(type => (
                   <label
                     key={type.value}
-                    className="flex items-center p-3 border border-slate-600 rounded-lg cursor-pointer hover:border-green-400 transition-colors"
+                    className={`
+                      flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-all
+                      ${formData.business_type === type.value
+                        ? 'border-green-500 bg-green-500/20'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-800/50'
+                      }
+                    `}
                   >
                     <input
                       type="radio"
@@ -192,17 +237,10 @@ export default function NewCustomer() {
                       className="sr-only"
                       required
                     />
-                    <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
-                      formData.business_type === type.value 
-                        ? 'border-green-500 bg-green-500'
-                        : 'border-slate-500'
-                      }`}>
-                      {formData.business_type === type.value && (
-                        <div className="w-2 h-2 rounded-full bg-slate-950 m-0.5" />
-                      )}
-                    </div>
-                    <span className="text-sm mr-2">{type.icon}</span>
-                    <span className="text-white text-sm">{type.label}</span>
+                    <div className="text-2xl mb-2">{getBusinessTypeIcon(type.value)}</div>
+                    <span className="text-sm font-medium text-white text-center">
+                      {type.label}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -218,7 +256,7 @@ export default function NewCustomer() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
-                label="Kontaktperson"
+                label="Kontaktperson *"
                 name="contact_person"
                 value={formData.contact_person}
                 onChange={handleChange}
@@ -227,7 +265,7 @@ export default function NewCustomer() {
               />
               
               <Input
-                label="E-postadress"
+                label="E-postadress *"
                 name="email"
                 type="email"
                 value={formData.email}
@@ -237,7 +275,7 @@ export default function NewCustomer() {
               />
               
               <Input
-                label="Telefonnummer"
+                label="Telefonnummer *"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
@@ -246,7 +284,7 @@ export default function NewCustomer() {
               />
               
               <Input
-                label="Adress"
+                label="Adress *"
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
@@ -273,7 +311,13 @@ export default function NewCustomer() {
                   {contractTypes.map(type => (
                     <label
                       key={type.id}
-                      className="flex items-center p-4 border border-slate-600 rounded-lg cursor-pointer hover:border-green-400 transition-colors"
+                      className={`
+                        flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all
+                        ${formData.contract_type_id === type.id 
+                          ? 'border-green-500 bg-green-500/20'
+                          : 'border-slate-600 hover:border-slate-500'
+                        }
+                      `}
                     >
                       <input
                         type="radio"
@@ -289,10 +333,10 @@ export default function NewCustomer() {
                           : 'border-slate-500'
                         }`}>
                         {formData.contract_type_id === type.id && (
-                          <div className="w-2 h-2 rounded-full bg-slate-950 m-0.5" />
+                          <div className="w-2 h-2 rounded-full bg-slate-950" />
                         )}
                       </div>
-                      <span className="text-white">{type.name}</span>
+                      <span className="text-white font-medium">{type.name}</span>
                     </label>
                   ))}
                 </div>
@@ -318,7 +362,7 @@ export default function NewCustomer() {
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     <Clock className="w-4 h-4 inline mr-1" />
-                    Avtalslängd (månader)
+                    Avtalslängd (månader) *
                   </label>
                   <input
                     type="number"
@@ -327,6 +371,7 @@ export default function NewCustomer() {
                     onChange={handleLengthChange}
                     min="1"
                     max="120"
+                    required
                     placeholder="12"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
@@ -338,7 +383,7 @@ export default function NewCustomer() {
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     <DollarSign className="w-4 h-4 inline mr-1" />
-                    Avtalets årspremie (SEK)
+                    Avtalets årspremie (SEK) *
                   </label>
                   <input
                     type="number"
@@ -347,6 +392,7 @@ export default function NewCustomer() {
                     onChange={handlePremiumChange}
                     min="0"
                     step="0.01"
+                    required
                     placeholder="50000"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
@@ -374,25 +420,20 @@ export default function NewCustomer() {
                 </div>
               </div>
 
-              {/* Avtalsansvarig */}
+              {/* UPPDATERAD: Kontraktansvarig med TechnicianDropdown */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  <Users className="w-4 h-4 inline mr-1" />
-                  Avtalsansvarig
-                </label>
-                <select
-                  name="assigned_account_manager"
+                <TechnicianDropdown
+                  label="Kontraktansvarig *"
                   value={formData.assigned_account_manager}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Välj avtalsansvarig</option>
-                  <option value="anna.svensson@begone.se">Anna Svensson</option>
-                  <option value="erik.larsson@begone.se">Erik Larsson</option>
-                  <option value="maria.andersson@begone.se">Maria Andersson</option>
-                  <option value="johan.nilsson@begone.se">Johan Nilsson</option>
-                  <option value="lisa.johansson@begone.se">Lisa Johansson</option>
-                </select>
+                  onChange={handleAccountManagerChange}
+                  placeholder="Välj ansvarig tekniker"
+                  includeUnassigned={false}
+                  onlyActive={true}
+                  required={true}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Välj tekniker som kommer att vara huvudansvarig för detta kundavtal
+                </p>
               </div>
 
               {/* Avtalsobjekt beskrivning */}
@@ -413,15 +454,15 @@ export default function NewCustomer() {
             </div>
           </Card>
 
-          {/* Sammanfattning */}
+          {/* FÖRBÄTTRAD Sammanfattning */}
           {formData.company_name && formData.contract_type_id && formData.business_type && (
             <Card className="bg-green-500/10 border-green-500/20">
               <div className="flex items-center mb-4">
                 <FileText className="w-5 h-5 text-green-400 mr-2" />
                 <h3 className="text-lg font-semibold text-green-400">Sammanfattning</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div className="space-y-2">
                   <p className="text-slate-300">
                     <strong>Företag:</strong> {formData.company_name}
                   </p>
@@ -435,7 +476,7 @@ export default function NewCustomer() {
                     <strong>Avtalstyp:</strong> {contractTypes.find(t => t.id === formData.contract_type_id)?.name}
                   </p>
                 </div>
-                <div>
+                <div className="space-y-2">
                   {formData.contract_start_date && (
                     <p className="text-slate-300">
                       <strong>Startdatum:</strong> {new Date(formData.contract_start_date).toLocaleDateString('sv-SE')}
@@ -443,7 +484,7 @@ export default function NewCustomer() {
                   )}
                   {formData.contract_length_months && (
                     <p className="text-slate-300">
-                      <strong>Längd:</strong> {formData.contract_length_months} månader
+                      <strong>Längd:</strong> {formData.contract_length_months} månader ({(parseInt(formData.contract_length_months) / 12).toFixed(1)} år)
                     </p>
                   )}
                   {formData.annual_premium && (
@@ -461,6 +502,21 @@ export default function NewCustomer() {
             </Card>
           )}
 
+          {/* Information - UPPDATERAD */}
+          <Card className="bg-blue-500/10 border-blue-500/20">
+            <h3 className="text-sm font-medium text-blue-400 mb-2">
+              Vad händer efter skapande?
+            </h3>
+            <ul className="text-sm text-slate-300 space-y-1">
+              <li>• Kunden läggs till i databasen med all avtalsinformation</li>
+              <li>• En ClickUp-lista skapas automatiskt för kundens ärenden</li>
+              <li>• En välkomstmail skickas till kundens e-postadress</li>
+              <li>• Kunden får inloggningsuppgifter till kundportalen</li>
+              <li>• Den tilldelade kontraktansvariga får notifiering</li>
+              <li>• Tekniker kan nu tilldelas ärenden för denna kund</li>
+            </ul>
+          </Card>
+
           {/* Knappar */}
           <div className="flex justify-end gap-4">
             <Button
@@ -473,9 +529,317 @@ export default function NewCustomer() {
             <Button
               type="submit"
               loading={loading}
-              disabled={loading}
+              disabled={loading || !formData.assigned_account_manager}
             >
-              Skapa kund och skicka inbjudan
+              {loading ? 'Skapar kund...' : 'Skapa kund och skicka inbjudan'}
+            </Button>
+          </div>
+        </form>
+      </main>
+    </div>
+  )
+}
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Header */}
+      <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin/customers')}
+                className="text-slate-400 hover:text-white"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Tillbaka till kunder
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white mb-2">Lägg till ny kund</h1>
+          <p className="text-slate-400">Skapa en ny kund med avtalsinformation och ClickUp-integration</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Grundinformation */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <Building2 className="w-5 h-5 text-blue-500 mr-2" />
+              <h2 className="text-lg font-semibold text-white">Grundinformation</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="Företagsnamn *"
+                name="company_name"
+                value={formData.company_name}
+                onChange={handleChange}
+                required
+                placeholder="AB Exempel"
+              />
+
+              <Input
+                label="Organisationsnummer *"
+                name="org_number"
+                value={formData.org_number}
+                onChange={handleChange}
+                required
+                placeholder="123456-7890"
+              />
+
+              <Input
+                label="Kontaktperson *"
+                name="contact_person"
+                value={formData.contact_person}
+                onChange={handleChange}
+                required
+                placeholder="Anna Andersson"
+              />
+
+              <Input
+                label="E-postadress *"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                placeholder="anna@exempel.se"
+              />
+
+              <Input
+                label="Telefonnummer *"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                placeholder="08-123 456 78"
+              />
+
+              <div className="md:col-span-2">
+                <Input
+                  label="Adress *"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  required
+                  placeholder="Storgatan 1, 123 45 Stockholm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Avtalstyp *
+                </label>
+                <select
+                  name="contract_type_id"
+                  value={formData.contract_type_id}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Välj avtalstyp</option>
+                  {contractTypes.map(type => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Verksamhetstyp */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <Briefcase className="w-5 h-5 text-cyan-500 mr-2" />
+              <h2 className="text-lg font-semibold text-white">Verksamhetstyp</h2>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {BUSINESS_TYPES.map(type => (
+                <label
+                  key={type.value}
+                  className={`
+                    flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-all
+                    ${formData.business_type === type.value
+                      ? 'border-green-500 bg-green-500/20'
+                      : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                    }
+                  `}
+                >
+                  <input
+                    type="radio"
+                    name="business_type"
+                    value={type.value}
+                    checked={formData.business_type === type.value}
+                    onChange={handleChange}
+                    className="sr-only"
+                  />
+                  <div className="text-2xl mb-2">{getBusinessTypeIcon(type.value)}</div>
+                  <span className="text-sm font-medium text-white text-center">
+                    {type.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Card>
+
+          {/* Avtalsinformation */}
+          <Card>
+            <div className="flex items-center mb-6">
+              <FileText className="w-5 h-5 text-green-500 mr-2" />
+              <h2 className="text-lg font-semibold text-white">Avtalsinformation</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="Avtalets startdatum *"
+                name="contract_start_date"
+                type="date"
+                value={formData.contract_start_date}
+                onChange={handleChange}
+                required
+              />
+
+              <Input
+                label="Avtalslängd (månader) *"
+                name="contract_length_months"
+                type="number"
+                value={formData.contract_length_months}
+                onChange={handleChange}
+                required
+                placeholder="12"
+                min="1"
+                max="120"
+              />
+
+              <Input
+                label="Årspremie (SEK) *"
+                name="annual_premium"
+                type="number"
+                value={formData.annual_premium}
+                onChange={handleChange}
+                required
+                placeholder="50000"
+                step="0.01"
+              />
+
+              <Input
+                label="Totalt avtalsvärde (SEK)"
+                name="total_contract_value"
+                type="number"
+                value={formData.total_contract_value}
+                onChange={handleChange}
+                placeholder="Beräknas automatiskt"
+                step="0.01"
+                readOnly
+                className="bg-slate-700/50"
+              />
+
+              {/* UPPDATERAD: Tekniker som kontraktansvarig */}
+              <div className="md:col-span-2">
+                <TechnicianDropdown
+                  label="Kontraktansvarig *"
+                  value={formData.assigned_account_manager}
+                  onChange={handleAccountManagerChange}
+                  placeholder="Välj ansvarig tekniker"
+                  includeUnassigned={false}
+                  onlyActive={true}
+                  required={true}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Avtalsobjekt / Beskrivning
+                </label>
+                <textarea
+                  name="contract_description"
+                  value={formData.contract_description}
+                  onChange={handleChange}
+                  rows={4}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Beskrivning av vad avtalet omfattar..."
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Sammanfattning */}
+          {formData.company_name && formData.annual_premium && formData.contract_length_months && (
+            <Card className="bg-blue-500/10 border-blue-500/20">
+              <div className="flex items-center mb-4">
+                <Clock className="w-5 h-5 text-blue-400 mr-2" />
+                <h2 className="text-lg font-semibold text-white">Sammanfattning</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-400">Företag</p>
+                  <p className="text-white font-medium">{formData.company_name}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Avtalslängd</p>
+                  <p className="text-white font-medium">
+                    {formData.contract_length_months} månader
+                    {formData.contract_length_months && ` (${(parseInt(formData.contract_length_months) / 12).toFixed(1)} år)`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Totalt värde</p>
+                  <p className="text-white font-medium">
+                    {formData.total_contract_value && 
+                      new Intl.NumberFormat('sv-SE', {
+                        style: 'currency',
+                        currency: 'SEK',
+                        minimumFractionDigits: 0
+                      }).format(parseFloat(formData.total_contract_value))
+                    }
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Information */}
+          <Card className="bg-green-500/10 border-green-500/20">
+            <h3 className="text-sm font-medium text-green-400 mb-2">
+              Vad händer efter skapande?
+            </h3>
+            <ul className="text-sm text-slate-300 space-y-1">
+              <li>• Kunden läggs till i databasen med all avtalsinformation</li>
+              <li>• En ClickUp-lista skapas automatiskt för kundens ärenden</li>
+              <li>• En välkomstmail skickas till kundens e-postadress</li>
+              <li>• Kunden får inloggningsuppgifter till kundportalen</li>
+              <li>• Den tilldelade kontraktansvariga får notifiering</li>
+            </ul>
+          </Card>
+
+          {/* Submit buttons */}
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate('/admin/customers')}
+              className="flex-1"
+            >
+              Avbryt
+            </Button>
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? 'Skapar kund...' : 'Skapa kund'}
             </Button>
           </div>
         </form>

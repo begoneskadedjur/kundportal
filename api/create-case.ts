@@ -1,4 +1,4 @@
-// api/create-case.ts - ENKEL FIX för ClickUp 400-fel
+// api/create-case.ts - Uppdaterad med tekniker-integration
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -38,7 +38,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pest_type = '', 
       case_type = '', 
       address = '', 
-      phone = '' 
+      phone = '',
+      assigned_technician_email = '' // NY: Tekniker-tilldelning
     } = req.body
 
     // Validera required fields
@@ -76,86 +77,110 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Kund saknar ClickUp lista' })
     }
 
+    // 2. Hämta tekniker-info om tilldelad
+    let assignedTechnician = null
+    if (assigned_technician_email) {
+      console.log('Fetching technician info for email:', assigned_technician_email)
+      const { data: technicianData, error: technicianError } = await supabase
+        .from('technicians')
+        .select('id, name, email, direct_phone, role')
+        .eq('email', assigned_technician_email)
+        .eq('is_active', true)
+        .single()
+
+      if (technicianError) {
+        console.error('Technician fetch error:', technicianError)
+        // Fortsätt utan tekniker-tilldelning istället för att stoppa
+      } else {
+        assignedTechnician = technicianData
+        console.log('Technician found:', assignedTechnician.name)
+      }
+    }
+
     console.log('Customer found:', {
       company: customer.company_name,
-      clickup_list: customer.clickup_list_id
+      clickup_list: customer.clickup_list_id,
+      assigned_technician: assignedTechnician?.name || 'Ingen tilldelad'
     })
 
-    // 2. Generera case number
+    // 3. Generera case number
     const caseNumber = `${customer.company_name.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`
 
-    // 3. Förbered beskrivning med extra info
+    // 4. Förbered beskrivning med extra info
     let fullDescription = description
     if (pest_type) fullDescription += `\n\n🐛 Skadedjurstyp: ${pest_type}`
     if (case_type) fullDescription += `\n📋 Ärendetyp: ${case_type}`
     if (address) fullDescription += `\n📍 Adress: ${address}`
     if (phone) fullDescription += `\n📞 Kontakttelefon: ${phone}`
-
-    // 4. Mappa prioritet till ClickUp format
-    const mapPriorityToClickUp = (priority: string): number => {
-      const priorityMap: { [key: string]: number } = {
-        'urgent': 1,  // 🔴 Akut prioritet
-        'high': 2,    // 🟠 Hög prioritet  
-        'normal': 3,  // 🔹 Normal prioritet
-        'low': 4      // 🔸 Låg prioritet
-      }
-      return priorityMap[priority] || 3 // Default till normal
+    if (assignedTechnician) {
+      fullDescription += `\n👤 Tilldelad tekniker: ${assignedTechnician.name} (${assignedTechnician.email})`
     }
 
-    // 5. Skapa task i ClickUp med priority och all info i description
+    // 5. Skapa task i ClickUp
     console.log('Creating ClickUp task...')
-    const clickupTaskData = {
-      name: title,
+    const clickupPayload = {
+      name: `${caseNumber}: ${title}`,
       description: fullDescription,
-      priority: mapPriorityToClickUp(priority)
+      priority: priority === 'urgent' ? 1 : priority === 'high' ? 2 : priority === 'normal' ? 3 : 4,
+      status: 'open',
+      assignees: assignedTechnician ? [] : [], // ClickUp assignees skulle behöva ClickUp user IDs
+      custom_fields: [
+        {
+          id: 'adress_field_id', // Ersätt med verkligt field ID
+          value: address || ''
+        },
+        {
+          id: 'skadedjur_field_id', // Ersätt med verkligt field ID  
+          value: pest_type
+        },
+        {
+          id: 'arende_field_id', // Ersätt med verkligt field ID
+          value: case_type
+        }
+      ]
     }
 
-    console.log('ClickUp task data:', clickupTaskData)
-
-    const clickupResponse = await fetch(
-      `https://api.clickup.com/api/v2/list/${customer.clickup_list_id}/task`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': CLICKUP_API_TOKEN,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(clickupTaskData)
-      }
-    )
+    const clickupResponse = await fetch(`https://api.clickup.com/api/v2/list/${customer.clickup_list_id}/task`, {
+      method: 'POST',
+      headers: {
+        'Authorization': CLICKUP_API_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(clickupPayload)
+    })
 
     if (!clickupResponse.ok) {
-      const errorData = await clickupResponse.text()
-      console.error('ClickUp API error:', {
-        status: clickupResponse.status,
-        statusText: clickupResponse.statusText,
-        body: errorData,
-        sentData: clickupTaskData
-      })
-      
-      throw new Error(`ClickUp API fel: ${clickupResponse.status} - ${errorData}`)
+      const errorText = await clickupResponse.text()
+      console.error('ClickUp task creation failed:', errorText)
+      throw new Error(`ClickUp API error: ${clickupResponse.status}`)
     }
 
     const clickupTask = await clickupResponse.json()
-    console.log('ClickUp task created:', { id: clickupTask.id, name: clickupTask.name })
+    console.log('ClickUp task created:', clickupTask.id)
 
-    // 6. Skapa case i databas
+    // 6. Skapa case i databas med tekniker-info
     console.log('Creating case in database...')
+    const caseData = {
+      customer_id: customer_id,
+      clickup_task_id: clickupTask.id,
+      case_number: caseNumber,
+      title: title,
+      description: description,
+      status: 'open',
+      priority: priority,
+      pest_type: pest_type || null,
+      case_type: case_type || null,
+      address_formatted: address || null,
+      // Tekniker-info
+      assigned_technician_id: assignedTechnician?.id || null,
+      assigned_technician_name: assignedTechnician?.name || null,
+      assigned_technician_email: assignedTechnician?.email || null,
+      created_at: new Date().toISOString()
+    }
+
     const { data: newCase, error: caseError } = await supabase
       .from('cases')
-      .insert({
-        customer_id: customer_id,
-        clickup_task_id: clickupTask.id,
-        case_number: caseNumber,
-        title: title,
-        description: description,
-        status: 'open',
-        priority: priority,
-        pest_type: pest_type || null,
-        case_type: case_type || null,
-        address_formatted: address || null,
-        created_at: new Date().toISOString()
-      })
+      .insert(caseData)
       .select()
       .single()
 
@@ -184,6 +209,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: newCase.title,
         status: newCase.status,
         priority: newCase.priority,
+        assigned_technician: assignedTechnician ? {
+          id: assignedTechnician.id,
+          name: assignedTechnician.name,
+          email: assignedTechnician.email
+        } : null,
         clickup_task_id: clickupTask.id,
         clickup_url: clickupTask.url || `https://app.clickup.com/t/${clickupTask.id}`
       }
