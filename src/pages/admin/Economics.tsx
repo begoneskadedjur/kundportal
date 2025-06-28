@@ -1,17 +1,16 @@
-// src/pages/admin/Economics.tsx
+// src/pages/admin/Economics.tsx - UPPGRADERAD MED PRESTANDA-FLIKAR
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Activity, Gift, Zap,
-  ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
+  Activity, Gift, Zap, Bug, UserCheck
 } from 'lucide-react';
-import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
-import { supabase } from '../../lib/supabase';
-import { economicStatisticsService } from '../../services/economicStatisticsService';
-import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType } from '../../services/economicStatisticsService';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import { supabase } from '@/lib/supabase';
+import { economicStatisticsService } from '@/services/economicStatisticsService';
+import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '@/services/economicStatisticsService';
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -62,6 +61,7 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
       </div>
       <div className="h-64 flex items-end justify-between gap-2 mb-4">
         {data.map((monthData, index) => {
+          if (!monthData) return null;
           const height = maxValue > 0 ? (monthData.value / maxValue) * 200 : 0;
           return (
             <div key={index} className="flex flex-col items-center flex-1 group">
@@ -75,38 +75,21 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
       </div>
       <div className="pt-4 border-t border-slate-700 text-sm">
         <span className="text-slate-400">Total {currentYear}: </span>
-        <span className={`font-medium ${type === 'contracts' ? 'text-green-400' : 'text-blue-400'}`}>{formatValue(data.reduce((sum, d) => sum + d.value, 0))}</span>
+        <span className={`font-medium ${type === 'contracts' ? 'text-green-400' : 'text-blue-400'}`}>{formatValue(data.reduce((sum, d) => sum + (d?.value || 0), 0))}</span>
       </div>
     </Card>
   );
 };
 
-
-// --- NYA, INSIKTSFULLA KOMPONENTER ---
-
 const MonthlyGrowthAnalysisCard = ({ analysis }: { analysis: MonthlyGrowthAnalysis }) => (
   <Card className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-slate-700 h-full">
     <h3 className="text-lg font-semibold text-white mb-4">Månadens Tillväxt-analys (MRR)</h3>
     <div className="space-y-2 text-sm">
-      <div className="flex justify-between items-center text-slate-400">
-        <span>Start-MRR</span>
-        <span>{formatCurrency(analysis.startMRR)}</span>
-      </div>
-      <div className="flex justify-between items-center text-green-400">
-        <span><ArrowUp className="inline w-4 h-4 mr-1" />Nytt MRR</span>
-        <span className="font-semibold">{formatCurrency(analysis.newMRR)}</span>
-      </div>
-      <div className="flex justify-between items-center text-red-400">
-        <span><ArrowDown className="inline w-4 h-4 mr-1" />Förlorat MRR</span>
-        <span className="font-semibold">{formatCurrency(analysis.churnedMRR)}</span>
-      </div>
+      <div className="flex justify-between items-center text-slate-400"><span>Start-MRR</span><span>{formatCurrency(analysis.startMRR)}</span></div>
+      <div className="flex justify-between items-center text-green-400"><span><ArrowUp className="inline w-4 h-4 mr-1" />Nytt MRR</span><span className="font-semibold">{formatCurrency(analysis.newMRR)}</span></div>
+      <div className="flex justify-between items-center text-red-400"><span><ArrowDown className="inline w-4 h-4 mr-1" />Förlorat MRR</span><span className="font-semibold">{formatCurrency(analysis.churnedMRR)}</span></div>
       <div className="border-t border-slate-700 my-2 !mt-3 !mb-3"></div>
-      <div className="flex justify-between items-center text-white text-base font-bold">
-        <span>Nettoförändring</span>
-        <span className={analysis.netChangeMRR >= 0 ? 'text-green-400' : 'text-red-400'}>
-          {analysis.netChangeMRR >= 0 ? '+' : ''}{formatCurrency(analysis.netChangeMRR)}
-        </span>
-      </div>
+      <div className="flex justify-between items-center text-white text-base font-bold"><span>Nettoförändring</span><span className={analysis.netChangeMRR >= 0 ? 'text-green-400' : 'text-red-400'}>{analysis.netChangeMRR >= 0 ? '+' : ''}{formatCurrency(analysis.netChangeMRR)}</span></div>
     </div>
   </Card>
 );
@@ -119,57 +102,87 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
         {opportunities.map(opp => (
           <li key={opp.customerId} className="bg-slate-800/50 p-3 rounded-lg text-sm">
             <p className="font-bold text-white">{opp.companyName}</p>
-            <div className="flex justify-between mt-1">
-              <span className="text-slate-400">Avtal: {formatCurrency(opp.annualPremium)}</span>
-              <span className="text-cyan-400 font-semibold">Ärenden (6mån): {formatCurrency(opp.caseRevenueLast6Months)}</span>
-            </div>
+            <div className="flex justify-between mt-1"><span className="text-slate-400">Avtal: {formatCurrency(opp.annualPremium)}</span><span className="text-cyan-400 font-semibold">Ärenden (6mån): {formatCurrency(opp.caseRevenueLast6Months)}</span></div>
           </li>
         ))}
       </ul>
-    ) : (
-      <p className="text-slate-400 text-sm">Inga tydliga upsell-möjligheter just nu.</p>
-    )}
+    ) : (<p className="text-slate-400 text-sm">Inga tydliga upsell-möjligheter just nu.</p>)}
   </Card>
 );
 
 const BusinessTypeTable = ({ data }: { data: ARRByBusinessType[] }) => {
   const [sortKey, setSortKey] = useState<keyof ARRByBusinessType>('arr');
   const sortedData = [...data].sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number));
-  const SortableHeader = ({ label, a_key }: { label: string; a_key: keyof ARRByBusinessType }) => (
-      <th onClick={() => setSortKey(a_key)} className="text-right py-3 px-2 text-slate-400 font-medium cursor-pointer hover:text-white">
-          {label} {sortKey === a_key && '▼'}
-      </th>
-  );
-  
+  const SortableHeader = ({ label, a_key }: { label: string; a_key: keyof ARRByBusinessType }) => (<th onClick={() => setSortKey(a_key)} className="text-right py-3 px-2 text-slate-400 font-medium cursor-pointer hover:text-white">{label} {sortKey === a_key && '▼'}</th>);
   return(
     <Card className="h-full">
       <h2 className="text-xl font-bold text-white mb-4">Intäkter per Verksamhetstyp</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-700">
-              <th className="text-left py-3 px-2 text-slate-400 font-medium">Verksamhetstyp</th>
-              <SortableHeader label="Kunder" a_key="customer_count" />
-              <SortableHeader label="Total ARR" a_key="arr" />
-              <SortableHeader label="Avg. ARR" a_key="average_arr_per_customer" />
-              <SortableHeader label="Ärende-intäkter" a_key="additional_case_revenue" />
-            </tr>
-          </thead>
-          <tbody>
-            {sortedData.map(item => (
-              <tr key={item.business_type} className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-2 text-white font-medium">{item.business_type}</td>
-                <td className="py-3 px-2 text-right">{item.customer_count}</td>
-                <td className="py-3 px-2 text-right text-green-400">{formatCurrency(item.arr)}</td>
-                <td className="py-3 px-2 text-right">{formatCurrency(item.average_arr_per_customer)}</td>
-                <td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(item.additional_case_revenue)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Verksamhetstyp</th><SortableHeader label="Kunder" a_key="customer_count" /><SortableHeader label="Total ARR" a_key="arr" /><SortableHeader label="Avg. ARR" a_key="average_arr_per_customer" /><SortableHeader label="Ärende-intäkter" a_key="additional_case_revenue" /></tr></thead><tbody>{sortedData.map(item => (<tr key={item.business_type} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium">{item.business_type}</td><td className="py-3 px-2 text-right">{item.customer_count}</td><td className="py-3 px-2 text-right text-green-400">{formatCurrency(item.arr)}</td><td className="py-3 px-2 text-right">{formatCurrency(item.average_arr_per_customer)}</td><td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(item.additional_case_revenue)}</td></tr>))}</tbody></table></div>
     </Card>
   );
+}
+
+// 🆕 NY PRESTANDA-KOMPONENT MED FLIKAR
+const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
+  const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
+
+  return (
+    <Card>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+        <h2 className="text-xl font-bold text-white">Prestanda & Intäkter</h2>
+        <div className="flex items-center gap-2 p-1 bg-slate-800 rounded-lg">
+          <Button size="sm" variant={activeTab === 'technician' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('technician')} className="flex items-center gap-2"><UserCheck className="w-4 h-4" />Per Tekniker</Button>
+          <Button size="sm" variant={activeTab === 'pest' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('pest')} className="flex items-center gap-2"><Bug className="w-4 h-4" />Per Skadedjurstyp</Button>
+        </div>
+      </div>
+      
+      <div className="overflow-x-auto">
+        {activeTab === 'technician' && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700">
+                <th className="text-left py-3 px-2 text-slate-400 font-medium">Tekniker</th>
+                <th className="text-right py-3 px-2 text-green-400 font-medium">Avtalsintäkt (#)</th>
+                <th className="text-right py-3 px-2 text-cyan-400 font-medium">Ärende-intäkt (#)</th>
+                <th className="text-right py-3 px-2 text-purple-400 font-medium">Total Intäkt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.byTechnician.map(tech => (
+                <tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30">
+                  <td className="py-3 px-2 text-white font-medium">{tech.name}</td>
+                  <td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td>
+                  <td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td>
+                  <td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        
+        {activeTab === 'pest' && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700">
+                <th className="text-left py-3 px-2 text-slate-400 font-medium">Skadedjurstyp</th>
+                <th className="text-right py-3 px-2 text-slate-400 font-medium">Antal Ärenden</th>
+                <th className="text-right py-3 px-2 text-cyan-400 font-medium">Total Intäkt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.byPestType.map(pest => (
+                <tr key={pest.pestType} className="border-b border-slate-800 hover:bg-slate-800/30">
+                  <td className="py-3 px-2 text-white font-medium">{pest.pestType}</td>
+                  <td className="py-3 px-2 text-right">{pest.caseCount}</td>
+                  <td className="py-3 px-2 text-right text-cyan-400 font-bold">{formatCurrency(pest.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Card>
+  )
 }
 
 // --- HUVUDKOMPONENT ---
@@ -249,21 +262,17 @@ export default function Economics() {
     );
   }
 
-  const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities } = dashboardStats;
+  const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities, performanceStats } = dashboardStats;
 
   return (
     <div className="min-h-screen bg-slate-950">
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white">
-              <ArrowLeft className="w-4 h-4 mr-2" />Tillbaka
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button>
             <h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1>
           </div>
-          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={loading} className="text-slate-400 hover:text-white">
-            <Activity className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />Uppdatera
-          </Button>
+          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={loading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
 
@@ -281,35 +290,35 @@ export default function Economics() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <BusinessTypeTable data={arrByBusinessType} />
-          </div>
+          <div className="lg:col-span-2"><BusinessTypeTable data={arrByBusinessType} /></div>
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
-
+        
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
-            <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
+          <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
+          <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
         </div>
+
+        <PerformanceAndRevenueCard data={performanceStats} />
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card>
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Clock className="w-6 h-6 text-yellow-500" />Kommande Avtalsförnyelser</h2>
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-red-500/10 p-4 rounded-lg text-center"><p className="text-red-400 text-sm">Inom 3 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring3Months}</p></div>
-                    <div className="bg-orange-500/10 p-4 rounded-lg text-center"><p className="text-orange-400 text-sm">4-6 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring6Months}</p></div>
-                    <div className="bg-yellow-500/10 p-4 rounded-lg text-center"><p className="text-yellow-400 text-sm">7-12 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring12Months}</p></div>
-                </div>
-            </Card>
-            <Card>
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Target className="w-5 h-5 text-green-500" />Ekonomiska Nyckeltal</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">ARR per Kund</p><p className="text-white font-medium text-lg">{formatCurrency(arr.averageARRPerCustomer)}</p></div>
-                    <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Churn Rate</p><p className={`font-medium text-lg ${arr.churnRate > 5 ? 'text-red-400' : 'text-green-400'}`}>{arr.churnRate.toFixed(1)}%</p></div>
-                    <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Retention Rate</p><p className={`font-medium text-lg ${arr.retentionRate >= 90 ? 'text-green-400' : 'text-yellow-400'}`}>{arr.retentionRate.toFixed(1)}%</p></div>
-                    <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Net Revenue Retention</p><p className={`font-medium text-lg ${arr.netRevenueRetention >= 100 ? 'text-green-400' : 'text-red-400'}`}>{arr.netRevenueRetention.toFixed(1)}%</p></div>
-                </div>
-            </Card>
+          <Card>
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Clock className="w-6 h-6 text-yellow-500" />Kommande Avtalsförnyelser</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-red-500/10 p-4 rounded-lg text-center"><p className="text-red-400 text-sm">Inom 3 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring3Months}</p></div>
+              <div className="bg-orange-500/10 p-4 rounded-lg text-center"><p className="text-orange-400 text-sm">4-6 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring6Months}</p></div>
+              <div className="bg-yellow-500/10 p-4 rounded-lg text-center"><p className="text-yellow-400 text-sm">7-12 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring12Months}</p></div>
+            </div>
+          </Card>
+          <Card>
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Target className="w-5 h-5 text-green-500" />Ekonomiska Nyckeltal</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">ARR per Kund</p><p className="text-white font-medium text-lg">{formatCurrency(arr.averageARRPerCustomer)}</p></div>
+              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Churn Rate</p><p className={`font-medium text-lg ${arr.churnRate > 5 ? 'text-red-400' : 'text-green-400'}`}>{arr.churnRate.toFixed(1)}%</p></div>
+              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Retention Rate</p><p className={`font-medium text-lg ${arr.retentionRate >= 90 ? 'text-green-400' : 'text-yellow-400'}`}>{arr.retentionRate.toFixed(1)}%</p></div>
+              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Net Revenue Retention</p><p className={`font-medium text-lg ${arr.netRevenueRetention >= 100 ? 'text-green-400' : 'text-red-400'}`}>{arr.netRevenueRetention.toFixed(1)}%</p></div>
+            </div>
+          </Card>
         </div>
 
         <div className="mt-8 flex items-center justify-between text-xs text-slate-500">
