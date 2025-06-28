@@ -10,7 +10,7 @@ import {
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
-// 🆕 ANVÄNDER NY SERVICE
+// ❗ KONTROLLERA DENNA RAD! Filnamnet måste vara exakt "economicStatisticsService.ts"
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType } from '../../services/economicStatisticsService';
 
@@ -193,7 +193,9 @@ export default function Economics() {
   }, []);
 
   useEffect(() => {
-    fetchChartData(contractsChartYear, caseRevenueChartYear);
+    if(!loading) { // Undvik att köra vid första sidladdningen
+        fetchChartData(contractsChartYear, caseRevenueChartYear);
+    }
   }, [contractsChartYear, caseRevenueChartYear]);
 
   const fetchEconomicData = async () => {
@@ -202,6 +204,7 @@ export default function Economics() {
     try {
       const stats = await economicStatisticsService.getDashboardStats(30);
       setDashboardStats(stats);
+      // Hämta initial grafdata
       await fetchChartData(new Date().getFullYear(), new Date().getFullYear());
     } catch (error: any) {
       setError(error.message || 'Kunde inte hämta ekonomisk data');
