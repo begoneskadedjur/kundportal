@@ -1,11 +1,12 @@
-// src/pages/admin/Economics.tsx - KOMPLETT med verklig data och faktiska utfall
+// src/pages/admin/Economics.tsx - FIXAD med svenska översättningar och månadsgrafer
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, CreditCard, PieChart, ArrowUp, ArrowDown, 
   Eye, Download, Activity, Users, Building2, FileText, Zap,
-  Calculator, Coins, Receipt, ChevronDown, ChevronUp, Info, Shield
+  Calculator, Coins, Receipt, ChevronDown, ChevronUp, Info, Shield,
+  ChevronLeft, ChevronRight
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -31,6 +32,125 @@ const Tooltip = ({ children, content }: { children: React.ReactNode, content: st
         </div>
       )}
     </div>
+  )
+}
+
+// 🆕 Månadsvis Graf Component
+const MonthlyChart = ({ 
+  title, 
+  data, 
+  currentYear, 
+  onYearChange, 
+  type = 'contracts' 
+}: {
+  title: string
+  data: Array<{ month: string, contracts: number, revenue: number }>
+  currentYear: number
+  onYearChange: (year: number) => void
+  type: 'contracts' | 'revenue'
+}) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  const maxValue = Math.max(...data.map(d => type === 'contracts' ? d.contracts : d.revenue))
+  const monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'
+  ]
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-green-500" />
+          {title}
+        </h3>
+        
+        {/* År-väljare */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onYearChange(currentYear - 1)}
+            className="text-slate-400 hover:text-white"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-white font-medium px-3">{currentYear}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onYearChange(currentYear + 1)}
+            disabled={currentYear >= new Date().getFullYear()}
+            className="text-slate-400 hover:text-white disabled:opacity-50"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Graf */}
+      <div className="h-64 flex items-end justify-between gap-2 mb-4">
+        {data.map((month, index) => {
+          const value = type === 'contracts' ? month.contracts : month.revenue
+          const height = maxValue > 0 ? (value / maxValue) * 200 : 0
+          
+          return (
+            <div key={index} className="flex flex-col items-center flex-1">
+              <div 
+                className={`w-full rounded-t-lg transition-all duration-300 hover:opacity-80 ${
+                  type === 'contracts' ? 'bg-green-500' : 'bg-blue-500'
+                }`}
+                style={{ height: `${height}px`, minHeight: value > 0 ? '4px' : '0px' }}
+                title={`${monthNames[index]}: ${type === 'contracts' ? value : formatCurrency(value)}`}
+              />
+              <div className="mt-2 text-center">
+                <div className="text-xs text-slate-400">{monthNames[index]}</div>
+                <div className={`text-sm font-medium ${
+                  type === 'contracts' ? 'text-green-400' : 'text-blue-400'
+                }`}>
+                  {type === 'contracts' ? value : formatCurrency(value)}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Sammanfattning */}
+      <div className="pt-4 border-t border-slate-700">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-slate-400">Total {currentYear}:</span>
+            <span className={`ml-2 font-medium ${
+              type === 'contracts' ? 'text-green-400' : 'text-blue-400'
+            }`}>
+              {type === 'contracts' 
+                ? data.reduce((sum, d) => sum + d.contracts, 0)
+                : formatCurrency(data.reduce((sum, d) => sum + d.revenue, 0))
+              }
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400">Genomsnitt/månad:</span>
+            <span className={`ml-2 font-medium ${
+              type === 'contracts' ? 'text-green-400' : 'text-blue-400'
+            }`}>
+              {type === 'contracts'
+                ? Math.round(data.reduce((sum, d) => sum + d.contracts, 0) / 12)
+                : formatCurrency(data.reduce((sum, d) => sum + d.revenue, 0) / 12)
+              }
+            </span>
+          </div>
+        </div>
+      </div>
+    </Card>
   )
 }
 
@@ -272,9 +392,82 @@ export default function Economics() {
     averageContractValue: number
   }>>([])
 
+  // 🆕 Graf-data state
+  const [contractsChartYear, setContractsChartYear] = useState(new Date().getFullYear())
+  const [revenueChartYear, setRevenueChartYear] = useState(new Date().getFullYear())
+  const [contractsChartData, setContractsChartData] = useState<Array<{
+    month: string
+    contracts: number
+    revenue: number
+  }>>([])
+  const [revenueChartData, setRevenueChartData] = useState<Array<{
+    month: string
+    contracts: number
+    revenue: number
+  }>>([])
+
   useEffect(() => {
     fetchEconomicData()
   }, [selectedPeriod])
+
+  useEffect(() => {
+    fetchChartData()
+  }, [contractsChartYear, revenueChartYear])
+
+  // 🆕 Hämta grafdata för specifikt år
+  const fetchChartData = async () => {
+    try {
+      // Hämta data för kontraktsgraf
+      const contractsData = await getYearlyChartData(contractsChartYear)
+      setContractsChartData(contractsData)
+
+      // Hämta data för intäktsgraf
+      const revenueData = await getYearlyChartData(revenueChartYear)
+      setRevenueChartData(revenueData)
+    } catch (error) {
+      console.error('Error fetching chart data:', error)
+    }
+  }
+
+  // 🆕 Hämta månadsvis data för ett specifikt år
+  const getYearlyChartData = async (year: number) => {
+    try {
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('created_at, annual_premium')
+        .eq('is_active', true)
+        .gte('created_at', `${year}-01-01T00:00:00.000Z`)
+        .lt('created_at', `${year + 1}-01-01T00:00:00.000Z`)
+        .order('created_at', { ascending: true })
+      
+      if (error) throw error
+
+      // Skapa 12 månader med 0-värden
+      const monthlyData = Array.from({ length: 12 }, (_, index) => ({
+        month: new Date(year, index).toLocaleDateString('sv-SE', { month: 'short' }),
+        contracts: 0,
+        revenue: 0
+      }))
+
+      // Fyll i verklig data
+      customers?.forEach(customer => {
+        const date = new Date(customer.created_at)
+        const monthIndex = date.getMonth()
+        
+        monthlyData[monthIndex].contracts += 1
+        monthlyData[monthIndex].revenue += customer.annual_premium || 0
+      })
+
+      return monthlyData
+    } catch (error) {
+      console.error('Error fetching yearly chart data:', error)
+      return Array.from({ length: 12 }, (_, index) => ({
+        month: new Date(year, index).toLocaleDateString('sv-SE', { month: 'short' }),
+        contracts: 0,
+        revenue: 0
+      }))
+    }
+  }
 
   const fetchEconomicData = async () => {
     setLoading(true)
@@ -449,6 +642,30 @@ export default function Economics() {
     } catch (error) {
       console.error('Error fetching monthly trend:', error)
       return []
+    }
+  }
+
+    // 🆕 FIXAD: Hämta antal betalda ärenden korrekt
+  const getPaidCasesCount = async () => {
+    try {
+      const thisMonthStart = new Date()
+      thisMonthStart.setDate(1)
+      thisMonthStart.setHours(0, 0, 0, 0)
+      
+      const { data: paidCases, error } = await supabase
+        .from('cases')
+        .select('id')
+        .not('price', 'is', null)
+        .gt('price', 0)
+        .not('completed_date', 'is', null)
+        .gte('completed_date', thisMonthStart.toISOString())
+      
+      if (error) throw error
+      
+      return paidCases?.length || 0
+    } catch (error) {
+      console.error('Error fetching paid cases count:', error)
+      return 0
     }
   }
 
@@ -691,7 +908,166 @@ export default function Economics() {
                   <TrendingUp className="w-6 h-6 text-purple-500" />
                   <h2 className="text-xl font-bold text-white">5-års Faktiska Utfall & Prognoser</h2>
                 </div>
-                <Tooltip content="Visar faktiska intäkter baserat på verkliga avtal med contract_end_date. År utan avtal visar prognoser baserat på verklig tillväxt.">
+                <Tooltip content="Genomsnittligt pris för extra ärenden utöver avtal. Indikerar potential för ytterligare intäkter.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">⌀ Ärendepris</p>
+                <p className="text-cyan-400 font-medium text-lg">{formatCurrency(arr.averageCasePrice)}</p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Andel kunder som säger upp sina avtal per månad. Lägre är bättre för långsiktig tillväxt.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Churn Rate</p>
+                <p className={`font-medium text-lg ${arr.churnRate > 5 ? 'text-red-400' : 'text-green-400'}`}>
+                  {arr.churnRate.toFixed(1)}%
+                </p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Antal betalda ärenden denna månad utöver ordinarie avtal. Visar aktivitet i extraarbeten.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Betalda Ärenden</p>
+                <p className="text-cyan-400 font-medium text-lg">{arr.paidCasesThisMonth}</p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Andel kunder som stannar kvar per år. Högre är bättre för långsiktig lönsamhet.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Retention Rate</p>
+                <p className={`font-medium text-lg ${arr.retentionRate >= 90 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {arr.retentionRate.toFixed(1)}%
+                </p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Total kontraktsvärde för alla aktiva avtal baserat på contract_end_date. Visar totalexponering.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Total Contract Value</p>
+                <p className="text-white font-medium text-lg">{formatCurrency(arr.totalContractValue)}</p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Net Revenue Retention - inkluderar uppskalning av befintliga kunder och ärende-intäkter.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Net Revenue Retention</p>
+                <p className={`font-medium text-lg ${arr.netRevenueRetention >= 100 ? 'text-green-400' : 'text-red-400'}`}>
+                  {arr.netRevenueRetention.toFixed(1)}%
+                </p>
+              </div>
+            </Tooltip>
+
+            <Tooltip content="Förväntad intäkt från prospekterande kunder och säljpipeline.">
+              <div className="bg-slate-800/30 rounded-lg p-4 cursor-help hover:bg-slate-800/50 transition-colors">
+                <p className="text-slate-400 text-sm">Pipeline ARR</p>
+                <p className="text-white font-medium text-lg">{formatCurrency(arr.pipelineARR)}</p>
+              </div>
+            </Tooltip>
+          </div>
+
+          {/* 🆕 FÖRBÄTTRAD Health Score med ärende-intäkter */}
+          <div className="p-4 bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20 rounded-lg">
+            <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Ekonomisk Hälsostatus
+            </h4>
+            <div className="flex items-center gap-2">
+              {arr.monthlyGrowth >= 5 && arr.churnRate <= 3 && arr.retentionRate >= 95 ? (
+                <>
+                  <span className="text-2xl">💰</span>
+                  <div>
+                    <p className="text-green-400 font-medium">Stark ekonomisk hälsa</p>
+                    <p className="text-slate-400 text-sm">
+                      Utmärkt tillväxt ({arr.monthlyGrowth.toFixed(1)}%), låg churn ({arr.churnRate.toFixed(1)}%), 
+                      hög retention ({arr.retentionRate.toFixed(1)}%)
+                    </p>
+                    <p className="text-cyan-400 text-xs mt-1">
+                      Extra ärende-intäkter: {formatCurrency(arr.additionalCaseRevenue)} 
+                      ({((arr.additionalCaseRevenue / arr.currentARR) * 100).toFixed(1)}% av ARR)
+                    </p>
+                  </div>
+                </>
+              ) : arr.monthlyGrowth >= 2 && arr.churnRate <= 5 && arr.retentionRate >= 85 ? (
+                <>
+                  <span className="text-2xl">📈</span>
+                  <div>
+                    <p className="text-blue-400 font-medium">God ekonomisk hälsa</p>
+                    <p className="text-slate-400 text-sm">
+                      Solid tillväxt ({arr.monthlyGrowth.toFixed(1)}%) och kundretention ({arr.retentionRate.toFixed(1)}%)
+                    </p>
+                    <p className="text-cyan-400 text-xs mt-1">
+                      Ärende-intäkter utgör {((arr.additionalCaseRevenue / arr.currentARR) * 100).toFixed(1)}% av ARR
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">⚠️</span>
+                  <div>
+                    <p className="text-yellow-400 font-medium">Ekonomin behöver uppmärksamhet</p>
+                    <p className="text-slate-400 text-sm">
+                      Fokusera på tillväxt ({arr.monthlyGrowth.toFixed(1)}%) och kundretention ({arr.retentionRate.toFixed(1)}%)
+                    </p>
+                    {arr.additionalCaseRevenue > 0 && (
+                      <p className="text-cyan-400 text-xs mt-1">
+                        Positivt: {formatCurrency(arr.additionalCaseRevenue)} i ärende-intäkter
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Footer Actions */}
+        <div className="mt-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">
+              Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}
+            </span>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Zap className="w-3 h-3" />
+              <span>100% verklig data från databas</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-green-500">
+              <DollarSign className="w-3 h-3" />
+              <span>ARR: {formatCurrency(arr.currentARR)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-cyan-500">
+              <Receipt className="w-3 h-3" />
+              <span>Ärenden: {formatCurrency(arr.additionalCaseRevenue)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-purple-500">
+              <Calculator className="w-3 h-3" />
+              <span>Total: {formatCurrency(arr.totalRevenue)}</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/admin/customers')}
+              className="text-slate-400 hover:text-white"
+            >
+              <Building2 className="w-4 h-4 mr-2" />
+              Hantera Kunder
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/admin/technicians-statistics')}
+              className="text-slate-400 hover:text-white"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Tekniker-statistik
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+} content="Visar faktiska intäkter baserat på verkliga avtal med contract_end_date. År utan avtal visar prognoser baserat på verklig tillväxt.">
                   <Eye className="w-4 h-4 text-slate-400" />
                 </Tooltip>
               </div>
@@ -838,6 +1214,25 @@ export default function Economics() {
             </Tooltip>
           </div>
         </Card>
+
+        {/* 🆕 MÅNADSGRAFER - Tecknade avtal och Intäkter */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+          <MonthlyChart
+            title="Tecknade Avtal per Månad"
+            data={contractsChartData}
+            currentYear={contractsChartYear}
+            onYearChange={setContractsChartYear}
+            type="contracts"
+          />
+          
+          <MonthlyChart
+            title="Intäkter per Månad"
+            data={revenueChartData}
+            currentYear={revenueChartYear}
+            onYearChange={setRevenueChartYear}
+            type="revenue"
+          />
+        </div>
 
         {/* Sales Trend & Business Type Analysis */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
