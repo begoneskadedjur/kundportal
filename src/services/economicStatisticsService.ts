@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - UPPGRADERAD MED ARR-PROGNOS OCH FIXAR
+// src/services/economicStatisticsService.ts - FIX: Synkroniserar datumfilter för prestanda-stats
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -119,7 +119,7 @@ class EconomicStatisticsService {
 
   async getPerformanceStats(): Promise<PerformanceStats> {
     const normalizeName = (name: string): string => {
-      if (!name) return 'Okänd';
+      if (!name) return 'okänd';
       if (name.includes('@')) {
         return name.split('@')[0].replace(/[._]/g, ' ').toLowerCase();
       }
@@ -128,12 +128,25 @@ class EconomicStatisticsService {
 
     const getDisplayName = (currentName: string, newName: string): string => {
       if (!newName) return currentName;
+      if (!currentName) return newName;
+      // Prefer the non-email, properly cased name
       return !newName.includes('@') ? newName : currentName;
     };
 
+    // ❗ FIX: Tittar bara på ärenden från de senaste 12 månaderna
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
     const [customersRes, casesRes] = await Promise.all([
+      // Kunddata (kontrakt) är alltid "live"
       supabase.from('customers').select('annual_premium, assigned_account_manager').eq('is_active', true),
-      supabase.from('cases').select('price, assigned_technician_name, pest_type').not('price', 'is', null).gt('price', 0)
+      // Ärendedata filtreras nu för att vara mer relevant
+      supabase.from('cases')
+        .select('price, assigned_technician_name, pest_type, completed_date')
+        .not('price', 'is', null)
+        .gt('price', 0)
+        .not('completed_date', 'is', null) // Måste vara slutfört
+        .gte('completed_date', oneYearAgo.toISOString()) // Inom det senaste året
     ]);
 
     if (customersRes.error) throw customersRes.error;
