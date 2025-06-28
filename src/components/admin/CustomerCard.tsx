@@ -98,6 +98,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
 
   const handleActionClick = (e: React.MouseEvent, action: () => void) => {
     e.stopPropagation()
+    setShowDropdown(false) // Stäng dropdown först
     action()
   }
 
@@ -164,9 +165,9 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
                 <button
                   onClick={(e) => handleActionClick(e, () => {
                     setShowCreateCaseModal(true)
-                    setShowDropdown(false)
                   })}
                   className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
+                  disabled={showCreateCaseModal} // Förhindra dubbelklick
                 >
                   <Plus className="w-4 h-4" />
                   Skapa ärende

@@ -1,9 +1,9 @@
-// src/components/admin/AdminCreateCaseModal.tsx - Modal för att skapa ärende från admin
+// src/components/admin/AdminCreateCaseModal.tsx - Förbättrad version
 import { useState } from 'react'
-import { X, AlertCircle, CheckCircle, Bug, MapPin, Phone, FileText, User } from 'lucide-react'
+import { AlertCircle, CheckCircle, Bug, MapPin, Phone, FileText, User } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
-import Card from '../ui/Card'
+import Modal from '../ui/Modal'
 
 interface Customer {
   id: string
@@ -113,43 +113,74 @@ export default function AdminCreateCaseModal({
     }))
   }
 
-  if (!isOpen) return null
+  const handleClose = () => {
+    if (!loading) {
+      onClose()
+    }
+  }
 
   // Success state
   if (submitted) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-md text-center p-8">
+      <Modal
+        isOpen={isOpen}
+        onClose={() => {}} // Förhindra stängning under success
+        title="Ärendet har skapats!"
+        size="md"
+        preventClose={true}
+      >
+        <div className="p-8 text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">
-            Ärendet har skapats!
+            Framgångsrikt skapat!
           </h3>
           <p className="text-slate-400 mb-4">
-            Ärendet för <strong>{customer.company_name}</strong> har skapats och tilldelats i ClickUp.
+            Ärendet för <strong className="text-white">{customer.company_name}</strong> har skapats och tilldelats i ClickUp.
           </p>
           <div className="flex items-center justify-center text-sm text-slate-400">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500 mr-2"></div>
             Stänger automatiskt...
           </div>
-        </Card>
-      </div>
+        </div>
+      </Modal>
     )
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Skapa nytt ärende</h2>
-            <p className="text-slate-400 mt-1">För {customer.company_name}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
+  const footer = (
+    <div className="flex gap-3 p-6">
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={handleClose}
+        disabled={loading}
+        className="flex-1"
+      >
+        Avbryt
+      </Button>
+      <Button
+        type="submit"
+        form="create-case-form"
+        loading={loading}
+        disabled={loading || !formData.title || !formData.description}
+        className="flex-1"
+      >
+        {loading ? 'Skapar ärende...' : 'Skapa ärende'}
+      </Button>
+    </div>
+  )
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Skapa nytt ärende"
+      subtitle={`För ${customer.company_name}`}
+      size="xl"
+      footer={footer}
+      preventClose={loading}
+    >
+      <div className="p-6">
+        <form id="create-case-form" onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -210,7 +241,7 @@ export default function AdminCreateCaseModal({
                 onChange={handleChange}
                 required
                 rows={4}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-y"
                 placeholder="Detaljerad beskrivning av problemet, symptom och önskade åtgärder..."
               />
             </div>
@@ -308,28 +339,8 @@ export default function AdminCreateCaseModal({
               <li>• Ärendet visas i kundens portal</li>
             </ul>
           </div>
-
-          {/* Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Avbryt
-            </Button>
-            <Button
-              type="submit"
-              loading={loading}
-              disabled={loading || !formData.title || !formData.description}
-              className="flex-1"
-            >
-              {loading ? 'Skapar ärende...' : 'Skapa ärende'}
-            </Button>
-          </div>
         </form>
-      </Card>
-    </div>
+      </div>
+    </Modal>
   )
 }
