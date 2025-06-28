@@ -846,4 +846,3 @@ export default function NewCustomer() {
       </main>
     </div>
   )
-}
