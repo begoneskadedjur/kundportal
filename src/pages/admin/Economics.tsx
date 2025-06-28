@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - UPPGRADERAD MED PRESTANDA-FLIKAR
+// src/pages/admin/Economics.tsx - KORRIGERAD MED KORREKTA SÖKVÄGAR
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -6,8 +6,8 @@ import {
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck
 } from 'lucide-react';
-import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
 import { supabase } from '@/lib/supabase';
 import { economicStatisticsService } from '@/services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '@/services/economicStatisticsService';
@@ -122,7 +122,6 @@ const BusinessTypeTable = ({ data }: { data: ARRByBusinessType[] }) => {
   );
 }
 
-// 🆕 NY PRESTANDA-KOMPONENT MED FLIKAR
 const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
 
