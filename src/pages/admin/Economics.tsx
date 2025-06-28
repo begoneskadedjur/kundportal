@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION
+// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v2
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -125,7 +125,6 @@ const BusinessTypeTable = ({ data }: { data: ARRByBusinessType[] }) => {
 
 const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
-
   return (
     <Card>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -153,7 +152,6 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   )
 }
 
-// ✨ NY, FÖRBÄTTRAD ARR-PROGNOSKOMPONENT
 const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
   const maxValue = Math.max(...data.map(d => d.projectedARR), 1);
   return (
@@ -192,8 +190,16 @@ export default function Economics() {
   const [contractsChartData, setContractsChartData] = useState<Array<{ month: string, value: number }>>([]);
   const [caseRevenueChartData, setCaseRevenueChartData] = useState<Array<{ month: string, value: number }>>([]);
   
-  useEffect(() => { fetchEconomicData(); }, []);
-  useEffect(() => { if(!loading) fetchChartData(contractsChartYear, caseRevenueChartYear); }, [contractsChartYear, caseRevenueChartYear, loading]);
+  useEffect(() => {
+    fetchEconomicData();
+  }, []);
+
+  // FIX: Dedikerad useEffect för att hämta grafdata när årtal ändras
+  useEffect(() => {
+    if(!loading) { 
+        fetchChartData(contractsChartYear, caseRevenueChartYear);
+    }
+  }, [contractsChartYear, caseRevenueChartYear, loading]);
 
   const fetchEconomicData = async () => {
     setLoading(true);

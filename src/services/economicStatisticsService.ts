@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FIX: Synkroniserar datumfilter för alla komponenter
+// src/services/economicStatisticsService.ts - FIX: Justerar ARR-prognos för innevarande år
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -116,7 +116,7 @@ class EconomicStatisticsService {
       throw error;
     }
   }
-
+  
   async getPerformanceStats(): Promise<PerformanceStats> {
     const normalizeName = (name: string): string => {
       if (!name) return 'okänd';
@@ -209,24 +209,28 @@ class EconomicStatisticsService {
 
     const projections: ARRProjection[] = [];
     const currentYear = new Date().getFullYear();
+    const currentARR = customers.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
 
     for (let i = 0; i < 6; i++) {
         const targetYear = currentYear + i;
-        const yearStart = new Date(targetYear, 0, 1);
-        const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
         let totalProjectedRevenueForYear = 0;
 
-        for (const customer of customers) {
-            const contractStart = new Date(customer.contract_start_date);
-            const contractEnd = new Date(customer.contract_end_date);
-            const dailyRate = (customer.annual_premium || 0) / 365.25;
+        if (targetYear === currentYear) {
+            totalProjectedRevenueForYear = currentARR;
+        } else {
+            const yearStart = new Date(targetYear, 0, 1);
+            const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
+            for (const customer of customers) {
+                const contractStart = new Date(customer.contract_start_date);
+                const contractEnd = new Date(customer.contract_end_date);
+                const dailyRate = (customer.annual_premium || 0) / 365.25;
+                const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()));
+                const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()));
 
-            const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()));
-            const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()));
-
-            if (overlapStart < overlapEnd) {
-                const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
-                totalProjectedRevenueForYear += overlapDays * dailyRate;
+                if (overlapStart < overlapEnd) {
+                    const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
+                    totalProjectedRevenueForYear += overlapDays * dailyRate;
+                }
             }
         }
         projections.push({ year: targetYear, projectedARR: totalProjectedRevenueForYear });
