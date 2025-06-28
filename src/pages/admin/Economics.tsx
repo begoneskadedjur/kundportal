@@ -1,13 +1,16 @@
-// src/pages/admin/Economics.tsx - KORRIGERAD MED KORREKTA SÖKVÄGAR
+// src/pages/admin/Economics.tsx - KORRIGERAD MED RELATIVA SÖKVÄGAR FÖR UI-KOMPONENTER
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Activity, Gift, Zap, Bug, UserCheck
+  Activity, Gift, Zap, Bug, UserCheck,
+  ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
+// ❗ FIX: Byt tillbaka till relativa sökvägar för UI-komponenter
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+// ✅ Behåll alias för lib och services eftersom det fungerar
 import { supabase } from '@/lib/supabase';
 import { economicStatisticsService } from '@/services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '@/services/economicStatisticsService';
