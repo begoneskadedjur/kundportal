@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - KORRIGERAD MED RELATIVA SÖKVÄGAR FÖR UI-KOMPONENTER
+// src/pages/admin/Economics.tsx - KORRIGERAD MED ENDAST RELATIVA SÖKVÄGAR
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,13 +7,12 @@ import {
   Activity, Gift, Zap, Bug, UserCheck,
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
-// ❗ FIX: Byt tillbaka till relativa sökvägar för UI-komponenter
+// ❗ FIX: Byt tillbaka till relativa sökvägar för ALLA lokala importer
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-// ✅ Behåll alias för lib och services eftersom det fungerar
-import { supabase } from '@/lib/supabase';
-import { economicStatisticsService } from '@/services/economicStatisticsService';
-import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '@/services/economicStatisticsService';
+import { supabase } from '../../lib/supabase';
+import { economicStatisticsService } from '../../services/economicStatisticsService';
+import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats } from '../../services/economicStatisticsService';
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
