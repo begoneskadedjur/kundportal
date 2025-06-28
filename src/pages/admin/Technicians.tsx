@@ -1,4 +1,4 @@
-// src/pages/admin/Technicians.tsx - Teknikerhantering
+// src/pages/admin/Technicians.tsx - Teknikerhantering (Fixad version utan externa dependencies)
 import { useState, useEffect } from 'react'
 import { 
   Plus, Search, Filter, User, Mail, Phone, MapPin, 
@@ -8,9 +8,225 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { technicianService } from '../../services/technicianService'
-import { TECHNICIAN_ROLES, type Technician, type TechnicianFormData } from '../../types/database'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+
+// Tekniker-typer
+type Technician = {
+  id: string
+  name: string
+  role: string
+  email: string
+  direct_phone: string | null
+  office_phone: string | null
+  address: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+type TechnicianFormData = {
+  name: string
+  role: string
+  email: string
+  direct_phone: string
+  office_phone: string
+  address: string
+}
+
+// Tekniker-roller
+const TECHNICIAN_ROLES = [
+  'Skadedjurstekniker',
+  'VD',
+  'Marknad & Försäljningschef',
+  'Regionchef Dalarna',
+  'Koordinator/kundtjänst',
+  'Annan'
+] as const
+
+// Tekniker Service (inbyggd för att undvika import-fel)
+const technicianService = {
+  async getAllTechnicians(): Promise<Technician[]> {
+    try {
+      const { data, error } = await supabase
+        .from('technicians')
+        .select('*')
+        .order('name', { ascending: true })
+      
+      if (error) throw error
+      return data || []
+    } catch (error: any) {
+      console.error('Error fetching technicians:', error)
+      toast.error('Kunde inte hämta tekniker')
+      throw error
+    }
+  },
+
+  async createTechnician(technicianData: TechnicianFormData): Promise<Technician> {
+    try {
+      // Validera e-post format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(technicianData.email)) {
+        throw new Error('Ogiltig e-postadress')
+      }
+
+      // Formatera telefonnummer
+      const formatPhone = (phone: string) => {
+        if (!phone) return null
+        return phone.replace(/[\s-]/g, '').replace(/^0/, '+46')
+      }
+
+      const insertData = {
+        name: technicianData.name.trim(),
+        role: technicianData.role,
+        email: technicianData.email.toLowerCase().trim(),
+        direct_phone: formatPhone(technicianData.direct_phone),
+        office_phone: formatPhone(technicianData.office_phone),
+        address: technicianData.address.trim() || null,
+        is_active: true
+      }
+
+      const { data, error } = await supabase
+        .from('technicians')
+        .insert(insertData)
+        .select()
+        .single()
+      
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('En tekniker med denna e-postadress finns redan')
+        }
+        throw error
+      }
+      
+      toast.success('Tekniker skapad!')
+      return data
+    } catch (error: any) {
+      console.error('Error creating technician:', error)
+      toast.error(error.message || 'Kunde inte skapa tekniker')
+      throw error
+    }
+  },
+
+  async updateTechnician(id: string, updates: Partial<TechnicianFormData>): Promise<Technician> {
+    try {
+      const updateData: any = {}
+      
+      if (updates.name) updateData.name = updates.name.trim()
+      if (updates.role) updateData.role = updates.role
+      if (updates.email) updateData.email = updates.email.toLowerCase().trim()
+      if (updates.address) updateData.address = updates.address.trim()
+      
+      // Formatera telefonnummer
+      const formatPhone = (phone: string) => {
+        if (!phone) return null
+        return phone.replace(/[\s-]/g, '').replace(/^0/, '+46')
+      }
+      
+      if (updates.direct_phone !== undefined) {
+        updateData.direct_phone = formatPhone(updates.direct_phone)
+      }
+      if (updates.office_phone !== undefined) {
+        updateData.office_phone = formatPhone(updates.office_phone)
+      }
+
+      const { data, error } = await supabase
+        .from('technicians')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('En tekniker med denna e-postadress finns redan')
+        }
+        throw error
+      }
+      
+      toast.success('Tekniker uppdaterad!')
+      return data
+    } catch (error: any) {
+      console.error('Error updating technician:', error)
+      toast.error(error.message || 'Kunde inte uppdatera tekniker')
+      throw error
+    }
+  },
+
+  async toggleTechnicianStatus(id: string, isActive: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('technicians')
+        .update({ is_active: isActive })
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      toast.success(`Tekniker ${isActive ? 'aktiverad' : 'inaktiverad'}`)
+    } catch (error: any) {
+      console.error('Error toggling technician status:', error)
+      toast.error('Kunde inte uppdatera tekniker-status')
+      throw error
+    }
+  },
+
+  async deleteTechnician(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('technicians')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      toast.success('Tekniker borttagen')
+    } catch (error: any) {
+      console.error('Error deleting technician:', error)
+      toast.error(error.message || 'Kunde inte ta bort tekniker')
+      throw error
+    }
+  },
+
+  async getTechnicianStats(): Promise<{
+    total: number
+    active: number
+    byRole: Record<string, number>
+  }> {
+    try {
+      const technicians = await this.getAllTechnicians()
+      
+      const stats = {
+        total: technicians.length,
+        active: technicians.filter(t => t.is_active).length,
+        byRole: technicians.reduce((acc, technician) => {
+          acc[technician.role] = (acc[technician.role] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+      }
+      
+      return stats
+    } catch (error) {
+      return { total: 0, active: 0, byRole: {} }
+    }
+  },
+
+  formatPhoneForDisplay(phone: string | null): string {
+    if (!phone) return '-'
+    
+    // Konvertera från +46 format till 0 format för visning
+    if (phone.startsWith('+46')) {
+      const number = phone.slice(3)
+      return `0${number.slice(0, 2)}-${number.slice(2, 5)} ${number.slice(5, 7)} ${number.slice(7)}`
+    }
+    
+    return phone
+  },
+
+  formatPhoneForLink(phone: string | null): string | null {
+    if (!phone) return null
+    return phone // Behåll +46 format för tel: länkar
+  }
+}
 
 // Modal för att skapa/redigera tekniker
 function TechnicianModal({ 
