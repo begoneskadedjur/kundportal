@@ -101,6 +101,7 @@ const MonthlyChart = ({ title, chartState, onYearChange, type = 'contracts' }: {
   );
 };
 
+
 // --- ÖVRIGA KOMPONENTER (korrekt formaterade) ---
 
 const MonthlyGrowthAnalysisCard = ({ analysis }: { analysis: MonthlyGrowthAnalysis }) => (
@@ -132,7 +133,7 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
   </Card>
 );
 
-// FIX: Denna komponent anropar nu den korrekta funktionen och hanterar sitt eget state
+// FIX: Denna komponent anropar den korrekta funktionen och hanterar sitt eget state
 const SegmentPerformanceCard = () => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<ARRByBusinessType[]>([]);
