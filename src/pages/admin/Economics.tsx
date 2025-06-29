@@ -1,10 +1,10 @@
-// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v3
+// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v4
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Activity, Gift, Zap, Bug, UserCheck,
+  Activity, Gift, Zap, Bug, UserCheck, Briefcase,
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -57,7 +57,7 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear - 1)} className="text-slate-400 hover:text-white"><ChevronLeftIcon className="w-4 h-4" /></Button>
           <span className="text-white font-medium px-3">{currentYear}</span>
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear > new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
         </div>
       </div>
       <div className="h-64 flex items-end justify-between gap-2 mb-4">
@@ -111,57 +111,53 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
   </Card>
 );
 
-const BusinessTypeBreakdown = ({ data }: { data: ARRByBusinessType[] }) => {
-  const [showAll, setShowAll] = useState(false);
-  const { totalARR, totalCaseRevenue, sortedData } = useMemo(() => {
-    const totalARR = data.reduce((sum, item) => sum + item.arr, 0);
-    const totalCaseRevenue = data.reduce((sum, item) => sum + item.additional_case_revenue, 0);
+const SegmentPerformanceCard = () => {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [data, setData] = useState<ARRByBusinessType[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSegmentData = async () => {
+      setLoading(true);
+      const segmentData = await economicStatisticsService.getARRByBusinessTypeForYear(year);
+      setData(segmentData);
+      setLoading(false);
+    };
+    fetchSegmentData();
+  }, [year]);
+
+  const { sortedData } = useMemo(() => {
     const sortedData = [...data].sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
-    return { totalARR, totalCaseRevenue, sortedData };
+    return { sortedData };
   }, [data]);
 
-  const visibleData = showAll ? sortedData : sortedData.slice(0, 7);
   const maxRevenue = Math.max(...sortedData.map(d => d.arr + d.additional_case_revenue), 1);
 
   return (
-    <Card>
+    <Card className="col-span-1 lg:col-span-2">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">Intäkter per Verksamhetstyp</h2>
-        <div className="text-right">
-          <p className="text-lg font-bold text-white">{formatCurrency(totalARR + totalCaseRevenue)}</p>
-          <p className="text-xs text-slate-400">Total intäkt från segment</p>
+        <h2 className="text-xl font-bold text-white">Segmentanalys</h2>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setYear(year - 1)} className="text-slate-400 hover:text-white"><ChevronLeftIcon className="w-4 h-4" /></Button>
+          <span className="text-white font-medium px-3">{year}</span>
+          <Button variant="ghost" size="sm" onClick={() => setYear(year + 1)} disabled={year >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
         </div>
       </div>
-      <div className="space-y-3">
-        {visibleData.map(item => {
-          const totalItemRevenue = item.arr + item.additional_case_revenue;
-          const barWidth = (totalItemRevenue / maxRevenue) * 100;
-          const arrWidth = totalItemRevenue > 0 ? (item.arr / totalItemRevenue) * 100 : 0;
-          return (
-            <div key={item.business_type} className="group">
-              <div className="flex justify-between items-center mb-1 text-sm">
-                <span className="font-medium text-white capitalize">{item.business_type} ({item.customer_count})</span>
-                <span className="font-semibold text-white">{formatCurrency(totalItemRevenue)}</span>
+      {loading ? (
+        <div className="h-48 flex items-center justify-center"><Activity className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : (
+        <div className="space-y-3">
+          {sortedData.length > 0 ? sortedData.slice(0, 7).map(item => {
+            const totalItemRevenue = item.arr + item.additional_case_revenue;
+            const barWidth = (totalItemRevenue / maxRevenue) * 100;
+            const arrWidth = totalItemRevenue > 0 ? (item.arr / totalItemRevenue) * 100 : 0;
+            return (
+              <div key={item.business_type}>
+                <div className="flex justify-between items-center mb-1 text-sm"><span className="font-medium text-white capitalize">{item.business_type} ({item.customer_count})</span><span className="font-semibold text-white">{formatCurrency(totalItemRevenue)}</span></div>
+                <div className="w-full bg-slate-800 rounded-full h-4 relative"><div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barWidth}%`}}><Tooltip content={`Avtal: ${formatCurrency(item.arr)}`}><div className="h-full bg-green-500" style={{ width: `${arrWidth}%`}} /></Tooltip><Tooltip content={`Ärenden: ${formatCurrency(item.additional_case_revenue)}`}><div className="h-full bg-cyan-500" style={{ width: `${100 - arrWidth}%`}} /></Tooltip></div></div>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-4 relative overflow-hidden">
-                <div className="h-full flex" style={{ width: `${barWidth}%`}}>
-                  <Tooltip content={`Avtal: ${formatCurrency(item.arr)}`}>
-                    <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${arrWidth}%`}} />
-                  </Tooltip>
-                   <Tooltip content={`Ärenden: ${formatCurrency(item.additional_case_revenue)}`}>
-                    <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${100 - arrWidth}%`}} />
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {sortedData.length > 7 && (
-        <div className="text-center mt-4">
-          <Button variant="link" onClick={() => setShowAll(!showAll)}>
-            {showAll ? 'Visa färre' : `Visa alla ${sortedData.length} verksamhetstyper`}
-          </Button>
+            );
+          }) : <p className="text-slate-400 text-center py-10">Ingen data för valt år.</p>}
         </div>
       )}
     </Card>
@@ -197,32 +193,39 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   )
 }
 
-const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
-  const maxValue = Math.max(...data.map(d => d.projectedARR), 1);
-  return (
-    <Card>
-      <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-        <TrendingUp className="w-5 h-5 text-blue-500"/>
-        ARR - Aktiva avtal
-      </h2>
-      <div className="h-64 flex items-end justify-between gap-4">
-        {data.map(yearData => {
-          const height = maxValue > 0 ? (yearData.projectedARR / maxValue) * 230 : 0;
-          return (
-            <div key={yearData.year} className="flex flex-col items-center flex-1 group">
-              <div className="text-sm text-blue-400 font-semibold mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                {formatCurrency(yearData.projectedARR)}
-              </div>
-              <div className="w-full max-w-12 bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400" style={{ height: `${height}px` }}/>
-              <div className="mt-2 text-center font-bold text-white">{yearData.year}</div>
+const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
+  <Card>
+    <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+      <TrendingUp className="w-5 h-5 text-blue-500"/>Framtida ARR
+    </h2>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {data.map((yearData, index) => {
+        const prevYearARR = index > 0 ? data[index - 1].projectedARR : 0;
+        const growth = prevYearARR > 0 ? ((yearData.projectedARR - prevYearARR) / prevYearARR) * 100 : 0;
+        const isCurrentYear = yearData.year === new Date().getFullYear();
+        return (
+          <div key={yearData.year} className={`p-4 rounded-lg flex flex-col justify-between ${isCurrentYear ? 'bg-blue-500/20 border border-blue-500/50' : 'bg-slate-800/50'}`}>
+            <div>
+              <p className={`font-bold text-lg ${isCurrentYear ? 'text-blue-300' : 'text-slate-400'}`}>{yearData.year}</p>
+              <p className="text-2xl font-bold text-white mt-1">{formatCurrency(yearData.projectedARR)}</p>
             </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-};
-
+            <div className="mt-4">
+              {index > 0 && (
+                <div className={`flex items-center text-sm ${growth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {growth >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                  <span className="ml-1">{growth.toFixed(1)}%</span>
+                </div>
+              )}
+              <div className="flex items-center text-xs text-slate-500 mt-1">
+                <Briefcase className="w-3 h-3 mr-1.5"/>{yearData.activeContracts} avtal
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </Card>
+);
 
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
@@ -236,15 +239,8 @@ export default function Economics() {
   const [contractsChartData, setContractsChartData] = useState<Array<{ month: string, value: number }>>([]);
   const [caseRevenueChartData, setCaseRevenueChartData] = useState<Array<{ month: string, value: number }>>([]);
   
-  useEffect(() => {
-    fetchEconomicData();
-  }, []);
-
-  useEffect(() => {
-    if(!loading) { 
-        fetchChartData(contractsChartYear, caseRevenueChartYear);
-    }
-  }, [contractsChartYear, caseRevenueChartYear, loading]);
+  useEffect(() => { fetchEconomicData(); }, []);
+  useEffect(() => { if(!loading) fetchChartData(contractsChartYear, caseRevenueChartYear); }, [contractsChartYear, caseRevenueChartYear, loading]);
 
   const fetchEconomicData = async () => {
     setLoading(true);
@@ -291,7 +287,7 @@ export default function Economics() {
     return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
 
-  const { arr, growthAnalysis, arrByBusinessType, upsellOpportunities, performanceStats, arrProjections } = dashboardStats;
+  const { arr, growthAnalysis, upsellOpportunities, performanceStats, arrProjections } = dashboardStats;
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -316,9 +312,7 @@ export default function Economics() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <BusinessTypeBreakdown data={arrByBusinessType} />
-          </div>
+          <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
         
@@ -327,7 +321,7 @@ export default function Economics() {
           <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
         </div>
 
-        <ARRProjectionChart data={arrProjections} />
+        <FutureARRChart data={arrProjections} />
         
         <PerformanceAndRevenueCard data={performanceStats} />
         
