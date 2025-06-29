@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, TrendingUp, DollarSign, Calendar, Target, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react' // Lade till useMemo
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, TrendingUp, DollarSign, Calendar, Target, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import toast from 'react-hot-toast'
+
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import ManageSpendCard from '../../components/admin/ManageSpendCard'
-// FIX: Importen har ändrats till att använda den nya, kombinerade statisticsService
-import { statisticsService, UpsellOpportunity, TechnicianPerformance, MonthlyGrowthAnalysis, ARRProjection } from '../../services/statisticsService'
-import { customerService } from '../../services/customerService'
-import { caseService } from '../../services/caseService'
-import toast from 'react-hot-toast'
 
-// Typdefinitionen är oförändrad
+// FIX: Importerar KLASSERNA, inte färdiga objekt.
+import { StatisticsService, UpsellOpportunity, TechnicianPerformance, MonthlyGrowthAnalysis, ARRProjection } from '../../services/statisticsService'
+import { CustomerService } from '../../services/customerService'
+import { CaseService } from '../../services/caseService'
+
+// Typdefinition är oförändrad
 type EconomicData = {
   totalRevenue: number
   totalCaseRevenue: number
@@ -22,36 +24,42 @@ type EconomicData = {
   avgCustomerValue: number
 }
 
+// --- Huvudkomponent ---
+
 export default function Economics() {
   const navigate = useNavigate()
+
+  // FIX: Skapar stabila instanser av dina services inuti komponenten.
+  // Detta sker efter att alla filer laddats och förhindrar cirkulära beroenden.
+  const statisticsService = useMemo(() => new StatisticsService(), [])
+  const customerService = useMemo(() => new CustomerService(), [])
+  const caseService = useMemo(() => new CaseService(), [])
+
+  // -- State-hantering (oförändrad) --
   const [loading, setLoading] = useState(true)
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(() => new Date())
   
-  // State-variablerna är oförändrade
-  const [yearlyData, setYearlyData] = useState<EconomicData>({
-    totalRevenue: 0, totalCaseRevenue: 0, totalSpend: 0, newCustomers: 0,
-    cac: 0, ltv: 0, roi: 0, avgCustomerValue: 0
-  })
+  const [yearlyData, setYearlyData] = useState<EconomicData>({ totalRevenue: 0, totalCaseRevenue: 0, totalSpend: 0, newCustomers: 0, cac: 0, ltv: 0, roi: 0, avgCustomerValue: 0 })
   const [segmentData, setSegmentData] = useState<Array<{ businessType: string; customers: number; revenue: number }>>([])
   const [upsellData, setUpsellData] = useState<UpsellOpportunity[]>([])
   const [technicianPerformance, setTechnicianPerformance] = useState<TechnicianPerformance[]>([])
   const [monthlyGrowth, setMonthlyGrowth] = useState<MonthlyGrowthAnalysis | null>(null)
   const [arrProjections, setArrProjections] = useState<ARRProjection[]>([])
 
-  // Funktion för att hämta all data vid sidladdning eller årsbyte
+  // --- Datahämtning (logiken är densamma, men använder de lokala service-instanserna) ---
+
   const fetchAllData = async () => {
     setLoading(true)
     try {
       const [customers, cases, yearSpendData] = await Promise.all([
         customerService.getCustomers(),
         caseService.getCases(),
-        statisticsService.getYearlySpend(currentYear) // ANVÄNDER NYA SERVICEN
+        statisticsService.getYearlySpend(currentYear)
       ])
 
       const activeCustomers = customers.filter(c => c.is_active)
       
-      // ÅRLIGA BERÄKNINGAR (logiken är oförändrad)
       const totalRevenue = activeCustomers.reduce((sum, c) => sum + (c.annual_premium || 0), 0)
       const totalCaseRevenue = cases.filter(c => c.completed_date && new Date(c.completed_date).getFullYear() === currentYear).reduce((sum, c) => sum + (c.price || 0), 0)
       const totalSpend = yearSpendData.reduce((sum, month) => sum + month.spend, 0)
@@ -64,12 +72,11 @@ export default function Economics() {
 
       setYearlyData({ totalRevenue, totalCaseRevenue, totalSpend, newCustomers: newCustomersThisYear, cac, ltv, roi, avgCustomerValue: avgAnnualPremium })
 
-      // HÄMTA ÖVRIGA STATISTIK-OBJEKT
       const [upsellOpportunities, monthlyGrowthAnalysis, projections, businessSegments] = await Promise.all([
-        statisticsService.getUpsellOpportunities(customers, cases, 5), // ANVÄNDER NYA SERVICEN
-        statisticsService.getMonthlyGrowthAnalysis(customers),         // ANVÄNDER NYA SERVICEN
-        statisticsService.getARRProjections(customers),              // ANVÄNDER NYA SERVICEN
-        statisticsService.getARRByBusinessType(customers, cases)       // ANVÄNDER NYA SERVICEN
+        statisticsService.getUpsellOpportunities(customers, cases, 5),
+        statisticsService.getMonthlyGrowthAnalysis(customers),
+        statisticsService.getARRProjections(customers),
+        statisticsService.getARRByBusinessType(customers, cases)
       ])
 
       setUpsellData(upsellOpportunities)
@@ -79,46 +86,29 @@ export default function Economics() {
 
       await fetchMonthlyPerformance()
 
-    } catch (error) {
-      console.error('Error fetching yearly data:', error)
-      toast.error('Kunde inte hämta årsdata')
-    } finally {
-      setLoading(false)
-    }
+    } catch (error) { console.error('Error fetching yearly data:', error); toast.error('Kunde inte hämta årsdata') } 
+    finally { setLoading(false) }
   }
 
   const fetchMonthlyPerformance = async () => {
     try {
-      const performanceStats = await statisticsService.getPerformanceStatsForMonth(selectedMonth) // ANVÄNDER NYA SERVICEN
+      const performanceStats = await statisticsService.getPerformanceStatsForMonth(selectedMonth)
       setTechnicianPerformance(performanceStats.byTechnician)
-    } catch (error) {
-      console.error('Error fetching monthly performance data:', error)
-      toast.error('Kunde inte hämta månadsdata')
-    }
+    } catch (error) { console.error('Error fetching monthly performance data:', error); toast.error('Kunde inte hämta månadsdata') }
   }
   
-  useEffect(() => {
-    fetchAllData()
-  }, [currentYear])
+  // --- Side Effects ---
+  useEffect(() => { fetchAllData() }, [currentYear])
+  useEffect(() => { if (!loading) { fetchMonthlyPerformance() } }, [selectedMonth])
 
-  useEffect(() => {
-    if (!loading) {
-      fetchMonthlyPerformance()
-    }
-  }, [selectedMonth])
-
-  // HJÄLPFUNKTIONER (oförändrade)
-  const getBusinessTypeLabel = (value: string): string => {
-    const types: { [key: string]: string } = { 'brf': 'BRF', 'restaurant': 'Restaurang', 'hotel': 'Hotell', 'fastighetsägare': 'Fastighetsägare', 'boendeverksamhet': 'Boendeverksamhet', 'livsmedelsbutik': 'Livsmedelsbutik', 'hästgård': 'Hästgård', 'såverk': 'Såverk', 'fastighetsförvaltning': 'Fastighetsförvaltning', 'livsmedelsindustri': 'Livsmedelsindustri', 'samfällighet': 'Samfällighet', 'annat': 'Annat' }
-    return types[value] || value
-  }
+  // --- Hjälpfunktioner och Handlers ---
+  const getBusinessTypeLabel = (value: string): string => { const types: { [key: string]: string } = { 'brf': 'BRF', 'restaurant': 'Restaurang', 'hotel': 'Hotell', 'fastighetsägare': 'Fastighetsägare', 'boendeverksamhet': 'Boendeverksamhet', 'livsmedelsbutik': 'Livsmedelsbutik', 'hästgård': 'Hästgård', 'såverk': 'Såverk', 'fastighetsförvaltning': 'Fastighetsförvaltning', 'livsmedelsindustri': 'Livsmedelsindustri', 'samfällighet': 'Samfällighet', 'annat': 'Annat' }; return types[value] || value }
   const formatCurrency = (amount: number): string => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0 }).format(amount)
   const formatMonth = (date: Date): string => date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setSelectedMonth(prev => { const newDate = new Date(prev); newDate.setMonth(newDate.getMonth() + (direction === 'prev' ? -1 : 1)); return newDate })
-  }
+  const navigateMonth = (direction: 'prev' | 'next') => { setSelectedMonth(prev => { const newDate = new Date(prev); newDate.setMonth(newDate.getMonth() + (direction === 'prev' ? -1 : 1)); return newDate }) }
   const handleSpendUpdate = () => { fetchAllData() }
 
+  // --- Renderingslogik ---
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -136,44 +126,21 @@ export default function Economics() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" /> Tillbaka
-              </Button>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Tillbaka</Button>
               <h1 className="text-2xl font-bold text-white">Ekonomisk Översikt</h1>
             </div>
             <Button onClick={fetchAllData} disabled={loading}>Uppdatera</Button>
           </div>
         </div>
       </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-12">
           <h2 className="text-xl font-semibold text-white mb-6">Årsöversikt {currentYear}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div><p className="text-slate-400 text-sm">ARR (Årlig)</p><p className="text-2xl font-bold text-green-400">{formatCurrency(yearlyData.totalRevenue)}</p></div>
-                <TrendingUp className="w-8 h-8 text-green-500" />
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div><p className="text-slate-400 text-sm">Ärende-intäkter (år)</p><p className="text-2xl font-bold text-blue-400">{formatCurrency(yearlyData.totalCaseRevenue)}</p></div>
-                <DollarSign className="w-8 h-8 text-blue-500" />
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div><p className="text-slate-400 text-sm">MRR</p><p className="text-2xl font-bold text-white">{formatCurrency(yearlyData.totalRevenue / 12)}</p></div>
-                <Calendar className="w-8 h-8 text-purple-500" />
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div><p className="text-slate-400 text-sm">Total Intäkt (år)</p><p className="text-2xl font-bold text-white">{formatCurrency(yearlyData.totalRevenue + yearlyData.totalCaseRevenue)}</p></div>
-                <Target className="w-8 h-8 text-yellow-500" />
-              </div>
-            </Card>
+            <Card><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">ARR (Årlig)</p><p className="text-2xl font-bold text-green-400">{formatCurrency(yearlyData.totalRevenue)}</p></div><TrendingUp className="w-8 h-8 text-green-500" /></div></Card>
+            <Card><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">Ärende-intäkter (år)</p><p className="text-2xl font-bold text-blue-400">{formatCurrency(yearlyData.totalCaseRevenue)}</p></div><DollarSign className="w-8 h-8 text-blue-500" /></div></Card>
+            <Card><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">MRR</p><p className="text-2xl font-bold text-white">{formatCurrency(yearlyData.totalRevenue / 12)}</p></div><Calendar className="w-8 h-8 text-purple-500" /></div></Card>
+            <Card><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">Total Intäkt (år)</p><p className="text-2xl font-bold text-white">{formatCurrency(yearlyData.totalRevenue + yearlyData.totalCaseRevenue)}</p></div><Target className="w-8 h-8 text-yellow-500" /></div></Card>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <Card>
