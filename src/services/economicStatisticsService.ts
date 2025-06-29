@@ -1,7 +1,5 @@
 // src/services/economicStatisticsService.ts - KOMPLETT VERSION med alla funktioner
 import { supabase } from '../lib/supabase'
-import { technicianStatisticsService } from './technicianStatisticsService'
-import type { TechnicianStats } from './technicianStatisticsService'
 
 // --- Typer och Interfaces ---
 type CustomerData = { 
