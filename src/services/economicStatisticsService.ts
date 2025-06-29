@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FINAL FIX: Re-introduces the specific function needed by the SegmentPerformanceCard component.
+// src/services/economicStatisticsService.ts - Properly formatted and with dynamic CAC calculation
 
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
@@ -39,8 +39,7 @@ export interface UnitEconomics { cac: number; ltv: number; ltvToCacRatio: number
 export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; unitEconomics: UnitEconomics; }
 
 class EconomicStatisticsService {
-
-  // Huvudmetod för dashboarden - optimeringarna är kvar
+  
   getDashboardStats = async (periodInDays: number = 30): Promise<DashboardStats> => {
     try {
       const [customersRes, casesRes] = await Promise.all([
@@ -81,10 +80,52 @@ class EconomicStatisticsService {
     }
   }
 
-  // =================================================================================================
-  // === FIX: ÅTERINFÖR DEN SPECIFIKA FUNKTIONEN SOM SegmentPerformanceCard BEHÖVER ===
-  // Denna funktion anropas direkt av komponenten och är inte en del av den optimerade getDashboardStats-kedjan.
-  // =================================================================================================
+  getUnitEconomics = async (arrStats: ARRStats): Promise<UnitEconomics> => {
+    // Steg 1: Hämta den SENASTE posten från marknadskostnader
+    const { data: latestSpendEntry, error: spendError } = await supabase
+      .from('monthly_marketing_spend')
+      .select('month, spend')
+      .order('month', { ascending: false })
+      .limit(1)
+      .single();
+
+    // Beräkna en standard-LTV som fallback
+    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01;
+    const defaultLtv = churnRateForLTV > 0 ? arrStats.averageARRPerCustomer / churnRateForLTV : 0;
+    
+    // Om ingen kostnadspost finns, returnera 0 för CAC-relaterade värden
+    if (spendError || !latestSpendEntry) {
+      if (spendError && spendError.code !== 'PGRST116') {
+        console.error("Error fetching marketing spend:", spendError);
+      }
+      return { cac: 0, ltv: defaultLtv, ltvToCacRatio: 0, paybackPeriodMonths: 0 };
+    }
+    
+    // Steg 2: Använd den hittade månadens data
+    const marketingSpend = latestSpendEntry.spend;
+    const spendMonth = new Date(latestSpendEntry.month);
+
+    // Steg 3: Hitta antalet nya kunder under EXAKT SAMMA MÅNAD som kostnaden
+    const firstDayOfSpendMonth = new Date(spendMonth.getFullYear(), spendMonth.getMonth(), 1);
+    const lastDayOfSpendMonth = new Date(spendMonth.getFullYear(), spendMonth.getMonth() + 1, 0);
+
+    const { count: newCustomersInSpendMonth, error: customersError } = await supabase
+      .from('customers')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayOfSpendMonth.toISOString())
+      .lte('created_at', lastDayOfSpendMonth.toISOString());
+
+    if (customersError) throw customersError;
+
+    // Steg 4: Beräkna CAC och övriga värden
+    const cac = newCustomersInSpendMonth && newCustomersInSpendMonth > 0 ? marketingSpend / newCustomersInSpendMonth : 0;
+    const ltvToCacRatio = cac > 0 ? defaultLtv / cac : 0;
+    const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
+    const paybackPeriodMonths = avgMrrPerCustomer > 0 ? cac / avgMrrPerCustomer : 0;
+
+    return { cac, ltv: defaultLtv, ltvToCacRatio, paybackPeriodMonths };
+  }
+
   getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
     const yearStart = new Date(targetYear, 0, 1);
     const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
@@ -152,10 +193,7 @@ class EconomicStatisticsService {
       additional_case_revenue: data.caseRevenue
     })).sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
   }
-  // === SLUT PÅ FIX ===
 
-
-  // Alla andra metoder är oförändrade och använder de optimerade anropen
   getARRStats = async (allCustomers: CustomerData[], allCases: CaseData[], periodInDays: number): Promise<ARRStats> => {
     const paidCases = allCases.filter(c => c.completed_date && c.price && c.price > 0);
     const activeCustomers = allCustomers.filter(c => c.is_active);
@@ -186,40 +224,6 @@ class EconomicStatisticsService {
       averageCasePrice: paidCases.length > 0 ? additionalCaseRevenue / paidCases.length : 0,
       paidCasesThisMonth,
     };
-  }
-
-  getUnitEconomics = async (arrStats: ARRStats): Promise<UnitEconomics> => {
-    const today = new Date();
-    const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-
-    const { data: spendData, error: spendError } = await supabase
-      .from('monthly_marketing_spend')
-      .select('spend')
-      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0])
-      .single();
-    
-    if (spendError && spendError.code !== 'PGRST116') { 
-      console.error("Error fetching marketing spend:", spendError);
-    }
-    const marketingSpend = spendData?.spend || 0;
-
-    const { count: newCustomersLastMonth, error: customersError } = await supabase
-      .from('customers')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', firstDayOfLastMonth.toISOString())
-      .lte('created_at', lastDayOfLastMonth.toISOString());
-
-    if (customersError) throw customersError;
-
-    const cac = newCustomersLastMonth && newCustomersLastMonth > 0 ? marketingSpend / newCustomersLastMonth : 0;
-    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01;
-    const ltv = churnRateForLTV > 0 ? arrStats.averageARRPerCustomer / churnRateForLTV : 0;
-    const ltvToCacRatio = cac > 0 ? ltv / cac : 0;
-    const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
-    const paybackPeriodMonths = avgMrrPerCustomer > 0 ? cac / avgMrrPerCustomer : 0;
-
-    return { cac, ltv, ltvToCacRatio, paybackPeriodMonths };
   }
   
   getARRByBusinessType = async (allCustomers: CustomerData[], allCases: CaseData[]): Promise<ARRByBusinessType[]> => {

@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx
+// src/pages/admin/Economics.tsx - FINAL: With correct formatting and component placement.
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,21 +6,25 @@ import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Trash2, Save
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import Input from '../../components/ui/Input';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
-import ManageSpendCard from '../../components/admin/ManageSpendCard'; // <-- NY IMPORT
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
 type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
+type SpendEntry = { id: number; month: string; spend: number; notes: string | null; };
 
-// --- FORMATTERING & UI-KOMPONENTER ---
+// --- FORMATTERING & HJÄLPFUNKTIONER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
+
+// --- UI-KOMPONENTER ---
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
   const [show, setShow] = useState(false);
@@ -289,11 +293,9 @@ export default function Economics() {
   const [caseRevenueChartState, setCaseRevenueChartState] = useState<ChartState>(initialChartState);
   
   const fetchEconomicData = async () => {
-    // Vid uppdatering av kostnader, behöver vi inte sätta hela sidan i laddningsläge
     if (!pageLoading) {
-      setDashboardStats(null); // Rensa gammal data för att visa uppdatering
+      setPageLoading(true); // Visa spinner vid manuell uppdatering
     }
-
     setPageError(null);
     try {
       const stats = await economicStatisticsService.getDashboardStats(30);
@@ -388,8 +390,6 @@ export default function Economics() {
           <MonthlyGrowthAnalysisCard analysis={growthAnalysis} />
         </div>
         
-        <ManageSpendCard onDataChange={fetchEconomicData} />
-        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
@@ -425,6 +425,9 @@ export default function Economics() {
             </div>
           </Card>
         </div>
+        
+        {/* ManageSpendCard har flyttats hit, längst ner */}
+        <ManageSpendCard onDataChange={fetchEconomicData} />
 
         <div className="mt-8 flex items-center justify-between text-xs text-slate-500">
           <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
