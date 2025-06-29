@@ -114,10 +114,17 @@ const AccountManagerRevenueChart: React.FC = () => {
     }
   })
 
-  // Identifiera topp performers
+  // Identifiera topp performers med konverterade namn
   const topRevenue = accountManagerRevenue[0]
   const mostCustomers = [...accountManagerRevenue].sort((a, b) => b.customers_count - a.customers_count)[0]
   const highestAvgValue = [...accountManagerRevenue].sort((a, b) => b.avg_contract_value - a.avg_contract_value)[0]
+
+  // Hjälpfunktion för att konvertera email till namn
+  const convertEmailToName = (email: string): string => {
+    return email.split('@')[0].replace('.', ' ').split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+  }
 
   return (
     <Card>
@@ -264,9 +271,7 @@ const AccountManagerRevenueChart: React.FC = () => {
             {accountManagerRevenue.map((am, index) => (
               <div key={am.account_manager} className="flex items-center justify-between text-xs bg-slate-800/30 rounded px-2 py-1">
                 <span className="text-slate-300">
-                  #{index + 1} {am.account_manager.split('@')[0].replace('.', ' ').split(' ').map(word => 
-                    word.charAt(0).toUpperCase() + word.slice(1)
-                  ).join(' ')}
+                  #{index + 1} {convertEmailToName(am.account_manager)}
                 </span>
                 <div className="flex items-center space-x-3 text-slate-400">
                   <span>{formatCurrency(am.annual_revenue)}</span>
