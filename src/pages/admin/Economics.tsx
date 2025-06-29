@@ -1,10 +1,11 @@
-// src/pages/admin/Economics.tsx - UPPGRADERAD MED ENHETSEKONOMI (CAC, LTV)
+// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION med alla komponenter och fixar
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale
+  Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -54,9 +55,9 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2"><BarChart3 className="w-5 h-5 text-green-500" />{title}</h3>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear - 1)} className="text-slate-400 hover:text-white"><ChevronLeftIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear - 1)} className="text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></Button>
           <span className="text-white font-medium px-3">{currentYear}</span>
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRight className="w-4 h-4" /></Button>
         </div>
       </div>
       <div className="h-64 flex items-end justify-between gap-2 mb-4">
@@ -145,9 +146,9 @@ const SegmentPerformanceCard = () => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-white">Segmentanalys</h2>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setYear(year - 1)} className="text-slate-400 hover:text-white"><ChevronLeftIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => setYear(year - 1)} className="text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></Button>
           <span className="text-white font-medium px-3">{year}</span>
-          <Button variant="ghost" size="sm" onClick={() => setYear(year + 1)} disabled={year >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => setYear(year + 1)} disabled={year >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRight className="w-4 h-4" /></Button>
         </div>
       </div>
       {loading ? (
@@ -236,7 +237,6 @@ const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   </Card>
 );
 
-// 🆕 NY KOMPONENT FÖR ENHETSEKONOMI
 const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
   <Card>
     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
