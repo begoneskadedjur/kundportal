@@ -1,4 +1,5 @@
-// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION med alla komponenter och fixar
+// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION with robust chart handling & proper formatting
+
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -12,6 +13,15 @@ import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
+
+// --- TYPER & GRÄNSSNITT ---
+type ChartDataPoint = { month: string; value: number };
+type ChartState = {
+  loading: boolean;
+  error: string | null;
+  data: ChartDataPoint[];
+  year: number;
+};
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -45,9 +55,9 @@ const MetricCard = ({ title, value, icon: Icon, color, tooltip }: { title: strin
   </Tooltip>
 );
 
-const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contracts' }: { title: string; data: Array<{ month: string, value: number }>; currentYear: number; onYearChange: (year: number) => void; type?: 'contracts' | 'revenue' }) => {
+const MonthlyChart = ({ title, chartState, onYearChange, type = 'contracts' }: { title: string; chartState: ChartState; onYearChange: (year: number) => void; type?: 'contracts' | 'revenue' }) => {
   const formatValue = (amount: number) => type === 'revenue' ? formatCurrency(amount) : amount.toString();
-  const maxValue = Math.max(...data.map(d => d.value), 1);
+  const maxValue = Math.max(...chartState.data.map(d => d.value), 1);
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
   
   return (
@@ -55,32 +65,44 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2"><BarChart3 className="w-5 h-5 text-green-500" />{title}</h3>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear - 1)} className="text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></Button>
-          <span className="text-white font-medium px-3">{currentYear}</span>
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRight className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(chartState.year - 1)} className="text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></Button>
+          <span className="text-white font-medium px-3">{chartState.year}</span>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(chartState.year + 1)} disabled={chartState.year >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRight className="w-4 h-4" /></Button>
         </div>
       </div>
-      <div className="h-64 flex items-end justify-between gap-2 mb-4">
-        {data.map((monthData, index) => {
-          if (!monthData) return null;
-          const height = maxValue > 0 ? (monthData.value / maxValue) * 200 : 0;
-          return (
-            <div key={index} className="flex flex-col items-center flex-1 group">
-              <div className="relative w-full rounded-t-lg transition-all duration-300 group-hover:opacity-80" style={{ height: `${height}px`, minHeight: '4px', backgroundColor: type === 'contracts' ? '#22c55e' : '#3b82f6' }}>
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-800 text-white text-xs px-2 py-1 rounded">{formatValue(monthData.value)}</div>
-              </div>
-              <div className="mt-2 text-xs text-slate-400">{monthNames[index]}</div>
-            </div>
-          );
-        })}
+      <div className="h-64 flex items-center justify-center">
+        {chartState.loading ? (
+           <Activity className="w-6 h-6 animate-spin text-blue-500" />
+        ) : chartState.error ? (
+          <div className="text-red-400 flex items-center gap-2"><AlertTriangle className="w-5 h-5"/>{chartState.error}</div>
+        ) : (
+          <div className="h-full w-full flex items-end justify-between gap-2 mb-4">
+            {chartState.data.map((monthData, index) => {
+              const height = maxValue > 0 ? (monthData.value / maxValue) * 200 : 0;
+              return (
+                <div key={index} className="flex flex-col items-center flex-1 group">
+                  <div className="relative w-full rounded-t-lg transition-all duration-300 group-hover:opacity-80" style={{ height: `${height}px`, minHeight: '4px', backgroundColor: type === 'contracts' ? '#22c55e' : '#3b82f6' }}>
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-800 text-white text-xs px-2 py-1 rounded">{formatValue(monthData.value)}</div>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400">{monthNames[index]}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      <div className="pt-4 border-t border-slate-700 text-sm">
-        <span className="text-slate-400">Total {currentYear}: </span>
-        <span className={`font-medium ${type === 'contracts' ? 'text-green-400' : 'text-blue-400'}`}>{formatValue(data.reduce((sum, d) => sum + (d?.value || 0), 0))}</span>
-      </div>
+      {!chartState.loading && !chartState.error && (
+        <div className="pt-4 border-t border-slate-700 text-sm">
+          <span className="text-slate-400">Total {chartState.year}: </span>
+          <span className={`font-medium ${type === 'contracts' ? 'text-green-400' : 'text-blue-400'}`}>{formatValue(chartState.data.reduce((sum, d) => sum + (d?.value || 0), 0))}</span>
+        </div>
+      )}
     </Card>
   );
 };
+
+
+// --- ÖVRIGA KOMPONENTER (korrekt formaterade) ---
 
 const MonthlyGrowthAnalysisCard = ({ analysis }: { analysis: MonthlyGrowthAnalysis }) => (
   <Card className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-slate-700 h-full">
@@ -134,9 +156,8 @@ const SegmentPerformanceCard = () => {
     fetchSegmentData();
   }, [year]);
 
-  const { sortedData } = useMemo(() => {
-    const sortedData = [...data].sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
-    return { sortedData };
+  const sortedData = useMemo(() => {
+    return [...data].sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
   }, [data]);
 
   const maxRevenue = Math.max(...sortedData.map(d => d.arr + d.additional_case_revenue), 1);
@@ -201,7 +222,7 @@ const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
       </div>
     </Card>
   )
-}
+};
 
 const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   <Card>
@@ -263,63 +284,105 @@ const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
   </Card>
 );
 
+
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
 
-  const [contractsChartYear, setContractsChartYear] = useState(new Date().getFullYear());
-  const [caseRevenueChartYear, setCaseRevenueChartYear] = useState(new Date().getFullYear());
-  const [contractsChartData, setContractsChartData] = useState<Array<{ month: string, value: number }>>([]);
-  const [caseRevenueChartData, setCaseRevenueChartData] = useState<Array<{ month: string, value: number }>>([]);
+  const initialChartState = { loading: true, error: null, data: [], year: new Date().getFullYear() };
+  const [contractsChartState, setContractsChartState] = useState<ChartState>(initialChartState);
+  const [caseRevenueChartState, setCaseRevenueChartState] = useState<ChartState>(initialChartState);
   
-  useEffect(() => { fetchEconomicData(); }, []);
-  useEffect(() => { if(!loading) fetchChartData(contractsChartYear, caseRevenueChartYear); }, [contractsChartYear, caseRevenueChartYear, loading]);
+  // Hämta huvuddata en gång vid sidladdning
+  useEffect(() => {
+    const fetchEconomicData = async () => {
+      setPageLoading(true);
+      setPageError(null);
+      try {
+        const stats = await economicStatisticsService.getDashboardStats(30);
+        setDashboardStats(stats);
+      } catch (error: any) {
+        setPageError(error.message || 'Kunde inte hämta ekonomisk data');
+      } finally {
+        setPageLoading(false);
+      }
+    };
+    fetchEconomicData();
+  }, []);
 
-  const fetchEconomicData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const stats = await economicStatisticsService.getDashboardStats(30);
-      setDashboardStats(stats);
-    } catch (error: any) {
-      setError(error.message || 'Kunde inte hämta ekonomisk data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Separata useEffects för varje diagram, triggas när deras respektive år ändras
+  useEffect(() => {
+    const fetchContractsData = async () => {
+      setContractsChartState(prev => ({ ...prev, loading: true, error: null }));
+      try {
+        const data = await getYearlyChartData('customers', 'created_at', contractsChartState.year, 'count');
+        setContractsChartState(prev => ({ ...prev, data, loading: false }));
+      } catch (error) {
+        console.error("Error fetching contracts chart data", error);
+        setContractsChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
+      }
+    };
+    fetchContractsData();
+  }, [contractsChartState.year]);
 
-  const fetchChartData = async (contractsYear: number, caseRevenueYear: number) => {
-    try {
-        const [contracts, caseRevenue] = await Promise.all([
-            getYearlyChartData('customers', 'created_at', contractsYear, 'count'),
-            getYearlyChartData('cases', 'completed_date', caseRevenueYear, 'sum', 'price')
-        ]);
-        setContractsChartData(contracts);
-        setCaseRevenueChartData(caseRevenue);
-    } catch (error) { console.error("Error fetching chart data", error); }
-  };
+  useEffect(() => {
+    const fetchCaseRevenueData = async () => {
+      setCaseRevenueChartState(prev => ({ ...prev, loading: true, error: null }));
+      try {
+        const data = await getYearlyChartData('cases', 'completed_date', caseRevenueChartState.year, 'sum', 'price');
+        setCaseRevenueChartState(prev => ({ ...prev, data, loading: false }));
+      } catch (error) {
+        console.error("Error fetching case revenue chart data", error);
+        setCaseRevenueChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
+      }
+    };
+    fetchCaseRevenueData();
+  }, [caseRevenueChartState.year]);
 
-  const getYearlyChartData = async (table: string, date_col: string, year: number, aggregation: 'count' | 'sum', sum_col?: string) => {
+  // Generisk funktion för att hämta årsdata med bättre typsäkerhet
+  const getYearlyChartData = async (
+    table: string, 
+    date_col: string, 
+    year: number, 
+    aggregation: 'count' | 'sum', 
+    sum_col?: string
+  ): Promise<ChartDataPoint[]> => {
+    
+    type RowType = { [date_col: string]: string; [key: string]: any; };
+    
     const select_cols = aggregation === 'sum' ? `${date_col}, ${sum_col}` : date_col;
     let query = supabase.from(table).select(select_cols)
-        .gte(date_col, `${year}-01-01T00:00:00Z`).lt(date_col, `${year + 1}-01-01T00:00:00Z`);
-    if(sum_col) { query = query.not(sum_col, 'is', null).gt(sum_col, 0); }
+        .gte(date_col, `${year}-01-01T00:00:00Z`)
+        .lt(date_col, `${year + 1}-01-01T00:00:00Z`);
+
+    if(sum_col) { 
+      query = query.not(sum_col, 'is', null).gt(sum_col, 0); 
+    }
+
     const { data, error } = await query;
     if(error) throw error;
-    const monthlyData = Array.from({ length: 12 }, (_, i) => ({ month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), value: 0 }));
-    data.forEach((row: any) => {
+    
+    const monthlyData: ChartDataPoint[] = Array.from({ length: 12 }, (_, i) => ({ 
+      month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), 
+      value: 0 
+    }));
+    
+    (data as RowType[]).forEach((row) => {
         if (!row[date_col]) return;
         const monthIndex = new Date(row[date_col]).getMonth();
-        if(aggregation === 'count') monthlyData[monthIndex].value++;
-        else monthlyData[monthIndex].value += row[sum_col!] || 0;
+        if(aggregation === 'count') {
+          monthlyData[monthIndex].value++;
+        } else if (sum_col && typeof row[sum_col] === 'number') {
+          monthlyData[monthIndex].value += row[sum_col];
+        }
     });
     return monthlyData;
   }
 
-  if (loading || !dashboardStats) {
+  if (pageLoading || !dashboardStats) {
     return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
 
@@ -330,12 +393,12 @@ export default function Economics() {
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-4"><Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button><h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1></div>
-          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={loading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />Uppdatera</Button>
+          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} disabled={pageLoading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {error && <Card className="bg-red-500/10 border-red-500/50"><AlertTriangle className="inline w-6 h-6 text-red-400 mr-2"/>{error}</Card>}
+        {pageError && <Card className="bg-red-500/10 border-red-500/50"><AlertTriangle className="inline w-6 h-6 text-red-400 mr-2"/>{pageError}</Card>}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
@@ -355,8 +418,8 @@ export default function Economics() {
         <UnitEconomicsCard data={unitEconomics} />
         
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />
-          <MonthlyChart title="Ärende-intäkter per Månad" data={caseRevenueChartData} currentYear={caseRevenueChartYear} onYearChange={setCaseRevenueChartYear} type="revenue" />
+          <MonthlyChart title="Nya Avtal per Månad" chartState={contractsChartState} onYearChange={(year) => setContractsChartState(prev => ({...prev, year}))} type="contracts" />
+          <MonthlyChart title="Ärende-intäkter per Månad" chartState={caseRevenueChartState} onYearChange={(year) => setCaseRevenueChartState(prev => ({...prev, year}))} type="revenue" />
         </div>
 
         <FutureARRChart data={arrProjections} />
@@ -385,7 +448,7 @@ export default function Economics() {
 
         <div className="mt-8 flex items-center justify-between text-xs text-slate-500">
           <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
-          <div className="flex items-center gap-2"><Zap className="w-3 h-3 text-green-500" /><span>100% verklig data från databas</span></div>
+          <div className="flex items-center gap-2"><Zap className="w-3 h-3 text-green-500" /><span>Verklig data från databas</span></div>
         </div>
       </main>
     </div>
