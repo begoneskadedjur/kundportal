@@ -55,6 +55,14 @@ const ScatterTooltip = ({ active, payload }: any) => {
 const AccountManagerRevenueChart: React.FC = () => {
   const { accountManagerRevenue, loading, error } = useEconomicsDashboard()
 
+  // Hjälpfunktion för att konvertera email till namn - MÅSTE vara här i början
+  const convertEmailToName = (email: string): string => {
+    if (!email || !email.includes('@')) return email || 'N/A'
+    return email.split('@')[0].replace('.', ' ').split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+  }
+
   if (loading) {
     return (
       <Card>
@@ -100,11 +108,14 @@ const AccountManagerRevenueChart: React.FC = () => {
   const totalCustomers = accountManagerRevenue.reduce((sum, am) => sum + am.customers_count, 0)
   const avgRevenuePerManager = totalRevenue / accountManagerRevenue.length
 
+  // Identifiera topp performers med konverterade namn
+  const topRevenue = accountManagerRevenue[0]
+  const mostCustomers = [...accountManagerRevenue].sort((a, b) => b.customers_count - a.customers_count)[0]
+  const highestAvgValue = [...accountManagerRevenue].sort((a, b) => b.avg_contract_value - a.avg_contract_value)[0]
+
   // Förkorta namn för visualisering
   const chartData = accountManagerRevenue.map(am => {
-    const displayName = am.account_manager.split('@')[0].replace('.', ' ').split(' ').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ')
+    const displayName = convertEmailToName(am.account_manager)
     
     return {
       ...am,
@@ -113,18 +124,6 @@ const AccountManagerRevenueChart: React.FC = () => {
         : displayName
     }
   })
-
-  // Identifiera topp performers med konverterade namn
-  const topRevenue = accountManagerRevenue[0]
-  const mostCustomers = [...accountManagerRevenue].sort((a, b) => b.customers_count - a.customers_count)[0]
-  const highestAvgValue = [...accountManagerRevenue].sort((a, b) => b.avg_contract_value - a.avg_contract_value)[0]
-
-  // Hjälpfunktion för att konvertera email till namn
-  const convertEmailToName = (email: string): string => {
-    return email.split('@')[0].replace('.', ' ').split(' ').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ')
-  }
 
   return (
     <Card>
@@ -219,7 +218,7 @@ const AccountManagerRevenueChart: React.FC = () => {
         </div>
       </div>
 
-      {/* Topp prestationer */}
+      {/* Topp prestationer - FIXADE VERSIONEN */}
       <div className="mt-6 pt-4 border-t border-slate-700">
         <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center">
           <Crown className="w-4 h-4 mr-1" />
@@ -227,36 +226,42 @@ const AccountManagerRevenueChart: React.FC = () => {
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Högst ARR */}
+          {/* Högst ARR - ANVÄNDER convertEmailToName */}
           <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-indigo-400 font-medium text-sm">Högst ARR</p>
-                <p className="text-white font-semibold text-sm">{topRevenue?.account_manager}</p>
+                <p className="text-white font-semibold text-sm">
+                  {topRevenue ? convertEmailToName(topRevenue.account_manager) : 'N/A'}
+                </p>
                 <p className="text-slate-400 text-xs">{formatCurrency(topRevenue?.annual_revenue || 0)}</p>
               </div>
               <div className="text-indigo-400 text-xl">👑</div>
             </div>
           </div>
 
-          {/* Flest kunder */}
+          {/* Flest kunder - ANVÄNDER convertEmailToName */}
           <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-400 font-medium text-sm">Flest kunder</p>
-                <p className="text-white font-semibold text-sm">{mostCustomers?.account_manager}</p>
-                <p className="text-slate-400 text-xs">{mostCustomers?.customers_count} kunder</p>
+                <p className="text-white font-semibold text-sm">
+                  {mostCustomers ? convertEmailToName(mostCustomers.account_manager) : 'N/A'}
+                </p>
+                <p className="text-slate-400 text-xs">{mostCustomers?.customers_count || 0} kunder</p>
               </div>
               <div className="text-blue-400 text-xl">🏢</div>
             </div>
           </div>
 
-          {/* Högst genomsnittsvärde */}
+          {/* Högst genomsnittsvärde - ANVÄNDER convertEmailToName */}
           <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-400 font-medium text-sm">Högst kundvärde</p>
-                <p className="text-white font-semibold text-sm">{highestAvgValue?.account_manager}</p>
+                <p className="text-white font-semibold text-sm">
+                  {highestAvgValue ? convertEmailToName(highestAvgValue.account_manager) : 'N/A'}
+                </p>
                 <p className="text-slate-400 text-xs">{formatCurrency(highestAvgValue?.avg_contract_value || 0)}/kund</p>
               </div>
               <div className="text-green-400 text-xl">💎</div>
