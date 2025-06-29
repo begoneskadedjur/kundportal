@@ -1,85 +1,18 @@
-// src/services/economicStatisticsService.ts - UPPGRADERAD MED ÅRSFILTER OCH DETALJERAD PROGNOS
+// src/services/economicStatisticsService.ts - FIX: Correct 'this' context in Promise.all
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
 
 // --- INTERFACES ---
-export interface TechnicianPerformance {
-  name: string;
-  contractRevenue: number;
-  caseRevenue: number;
-  totalRevenue: number;
-  contractCount: number;
-  caseCount: number;
-}
-
-export interface PestTypePerformance {
-  pestType: string;
-  revenue: number;
-  caseCount: number;
-}
-
-export interface PerformanceStats {
-  byTechnician: TechnicianPerformance[];
-  byPestType: PestTypePerformance[];
-}
-
-export interface MonthlyGrowthAnalysis {
-  startMRR: number;
-  newMRR: number;
-  churnedMRR: number;
-  netChangeMRR: number;
-  endMRR: number;
-}
-
-export interface UpsellOpportunity {
-  customerId: string;
-  companyName: string;
-  annualPremium: number;
-  caseRevenueLast6Months: number;
-  caseToArrRatio: number;
-}
-
-export interface ARRStats {
-  currentARR: number;
-  monthlyGrowth: number;
-  monthlyRecurringRevenue: number;
-  averageARRPerCustomer: number;
-  churnRate: number;
-  retentionRate: number;
-  netRevenueRetention: number;
-  contractsExpiring3Months: number;
-  contractsExpiring6Months: number;
-  contractsExpiring12Months: number;
-  additionalCaseRevenue: number;
-  totalRevenue: number;
-  averageCasePrice: number;
-  paidCasesThisMonth: number;
-}
-
-export interface ARRByBusinessType {
-  business_type: string;
-  arr: number;
-  customer_count: number;
-  average_arr_per_customer: number;
-  additional_case_revenue: number;
-}
-
-export interface ARRProjection {
-  year: number;
-  projectedARR: number;
-  activeContracts: number;
-}
-
-export interface DashboardStats {
-  arr: ARRStats;
-  arrByBusinessType: ARRByBusinessType[];
-  technicians: TechnicianStats;
-  growthAnalysis: MonthlyGrowthAnalysis;
-  upsellOpportunities: UpsellOpportunity[];
-  performanceStats: PerformanceStats;
-  arrProjections: ARRProjection[];
-}
+export interface TechnicianPerformance { name: string; contractRevenue: number; caseRevenue: number; totalRevenue: number; contractCount: number; caseCount: number; }
+export interface PestTypePerformance { pestType: string; revenue: number; caseCount: number; }
+export interface PerformanceStats { byTechnician: TechnicianPerformance[]; byPestType: PestTypePerformance[]; }
+export interface MonthlyGrowthAnalysis { startMRR: number; newMRR: number; churnedMRR: number; netChangeMRR: number; endMRR: number; }
+export interface UpsellOpportunity { customerId: string; companyName: string; annualPremium: number; caseRevenueLast6Months: number; caseToArrRatio: number; }
+export interface ARRStats { currentARR: number; monthlyGrowth: number; monthlyRecurringRevenue: number; averageARRPerCustomer: number; churnRate: number; retentionRate: number; netRevenueRetention: number; contractsExpiring3Months: number; contractsExpiring6Months: number; contractsExpiring12Months: number; additionalCaseRevenue: number; totalRevenue: number; averageCasePrice: number; paidCasesThisMonth: number; }
+export interface ARRByBusinessType { business_type: string; arr: number; customer_count: number; average_arr_per_customer: number; additional_case_revenue: number; }
+export interface ARRProjection { year: number; projectedARR: number; activeContracts: number; }
+export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; }
 
 class EconomicStatisticsService {
 
@@ -118,7 +51,7 @@ class EconomicStatisticsService {
     }
   }
 
-  async getARRByBusinessTypeForYear(targetYear: number): Promise<ARRByBusinessType[]> {
+  getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
     const yearStart = new Date(targetYear, 0, 1);
     const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
 
@@ -185,7 +118,7 @@ class EconomicStatisticsService {
     })).sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
   }
 
-  async getPerformanceStats(): Promise<PerformanceStats> {
+  getPerformanceStats = async (): Promise<PerformanceStats> => {
     const normalizeName = (name: string): string => {
       if (!name) return 'okänd';
       if (name.includes('@')) {
@@ -263,7 +196,7 @@ class EconomicStatisticsService {
     return { byTechnician, byPestType };
   }
 
-  async getARRProjections(): Promise<ARRProjection[]> {
+  getARRProjections = async (): Promise<ARRProjection[]> => {
     const { data: customers, error } = await supabase
         .from('customers')
         .select('annual_premium, contract_start_date, contract_end_date')
@@ -309,7 +242,7 @@ class EconomicStatisticsService {
     return projections;
   }
 
-  async getMonthlyGrowthAnalysis(): Promise<MonthlyGrowthAnalysis> {
+  getMonthlyGrowthAnalysis = async (): Promise<MonthlyGrowthAnalysis> => {
     const today = new Date();
     const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
     const { data: customers, error } = await supabase
@@ -335,7 +268,7 @@ class EconomicStatisticsService {
     };
   }
 
-  async getUpsellOpportunities(limit: number = 5): Promise<UpsellOpportunity[]> {
+  getUpsellOpportunities = async (limit: number = 5): Promise<UpsellOpportunity[]> => {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const [customerRes, caseRes] = await Promise.all([
@@ -366,7 +299,7 @@ class EconomicStatisticsService {
     return opportunities.sort((a, b) => b.caseToArrRatio - a.caseToArrRatio).slice(0, limit);
   }
 
-  async getARRStats(periodInDays: number): Promise<ARRStats> {
+  getARRStats = async (periodInDays: number): Promise<ARRStats> => {
     const [customersRes, casesRes] = await Promise.all([
         supabase.from('customers').select('id, is_active, annual_premium, created_at, contract_end_date'),
         supabase.from('cases').select('id, price, completed_date').not('price', 'is', null).gt('price', 0)
@@ -402,7 +335,36 @@ class EconomicStatisticsService {
     };
   }
 
-  private async calculateGrowthMetrics(currentARR: number): Promise<{ monthlyGrowth: number }> {
+  getARRByBusinessType = async (): Promise<ARRByBusinessType[]> => {
+    const [customersRes, casesRes] = await Promise.all([
+      supabase.from('customers').select('id, business_type, annual_premium').eq('is_active', true),
+      supabase.from('cases').select('customer_id, price, completed_date').not('price', 'is', null).gt('price', 0).not('completed_date', 'is', null)
+    ]);
+    if (customersRes.error) throw customersRes.error;
+    if (casesRes.error) throw casesRes.error;
+    const businessTypeMap = new Map<string, { arr: number; count: number; caseRevenue: number }>();
+    const customerCaseRevenue = new Map<string, number>();
+    (casesRes.data || []).forEach(c => {
+        if(c.customer_id) customerCaseRevenue.set(c.customer_id, (customerCaseRevenue.get(c.customer_id) || 0) + (c.price || 0));
+    });
+    (customersRes.data || []).forEach(customer => {
+      const type = customer.business_type || 'Annat';
+      const current = businessTypeMap.get(type) || { arr: 0, count: 0, caseRevenue: 0 };
+      current.arr += customer.annual_premium || 0;
+      current.count++;
+      current.caseRevenue += customerCaseRevenue.get(customer.id) || 0;
+      businessTypeMap.set(type, current);
+    });
+    return Array.from(businessTypeMap.entries()).map(([business_type, data]) => ({
+      business_type,
+      arr: data.arr,
+      customer_count: data.count,
+      average_arr_per_customer: data.count > 0 ? data.arr / data.count : 0,
+      additional_case_revenue: data.caseRevenue
+    })).sort((a, b) => b.arr - a.arr);
+  }
+
+  calculateGrowthMetrics = async (currentARR: number): Promise<{ monthlyGrowth: number }> => {
     const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
     const { data, error } = await supabase.from('customers').select('annual_premium').eq('is_active', true).lte('created_at', lastMonth.toISOString());
     if (error) throw error;
@@ -410,7 +372,7 @@ class EconomicStatisticsService {
     return { monthlyGrowth: lastMonthARR > 0 ? ((currentARR - lastMonthARR) / lastMonthARR) * 100 : (currentARR > 0 ? 100 : 0) };
   }
 
-  private async calculateChurnMetrics(allCustomers: any[], periodInDays: number): Promise<{ churnRate: number; netRevenueRetention: number }> {
+  calculateChurnMetrics = async (allCustomers: any[], periodInDays: number): Promise<{ churnRate: number; netRevenueRetention: number }> => {
     const periodStart = new Date(); periodStart.setDate(periodStart.getDate() - periodInDays);
     const activeAtStart = allCustomers.filter(c => new Date(c.created_at) < periodStart && c.is_active);
     const churnedInPeriod = activeAtStart.filter(c => !c.is_active);
@@ -422,7 +384,7 @@ class EconomicStatisticsService {
     return { churnRate, netRevenueRetention };
   }
   
-  private calculateRenewalMetrics(activeCustomers: any[]): { expiring3Months: number; expiring6Months: number; expiring12Months: number; } {
+  calculateRenewalMetrics = (activeCustomers: any[]): { expiring3Months: number; expiring6Months: number; expiring12Months: number; } => {
     const now = new Date();
     const in3Months = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const in6Months = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
