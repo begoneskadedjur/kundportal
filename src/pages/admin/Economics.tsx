@@ -1,17 +1,16 @@
-// src/pages/admin/Economics.tsx - FIX: Korrekt felhantering i SegmentPerformanceCard
+// src/pages/admin/Economics.tsx - UPPGRADERAD MED ENHETSEKONOMI (CAC, LTV)
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
-  Activity, Gift, Zap, Bug, UserCheck, Briefcase,
-  ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon
+  Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
-import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection } from '../../services/economicStatisticsService';
+import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -237,6 +236,33 @@ const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   </Card>
 );
 
+// 🆕 NY KOMPONENT FÖR ENHETSEKONOMI
+const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
+  <Card>
+    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+      <div className="bg-slate-800/50 p-4 rounded-lg">
+        <p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p>
+        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p>
+      </div>
+      <div className="bg-slate-800/50 p-4 rounded-lg">
+        <p className="text-sm text-slate-400">Livstidsvärde (LTV)</p>
+        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.ltv)}</p>
+      </div>
+      <div className="bg-slate-800/50 p-4 rounded-lg">
+        <p className="text-sm text-slate-400">LTV / CAC Ratio</p>
+        <p className={`text-2xl font-bold mt-1 ${data.ltvToCacRatio >= 3 ? 'text-green-400' : 'text-yellow-400'}`}>
+          {data.ltvToCacRatio.toFixed(1)}x
+        </p>
+      </div>
+      <div className="bg-slate-800/50 p-4 rounded-lg">
+        <p className="text-sm text-slate-400">Återbetalningstid</p>
+        <p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p>
+      </div>
+    </div>
+  </Card>
+);
+
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
   const navigate = useNavigate();
@@ -297,7 +323,7 @@ export default function Economics() {
     return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
 
-  const { arr, growthAnalysis, upsellOpportunities, performanceStats, arrProjections } = dashboardStats;
+  const { arr, growthAnalysis, upsellOpportunities, performanceStats, arrProjections, unitEconomics } = dashboardStats;
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -325,6 +351,8 @@ export default function Economics() {
           <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
+        
+        <UnitEconomicsCard data={unitEconomics} />
         
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <MonthlyChart title="Nya Avtal per Månad" data={contractsChartData} currentYear={contractsChartYear} onYearChange={setContractsChartYear} type="contracts" />

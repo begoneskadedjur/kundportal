@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FIX: Correct 'this' context in Promise.all
+// src/services/economicStatisticsService.ts - FIX: Correct 'this' context by using arrow functions
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -12,28 +12,32 @@ export interface UpsellOpportunity { customerId: string; companyName: string; an
 export interface ARRStats { currentARR: number; monthlyGrowth: number; monthlyRecurringRevenue: number; averageARRPerCustomer: number; churnRate: number; retentionRate: number; netRevenueRetention: number; contractsExpiring3Months: number; contractsExpiring6Months: number; contractsExpiring12Months: number; additionalCaseRevenue: number; totalRevenue: number; averageCasePrice: number; paidCasesThisMonth: number; }
 export interface ARRByBusinessType { business_type: string; arr: number; customer_count: number; average_arr_per_customer: number; additional_case_revenue: number; }
 export interface ARRProjection { year: number; projectedARR: number; activeContracts: number; }
-export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; }
+export interface UnitEconomics { cac: number; ltv: number; ltvToCacRatio: number; paybackPeriodMonths: number; }
+export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; unitEconomics: UnitEconomics; }
 
 class EconomicStatisticsService {
 
-  async getDashboardStats(periodInDays: number = 30): Promise<DashboardStats> {
+  // ❗ FIX: 'this' är nu korrekt bundet i Promise.all
+  getDashboardStats = async (periodInDays: number = 30): Promise<DashboardStats> => {
     try {
+      const arr = await this.getARRStats(periodInDays);
+      
       const [
-        arr,
         arrByBusinessType,
         technicians,
         growthAnalysis,
         upsellOpportunities,
         performanceStats,
-        arrProjections
+        arrProjections,
+        unitEconomics
       ] = await Promise.all([
-        this.getARRStats(periodInDays),
         this.getARRByBusinessType(),
         technicianStatisticsService.getTechnicianStats(periodInDays),
         this.getMonthlyGrowthAnalysis(),
         this.getUpsellOpportunities(5),
         this.getPerformanceStats(),
-        this.getARRProjections()
+        this.getARRProjections(),
+        this.getUnitEconomics(arr)
       ]);
 
       return {
@@ -44,11 +48,44 @@ class EconomicStatisticsService {
         upsellOpportunities,
         performanceStats,
         arrProjections,
+        unitEconomics,
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       throw error;
     }
+  }
+
+  getUnitEconomics = async (arrStats: ARRStats): Promise<UnitEconomics> => {
+    const today = new Date();
+    const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    const { data: spendData, error: spendError } = await supabase
+      .from('monthly_marketing_spend')
+      .select('spend')
+      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0])
+      .single();
+    
+    if (spendError && spendError.code !== 'PGRST116') console.error("Error fetching marketing spend:", spendError);
+    const marketingSpend = spendData?.spend || 0;
+
+    const { count: newCustomersLastMonth, error: customersError } = await supabase
+      .from('customers')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayOfLastMonth.toISOString())
+      .lte('created_at', lastDayOfLastMonth.toISOString());
+
+    if (customersError) throw customersError;
+
+    const cac = newCustomersLastMonth && newCustomersLastMonth > 0 ? marketingSpend / newCustomersLastMonth : 0;
+    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01;
+    const ltv = arrStats.averageARRPerCustomer / churnRateForLTV;
+    const ltvToCacRatio = cac > 0 ? ltv / cac : 0;
+    const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
+    const paybackPeriodMonths = avgMrrPerCustomer > 0 ? cac / avgMrrPerCustomer : 0;
+
+    return { cac, ltv, ltvToCacRatio, paybackPeriodMonths };
   }
 
   getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
