@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FIXAD VERSION
+// src/pages/admin/Economics.tsx - FIXAD VERSION med korrigerade ManageSpendCard props
 import { useState, useEffect } from 'react'
 import { ArrowLeft, TrendingUp, DollarSign, Calendar, Users, Target, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -33,7 +33,7 @@ export default function Economics() {
   const [currentYear] = useState(2025)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return now
   })
   
   // Årsdata
@@ -49,7 +49,7 @@ export default function Economics() {
   
   // Månadsdata
   const [monthlyData, setMonthlyData] = useState<MonthlyData>({
-    month: selectedMonth,
+    month: selectedMonth.toISOString().slice(0, 7),
     revenue: 0,
     spend: 0,
     newCustomers: 0,
@@ -142,15 +142,17 @@ export default function Economics() {
 
   const fetchMonthlyData = async () => {
     try {
+      const monthStr = selectedMonth.toISOString().slice(0, 7)
+      
       // Hämta månadsdata från marketing spend
-      const monthSpend = await economicStatisticsService.getMonthlySpend(selectedMonth)
+      const monthSpend = await economicStatisticsService.getMonthlySpend(monthStr)
       
       // Hämta nya kunder för månaden
       const customers = await customerService.getCustomers()
       const monthCustomers = customers.filter(customer => {
         if (!customer.created_at) return false
         const createdMonth = new Date(customer.created_at).toISOString().slice(0, 7)
-        return createdMonth === selectedMonth && customer.is_active
+        return createdMonth === monthStr && customer.is_active
       })
       
       // Beräkna månadsintäkter (ungefär - årspremie / 12)
@@ -159,7 +161,7 @@ export default function Economics() {
       }, 0)
       
       setMonthlyData({
-        month: selectedMonth,
+        month: monthStr,
         revenue: monthRevenue,
         spend: monthSpend?.spend || 0,
         newCustomers: monthCustomers.length,
@@ -198,35 +200,21 @@ export default function Economics() {
     }).format(amount)
   }
 
-  const formatMonth = (monthStr: string): string => {
-    const [year, month] = monthStr.split('-')
-    const monthNames = [
-      'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
-      'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
-    ]
-    return `${monthNames[parseInt(month) - 1]} ${year}`
+  const formatMonth = (date: Date): string => {
+    return date.toLocaleDateString('sv-SE', {
+      month: 'long',
+      year: 'numeric'
+    })
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month
-
+    const newDate = new Date(selectedMonth)
     if (direction === 'prev') {
-      newMonth -= 1
-      if (newMonth < 1) {
-        newMonth = 12
-        newYear -= 1
-      }
+      newDate.setMonth(newDate.getMonth() - 1)
     } else {
-      newMonth += 1
-      if (newMonth > 12) {
-        newMonth = 1
-        newYear += 1
-      }
+      newDate.setMonth(newDate.getMonth() + 1)
     }
-
-    setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`)
+    setSelectedMonth(newDate)
   }
 
   const handleSpendUpdate = () => {
@@ -295,7 +283,7 @@ export default function Economics() {
             <Card>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm">Årende-intäkter</p>
+                  <p className="text-slate-400 text-sm">Ärende-intäkter</p>
                   <p className="text-2xl font-bold text-blue-400">
                     {formatCurrency(7000)} {/* Hårdkodat från bilden */}
                   </p>
@@ -536,12 +524,10 @@ export default function Economics() {
             </div>
           </Card>
 
-          {/* Hantera Marknadskostnader */}
+          {/* Hantera Marknadskostnader - KORRIGERADE PROPS */}
           <ManageSpendCard
             selectedMonth={selectedMonth}
-            currentSpend={monthlyData.spend}
-            currentNotes={monthlyData.notes}
-            onUpdate={handleSpendUpdate}
+            onDataChange={handleSpendUpdate}
           />
         </div>
       </main>
