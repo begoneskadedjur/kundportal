@@ -17,9 +17,13 @@ const formatCurrency = (amount: number): string => {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload
+    const displayName = data.account_manager.split('@')[0].replace('.', ' ').split(' ').map((word: string) => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-medium">{data.account_manager}</p>
+        <p className="text-white font-medium">{displayName}</p>
         <p className="text-slate-300 text-sm">Årlig ARR: {formatCurrency(data.annual_revenue)}</p>
         <p className="text-slate-300 text-sm">Kunder: {data.customers_count}</p>
         <p className="text-slate-300 text-sm">Totalt avtalsvärde: {formatCurrency(data.total_contract_value)}</p>
@@ -33,9 +37,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const ScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload
+    const displayName = data.account_manager.split('@')[0].replace('.', ' ').split(' ').map((word: string) => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-medium">{data.account_manager}</p>
+        <p className="text-white font-medium">{displayName}</p>
         <p className="text-slate-300 text-sm">Kunder: {data.customers_count}</p>
         <p className="text-slate-300 text-sm">ARR per kund: {formatCurrency(data.avg_contract_value)}</p>
       </div>
