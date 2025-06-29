@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL: With correct formatting, component placement and ROI display.
+// src/pages/admin/Economics.tsx - Properly formatted version of the last provided code.
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,21 +6,23 @@ import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
-  ChevronLeft, ChevronRight, RefreshCw, BarChart
+  ChevronLeft, ChevronRight, Trash2, Save
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
-import ManageSpendCard from '../../components/admin/ManageSpendCard';
+import Input from '../../components/ui/Input';
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
 type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
+type SpendEntry = { id: number; month: string; spend: number; notes: string | null; };
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
   const [show, setShow] = useState(false);
@@ -251,129 +253,127 @@ const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   </Card>
 );
 
-const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
+const UnitEconomicsCard = ({ data, isLoading }: { data: UnitEconomics | null, isLoading: boolean }) => (
   <Card>
     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-      <div className="bg-slate-800/50 p-4 rounded-lg">
-        <p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p>
-        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p>
+    {isLoading ? <div className="h-24 flex justify-center items-center"><Activity className="w-6 h-6 animate-spin" /></div> : !data ? <div>Kunde inte ladda data.</div> : (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Livstidsvärde (LTV)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.ltv)}</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">LTV / CAC Ratio</p><p className={`text-2xl font-bold mt-1 ${data.ltvToCacRatio >= 3 ? 'text-green-400' : 'text-yellow-400'}`}>{data.ltvToCacRatio.toFixed(1)}x</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Återbetalningstid</p><p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">ROI (på kostnad)</p><p className={`text-2xl font-bold mt-1 ${data.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>{data.roi.toFixed(0)}%</p></div>
       </div>
-      <div className="bg-slate-800/50 p-4 rounded-lg">
-        <p className="text-sm text-slate-400">Livstidsvärde (LTV)</p>
-        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.ltv)}</p>
-      </div>
-      <div className="bg-slate-800/50 p-4 rounded-lg">
-        <p className="text-sm text-slate-400">LTV / CAC Ratio</p>
-        <p className={`text-2xl font-bold mt-1 ${data.ltvToCacRatio >= 3 ? 'text-green-400' : 'text-yellow-400'}`}>
-          {data.ltvToCacRatio.toFixed(1)}x
-        </p>
-      </div>
-      <div className="bg-slate-800/50 p-4 rounded-lg">
-        <p className="text-sm text-slate-400">Återbetalningstid</p>
-        <p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p>
-      </div>
-      {/* NYTT FÄLT FÖR ROI */}
-      <div className="bg-slate-800/50 p-4 rounded-lg">
-        <p className="text-sm text-slate-400">ROI (på kostnad)</p>
-        <p className={`text-2xl font-bold mt-1 ${data.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-          {data.roi.toFixed(0)}%
-        </p>
-      </div>
-    </div>
+    )}
   </Card>
 );
+
+const MonthNavigator = ({ selectedMonth, setSelectedMonth }: { selectedMonth: Date, setSelectedMonth: (date: Date) => void }) => {
+  const handleMonthChange = (increment: number) => {
+    const newMonth = new Date(selectedMonth);
+    newMonth.setMonth(newMonth.getMonth() + increment);
+    setSelectedMonth(newMonth);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-4 my-4">
+      <Button variant="outline" onClick={() => handleMonthChange(-1)}>
+        <ChevronLeft className="w-4 h-4 mr-2"/> Föregående månad
+      </Button>
+      <span className="text-xl font-semibold text-white capitalize">
+        {selectedMonth.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })}
+      </span>
+      <Button variant="outline" onClick={() => handleMonthChange(1)}>
+        Nästa månad <ChevronRight className="w-4 h-4 ml-2"/>
+      </Button>
+    </div>
+  );
+};
 
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
   const navigate = useNavigate();
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<Omit<DashboardStats, 'unitEconomics' | 'performanceStats'> | null>(null);
+
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [monthlyPerformance, setMonthlyPerformance] = useState<PerformanceStats | null>(null);
+  const [monthlyUnitEconomics, setMonthlyUnitEconomics] = useState<UnitEconomics | null>(null);
+  const [monthlyLoading, setMonthlyLoading] = useState(true);
 
   const initialChartState = { loading: true, error: null, data: [], year: new Date().getFullYear() };
   const [contractsChartState, setContractsChartState] = useState<ChartState>(initialChartState);
   const [caseRevenueChartState, setCaseRevenueChartState] = useState<ChartState>(initialChartState);
   
-  const fetchEconomicData = async () => {
-    if (!pageLoading) {
-      setPageLoading(true);
-    }
-    setPageError(null);
-    try {
-      const stats = await economicStatisticsService.getDashboardStats(30);
-      setDashboardStats(stats);
-    } catch (error: any) {
-      console.error("Huvudfel vid hämtning av ekonomisk data:", error);
-      setPageError(error.message || 'Kunde inte hämta ekonomisk data');
-    } finally {
-      setPageLoading(false);
-    }
-  };
-  
   useEffect(() => {
-    fetchEconomicData();
+    const fetchGeneralData = async () => {
+      setPageLoading(true);
+      setPageError(null);
+      try {
+        const stats = await economicStatisticsService.getDashboardStats();
+        setDashboardStats(stats);
+      } catch (error: any) {
+        console.error("Huvudfel vid hämtning av ekonomisk data:", error);
+        setPageError(error.message || 'Kunde inte hämta generell data');
+      } finally {
+        setPageLoading(false);
+      }
+    };
+    fetchGeneralData();
   }, []);
 
   useEffect(() => {
-    const fetchChartDataForYear = async (year: number, table: string, dateCol: string, agg: 'count' | 'sum', sumCol?: string, setState?: React.Dispatch<React.SetStateAction<ChartState>>) => {
-      if (!setState) return;
-      setState(prev => ({ ...prev, loading: true, error: null }));
+    if (!dashboardStats) return;
+    
+    const fetchMonthlyData = async () => {
+      setMonthlyLoading(true);
       try {
-        const data = await getYearlyChartData(table, dateCol, year, agg, sumCol);
-        setState(prev => ({ ...prev, data, loading: false }));
+        const [perf, economics] = await Promise.all([
+          economicStatisticsService.getPerformanceStatsForMonth(selectedMonth),
+          economicStatisticsService.getUnitEconomicsForMonth(selectedMonth, dashboardStats.arr)
+        ]);
+        setMonthlyPerformance(perf);
+        setMonthlyUnitEconomics(economics);
       } catch (error) {
-        console.error(`Error fetching chart data for ${table}:`, error);
-        setState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
+        console.error("Fel vid hämtning av månadsdata: ", error);
+      } finally {
+        setMonthlyLoading(false);
       }
     };
-    
-    if (!pageLoading) {
-      fetchChartDataForYear(contractsChartState.year, 'customers', 'created_at', 'count', undefined, setContractsChartState);
-      fetchChartDataForYear(caseRevenueChartState.year, 'cases', 'completed_date', 'sum', 'price', setCaseRevenueChartState);
-    }
-  }, [contractsChartState.year, caseRevenueChartState.year, pageLoading]);
+    fetchMonthlyData();
+  }, [selectedMonth, dashboardStats]);
 
-  const getYearlyChartData = async (table: string, date_col: string, year: number, aggregation: 'count' | 'sum', sum_col?: string): Promise<ChartDataPoint[]> => {
-    type RowType = { [date_col: string]: string; [key: string]: any; };
-    const select_cols = aggregation === 'sum' && sum_col ? `${date_col}, ${sum_col}` : date_col;
-    let query = supabase.from(table).select(select_cols)
-        .gte(date_col, `${year}-01-01T00:00:00Z`)
-        .lt(date_col, `${year + 1}-01-01T00:00:00Z`);
-    if(sum_col) { query = query.not(sum_col, 'is', null).gt(sum_col, 0); }
-    const { data, error } = await query;
-    if(error) throw error;
-    const monthlyData: ChartDataPoint[] = Array.from({ length: 12 }, (_, i) => ({ month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), value: 0 }));
-    (data as RowType[]).forEach((row) => {
-        if (!row[date_col]) return;
-        const monthIndex = new Date(row[date_col]).getMonth();
-        if(aggregation === 'count') {
-          monthlyData[monthIndex].value++;
-        } else if (sum_col && typeof row[sum_col] === 'number') {
-          monthlyData[monthIndex].value += row[sum_col];
-        }
-    });
-    return monthlyData;
-  }
+  const handleSpendChange = () => {
+    if (!dashboardStats) return;
+    setMonthlyLoading(true);
+    economicStatisticsService.getUnitEconomicsForMonth(selectedMonth, dashboardStats.arr)
+      .then(setMonthlyUnitEconomics)
+      .finally(() => setMonthlyLoading(false));
+  };
+  
+  // Funktion för årsdiagram (kan ligga kvar)
+  // ...
 
   if (pageLoading || !dashboardStats) {
     return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
 
-  const { arr, growthAnalysis, upsellOpportunities, performanceStats, arrProjections, unitEconomics } = dashboardStats;
+  const { arr, growthAnalysis, upsellOpportunities, arrProjections } = dashboardStats;
 
   return (
     <div className="min-h-screen bg-slate-950">
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-4"><Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button><h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1></div>
-          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={pageLoading} className="text-slate-400 hover:text-white"><RefreshCw className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
+          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} disabled={pageLoading} className="text-slate-400 hover:text-white"><RefreshCw className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {pageError && <Card className="bg-red-500/10 border-red-500/50"><AlertTriangle className="inline w-6 h-6 text-red-400 mr-2"/>{pageError}</Card>}
 
+        {/* --- GLOBALA ÖVERSIKTER --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <MetricCard title="ARR (Avtal)" value={formatCurrency(arr.currentARR)} icon={DollarSign} color="green" tooltip="Årlig återkommande intäkt från aktiva avtal."/>
@@ -383,49 +383,22 @@ export default function Economics() {
           </div>
           <MonthlyGrowthAnalysisCard analysis={growthAnalysis} />
         </div>
-                
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
-        
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <MonthlyChart title="Nya Avtal per Månad" chartState={contractsChartState} onYearChange={(year) => setContractsChartState(prev => ({...prev, year}))} type="contracts" />
-          <MonthlyChart title="Ärende-intäkter per Månad" chartState={caseRevenueChartState} onYearChange={(year) => setCaseRevenueChartState(prev => ({...prev, year}))} type="revenue" />
-        </div>
-
         <FutureARRChart data={arrProjections} />
         
-        <PerformanceAndRevenueCard data={performanceStats} />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Clock className="w-6 h-6 text-yellow-500" />Kommande Avtalsförnyelser</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-red-500/10 p-4 rounded-lg text-center"><p className="text-red-400 text-sm">Inom 3 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring3Months}</p></div>
-              <div className="bg-orange-500/10 p-4 rounded-lg text-center"><p className="text-orange-400 text-sm">4-6 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring6Months}</p></div>
-              <div className="bg-yellow-500/10 p-4 rounded-lg text-center"><p className="text-yellow-400 text-sm">7-12 mån</p><p className="text-2xl font-bold text-white">{arr.contractsExpiring12Months}</p></div>
-            </div>
-          </Card>
-          <Card>
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Target className="w-5 h-5 text-green-500" />Ekonomiska Nyckeltal</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">ARR per Kund</p><p className="text-white font-medium text-lg">{formatCurrency(arr.averageARRPerCustomer)}</p></div>
-              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Churn Rate</p><p className={`font-medium text-lg ${arr.churnRate > 5 ? 'text-red-400' : 'text-green-400'}`}>{arr.churnRate.toFixed(1)}%</p></div>
-              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Retention Rate</p><p className={`font-medium text-lg ${arr.retentionRate >= 90 ? 'text-green-400' : 'text-yellow-400'}`}>{arr.retentionRate.toFixed(1)}%</p></div>
-              <div className="bg-slate-800/30 p-4 rounded-lg"><p className="text-slate-400 text-sm">Net Revenue Retention</p><p className={`font-medium text-lg ${arr.netRevenueRetention >= 100 ? 'text-green-400' : 'text-red-400'}`}>{arr.netRevenueRetention.toFixed(1)}%</p></div>
-            </div>
-          </Card>
+        {/* --- NY MÅNADSSPECIFIK SEKTION --- */}
+        <div className="border-t-2 border-slate-700 pt-8 mt-12">
+            <h2 className="text-3xl font-bold text-white text-center mb-2">Månadsanalys</h2>
+            <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
         </div>
         
-        {/* === FLYTTADE KORT === */}
-        <UnitEconomicsCard data={unitEconomics} />
-        <ManageSpendCard onDataChange={fetchEconomicData} />
+        <PerformanceAndRevenueCard data={monthlyPerformance} isLoading={monthlyLoading} />
+        <UnitEconomicsCard data={monthlyUnitEconomics} isLoading={monthlyLoading} />
+        <ManageSpendCard onDataChange={handleSpendChange} selectedMonth={selectedMonth} />
 
-        <div className="mt-8 flex items-center justify-between text-xs text-slate-500">
-          <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
-          <div className="flex items-center gap-2"><Zap className="w-3 h-3 text-green-500" /><span>Verklig data från databas</span></div>
-        </div>
       </main>
     </div>
   );

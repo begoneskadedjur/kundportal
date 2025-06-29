@@ -1,14 +1,12 @@
-// src/services/economicStatisticsService.ts - FINAL: Correctly calculates Unit Economics based on latest spend data.
+// src/services/economicStatisticsService.ts - Allows for multiple spend entries per month
 
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
 
-// --- DATABASE TYPES ---
+// --- Typer och Interfaces ---
 type CustomerData = { id: string; is_active: boolean; annual_premium: number | null; created_at: string; contract_start_date: string | null; contract_end_date: string | null; business_type: string | null; company_name: string | null; assigned_account_manager: string | null; };
 type CaseData = { id: string; customer_id: string | null; price: number | null; completed_date: string | null; assigned_technician_name: string | null; pest_type: string | null; };
-
-// --- INTERFACES ---
 export interface TechnicianPerformance { name: string; contractRevenue: number; caseRevenue: number; totalRevenue: number; contractCount: number; caseCount: number; }
 export interface PestTypePerformance { pestType: string; revenue: number; caseCount: number; }
 export interface PerformanceStats { byTechnician: TechnicianPerformance[]; byPestType: PestTypePerformance[]; }
@@ -17,13 +15,13 @@ export interface UpsellOpportunity { customerId: string; companyName: string; an
 export interface ARRStats { currentARR: number; monthlyGrowth: number; monthlyRecurringRevenue: number; averageARRPerCustomer: number; churnRate: number; retentionRate: number; netRevenueRetention: number; contractsExpiring3Months: number; contractsExpiring6Months: number; contractsExpiring12Months: number; additionalCaseRevenue: number; totalRevenue: number; averageCasePrice: number; paidCasesThisMonth: number; }
 export interface ARRByBusinessType { business_type: string; arr: number; customer_count: number; average_arr_per_customer: number; additional_case_revenue: number; }
 export interface ARRProjection { year: number; projectedARR: number; activeContracts: number; }
-// ROI (Return on Investment) tillagd
 export interface UnitEconomics { cac: number; ltv: number; ltvToCacRatio: number; paybackPeriodMonths: number; roi: number; }
 export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; unitEconomics: UnitEconomics; }
 
 class EconomicStatisticsService {
   
-  getDashboardStats = async (periodInDays: number = 30): Promise<DashboardStats> => {
+  // Hämtar generell, ej månadsspecifik data
+  getDashboardStats = async (): Promise<Omit<DashboardStats, 'unitEconomics' | 'performanceStats'>> => {
     try {
       const [customersRes, casesRes] = await Promise.all([
         supabase.from('customers').select<string, CustomerData>('id, is_active, annual_premium, created_at, contract_start_date, contract_end_date, business_type, company_name, assigned_account_manager'),
@@ -36,87 +34,126 @@ class EconomicStatisticsService {
       const allCustomers: CustomerData[] = customersRes.data || [];
       const allCases: CaseData[] = casesRes.data || [];
       
-      const arr = await this.getARRStats(allCustomers, allCases, periodInDays);
+      const arr = await this.getARRStats(allCustomers, allCases, 30);
       
-      const [
-        arrByBusinessType,
-        technicians,
-        growthAnalysis,
-        upsellOpportunities,
-        performanceStats,
-        arrProjections,
-        unitEconomics
-      ] = await Promise.all([
+      const [ arrByBusinessType, technicians, growthAnalysis, upsellOpportunities, arrProjections ] = await Promise.all([
         this.getARRByBusinessType(allCustomers, allCases),
-        technicianStatisticsService.getTechnicianStats(periodInDays),
+        technicianStatisticsService.getTechnicianStats(30),
         this.getMonthlyGrowthAnalysis(allCustomers),
         this.getUpsellOpportunities(allCustomers, allCases, 5),
-        this.getPerformanceStats(allCustomers, allCases),
         this.getARRProjections(allCustomers),
-        this.getUnitEconomics(arr) // Denna anropar den nya, korrekta logiken
       ]);
 
-      return { arr, arrByBusinessType, technicians, growthAnalysis, upsellOpportunities, performanceStats, arrProjections, unitEconomics };
+      return { arr, arrByBusinessType, technicians, growthAnalysis, upsellOpportunities, arrProjections };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       throw error;
     }
   }
 
-  // =================================================================================================
-  // === FIX: DYNAMISK OCH KORREKT BERÄKNING AV UNIT ECONOMICS ===
-  // =================================================================================================
-  getUnitEconomics = async (arrStats: ARRStats): Promise<UnitEconomics> => {
-    // Steg 1: Hämta den SENASTE posten från marknadskostnader för att veta vilken månad vi ska analysera
-    const { data: latestSpendEntry, error: spendError } = await supabase
-      .from('monthly_marketing_spend')
-      .select('month, spend')
-      .order('month', { ascending: false })
-      .limit(1)
-      .single();
+  // --- MÅNADSSPECIFIKA FUNKTIONER ---
 
-    // Beräkna en standard-LTV som fallback. Denna är inte beroende av kostnaden.
-    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01;
-    const defaultLtv = churnRateForLTV > 0 ? arrStats.averageARRPerCustomer / churnRateForLTV : 0;
-    
-    // Om ingen kostnadspost finns, kan vi inte beräkna CAC, ROI etc.
-    if (spendError || !latestSpendEntry) {
-      if (spendError && spendError.code !== 'PGRST116') { // Ignorera "hittade inga rader"-felet
-        console.error("Error fetching marketing spend:", spendError);
-      }
-      return { cac: 0, ltv: defaultLtv, ltvToCacRatio: 0, paybackPeriodMonths: 0, roi: 0 };
+  getUnitEconomicsForMonth = async (selectedDate: Date, globalArrStats: ARRStats): Promise<UnitEconomics> => {
+    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+    // FIX: Summera ALLA kostnader för den valda månaden
+    const { data: spendEntries, error: spendError } = await supabase
+      .from('monthly_marketing_spend')
+      .select('spend')
+      .gte('month', firstDayOfMonth.toISOString().split('T')[0])
+      .lte('month', lastDayOfMonth.toISOString().split('T')[0]);
+
+    if (spendError) {
+      console.error("Error fetching marketing spend:", spendError);
+      throw spendError;
     }
     
-    // Steg 2: Använd den hittade månadens data
-    const marketingSpend = latestSpendEntry.spend;
-    const spendMonth = new Date(latestSpendEntry.month);
+    const marketingSpend = (spendEntries || []).reduce((sum, entry) => sum + entry.spend, 0);
 
-    // Steg 3: Hitta nya kunder och deras totala värde under EXAKT SAMMA MÅNAD som kostnaden
-    const firstDayOfSpendMonth = new Date(spendMonth.getFullYear(), spendMonth.getMonth(), 1);
-    const lastDayOfSpendMonth = new Date(spendMonth.getFullYear(), spendMonth.getMonth() + 1, 0);
-
-    const { data: newCustomersInSpendMonth, error: customersError } = await supabase
+    const { data: newCustomersInMonth, error: customersError } = await supabase
       .from('customers')
-      .select('annual_premium') // Vi behöver bara deras värde
-      .gte('created_at', firstDayOfSpendMonth.toISOString())
-      .lte('created_at', lastDayOfSpendMonth.toISOString());
+      .select('annual_premium')
+      .gte('created_at', firstDayOfMonth.toISOString())
+      .lte('created_at', lastDayOfMonth.toISOString());
 
     if (customersError) throw customersError;
 
-    const numberOfNewCustomers = newCustomersInSpendMonth?.length || 0;
-    const newArrFromPeriod = (newCustomersInSpendMonth || []).reduce((sum, c) => sum + (c.annual_premium || 0), 0);
+    const numberOfNewCustomers = newCustomersInMonth?.length || 0;
+    const newArrFromPeriod = (newCustomersInMonth || []).reduce((sum, c) => sum + (c.annual_premium || 0), 0);
     
-    // Steg 4: Beräkna alla nyckeltal
+    const churnRateForLTV = globalArrStats.churnRate > 0 ? globalArrStats.churnRate / 100 : 0.01;
+    const ltv = churnRateForLTV > 0 ? globalArrStats.averageARRPerCustomer / churnRateForLTV : 0;
+    
     const cac = numberOfNewCustomers > 0 ? marketingSpend / numberOfNewCustomers : 0;
-    const ltvToCacRatio = cac > 0 ? defaultLtv / cac : 0;
-    const paybackPeriodMonths = (arrStats.averageARRPerCustomer / 12) > 0 ? cac / (arrStats.averageARRPerCustomer / 12) : 0;
+    const ltvToCacRatio = cac > 0 ? ltv / cac : 0;
+    const paybackPeriodMonths = (globalArrStats.averageARRPerCustomer / 12) > 0 ? cac / (globalArrStats.averageARRPerCustomer / 12) : 0;
     const roi = marketingSpend > 0 ? ((newArrFromPeriod - marketingSpend) / marketingSpend) * 100 : 0;
 
-    return { cac, ltv: defaultLtv, ltvToCacRatio, paybackPeriodMonths, roi };
+    return { cac, ltv, ltvToCacRatio, paybackPeriodMonths, roi };
+  }
+  
+  getPerformanceStatsForMonth = async (selectedDate: Date): Promise<PerformanceStats> => {
+    // Samma som innan, men korrekt formaterad
+    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+    const [customersRes, casesRes] = await Promise.all([
+      supabase.from('customers').select('annual_premium, assigned_account_manager').eq('is_active', true),
+      supabase.from('cases')
+        .select('price, assigned_technician_name, pest_type, completed_date')
+        .not('price', 'is', null).gt('price', 0)
+        .gte('completed_date', firstDayOfMonth.toISOString())
+        .lte('completed_date', lastDayOfMonth.toISOString())
+    ]);
+
+    if (customersRes.error) throw customersRes.error;
+    if (casesRes.error) throw casesRes.error;
+
+    const normalizeName = (name: string): string => !name ? 'okänd' : name.includes('@') ? name.split('@')[0].replace(/[._]/g, ' ').toLowerCase() : name.toLowerCase();
+    const getDisplayName = (current: string, newName: string): string => !newName ? current : (!current || !newName.includes('@')) ? newName : current;
+
+    const techMap = new Map<string, { displayName: string, contractRevenue: number, caseRevenue: number, contractCount: number, caseCount: number }>();
+
+    (customersRes.data || []).forEach(c => {
+      if (!c.assigned_account_manager) return;
+      const key = normalizeName(c.assigned_account_manager);
+      const current = techMap.get(key) || { displayName: c.assigned_account_manager, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
+      current.contractRevenue += c.annual_premium || 0;
+      current.contractCount++;
+      current.displayName = getDisplayName(current.displayName, c.assigned_account_manager);
+      techMap.set(key, current);
+    });
+
+    (casesRes.data || []).forEach(c => {
+      if (!c.assigned_technician_name) return;
+      const key = normalizeName(c.assigned_technician_name);
+      const current = techMap.get(key) || { displayName: c.assigned_technician_name, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
+      current.caseRevenue += c.price || 0;
+      current.caseCount++;
+      current.displayName = getDisplayName(current.displayName, c.assigned_technician_name);
+      techMap.set(key, current);
+    });
+    
+    const byTechnician = Array.from(techMap.values()).map(d => ({ name: d.displayName, contractRevenue: d.contractRevenue, caseRevenue: d.caseRevenue, totalRevenue: d.contractRevenue + d.caseRevenue, contractCount: d.contractCount, caseCount: d.caseCount })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    const pestMap = new Map<string, { revenue: number, caseCount: number }>();
+    (casesRes.data || []).forEach(c => {
+      const pestType = c.pest_type || 'Okänt';
+      const current = pestMap.get(pestType) || { revenue: 0, caseCount: 0 };
+      current.revenue += c.price || 0;
+      current.caseCount++;
+      pestMap.set(pestType, current);
+    });
+    
+    const byPestType = Array.from(pestMap.entries()).map(([pestType, data]) => ({ pestType, ...data })).sort((a, b) => b.revenue - a.revenue);
+    
+    return { byTechnician, byPestType };
   }
 
-  // Resten av filen är korrekt formaterad och oförändrad.
-  // ... (alla andra funktioner som getARRByBusinessTypeForYear, getARRStats, etc.)
+  // --- ÖVRIGA FUNKTIONER ---
+  // Alla andra funktioner som getARRStats, getARRByBusinessTypeForYear etc. är oförändrade och korrekt formaterade nedanför.
+  
   getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
     const yearStart = new Date(targetYear, 0, 1);
     const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
@@ -217,52 +254,6 @@ class EconomicStatisticsService {
       businessTypeMap.set(type, current);
     });
     return Array.from(businessTypeMap.entries()).map(([business_type, data]) => ({ business_type, arr: data.arr, customer_count: data.count, average_arr_per_customer: data.count > 0 ? data.arr / data.count : 0, additional_case_revenue: data.caseRevenue })).sort((a, b) => b.arr - a.arr);
-  }
-
-  getPerformanceStats = async (allCustomers: CustomerData[], allCases: CaseData[]): Promise<PerformanceStats> => {
-    const normalizeName = (name: string): string => {
-        if (!name) return 'okänd';
-        return name.includes('@') ? name.split('@')[0].replace(/[._]/g, ' ').toLowerCase() : name.toLowerCase();
-    };
-    const getDisplayName = (currentName: string, newName: string): string => {
-        if (!newName) return currentName;
-        if (!currentName || !newName.includes('@')) return newName;
-        return currentName;
-    };
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const activeCustomers = allCustomers.filter(c => c.is_active);
-    const recentCases = allCases.filter(c => c.price && c.price > 0 && c.completed_date && new Date(c.completed_date) >= oneYearAgo);
-    const techMap = new Map<string, { displayName: string, contractRevenue: number; caseRevenue: number; contractCount: number; caseCount: number }>();
-    activeCustomers.forEach(customer => {
-      if (!customer.assigned_account_manager) return;
-      const key = normalizeName(customer.assigned_account_manager);
-      const current = techMap.get(key) || { displayName: customer.assigned_account_manager, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
-      current.contractRevenue += customer.annual_premium || 0;
-      current.contractCount++;
-      current.displayName = getDisplayName(current.displayName, customer.assigned_account_manager);
-      techMap.set(key, current);
-    });
-    recentCases.forEach(c => {
-      if (!c.assigned_technician_name) return;
-      const key = normalizeName(c.assigned_technician_name);
-      const current = techMap.get(key) || { displayName: c.assigned_technician_name, contractRevenue: 0, caseRevenue: 0, contractCount: 0, caseCount: 0 };
-      current.caseRevenue += c.price || 0;
-      current.caseCount++;
-      current.displayName = getDisplayName(current.displayName, c.assigned_technician_name);
-      techMap.set(key, current);
-    });
-    const byTechnician = Array.from(techMap.values()).map(data => ({ name: data.displayName, contractRevenue: data.contractRevenue, caseRevenue: data.caseRevenue, totalRevenue: data.contractRevenue + data.caseRevenue, contractCount: data.contractCount, caseCount: data.caseCount, })).sort((a, b) => b.totalRevenue - a.totalRevenue);
-    const pestMap = new Map<string, { revenue: number, caseCount: number }>();
-    recentCases.forEach(c => {
-      const pestType = c.pest_type || 'Okänt';
-      const current = pestMap.get(pestType) || { revenue: 0, caseCount: 0 };
-      current.revenue += c.price || 0;
-      current.caseCount++;
-      pestMap.set(pestType, current);
-    });
-    const byPestType = Array.from(pestMap.entries()).map(([pestType, data]) => ({ pestType, ...data })).sort((a, b) => b.revenue - a.revenue);
-    return { byTechnician, byPestType };
   }
 
   getARRProjections = async (allCustomers: CustomerData[]): Promise<ARRProjection[]> => {

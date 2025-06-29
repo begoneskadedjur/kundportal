@@ -1,4 +1,4 @@
-// src/components/admin/ManageSpendCard.tsx
+// src/components/admin/ManageSpendCard.tsx - Updated to use insert instead of upsert
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -7,28 +7,23 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { Save, Trash2 } from 'lucide-react';
 
-type SpendEntry = {
-  id: number;
-  month: string;
-  spend: number;
-  notes: string | null;
-};
+type SpendEntry = { id: number; month: string; spend: number; notes: string | null; };
 
-// Hjälpfunktioner specifika för denna komponent
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
 
-const ManageSpendCard = ({ onDataChange }: { onDataChange: () => void }) => {
+export default function ManageSpendCard({ onDataChange, selectedMonth }: { onDataChange: () => void, selectedMonth: Date }) {
   const [spendEntries, setSpendEntries] = useState<SpendEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State för formuläret
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  const [month, setMonth] = useState(formatDateForInput(lastMonth));
+  const [monthInput, setMonthInput] = useState(formatDateForInput(selectedMonth));
   const [spend, setSpend] = useState('');
   const [notes, setNotes] = useState('');
+  
+  useEffect(() => {
+    setMonthInput(formatDateForInput(selectedMonth));
+  }, [selectedMonth]);
 
   const fetchSpendEntries = async () => {
     setLoading(true);
@@ -52,42 +47,32 @@ const ManageSpendCard = ({ onDataChange }: { onDataChange: () => void }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!month || !spend) {
-      alert("Månad och kostnad måste fyllas i.");
+    if (!monthInput || !spend) {
+      alert("Datum och kostnad måste fyllas i.");
       return;
     }
-
-    // Säkerställ att det är första dagen i månaden som sparas
-    const monthDate = new Date(month);
-    const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     
-    const { error } = await supabase
-      .from('monthly_marketing_spend')
-      .upsert({ 
-        month: formatDateForInput(firstDay), 
+    // FIX: Använd enkel 'insert' istället för 'upsert'
+    const { error } = await supabase.from('monthly_marketing_spend').insert({ 
+        month: monthInput, 
         spend: Number(spend),
         notes
-      }, { onConflict: 'month' });
+      });
 
     if (error) {
+      console.error(error);
       alert("Kunde inte spara kostnad: " + error.message);
     } else {
-      // Rensa formulär och ladda om allt
       setSpend('');
       setNotes('');
       await fetchSpendEntries();
-      onDataChange(); // Trigga uppdatering av hela dashboarden
+      onDataChange();
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Är du säker på att du vill radera denna kostnadspost?")) return;
-    
-    const { error } = await supabase
-      .from('monthly_marketing_spend')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('monthly_marketing_spend').delete().eq('id', id);
     if (error) {
       alert("Kunde inte radera post: " + error.message);
     } else {
@@ -100,25 +85,22 @@ const ManageSpendCard = ({ onDataChange }: { onDataChange: () => void }) => {
     <Card>
       <h2 className="text-xl font-bold text-white mb-6">Hantera Marknadskostnader</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Formulär för att lägga till ny kostnad */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <h3 className="text-lg font-semibold text-white">Lägg till/uppdatera kostnad</h3>
+          <h3 className="text-lg font-semibold text-white">Lägg till ny kostnad</h3>
           <div>
-            <label htmlFor="month" className="block text-sm font-medium text-slate-400 mb-1">Månad</label>
-            <Input type="date" id="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <label htmlFor="month" className="block text-sm font-medium text-slate-400 mb-1">Datum</label>
+            <Input type="date" id="month" value={monthInput} onChange={(e) => setMonthInput(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="spend" className="block text-sm font-medium text-slate-400 mb-1">Total kostnad (SEK)</label>
+            <label htmlFor="spend" className="block text-sm font-medium text-slate-400 mb-1">Kostnad (SEK)</label>
             <Input type="number" id="spend" placeholder="15000" value={spend} onChange={(e) => setSpend(e.target.value)} />
           </div>
           <div>
             <label htmlFor="notes" className="block text-sm font-medium text-slate-400 mb-1">Anteckningar (valfritt)</label>
-            <Input type="text" id="notes" placeholder="Google Ads, etc." value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Input type="text" id="notes" placeholder="Google Ads, Facebook etc." value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
           <Button type="submit" className="w-full"><Save className="w-4 h-4 mr-2"/>Spara kostnad</Button>
         </form>
-
-        {/* Lista över befintliga kostnader */}
         <div className="space-y-3">
           <h3 className="text-lg font-semibold text-white">Befintliga poster</h3>
           {loading ? <p className="text-slate-400">Laddar...</p> : 
@@ -128,12 +110,10 @@ const ManageSpendCard = ({ onDataChange }: { onDataChange: () => void }) => {
              {spendEntries.map(entry => (
                <div key={entry.id} className="bg-slate-800/50 p-3 rounded-lg flex items-center justify-between">
                  <div>
-                   <p className="font-bold text-white">{new Date(entry.month).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long' })}: {formatCurrency(entry.spend)}</p>
+                   <p className="font-bold text-white">{new Date(entry.month).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}: {formatCurrency(entry.spend)}</p>
                    {entry.notes && <p className="text-sm text-slate-400">{entry.notes}</p>}
                  </div>
-                 <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)} className="text-red-500 hover:bg-red-500/10 hover:text-red-400">
-                   <Trash2 className="w-4 h-4" />
-                 </Button>
+                 <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)} className="text-red-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 className="w-4 h-4" /></Button>
                </div>
              ))}
            </div>
@@ -143,5 +123,3 @@ const ManageSpendCard = ({ onDataChange }: { onDataChange: () => void }) => {
     </Card>
   )
 }
-
-export default ManageSpendCard;
