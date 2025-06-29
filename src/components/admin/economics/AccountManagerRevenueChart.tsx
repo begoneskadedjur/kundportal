@@ -93,12 +93,18 @@ const AccountManagerRevenueChart: React.FC = () => {
   const avgRevenuePerManager = totalRevenue / accountManagerRevenue.length
 
   // Förkorta namn för visualisering
-  const chartData = accountManagerRevenue.map(am => ({
-    ...am,
-    shortName: am.account_manager.length > 15 
-      ? am.account_manager.substring(0, 15) + '...' 
-      : am.account_manager
-  }))
+  const chartData = accountManagerRevenue.map(am => {
+    const displayName = am.account_manager.split('@')[0].replace('.', ' ').split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+    
+    return {
+      ...am,
+      shortName: displayName.length > 15 
+        ? displayName.substring(0, 15) + '...' 
+        : displayName
+    }
+  })
 
   // Identifiera topp performers
   const topRevenue = accountManagerRevenue[0]
@@ -249,7 +255,11 @@ const AccountManagerRevenueChart: React.FC = () => {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {accountManagerRevenue.map((am, index) => (
               <div key={am.account_manager} className="flex items-center justify-between text-xs bg-slate-800/30 rounded px-2 py-1">
-                <span className="text-slate-300">#{index + 1} {am.account_manager}</span>
+                <span className="text-slate-300">
+                  #{index + 1} {am.account_manager.split('@')[0].replace('.', ' ').split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')}
+                </span>
                 <div className="flex items-center space-x-3 text-slate-400">
                   <span>{formatCurrency(am.annual_revenue)}</span>
                   <span>•</span>
