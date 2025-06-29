@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL: With correct formatting and component placement.
+// src/pages/admin/Economics.tsx - FINAL FIX: Adds the missing import statement for ManageSpendCard.
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,23 +8,23 @@ import {
   Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
   ChevronLeft, ChevronRight, Trash2, Save
 } from 'lucide-react';
+
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
+import ManageSpendCard from '../../components/admin/ManageSpendCard'; // <--- DENNA RAD SAKNADES
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
 type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
-type SpendEntry = { id: number; month: string; spend: number; notes: string | null; };
 
 // --- FORMATTERING & HJÄLPFUNKTIONER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
-const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
 
-// --- UI-KOMPONENTER ---
+// --- UI-KOMPONENTER (Korrekt formaterade) ---
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
   const [show, setShow] = useState(false);
@@ -294,7 +294,7 @@ export default function Economics() {
   
   const fetchEconomicData = async () => {
     if (!pageLoading) {
-      setPageLoading(true); // Visa spinner vid manuell uppdatering
+      setPageLoading(true);
     }
     setPageError(null);
     try {
@@ -389,7 +389,7 @@ export default function Economics() {
           </div>
           <MonthlyGrowthAnalysisCard analysis={growthAnalysis} />
         </div>
-        
+                
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
