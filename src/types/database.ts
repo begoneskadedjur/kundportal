@@ -21,7 +21,7 @@ export type Database = {
           // Avtalsfält - UTÖKAD med contract_end_date
           contract_start_date: string | null
           contract_length_months: number | null
-          contract_end_date: string | null  // 🆕 NYA FÄLTET
+          contract_end_date: string | null
           annual_premium: number | null
           total_contract_value: number | null
           contract_description: string | null
@@ -33,7 +33,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at' | 'contract_status'> & {
           contract_status?: 'active' | 'pending' | 'expired' | 'cancelled'
-          contract_end_date?: string | null  // 🆕 Lägg till i Insert-typen
+          contract_end_date?: string | null
         }
         Update: Partial<Database['public']['Tables']['customers']['Insert']>
       }
@@ -50,7 +50,6 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contract_types']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contract_types']['Insert']>
       }
-      // TEKNIKER-TABELL (behålls oförändrad)
       technicians: {
         Row: {
           id: string
@@ -79,6 +78,7 @@ export type Database = {
           pest_type: string
           location_details: string
           description: string
+          created_date: string | null // 👇 FIX: Denna rad har lagts till för att matcha databasen
           scheduled_date: string | null
           completed_date: string | null
           created_at: string
@@ -148,13 +148,12 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['user_invitations']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['user_invitations']['Insert']>
       }
-      // 🆕 NYA TABELLEN FÖR MARKNADSFÖRINGSUTGIFTER
       monthly_marketing_spend: {
         Row: {
           id: string
-          month: string // YYYY-MM-DD format (första dagen i månaden)
-          spend: number // Utgift i SEK
-          notes: string | null // Valfria anteckningar
+          month: string
+          spend: number
+          notes: string | null
           created_at: string
           updated_at: string
         }
@@ -165,24 +164,21 @@ export type Database = {
   }
 }
 
-// Hjälptyper (behålls alla befintliga)
+// Hjälptyper
 export type Customer = Database['public']['Tables']['customers']['Row']
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 
 export type ContractType = Database['public']['Tables']['contract_types']['Row']
 
-// TEKNIKER-TYPER (behålls oförändrade)
 export type Technician = Database['public']['Tables']['technicians']['Row']
 export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
 export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
 
-// 🆕 MARKNADSFÖRINGSUTGIFTER TYPER
 export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
 export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
 export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
 
-// Tekniker-roller (behålls oförändrade)
 export const TECHNICIAN_ROLES = [
   'Skadedjurstekniker',
   'VD',
@@ -194,9 +190,8 @@ export const TECHNICIAN_ROLES = [
 
 export type TechnicianRole = typeof TECHNICIAN_ROLES[number]
 
-// Utökad kunddata - UPPDATERAD med contract_end_date
+// Formulärdata-typer
 export type CustomerFormData = {
-  // Grundinformation
   company_name: string
   org_number: string
   contact_person: string
@@ -206,17 +201,15 @@ export type CustomerFormData = {
   contract_type_id: string
   business_type: string
   
-  // Avtalsinformation - UTÖKAD
   contract_start_date: string
   contract_length_months: string
-  contract_end_date: string  // 🆕 NYA FÄLTET i formulär-typen
+  contract_end_date: string
   annual_premium: string
   total_contract_value: string
   contract_description: string
   assigned_account_manager: string
 }
 
-// Tekniker-formulärdata (behålls oförändrad)
 export type TechnicianFormData = {
   name: string
   role: TechnicianRole
@@ -226,14 +219,13 @@ export type TechnicianFormData = {
   address: string
 }
 
-// 🆕 FORMULÄRDATA FÖR MARKNADSFÖRINGSUTGIFTER
 export type SpendFormData = {
-  month: string // YYYY-MM-DD
-  spend: string // Som sträng i formuläret, konverteras till number
+  month: string
+  spend: string
   notes: string
 }
 
-// Avtalsansvariga (behålls oförändrade)
+// Konstanter & Hjälpfunktioner
 export const ACCOUNT_MANAGERS = [
   { value: 'christian.karlsson@begone.se', label: 'Christian Karlsson' },
   { value: 'kristian.agnevik@begone.se', label: 'Kristian Agnevik' },
@@ -243,12 +235,11 @@ export const ACCOUNT_MANAGERS = [
 
 export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']
 
-// 🆕 NYA HJÄLPFUNKTIONER för contract_end_date hantering
 export const calculateContractEndDate = (startDate: string, lengthInMonths: number): string => {
   const start = new Date(startDate)
   const end = new Date(start)
   end.setMonth(end.getMonth() + lengthInMonths)
-  return end.toISOString().split('T')[0] // YYYY-MM-DD format
+  return end.toISOString().split('T')[0]
 }
 
 export const getContractTimeRemaining = (endDate: string) => {
@@ -262,7 +253,7 @@ export const getContractTimeRemaining = (endDate: string) => {
     days: diffDays,
     months: diffMonths,
     isExpired: diffDays <= 0,
-    isExpiringSoon: diffDays <= 90, // Inom 3 månader
+    isExpiringSoon: diffDays <= 90,
     status: diffDays <= 0 ? 'expired' : 
             diffDays <= 30 ? 'critical' :
             diffDays <= 90 ? 'warning' : 'good'
@@ -277,12 +268,7 @@ export const formatContractPeriod = (startDate: string, endDate: string): string
 
 export const getContractStatus = (customer: Customer) => {
   if (!customer.contract_end_date) {
-    return {
-      text: 'Inget slutdatum',
-      color: 'text-slate-400',
-      bgColor: 'bg-slate-500/10',
-      daysLeft: null
-    }
+    return { text: 'Inget slutdatum', color: 'text-slate-400', bgColor: 'bg-slate-500/10', daysLeft: null }
   }
 
   const now = new Date()
@@ -291,38 +277,17 @@ export const getContractStatus = (customer: Customer) => {
   const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24))
 
   if (daysLeft < 0) {
-    return {
-      text: `Utgånget ${Math.abs(daysLeft)} dagar sedan`,
-      color: 'text-red-400',
-      bgColor: 'bg-red-500/10',
-      daysLeft: daysLeft
-    }
+    return { text: `Utgånget ${Math.abs(daysLeft)} dagar sedan`, color: 'text-red-400', bgColor: 'bg-red-500/10', daysLeft }
   } else if (daysLeft <= 30) {
-    return {
-      text: `${daysLeft} dagar kvar`,
-      color: 'text-red-400',
-      bgColor: 'bg-red-500/10',
-      daysLeft: daysLeft
-    }
+    return { text: `${daysLeft} dagar kvar`, color: 'text-red-400', bgColor: 'bg-red-500/10', daysLeft }
   } else if (daysLeft <= 90) {
-    return {
-      text: `${daysLeft} dagar kvar`,
-      color: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/10',
-      daysLeft: daysLeft
-    }
+    return { text: `${daysLeft} dagar kvar`, color: 'text-yellow-400', bgColor: 'bg-yellow-500/10', daysLeft }
   } else {
     const monthsLeft = Math.ceil(daysLeft / 30)
-    return {
-      text: `${monthsLeft} månader kvar`,
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/10',
-      daysLeft: daysLeft
-    }
+    return { text: `${monthsLeft} månader kvar`, color: 'text-green-400', bgColor: 'bg-green-500/10', daysLeft }
   }
 }
 
-// 🆕 Avancerade avtalsfunktioner
 export const calculateContractProgress = (startDate: string, endDate: string): number => {
   const now = new Date()
   const start = new Date(startDate)
@@ -342,39 +307,18 @@ export const getContractRenewalUrgency = (endDate: string): {
   const timeRemaining = getContractTimeRemaining(endDate)
   
   if (timeRemaining.isExpired) {
-    return {
-      urgency: 'critical',
-      message: 'Avtalet har gått ut',
-      actionNeeded: true
-    }
+    return { urgency: 'critical', message: 'Avtalet har gått ut', actionNeeded: true }
   } else if (timeRemaining.days <= 30) {
-    return {
-      urgency: 'critical',
-      message: 'Avtalet löper ut inom 30 dagar',
-      actionNeeded: true
-    }
+    return { urgency: 'critical', message: 'Avtalet löper ut inom 30 dagar', actionNeeded: true }
   } else if (timeRemaining.days <= 90) {
-    return {
-      urgency: 'high',
-      message: 'Avtalet löper ut inom 3 månader',
-      actionNeeded: true
-    }
+    return { urgency: 'high', message: 'Avtalet löper ut inom 3 månader', actionNeeded: true }
   } else if (timeRemaining.days <= 180) {
-    return {
-      urgency: 'medium',
-      message: 'Avtalet löper ut inom 6 månader',
-      actionNeeded: false
-    }
+    return { urgency: 'medium', message: 'Avtalet löper ut inom 6 månader', actionNeeded: false }
   } else {
-    return {
-      urgency: 'low',
-      message: 'Avtalet är stabilt',
-      actionNeeded: false
-    }
+    return { urgency: 'low', message: 'Avtalet är stabilt', actionNeeded: false }
   }
 }
 
-// 🆕 Valideringar för avtalsdatum
 export const validateContractDates = (startDate: string, endDate: string): {
   isValid: boolean
   errors: string[]
@@ -382,15 +326,9 @@ export const validateContractDates = (startDate: string, endDate: string): {
   const errors: string[] = []
   const start = new Date(startDate)
   const end = new Date(endDate)
-  const now = new Date()
   
   if (start >= end) {
     errors.push('Slutdatum måste vara efter startdatum')
-  }
-  
-  if (start > now) {
-    // Varning, inte fel
-    console.warn('Avtalet startar i framtiden')
   }
   
   const contractLengthDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
@@ -398,23 +336,16 @@ export const validateContractDates = (startDate: string, endDate: string): {
     errors.push('Avtalet måste vara minst 30 dagar långt')
   }
   
-  if (contractLengthDays > 365 * 10) { // 10 år
+  if (contractLengthDays > 365 * 10) {
     errors.push('Avtalet kan inte vara längre än 10 år')
   }
   
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
+  return { isValid: errors.length === 0, errors }
 }
 
-// 🆕 HJÄLPFUNKTIONER FÖR MARKNADSFÖRINGSUTGIFTER
 export const formatSpendMonth = (monthStr: string): string => {
   const [year, month] = monthStr.split('-')
-  const monthNames = [
-    'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
-    'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
-  ]
+  const monthNames = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni', 'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December']
   return `${monthNames[parseInt(month) - 1]} ${year}`
 }
 
@@ -434,24 +365,19 @@ export const validateSpendData = (spend: number, month: string): {
   if (spend < 0) {
     errors.push('Utgift kan inte vara negativ')
   }
-  
-  if (spend > 10000000) { // 10 miljoner SEK
+  if (spend > 10000000) {
     errors.push('Utgift verkar orealistiskt hög')
   }
   
   const monthDate = new Date(month)
-  const now = new Date()
   const twoYearsFromNow = new Date()
-  twoYearsFromNow.setFullYear(now.getFullYear() + 2)
+  twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2)
   
   if (monthDate > twoYearsFromNow) {
     errors.push('Datum kan inte vara mer än 2 år i framtiden')
   }
   
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
+  return { isValid: errors.length === 0, errors }
 }
 
 export const formatCurrency = (amount: number): string => {
@@ -462,7 +388,6 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-// 🆕 EXTRA HJÄLPFUNKTIONER FÖR MÅNADSHANTERING
 export const getMonthRange = (startMonth: string, endMonth: string): string[] => {
   const start = new Date(startMonth)
   const end = new Date(endMonth)
