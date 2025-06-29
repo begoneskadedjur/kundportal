@@ -48,6 +48,8 @@ export interface CaseEconomy {
   avg_completion_days: number
   total_cases_this_month: number
   total_revenue_this_month: number
+  ongoing_cases_count: number
+  ongoing_potential_revenue: number
   case_types: Array<{
     case_type: string
     count: number
@@ -376,14 +378,17 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   try {
     const currentMonth = new Date().toISOString().slice(0, 7)
     
-    const { data: cases } = await supabase
+    // Hämta alla ärenden för denna månad
+    const { data: allCases } = await supabase
       .from('cases')
       .select('price, case_type, created_at, completed_date')
-      .gte('created_at', `${currentMonth}-01`)
-      .lt('created_at', `${currentMonth}-32`)
+      .or(`and(created_at.gte.${currentMonth}-01,created_at.lt.${currentMonth}-32),and(completed_date.gte.${currentMonth}-01,completed_date.lt.${currentMonth}-32)`)
 
-    const completedCases = cases?.filter(c => c.completed_date) || []
+    // Separera avslutade och pågående ärenden
+    const completedCases = allCases?.filter(c => c.completed_date && c.price && c.price > 0) || []
+    const ongoingCases = allCases?.filter(c => !c.completed_date && c.price && c.price > 0) || []
     
+    // Beräkningar baserat på ENDAST avslutade ärenden för säkra intäkter
     const avg_case_price = completedCases.length > 0 
       ? completedCases.reduce((sum, c) => sum + (c.price || 0), 0) / completedCases.length 
       : 0
@@ -397,10 +402,10 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
         }, 0) / completedCases.length
       : 0
 
-    const total_cases_this_month = cases?.length || 0
+    const total_cases_this_month = completedCases.length
     const total_revenue_this_month = completedCases.reduce((sum, c) => sum + (c.price || 0), 0)
 
-    // Gruppera per ärendetype
+    // Gruppera per ärendetype (ENDAST avslutade)
     const caseTypeStats: { [key: string]: any } = {}
     completedCases.forEach(case_ => {
       const type = case_.case_type || 'Okänt'
@@ -416,6 +421,10 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       caseTypeStats[type].total_revenue += case_.price || 0
     })
 
+    // Lägg till pågående ärenden data för "Mest lönsam" kortets alternativa visning
+    const ongoingRevenue = ongoingCases.reduce((sum, c) => sum + (c.price || 0), 0)
+    const ongoingCount = ongoingCases.length
+
     const case_types = Object.values(caseTypeStats).map((type: any) => ({
       ...type,
       avg_price: type.count > 0 ? type.total_revenue / type.count : 0
@@ -426,7 +435,10 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       avg_completion_days,
       total_cases_this_month,
       total_revenue_this_month,
-      case_types
+      case_types,
+      // Lägg till pågående ärenden data
+      ongoing_cases_count: ongoingCount,
+      ongoing_potential_revenue: ongoingRevenue
     }
   } catch (error) {
     console.error('Error fetching case economy:', error)

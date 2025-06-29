@@ -191,15 +191,15 @@ const CaseEconomyChart: React.FC = () => {
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Mest lönsam */}
+          {/* Mest lönsam - nu visar pågående potential */}
           <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-400 font-medium text-sm">Mest lönsam</p>
-                <p className="text-white font-semibold text-sm">{mostProfitable?.case_type || 'N/A'}</p>
-                <p className="text-slate-400 text-xs">{formatCurrency(mostProfitable?.total_revenue || 0)}</p>
+                <p className="text-green-400 font-medium text-sm">Pågående potential</p>
+                <p className="text-white font-semibold text-sm">{caseEconomy.ongoing_cases_count} ärenden</p>
+                <p className="text-slate-400 text-xs">{formatCurrency(caseEconomy.ongoing_potential_revenue)} potential</p>
               </div>
-              <div className="text-green-400 text-xl">💰</div>
+              <div className="text-green-400 text-xl">⏳</div>
             </div>
           </div>
 
@@ -235,7 +235,7 @@ const CaseEconomyChart: React.FC = () => {
             <table className="w-full text-xs">
               <thead className="bg-slate-800">
                 <tr className="text-slate-300">
-                  <th className="px-3 py-2 text-left">Ärendetype</th>
+                  <th className="px-3 py-2 text-left">Typ av ärende</th>
                   <th className="px-3 py-2 text-right">Antal</th>
                   <th className="px-3 py-2 text-right">Genomsnittspris</th>
                   <th className="px-3 py-2 text-right">Total intäkt</th>
