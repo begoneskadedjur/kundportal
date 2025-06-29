@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v4
+// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection } from '../../services/economicStatisticsService';
 
-// --- FORMATTERING & UI-KOMPONENTER ---
+// --- FORMATTING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
@@ -57,7 +57,7 @@ const MonthlyChart = ({ title, data, currentYear, onYearChange, type = 'contract
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear - 1)} className="text-slate-400 hover:text-white"><ChevronLeftIcon className="w-4 h-4" /></Button>
           <span className="text-white font-medium px-3">{currentYear}</span>
-          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear > new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => onYearChange(currentYear + 1)} disabled={currentYear >= new Date().getFullYear()} className="text-slate-400 hover:text-white disabled:opacity-50"><ChevronRightIcon className="w-4 h-4" /></Button>
         </div>
       </div>
       <div className="h-64 flex items-end justify-between gap-2 mb-4">
@@ -115,13 +115,21 @@ const SegmentPerformanceCard = () => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<ARRByBusinessType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSegmentData = async () => {
       setLoading(true);
-      const segmentData = await economicStatisticsService.getARRByBusinessTypeForYear(year);
-      setData(segmentData);
-      setLoading(false);
+      setError(null);
+      try {
+        const segmentData = await economicStatisticsService.getARRByBusinessTypeForYear(year);
+        setData(segmentData);
+      } catch (err: any) {
+        console.error("Failed to fetch segment data:", err);
+        setError("Kunde inte ladda segmentdata.");
+      } finally {
+        setLoading(false);
+      }
     };
     fetchSegmentData();
   }, [year]);
@@ -145,6 +153,8 @@ const SegmentPerformanceCard = () => {
       </div>
       {loading ? (
         <div className="h-48 flex items-center justify-center"><Activity className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : error ? (
+        <div className="h-48 flex items-center justify-center text-red-400"><AlertTriangle className="w-5 h-5 mr-2"/> {error}</div>
       ) : (
         <div className="space-y-3">
           {sortedData.length > 0 ? sortedData.slice(0, 7).map(item => {

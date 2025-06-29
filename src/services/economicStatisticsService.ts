@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FIX: Justerar ARR-prognos för innevarande år
+// src/services/economicStatisticsService.ts - UPPGRADERAD MED ÅRSFILTER OCH DETALJERAD PROGNOS
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -68,6 +68,7 @@ export interface ARRByBusinessType {
 export interface ARRProjection {
   year: number;
   projectedARR: number;
+  activeContracts: number;
 }
 
 export interface DashboardStats {
@@ -116,7 +117,74 @@ class EconomicStatisticsService {
       throw error;
     }
   }
-  
+
+  async getARRByBusinessTypeForYear(targetYear: number): Promise<ARRByBusinessType[]> {
+    const yearStart = new Date(targetYear, 0, 1);
+    const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
+
+    const { data: allCustomers, error: customersError } = await supabase
+      .from('customers')
+      .select('id, business_type, annual_premium, contract_start_date, contract_end_date')
+      .eq('is_active', true);
+    if (customersError) throw customersError;
+
+    const { data: allCases, error: casesError } = await supabase
+      .from('cases')
+      .select('customer_id, price, completed_date')
+      .not('price', 'is', null).gt('price', 0)
+      .not('completed_date', 'is', null)
+      .gte('completed_date', yearStart.toISOString())
+      .lte('completed_date', yearEnd.toISOString());
+    if (casesError) throw casesError;
+
+    const businessTypeMap = new Map<string, { arr: number; caseRevenue: number; customerIds: Set<string> }>();
+
+    (allCustomers || []).forEach(customer => {
+        const type = customer.business_type || 'Annat';
+        if (!businessTypeMap.has(type)) {
+            businessTypeMap.set(type, { arr: 0, caseRevenue: 0, customerIds: new Set() });
+        }
+    });
+    
+    (allCustomers || []).forEach(customer => {
+        if (!customer.contract_start_date || !customer.contract_end_date || !customer.annual_premium) return;
+        const type = customer.business_type || 'Annat';
+        const contractStart = new Date(customer.contract_start_date);
+        const contractEnd = new Date(customer.contract_end_date);
+        
+        const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()));
+        const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()));
+
+        if (overlapStart < overlapEnd) {
+            const dailyRate = customer.annual_premium / 365.25;
+            const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
+            const revenueForYear = overlapDays * dailyRate;
+            
+            const current = businessTypeMap.get(type)!;
+            current.arr += revenueForYear;
+            current.customerIds.add(customer.id);
+        }
+    });
+
+    const customerIdToTypeMap = new Map(allCustomers.map(c => [c.id, c.business_type || 'Annat']));
+    (allCases || []).forEach(c => {
+        const type = customerIdToTypeMap.get(c.customer_id);
+        if (type && businessTypeMap.has(type)) {
+            const current = businessTypeMap.get(type)!;
+            current.caseRevenue += c.price || 0;
+            current.customerIds.add(c.customer_id);
+        }
+    });
+
+    return Array.from(businessTypeMap.entries()).map(([business_type, data]) => ({
+      business_type,
+      arr: data.arr,
+      customer_count: data.customerIds.size,
+      average_arr_per_customer: data.customerIds.size > 0 ? data.arr / data.customerIds.size : 0,
+      additional_case_revenue: data.caseRevenue
+    })).sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
+  }
+
   async getPerformanceStats(): Promise<PerformanceStats> {
     const normalizeName = (name: string): string => {
       if (!name) return 'okänd';
@@ -214,9 +282,11 @@ class EconomicStatisticsService {
     for (let i = 0; i < 6; i++) {
         const targetYear = currentYear + i;
         let totalProjectedRevenueForYear = 0;
+        let activeContractsInYear = 0;
 
         if (targetYear === currentYear) {
             totalProjectedRevenueForYear = currentARR;
+            activeContractsInYear = customers.length;
         } else {
             const yearStart = new Date(targetYear, 0, 1);
             const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
@@ -230,10 +300,11 @@ class EconomicStatisticsService {
                 if (overlapStart < overlapEnd) {
                     const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
                     totalProjectedRevenueForYear += overlapDays * dailyRate;
+                    activeContractsInYear++;
                 }
             }
         }
-        projections.push({ year: targetYear, projectedARR: totalProjectedRevenueForYear });
+        projections.push({ year: targetYear, projectedARR: totalProjectedRevenueForYear, activeContracts: activeContractsInYear });
     }
     return projections;
   }
@@ -329,35 +400,6 @@ class EconomicStatisticsService {
       averageCasePrice: paidCases.length > 0 ? additionalCaseRevenue / paidCases.length : 0,
       paidCasesThisMonth,
     };
-  }
-
-  async getARRByBusinessType(): Promise<ARRByBusinessType[]> {
-    const [customersRes, casesRes] = await Promise.all([
-      supabase.from('customers').select('id, business_type, annual_premium').eq('is_active', true),
-      supabase.from('cases').select('customer_id, price, completed_date').not('price', 'is', null).gt('price', 0).not('completed_date', 'is', null)
-    ]);
-    if (customersRes.error) throw customersRes.error;
-    if (casesRes.error) throw casesRes.error;
-    const businessTypeMap = new Map<string, { arr: number; count: number; caseRevenue: number }>();
-    const customerCaseRevenue = new Map<string, number>();
-    (casesRes.data || []).forEach(c => {
-        if(c.customer_id) customerCaseRevenue.set(c.customer_id, (customerCaseRevenue.get(c.customer_id) || 0) + (c.price || 0));
-    });
-    (customersRes.data || []).forEach(customer => {
-      const type = customer.business_type || 'Annat';
-      const current = businessTypeMap.get(type) || { arr: 0, count: 0, caseRevenue: 0 };
-      current.arr += customer.annual_premium || 0;
-      current.count++;
-      current.caseRevenue += customerCaseRevenue.get(customer.id) || 0;
-      businessTypeMap.set(type, current);
-    });
-    return Array.from(businessTypeMap.entries()).map(([business_type, data]) => ({
-      business_type,
-      arr: data.arr,
-      customer_count: data.count,
-      average_arr_per_customer: data.count > 0 ? data.arr / data.count : 0,
-      additional_case_revenue: data.caseRevenue
-    })).sort((a, b) => b.arr - a.arr);
   }
 
   private async calculateGrowthMetrics(currentARR: number): Promise<{ monthlyGrowth: number }> {
