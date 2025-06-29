@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - FIX: Correct 'this' context by using arrow functions
+// src/services/economicStatisticsService.ts - UPPGRADERAD MED ENHETSEKONOMI & THIS-CONTEXT FIX
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -13,11 +13,20 @@ export interface ARRStats { currentARR: number; monthlyGrowth: number; monthlyRe
 export interface ARRByBusinessType { business_type: string; arr: number; customer_count: number; average_arr_per_customer: number; additional_case_revenue: number; }
 export interface ARRProjection { year: number; projectedARR: number; activeContracts: number; }
 export interface UnitEconomics { cac: number; ltv: number; ltvToCacRatio: number; paybackPeriodMonths: number; }
-export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; unitEconomics: UnitEconomics; }
+
+export interface DashboardStats {
+  arr: ARRStats;
+  arrByBusinessType: ARRByBusinessType[];
+  technicians: TechnicianStats;
+  growthAnalysis: MonthlyGrowthAnalysis;
+  upsellOpportunities: UpsellOpportunity[];
+  performanceStats: PerformanceStats;
+  arrProjections: ARRProjection[];
+  unitEconomics: UnitEconomics;
+}
 
 class EconomicStatisticsService {
 
-  // ❗ FIX: 'this' är nu korrekt bundet i Promise.all
   getDashboardStats = async (periodInDays: number = 30): Promise<DashboardStats> => {
     try {
       const arr = await this.getARRStats(periodInDays);
@@ -64,10 +73,13 @@ class EconomicStatisticsService {
     const { data: spendData, error: spendError } = await supabase
       .from('monthly_marketing_spend')
       .select('spend')
-      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0])
+      .gte('month', firstDayOfLastMonth.toISOString())
+      .lte('month', lastDayOfLastMonth.toISOString())
       .single();
     
-    if (spendError && spendError.code !== 'PGRST116') console.error("Error fetching marketing spend:", spendError);
+    if (spendError && spendError.code !== 'PGRST116') {
+      console.error("Error fetching marketing spend:", spendError);
+    }
     const marketingSpend = spendData?.spend || 0;
 
     const { count: newCustomersLastMonth, error: customersError } = await supabase
@@ -85,7 +97,12 @@ class EconomicStatisticsService {
     const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
     const paybackPeriodMonths = avgMrrPerCustomer > 0 ? cac / avgMrrPerCustomer : 0;
 
-    return { cac, ltv, ltvToCacRatio, paybackPeriodMonths };
+    return {
+      cac,
+      ltv,
+      ltvToCacRatio,
+      paybackPeriodMonths,
+    };
   }
 
   getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
