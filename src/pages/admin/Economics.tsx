@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL FIX: Adds the missing import statement for ManageSpendCard.
+// src/pages/admin/Economics.tsx - FINAL: With correct formatting, component placement and ROI display.
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,25 +6,21 @@ import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
-  ChevronLeft, ChevronRight, Trash2, Save
+  ChevronLeft, ChevronRight, RefreshCw, BarChart
 } from 'lucide-react';
-
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import Input from '../../components/ui/Input';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
-import ManageSpendCard from '../../components/admin/ManageSpendCard'; // <--- DENNA RAD SAKNADES
+import ManageSpendCard from '../../components/admin/ManageSpendCard';
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
 type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
 
-// --- FORMATTERING & HJÄLPFUNKTIONER ---
+// --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
-
-// --- UI-KOMPONENTER (Korrekt formaterade) ---
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
   const [show, setShow] = useState(false);
@@ -258,7 +254,7 @@ const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
 const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
   <Card>
     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
       <div className="bg-slate-800/50 p-4 rounded-lg">
         <p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p>
         <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p>
@@ -276,6 +272,13 @@ const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
       <div className="bg-slate-800/50 p-4 rounded-lg">
         <p className="text-sm text-slate-400">Återbetalningstid</p>
         <p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p>
+      </div>
+      {/* NYTT FÄLT FÖR ROI */}
+      <div className="bg-slate-800/50 p-4 rounded-lg">
+        <p className="text-sm text-slate-400">ROI (på kostnad)</p>
+        <p className={`text-2xl font-bold mt-1 ${data.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {data.roi.toFixed(0)}%
+        </p>
       </div>
     </div>
   </Card>
@@ -313,32 +316,23 @@ export default function Economics() {
   }, []);
 
   useEffect(() => {
-    const fetchContractsData = async () => {
-      setContractsChartState(prev => ({ ...prev, loading: true, error: null }));
+    const fetchChartDataForYear = async (year: number, table: string, dateCol: string, agg: 'count' | 'sum', sumCol?: string, setState?: React.Dispatch<React.SetStateAction<ChartState>>) => {
+      if (!setState) return;
+      setState(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const data = await getYearlyChartData('customers', 'created_at', contractsChartState.year, 'count');
-        setContractsChartState(prev => ({ ...prev, data, loading: false }));
+        const data = await getYearlyChartData(table, dateCol, year, agg, sumCol);
+        setState(prev => ({ ...prev, data, loading: false }));
       } catch (error) {
-        console.error("Error fetching contracts chart data", error);
-        setContractsChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
+        console.error(`Error fetching chart data for ${table}:`, error);
+        setState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
       }
     };
-    if (!pageLoading) fetchContractsData();
-  }, [contractsChartState.year, pageLoading]);
-
-  useEffect(() => {
-    const fetchCaseRevenueData = async () => {
-      setCaseRevenueChartState(prev => ({ ...prev, loading: true, error: null }));
-      try {
-        const data = await getYearlyChartData('cases', 'completed_date', caseRevenueChartState.year, 'sum', 'price');
-        setCaseRevenueChartState(prev => ({ ...prev, data, loading: false }));
-      } catch (error) {
-        console.error("Error fetching case revenue chart data", error);
-        setCaseRevenueChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
-      }
-    };
-    if (!pageLoading) fetchCaseRevenueData();
-  }, [caseRevenueChartState.year, pageLoading]);
+    
+    if (!pageLoading) {
+      fetchChartDataForYear(contractsChartState.year, 'customers', 'created_at', 'count', undefined, setContractsChartState);
+      fetchChartDataForYear(caseRevenueChartState.year, 'cases', 'completed_date', 'sum', 'price', setCaseRevenueChartState);
+    }
+  }, [contractsChartState.year, caseRevenueChartState.year, pageLoading]);
 
   const getYearlyChartData = async (table: string, date_col: string, year: number, aggregation: 'count' | 'sum', sum_col?: string): Promise<ChartDataPoint[]> => {
     type RowType = { [date_col: string]: string; [key: string]: any; };
@@ -373,7 +367,7 @@ export default function Economics() {
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-4"><Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button><h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1></div>
-          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={pageLoading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
+          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={pageLoading} className="text-slate-400 hover:text-white"><RefreshCw className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
 
@@ -394,8 +388,6 @@ export default function Economics() {
           <SegmentPerformanceCard />
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
-        
-        <UnitEconomicsCard data={unitEconomics} />
         
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <MonthlyChart title="Nya Avtal per Månad" chartState={contractsChartState} onYearChange={(year) => setContractsChartState(prev => ({...prev, year}))} type="contracts" />
@@ -426,7 +418,8 @@ export default function Economics() {
           </Card>
         </div>
         
-        {/* ManageSpendCard har flyttats hit, längst ner */}
+        {/* === FLYTTADE KORT === */}
+        <UnitEconomicsCard data={unitEconomics} />
         <ManageSpendCard onDataChange={fetchEconomicData} />
 
         <div className="mt-8 flex items-center justify-between text-xs text-slate-500">
