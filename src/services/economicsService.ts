@@ -377,14 +377,23 @@ export const getMonthlyMarketingSpend = async (): Promise<MarketingSpend[]> => {
 export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   try {
     console.log('🔍 getCaseEconomy: Starting query...')
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    console.log('📅 Current month:', currentMonth)
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1 // getMonth() är 0-indexerad
     
-    // Hämta alla ärenden för denna månad
+    // Skapa korrekt startdatum och slutdatum för månaden
+    const monthStart = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear
+    const monthEnd = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`
+    
+    console.log('📅 Date range:', { monthStart, monthEnd })
+    
+    // Hämta ärenden skapade ELLER avslutade denna månad
     const { data: allCases, error } = await supabase
       .from('cases')
       .select('price, case_type, created_at, completed_date')
-      .or(`and(created_at.gte.${currentMonth}-01,created_at.lt.${currentMonth}-32),and(completed_date.gte.${currentMonth}-01,completed_date.lt.${currentMonth}-32)`)
+      .or(`and(created_at.gte.${monthStart},created_at.lt.${monthEnd}),and(completed_date.gte.${monthStart},completed_date.lt.${monthEnd})`)
 
     if (error) {
       console.error('❌ Supabase error in getCaseEconomy:', error)
