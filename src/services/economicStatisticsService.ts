@@ -1,4 +1,4 @@
-// src/services/economicStatisticsService.ts - UPPGRADERAD MED ENHETSEKONOMI & THIS-CONTEXT FIX
+// src/services/economicStatisticsService.ts - FINAL FIX: Corrects date formatting and 'this' context
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
@@ -73,11 +73,10 @@ class EconomicStatisticsService {
     const { data: spendData, error: spendError } = await supabase
       .from('monthly_marketing_spend')
       .select('spend')
-      .gte('month', firstDayOfLastMonth.toISOString())
-      .lte('month', lastDayOfLastMonth.toISOString())
+      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0]) // FIX: Use YYYY-MM-DD format
       .single();
     
-    if (spendError && spendError.code !== 'PGRST116') {
+    if (spendError && spendError.code !== 'PGRST116') { // Ignore "no rows found" error
       console.error("Error fetching marketing spend:", spendError);
     }
     const marketingSpend = spendData?.spend || 0;
@@ -97,12 +96,7 @@ class EconomicStatisticsService {
     const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
     const paybackPeriodMonths = avgMrrPerCustomer > 0 ? cac / avgMrrPerCustomer : 0;
 
-    return {
-      cac,
-      ltv,
-      ltvToCacRatio,
-      paybackPeriodMonths,
-    };
+    return { cac, ltv, ltvToCacRatio, paybackPeriodMonths };
   }
 
   getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
