@@ -12,6 +12,7 @@ import TechnicianRevenueChart from '../../components/admin/economics/TechnicianR
 import AccountManagerRevenueChart from '../../components/admin/economics/AccountManagerRevenueChart'
 import CaseEconomyChart from '../../components/admin/economics/CaseEconomyChart'
 import CustomerContractTable from '../../components/admin/economics/CustomerContractTable'
+import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
 
 const Economics: React.FC = () => {
   const navigate = useNavigate()
@@ -105,6 +106,12 @@ const Economics: React.FC = () => {
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">Detaljerad Avtalslista</h2>
             <CustomerContractTable />
+          </section>
+
+          {/* 9. Marknadsföringskostnader */}
+          <section>
+            <h2 className="text-xl font-semibold text-white mb-4">Hantera Marknadsföringskostnader</h2>
+            <MarketingSpendManager />
           </section>
         </div>
       </main>
