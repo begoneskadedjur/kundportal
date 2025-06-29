@@ -1,11 +1,10 @@
-// src/services/economicStatisticsService.ts - Refactored for performance and robustness
+// src/services/economicStatisticsService.ts - FINAL FIX: Re-introduces the specific function needed by the SegmentPerformanceCard component.
 
 import { supabase } from '../lib/supabase';
 import { technicianStatisticsService } from './technicianStatisticsService';
 import type { TechnicianStats } from './technicianStatisticsService';
 
-// --- DATABASE TYPES (for better type safety) ---
-// FÖRBÄTTRING: Definierar typer för datan som hämtas för att undvika 'any'
+// --- DATABASE TYPES ---
 type CustomerData = {
   id: string;
   is_active: boolean;
@@ -27,7 +26,7 @@ type CaseData = {
   pest_type: string | null;
 };
 
-// --- INTERFACES (Unchanged) ---
+// --- INTERFACES ---
 export interface TechnicianPerformance { name: string; contractRevenue: number; caseRevenue: number; totalRevenue: number; contractCount: number; caseCount: number; }
 export interface PestTypePerformance { pestType: string; revenue: number; caseCount: number; }
 export interface PerformanceStats { byTechnician: TechnicianPerformance[]; byPestType: PestTypePerformance[]; }
@@ -37,24 +36,13 @@ export interface ARRStats { currentARR: number; monthlyGrowth: number; monthlyRe
 export interface ARRByBusinessType { business_type: string; arr: number; customer_count: number; average_arr_per_customer: number; additional_case_revenue: number; }
 export interface ARRProjection { year: number; projectedARR: number; activeContracts: number; }
 export interface UnitEconomics { cac: number; ltv: number; ltvToCacRatio: number; paybackPeriodMonths: number; }
-
-export interface DashboardStats {
-  arr: ARRStats;
-  arrByBusinessType: ARRByBusinessType[];
-  technicians: TechnicianStats;
-  growthAnalysis: MonthlyGrowthAnalysis;
-  upsellOpportunities: UpsellOpportunity[];
-  performanceStats: PerformanceStats;
-  arrProjections: ARRProjection[];
-  unitEconomics: UnitEconomics;
-}
+export interface DashboardStats { arr: ARRStats; arrByBusinessType: ARRByBusinessType[]; technicians: TechnicianStats; growthAnalysis: MonthlyGrowthAnalysis; upsellOpportunities: UpsellOpportunity[]; performanceStats: PerformanceStats; arrProjections: ARRProjection[]; unitEconomics: UnitEconomics; }
 
 class EconomicStatisticsService {
 
-  // --- REFAKTORERING: Huvudmetod som hämtar all data en gång och distribuerar den ---
+  // Huvudmetod för dashboarden - optimeringarna är kvar
   getDashboardStats = async (periodInDays: number = 30): Promise<DashboardStats> => {
     try {
-      // Steg 1: Hämta all grunddata från databasen EN GÅNG
       const [customersRes, casesRes] = await Promise.all([
         supabase.from('customers').select<string, CustomerData>('id, is_active, annual_premium, created_at, contract_start_date, contract_end_date, business_type, company_name, assigned_account_manager'),
         supabase.from('cases').select<string, CaseData>('id, customer_id, price, completed_date, assigned_technician_name, pest_type')
@@ -66,7 +54,6 @@ class EconomicStatisticsService {
       const allCustomers: CustomerData[] = customersRes.data || [];
       const allCases: CaseData[] = casesRes.data || [];
       
-      // Steg 2: Anropa de olika beräkningsfunktionerna med den redan hämtade datan
       const arr = await this.getARRStats(allCustomers, allCases, periodInDays);
       
       const [
@@ -79,12 +66,12 @@ class EconomicStatisticsService {
         unitEconomics
       ] = await Promise.all([
         this.getARRByBusinessType(allCustomers, allCases),
-        technicianStatisticsService.getTechnicianStats(periodInDays), // Denna service har sin egen datahämtning, kan optimeras separat
+        technicianStatisticsService.getTechnicianStats(periodInDays),
         this.getMonthlyGrowthAnalysis(allCustomers),
         this.getUpsellOpportunities(allCustomers, allCases, 5),
         this.getPerformanceStats(allCustomers, allCases),
         this.getARRProjections(allCustomers),
-        this.getUnitEconomics(arr) // Denna behöver fortfarande göra ett eget anrop för marknadskostnader
+        this.getUnitEconomics(arr)
       ]);
 
       return { arr, arrByBusinessType, technicians, growthAnalysis, upsellOpportunities, performanceStats, arrProjections, unitEconomics };
@@ -93,8 +80,82 @@ class EconomicStatisticsService {
       throw error;
     }
   }
-  
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
+
+  // =================================================================================================
+  // === FIX: ÅTERINFÖR DEN SPECIFIKA FUNKTIONEN SOM SegmentPerformanceCard BEHÖVER ===
+  // Denna funktion anropas direkt av komponenten och är inte en del av den optimerade getDashboardStats-kedjan.
+  // =================================================================================================
+  getARRByBusinessTypeForYear = async (targetYear: number): Promise<ARRByBusinessType[]> => {
+    const yearStart = new Date(targetYear, 0, 1);
+    const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59);
+
+    const { data: allCustomers, error: customersError } = await supabase
+      .from('customers')
+      .select('id, business_type, annual_premium, contract_start_date, contract_end_date')
+      .eq('is_active', true);
+    if (customersError) throw customersError;
+
+    const { data: allCases, error: casesError } = await supabase
+      .from('cases')
+      .select('customer_id, price, completed_date')
+      .not('price', 'is', null).gt('price', 0)
+      .not('completed_date', 'is', null)
+      .gte('completed_date', yearStart.toISOString())
+      .lte('completed_date', yearEnd.toISOString());
+    if (casesError) throw casesError;
+
+    const businessTypeMap = new Map<string, { arr: number; caseRevenue: number; customerIds: Set<string> }>();
+
+    (allCustomers || []).forEach(customer => {
+        const type = customer.business_type || 'Annat';
+        if (!businessTypeMap.has(type)) {
+            businessTypeMap.set(type, { arr: 0, caseRevenue: 0, customerIds: new Set() });
+        }
+    });
+    
+    (allCustomers || []).forEach(customer => {
+        if (!customer.contract_start_date || !customer.contract_end_date || !customer.annual_premium) return;
+        const type = customer.business_type || 'Annat';
+        const contractStart = new Date(customer.contract_start_date);
+        const contractEnd = new Date(customer.contract_end_date);
+        
+        const overlapStart = new Date(Math.max(contractStart.getTime(), yearStart.getTime()));
+        const overlapEnd = new Date(Math.min(contractEnd.getTime(), yearEnd.getTime()));
+
+        if (overlapStart < overlapEnd) {
+            const dailyRate = customer.annual_premium / 365.25;
+            const overlapDays = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
+            const revenueForYear = overlapDays * dailyRate;
+            
+            const current = businessTypeMap.get(type)!;
+            current.arr += revenueForYear;
+            current.customerIds.add(customer.id);
+        }
+    });
+
+    const customerIdToTypeMap = new Map((allCustomers || []).map(c => [c.id, c.business_type || 'Annat']));
+    (allCases || []).forEach(c => {
+        if (!c.customer_id) return;
+        const type = customerIdToTypeMap.get(c.customer_id);
+        if (type && businessTypeMap.has(type)) {
+            const current = businessTypeMap.get(type)!;
+            current.caseRevenue += c.price || 0;
+            current.customerIds.add(c.customer_id);
+        }
+    });
+
+    return Array.from(businessTypeMap.entries()).map(([business_type, data]) => ({
+      business_type,
+      arr: data.arr,
+      customer_count: data.customerIds.size,
+      average_arr_per_customer: data.customerIds.size > 0 ? data.arr / data.customerIds.size : 0,
+      additional_case_revenue: data.caseRevenue
+    })).sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
+  }
+  // === SLUT PÅ FIX ===
+
+
+  // Alla andra metoder är oförändrade och använder de optimerade anropen
   getARRStats = async (allCustomers: CustomerData[], allCases: CaseData[], periodInDays: number): Promise<ARRStats> => {
     const paidCases = allCases.filter(c => c.completed_date && c.price && c.price > 0);
     const activeCustomers = allCustomers.filter(c => c.is_active);
@@ -107,7 +168,7 @@ class EconomicStatisticsService {
     const renewalMetrics = this.calculateRenewalMetrics(activeCustomers);
     
     const thisMonthStart = new Date(); thisMonthStart.setDate(1); thisMonthStart.setHours(0,0,0,0);
-    const paidCasesThisMonth = paidCases.filter(c => new Date(c.completed_date!) >= thisMonthStart).length;
+    const paidCasesThisMonth = paidCases.filter(c => c.completed_date != null && new Date(c.completed_date) >= thisMonthStart).length;
 
     return {
       currentARR,
@@ -135,10 +196,10 @@ class EconomicStatisticsService {
     const { data: spendData, error: spendError } = await supabase
       .from('monthly_marketing_spend')
       .select('spend')
-      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0]) // KORREKT DATUMFORMAT
+      .eq('month', firstDayOfLastMonth.toISOString().split('T')[0])
       .single();
     
-    if (spendError && spendError.code !== 'PGRST116') {
+    if (spendError && spendError.code !== 'PGRST116') { 
       console.error("Error fetching marketing spend:", spendError);
     }
     const marketingSpend = spendData?.spend || 0;
@@ -152,7 +213,7 @@ class EconomicStatisticsService {
     if (customersError) throw customersError;
 
     const cac = newCustomersLastMonth && newCustomersLastMonth > 0 ? marketingSpend / newCustomersLastMonth : 0;
-    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01; // Undvik division med noll
+    const churnRateForLTV = arrStats.churnRate > 0 ? arrStats.churnRate / 100 : 0.01;
     const ltv = churnRateForLTV > 0 ? arrStats.averageARRPerCustomer / churnRateForLTV : 0;
     const ltvToCacRatio = cac > 0 ? ltv / cac : 0;
     const avgMrrPerCustomer = arrStats.averageARRPerCustomer / 12;
@@ -161,7 +222,6 @@ class EconomicStatisticsService {
     return { cac, ltv, ltvToCacRatio, paybackPeriodMonths };
   }
   
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
   getARRByBusinessType = async (allCustomers: CustomerData[], allCases: CaseData[]): Promise<ARRByBusinessType[]> => {
     const activeCustomers = allCustomers.filter(c => c.is_active);
     const businessTypeMap = new Map<string, { arr: number; count: number; caseRevenue: number }>();
@@ -191,7 +251,6 @@ class EconomicStatisticsService {
     })).sort((a, b) => b.arr - a.arr);
   }
 
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
   getPerformanceStats = async (allCustomers: CustomerData[], allCases: CaseData[]): Promise<PerformanceStats> => {
     const normalizeName = (name: string): string => {
         if (!name) return 'okänd';
@@ -255,7 +314,6 @@ class EconomicStatisticsService {
     return { byTechnician, byPestType };
   }
 
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
   getARRProjections = async (allCustomers: CustomerData[]): Promise<ARRProjection[]> => {
     const activeCustomers = allCustomers.filter(c => c.is_active && c.annual_premium && c.contract_start_date && c.contract_end_date);
     if (activeCustomers.length === 0) return [];
@@ -295,7 +353,6 @@ class EconomicStatisticsService {
     return projections;
   }
 
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
   getMonthlyGrowthAnalysis = async (allCustomers: CustomerData[]): Promise<MonthlyGrowthAnalysis> => {
     const today = new Date();
     const oneMonthAgo = new Date();
@@ -308,7 +365,6 @@ class EconomicStatisticsService {
     const newCustomers = allCustomers.filter(c => new Date(c.created_at) >= oneMonthAgo && c.is_active);
     const newARR = newCustomers.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
     
-    // En kund har "churnat" om den var aktiv vid periodens början men inte längre är det nu
     const churnedCustomers = activeAtStart.filter(startCustomer => {
         const currentStatus = allCustomers.find(c => c.id === startCustomer.id);
         return !currentStatus || !currentStatus.is_active;
@@ -327,7 +383,6 @@ class EconomicStatisticsService {
     };
   }
   
-  // REFAKTORERING: Tar emot data istället för att hämta den själv
   getUpsellOpportunities = async (allCustomers: CustomerData[], allCases: CaseData[], limit: number = 5): Promise<UpsellOpportunity[]> => {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -360,13 +415,10 @@ class EconomicStatisticsService {
     return opportunities.sort((a, b) => b.caseToArrRatio - a.caseToArrRatio).slice(0, limit);
   }
 
-  // --- HJÄLPMETODER FÖR BERÄKNINGAR ---
-
   calculateGrowthMetrics = async (allCustomers: CustomerData[], currentARR: number): Promise<{ monthlyGrowth: number }> => {
     const lastMonth = new Date(); 
     lastMonth.setMonth(lastMonth.getMonth() - 1);
     
-    // Filtrera befintlig data istället för nytt DB-anrop
     const customersActiveLastMonth = allCustomers.filter(c => c.is_active && new Date(c.created_at) <= lastMonth);
     const lastMonthARR = customersActiveLastMonth.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
 
@@ -391,8 +443,7 @@ class EconomicStatisticsService {
     const startRevenue = activeAtStart.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
     const remainingCustomersFromCohort = allCustomers.filter(c => activeAtStartIds.has(c.id) && c.is_active);
     const endRevenueFromSameCohort = remainingCustomersFromCohort.reduce((sum, c) => sum + (c.annual_premium || 0), 0);
-
-    // Här kan man också inkludera expansion/contraction från de återstående kunderna för en mer exakt NRR, men detta är en bra start.
+    
     const netRevenueRetention = startRevenue > 0 ? (endRevenueFromSameCohort / startRevenue) * 100 : 100;
 
     return { churnRate, netRevenueRetention };
@@ -400,7 +451,6 @@ class EconomicStatisticsService {
   
   calculateRenewalMetrics = (activeCustomers: CustomerData[]): { expiring3Months: number; expiring6Months: number; expiring12Months: number; } => {
     const now = new Date();
-    // FÖRBÄTTRING: Använd setMonth för mer exakta framtida datum
     const in3Months = new Date(); in3Months.setMonth(now.getMonth() + 3);
     const in6Months = new Date(); in6Months.setMonth(now.getMonth() + 6);
     const in12Months = new Date(); in12Months.setMonth(now.getMonth() + 12);
