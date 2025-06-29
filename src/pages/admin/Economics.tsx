@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION
+// src/pages/admin/Economics.tsx - FIX: Korrekt felhantering i SegmentPerformanceCard
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection } from '../../services/economicStatisticsService';
 
-// --- FORMATTING & UI-KOMPONENTER ---
+// --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
