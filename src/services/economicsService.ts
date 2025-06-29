@@ -325,35 +325,68 @@ export const getAccountManagerRevenue = async (): Promise<AccountManagerRevenue[
   }
 }
 
-// 6. Marknadsföringskostnader och CAC
+// 6. Marknadsföringskostnader och CAC - FIXAD VERSION
 export const getMonthlyMarketingSpend = async (): Promise<MarketingSpend[]> => {
   try {
+    console.log('🔍 getMonthlyMarketingSpend: Starting...')
+    
     // Hämta marknadsföringskostnader
     const { data: spendData } = await supabase
       .from('monthly_marketing_spend')
       .select('month, spend')
       .order('month')
 
-    // Hämta nya kunder per månad
+    // Hämta alla kunder för att beräkna nya kunder per månad
     const { data: customerData } = await supabase
       .from('customers')
       .select('created_at')
       .order('created_at')
 
+    console.log('📊 Raw data:', { 
+      spendData: spendData?.length || 0, 
+      customerData: customerData?.length || 0 
+    })
+
     const monthlyStats: { [key: string]: MarketingSpend } = {}
 
-    // Initiera med marknadsföringskostnader
+    // FIX 1: Skapa en lista av alla månader som behövs (både från marknadsföringskostnader och nya kunder)
+    const allMonths = new Set<string>()
+    
+    // Lägg till månader från marknadsföringskostnader
     spendData?.forEach(item => {
       const month = item.month.slice(0, 7) // YYYY-MM
+      allMonths.add(month)
+    })
+    
+    // Lägg till månader från nya kunder
+    customerData?.forEach(customer => {
+      const month = customer.created_at.slice(0, 7) // YYYY-MM
+      allMonths.add(month)
+    })
+
+    // FIX 2: Lägg till aktuell månad om den inte finns
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    allMonths.add(currentMonth)
+
+    // Initiera alla månader med standardvärden
+    Array.from(allMonths).forEach(month => {
       monthlyStats[month] = {
         month,
-        spend: item.spend || 0,
+        spend: 0,
         new_customers: 0,
         cac: 0
       }
     })
 
-    // Lägg till nya kunder
+    // Lägg till marknadsföringskostnader
+    spendData?.forEach(item => {
+      const month = item.month.slice(0, 7)
+      if (monthlyStats[month]) {
+        monthlyStats[month].spend = item.spend || 0
+      }
+    })
+
+    // Lägg till nya kunder - NU RÄKNAS ALLA MÅNADER!
     customerData?.forEach(customer => {
       const month = customer.created_at.slice(0, 7)
       if (monthlyStats[month]) {
@@ -361,12 +394,27 @@ export const getMonthlyMarketingSpend = async (): Promise<MarketingSpend[]> => {
       }
     })
 
-    // Beräkna CAC
+    // Beräkna CAC för alla månader
     Object.values(monthlyStats).forEach(month => {
       month.cac = month.new_customers > 0 ? month.spend / month.new_customers : 0
     })
 
-    return Object.values(monthlyStats).sort((a, b) => a.month.localeCompare(b.month))
+    console.log('📈 Processed monthly stats:', Object.keys(monthlyStats).length)
+    console.log('🔢 Sample data:', Object.values(monthlyStats).slice(0, 3))
+
+    // FIX 3: Sortera så att senaste månaden kommer sist (korrekt kronologisk ordning)
+    const result = Object.values(monthlyStats)
+      .filter(month => month.spend > 0 || month.new_customers > 0) // Visa bara månader med aktivitet
+      .sort((a, b) => a.month.localeCompare(b.month)) // Kronologisk ordning - senaste månaden längst till höger
+
+    console.log('✅ Final result:', {
+      months: result.length,
+      firstMonth: result[0]?.month,
+      lastMonth: result[result.length - 1]?.month,
+      totalNewCustomers: result.reduce((sum, m) => sum + m.new_customers, 0)
+    })
+
+    return result
   } catch (error) {
     console.error('Error fetching marketing spend:', error)
     throw error
