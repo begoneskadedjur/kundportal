@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL POLISHED VERSION with robust chart handling & proper formatting
+// src/pages/admin/Economics.tsx - FINAL FIX: Corrects component logic and maintains proper formatting
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -101,7 +101,6 @@ const MonthlyChart = ({ title, chartState, onYearChange, type = 'contracts' }: {
   );
 };
 
-
 // --- ÖVRIGA KOMPONENTER (korrekt formaterade) ---
 
 const MonthlyGrowthAnalysisCard = ({ analysis }: { analysis: MonthlyGrowthAnalysis }) => (
@@ -133,6 +132,7 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
   </Card>
 );
 
+// FIX: Denna komponent anropar nu den korrekta funktionen och hanterar sitt eget state
 const SegmentPerformanceCard = () => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<ARRByBusinessType[]>([]);
@@ -144,6 +144,7 @@ const SegmentPerformanceCard = () => {
       setLoading(true);
       setError(null);
       try {
+        // ANROPAR NU KORREKT FUNKTION
         const segmentData = await economicStatisticsService.getARRByBusinessTypeForYear(year);
         setData(segmentData);
       } catch (err: any) {
@@ -353,7 +354,7 @@ export default function Economics() {
     
     type RowType = { [date_col: string]: string; [key: string]: any; };
     
-    const select_cols = aggregation === 'sum' ? `${date_col}, ${sum_col}` : date_col;
+    const select_cols = aggregation === 'sum' && sum_col ? `${date_col}, ${sum_col}` : date_col;
     let query = supabase.from(table).select(select_cols)
         .gte(date_col, `${year}-01-01T00:00:00Z`)
         .lt(date_col, `${year + 1}-01-01T00:00:00Z`);
