@@ -1,4 +1,4 @@
-// src/types/database.ts - Komplett uppdaterad med contract_end_date + all befintlig struktur
+// src/types/database.ts - Komplett uppdaterad med contract_end_date + monthly_marketing_spend + all befintlig struktur
 export type Database = {
   public: {
     Tables: {
@@ -148,6 +148,19 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['user_invitations']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['user_invitations']['Insert']>
       }
+      // 🆕 NYA TABELLEN FÖR MARKNADSFÖRINGSUTGIFTER
+      monthly_marketing_spend: {
+        Row: {
+          id: string
+          month: string // YYYY-MM-DD format (första dagen i månaden)
+          spend: number // Utgift i SEK
+          notes: string | null // Valfria anteckningar
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['monthly_marketing_spend']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['monthly_marketing_spend']['Insert']>
+      }
     }
   }
 }
@@ -163,6 +176,11 @@ export type ContractType = Database['public']['Tables']['contract_types']['Row']
 export type Technician = Database['public']['Tables']['technicians']['Row']
 export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
 export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
+
+// 🆕 MARKNADSFÖRINGSUTGIFTER TYPER
+export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
+export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
+export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
 
 // Tekniker-roller (behålls oförändrade)
 export const TECHNICIAN_ROLES = [
@@ -206,6 +224,13 @@ export type TechnicianFormData = {
   direct_phone: string
   office_phone: string
   address: string
+}
+
+// 🆕 FORMULÄRDATA FÖR MARKNADSFÖRINGSUTGIFTER
+export type SpendFormData = {
+  month: string // YYYY-MM-DD
+  spend: string // Som sträng i formuläret, konverteras till number
+  notes: string
 }
 
 // Avtalsansvariga (behålls oförändrade)
@@ -381,4 +406,99 @@ export const validateContractDates = (startDate: string, endDate: string): {
     isValid: errors.length === 0,
     errors
   }
+}
+
+// 🆕 HJÄLPFUNKTIONER FÖR MARKNADSFÖRINGSUTGIFTER
+export const formatSpendMonth = (monthStr: string): string => {
+  const [year, month] = monthStr.split('-')
+  const monthNames = [
+    'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+    'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+  ]
+  return `${monthNames[parseInt(month) - 1]} ${year}`
+}
+
+export const getCurrentMonth = (): string => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}-01`
+}
+
+export const validateSpendData = (spend: number, month: string): {
+  isValid: boolean
+  errors: string[]
+} => {
+  const errors: string[] = []
+  
+  if (spend < 0) {
+    errors.push('Utgift kan inte vara negativ')
+  }
+  
+  if (spend > 10000000) { // 10 miljoner SEK
+    errors.push('Utgift verkar orealistiskt hög')
+  }
+  
+  const monthDate = new Date(month)
+  const now = new Date()
+  const twoYearsFromNow = new Date()
+  twoYearsFromNow.setFullYear(now.getFullYear() + 2)
+  
+  if (monthDate > twoYearsFromNow) {
+    errors.push('Datum kan inte vara mer än 2 år i framtiden')
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  }
+}
+
+export const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 0
+  }).format(amount)
+}
+
+// 🆕 EXTRA HJÄLPFUNKTIONER FÖR MÅNADSHANTERING
+export const getMonthRange = (startMonth: string, endMonth: string): string[] => {
+  const start = new Date(startMonth)
+  const end = new Date(endMonth)
+  const months: string[] = []
+  
+  const current = new Date(start)
+  while (current <= end) {
+    const year = current.getFullYear()
+    const month = String(current.getMonth() + 1).padStart(2, '0')
+    months.push(`${year}-${month}-01`)
+    current.setMonth(current.getMonth() + 1)
+  }
+  
+  return months
+}
+
+export const getPreviousMonth = (monthStr: string): string => {
+  const date = new Date(monthStr)
+  date.setMonth(date.getMonth() - 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}-01`
+}
+
+export const getNextMonth = (monthStr: string): string => {
+  const date = new Date(monthStr)
+  date.setMonth(date.getMonth() + 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}-01`
+}
+
+export const isValidMonthFormat = (monthStr: string): boolean => {
+  const regex = /^\d{4}-\d{2}-01$/
+  if (!regex.test(monthStr)) return false
+  
+  const date = new Date(monthStr)
+  return !isNaN(date.getTime())
 }
