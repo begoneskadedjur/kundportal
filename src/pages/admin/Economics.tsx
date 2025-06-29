@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - FINAL FIX: Corrects component logic and maintains proper formatting
+// src/pages/admin/Economics.tsx
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,15 +13,11 @@ import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
+import ManageSpendCard from '../../components/admin/ManageSpendCard'; // <-- NY IMPORT
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
-type ChartState = {
-  loading: boolean;
-  error: string | null;
-  data: ChartDataPoint[];
-  year: number;
-};
+type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
 
 // --- FORMATTERING & UI-KOMPONENTER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
@@ -101,9 +97,6 @@ const MonthlyChart = ({ title, chartState, onYearChange, type = 'contracts' }: {
   );
 };
 
-
-// --- ÖVRIGA KOMPONENTER (korrekt formaterade) ---
-
 const MonthlyGrowthAnalysisCard = ({ analysis }: { analysis: MonthlyGrowthAnalysis }) => (
   <Card className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-slate-700 h-full">
     <h3 className="text-lg font-semibold text-white mb-4">Månadens Tillväxt-analys (MRR)</h3>
@@ -133,7 +126,6 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
   </Card>
 );
 
-// FIX: Denna komponent anropar den korrekta funktionen och hanterar sitt eget state
 const SegmentPerformanceCard = () => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<ARRByBusinessType[]>([]);
@@ -145,7 +137,6 @@ const SegmentPerformanceCard = () => {
       setLoading(true);
       setError(null);
       try {
-        // ANROPAR NU KORREKT FUNKTION
         const segmentData = await economicStatisticsService.getARRByBusinessTypeForYear(year);
         setData(segmentData);
       } catch (err: any) {
@@ -286,7 +277,6 @@ const UnitEconomicsCard = ({ data }: { data: UnitEconomics }) => (
   </Card>
 );
 
-
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
   const navigate = useNavigate();
@@ -298,24 +288,28 @@ export default function Economics() {
   const [contractsChartState, setContractsChartState] = useState<ChartState>(initialChartState);
   const [caseRevenueChartState, setCaseRevenueChartState] = useState<ChartState>(initialChartState);
   
-  // Hämta huvuddata en gång vid sidladdning
+  const fetchEconomicData = async () => {
+    // Vid uppdatering av kostnader, behöver vi inte sätta hela sidan i laddningsläge
+    if (!pageLoading) {
+      setDashboardStats(null); // Rensa gammal data för att visa uppdatering
+    }
+
+    setPageError(null);
+    try {
+      const stats = await economicStatisticsService.getDashboardStats(30);
+      setDashboardStats(stats);
+    } catch (error: any) {
+      console.error("Huvudfel vid hämtning av ekonomisk data:", error);
+      setPageError(error.message || 'Kunde inte hämta ekonomisk data');
+    } finally {
+      setPageLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    const fetchEconomicData = async () => {
-      setPageLoading(true);
-      setPageError(null);
-      try {
-        const stats = await economicStatisticsService.getDashboardStats(30);
-        setDashboardStats(stats);
-      } catch (error: any) {
-        setPageError(error.message || 'Kunde inte hämta ekonomisk data');
-      } finally {
-        setPageLoading(false);
-      }
-    };
     fetchEconomicData();
   }, []);
 
-  // Separata useEffects för varje diagram, triggas när deras respektive år ändras
   useEffect(() => {
     const fetchContractsData = async () => {
       setContractsChartState(prev => ({ ...prev, loading: true, error: null }));
@@ -327,8 +321,8 @@ export default function Economics() {
         setContractsChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
       }
     };
-    fetchContractsData();
-  }, [contractsChartState.year]);
+    if (!pageLoading) fetchContractsData();
+  }, [contractsChartState.year, pageLoading]);
 
   useEffect(() => {
     const fetchCaseRevenueData = async () => {
@@ -341,37 +335,19 @@ export default function Economics() {
         setCaseRevenueChartState(prev => ({ ...prev, loading: false, error: "Kunde inte ladda data" }));
       }
     };
-    fetchCaseRevenueData();
-  }, [caseRevenueChartState.year]);
+    if (!pageLoading) fetchCaseRevenueData();
+  }, [caseRevenueChartState.year, pageLoading]);
 
-  // Generisk funktion för att hämta årsdata med bättre typsäkerhet
-  const getYearlyChartData = async (
-    table: string, 
-    date_col: string, 
-    year: number, 
-    aggregation: 'count' | 'sum', 
-    sum_col?: string
-  ): Promise<ChartDataPoint[]> => {
-    
+  const getYearlyChartData = async (table: string, date_col: string, year: number, aggregation: 'count' | 'sum', sum_col?: string): Promise<ChartDataPoint[]> => {
     type RowType = { [date_col: string]: string; [key: string]: any; };
-    
     const select_cols = aggregation === 'sum' && sum_col ? `${date_col}, ${sum_col}` : date_col;
     let query = supabase.from(table).select(select_cols)
         .gte(date_col, `${year}-01-01T00:00:00Z`)
         .lt(date_col, `${year + 1}-01-01T00:00:00Z`);
-
-    if(sum_col) { 
-      query = query.not(sum_col, 'is', null).gt(sum_col, 0); 
-    }
-
+    if(sum_col) { query = query.not(sum_col, 'is', null).gt(sum_col, 0); }
     const { data, error } = await query;
     if(error) throw error;
-    
-    const monthlyData: ChartDataPoint[] = Array.from({ length: 12 }, (_, i) => ({ 
-      month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), 
-      value: 0 
-    }));
-    
+    const monthlyData: ChartDataPoint[] = Array.from({ length: 12 }, (_, i) => ({ month: new Date(year, i).toLocaleDateString('sv-SE', { month: 'short' }), value: 0 }));
     (data as RowType[]).forEach((row) => {
         if (!row[date_col]) return;
         const monthIndex = new Date(row[date_col]).getMonth();
@@ -395,7 +371,7 @@ export default function Economics() {
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-4"><Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-4 h-4 mr-2" />Tillbaka</Button><h1 className="text-xl font-bold text-white">Ekonomisk Översikt</h1></div>
-          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} disabled={pageLoading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
+          <Button variant="ghost" size="sm" onClick={fetchEconomicData} disabled={pageLoading} className="text-slate-400 hover:text-white"><Activity className={`w-4 h-4 mr-2 ${pageLoading ? 'animate-spin' : ''}`} />Uppdatera</Button>
         </div>
       </header>
 
@@ -411,6 +387,8 @@ export default function Economics() {
           </div>
           <MonthlyGrowthAnalysisCard analysis={growthAnalysis} />
         </div>
+        
+        <ManageSpendCard onDataChange={fetchEconomicData} />
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <SegmentPerformanceCard />
