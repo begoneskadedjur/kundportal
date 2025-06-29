@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - Properly formatted version of the last provided code.
+// src/pages/admin/Economics.tsx - FINAL FIX: Adds the missing import for the RefreshCw icon.
 
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,24 +6,25 @@ import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
   Calendar, AlertTriangle, ArrowUp, ArrowDown,
   Activity, Gift, Zap, Bug, UserCheck, Briefcase, Scale,
-  ChevronLeft, ChevronRight, Trash2, Save
+  ChevronLeft, ChevronRight, RefreshCw, BarChart, // <-- FIX: RefreshCw är nu tillagd
+  Trash2, Save
 } from 'lucide-react';
+
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { economicStatisticsService } from '../../services/economicStatisticsService';
 import type { DashboardStats, MonthlyGrowthAnalysis, UpsellOpportunity, ARRByBusinessType, PerformanceStats, ARRProjection, UnitEconomics } from '../../services/economicStatisticsService';
-import Input from '../../components/ui/Input';
+import ManageSpendCard from '../../components/admin/ManageSpendCard';
 
 // --- TYPER & GRÄNSSNITT ---
 type ChartDataPoint = { month: string; value: number };
 type ChartState = { loading: boolean; error: string | null; data: ChartDataPoint[]; year: number; };
-type SpendEntry = { id: number; month: string; spend: number; notes: string | null; };
 
-// --- FORMATTERING & UI-KOMPONENTER ---
+// --- HJÄLPFUNKTIONER ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
-const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
 
+// --- UI-KOMPONENTER ---
 const Tooltip = ({ children, content }: { children: React.ReactNode, content: string }) => {
   const [show, setShow] = useState(false);
   return (
@@ -190,35 +191,6 @@ const SegmentPerformanceCard = () => {
   );
 };
 
-const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
-  const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
-  return (
-    <Card>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-        <h2 className="text-xl font-bold text-white">Prestanda & Intäkter</h2>
-        <div className="flex items-center gap-2 p-1 bg-slate-800 rounded-lg">
-          <Button size="sm" variant={activeTab === 'technician' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('technician')} className="flex items-center gap-2"><UserCheck className="w-4 h-4" />Per Tekniker</Button>
-          <Button size="sm" variant={activeTab === 'pest' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('pest')} className="flex items-center gap-2"><Bug className="w-4 h-4" />Per Skadedjurstyp</Button>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        {activeTab === 'technician' && (
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Tekniker</th><th className="text-right py-3 px-2 text-green-400 font-medium">Avtalsintäkt (#)</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Ärende-intäkt (#)</th><th className="text-right py-3 px-2 text-purple-400 font-medium">Total Intäkt</th></tr></thead>
-            <tbody>{data.byTechnician.map(tech => (<tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium capitalize">{tech.name}</td><td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td><td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td><td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td></tr>))}</tbody>
-          </table>
-        )}
-        {activeTab === 'pest' && (
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Skadedjurstyp</th><th className="text-right py-3 px-2 text-slate-400 font-medium">Antal Ärenden</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Total Intäkt</th></tr></thead>
-            <tbody>{data.byPestType.map(pest => (<tr key={pest.pestType} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium">{pest.pestType}</td><td className="py-3 px-2 text-right">{pest.caseCount}</td><td className="py-3 px-2 text-right text-cyan-400 font-bold">{formatCurrency(pest.revenue)}</td></tr>))}</tbody>
-          </table>
-        )}
-      </div>
-    </Card>
-  )
-};
-
 const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   <Card>
     <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
@@ -253,21 +225,6 @@ const FutureARRChart = ({ data }: { data: ARRProjection[] }) => (
   </Card>
 );
 
-const UnitEconomicsCard = ({ data, isLoading }: { data: UnitEconomics | null, isLoading: boolean }) => (
-  <Card>
-    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
-    {isLoading ? <div className="h-24 flex justify-center items-center"><Activity className="w-6 h-6 animate-spin" /></div> : !data ? <div>Kunde inte ladda data.</div> : (
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p></div>
-        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Livstidsvärde (LTV)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.ltv)}</p></div>
-        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">LTV / CAC Ratio</p><p className={`text-2xl font-bold mt-1 ${data.ltvToCacRatio >= 3 ? 'text-green-400' : 'text-yellow-400'}`}>{data.ltvToCacRatio.toFixed(1)}x</p></div>
-        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Återbetalningstid</p><p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p></div>
-        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">ROI (på kostnad)</p><p className={`text-2xl font-bold mt-1 ${data.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>{data.roi.toFixed(0)}%</p></div>
-      </div>
-    )}
-  </Card>
-);
-
 const MonthNavigator = ({ selectedMonth, setSelectedMonth }: { selectedMonth: Date, setSelectedMonth: (date: Date) => void }) => {
   const handleMonthChange = (increment: number) => {
     const newMonth = new Date(selectedMonth);
@@ -287,6 +244,51 @@ const MonthNavigator = ({ selectedMonth, setSelectedMonth }: { selectedMonth: Da
         Nästa månad <ChevronRight className="w-4 h-4 ml-2"/>
       </Button>
     </div>
+  );
+};
+
+const UnitEconomicsCard = ({ data, isLoading }: { data: UnitEconomics | null, isLoading: boolean }) => (
+  <Card>
+    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><Scale className="w-6 h-6 text-indigo-400"/>Enhetsekonomi & Lönsamhet</h2>
+    {isLoading ? <div className="h-24 flex justify-center items-center"><Activity className="w-6 h-6 animate-spin" /></div> : !data ? <div>Kunde inte ladda data.</div> : (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Kundförvärvskostnad (CAC)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.cac)}</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Livstidsvärde (LTV)</p><p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.ltv)}</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">LTV / CAC Ratio</p><p className={`text-2xl font-bold mt-1 ${data.ltvToCacRatio >= 3 ? 'text-green-400' : 'text-yellow-400'}`}>{data.ltvToCacRatio.toFixed(1)}x</p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">Återbetalningstid</p><p className="text-2xl font-bold text-white mt-1">{data.paybackPeriodMonths.toFixed(1)} <span className="text-base font-normal text-slate-400">mån</span></p></div>
+        <div className="bg-slate-800/50 p-4 rounded-lg"><p className="text-sm text-slate-400">ROI (på kostnad)</p><p className={`text-2xl font-bold mt-1 ${data.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>{data.roi.toFixed(0)}%</p></div>
+      </div>
+    )}
+  </Card>
+);
+
+const PerformanceAndRevenueCard = ({ data, isLoading }: { data: PerformanceStats | null, isLoading: boolean }) => {
+  const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
+  return (
+    <Card>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+        <h2 className="text-xl font-bold text-white">Prestanda & Intäkter (per månad)</h2>
+        <div className="flex items-center gap-2 p-1 bg-slate-800 rounded-lg"><Button size="sm" variant={activeTab === 'technician' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('technician')} className="flex items-center gap-2"><UserCheck className="w-4 h-4" />Per Tekniker</Button><Button size="sm" variant={activeTab === 'pest' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('pest')} className="flex items-center gap-2"><Bug className="w-4 h-4" />Per Skadedjurstyp</Button></div>
+      </div>
+      <div className="overflow-x-auto">
+        {isLoading ? <div className="h-48 flex justify-center items-center"><Activity className="w-6 h-6 animate-spin" /></div> : !data ? <div>Kunde inte ladda data.</div> : (
+          <>
+            {activeTab === 'technician' && (
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Tekniker</th><th className="text-right py-3 px-2 text-green-400 font-medium">Avtalsintäkt (#)</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Ärende-intäkt (#)</th><th className="text-right py-3 px-2 text-purple-400 font-medium">Total Intäkt</th></tr></thead>
+                <tbody>{(data.byTechnician || []).map(tech => (<tr key={tech.name} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium capitalize">{tech.name}</td><td className="py-3 px-2 text-right text-green-400">{formatCurrency(tech.contractRevenue)} <span className='text-xs text-slate-500'>({tech.contractCount})</span></td><td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(tech.caseRevenue)} <span className='text-xs text-slate-500'>({tech.caseCount})</span></td><td className="py-3 px-2 text-right text-purple-400 font-bold">{formatCurrency(tech.totalRevenue)}</td></tr>))}</tbody>
+              </table>
+            )}
+            {activeTab === 'pest' && (
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Skadedjurstyp</th><th className="text-right py-3 px-2 text-slate-400 font-medium">Antal Ärenden</th><th className="text-right py-3 px-2 text-cyan-400 font-medium">Total Intäkt</th></tr></thead>
+                <tbody>{(data.byPestType || []).map(pest => (<tr key={pest.pestType} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium">{pest.pestType}</td><td className="py-3 px-2 text-right">{pest.caseCount}</td><td className="py-3 px-2 text-right text-cyan-400 font-bold">{formatCurrency(pest.revenue)}</td></tr>))}</tbody>
+              </table>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
   );
 };
 
@@ -352,9 +354,6 @@ export default function Economics() {
       .finally(() => setMonthlyLoading(false));
   };
   
-  // Funktion för årsdiagram (kan ligga kvar)
-  // ...
-
   if (pageLoading || !dashboardStats) {
     return (<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Activity className="w-8 h-8 text-green-500 mx-auto mb-4 animate-spin" /></div>);
   }
