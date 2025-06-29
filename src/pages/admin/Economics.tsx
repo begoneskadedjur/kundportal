@@ -1,5 +1,5 @@
-// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v2
-import { useEffect, useState } from 'react';
+// src/pages/admin/Economics.tsx - SLUTGILTIG POLERAD VERSION v3
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, DollarSign, TrendingUp, Clock, Target, BarChart3,
@@ -111,17 +111,62 @@ const UpsellOpportunitiesCard = ({ opportunities }: { opportunities: UpsellOppor
   </Card>
 );
 
-const BusinessTypeTable = ({ data }: { data: ARRByBusinessType[] }) => {
-  const [sortKey, setSortKey] = useState<keyof ARRByBusinessType>('arr');
-  const sortedData = [...data].sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number));
-  const SortableHeader = ({ label, a_key }: { label: string; a_key: keyof ARRByBusinessType }) => (<th onClick={() => setSortKey(a_key)} className="text-right py-3 px-2 text-slate-400 font-medium cursor-pointer hover:text-white">{label} {sortKey === a_key && '▼'}</th>);
-  return(
-    <Card className="h-full">
-      <h2 className="text-xl font-bold text-white mb-4">Intäkter per Verksamhetstyp</h2>
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-slate-700"><th className="text-left py-3 px-2 text-slate-400 font-medium">Verksamhetstyp</th><SortableHeader label="Kunder" a_key="customer_count" /><SortableHeader label="Total ARR" a_key="arr" /><SortableHeader label="Avg. ARR" a_key="average_arr_per_customer" /><SortableHeader label="Ärende-intäkter" a_key="additional_case_revenue" /></tr></thead><tbody>{sortedData.map(item => (<tr key={item.business_type} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-3 px-2 text-white font-medium">{item.business_type}</td><td className="py-3 px-2 text-right">{item.customer_count}</td><td className="py-3 px-2 text-right text-green-400">{formatCurrency(item.arr)}</td><td className="py-3 px-2 text-right">{formatCurrency(item.average_arr_per_customer)}</td><td className="py-3 px-2 text-right text-cyan-400">{formatCurrency(item.additional_case_revenue)}</td></tr>))}</tbody></table></div>
+const BusinessTypeBreakdown = ({ data }: { data: ARRByBusinessType[] }) => {
+  const [showAll, setShowAll] = useState(false);
+  const { totalARR, totalCaseRevenue, sortedData } = useMemo(() => {
+    const totalARR = data.reduce((sum, item) => sum + item.arr, 0);
+    const totalCaseRevenue = data.reduce((sum, item) => sum + item.additional_case_revenue, 0);
+    const sortedData = [...data].sort((a, b) => (b.arr + b.additional_case_revenue) - (a.arr + a.additional_case_revenue));
+    return { totalARR, totalCaseRevenue, sortedData };
+  }, [data]);
+
+  const visibleData = showAll ? sortedData : sortedData.slice(0, 7);
+  const maxRevenue = Math.max(...sortedData.map(d => d.arr + d.additional_case_revenue), 1);
+
+  return (
+    <Card>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-white">Intäkter per Verksamhetstyp</h2>
+        <div className="text-right">
+          <p className="text-lg font-bold text-white">{formatCurrency(totalARR + totalCaseRevenue)}</p>
+          <p className="text-xs text-slate-400">Total intäkt från segment</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {visibleData.map(item => {
+          const totalItemRevenue = item.arr + item.additional_case_revenue;
+          const barWidth = (totalItemRevenue / maxRevenue) * 100;
+          const arrWidth = totalItemRevenue > 0 ? (item.arr / totalItemRevenue) * 100 : 0;
+          return (
+            <div key={item.business_type} className="group">
+              <div className="flex justify-between items-center mb-1 text-sm">
+                <span className="font-medium text-white capitalize">{item.business_type} ({item.customer_count})</span>
+                <span className="font-semibold text-white">{formatCurrency(totalItemRevenue)}</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-4 relative overflow-hidden">
+                <div className="h-full flex" style={{ width: `${barWidth}%`}}>
+                  <Tooltip content={`Avtal: ${formatCurrency(item.arr)}`}>
+                    <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${arrWidth}%`}} />
+                  </Tooltip>
+                   <Tooltip content={`Ärenden: ${formatCurrency(item.additional_case_revenue)}`}>
+                    <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${100 - arrWidth}%`}} />
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {sortedData.length > 7 && (
+        <div className="text-center mt-4">
+          <Button variant="link" onClick={() => setShowAll(!showAll)}>
+            {showAll ? 'Visa färre' : `Visa alla ${sortedData.length} verksamhetstyper`}
+          </Button>
+        </div>
+      )}
     </Card>
   );
-}
+};
 
 const PerformanceAndRevenueCard = ({ data }: { data: PerformanceStats }) => {
   const [activeTab, setActiveTab] = useState<'technician' | 'pest'>('technician');
@@ -178,6 +223,7 @@ const ARRProjectionChart = ({ data }: { data: ARRProjection[] }) => {
   );
 };
 
+
 // --- HUVUDKOMPONENT ---
 export default function Economics() {
   const navigate = useNavigate();
@@ -194,7 +240,6 @@ export default function Economics() {
     fetchEconomicData();
   }, []);
 
-  // FIX: Dedikerad useEffect för att hämta grafdata när årtal ändras
   useEffect(() => {
     if(!loading) { 
         fetchChartData(contractsChartYear, caseRevenueChartYear);
@@ -263,7 +308,7 @@ export default function Economics() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <MetricCard title="ARR (Avtal)" value={formatCurrency(arr.currentARR)} icon={DollarSign} color="green" tooltip="Årlig återkommande intäkt från aktiva avtal."/>
-            <MetricCard title="Ärende-intäkter" value={formatCurrency(arr.additionalCaseRevenue)} icon={TrendingUp} color="cyan" tooltip="Totala intäkter från extra-ärenden."/>
+            <MetricCard title="Ärende-intäkter" value={formatCurrency(arr.additionalCaseRevenue)} icon={TrendingUp} color="cyan" tooltip="Totala intäkter från slutförda extra-ärenden."/>
             <MetricCard title="MRR" value={formatCurrency(arr.monthlyRecurringRevenue)} icon={Calendar} color="blue" tooltip="Månatlig återkommande intäkt (ARR / 12)."/>
             <MetricCard title="Total Intäkt" value={formatCurrency(arr.totalRevenue)} icon={TrendingUp} color="purple" tooltip="Total intäkt (ARR + Ärenden)."/>
           </div>
@@ -271,7 +316,9 @@ export default function Economics() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2"><BusinessTypeTable data={arrByBusinessType} /></div>
+          <div className="lg:col-span-2">
+            <BusinessTypeBreakdown data={arrByBusinessType} />
+          </div>
           <UpsellOpportunitiesCard opportunities={upsellOpportunities} />
         </div>
         
