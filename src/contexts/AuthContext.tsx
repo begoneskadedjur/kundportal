@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - FIXED VERSION för siduppdateringsproblemet
+// src/contexts/AuthContext.tsx - FIXED VERSION för siduppdateringsproblemet + AUTO-ACCEPTERING
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -124,7 +124,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []); // Tom dependency array - körs bara en gång
 
-  // FIX 2: Förbättrad fetchProfile med bättre error handling
+  // NYTT: Auto-acceptering av inbjudan vid första inloggningen
+  const acceptInvitationAutomatically = async (customerId: string, email: string, userId: string) => {
+    try {
+      console.log('🎫 Auto-accepting invitation for customer:', customerId);
+      
+      const response = await fetch('/api/accept-invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          customerId, 
+          email,
+          userId // Skicka med user ID från auth
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Invitation auto-accepted:', result.message);
+        
+        // Visa diskret notifiering om det var första gången
+        if (result.message !== 'Inbjudan redan accepterad') {
+          toast.success('Välkommen! Ditt konto är nu aktiverat.', {
+            duration: 4000,
+            icon: '🎉'
+          });
+        }
+      } else {
+        const error = await response.json();
+        console.log('ℹ️ Auto-accept info:', error.error);
+        // Ingen toast för fel här - det är inte kritiskt för inloggningen
+      }
+    } catch (error) {
+      console.error('Auto-accept failed (non-critical):', error);
+      // Misslyckas inte hela inloggningen om detta går fel
+    }
+  };
+
+  // FIX 2: Förbättrad fetchProfile med bättre error handling + AUTO-ACCEPTERING
   const fetchProfile = async (userId: string, authUser: User) => {
     try {
       console.log('📋 Fetching profile for user:', userId);
@@ -145,6 +182,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('✅ Profile loaded:', profileData);
       setProfile(profileData);
+
+      // NYTT: Auto-acceptera inbjudan om användaren är kund och har customer_id
+      if (!profileData.is_admin && profileData.customer_id && authUser.email) {
+        await acceptInvitationAutomatically(
+          profileData.customer_id, 
+          authUser.email, 
+          userId
+        );
+      }
 
       // FIX 3: Säkrare navigation som bara sker när användaren är på login/root
       const currentPath = location.pathname;
