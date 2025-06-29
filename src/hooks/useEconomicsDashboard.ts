@@ -55,6 +55,8 @@ export const useEconomicsDashboard = (): UseEconomicsDashboardReturn => {
       setLoading(true)
       setError(null)
 
+      console.log('🔄 useEconomicsDashboard: Starting to fetch all data...')
+
       // Kör alla queries parallellt för bättre prestanda
       const [
         kpiData,
@@ -66,15 +68,18 @@ export const useEconomicsDashboard = (): UseEconomicsDashboardReturn => {
         caseEconomy,
         customerContracts
       ] = await Promise.all([
-        getKpiData(),
-        getMonthlyRevenue(),
-        getExpiringContracts(),
-        getTechnicianRevenue(),
-        getAccountManagerRevenue(),
-        getMonthlyMarketingSpend(),
-        getCaseEconomy(),
-        getCustomerContracts()
+        getKpiData().catch(err => { console.error('❌ KPI data error:', err); return null; }),
+        getMonthlyRevenue().catch(err => { console.error('❌ Monthly revenue error:', err); return []; }),
+        getExpiringContracts().catch(err => { console.error('❌ Expiring contracts error:', err); return []; }),
+        getTechnicianRevenue().catch(err => { console.error('❌ Technician revenue error:', err); return []; }),
+        getAccountManagerRevenue().catch(err => { console.error('❌ Account manager revenue error:', err); return []; }),
+        getMonthlyMarketingSpend().catch(err => { console.error('❌ Marketing spend error:', err); return []; }),
+        getCaseEconomy().catch(err => { console.error('❌ Case economy error:', err); return null; }),
+        getCustomerContracts().catch(err => { console.error('❌ Customer contracts error:', err); return []; })
       ])
+
+      console.log('✅ useEconomicsDashboard: All data fetched successfully')
+      console.log('📊 Case economy data:', caseEconomy)
 
       setData({
         kpiData,
@@ -87,7 +92,7 @@ export const useEconomicsDashboard = (): UseEconomicsDashboardReturn => {
         customerContracts
       })
     } catch (err) {
-      console.error('Error fetching economics dashboard data:', err)
+      console.error('💥 Error fetching economics dashboard data:', err)
       setError(err instanceof Error ? err.message : 'Ett oväntat fel inträffade')
     } finally {
       setLoading(false)

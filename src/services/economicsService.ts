@@ -376,17 +376,36 @@ export const getMonthlyMarketingSpend = async (): Promise<MarketingSpend[]> => {
 // 7. Ärendeekonomi
 export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   try {
+    console.log('🔍 getCaseEconomy: Starting query...')
     const currentMonth = new Date().toISOString().slice(0, 7)
+    console.log('📅 Current month:', currentMonth)
     
     // Hämta alla ärenden för denna månad
-    const { data: allCases } = await supabase
+    const { data: allCases, error } = await supabase
       .from('cases')
       .select('price, case_type, created_at, completed_date')
       .or(`and(created_at.gte.${currentMonth}-01,created_at.lt.${currentMonth}-32),and(completed_date.gte.${currentMonth}-01,completed_date.lt.${currentMonth}-32)`)
 
+    if (error) {
+      console.error('❌ Supabase error in getCaseEconomy:', error)
+      throw error
+    }
+
+    console.log('📊 Raw cases data:', { 
+      total_cases: allCases?.length || 0,
+      sample: allCases?.slice(0, 3) 
+    })
+
     // Separera avslutade och pågående ärenden
     const completedCases = allCases?.filter(c => c.completed_date && c.price && c.price > 0) || []
     const ongoingCases = allCases?.filter(c => !c.completed_date && c.price && c.price > 0) || []
+    
+    console.log('🔢 Processed cases:', {
+      completed: completedCases.length,
+      ongoing: ongoingCases.length,
+      completed_sample: completedCases.slice(0, 2),
+      ongoing_sample: ongoingCases.slice(0, 2)
+    })
     
     // Beräkningar baserat på ENDAST avslutade ärenden för säkra intäkter
     const avg_case_price = completedCases.length > 0 
@@ -430,7 +449,7 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       avg_price: type.count > 0 ? type.total_revenue / type.count : 0
     }))
 
-    return {
+    const result = {
       avg_case_price,
       avg_completion_days,
       total_cases_this_month,
@@ -440,8 +459,11 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       ongoing_cases_count: ongoingCount,
       ongoing_potential_revenue: ongoingRevenue
     }
+
+    console.log('✅ getCaseEconomy result:', result)
+    return result
   } catch (error) {
-    console.error('Error fetching case economy:', error)
+    console.error('💥 Error in getCaseEconomy:', error)
     throw error
   }
 }
