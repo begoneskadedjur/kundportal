@@ -1,109 +1,149 @@
-// src/App.tsx
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+// src/App.tsx - Updated with customer cases route
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
 
-// Pages
-import Home from './pages/Home'
+// Auth pages
 import Login from './pages/auth/Login'
 import SetPassword from './pages/auth/SetPassword'
+import ForgotPassword from './pages/auth/ForgotPassword'
 
-// Admin Pages
+// Admin pages
 import AdminDashboard from './pages/admin/Dashboard'
 import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
-import Technicians from './pages/admin/Technicians'
 import Economics from './pages/admin/Economics'
 
-
-// Customer Pages
+// Customer pages
 import CustomerPortal from './pages/customer/Portal'
 import Cases from './pages/customer/Cases'
 import Schedule from './pages/customer/Schedule'
 
-// Components
+// Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
+
+// Global styles
+import './styles/globals.css'
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <div className="min-h-screen bg-slate-950">
           <Routes>
-            <Route path="/" element={<Home />} />
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/set-password" element={<SetPassword />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+
+            {/* Admin routes */}
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/customers" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Customers />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/customers/:id" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CustomerDetails />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/customers/new" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <NewCustomer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/economics" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Economics />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Customer routes */}
+            <Route 
+              path="/customer" 
+              element={
+                <ProtectedRoute requiredRole="customer">
+                  <CustomerPortal />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/customer/cases" 
+              element={
+                <ProtectedRoute requiredRole="customer">
+                  <Cases />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/customer/schedule" 
+              element={
+                <ProtectedRoute requiredRole="customer">
+                  <Schedule />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Default redirects */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             
-            {/* Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute role="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/dashboard" element={
-              <ProtectedRoute role="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/customers" element={
-              <ProtectedRoute role="admin">
-                <Customers />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/customers/new" element={
-              <ProtectedRoute role="admin">
-                <NewCustomer />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/customers/:id" element={
-              <ProtectedRoute role="admin">
-                <CustomerDetails />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/technicians" element={
-              <ProtectedRoute role="admin">
-                <Technicians />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/economics" element={
-              <ProtectedRoute role="admin">
-                <Economics />
-              </ProtectedRoute>
-            } />
-            
-            {/* Customer Routes */}
-            <Route path="/customer" element={
-              <ProtectedRoute role="customer">
-                <CustomerPortal />
-              </ProtectedRoute>
-            } />
-            <Route path="/customer/cases" element={
-              <ProtectedRoute role="customer">
-                <Cases />
-              </ProtectedRoute>
-            } />
-            <Route path="/customer/schedule" element={
-              <ProtectedRoute role="customer">
-                <Schedule />
-              </ProtectedRoute>
-            } />
+            {/* Legacy portal redirects - FIX FOR THE BLACK SCREEN */}
+            <Route path="/portal" element={<Navigate to="/customer" replace />} />
+            <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
+
+            {/* 404 fallback */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
-          
+
+          {/* Toast notifications */}
           <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#1e293b',
-                color: '#fff',
-                border: '1px solid #475569'
-              }
+                background: '#1e293b', // slate-800
+                color: '#f8fafc', // slate-50
+                border: '1px solid #475569', // slate-600
+              },
+              success: {
+                iconTheme: {
+                  primary: '#22c55e', // green-500
+                  secondary: '#f8fafc', // slate-50
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444', // red-500
+                  secondary: '#f8fafc', // slate-50
+                },
+              },
             }}
           />
         </div>
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   )
 }
 

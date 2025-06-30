@@ -42,7 +42,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
       setError(null)
 
       // Hämta ärenden från ClickUp API via backend
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
+      const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       if (response.ok) {
         const data = await response.json()

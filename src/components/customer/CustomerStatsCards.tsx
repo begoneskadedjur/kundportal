@@ -34,7 +34,7 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId }) =
       setLoading(true)
       
       // Här skulle vi hämta från ClickUp API via vår backend
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customerId}`)
+      const response = await fetch(`/api/clickup-tasks?list_id=${clickupListId}`)
       
       if (response.ok) {
         const data = await response.json()

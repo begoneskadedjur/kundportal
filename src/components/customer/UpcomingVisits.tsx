@@ -42,7 +42,7 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
       setError(null)
 
       // Hämta ärenden från ClickUp som har schemalagda datum
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
+      const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       if (response.ok) {
         const data = await response.json()

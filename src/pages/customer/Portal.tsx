@@ -1,4 +1,4 @@
-// src/pages/customer/Portal.tsx - REDESIGNED VERSION
+// src/pages/customer/Portal.tsx - UNCHANGED (passar bara data vidare)
 import React, { useEffect, useState } from 'react'
 import { LogOut, RefreshCw, Settings, Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -197,7 +197,10 @@ const CustomerPortal: React.FC = () => {
           {/* 1. Stats Cards */}
           <section>
             <h3 className="text-xl font-semibold text-white mb-4">Översikt</h3>
-            <CustomerStatsCards customerId={customer.id} />
+            <CustomerStatsCards 
+              customerId={customer.id}
+              clickupListId={customer.clickup_list_id}
+            />
           </section>
 
           {/* Grid för Quick Actions + Company Info */}
@@ -242,6 +245,7 @@ const CustomerPortal: React.FC = () => {
           <section>
             <RecentActivity 
               customerId={customer.id}
+              clickupListId={customer.clickup_list_id}
               refreshTrigger={refreshing}
             />
           </section>

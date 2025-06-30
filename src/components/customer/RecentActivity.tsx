@@ -19,17 +19,18 @@ interface ActivityItem {
 
 interface RecentActivityProps {
   customerId: string
+  clickupListId: string
   refreshTrigger?: boolean
 }
 
-const RecentActivity: React.FC<RecentActivityProps> = ({ customerId, refreshTrigger }) => {
+const RecentActivity: React.FC<RecentActivityProps> = ({ customerId, clickupListId, refreshTrigger }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchRecentActivity()
-  }, [customerId, refreshTrigger])
+  }, [customerId, clickupListId, refreshTrigger])
 
   const fetchRecentActivity = async () => {
     try {
@@ -37,7 +38,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ customerId, refreshTrig
       setError(null)
 
       // Hämta cases från ClickUp för att skapa aktivitetshistorik
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customerId}`)
+      const response = await fetch(`/api/clickup-tasks?list_id=${clickupListId}`)
       
       if (response.ok) {
         const data = await response.json()

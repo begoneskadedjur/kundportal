@@ -119,12 +119,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Navigera endast om användaren är på login-relaterade sidor
+      // FIXED: Navigera enligt din faktiska routing struktur
       const currentPath = location.pathname;
-      const shouldNavigate = ['/', '/login', '/auth/login'].includes(currentPath);
+      const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
       
       if (shouldNavigate) {
-        const targetPath = profileData.is_admin ? '/admin/dashboard' : '/portal';
+        // FIX: Använd korrekt paths enligt din App.tsx
+        const targetPath = profileData.is_admin ? '/admin' : '/customer';
         console.log(`🧭 Navigating from ${currentPath} to ${targetPath}`);
         
         // Använd setTimeout för att undvika navigation under rendering

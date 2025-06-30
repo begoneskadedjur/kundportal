@@ -1,4 +1,4 @@
-// src/pages/customer/Cases.tsx  
+// src/pages/customer/Cases.tsx (din befintliga)
 export default function Cases() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">
