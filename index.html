@@ -12,6 +12,16 @@
     <!-- Base href för korrekt routing -->
     <base href="/" />
     
+    <!-- SSR Fix för Vercel deployment -->
+    <script>
+      if (typeof global === 'undefined') {
+        var global = globalThis;
+      }
+      if (typeof document === 'undefined') {
+        var document = {};
+      }
+    </script>
+    
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <title>BeGone Kundportal</title>
   </head>
