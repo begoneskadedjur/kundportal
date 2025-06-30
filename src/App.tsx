@@ -1,4 +1,4 @@
-// src/App.tsx - Updated with customer cases route
+// src/App.tsx - FIXED Router/AuthProvider order
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -28,8 +28,8 @@ import './styles/globals.css'
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <div className="min-h-screen bg-slate-950">
           <Routes>
             {/* Public routes */}
@@ -142,8 +142,8 @@ function App() {
             }}
           />
         </div>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   )
 }
 
