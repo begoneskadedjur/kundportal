@@ -1,4 +1,4 @@
-// src/pages/customer/Portal.tsx
+// src/pages/customer/Portal.tsx - DEBUG VERSION
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -34,7 +34,7 @@ import CustomerSettingsModal from '../../components/customer/CustomerSettingsMod
 type Customer = {
   id: string
   company_name: string
-  org_number: string | null  // TILLAGD
+  org_number: string | null
   contact_person: string
   email: string
   phone: string
@@ -90,15 +90,137 @@ type TaskStats = {
   completed: number
 }
 
+// 🐛 DEBUG COMPONENT - Visar all viktig state
+const DebugInfo = ({ profile, customer, error, loading }: { 
+  profile: any, 
+  customer: any, 
+  error: any, 
+  loading: boolean 
+}) => {
+  const [showDebug, setShowDebug] = useState(true)
+
+  if (!showDebug) {
+    return (
+      <button
+        onClick={() => setShowDebug(true)}
+        className="fixed top-4 right-4 bg-yellow-500 text-black px-3 py-1 rounded text-xs z-50"
+      >
+        Show Debug
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed top-4 right-4 bg-slate-800 border border-yellow-500 rounded-lg p-4 max-w-sm z-50 max-h-96 overflow-y-auto">
+      <div className="flex justify-between items-center mb-2">
+        <h4 className="text-yellow-400 font-semibold">🐛 Debug Portal</h4>
+        <button
+          onClick={() => setShowDebug(false)}
+          className="text-slate-400 hover:text-white text-xs"
+        >
+          ✕
+        </button>
+      </div>
+      
+      <div className="text-xs space-y-2 text-white">
+        <div className="bg-slate-700 p-2 rounded">
+          <p><strong>Loading:</strong> {loading ? '🔄 True' : '✅ False'}</p>
+          <p><strong>Error:</strong> {error ? `❌ ${error}` : '✅ None'}</p>
+        </div>
+        
+        <div className="bg-slate-700 p-2 rounded">
+          <p><strong>Profile exists:</strong> {profile ? '✅ Yes' : '❌ No'}</p>
+          {profile && (
+            <>
+              <p><strong>Email:</strong> {profile.email}</p>
+              <p><strong>Customer ID:</strong> {profile.customer_id || '❌ Missing'}</p>
+              <p><strong>Is Admin:</strong> {profile.is_admin ? 'Yes' : 'No'}</p>
+              <p><strong>Is Active:</strong> {profile.is_active ? 'Yes' : 'No'}</p>
+              <p><strong>User ID:</strong> {profile.user_id}</p>
+            </>
+          )}
+        </div>
+        
+        <div className="bg-slate-700 p-2 rounded">
+          <p><strong>Customer exists:</strong> {customer ? '✅ Yes' : '❌ No'}</p>
+          {customer && (
+            <>
+              <p><strong>Company:</strong> {customer.company_name}</p>
+              <p><strong>ClickUp List:</strong> {customer.clickup_list_id}</p>
+              <p><strong>Contact:</strong> {customer.contact_person}</p>
+            </>
+          )}
+        </div>
+
+        <div className="bg-slate-700 p-2 rounded">
+          <p><strong>Current URL:</strong> {window.location.pathname}</p>
+          <p><strong>Timestamp:</strong> {new Date().toLocaleTimeString()}</p>
+        </div>
+
+        <div className="space-y-1">
+          <button
+            onClick={() => {
+              console.log('🐛 Manual Debug - Current State:', {
+                profile,
+                customer,
+                error,
+                loading,
+                location: window.location.pathname
+              })
+            }}
+            className="w-full bg-blue-600 text-white px-2 py-1 rounded text-xs"
+          >
+            Log State to Console
+          </button>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-green-600 text-white px-2 py-1 rounded text-xs"
+          >
+            Reload Page
+          </button>
+          
+          {profile?.customer_id && (
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/accept-invitation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      customerId: profile.customer_id,
+                      email: profile.email,
+                      userId: profile.user_id
+                    })
+                  })
+                  const result = await response.json()
+                  console.log('Manual accept result:', result)
+                  alert(`Accept result: ${result.message}`)
+                } catch (error) {
+                  console.error('Manual accept error:', error)
+                  alert(`Accept error: ${error}`)
+                }
+              }}
+              className="w-full bg-purple-600 text-white px-2 py-1 rounded text-xs"
+            >
+              Manual Accept Invitation
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CustomerPortal() {
-  const { profile, signOut } = useAuth() // Lägg till signOut
+  const { profile, signOut } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [tasks, setTasks] = useState<ClickUpTask[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
   const [showAllTasks, setShowAllTasks] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [dateFilter, setDateFilter] = useState('all') // all, last30, last90, thisYear, lastYear
-  const [statusFilter, setStatusFilter] = useState('all') // all, genomfört, bokat, under_hantering
+  const [dateFilter, setDateFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [taskStats, setTaskStats] = useState<TaskStats>({
     total: 0,
     open: 0,
@@ -112,16 +234,43 @@ export default function CustomerPortal() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
+  // 🐛 DEBUG: Log alla viktiga state changes
+  useEffect(() => {
+    console.log('🐛 Portal State Change:', {
+      profile: profile ? {
+        email: profile.email,
+        customer_id: profile.customer_id,
+        is_admin: profile.is_admin,
+        is_active: profile.is_active
+      } : null,
+      customer: customer ? {
+        company_name: customer.company_name,
+        clickup_list_id: customer.clickup_list_id
+      } : null,
+      loading,
+      error,
+      hasCustomerId: !!profile?.customer_id,
+      timestamp: new Date().toISOString()
+    })
+  }, [profile, customer, loading, error])
+
   // Hämta kunddata
   useEffect(() => {
+    console.log('🔄 Profile effect triggered:', profile)
     if (profile?.customer_id) {
+      console.log('✅ Profile has customer_id, fetching customer data...')
       fetchCustomerData()
+    } else if (profile) {
+      console.log('❌ Profile exists but no customer_id:', profile)
+      setError('Ingen kundkoppling hittades i profilen')
+      setLoading(false)
     }
   }, [profile])
 
   // Hämta ClickUp-uppgifter och kommande besök när kunddata är hämtad
   useEffect(() => {
     if (customer?.clickup_list_id) {
+      console.log('🎯 Customer loaded, fetching ClickUp tasks...')
       fetchClickUpTasks()
       fetchUpcomingVisits()
     }
@@ -129,6 +278,8 @@ export default function CustomerPortal() {
 
   const fetchCustomerData = async () => {
     try {
+      console.log('📊 Fetching customer data for customer_id:', profile!.customer_id)
+      
       const { data, error } = await supabase
         .from('customers')
         .select(`
@@ -140,13 +291,22 @@ export default function CustomerPortal() {
         .eq('id', profile!.customer_id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Customer fetch error:', error)
+        throw error
+      }
       
-      console.log('Customer data fetched:', data) // Debug log för att se alla fält
+      console.log('✅ Customer data fetched successfully:', {
+        id: data.id,
+        company_name: data.company_name,
+        clickup_list_id: data.clickup_list_id,
+        contact_person: data.contact_person
+      })
+      
       setCustomer(data)
     } catch (error: any) {
-      console.error('Error fetching customer:', error)
-      setError('Kunde inte hämta kunddata')
+      console.error('💥 Error fetching customer:', error)
+      setError(`Kunde inte hämta kunddata: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -156,9 +316,8 @@ export default function CustomerPortal() {
     if (!customer?.clickup_list_id) return
 
     try {
-      console.log('Fetching upcoming visits from ClickUp API...')
+      console.log('📅 Fetching upcoming visits from ClickUp API...')
       
-      // Använd samma API som för ärenden
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
       if (!response.ok) {
@@ -172,15 +331,12 @@ export default function CustomerPortal() {
       const now = new Date()
       const upcomingTasks = allTasks.filter((task: ClickUpTask) => {
         if (!task.due_date) return false
-        
         const dueDate = new Date(parseInt(task.due_date))
         return dueDate >= now
       })
       
-      // Konvertera till visit-format och sortera efter datum
       const upcomingVisits = upcomingTasks
         .map((task: ClickUpTask) => {
-          // Hitta custom fields för mer detaljerad info
           const getCustomField = (name: string) => {
             return task.custom_fields?.find((field: any) => 
               field.name.toLowerCase() === name.toLowerCase()
@@ -214,19 +370,18 @@ export default function CustomerPortal() {
             ].filter(Boolean).join(' - '),
             status: task.status.status,
             created_at: task.date_created,
-            // Extra info från ClickUp
             address: addressField?.value?.formatted_address || null,
             clickup_url: `https://app.clickup.com/t/${task.id}`
           }
         })
         .sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime())
-        .slice(0, 5) // Begränsa till 5 st
+        .slice(0, 5)
       
       setVisits(upcomingVisits)
       console.log(`✅ Found ${upcomingVisits.length} upcoming visits`)
       
     } catch (error) {
-      console.error('Error fetching upcoming visits:', error)
+      console.error('❌ Error fetching upcoming visits:', error)
     }
   }
 
@@ -234,35 +389,36 @@ export default function CustomerPortal() {
     if (!customer?.clickup_list_id) return
 
     setTasksLoading(true)
-    setError(null) // Rensa tidigare fel
+    setError(null)
     
     try {
-      console.log('Fetching tasks for list:', customer.clickup_list_id)
+      console.log('📋 Fetching tasks for list:', customer.clickup_list_id)
       
-      // Använd vår backend API för att hämta ClickUp-uppgifter
       const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
       
-      console.log('ClickUp API response status:', response.status)
+      console.log('📊 ClickUp API response status:', response.status)
       
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('ClickUp API error:', errorData)
+        console.error('❌ ClickUp API error:', errorData)
         throw new Error(errorData.error || 'Kunde inte hämta ärenden från ClickUp')
       }
 
       const data = await response.json()
-      console.log('ClickUp API data:', data)
+      console.log('✅ ClickUp API data received:', {
+        tasksCount: data.tasks?.length || 0,
+        hasDebug: !!data.debug
+      })
       
       setTasks(data.tasks || [])
       calculateTaskStats(data.tasks || [])
       
-      // Visa debug-info om det finns
       if (data.debug) {
-        console.log('ClickUp Debug info:', data.debug)
+        console.log('🔍 ClickUp Debug info:', data.debug)
       }
       
     } catch (error: any) {
-      console.error('Error fetching ClickUp tasks:', error)
+      console.error('💥 Error fetching ClickUp tasks:', error)
       setError(`ClickUp integration fel: ${error.message}`)
     } finally {
       setTasksLoading(false)
@@ -271,14 +427,12 @@ export default function CustomerPortal() {
 
   // Filtrera tasks baserat på sökning, datum och status
   const filteredTasks = tasks.filter(task => {
-    // Textfiltrera
     const matchesSearch = task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.assignees.length > 0 && task.assignees[0].username.toLowerCase().includes(searchQuery.toLowerCase()))
     
     if (!matchesSearch) return false
     
-    // Statusfilter
     if (statusFilter !== 'all') {
       const taskStatus = task.status.status.toLowerCase()
       switch (statusFilter) {
@@ -296,9 +450,7 @@ export default function CustomerPortal() {
       }
     }
     
-    // Datumfilter - använd deadline istället för created date
     if (dateFilter !== 'all') {
-      // Om ärendet inte har deadline, skippa datumfiltrering för detta ärende
       if (!task.due_date) return true
       
       const taskDate = new Date(parseInt(task.due_date))
@@ -336,16 +488,11 @@ export default function CustomerPortal() {
     taskList.forEach(task => {
       const status = task.status.status.toLowerCase()
       
-      // Avslutade ärenden: genomfört/genomförd, avslutad, klar, complete
       if (status === 'genomfört' || status === 'genomförd' || status === 'avslutad' || status === 'klar' || status === 'complete') {
         stats.completed++
-      }
-      // Pågående ärenden: "bokat" eller "under hantering"
-      else if (status === 'bokat' || status === 'under hantering') {
+      } else if (status === 'bokat' || status === 'under hantering') {
         stats.inProgress++
-      }
-      // Öppna ärenden: allt annat
-      else {
+      } else {
         stats.open++
       }
     })
@@ -358,47 +505,32 @@ export default function CustomerPortal() {
     return new Date(parseInt(timestamp)).toLocaleDateString('sv-SE')
   }
 
-  const getPriorityColor = (priority: string | null) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return 'text-red-500'
-      case 'high': return 'text-orange-500'
-      case 'normal': return 'text-yellow-500'
-      case 'low': return 'text-green-500'
-      default: return 'text-slate-400'
-    }
-  }
-
   const getPriorityDisplay = (priority: string | null) => {
     if (!priority) return null
     
     const priorityLower = priority.toLowerCase()
     
-    // Prioritetskonfiguration med ClickUps färger
     const config = {
       'urgent': { 
         text: 'Akut', 
-        color: '#f87171',
         flagColor: 'text-red-500',
         borderColor: 'border-red-500/50',
         textColor: 'text-red-400'
       },
       'high': { 
         text: 'Hög', 
-        color: '#fb923c',
         flagColor: 'text-orange-500',
         borderColor: 'border-orange-500/50',
         textColor: 'text-orange-400'
       },
       'normal': { 
         text: 'Normal', 
-        color: '#60a5fa',
         flagColor: 'text-blue-500',
         borderColor: 'border-blue-500/50',
         textColor: 'text-blue-400'
       },
       'low': { 
         text: 'Låg', 
-        color: '#9ca3af',
         flagColor: 'text-gray-500',
         borderColor: 'border-gray-500/50',
         textColor: 'text-gray-400'
@@ -431,7 +563,7 @@ export default function CustomerPortal() {
       case 'under hantering':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       default:
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30' // Öppna/nya ärenden
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
     }
   }
 
@@ -439,286 +571,208 @@ export default function CustomerPortal() {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
   }
 
-  const getDateFilterText = (filter: string) => {
-    switch (filter) {
-      case 'last30': return 'Senaste 30 dagarna'
-      case 'last90': return 'Senaste 3 månaderna'
-      case 'thisYear': return `I år (${new Date().getFullYear()})`
-      case 'lastYear': return `Förra året (${new Date().getFullYear() - 1})`
-      default: return 'Alla datum'
-    }
-  }
-
-  const getStatusFilterText = (filter: string) => {
-    switch (filter) {
-      case 'genomfört': return 'Avslutade'
-      case 'bokat': return 'Bokade'
-      case 'under_hantering': return 'Pågående'
-      default: return 'Alla statusar'
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  if (error || !customer) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Card className="text-center p-8">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Ett fel uppstod</h2>
-          <p className="text-slate-400 mb-4">{error || 'Kunde inte hämta kunddata'}</p>
-          <Button onClick={() => window.location.reload()}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Försök igen
-          </Button>
-        </Card>
-      </div>
-    )
-  }
-
+  // 🐛 ALLTID VISA DEBUG-INFO
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="glass border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Centrerad titel */}
-            <div className="flex-1 text-center">
-              <h1 className="text-2xl font-bold text-white">
-                BeGone Skadedjur Kundportal
-              </h1>
-            </div>
-            
-            {/* Kundinfo till höger */}
-            <div className="flex items-center space-x-3">
-              <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
-                <div className="flex items-center space-x-3 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Building className="w-4 h-4 text-slate-400" />
-                    <span className="text-white font-medium">{customer.company_name}</span>
-                  </div>
-                  <div className="w-px h-4 bg-slate-600"></div>
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{customer.contact_person}</span>
-                  </div>
-                  <div className="w-px h-4 bg-slate-600"></div>
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-400">{customer.contract_types.name}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Logga ut knapp */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => signOut()}
-                className="text-slate-400 hover:text-white hover:bg-slate-800"
-                title="Logga ut"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
+      <DebugInfo profile={profile} customer={customer} error={error} loading={loading} />
+      
+      {loading && (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="text-center">
+            <LoadingSpinner />
+            <p className="text-white mt-4">Laddar kundportal...</p>
+            <p className="text-slate-400 text-sm mt-2">
+              Hämtar profil: {profile ? '✅' : '⏳'} | 
+              Hämtar kund: {customer ? '✅' : '⏳'}
+            </p>
           </div>
         </div>
-      </header>
+      )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">
-            Välkommen, {customer.contact_person}!
-          </h2>
-          <p className="text-slate-400">
-            Här kan du följa alla era ärenden och se status på pågående uppdrag.
-          </p>
+      {!loading && (error || !customer) && (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <Card className="text-center p-8 max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">Ett fel uppstod</h2>
+            <p className="text-slate-400 mb-4">{error || 'Kunde inte hämta kunddata'}</p>
+            
+            {/* 🐛 DEBUG INFORMATION */}
+            <div className="text-left bg-slate-800 p-4 rounded-lg mb-4 text-xs">
+              <h3 className="text-yellow-400 mb-2">🐛 Debug Information:</h3>
+              <div className="text-slate-300 space-y-1">
+                <p><strong>Profile exists:</strong> {profile ? 'Yes' : 'No'}</p>
+                {profile && (
+                  <>
+                    <p><strong>Customer ID:</strong> {profile.customer_id || 'Missing'}</p>
+                    <p><strong>Email:</strong> {profile.email}</p>
+                    <p><strong>Is Active:</strong> {profile.is_active ? 'Yes' : 'No'}</p>
+                  </>
+                )}
+                <p><strong>Customer loaded:</strong> {customer ? 'Yes' : 'No'}</p>
+                <p><strong>Error:</strong> {error || 'No specific error'}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Button onClick={() => window.location.reload()}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Försök igen
+              </Button>
+              
+              {profile?.customer_id && (
+                <Button 
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/accept-invitation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          customerId: profile.customer_id,
+                          email: profile.email,
+                          userId: profile.user_id
+                        })
+                      })
+                      const result = await response.json()
+                      console.log('Manual accept result:', result)
+                      window.location.reload()
+                    } catch (error) {
+                      console.error('Manual accept error:', error)
+                    }
+                  }}
+                >
+                  🔄 Acceptera inbjudan manuellt
+                </Button>
+              )}
+            </div>
+          </Card>
         </div>
+      )}
 
-        {/* Stats Grid - Uppdaterad med 3 kort */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt antal ärenden</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {tasksLoading ? '-' : taskStats.total}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Pågående</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {tasksLoading ? '-' : taskStats.inProgress}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-blue-500" />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Avslutade</p>
-                <p className="text-3xl font-bold text-white mt-1">
-                  {tasksLoading ? '-' : taskStats.completed}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Ärenden */}
-          <div className="lg:col-span-2">
-            <Card>
-              <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-white">Aktuella ärenden</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={fetchClickUpTasks}
-                    loading={tasksLoading}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Uppdatera
-                  </Button>
+      {!loading && customer && (
+        <>
+          {/* Header */}
+          <header className="glass border-b border-white/10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex-1 text-center">
+                  <h1 className="text-2xl font-bold text-white">
+                    BeGone Skadedjur Kundportal
+                  </h1>
                 </div>
-
-                {/* Filter-sektion */}
-                <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  {/* Datumfilter */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-slate-300">Period (deadline):</label>
-                    <select 
-                      value={dateFilter}
-                      onChange={(e) => setDateFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 min-w-[160px]"
-                    >
-                      <option value="all">Alla datum</option>
-                      <option value="last30">Senaste 30 dagarna</option>
-                      <option value="last90">Senaste 3 månaderna</option>
-                      <option value="thisYear">I år ({new Date().getFullYear()})</option>
-                      <option value="lastYear">Förra året ({new Date().getFullYear() - 1})</option>
-                    </select>
-                  </div>
-                  
-                  {/* Statusfilter */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-slate-300">Status:</label>
-                    <select 
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 min-w-[140px]"
-                    >
-                      <option value="all">Alla statusar</option>
-                      <option value="genomfört">Avslutade</option>
-                      <option value="bokat">Bokade</option>
-                      <option value="under_hantering">Pågående</option>
-                    </select>
-                  </div>
-                  
-                  {/* Sökfunktion */}
-                  <div className="flex items-center space-x-2 flex-1">
-                    <label className="text-sm text-slate-300">Sök:</label>
-                    <div className="relative flex-1 max-w-xs">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Sök ärenden..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-green-500 w-full"
-                      />
+                
+                <div className="flex items-center space-x-3">
+                  <div className="bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
+                    <div className="flex items-center space-x-3 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <Building className="w-4 h-4 text-slate-400" />
+                        <span className="text-white font-medium">{customer.company_name}</span>
+                      </div>
+                      <div className="w-px h-4 bg-slate-600"></div>
+                      <div className="flex items-center space-x-2">
+                        <User className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-300">{customer.contact_person}</span>
+                      </div>
+                      <div className="w-px h-4 bg-slate-600"></div>
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-400">{customer.contract_types.name}</span>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Rensa filter-knapp */}
-                  {(searchQuery || dateFilter !== 'all' || statusFilter !== 'all') && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => {
-                        setSearchQuery('')
-                        setDateFilter('all')
-                        setStatusFilter('all')
-                      }}
-                      className="text-slate-400 hover:text-white"
-                    >
-                      Rensa filter
-                    </Button>
-                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => signOut()}
+                    className="text-slate-400 hover:text-white hover:bg-slate-800"
+                    title="Logga ut"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
+            </div>
+          </header>
 
+          {/* Main Content */}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">
+                Välkommen, {customer.contact_person}!
+              </h2>
+              <p className="text-slate-400">
+                Här kan du följa alla era ärenden och se status på pågående uppdrag.
+              </p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-400 text-sm">Totalt antal ärenden</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {tasksLoading ? '-' : taskStats.total}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-green-500" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-400 text-sm">Pågående</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {tasksLoading ? '-' : taskStats.inProgress}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-blue-500" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-400 text-sm">Avslutade</p>
+                    <p className="text-3xl font-bold text-white mt-1">
+                      {tasksLoading ? '-' : taskStats.completed}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Success Message */}
+            <Card className="mb-8 bg-green-500/10 border-green-500/50">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-6 h-6 text-green-400" />
+                <div>
+                  <h3 className="text-green-400 font-medium">Portal laddad framgångsrikt!</h3>
+                  <p className="text-green-300 text-sm mt-1">
+                    Kund: {customer.company_name} | Kontakt: {customer.contact_person}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Simple tasks display */}
+            <Card>
+              <h3 className="text-xl font-semibold text-white mb-4">Ärenden</h3>
               {tasksLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <LoadingSpinner />
+                  <span className="ml-3 text-slate-400">Laddar ärenden...</span>
                 </div>
-              ) : error ? (
-                <div className="text-center py-8">
-                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                  <p className="text-red-400 font-medium mb-2">ClickUp Integration Problem</p>
-                  <p className="text-slate-400 text-sm mb-4">{error}</p>
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500">Debug info:</p>
-                    <p className="text-xs text-slate-500">List ID: {customer.clickup_list_id}</p>
-                    <p className="text-xs text-slate-500">List Name: {customer.clickup_list_name}</p>
-                  </div>
-                  <Button 
-                    onClick={fetchClickUpTasks} 
-                    variant="secondary" 
-                    size="sm"
-                    className="mt-4"
-                  >
-                    Försök igen
-                  </Button>
-                </div>
-              ) : filteredTasks.length === 0 && (searchQuery || dateFilter !== 'all' || statusFilter !== 'all') ? (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400 mb-2">Inga ärenden matchar dina filter</p>
-                  <div className="text-sm text-slate-500 space-y-1">
-                    {searchQuery && <p>Sökning: "{searchQuery}"</p>}
-                    {dateFilter !== 'all' && <p>Period: {getDateFilterText(dateFilter)}</p>}
-                    {statusFilter !== 'all' && <p>Status: {getStatusFilterText(statusFilter)}</p>}
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => {
-                      setSearchQuery('')
-                      setDateFilter('all')
-                      setStatusFilter('all')
-                    }}
-                    className="mt-3"
-                  >
-                    Rensa filter
-                  </Button>
-                </div>
-              ) : filteredTasks.length === 0 ? (
+              ) : tasks.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">Inga ärenden finns ännu</p>
@@ -728,7 +782,7 @@ export default function CustomerPortal() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {(showAllTasks ? filteredTasks : filteredTasks.slice(0, 5)).map((task) => (
+                  {tasks.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
                       className="border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors"
@@ -743,18 +797,10 @@ export default function CustomerPortal() {
                           )}
                         </div>
                         <div className="flex items-center space-x-4 ml-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-slate-400">Status:</span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
-                              {capitalizeFirst(task.status.status)}
-                            </span>
-                          </div>
-                          {task.priority && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-slate-400">Prioritet:</span>
-                              {getPriorityDisplay(task.priority.priority)}
-                            </div>
-                          )}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status.status)}`}>
+                            {capitalizeFirst(task.status.status)}
+                          </span>
+                          {task.priority && getPriorityDisplay(task.priority.priority)}
                         </div>
                       </div>
 
@@ -788,169 +834,22 @@ export default function CustomerPortal() {
                       </div>
                     </div>
                   ))}
-
-                  {filteredTasks.length > 5 && (
+                  
+                  {tasks.length > 3 && (
                     <div className="text-center pt-4">
-                      <Button 
-                        variant="secondary" 
-                        size="sm"
-                        onClick={() => setShowAllTasks(!showAllTasks)}
-                      >
-                        {showAllTasks ? 'Visa färre ärenden' : `Visa alla ${filteredTasks.length} ärenden`}
+                      <Button variant="secondary" size="sm">
+                        Visa alla {tasks.length} ärenden
                       </Button>
                     </div>
                   )}
                 </div>
               )}
             </Card>
-          </div>
+          </main>
+        </>
+      )}
 
-          {/* Företagsinformation och besök */}
-          <div>
-            {/* Företagsinformation */}
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Företagsinformation</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSettingsModal(true)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Redigera
-                </Button>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center text-sm">
-                  <Building className="w-4 h-4 text-slate-400 mr-2" />
-                  <div className="flex flex-col">
-                    <span className="text-slate-300">{customer.company_name}</span>
-                    {customer.org_number && (
-                      <span className="text-xs text-slate-500">Org.nr: {customer.org_number}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center text-sm">
-                  <User className="w-4 h-4 text-slate-400 mr-2" />
-                  <span className="text-slate-300">{customer.contact_person}</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Mail className="w-4 h-4 text-slate-400 mr-2" />
-                  <span className="text-slate-300">{customer.email}</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Phone className="w-4 h-4 text-slate-400 mr-2" />
-                  <span className="text-slate-300">{customer.phone}</span>
-                </div>
-                <div className="flex items-start text-sm">
-                  <MapPin className="w-4 h-4 text-slate-400 mr-2 mt-0.5" />
-                  <span className="text-slate-300">{customer.address}</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Kommande besök */}
-            <Card className="mt-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Kommande besök</h3>
-              {visits.length === 0 ? (
-                <div className="text-center py-6">
-                  <Calendar className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm">Inga kommande besök planerade</p>
-                  <p className="text-slate-500 text-xs mt-1">Nya besök kommer att visas här</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {visits.map((visit) => (
-                    <div 
-                      key={visit.id}
-                      className="border border-slate-700 rounded-lg p-3 hover:border-slate-600 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center text-sm text-white font-medium mb-1">
-                            <Calendar className="w-4 h-4 mr-2 text-green-400" />
-                            {new Date(visit.visit_date).toLocaleDateString('sv-SE', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </div>
-                          {visit.technician_name && (
-                            <div className="flex items-center text-xs text-slate-400">
-                              <User className="w-3 h-3 mr-1" />
-                              {visit.technician_name}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          {visit.status && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400">Status:</span>
-                              <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(visit.status)}`}>
-                                {capitalizeFirst(visit.status)}
-                              </span>
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedTaskId(visit.id)}
-                            className="text-xs"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            Detaljer
-                          </Button>
-                        </div>
-                      </div>
-                      {visit.work_performed && (
-                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                          {visit.work_performed}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {visits.length >= 5 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      fullWidth 
-                      className="mt-3"
-                      disabled
-                    >
-                      Visa alla besök
-                    </Button>
-                  )}
-                </div>
-              )}
-            </Card>
-
-            {/* Skapa nytt ärende - Snygg box */}
-            <Card 
-              className="mt-6 cursor-pointer hover:border-green-500/50 transition-all group"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <div className="flex items-center justify-center p-6 text-center">
-                <div className="flex flex-col items-center space-y-3">
-                  <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-                    <Plus className="w-6 h-6 text-green-400 group-hover:text-green-300" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-white group-hover:text-green-100 transition-colors">
-                      Skapa nytt ärende
-                    </h4>
-                    <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
-                      Rapportera ett problem eller boka service
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </main>
-
-      {/* Case Details Modal */}
+      {/* Modals */}
       {selectedTaskId && (
         <CaseDetailsModal
           caseId=""
@@ -960,7 +859,6 @@ export default function CustomerPortal() {
         />
       )}
 
-      {/* Customer Settings Modal - NU MED KORREKT ORG_NUMBER */}
       {showSettingsModal && customer && (
         <CustomerSettingsModal
           isOpen={showSettingsModal}
@@ -968,7 +866,7 @@ export default function CustomerPortal() {
           customer={{
             id: customer.id,
             company_name: customer.company_name,
-            org_number: customer.org_number || '', // Nu kommer detta finnas tack vare uppdaterad type
+            org_number: customer.org_number || '',
             contact_person: customer.contact_person,
             email: customer.email,
             phone: customer.phone
@@ -979,14 +877,13 @@ export default function CustomerPortal() {
         />
       )}
 
-      {/* Create Case Modal */}
       {showCreateModal && customer && (
         <CreateCaseModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
-            fetchClickUpTasks() // Refresh case list
-            fetchUpcomingVisits() // Refresh visits
+            fetchClickUpTasks()
+            fetchUpcomingVisits()
           }}
           customerId={customer.id}
           customerInfo={{
