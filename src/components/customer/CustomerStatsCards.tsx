@@ -13,9 +13,10 @@ type TaskStats = {
 
 interface CustomerStatsCardsProps {
   customerId: string
+  clickupListId: string
 }
 
-const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId }) => {
+const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId, clickupListId }) => {
   const [stats, setStats] = useState<TaskStats>({
     total: 0,
     open: 0,
@@ -24,11 +25,11 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId }) =
     upcoming: 0
   })
   const [loading, setLoading] = useState(true)
-
+  
   useEffect(() => {
     fetchStats()
-  }, [customerId])
-
+  }, [customerId, clickupListId])
+  
   const fetchStats = async () => {
     try {
       setLoading(true)
@@ -83,7 +84,7 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId }) =
       setLoading(false)
     }
   }
-
+  
   const statCards = [
     {
       title: 'Totalt antal ärenden',
@@ -114,7 +115,7 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId }) =
       bgColor: 'bg-purple-500/20'
     }
   ]
-
+  
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statCards.map((stat) => {

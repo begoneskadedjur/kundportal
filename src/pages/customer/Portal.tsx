@@ -1,4 +1,4 @@
-// src/pages/customer/Portal.tsx - UNCHANGED (passar bara data vidare)
+// src/pages/customer/Portal.tsx - UPDATED with proper props and error handling
 import React, { useEffect, useState } from 'react'
 import { LogOut, RefreshCw, Settings, Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -7,7 +7,7 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
 
-// Import customer portal components (we'll create these)
+// Import customer portal components
 import CustomerStatsCards from '../../components/customer/CustomerStatsCards'
 import ActiveCasesList from '../../components/customer/ActiveCasesList'
 import UpcomingVisits from '../../components/customer/UpcomingVisits'
@@ -78,7 +78,13 @@ const CustomerPortal: React.FC = () => {
 
       if (error) throw error
       
-      setCustomer(data)
+      // Clean the data to prevent serialization issues
+      const cleanedData = {
+        ...data,
+        contract_types: data.contract_types ? { name: data.contract_types.name } : { name: 'Okänd' }
+      }
+      
+      setCustomer(cleanedData)
     } catch (error: any) {
       console.error('Error fetching customer:', error)
       setError(`Kunde inte hämta kunddata: ${error.message}`)
@@ -258,7 +264,7 @@ const CustomerPortal: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between text-sm text-slate-400">
             <div className="flex items-center gap-4">
-              <span>Avtalstyp: {customer.contract_types.name}</span>
+              <span>Avtalstyp: {customer.contract_types?.name || 'Okänd'}</span>
               <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
               <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
             </div>
