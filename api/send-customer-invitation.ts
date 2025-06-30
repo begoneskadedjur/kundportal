@@ -1,4 +1,4 @@
-// api/send-customer-invitation.ts
+// api/send-customer-invitation.ts - UPPDATERAD VERSION MED FIXAD NODEMAILER SYNTAX
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
@@ -254,8 +254,9 @@ async function upsertInvitation(supabase: any, customerId: string, email: string
   }
 }
 
+// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
 async function sendWelcomeEmail({ email, contactPerson, companyName, tempPassword, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: 'smtp.resend.com',
     port: 587,
     secure: false,
@@ -339,8 +340,9 @@ async function sendWelcomeEmail({ email, contactPerson, companyName, tempPasswor
   console.log('Welcome email sent to:', email)
 }
 
+// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
 async function sendAccessEmail({ email, contactPerson, companyName, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: 'smtp.resend.com',
     port: 587,
     secure: false,
@@ -413,8 +415,9 @@ async function sendAccessEmail({ email, contactPerson, companyName, loginLink, c
   console.log('Access email sent to:', email)
 }
 
+// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
 async function sendReminderEmail({ email, contactPerson, companyName, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: 'smtp.resend.com',
     port: 587,
     secure: false,
