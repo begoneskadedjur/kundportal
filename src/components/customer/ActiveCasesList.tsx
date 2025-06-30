@@ -4,6 +4,7 @@ import { FileText, Clock, AlertCircle, Eye, Calendar, MapPin, Bug } from 'lucide
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { supabase } from '../../lib/supabase'
 
 interface Case {
   id: string
@@ -41,18 +42,36 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
       setLoading(true)
       setError(null)
 
-      // Hämta ärenden från ClickUp API via backend
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
+      // Först: Hämta kundens clickup_list_id från databasen
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('clickup_list_id')
+        .eq('id', customer.id)
+        .single()
+
+      if (customerError || !customerData?.clickup_list_id) {
+        console.error('Customer not found or no ClickUp list:', customerError)
+        setError('Kunde inte hämta kundinformation')
+        setCases([])
+        return
+      }
+
+      // Sedan: Hämta ärenden från ClickUp API via backend med list_id
+      const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
       
       if (response.ok) {
         const data = await response.json()
         const tasks = data.tasks || []
+        
+        console.log('Fetched tasks for active cases:', tasks.length)
         
         // Filtrera endast aktiva ärenden (ej avslutade)
         const activeCases = tasks.filter((task: any) => {
           const status = task.status?.status?.toLowerCase() || ''
           return !['genomfört', 'genomförd', 'avslutad', 'klar', 'complete', 'closed'].includes(status)
         })
+
+        console.log('Active cases after filtering:', activeCases.length)
 
         // Mappa till vårt Case interface
         const mappedCases: Case[] = activeCases.map((task: any) => ({
@@ -66,73 +85,53 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
           description: task.description,
           scheduled_date: task.due_date ? new Date(parseInt(task.due_date)).toISOString() : undefined,
           created_at: task.date_created ? new Date(parseInt(task.date_created)).toISOString() : new Date().toISOString(),
-          assigned_technician_name: task.assignees?.[0]?.username
+          assigned_technician_name: task.assignees?.[0]?.username || 'Ej tilldelad'
         }))
 
-        setCases(mappedCases.slice(0, 5)) // Visa max 5 senaste
+        // Sortera efter skapandedatum (senaste först)
+        mappedCases.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        
+        setCases(mappedCases.slice(0, 5)) // Visa max 5 aktiva ärenden
       } else {
+        console.error('API error:', response.status, response.statusText)
+        setError('Kunde inte hämta ärenden från ClickUp')
         setCases([])
       }
     } catch (error) {
-      console.error('Error fetching cases:', error)
-      setError('Kunde inte hämta ärenden')
+      console.error('Error fetching active cases:', error)
+      setError('Kunde inte hämta aktiva ärenden')
       setCases([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Få prioritetsfärg
+  // Formatera prioritet för visning
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
       case 'urgent':
-      case 'hög':
-        return 'text-red-500 bg-red-500/20'
+        return 'bg-red-500/20 text-red-400 border-red-500/30'
       case 'high':
-      case 'medium':
-      case 'medel':
-        return 'text-yellow-500 bg-yellow-500/20'
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+      case 'normal':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       case 'low':
-      case 'låg':
-        return 'text-green-500 bg-green-500/20'
+        return 'bg-green-500/20 text-green-400 border-green-500/30'
       default:
-        return 'text-slate-500 bg-slate-500/20'
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     }
   }
 
-  // Få statusfärg
+  // Formatera status för visning
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase()
-    if (statusLower.includes('open') || statusLower.includes('öppen')) {
-      return 'text-blue-500 bg-blue-500/20'
+    if (statusLower.includes('bokat') || statusLower.includes('progress')) {
+      return 'bg-yellow-500/20 text-yellow-400'
+    } else if (statusLower.includes('open') || statusLower.includes('öppen')) {
+      return 'bg-blue-500/20 text-blue-400'
+    } else {
+      return 'bg-slate-500/20 text-slate-400'
     }
-    if (statusLower.includes('progress') || statusLower.includes('bokat') || statusLower.includes('pågående')) {
-      return 'text-yellow-500 bg-yellow-500/20'
-    }
-    if (statusLower.includes('waiting') || statusLower.includes('väntar')) {
-      return 'text-orange-500 bg-orange-500/20'
-    }
-    return 'text-slate-500 bg-slate-500/20'
-  }
-
-  // Formatera datum
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Idag'
-    }
-    if (date.toDateString() === tomorrow.toDateString()) {
-      return 'Imorgon'
-    }
-    return date.toLocaleDateString('sv-SE', { 
-      month: 'short', 
-      day: 'numeric',
-      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-    })
   }
 
   if (loading) {
@@ -150,8 +149,8 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-            <FileText className="w-5 h-5 text-orange-500" />
+          <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+            <FileText className="w-5 h-5 text-green-500" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Aktiva Ärenden</h3>
@@ -209,11 +208,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
           cases.map((caseItem) => (
             <div
               key={caseItem.id}
-              className="group p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-800/70 transition-all duration-200 cursor-pointer"
-              onClick={() => {
-                // TODO: Öppna case details modal
-                console.log('Opening case:', caseItem.id)
-              }}
+              className="group p-4 rounded-lg border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 cursor-pointer hover:scale-[1.02]"
             >
               {/* Case Header */}
               <div className="flex items-start justify-between mb-3">
@@ -222,7 +217,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
                     <span className="text-slate-400 text-sm font-mono">
                       {caseItem.case_number}
                     </span>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(caseItem.priority)}`}>
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(caseItem.priority)}`}>
                       {caseItem.priority}
                     </div>
                   </div>
@@ -230,8 +225,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
                     {caseItem.title}
                   </h4>
                 </div>
-                
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(caseItem.status)}`}>
+                <div className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(caseItem.status)}`}>
                   {caseItem.status}
                 </div>
               </div>
@@ -241,30 +235,27 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
                 {caseItem.pest_type && (
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Bug className="w-4 h-4" />
-                    <span>{caseItem.pest_type}</span>
+                    <span>Skadedjur: {caseItem.pest_type}</span>
                   </div>
                 )}
 
                 {caseItem.location_details && (
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <MapPin className="w-4 h-4" />
-                    {/* FIX: Access the formatted_address property of the location object */}
-                    <span className="truncate">
-                      {typeof caseItem.location_details === 'object' && caseItem.location_details?.formatted_address
-                        ? caseItem.location_details.formatted_address
-                        : caseItem.location_details}
-                    </span>
+                    <span className="truncate">{caseItem.location_details}</span>
                   </div>
                 )}
 
                 {caseItem.scheduled_date && (
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Calendar className="w-4 h-4" />
-                    <span>Schemalagt: {formatDate(caseItem.scheduled_date)}</span>
+                    <span>
+                      Schemalagt: {new Date(caseItem.scheduled_date).toLocaleDateString('sv-SE')}
+                    </span>
                   </div>
                 )}
 
-                {caseItem.assigned_technician_name && (
+                {caseItem.assigned_technician_name && caseItem.assigned_technician_name !== 'Ej tilldelad' && (
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Clock className="w-4 h-4" />
                     <span>Tekniker: {caseItem.assigned_technician_name}</span>
@@ -272,32 +263,21 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
                 )}
               </div>
 
-              {/* Action Hint */}
-              <div className="mt-3 pt-3 border-t border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-center text-slate-400 text-xs">
-                  <span>Klicka för att visa detaljer</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+              {/* Case Description Preview */}
+              {caseItem.description && (
+                <div className="mt-3 pt-3 border-t border-slate-700">
+                  <p className="text-sm text-slate-300 line-clamp-2">
+                    {caseItem.description.length > 100 
+                      ? caseItem.description.substring(0, 100) + '...'
+                      : caseItem.description
+                    }
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
           ))
         )}
       </div>
-
-      {/* Footer Action */}
-      {cases.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-slate-700">
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={() => window.location.href = `/customer/cases`}
-          >
-            Visa alla ärenden ({cases.length}+)
-          </Button>
-        </div>
-      )}
     </Card>
   )
 }

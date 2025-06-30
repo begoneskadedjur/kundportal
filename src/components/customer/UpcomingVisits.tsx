@@ -4,6 +4,7 @@ import { Calendar, Clock, User, MapPin, Phone, AlertCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { supabase } from '../../lib/supabase'
 
 interface Visit {
   id: string
@@ -41,12 +42,28 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
       setLoading(true)
       setError(null)
 
-      // Hämta ärenden från ClickUp som har schemalagda datum
-      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
+      // Först: Hämta kundens clickup_list_id från databasen
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('clickup_list_id')
+        .eq('id', customer.id)
+        .single()
+
+      if (customerError || !customerData?.clickup_list_id) {
+        console.error('Customer not found or no ClickUp list:', customerError)
+        setError('Kunde inte hämta kundinformation')
+        setVisits([])
+        return
+      }
+
+      // Sedan: Hämta ärenden från ClickUp som har schemalagda datum
+      const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
       
       if (response.ok) {
         const data = await response.json()
         const tasks = data.tasks || []
+        
+        console.log('Fetched tasks for upcoming visits:', tasks.length)
         
         // Filtrera tasks som har due_date i framtiden och är aktiva
         const upcomingTasks = tasks.filter((task: any) => {
@@ -59,6 +76,8 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
           return dueDate >= now && 
                  !['genomfört', 'genomförd', 'avslutad', 'klar', 'complete', 'closed'].includes(status)
         })
+
+        console.log('Upcoming visits after filtering:', upcomingTasks.length)
 
         // Mappa till Visit interface
         const mappedVisits: Visit[] = upcomingTasks.map((task: any) => ({
@@ -80,6 +99,8 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
         
         setVisits(mappedVisits.slice(0, 3)) // Visa max 3 kommande besök
       } else {
+        console.error('API error:', response.status, response.statusText)
+        setError('Kunde inte hämta besök från ClickUp')
         setVisits([])
       }
     } catch (error) {
@@ -278,11 +299,13 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
                   {visit.location && (
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                       <MapPin className="w-4 h-4" />
-                      {/* FIX: Access the formatted_address property of the location object */}
                       <span className="truncate">
                         {typeof visit.location === 'object' && visit.location?.formatted_address
                           ? visit.location.formatted_address
-                          : visit.location}
+                          : typeof visit.location === 'string' 
+                          ? visit.location 
+                          : customer.company_name
+                        }
                       </span>
                     </div>
                   )}
@@ -295,54 +318,22 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
                   )}
                 </div>
 
-                {/* Contact Info */}
-                {visit.technician_phone && (
-                  <div className="mt-3 pt-3 border-t border-slate-700/50">
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <Phone className="w-4 h-4" />
-                      <span>Tekniker: {visit.technician_phone}</span>
-                    </div>
+                {/* Work Description Preview */}
+                {visit.work_description && (
+                  <div className="mt-3 pt-3 border-t border-slate-700">
+                    <p className="text-sm text-slate-300 line-clamp-2">
+                      {visit.work_description.length > 100 
+                        ? visit.work_description.substring(0, 100) + '...'
+                        : visit.work_description
+                      }
+                    </p>
                   </div>
                 )}
-
-                {/* Status Indicator */}
-                <div className="mt-3 pt-3 border-t border-slate-700/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${urgency.color.replace('text-', 'bg-')} animate-pulse`}></div>
-                      <span className="text-xs text-slate-400">{visit.status}</span>
-                    </div>
-                    <div className="flex items-center text-slate-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span>Klicka för detaljer</span>
-                      <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
               </div>
             )
           })
         )}
       </div>
-
-      {/* Footer */}
-      {visits.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-slate-700">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-400">
-              <span>💡 Tips: Du får SMS-påminnelse 24h innan besöket</span>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => window.location.href = `/customer/schedule`}
-            >
-              Visa kalendern
-            </Button>
-          </div>
-        </div>
-      )}
     </Card>
   )
 }

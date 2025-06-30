@@ -1,4 +1,4 @@
-// api/create-case.ts - Uppdaterad med tekniker-integration
+// api/create-case.ts - FIXED VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case_type = '', 
       address = '', 
       phone = '',
-      assigned_technician_email = '' // NY: Tekniker-tilldelning
+      assigned_technician_email = ''
     } = req.body
 
     // Validera required fields
@@ -49,8 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
+    console.log('=== STEP 1: Fetch customer info ===')
     // 1. Hämta kund info för ClickUp list
-    console.log('Fetching customer info for ID:', customer_id)
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(`
@@ -77,6 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Kund saknar ClickUp lista' })
     }
 
+    console.log('Customer found:', {
+      company: customer.company_name,
+      clickup_list: customer.clickup_list_id
+    })
+
+    console.log('=== STEP 2: Handle technician assignment ===')
     // 2. Hämta tekniker-info om tilldelad
     let assignedTechnician = null
     if (assigned_technician_email) {
@@ -97,15 +103,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    console.log('Customer found:', {
-      company: customer.company_name,
-      clickup_list: customer.clickup_list_id,
-      assigned_technician: assignedTechnician?.name || 'Ingen tilldelad'
-    })
-
+    console.log('=== STEP 3: Generate case number ===')
     // 3. Generera case number
     const caseNumber = `${customer.company_name.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`
+    console.log('Generated case number:', caseNumber)
 
+    console.log('=== STEP 4: Prepare description ===')
     // 4. Förbered beskrivning med extra info
     let fullDescription = description
     if (pest_type) fullDescription += `\n\n🐛 Skadedjurstyp: ${pest_type}`
@@ -116,29 +119,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fullDescription += `\n👤 Tilldelad tekniker: ${assignedTechnician.name} (${assignedTechnician.email})`
     }
 
-    // 5. Skapa task i ClickUp
-    console.log('Creating ClickUp task...')
+    console.log('=== STEP 5: Create ClickUp task ===')
+    // 5. Skapa task i ClickUp (UTAN custom fields för att undvika fel)
     const clickupPayload = {
       name: `${caseNumber}: ${title}`,
       description: fullDescription,
       priority: priority === 'urgent' ? 1 : priority === 'high' ? 2 : priority === 'normal' ? 3 : 4,
-      status: 'open',
-      assignees: assignedTechnician ? [] : [], // ClickUp assignees skulle behöva ClickUp user IDs
-      custom_fields: [
-        {
-          id: 'adress_field_id', // Ersätt med verkligt field ID
-          value: address || ''
-        },
-        {
-          id: 'skadedjur_field_id', // Ersätt med verkligt field ID  
-          value: pest_type
-        },
-        {
-          id: 'arende_field_id', // Ersätt med verkligt field ID
-          value: case_type
-        }
-      ]
+      status: 'open'
+      // REMOVED: custom_fields (de hade felaktiga ID:n)
+      // REMOVED: assignees (behöver ClickUp user IDs, inte email)
     }
+
+    console.log('ClickUp payload:', JSON.stringify(clickupPayload, null, 2))
 
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/list/${customer.clickup_list_id}/task`, {
       method: 'POST',
@@ -151,15 +143,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!clickupResponse.ok) {
       const errorText = await clickupResponse.text()
-      console.error('ClickUp task creation failed:', errorText)
-      throw new Error(`ClickUp API error: ${clickupResponse.status}`)
+      console.error('ClickUp task creation failed:', {
+        status: clickupResponse.status,
+        statusText: clickupResponse.statusText,
+        error: errorText
+      })
+      throw new Error(`ClickUp API error: ${clickupResponse.status} - ${errorText}`)
     }
 
     const clickupTask = await clickupResponse.json()
-    console.log('ClickUp task created:', clickupTask.id)
+    console.log('ClickUp task created successfully:', {
+      id: clickupTask.id,
+      name: clickupTask.name,
+      url: clickupTask.url
+    })
 
+    console.log('=== STEP 6: Save to database ===')
     // 6. Skapa case i databas med tekniker-info
-    console.log('Creating case in database...')
     const caseData = {
       customer_id: customer_id,
       clickup_task_id: clickupTask.id,
@@ -178,6 +178,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       created_at: new Date().toISOString()
     }
 
+    console.log('Database case data:', JSON.stringify(caseData, null, 2))
+
     const { data: newCase, error: caseError } = await supabase
       .from('cases')
       .insert(caseData)
@@ -188,21 +190,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Database case creation error:', caseError)
       // Cleanup ClickUp task vid fel
       try {
+        console.log('Attempting to cleanup ClickUp task...')
         await fetch(`https://api.clickup.com/api/v2/task/${clickupTask.id}`, {
           method: 'DELETE',
           headers: { 'Authorization': CLICKUP_API_TOKEN }
         })
+        console.log('ClickUp task cleanup successful')
       } catch (cleanupError) {
         console.error('Failed to cleanup ClickUp task:', cleanupError)
       }
       throw new Error(`Kunde inte skapa ärende i databas: ${caseError.message}`)
     }
 
-    console.log('Case created successfully:', newCase.id)
-    console.log('=== CREATE CASE API SUCCESS ===')
+    console.log('=== CREATE CASE SUCCESS ===')
+    console.log('Case created successfully:', {
+      id: newCase.id,
+      case_number: newCase.case_number,
+      clickup_task_id: clickupTask.id
+    })
     
     return res.status(200).json({
       success: true,
+      message: 'Ärende skapat framgångsrikt',
       case: {
         id: newCase.id,
         case_number: newCase.case_number,
@@ -221,10 +230,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('=== CREATE CASE API ERROR ===')
-    console.error('Error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack
+    })
     
     return res.status(500).json({
-      error: error.message || 'Ett fel uppstod vid skapande av ärende'
+      error: error.message || 'Ett fel uppstod vid skapande av ärende',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 }
