@@ -42,7 +42,7 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
       setError(null)
 
       // Hämta ärenden från ClickUp som har schemalagda datum
-      const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
+      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
       
       if (response.ok) {
         const data = await response.json()
@@ -278,7 +278,12 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
                   {visit.location && (
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                       <MapPin className="w-4 h-4" />
-                      <span className="truncate">{visit.location}</span>
+                      {/* FIX: Access the formatted_address property of the location object */}
+                      <span className="truncate">
+                        {typeof visit.location === 'object' && visit.location?.formatted_address
+                          ? visit.location.formatted_address
+                          : visit.location}
+                      </span>
                     </div>
                   )}
 

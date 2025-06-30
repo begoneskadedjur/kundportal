@@ -42,7 +42,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
       setError(null)
 
       // Hämta ärenden från ClickUp API via backend
-      const response = await fetch(`/api/clickup-tasks?list_id=${customer.clickup_list_id}`)
+      const response = await fetch(`/api/clickup-tasks?customer_id=${customer.id}`)
       
       if (response.ok) {
         const data = await response.json()
@@ -248,7 +248,12 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
                 {caseItem.location_details && (
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <MapPin className="w-4 h-4" />
-                    <span className="truncate">{caseItem.location_details}</span>
+                    {/* FIX: Access the formatted_address property of the location object */}
+                    <span className="truncate">
+                      {typeof caseItem.location_details === 'object' && caseItem.location_details?.formatted_address
+                        ? caseItem.location_details.formatted_address
+                        : caseItem.location_details}
+                    </span>
                   </div>
                 )}
 
