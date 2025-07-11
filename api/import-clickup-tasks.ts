@@ -410,4 +410,3 @@ function mapTaskDates(task: any): any {
   
   return dateData
 }
-
