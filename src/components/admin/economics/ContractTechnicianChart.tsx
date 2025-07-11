@@ -114,24 +114,23 @@ const ContractTechnicianChart: React.FC = () => {
     }
   }
 
-  // 🎯 Memoized processing av avtalskund tekniker-data baserat på vald period
+  // 🎯 Memoized processing av avtalskund tekniker-data baserat på vald period  
   const technicianData = useMemo((): ContractTechnicianData[] => {
     if (!allData.cases.length) {
       return []
     }
 
-    // Bestäm datumspan för filtrering
+    // Bestäm datumspan för filtrering - FIX: Använd Array.from(new Set()) för unika datum
     const allCaseDates = allData.cases
       .map(c => c.completed_date)
       .filter(Boolean)
       .map(date => date.slice(0, 7))
-      .sort()
-
+    
     const uniqueDates = Array.from(new Set(allCaseDates)).sort()
     const selectedIndex = uniqueDates.findIndex(month => month === selectedMonth)
     
     if (selectedIndex === -1) {
-      console.log(`⚠️ Selected month ${selectedMonth} not found in contract data`)
+      console.log(`⚠️ Selected month ${selectedMonth} not found in contract data, available months:`, uniqueDates)
       return []
     }
     
@@ -149,7 +148,7 @@ const ContractTechnicianChart: React.FC = () => {
       return caseMonth >= startMonth && caseMonth <= endMonth
     })
 
-    // Filtrera nya kunder baserat på period
+    // Filtrera nya kunder baserat på period  
     const filteredCustomers = allData.customers.filter(customer => {
       if (!customer.created_at) return false
       const customerMonth = customer.created_at.slice(0, 7)
@@ -248,7 +247,6 @@ const ContractTechnicianChart: React.FC = () => {
       .map(c => c.completed_date)
       .filter(Boolean)
       .map(date => date.slice(0, 7))
-      .sort()
     
     const uniqueDates = Array.from(new Set(allDates)).sort()
     const earliestMonth = uniqueDates[0]
@@ -262,7 +260,6 @@ const ContractTechnicianChart: React.FC = () => {
       .map(c => c.completed_date)
       .filter(Boolean)
       .map(date => date.slice(0, 7))
-      .sort()
     
     const uniqueDates = Array.from(new Set(allDates)).sort()
     const latestMonth = uniqueDates[uniqueDates.length - 1]
@@ -351,6 +348,14 @@ const ContractTechnicianChart: React.FC = () => {
           <div className="text-center">
             <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Ingen avtalskund teknikerdata tillgänglig för vald period</p>
+            <p className="text-xs mt-2">
+              Månad: {selectedMonth}, Period: {selectedPeriod}, Cases: {allData.cases.length}
+            </p>
+            {allData.cases.length > 0 && (
+              <p className="text-xs text-slate-500 mt-1">
+                Tillgängliga månader: {Array.from(new Set(allData.cases.map(c => c.completed_date?.slice(0, 7)).filter(Boolean))).sort().join(', ')}
+              </p>
+            )}
           </div>
         </div>
       </Card>
