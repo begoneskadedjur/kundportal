@@ -1,4 +1,4 @@
-// src/types/database.ts - Komplett uppdaterad med contract_end_date + monthly_marketing_spend + all befintlig struktur
+// src/types/database.ts - Komplett uppdaterad med BeGone cases tabeller + befintlig struktur
 export type Database = {
   public: {
     Tables: {
@@ -78,7 +78,7 @@ export type Database = {
           pest_type: string
           location_details: string
           description: string
-          created_date: string | null // 👇 FIX: Denna rad har lagts till för att matcha databasen
+          created_date: string | null
           scheduled_date: string | null
           completed_date: string | null
           created_at: string
@@ -98,6 +98,112 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
+      }
+      // NYA BEGONE TABELLER
+      private_cases: {
+        Row: {
+          id: string
+          clickup_task_id: string
+          case_number: string | null
+          title: string
+          description: string | null
+          status: string
+          priority: string
+          created_at: string
+          updated_at: string
+          
+          // Assignees (upp till 3 tekniker per ärende)
+          primary_assignee_id: string | null
+          primary_assignee_name: string | null
+          primary_assignee_email: string | null
+          secondary_assignee_id: string | null
+          secondary_assignee_name: string | null
+          secondary_assignee_email: string | null
+          tertiary_assignee_id: string | null
+          tertiary_assignee_name: string | null
+          tertiary_assignee_email: string | null
+          
+          // Datum (svenska format via DATE kolumner)
+          start_date: string | null        // YYYY-MM-DD format
+          due_date: string | null         // YYYY-MM-DD format
+          completed_date: string | null   // YYYY-MM-DD format
+          
+          // Custom fields från ClickUp
+          adress: any | null // Adress (JSONB)
+          r_arbetskostnad: number | null // R - Arbetskostnad
+          avvikelser_tillbud_olyckor: string | null // Avvikelser, tillbud & Olyckor
+          r_rot_rut: string | null // R - ROT/RUT
+          rapport: string | null // Rapport
+          status_saneringsrapport: string | null // Status Saneringsrapport
+          r_fastighetsbeteckning: string | null // R - Fastighetsbeteckning
+          personnummer: string | null // Personnummer
+          r_material_utrustning: number | null // R -  Material & Utrustning 
+          kontaktperson: string | null // Kontaktperson
+          skadedjur: string | null // Skadedjur
+          skicka_bokningsbekraftelse: string | null // Skicka bokningsbekräftelse?
+          reklamation: string | null // Reklamation
+          e_post_kontaktperson: string | null // E-post Kontaktperson
+          telefon_kontaktperson: string | null // Telefon Kontaktperson
+          vaggloss_angade_rum: string | null // Vägglöss - Ångade rum
+          pris: number | null // Pris
+          filer: any | null // Filer (JSONB)
+          r_servicebil: number | null // R - Servicebil
+          annat_skadedjur: string | null // Annat Skadedjur
+        }
+        Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
+      }
+      business_cases: {
+        Row: {
+          id: string
+          clickup_task_id: string
+          case_number: string | null
+          title: string
+          description: string | null
+          status: string
+          priority: string
+          created_at: string
+          updated_at: string
+          
+          // Assignees (upp till 3 tekniker per ärende)
+          primary_assignee_id: string | null
+          primary_assignee_name: string | null
+          primary_assignee_email: string | null
+          secondary_assignee_id: string | null
+          secondary_assignee_name: string | null
+          secondary_assignee_email: string | null
+          tertiary_assignee_id: string | null
+          tertiary_assignee_name: string | null
+          tertiary_assignee_email: string | null
+          
+          // Datum (svenska format via DATE kolumner)
+          start_date: string | null        // YYYY-MM-DD format
+          due_date: string | null         // YYYY-MM-DD format
+          completed_date: string | null   // YYYY-MM-DD format
+          
+          // Custom fields från ClickUp
+          adress: any | null // Adress (JSONB)
+          avvikelser_tillbud_olyckor: string | null // Avvikelser, tillbud & Olyckor
+          rapport: string | null // Rapport
+          status_saneringsrapport: string | null // Status Saneringsrapport
+          markning_faktura: string | null // Märkning faktura
+          kontaktperson: string | null // Kontaktperson
+          e_post_faktura: string | null // E-post Faktura
+          skadedjur: string | null // Skadedjur
+          skicka_bokningsbekraftelse: string | null // Skicka bokningsbekräftelse?
+          org_nr: string | null // Org nr
+          reklamation: string | null // Reklamation
+          e_post_kontaktperson: string | null // E-post Kontaktperson
+          telefon_kontaktperson: string | null // Telefon Kontaktperson
+          skicka_erbjudande: string | null // Skicka erbjudande?
+          vaggloss_angade_rum: string | null // Vägglöss - Ångade rum
+          bestallare: string | null // Beställare
+          pris: number | null // Pris
+          filer: any | null // Filer (JSONB)
+          annat_skadedjur: string | null // Annat Skadedjur
+        }
+        Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['business_cases']['Insert']>
       }
       profiles: {
         Row: {
@@ -164,7 +270,7 @@ export type Database = {
   }
 }
 
-// Hjälptyper
+// Hjälptyper - BEFINTLIGA
 export type Customer = Database['public']['Tables']['customers']['Row']
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
@@ -178,6 +284,55 @@ export type TechnicianUpdate = Database['public']['Tables']['technicians']['Upda
 export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
 export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
 export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
+
+// NYA BEGONE CASE TYPER
+export type PrivateCasesRow = Database['public']['Tables']['private_cases']['Row']
+export type PrivateCasesInsert = Database['public']['Tables']['private_cases']['Insert']
+export type PrivateCasesUpdate = Database['public']['Tables']['private_cases']['Update']
+
+export type BusinessCasesRow = Database['public']['Tables']['business_cases']['Row']
+export type BusinessCasesInsert = Database['public']['Tables']['business_cases']['Insert']
+export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']['Update']
+
+// Union type för flexibel hantering
+export type BeGoneCaseRow = PrivateCasesRow | BusinessCasesRow
+
+// Hjälp-interfaces för assignee-hantering
+export interface CaseAssignee {
+  id?: string
+  name: string
+  email: string
+  role?: 'primary' | 'secondary' | 'tertiary'
+}
+
+export interface CaseDateInfo {
+  start_date?: string
+  due_date?: string
+  completed_date?: string
+  // Hjälpfunktioner för svenska format
+  start_date_swedish?: string    // DD/MM YYYY
+  due_date_swedish?: string      // DD/MM YYYY  
+  completed_date_swedish?: string // DD/MM YYYY
+}
+
+// Helper för att identifiera case-typ
+export interface CaseTypeInfo {
+  table: 'private_cases' | 'business_cases'
+  list_id: string
+  display_name: string
+}
+
+// Konstanter för tekniker-matching
+export const KNOWN_TECHNICIANS = [
+  { name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' },
+  { name: 'Benny Linden', email: 'benny.linden@begone.se' },
+  { name: 'Kristian Agnevik', email: 'kristian.agnevik@begone.se' },
+  { name: 'Christian Karlsson', email: 'christian.karlsson@begone.se' },
+  { name: 'Hans Norman', email: 'hans.norman@begone.se' },
+  { name: 'Mathias Carlsson', email: 'mathias.carlsson@begone.se' },
+  { name: 'Kim Wahlberg', email: 'kim.wahlberg@begone.se' },
+  { name: 'Jakob Wahlberg', email: 'jakob.wahlberg@begone.se' }
+] as const
 
 export const TECHNICIAN_ROLES = [
   'Skadedjurstekniker',
@@ -235,6 +390,30 @@ export const ACCOUNT_MANAGERS = [
 
 export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']
 
+// DATUM-HJÄLPFUNKTIONER (NYA)
+export const formatSwedishDate = (dateString?: string): string => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('sv-SE', {
+    day: '2-digit',
+    month: '2-digit', 
+    year: 'numeric'
+  })
+}
+
+export const formatSwedishDateTime = (timestamp?: string): string => {
+  if (!timestamp) return '-'
+  const date = new Date(timestamp)
+  return date.toLocaleDateString('sv-SE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// BEFINTLIGA HJÄLPFUNKTIONER
 export const calculateContractEndDate = (startDate: string, lengthInMonths: number): string => {
   const start = new Date(startDate)
   const end = new Date(start)
