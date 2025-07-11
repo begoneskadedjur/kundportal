@@ -265,4 +265,4 @@ const Economics: React.FC = () => {
   )
 }
 
-export default Economics```
+export default Economics
