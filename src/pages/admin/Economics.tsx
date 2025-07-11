@@ -146,8 +146,8 @@ const Economics: React.FC = () => {
             )}
 
             {selectedTechnicianView === 'both' && (
-              <div className="space-y-8">
-                {/* BeGone fullbredd */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* BeGone tekniker (vänster) */}
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Wrench className="w-5 h-5 text-blue-500" />
@@ -157,7 +157,7 @@ const Economics: React.FC = () => {
                   <BeGoneTechnicianChart />
                 </div>
                 
-                {/* Avtalskunder fullbredd */}
+                {/* Avtalskunder (höger) */}
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Building2 className="w-5 h-5 text-green-500" />
