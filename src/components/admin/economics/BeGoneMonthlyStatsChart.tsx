@@ -66,7 +66,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   
-  const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m'>('6m')
+  const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
   const [activeTab, setActiveTab] = useState<'overview' | 'technicians' | 'skadedjur' | 'status'>('overview')
 
   useEffect(() => {
@@ -217,7 +217,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     const selectedIndex = data.monthlyData.findIndex(item => item.month === selectedMonth)
     if (selectedIndex === -1) return []
     
-    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
+    const monthsToShow = selectedPeriod === '1m' ? 1 : selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
     const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
     const endIndex = selectedIndex + 1
     
@@ -244,7 +244,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       }
     }
     
-    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
+    const monthsToShow = selectedPeriod === '1m' ? 1 : selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
     const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
     const startMonth = data.monthlyData[startIndex]?.month
     const endMonth = selectedMonth
@@ -572,7 +572,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
 
             {/* Period filter */}
             <div className="flex bg-slate-800 rounded-lg p-1">
-              {(['3m', '6m', '12m'] as const).map((period) => (
+              {(['1m', '3m', '6m', '12m'] as const).map((period) => (
                 <Button
                   key={period}
                   variant={selectedPeriod === period ? 'primary' : 'secondary'}
@@ -580,7 +580,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                   onClick={() => setSelectedPeriod(period)}
                   className="text-xs"
                 >
-                  {period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
+                  {period === '1m' ? '1 mån' : period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
                 </Button>
               ))}
             </div>
@@ -590,7 +590,10 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
         {/* KPI för vald månad */}
         <div className="mb-6">
           <h3 className="text-sm text-slate-400 mb-3">
-            {formatSelectedMonth(selectedMonth)} - Engångsjobb översikt
+            {selectedPeriod === '1m' 
+              ? `${formatSelectedMonth(selectedMonth)} - Engångsjobb översikt`
+              : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Engångsjobb översikt`
+            }
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
