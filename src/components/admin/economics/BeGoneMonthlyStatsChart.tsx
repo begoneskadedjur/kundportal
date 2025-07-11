@@ -1,5 +1,5 @@
-// src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - FÖRENKLAD VERSION SOM FUNGERAR
-import React, { useState, useEffect } from 'react'
+// src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - FIXAD VERSION MED INTÄKTER
+import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, PieChart, Pie, Cell } from 'recharts'
 import { Briefcase, TrendingUp, Users, Calendar, DollarSign, ChevronLeft, ChevronRight, Bug, MapPin, AlertTriangle, RefreshCw } from 'lucide-react'
 import Card from '../../ui/Card'
@@ -7,7 +7,7 @@ import Button from '../../ui/Button'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
 
-// 🎯 Förenklad interface structure
+// 🎯 Interface structure
 interface BeGoneStats {
   monthlyData: Array<{
     month: string
@@ -19,6 +19,21 @@ interface BeGoneStats {
     total_revenue: number
     avg_case_value: number
   }>
+  allCasesData: Array<{
+    case_id: string
+    type: 'private' | 'business'
+    pris: number
+    completed_date: string
+    primary_assignee_name: string
+    skadedjur: string
+    status: string
+  }>
+  ongoingCasesData: Array<{
+    status: string
+  }>
+}
+
+interface AnalysisData {
   technicianData: Array<{
     name: string
     cases: number
@@ -28,6 +43,7 @@ interface BeGoneStats {
     type: string
     count: number
     percentage: number
+    revenue: number
   }>
   statusData: Array<{
     status: string
@@ -39,9 +55,8 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   // State
   const [data, setData] = useState<BeGoneStats>({
     monthlyData: [],
-    technicianData: [],
-    skadedjurData: [],
-    statusData: []
+    allCasesData: [],
+    ongoingCasesData: []
   })
   
   const [loading, setLoading] = useState(true)
@@ -58,7 +73,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     fetchBeGoneData()
   }, [])
 
-  // 🔄 Förenklad data fetching
+  // 🔄 Förbättrad data fetching - hämtar RAW data en gång
   const fetchBeGoneData = async () => {
     try {
       setLoading(true)
@@ -71,53 +86,74 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // 1. Avslutade privatpersonsärenden
-      const { data: privateCases, error: privateError } = await supabase
-        .from('private_cases')
-        .select('pris, completed_date, primary_assignee_name, skadedjur, status')
-        .eq('status', 'Avslutat')
-        .gte('completed_date', dateString)
-        .not('completed_date', 'is', null)
+      // 1. Hämta ALL data från båda tabellerna
+      const [privateResult, businessResult, ongoingPrivateResult, ongoingBusinessResult] = await Promise.all([
+        supabase
+          .from('private_cases')
+          .select('id, pris, completed_date, primary_assignee_name, skadedjur, status')
+          .eq('status', 'Avslutat')
+          .gte('completed_date', dateString)
+          .not('completed_date', 'is', null),
+        
+        supabase
+          .from('business_cases')
+          .select('id, pris, completed_date, primary_assignee_name, skadedjur, status')
+          .eq('status', 'Avslutat')
+          .gte('completed_date', dateString)
+          .not('completed_date', 'is', null),
+        
+        supabase
+          .from('private_cases')
+          .select('status')
+          .neq('status', 'Avslutat'),
+        
+        supabase
+          .from('business_cases')
+          .select('status')
+          .neq('status', 'Avslutat')
+      ])
 
-      if (privateError) {
-        console.error('❌ Private cases error:', privateError)
-        throw new Error(`Private cases: ${privateError.message}`)
-      }
+      if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`)
+      if (businessResult.error) throw new Error(`Business cases: ${businessResult.error.message}`)
 
-      // 2. Avslutade företagsärenden
-      const { data: businessCases, error: businessError } = await supabase
-        .from('business_cases')
-        .select('pris, completed_date, primary_assignee_name, skadedjur, status')
-        .eq('status', 'Avslutat')
-        .gte('completed_date', dateString)
-        .not('completed_date', 'is', null)
+      // Kombinera all case data
+      const allCasesData = [
+        ...(privateResult.data || []).map(case_ => ({
+          case_id: case_.id,
+          type: 'private' as const,
+          pris: case_.pris || 0,
+          completed_date: case_.completed_date,
+          primary_assignee_name: case_.primary_assignee_name || 'Ej tilldelad',
+          skadedjur: case_.skadedjur || 'Okänt',
+          status: case_.status
+        })),
+        ...(businessResult.data || []).map(case_ => ({
+          case_id: case_.id,
+          type: 'business' as const,
+          pris: case_.pris || 0,
+          completed_date: case_.completed_date,
+          primary_assignee_name: case_.primary_assignee_name || 'Ej tilldelad',
+          skadedjur: case_.skadedjur || 'Okänt',
+          status: case_.status
+        }))
+      ]
 
-      if (businessError) {
-        console.error('❌ Business cases error:', businessError)
-        throw new Error(`Business cases: ${businessError.message}`)
-      }
+      const ongoingCasesData = [
+        ...(ongoingPrivateResult.data || []),
+        ...(ongoingBusinessResult.data || [])
+      ]
 
-      // 3. Pågående ärenden för status
-      const { data: ongoingPrivate } = await supabase
-        .from('private_cases')
-        .select('status')
-        .neq('status', 'Avslutat')
+      console.log(`📊 Loaded: ${allCasesData.length} completed cases, ${ongoingCasesData.length} ongoing`)
 
-      const { data: ongoingBusiness } = await supabase
-        .from('business_cases')
-        .select('status')
-        .neq('status', 'Avslutat')
-
-      console.log(`📊 Loaded: ${(privateCases || []).length} private, ${(businessCases || []).length} business cases`)
-
-      // Processa data
-      const processedData = processBeGoneData(
-        privateCases || [], 
-        businessCases || [],
-        [...(ongoingPrivate || []), ...(ongoingBusiness || [])]
-      )
+      // Processa månadsdata
+      const monthlyData = processMonthlyData(allCasesData)
       
-      setData(processedData)
+      setData({
+        monthlyData,
+        allCasesData,
+        ongoingCasesData
+      })
+      
       console.log('✅ BeGone data processed successfully')
       
     } catch (err) {
@@ -128,10 +164,8 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     }
   }
 
-  // 📊 Data processing
-  const processBeGoneData = (privateCases: any[], businessCases: any[], ongoingCases: any[]): BeGoneStats => {
-    
-    // 1. MÅNADSDATA
+  // 📊 Process monthly data from raw cases
+  const processMonthlyData = (allCases: BeGoneStats['allCasesData']) => {
     const monthlyStats: { [key: string]: any } = {}
     
     // Skapa 12 månader
@@ -152,24 +186,18 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       }
     }
 
-    // Lägg till privatpersonsdata
-    privateCases.forEach(case_ => {
+    // Lägg till case data
+    allCases.forEach(case_ => {
       if (case_?.completed_date) {
         const monthKey = case_.completed_date.slice(0, 7)
         if (monthlyStats[monthKey]) {
-          monthlyStats[monthKey].private_cases++
-          monthlyStats[monthKey].private_revenue += case_.pris || 0
-        }
-      }
-    })
-
-    // Lägg till företagsdata
-    businessCases.forEach(case_ => {
-      if (case_?.completed_date) {
-        const monthKey = case_.completed_date.slice(0, 7)
-        if (monthlyStats[monthKey]) {
-          monthlyStats[monthKey].business_cases++
-          monthlyStats[monthKey].business_revenue += case_.pris || 0
+          if (case_.type === 'private') {
+            monthlyStats[monthKey].private_cases++
+            monthlyStats[monthKey].private_revenue += case_.pris
+          } else {
+            monthlyStats[monthKey].business_cases++
+            monthlyStats[monthKey].business_revenue += case_.pris
+          }
         }
       }
     })
@@ -181,19 +209,67 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       month.avg_case_value = month.total_cases > 0 ? month.total_revenue / month.total_cases : 0
     })
 
-    const monthlyData = Object.values(monthlyStats).sort((a: any, b: any) => a.month.localeCompare(b.month))
+    return Object.values(monthlyStats).sort((a: any, b: any) => a.month.localeCompare(b.month))
+  }
 
-    // 2. TEKNIKERDATA
-    const technicianStats: { [key: string]: { cases: number; revenue: number } } = {}
-    const allCases = [...privateCases, ...businessCases]
+  // 🎯 Memoized filtering - detta förhindrar infinite loops
+  const getFilteredData = useMemo(() => {
+    const selectedIndex = data.monthlyData.findIndex(item => item.month === selectedMonth)
+    if (selectedIndex === -1) return []
     
-    allCases.forEach(case_ => {
-      const name = case_?.primary_assignee_name || 'Ej tilldelad'
+    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
+    const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
+    const endIndex = selectedIndex + 1
+    
+    return data.monthlyData.slice(startIndex, endIndex)
+  }, [data.monthlyData, selectedMonth, selectedPeriod])
+
+  // 🆕 Memoized analysis data baserat på vald period
+  const getFilteredAnalysisData = useMemo((): AnalysisData => {
+    if (!data.allCasesData.length) {
+      return {
+        technicianData: [],
+        skadedjurData: [],
+        statusData: []
+      }
+    }
+
+    // Bestäm datumspan för filtrering
+    const selectedIndex = data.monthlyData.findIndex(item => item.month === selectedMonth)
+    if (selectedIndex === -1) {
+      return {
+        technicianData: [],
+        skadedjurData: [],
+        statusData: []
+      }
+    }
+    
+    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
+    const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
+    const startMonth = data.monthlyData[startIndex]?.month
+    const endMonth = selectedMonth
+
+    console.log(`🔍 Filtering analysis data: ${startMonth} to ${endMonth}`)
+
+    // Filtrera cases baserat på period
+    const filteredCases = data.allCasesData.filter(case_ => {
+      if (!case_.completed_date) return false
+      const caseMonth = case_.completed_date.slice(0, 7)
+      return caseMonth >= startMonth && caseMonth <= endMonth
+    })
+
+    console.log(`📊 Filtered to ${filteredCases.length} cases for analysis`)
+
+    // 1. TEKNIKERDATA
+    const technicianStats: { [key: string]: { cases: number; revenue: number } } = {}
+    
+    filteredCases.forEach(case_ => {
+      const name = case_.primary_assignee_name || 'Ej tilldelad'
       if (!technicianStats[name]) {
         technicianStats[name] = { cases: 0, revenue: 0 }
       }
       technicianStats[name].cases++
-      technicianStats[name].revenue += case_.pris || 0
+      technicianStats[name].revenue += case_.pris
     })
 
     const technicianData = Object.entries(technicianStats)
@@ -205,28 +281,33 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 8)
 
-    // 3. SKADEDJURDATA
-    const skadedjurStats: { [key: string]: number } = {}
+    // 2. SKADEDJURDATA med intäkter
+    const skadedjurStats: { [key: string]: { count: number; revenue: number } } = {}
     
-    allCases.forEach(case_ => {
-      const skadedjur = case_?.skadedjur || 'Okänt'
-      skadedjurStats[skadedjur] = (skadedjurStats[skadedjur] || 0) + 1
+    filteredCases.forEach(case_ => {
+      const skadedjur = case_.skadedjur || 'Okänt'
+      if (!skadedjurStats[skadedjur]) {
+        skadedjurStats[skadedjur] = { count: 0, revenue: 0 }
+      }
+      skadedjurStats[skadedjur].count++
+      skadedjurStats[skadedjur].revenue += case_.pris
     })
 
-    const totalCases = allCases.length
+    const totalCases = filteredCases.length
     const skadedjurData = Object.entries(skadedjurStats)
-      .map(([type, count]) => ({
+      .map(([type, stats]) => ({
         type,
-        count,
-        percentage: totalCases > 0 ? (count / totalCases) * 100 : 0
+        count: stats.count,
+        revenue: stats.revenue,
+        percentage: totalCases > 0 ? (stats.count / totalCases) * 100 : 0
       }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => b.revenue - a.revenue) // Sortera efter intäkt
       .slice(0, 8)
 
-    // 4. STATUSDATA
+    // 3. STATUSDATA (använder ongoing data)
     const statusStats: { [key: string]: number } = {}
     
-    ongoingCases.forEach(case_ => {
+    data.ongoingCasesData.forEach(case_ => {
       const status = case_?.status || 'Okänd'
       statusStats[status] = (statusStats[status] || 0) + 1
     })
@@ -236,12 +317,11 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
       .sort((a, b) => b.count - a.count)
 
     return {
-      monthlyData,
       technicianData,
       skadedjurData,
       statusData
     }
-  }
+  }, [data.allCasesData, data.ongoingCasesData, data.monthlyData, selectedMonth, selectedPeriod])
 
   // Navigation functions
   const goToPreviousMonth = () => {
@@ -345,23 +425,10 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     )
   }
 
-  // Data processing
-  const getFilteredData = () => {
-    const selectedIndex = data.monthlyData.findIndex(item => item.month === selectedMonth)
-    if (selectedIndex === -1) return []
-    
-    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
-    const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
-    const endIndex = selectedIndex + 1
-    
-    return data.monthlyData.slice(startIndex, endIndex)
-  }
-
-  const filteredData = getFilteredData()
   const selectedMonthData = data.monthlyData.find(item => item.month === selectedMonth)
 
   // Chart data
-  const chartData = filteredData.map(item => ({
+  const chartData = getFilteredData.map(item => ({
     month: new Date(item.month + '-01').toLocaleDateString('sv-SE', { 
       month: 'short', 
       year: '2-digit' 
@@ -403,6 +470,31 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               }
             </p>
           ))}
+        </div>
+      )
+    }
+    return null
+  }
+
+  // 🆕 Custom tooltip för tekniker/skadedjur med intäkter
+  const RevenueTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length > 0) {
+      const data = payload[0]?.payload
+      
+      return (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
+          <p className="font-semibold mb-2 text-white">{label}</p>
+          <p className="text-sm text-green-400">
+            Intäkt: {formatCurrency(data.revenue || 0)}
+          </p>
+          <p className="text-sm text-slate-300">
+            Ärenden: {data.cases || data.count || 0}
+          </p>
+          {data.percentage && (
+            <p className="text-sm text-slate-400">
+              Andel: {data.percentage.toFixed(1)}%
+            </p>
+          )}
         </div>
       )
     }
@@ -547,9 +639,9 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             <div className="space-y-3">
               <h4 className="text-white font-medium flex items-center gap-2">
                 <Users className="w-4 h-4 text-blue-500" />
-                Top Tekniker (Engångsjobb)
+                Top Tekniker ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
               </h4>
-              {data.technicianData.slice(0, 6).map((tech, index) => (
+              {getFilteredAnalysisData.technicianData.slice(0, 6).map((tech, index) => (
                 <div key={tech.name} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm`} 
@@ -564,14 +656,20 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {getFilteredAnalysisData.technicianData.length === 0 && (
+                <div className="text-center text-slate-400 py-8">
+                  <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Inga tekniker för denna period</p>
+                </div>
+              )}
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.technicianData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <BarChart data={getFilteredAnalysisData.technicianData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} angle={-45} textAnchor="end" height={60} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
-                  <Tooltip formatter={(value, name) => [formatCurrency(Number(value)), 'Intäkt']} />
+                  <Tooltip content={<RevenueTooltip />} />
                   <Bar dataKey="revenue" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
@@ -585,40 +683,48 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data.skadedjurData.slice(0, 6)}
+                    data={getFilteredAnalysisData.skadedjurData.slice(0, 6)}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={({ type, percentage }) => `${type}: ${percentage.toFixed(1)}%`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="count"
+                    dataKey="revenue"
                   >
-                    {data.skadedjurData.slice(0, 6).map((entry, index) => (
+                    {getFilteredAnalysisData.skadedjurData.slice(0, 6).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [value, 'Antal ärenden']} />
+                  <Tooltip content={<RevenueTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="space-y-3">
               <h4 className="text-white font-medium flex items-center gap-2">
                 <Bug className="w-4 h-4 text-red-500" />
-                Top Skadedjurstyper
+                Top Skadedjurstyper ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
               </h4>
-              {data.skadedjurData.slice(0, 8).map((item, index) => (
-                <div key={item.type} className="flex justify-between items-center p-2 border border-slate-700 rounded">
+              {getFilteredAnalysisData.skadedjurData.slice(0, 8).map((item, index) => (
+                <div key={item.type} className="flex justify-between items-center p-3 bg-slate-800 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
                     <span className="text-slate-300">{item.type}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white">{item.count}</span>
-                    <span className="text-slate-400 text-sm">{item.percentage.toFixed(1)}%</span>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-green-400 font-semibold text-sm">{formatCurrency(item.revenue)}</p>
+                      <p className="text-slate-400 text-xs">{item.count} ärenden ({item.percentage.toFixed(1)}%)</p>
+                    </div>
                   </div>
                 </div>
               ))}
+              {getFilteredAnalysisData.skadedjurData.length === 0 && (
+                <div className="text-center text-slate-400 py-8">
+                  <Bug className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Inga skadedjur för denna period</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -627,10 +733,10 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
           <div className="space-y-3">
             <h4 className="text-white font-medium flex items-center gap-2">
               <Calendar className="w-4 h-4 text-yellow-500" />
-              Pågående Ärenden Status
+              Pågående Ärenden Status (Alla)
             </h4>
-            {data.statusData.length > 0 ? (
-              data.statusData.map((status, index) => (
+            {getFilteredAnalysisData.statusData.length > 0 ? (
+              getFilteredAnalysisData.statusData.map((status, index) => (
                 <div key={status.status} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                   <span className="text-slate-300">{status.status}</span>
                   <div className="flex items-center gap-3">
@@ -639,7 +745,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                       <div 
                         className="h-full rounded-full"
                         style={{ 
-                          width: `${(status.count / Math.max(...data.statusData.map(s => s.count))) * 100}%`,
+                          width: `${(status.count / Math.max(...getFilteredAnalysisData.statusData.map(s => s.count))) * 100}%`,
                           backgroundColor: COLORS[index % COLORS.length]
                         }}
                       />

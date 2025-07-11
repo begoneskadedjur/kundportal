@@ -62,18 +62,18 @@ const KpiCards: React.FC = () => {
       trend: '+3 nya'
     },
     {
-      title: 'Merförsäljning Avtal (YTD)', // ✅ Uppdaterad label
+      title: 'Merförsäljning Avtal (YTD)', // 🆕 Uppdaterat namn
       value: formatCurrency(kpiData.total_case_revenue_ytd),
-      description: 'Intäkter från merförsäljning i år', // ✅ Uppdaterad beskrivning
+      description: 'Extra intäkter från avtalskunder', // 🆕 Uppdaterad beskrivning
       icon: BarChart3,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-500/20',
       trend: '+12.1%'
     },
     {
-      title: 'Intäkter Engångsjobb (YTD)', // ✅ Uppdaterad label
+      title: 'Intäkter Engångsjobb (YTD)', // 🆕 Uppdaterat namn
       value: formatCurrency(kpiData.total_begone_revenue_ytd),
-      description: 'Intäkter från engångsjobb', // ✅ Uppdaterad beskrivning
+      description: 'Intäkter från engångskunder', // 🆕 Uppdaterad beskrivning
       icon: Briefcase,
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/20',
