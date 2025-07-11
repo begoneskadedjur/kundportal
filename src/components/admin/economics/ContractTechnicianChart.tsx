@@ -1,4 +1,4 @@
-// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - FIXAD VERSION
+// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - KOMPLETT FIXAD VERSION
 import React, { useState, useEffect, useMemo } from 'react'
 import { Building2, Award, Target, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import Card from '../../ui/Card'
@@ -16,7 +16,7 @@ interface ContractTechnicianData {
   new_customer_value: number
   upsell_revenue: number
   avg_case_value: number
-  avg_new_customer_value: number
+  avg_contract_value: number  // Nytt: genomsnittligt avtalsvärde
   rank: number
 }
 
@@ -27,13 +27,15 @@ interface ContractCasesData {
     price: number
     completed_date: string
     case_type: string
-    customer_id: number
+    customer_id: string
   }>
   customers: Array<{
-    id: number
+    id: string
     annual_premium: number
     total_contract_value: number
     created_at: string
+    assigned_account_manager: string
+    company_name: string
   }>
 }
 
@@ -72,7 +74,7 @@ const ContractTechnicianChart: React.FC = () => {
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // 1. Avtalskunder ärenden (merförsäljning)
+      // 1. Avtalskunder ärenden (merförsäljning från cases-tabellen)
       const { data: cases, error: casesError } = await supabase
         .from('cases')
         .select('assigned_technician_name, assigned_technician_email, price, completed_date, case_type, customer_id')
@@ -85,10 +87,10 @@ const ContractTechnicianChart: React.FC = () => {
         throw new Error(`Contract cases: ${casesError.message}`)
       }
 
-      // 2. Nya avtalskunder (för att beräkna nya kunder per tekniker)
+      // 2. Nya avtalskunder (från customers-tabellen)
       const { data: customers, error: customersError } = await supabase
         .from('customers')
-        .select('id, annual_premium, total_contract_value, created_at')
+        .select('id, annual_premium, total_contract_value, created_at, assigned_account_manager, company_name')
         .gte('created_at', dateString)
         .eq('is_active', true)
 
@@ -116,9 +118,9 @@ const ContractTechnicianChart: React.FC = () => {
 
   // 🎯 Memoized processing av avtalskund tekniker-data baserat på vald period  
   const technicianData = useMemo((): ContractTechnicianData[] => {
-    // 🆕 ALLTID returnera data även om det är 0 - skapa placeholder tekniker om ingen data finns
-    if (!allData.cases.length) {
-      console.log('⚠️ No contract cases found, creating placeholder data')
+    // Skapa placeholder om ingen data finns
+    if (!allData.cases.length && !allData.customers.length) {
+      console.log('⚠️ No contract data found, creating placeholder data')
       return [
         {
           name: 'Ingen data tillgänglig',
@@ -130,34 +132,36 @@ const ContractTechnicianChart: React.FC = () => {
           new_customer_value: 0,
           upsell_revenue: 0,
           avg_case_value: 0,
-          avg_new_customer_value: 0,
+          avg_contract_value: 0,
           rank: 1
         }
       ]
     }
 
-    // Bestäm datumspan för filtrering - FIX: Använd Array.from(new Set()) för unika datum
+    // Bestäm datumspan för filtrering
     const allCaseDates = allData.cases
       .map(c => c.completed_date)
       .filter(Boolean)
       .map(date => date.slice(0, 7))
     
-    const uniqueDates = Array.from(new Set(allCaseDates)).sort()
+    const allCustomerDates = allData.customers
+      .map(c => c.created_at)
+      .filter(Boolean)
+      .map(date => date.slice(0, 7))
+
+    const allDates = [...allCaseDates, ...allCustomerDates]
+    const uniqueDates = Array.from(new Set(allDates)).sort()
+    
     console.log(`🔍 Available contract months:`, uniqueDates)
     console.log(`🎯 Selected month: ${selectedMonth}, Period: ${selectedPeriod}`)
     
     let selectedIndex = uniqueDates.findIndex(month => month === selectedMonth)
     
-    // 🆕 FIX: Om vald månad inte finns, använd den senaste tillgängliga månaden
+    // Om vald månad inte finns, använd den senaste tillgängliga månaden
     if (selectedIndex === -1) {
       console.log(`⚠️ Selected month ${selectedMonth} not found, using latest available month`)
       selectedIndex = uniqueDates.length - 1
-      if (selectedIndex >= 0) {
-        // Uppdatera selectedMonth till senaste tillgängliga (utan att trigga re-render loop)
-        const latestMonth = uniqueDates[selectedIndex]
-        console.log(`📅 Using latest month: ${latestMonth}`)
-      } else {
-        // Ingen data alls - returnera placeholder
+      if (selectedIndex < 0) {
         return [
           {
             name: 'Ingen avtalskund data',
@@ -169,7 +173,7 @@ const ContractTechnicianChart: React.FC = () => {
             new_customer_value: 0,
             upsell_revenue: 0,
             avg_case_value: 0,
-            avg_new_customer_value: 0,
+            avg_contract_value: 0,
             rank: 1
           }
         ]
@@ -178,7 +182,7 @@ const ContractTechnicianChart: React.FC = () => {
     
     const monthsToShow = selectedPeriod === '1m' ? 1 : selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
     const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
-    const endMonth = uniqueDates[selectedIndex] // Använd faktisk månad från data
+    const endMonth = uniqueDates[selectedIndex]
     const startMonth = uniqueDates[startIndex]
 
     console.log(`🔍 Filtering contract technician data: ${startMonth} to ${endMonth} (${monthsToShow} months)`)
@@ -199,7 +203,7 @@ const ContractTechnicianChart: React.FC = () => {
 
     console.log(`📊 Filtered contract data: ${filteredCases.length} cases, ${filteredCustomers.length} new customers`)
 
-    // 🆕 Om ingen filtrerad data, returnera placeholder istället för tom array
+    // Om ingen filtrerad data, returnera placeholder
     if (filteredCases.length === 0 && filteredCustomers.length === 0) {
       return [
         {
@@ -212,7 +216,7 @@ const ContractTechnicianChart: React.FC = () => {
           new_customer_value: 0,
           upsell_revenue: 0,
           avg_case_value: 0,
-          avg_new_customer_value: 0,
+          avg_contract_value: 0,
           rank: 1
         }
       ]
@@ -221,15 +225,7 @@ const ContractTechnicianChart: React.FC = () => {
     // Samla avtalskund tekniker-statistik
     const technicianStats: { [key: string]: any } = {}
 
-    // Beräkna nya kunder per tekniker (enkel fördelning baserat på cases)
-    const customerTechnicianMap: { [customerId: number]: string } = {}
-    filteredCases.forEach(case_ => {
-      if (!customerTechnicianMap[case_.customer_id]) {
-        customerTechnicianMap[case_.customer_id] = case_.assigned_technician_name
-      }
-    })
-
-    // Merförsäljning ärenden
+    // Merförsäljning ärenden från cases-tabellen
     filteredCases.forEach(case_ => {
       const name = case_.assigned_technician_name || 'Ej tilldelad'
       const email = case_.assigned_technician_email || ''
@@ -243,7 +239,8 @@ const ContractTechnicianChart: React.FC = () => {
           upsell_cases: 0,
           total_revenue: 0,
           new_customer_value: 0,
-          upsell_revenue: 0
+          upsell_revenue: 0,
+          customer_contracts: [] // Lista över kontrakt för genomsnitt
         }
       }
       
@@ -253,14 +250,42 @@ const ContractTechnicianChart: React.FC = () => {
       technicianStats[name].upsell_revenue += case_.price || 0
     })
 
-    // Nya avtalskunder värde
+    // Nya avtalskunder från customers-tabellen
+    // Koppla nya kunder till tekniker baserat på account_manager
     filteredCustomers.forEach(customer => {
-      const assignedTechnician = customerTechnicianMap[customer.id]
-      if (assignedTechnician && technicianStats[assignedTechnician]) {
-        technicianStats[assignedTechnician].new_customers++
-        technicianStats[assignedTechnician].new_customer_value += customer.total_contract_value || 0
-        technicianStats[assignedTechnician].total_revenue += customer.annual_premium || 0
+      // Mappa account manager email till tekniker namn
+      const accountManagerEmail = customer.assigned_account_manager
+      let technicianName = 'Ej tilldelad'
+      
+      // Enkel mappning från account manager till tekniker
+      if (accountManagerEmail?.includes('christian.karlsson')) {
+        technicianName = 'Christian Karlsson'
+      } else if (accountManagerEmail?.includes('kristian.agnevik')) {
+        technicianName = 'Kristian Agnevik'
+      } else if (accountManagerEmail?.includes('sofia.palshagen')) {
+        technicianName = 'Sofia Pålshagen'
+      } else if (accountManagerEmail?.includes('hans.norman')) {
+        technicianName = 'Hans Norman'
       }
+
+      if (!technicianStats[technicianName]) {
+        technicianStats[technicianName] = {
+          name: technicianName,
+          email: accountManagerEmail || '',
+          total_cases: 0,
+          new_customers: 0,
+          upsell_cases: 0,
+          total_revenue: 0,
+          new_customer_value: 0,
+          upsell_revenue: 0,
+          customer_contracts: []
+        }
+      }
+
+      technicianStats[technicianName].new_customers++
+      technicianStats[technicianName].new_customer_value += customer.total_contract_value || 0
+      technicianStats[technicianName].total_revenue += customer.annual_premium || 0
+      technicianStats[technicianName].customer_contracts.push(customer.total_contract_value || 0)
     })
 
     // Konvertera till array och beräkna genomsnitt + ranking
@@ -268,7 +293,9 @@ const ContractTechnicianChart: React.FC = () => {
       .map((tech: any) => ({
         ...tech,
         avg_case_value: tech.total_cases > 0 ? tech.total_revenue / tech.total_cases : 0,
-        avg_new_customer_value: tech.new_customers > 0 ? tech.new_customer_value / tech.new_customers : 0
+        avg_contract_value: tech.customer_contracts.length > 0 
+          ? tech.customer_contracts.reduce((sum: number, val: number) => sum + val, 0) / tech.customer_contracts.length 
+          : 0
       }))
       .sort((a, b) => b.total_revenue - a.total_revenue)
       .map((tech, index) => ({
@@ -302,12 +329,12 @@ const ContractTechnicianChart: React.FC = () => {
   }
 
   const canGoPrevious = () => {
-    if (!allData.cases.length) return false
+    if (!allData.cases.length && !allData.customers.length) return false
     
-    const allDates = allData.cases
-      .map(c => c.completed_date)
-      .filter(Boolean)
-      .map(date => date.slice(0, 7))
+    const allDates = [
+      ...allData.cases.map(c => c.completed_date),
+      ...allData.customers.map(c => c.created_at)
+    ].filter(Boolean).map(date => date.slice(0, 7))
     
     const uniqueDates = Array.from(new Set(allDates)).sort()
     const earliestMonth = uniqueDates[0]
@@ -315,12 +342,12 @@ const ContractTechnicianChart: React.FC = () => {
   }
 
   const canGoNext = () => {
-    if (!allData.cases.length) return false
+    if (!allData.cases.length && !allData.customers.length) return false
     
-    const allDates = allData.cases
-      .map(c => c.completed_date)
-      .filter(Boolean)
-      .map(date => date.slice(0, 7))
+    const allDates = [
+      ...allData.cases.map(c => c.completed_date),
+      ...allData.customers.map(c => c.created_at)
+    ].filter(Boolean).map(date => date.slice(0, 7))
     
     const uniqueDates = Array.from(new Set(allDates)).sort()
     const latestMonth = uniqueDates[uniqueDates.length - 1]
@@ -397,7 +424,7 @@ const ContractTechnicianChart: React.FC = () => {
     )
   }
 
-  // 🆕 ALDRIG empty state - visar alltid komponenten med data (även 0-värden)
+  // Sammanfattning för period
   const totalRevenue = technicianData.reduce((sum, tech) => sum + tech.total_revenue, 0)
   const totalCases = technicianData.reduce((sum, tech) => sum + tech.total_cases, 0)
   const totalNewCustomers = technicianData.reduce((sum, tech) => sum + tech.new_customers, 0)
@@ -406,16 +433,16 @@ const ContractTechnicianChart: React.FC = () => {
 
   return (
     <Card>
-      {/* Header med navigation */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header med navigation - FIXAD: Bättre responsiv layout */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div className="flex items-center">
           <Building2 className="w-5 h-5 text-green-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
           <span className="ml-2 text-sm text-slate-400">(Nya avtal + Merförsäljning)</span>
         </div>
         
-        {/* Navigation */}
-        <div className="flex items-center gap-4">
+        {/* Navigation - FIXAD: Bättre layout och mindre knappar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Månadväljare */}
           <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
             <Button
@@ -428,7 +455,7 @@ const ContractTechnicianChart: React.FC = () => {
               <ChevronLeft className="w-4 h-4" />
             </Button>
             
-            <div className="px-3 py-1 text-white font-medium min-w-[140px] text-center">
+            <div className="px-3 py-1 text-white font-medium min-w-[120px] text-center text-sm">
               {formatSelectedMonth(selectedMonth)}
             </div>
             
@@ -448,13 +475,13 @@ const ContractTechnicianChart: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={goToCurrentMonth}
-              className="text-xs"
+              className="text-xs px-3 py-1"
             >
               Nuvarande
             </Button>
           )}
 
-          {/* Period filter */}
+          {/* Period filter - FIXAD: Kompakta knappar */}
           <div className="flex bg-slate-800 rounded-lg p-1">
             {(['1m', '3m', '6m', '12m'] as const).map((period) => (
               <Button
@@ -462,16 +489,16 @@ const ContractTechnicianChart: React.FC = () => {
                 variant={selectedPeriod === period ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setSelectedPeriod(period)}
-                className="text-xs"
+                className="text-xs px-2 py-1"
               >
-                {period === '1m' ? '1 mån' : period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
+                {period === '1m' ? '1' : period === '3m' ? '3' : period === '6m' ? '6' : '12'}
               </Button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Period översikt */}
+      {/* Period översikt - FIXAD: Responsiv grid */}
       <div className="mb-6">
         <h3 className="text-sm text-slate-400 mb-3">
           {selectedPeriod === '1m' 
@@ -479,7 +506,7 @@ const ContractTechnicianChart: React.FC = () => {
             : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Avtalskund tekniker översikt`
           }
         </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
             <p className="text-green-400 font-bold text-lg">{formatCurrency(totalRevenue)}</p>
             <p className="text-green-300 text-sm">Total intäkt</p>
@@ -503,14 +530,14 @@ const ContractTechnicianChart: React.FC = () => {
         </div>
       </div>
 
-      {/* 🏆 Top 3 podium - 🆕 Visar även med 0-värden */}
+      {/* 🏆 Top 3 podium - Visar även med 0-värden */}
       {technicianData.length >= 3 && technicianData[0].total_revenue > 0 && (
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Award className="w-5 h-5 text-yellow-500" />
             Topp 3 Avtalskund Tekniker
           </h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {technicianData.slice(0, 3).map((tech, index) => (
               <div key={tech.name} className={`relative bg-gradient-to-br ${getMedalColor(tech.rank)} p-4 rounded-lg border-2`}>
                 <div className="text-center">
@@ -520,7 +547,7 @@ const ContractTechnicianChart: React.FC = () => {
                   <div className="space-y-1 text-white/80 text-sm">
                     <p>{tech.new_customers} nya avtal • {tech.upsell_cases} merförsäljning</p>
                     <p>Avtalsvärde: {formatCurrency(tech.new_customer_value)}</p>
-                    <p>⌀ {formatCurrency(tech.avg_case_value)}/ärende</p>
+                    <p>{formatCurrency(tech.avg_contract_value)}/avtal</p>
                   </div>
                 </div>
               </div>
@@ -529,20 +556,18 @@ const ContractTechnicianChart: React.FC = () => {
         </div>
       )}
 
-      {/* 🆕 Meddelande när ingen data finns */}
+      {/* Meddelande när ingen data finns */}
       {technicianData.length > 0 && technicianData[0].total_revenue === 0 && (
         <div className="mb-8">
           <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
             <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
             <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
             <p className="text-slate-400 text-sm mb-4">
-              Månad: {selectedMonth}, Period: {selectedPeriod}, Cases: {allData.cases.length}
+              Månad: {selectedMonth}, Period: {selectedPeriod}
             </p>
-            {allData.cases.length > 0 && (
-              <p className="text-xs text-slate-500">
-                Tillgängliga månader: {Array.from(new Set(allData.cases.map(c => c.completed_date?.slice(0, 7)).filter(Boolean))).sort().join(', ')}
-              </p>
-            )}
+            <p className="text-xs text-slate-500">
+              Cases: {allData.cases.length}, Customers: {allData.customers.length}
+            </p>
           </div>
         </div>
       )}
@@ -559,7 +584,7 @@ const ContractTechnicianChart: React.FC = () => {
           {technicianData.map((tech) => (
             <div 
               key={tech.name} 
-              className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+              className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border transition-all gap-3 ${
                 tech.rank <= 3 
                   ? `bg-gradient-to-r ${getMedalColor(tech.rank)} bg-opacity-20 border-opacity-40` 
                   : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
@@ -579,12 +604,12 @@ const ContractTechnicianChart: React.FC = () => {
                 </div>
               </div>
               
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-green-400 font-bold text-lg">{formatCurrency(tech.total_revenue)}</p>
                 <div className="text-slate-400 text-sm space-y-1">
                   <p>Avtalsvärde: {formatCurrency(tech.new_customer_value)}</p>
                   <p>Merförsäljning: {formatCurrency(tech.upsell_revenue)}</p>
-                  <p>⌀ {formatCurrency(tech.avg_case_value)}/ärende</p>
+                  <p>{formatCurrency(tech.avg_contract_value)}/avtal</p>
                 </div>
               </div>
             </div>
