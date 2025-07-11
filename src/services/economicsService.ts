@@ -1,4 +1,4 @@
-// 📁 src/services/economicsService.ts
+// 📁 src/services/economicsService.ts - UPPDATERAD med BeGone ärendeintäkter
 import { supabase } from '../lib/supabase'
 
 // Types för ekonomisk data
@@ -6,6 +6,7 @@ export interface MonthlyRevenue {
   month: string
   contract_revenue: number
   case_revenue: number
+  begone_revenue: number  // 🆕 Ny: BeGone ärendeintäkter
   total_revenue: number
 }
 
@@ -50,12 +51,28 @@ export interface CaseEconomy {
   total_revenue_this_month: number
   ongoing_cases_count: number
   ongoing_potential_revenue: number
+  // 🆕 BeGone ärendestatistik
+  begone_cases_this_month: number
+  begone_revenue_this_month: number
+  begone_avg_case_price: number
   case_types: Array<{
     case_type: string
     count: number
     avg_price: number
     total_revenue: number
   }>
+}
+
+// 🆕 Ny: BeGone ärendestatistik per månad
+export interface BeGoneMonthlyStats {
+  month: string
+  private_cases_count: number
+  business_cases_count: number
+  private_revenue: number
+  business_revenue: number
+  total_begone_revenue: number
+  total_begone_cases: number
+  avg_case_value: number
 }
 
 export interface CustomerContract {
@@ -78,11 +95,12 @@ export interface KpiData {
   monthly_recurring_revenue: number
   active_customers: number
   total_case_revenue_ytd: number
+  total_begone_revenue_ytd: number  // 🆕 Ny: BeGone intäkter året
   avg_customer_value: number
   churn_risk_customers: number
 }
 
-// 1. KPI Data - Huvudstatistik
+// 1. KPI Data - Huvudstatistik med BeGone ärendeintäkter
 export const getKpiData = async (): Promise<KpiData> => {
   try {
     // ARR från aktiva kunder
@@ -97,7 +115,7 @@ export const getKpiData = async (): Promise<KpiData> => {
     const active_customers = arrData?.length || 0
     const avg_customer_value = active_customers > 0 ? total_arr / active_customers : 0
 
-    // Ärendeintäkter i år
+    // Avtalskunder ärendeintäkter i år
     const currentYear = new Date().getFullYear()
     const { data: caseData } = await supabase
       .from('cases')
@@ -107,6 +125,27 @@ export const getKpiData = async (): Promise<KpiData> => {
       .not('completed_date', 'is', null)
 
     const total_case_revenue_ytd = caseData?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+
+    // 🆕 BeGone ärendeintäkter i år (både privat och företag)
+    const { data: privateData } = await supabase
+      .from('private_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', `${currentYear}-01-01`)
+      .lte('completed_date', `${currentYear}-12-31`)
+      .not('completed_date', 'is', null)
+
+    const { data: businessData } = await supabase
+      .from('business_cases')
+      .select('pris')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', `${currentYear}-01-01`)
+      .lte('completed_date', `${currentYear}-12-31`)
+      .not('completed_date', 'is', null)
+
+    const private_revenue = privateData?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+    const business_revenue = businessData?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+    const total_begone_revenue_ytd = private_revenue + business_revenue
 
     // Churn risk (avtal som löper ut inom 90 dagar)
     const { data: churnData } = await supabase
@@ -123,6 +162,7 @@ export const getKpiData = async (): Promise<KpiData> => {
       monthly_recurring_revenue,
       active_customers,
       total_case_revenue_ytd,
+      total_begone_revenue_ytd,  // 🆕 Ny
       avg_customer_value,
       churn_risk_customers
     }
@@ -132,7 +172,7 @@ export const getKpiData = async (): Promise<KpiData> => {
   }
 }
 
-// 2. Månadsvis intäktsflöde
+// 2. Månadsvis intäktsflöde med BeGone ärendeintäkter
 export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
   try {
     // Hämta alla kunder för kontraktsintäkter
@@ -141,14 +181,31 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
       .select('annual_premium, contract_start_date, contract_end_date, is_active')
       .eq('is_active', true)
 
-    // Hämta ärendeintäkter per månad (senaste 12 månaderna)
+    // Senaste 12 månader
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
+    // Avtalskunder ärendeintäkter
     const { data: cases } = await supabase
       .from('cases')
       .select('price, completed_date')
       .gte('completed_date', twelveMonthsAgo.toISOString())
+      .not('completed_date', 'is', null)
+
+    // 🆕 BeGone privatpersoner ärendeintäkter
+    const { data: privateCases } = await supabase
+      .from('private_cases')
+      .select('pris, completed_date')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', twelveMonthsAgo.toISOString().split('T')[0])
+      .not('completed_date', 'is', null)
+
+    // 🆕 BeGone företag ärendeintäkter
+    const { data: businessCases } = await supabase
+      .from('business_cases')
+      .select('pris, completed_date')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', twelveMonthsAgo.toISOString().split('T')[0])
       .not('completed_date', 'is', null)
 
     // Beräkna intäkter per månad
@@ -164,6 +221,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
         month: monthKey,
         contract_revenue: 0,
         case_revenue: 0,
+        begone_revenue: 0,  // 🆕 Ny
         total_revenue: 0
       }
     }
@@ -176,7 +234,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
       })
     })
 
-    // Lägg till ärendeintäkter
+    // Lägg till avtalskunder ärendeintäkter
     cases?.forEach(case_ => {
       if (case_.completed_date) {
         const monthKey = case_.completed_date.slice(0, 7)
@@ -186,9 +244,29 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
       }
     })
 
+    // 🆕 Lägg till BeGone privatpersoner ärendeintäkter
+    privateCases?.forEach(case_ => {
+      if (case_.completed_date) {
+        const monthKey = case_.completed_date.slice(0, 7)
+        if (monthlyData[monthKey]) {
+          monthlyData[monthKey].begone_revenue += case_.pris || 0
+        }
+      }
+    })
+
+    // 🆕 Lägg till BeGone företag ärendeintäkter
+    businessCases?.forEach(case_ => {
+      if (case_.completed_date) {
+        const monthKey = case_.completed_date.slice(0, 7)
+        if (monthlyData[monthKey]) {
+          monthlyData[monthKey].begone_revenue += case_.pris || 0
+        }
+      }
+    })
+
     // Beräkna totaler
     Object.values(monthlyData).forEach(month => {
-      month.total_revenue = month.contract_revenue + month.case_revenue
+      month.total_revenue = month.contract_revenue + month.case_revenue + month.begone_revenue
     })
 
     return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month))
@@ -198,278 +276,146 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
   }
 }
 
-// 3. Utgående avtal
-export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
+// 🆕 3. BeGone ärendestatistik per månad
+export const getBeGoneMonthlyStats = async (): Promise<BeGoneMonthlyStats[]> => {
   try {
-    const { data } = await supabase
-      .from('customers')
-      .select(`
-        id,
-        company_name,
-        contract_end_date,
-        annual_premium,
-        assigned_account_manager
-      `)
-      .eq('is_active', true)
-      .gte('contract_end_date', new Date().toISOString())
-      .order('contract_end_date')
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-    return data?.map(customer => {
-      const endDate = new Date(customer.contract_end_date)
-      const now = new Date()
-      const diffTime = endDate.getTime() - now.getTime()
-      const months_remaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30))
+    // Hämta avslutade privatpersonsärenden
+    const { data: privateCases } = await supabase
+      .from('private_cases')
+      .select('pris, completed_date')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', dateString)
+      .not('completed_date', 'is', null)
+
+    // Hämta avslutade företagsärenden
+    const { data: businessCases } = await supabase
+      .from('business_cases')
+      .select('pris, completed_date')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', dateString)
+      .not('completed_date', 'is', null)
+
+    // Gruppera per månad
+    const monthlyStats: { [key: string]: BeGoneMonthlyStats } = {}
+    
+    // Skapa tomma månader för senaste 12 månaderna
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      const monthKey = date.toISOString().slice(0, 7)
       
-      let risk_level: 'high' | 'medium' | 'low' = 'low'
-      if (months_remaining <= 3) risk_level = 'high'
-      else if (months_remaining <= 6) risk_level = 'medium'
-
-      return {
-        customer_id: customer.id,
-        company_name: customer.company_name,
-        contract_end_date: customer.contract_end_date,
-        annual_premium: customer.annual_premium || 0,
-        assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad',
-        months_remaining,
-        risk_level
+      monthlyStats[monthKey] = {
+        month: monthKey,
+        private_cases_count: 0,
+        business_cases_count: 0,
+        private_revenue: 0,
+        business_revenue: 0,
+        total_begone_revenue: 0,
+        total_begone_cases: 0,
+        avg_case_value: 0
       }
-    }) || []
-  } catch (error) {
-    console.error('Error fetching expiring contracts:', error)
-    throw error
-  }
-}
+    }
 
-// 4. Tekniker-intäkter
-export const getTechnicianRevenue = async (): Promise<TechnicianRevenue[]> => {
-  try {
-    const { data } = await supabase
-      .from('cases')
-      .select('assigned_technician_name, assigned_technician_email, price, status, completed_date')
-      .not('assigned_technician_name', 'is', null)
-
-    const technicianStats: { [key: string]: any } = {}
-
-    data?.forEach(case_ => {
-      const name = case_.assigned_technician_name
-      if (!name) return
-
-      if (!technicianStats[name]) {
-        technicianStats[name] = {
-          technician_name: name,
-          technician_email: case_.assigned_technician_email || '',
-          cases_total: 0,
-          cases_completed: 0,
-          total_revenue: 0,
-          avg_case_value: 0,
-          completion_rate: 0
-        }
-      }
-
-      technicianStats[name].cases_total++
-      
+    // Lägg till privatpersonsdata
+    privateCases?.forEach(case_ => {
       if (case_.completed_date) {
-        technicianStats[name].cases_completed++
-        technicianStats[name].total_revenue += case_.price || 0
-      }
-    })
-
-    return Object.values(technicianStats).map((tech: any) => ({
-      ...tech,
-      avg_case_value: tech.cases_completed > 0 ? tech.total_revenue / tech.cases_completed : 0,
-      completion_rate: tech.cases_total > 0 ? (tech.cases_completed / tech.cases_total) * 100 : 0
-    })).sort((a, b) => b.total_revenue - a.total_revenue)
-  } catch (error) {
-    console.error('Error fetching technician revenue:', error)
-    throw error
-  }
-}
-
-// 5. Account Manager-intäkter
-export const getAccountManagerRevenue = async (): Promise<AccountManagerRevenue[]> => {
-  try {
-    const { data } = await supabase
-      .from('customers')
-      .select('assigned_account_manager, annual_premium, total_contract_value')
-      .eq('is_active', true)
-      .not('assigned_account_manager', 'is', null)
-
-    const managerStats: { [key: string]: any } = {}
-
-    data?.forEach(customer => {
-      const manager = customer.assigned_account_manager
-      if (!manager) return
-
-      if (!managerStats[manager]) {
-        managerStats[manager] = {
-          account_manager: manager,
-          customers_count: 0,
-          total_contract_value: 0,
-          annual_revenue: 0,
-          avg_contract_value: 0
+        const monthKey = case_.completed_date.slice(0, 7)
+        if (monthlyStats[monthKey]) {
+          monthlyStats[monthKey].private_cases_count++
+          monthlyStats[monthKey].private_revenue += case_.pris || 0
         }
       }
-
-      managerStats[manager].customers_count++
-      managerStats[manager].total_contract_value += customer.total_contract_value || 0
-      managerStats[manager].annual_revenue += customer.annual_premium || 0
     })
 
-    return Object.values(managerStats).map((manager: any) => ({
-      ...manager,
-      avg_contract_value: manager.customers_count > 0 ? manager.total_contract_value / manager.customers_count : 0
-    })).sort((a, b) => b.annual_revenue - a.annual_revenue)
-  } catch (error) {
-    console.error('Error fetching account manager revenue:', error)
-    throw error
-  }
-}
-
-// 6. Marknadsföringskostnader och CAC - FIXAD VERSION
-export const getMonthlyMarketingSpend = async (): Promise<MarketingSpend[]> => {
-  try {
-    console.log('🔍 getMonthlyMarketingSpend: Starting...')
-    
-    // Hämta marknadsföringskostnader
-    const { data: spendData } = await supabase
-      .from('monthly_marketing_spend')
-      .select('month, spend')
-      .order('month')
-
-    // Hämta alla kunder för att beräkna nya kunder per månad
-    const { data: customerData } = await supabase
-      .from('customers')
-      .select('created_at')
-      .order('created_at')
-
-    console.log('📊 Raw data:', { 
-      spendData: spendData?.length || 0, 
-      customerData: customerData?.length || 0 
-    })
-
-    const monthlyStats: { [key: string]: MarketingSpend } = {}
-
-    // FIX 1: Skapa en lista av alla månader som behövs (både från marknadsföringskostnader och nya kunder)
-    const allMonths = new Set<string>()
-    
-    // Lägg till månader från marknadsföringskostnader
-    spendData?.forEach(item => {
-      const month = item.month.slice(0, 7) // YYYY-MM
-      allMonths.add(month)
-    })
-    
-    // Lägg till månader från nya kunder
-    customerData?.forEach(customer => {
-      const month = customer.created_at.slice(0, 7) // YYYY-MM
-      allMonths.add(month)
-    })
-
-    // FIX 2: Lägg till aktuell månad om den inte finns
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    allMonths.add(currentMonth)
-
-    // Initiera alla månader med standardvärden
-    Array.from(allMonths).forEach(month => {
-      monthlyStats[month] = {
-        month,
-        spend: 0,
-        new_customers: 0,
-        cac: 0
+    // Lägg till företagsdata
+    businessCases?.forEach(case_ => {
+      if (case_.completed_date) {
+        const monthKey = case_.completed_date.slice(0, 7)
+        if (monthlyStats[monthKey]) {
+          monthlyStats[monthKey].business_cases_count++
+          monthlyStats[monthKey].business_revenue += case_.pris || 0
+        }
       }
     })
 
-    // Lägg till marknadsföringskostnader
-    spendData?.forEach(item => {
-      const month = item.month.slice(0, 7)
-      if (monthlyStats[month]) {
-        monthlyStats[month].spend = item.spend || 0
-      }
-    })
-
-    // Lägg till nya kunder - NU RÄKNAS ALLA MÅNADER!
-    customerData?.forEach(customer => {
-      const month = customer.created_at.slice(0, 7)
-      if (monthlyStats[month]) {
-        monthlyStats[month].new_customers++
-      }
-    })
-
-    // Beräkna CAC för alla månader
+    // Beräkna totaler och genomsnitt
     Object.values(monthlyStats).forEach(month => {
-      month.cac = month.new_customers > 0 ? month.spend / month.new_customers : 0
+      month.total_begone_revenue = month.private_revenue + month.business_revenue
+      month.total_begone_cases = month.private_cases_count + month.business_cases_count
+      month.avg_case_value = month.total_begone_cases > 0 
+        ? month.total_begone_revenue / month.total_begone_cases 
+        : 0
     })
 
-    console.log('📈 Processed monthly stats:', Object.keys(monthlyStats).length)
-    console.log('🔢 Sample data:', Object.values(monthlyStats).slice(0, 3))
-
-    // FIX 3: Sortera så att senaste månaden kommer sist (korrekt kronologisk ordning)
-    const result = Object.values(monthlyStats)
-      .filter(month => month.spend > 0 || month.new_customers > 0) // Visa bara månader med aktivitet
-      .sort((a, b) => a.month.localeCompare(b.month)) // Kronologisk ordning - senaste månaden längst till höger
-
-    console.log('✅ Final result:', {
-      months: result.length,
-      firstMonth: result[0]?.month,
-      lastMonth: result[result.length - 1]?.month,
-      totalNewCustomers: result.reduce((sum, m) => sum + m.new_customers, 0)
-    })
-
-    return result
+    return Object.values(monthlyStats).sort((a, b) => a.month.localeCompare(b.month))
   } catch (error) {
-    console.error('Error fetching marketing spend:', error)
+    console.error('Error fetching BeGone monthly stats:', error)
     throw error
   }
 }
 
-// 7. Ärendeekonomi
+// 4. Uppdaterad ärendeekonomi med BeGone data
 export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   try {
     console.log('🔍 getCaseEconomy: Starting query...')
     const now = new Date()
     const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1 // getMonth() är 0-indexerad
+    const currentMonth = now.getMonth() + 1
     
-    // Skapa korrekt startdatum och slutdatum för månaden
     const monthStart = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`
     const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1
     const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear
     const monthEnd = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`
-    
-    console.log('📅 Date range:', { monthStart, monthEnd })
-    
-    // Hämta ärenden skapade ELLER avslutade denna månad
-    const { data: allCases, error } = await supabase
+
+    console.log('📅 Query period:', { monthStart, monthEnd })
+
+    // Avtalskunder ärenden denna månad
+    const { data: completedCases } = await supabase
       .from('cases')
-      .select('price, case_type, created_at, completed_date')
-      .or(`and(created_at.gte.${monthStart},created_at.lt.${monthEnd}),and(completed_date.gte.${monthStart},completed_date.lt.${monthEnd})`)
+      .select('price, completed_date, created_at, case_type')
+      .gte('completed_date', monthStart)
+      .lt('completed_date', monthEnd)
+      .not('completed_date', 'is', null)
 
-    if (error) {
-      console.error('❌ Supabase error in getCaseEconomy:', error)
-      throw error
-    }
+    const { data: ongoingCases } = await supabase
+      .from('cases')
+      .select('price')
+      .is('completed_date', null)
 
-    console.log('📊 Raw cases data:', { 
-      total_cases: allCases?.length || 0,
-      sample: allCases?.slice(0, 3) 
+    // 🆕 BeGone ärenden denna månad
+    const { data: completedPrivateCases } = await supabase
+      .from('private_cases')
+      .select('pris, completed_date, created_at')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', monthStart)
+      .lt('completed_date', monthEnd)
+      .not('completed_date', 'is', null)
+
+    const { data: completedBusinessCases } = await supabase
+      .from('business_cases')
+      .select('pris, completed_date, created_at')
+      .eq('status', 'Avslutat')
+      .gte('completed_date', monthStart)
+      .lt('completed_date', monthEnd)
+      .not('completed_date', 'is', null)
+
+    console.log('📊 Data fetched:', {
+      completedCases: completedCases?.length || 0,
+      completedPrivateCases: completedPrivateCases?.length || 0,
+      completedBusinessCases: completedBusinessCases?.length || 0,
+      ongoingCases: ongoingCases?.length || 0
     })
 
-    // Separera avslutade och pågående ärenden
-    const completedCases = allCases?.filter(c => c.completed_date && c.price && c.price > 0) || []
-    const ongoingCases = allCases?.filter(c => !c.completed_date && c.price && c.price > 0) || []
-    
-    console.log('🔢 Processed cases:', {
-      completed: completedCases.length,
-      ongoing: ongoingCases.length,
-      completed_sample: completedCases.slice(0, 2),
-      ongoing_sample: ongoingCases.slice(0, 2)
-    })
-    
-    // Beräkningar baserat på ENDAST avslutade ärenden för säkra intäkter
-    const avg_case_price = completedCases.length > 0 
+    // Beräkna avtalskunder statistik
+    const avg_case_price = completedCases && completedCases.length > 0
       ? completedCases.reduce((sum, c) => sum + (c.price || 0), 0) / completedCases.length 
       : 0
 
-    const avg_completion_days = completedCases.length > 0
+    const avg_completion_days = completedCases && completedCases.length > 0
       ? completedCases.reduce((sum, c) => {
           const created = new Date(c.created_at)
           const completed = new Date(c.completed_date!)
@@ -478,12 +424,21 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
         }, 0) / completedCases.length
       : 0
 
-    const total_cases_this_month = completedCases.length
-    const total_revenue_this_month = completedCases.reduce((sum, c) => sum + (c.price || 0), 0)
+    const total_cases_this_month = (completedCases?.length || 0)
+    const total_revenue_this_month = completedCases?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
 
-    // Gruppera per ärendetype (ENDAST avslutade)
+    // 🆕 BeGone statistik
+    const begone_cases_this_month = (completedPrivateCases?.length || 0) + (completedBusinessCases?.length || 0)
+    const begone_private_revenue = completedPrivateCases?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+    const begone_business_revenue = completedBusinessCases?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+    const begone_revenue_this_month = begone_private_revenue + begone_business_revenue
+    const begone_avg_case_price = begone_cases_this_month > 0 
+      ? begone_revenue_this_month / begone_cases_this_month 
+      : 0
+
+    // Gruppera avtalskunder per ärendetype
     const caseTypeStats: { [key: string]: any } = {}
-    completedCases.forEach(case_ => {
+    completedCases?.forEach(case_ => {
       const type = case_.case_type || 'Okänt'
       if (!caseTypeStats[type]) {
         caseTypeStats[type] = {
@@ -497,9 +452,25 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       caseTypeStats[type].total_revenue += case_.price || 0
     })
 
-    // Lägg till pågående ärenden data för "Mest lönsam" kortets alternativa visning
-    const ongoingRevenue = ongoingCases.reduce((sum, c) => sum + (c.price || 0), 0)
-    const ongoingCount = ongoingCases.length
+    // 🆕 Lägg till BeGone som ärendetyper
+    if (begone_cases_this_month > 0) {
+      caseTypeStats['BeGone Privatperson'] = {
+        case_type: 'BeGone Privatperson',
+        count: completedPrivateCases?.length || 0,
+        total_revenue: begone_private_revenue,
+        avg_price: completedPrivateCases?.length ? begone_private_revenue / completedPrivateCases.length : 0
+      }
+      
+      caseTypeStats['BeGone Företag'] = {
+        case_type: 'BeGone Företag',
+        count: completedBusinessCases?.length || 0,
+        total_revenue: begone_business_revenue,
+        avg_price: completedBusinessCases?.length ? begone_business_revenue / completedBusinessCases.length : 0
+      }
+    }
+
+    const ongoingRevenue = ongoingCases?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+    const ongoingCount = ongoingCases?.length || 0
 
     const case_types = Object.values(caseTypeStats).map((type: any) => ({
       ...type,
@@ -511,10 +482,13 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
       avg_completion_days,
       total_cases_this_month,
       total_revenue_this_month,
-      case_types,
-      // Lägg till pågående ärenden data
       ongoing_cases_count: ongoingCount,
-      ongoing_potential_revenue: ongoingRevenue
+      ongoing_potential_revenue: ongoingRevenue,
+      // 🆕 BeGone statistik
+      begone_cases_this_month,
+      begone_revenue_this_month,
+      begone_avg_case_price,
+      case_types
     }
 
     console.log('✅ getCaseEconomy result:', result)
@@ -525,7 +499,164 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
   }
 }
 
-// 8. Detaljerad avtalslista
+// Återstående funktioner behålls oförändrade...
+export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
+  try {
+    const threeMonthsFromNow = new Date()
+    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3)
+
+    const { data } = await supabase
+      .from('customers')
+      .select('id, company_name, contract_end_date, annual_premium, assigned_account_manager')
+      .eq('is_active', true)
+      .lte('contract_end_date', threeMonthsFromNow.toISOString())
+      .gte('contract_end_date', new Date().toISOString())
+      .order('contract_end_date')
+
+    return data?.map(customer => {
+      const endDate = new Date(customer.contract_end_date)
+      const now = new Date()
+      const months_remaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))
+      
+      return {
+        customer_id: customer.id,
+        company_name: customer.company_name,
+        contract_end_date: customer.contract_end_date,
+        annual_premium: customer.annual_premium || 0,
+        assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad',
+        months_remaining,
+        risk_level: months_remaining <= 1 ? 'high' : months_remaining <= 2 ? 'medium' : 'low'
+      }
+    }) || []
+  } catch (error) {
+    console.error('Error fetching expiring contracts:', error)
+    throw error
+  }
+}
+
+export const getTechnicianRevenue = async (): Promise<TechnicianRevenue[]> => {
+  try {
+    const { data } = await supabase
+      .from('cases')
+      .select('assigned_technician_name, assigned_technician_email, price, completed_date')
+      .not('assigned_technician_name', 'is', null)
+      .not('completed_date', 'is', null)
+
+    const technicianStats: { [key: string]: any } = {}
+
+    data?.forEach(case_ => {
+      const name = case_.assigned_technician_name
+      const email = case_.assigned_technician_email || ''
+      
+      if (!technicianStats[name]) {
+        technicianStats[name] = {
+          technician_name: name,
+          technician_email: email,
+          cases_completed: 0,
+          total_revenue: 0,
+          avg_case_value: 0,
+          completion_rate: 100
+        }
+      }
+      
+      technicianStats[name].cases_completed++
+      technicianStats[name].total_revenue += case_.price || 0
+    })
+
+    return Object.values(technicianStats).map((tech: any) => ({
+      ...tech,
+      avg_case_value: tech.cases_completed > 0 ? tech.total_revenue / tech.cases_completed : 0
+    })).sort((a, b) => b.total_revenue - a.total_revenue)
+  } catch (error) {
+    console.error('Error fetching technician revenue:', error)
+    throw error
+  }
+}
+
+export const getAccountManagerRevenue = async (): Promise<AccountManagerRevenue[]> => {
+  try {
+    const { data } = await supabase
+      .from('customers')
+      .select('assigned_account_manager, annual_premium, total_contract_value')
+      .eq('is_active', true)
+      .not('assigned_account_manager', 'is', null)
+
+    const managerStats: { [key: string]: any } = {}
+
+    data?.forEach(customer => {
+      const manager = customer.assigned_account_manager
+      
+      if (!managerStats[manager]) {
+        managerStats[manager] = {
+          account_manager: manager,
+          customers_count: 0,
+          total_contract_value: 0,
+          annual_revenue: 0,
+          avg_contract_value: 0
+        }
+      }
+      
+      managerStats[manager].customers_count++
+      managerStats[manager].total_contract_value += customer.total_contract_value || 0
+      managerStats[manager].annual_revenue += customer.annual_premium || 0
+    })
+
+    return Object.values(managerStats).map((manager: any) => ({
+      ...manager,
+      avg_contract_value: manager.customers_count > 0 
+        ? manager.total_contract_value / manager.customers_count 
+        : 0
+    })).sort((a, b) => b.annual_revenue - a.total_revenue)
+  } catch (error) {
+    console.error('Error fetching account manager revenue:', error)
+    throw error
+  }
+}
+
+export const getMarketingSpend = async (): Promise<MarketingSpend[]> => {
+  try {
+    const { data: spendData } = await supabase
+      .from('monthly_marketing_spend')
+      .select('month, spend')
+      .order('month')
+
+    const { data: customerData } = await supabase
+      .from('customers')
+      .select('created_at')
+      .eq('is_active', true)
+
+    const monthlyStats: { [key: string]: MarketingSpend } = {}
+
+    spendData?.forEach(spend => {
+      const month = spend.month.slice(0, 7)
+      monthlyStats[month] = {
+        month,
+        spend: spend.spend,
+        new_customers: 0,
+        cac: 0
+      }
+    })
+
+    customerData?.forEach(customer => {
+      const month = customer.created_at.slice(0, 7)
+      if (monthlyStats[month]) {
+        monthlyStats[month].new_customers++
+      }
+    })
+
+    Object.values(monthlyStats).forEach(month => {
+      month.cac = month.new_customers > 0 ? month.spend / month.new_customers : 0
+    })
+
+    return Object.values(monthlyStats)
+      .filter(month => month.spend > 0 || month.new_customers > 0)
+      .sort((a, b) => a.month.localeCompare(b.month))
+  } catch (error) {
+    console.error('Error fetching marketing spend:', error)
+    throw error
+  }
+}
+
 export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
   try {
     const { data } = await supabase

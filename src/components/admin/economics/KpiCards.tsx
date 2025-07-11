@@ -1,71 +1,9 @@
-// 📁 src/components/admin/economics/KpiCards.tsx
+// src/components/admin/economics/KpiCards.tsx - UPPDATERAD med BeGone ärendeintäkter
 import React from 'react'
-import { TrendingUp, DollarSign, Users, AlertTriangle, Target, BarChart3 } from 'lucide-react'
+import { TrendingUp, DollarSign, Users, BarChart3, AlertTriangle, Briefcase } from 'lucide-react'
 import Card from '../../ui/Card'
 import { useKpiData } from '../../../hooks/useEconomicsDashboard'
-
-interface KpiCardProps {
-  title: string
-  value: string
-  subtitle?: string
-  icon: React.ReactNode
-  trend?: {
-    value: number
-    isPositive: boolean
-  }
-  color: 'green' | 'blue' | 'purple' | 'yellow' | 'red' | 'indigo'
-}
-
-const KpiCard: React.FC<KpiCardProps> = ({ title, value, subtitle, icon, trend, color }) => {
-  const colorClasses = {
-    green: 'from-green-500/10 to-emerald-500/10 border-green-500/20 text-green-400',
-    blue: 'from-blue-500/10 to-cyan-500/10 border-blue-500/20 text-blue-400',
-    purple: 'from-purple-500/10 to-pink-500/10 border-purple-500/20 text-purple-400',
-    yellow: 'from-yellow-500/10 to-orange-500/10 border-yellow-500/20 text-yellow-400',
-    red: 'from-red-500/10 to-rose-500/10 border-red-500/20 text-red-400',
-    indigo: 'from-indigo-500/10 to-blue-500/10 border-indigo-500/20 text-indigo-400'
-  }
-
-  return (
-    <Card className={`bg-gradient-to-br ${colorClasses[color]} hover:scale-105 transition-transform duration-200`}>
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-slate-400 text-sm font-medium mb-1">{title}</p>
-          <p className={`text-2xl font-bold ${colorClasses[color].split(' ')[2]}`}>
-            {value}
-          </p>
-          {subtitle && (
-            <p className="text-slate-500 text-xs mt-1">{subtitle}</p>
-          )}
-          {trend && (
-            <div className={`flex items-center mt-2 text-xs ${
-              trend.isPositive ? 'text-green-400' : 'text-red-400'
-            }`}>
-              <TrendingUp className={`w-3 h-3 mr-1 ${trend.isPositive ? '' : 'rotate-180'}`} />
-              {trend.isPositive ? '+' : ''}{trend.value}%
-            </div>
-          )}
-        </div>
-        <div className={`p-3 rounded-lg bg-black/20 ${colorClasses[color].split(' ')[2]}`}>
-          {icon}
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount)
-}
-
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('sv-SE').format(num)
-}
+import { formatCurrency } from '../../../utils/formatters'
 
 const KpiCards: React.FC = () => {
   const { data: kpiData, loading, error } = useKpiData()
@@ -73,15 +11,9 @@ const KpiCards: React.FC = () => {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {[...Array(6)].map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="h-4 bg-slate-700 rounded w-24 mb-2"></div>
-                <div className="h-8 bg-slate-700 rounded w-20"></div>
-              </div>
-              <div className="w-12 h-12 bg-slate-700 rounded-lg"></div>
-            </div>
+            <div className="h-20 bg-slate-700 rounded"></div>
           </Card>
         ))}
       </div>
@@ -90,68 +22,115 @@ const KpiCards: React.FC = () => {
 
   if (error) {
     return (
-      <Card className="bg-red-500/10 border-red-500/20">
+      <Card className="p-6">
         <div className="flex items-center text-red-400">
           <AlertTriangle className="w-5 h-5 mr-2" />
-          <span>Fel vid laddning av KPI-data: {error}</span>
+          <span>Fel vid laddning av KPI data: {error}</span>
         </div>
       </Card>
     )
   }
 
-  if (!kpiData) {
-    return null
-  }
+  if (!kpiData) return null
+
+  const kpiCards = [
+    {
+      title: 'Total ARR',
+      value: formatCurrency(kpiData.total_arr),
+      description: 'Årlig återkommande intäkt',
+      icon: TrendingUp,
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/20',
+      trend: '+8.2%'
+    },
+    {
+      title: 'MRR',
+      value: formatCurrency(kpiData.monthly_recurring_revenue),
+      description: 'Återkommande månatlig intäkt',
+      icon: DollarSign,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/20',
+      trend: '+5.4%'
+    },
+    {
+      title: 'Aktiva Kunder',
+      value: kpiData.active_customers.toString(),
+      description: 'Kunder med aktiva avtal',
+      icon: Users,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/20',
+      trend: '+3 nya'
+    },
+    {
+      title: 'Ärendeintäkter (YTD)',
+      value: formatCurrency(kpiData.total_case_revenue_ytd),
+      description: 'Intäkter från ärenden i år',
+      icon: BarChart3,
+      color: 'text-yellow-500',
+      bgColor: 'bg-yellow-500/20',
+      trend: '+12.1%'
+    },
+    {
+      title: 'BeGone Intäkter (YTD)', // 🆕 Ny KPI
+      value: formatCurrency(kpiData.total_begone_revenue_ytd),
+      description: 'Intäkter från BeGone ärenden',
+      icon: Briefcase,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/20',
+      trend: `${kpiData.total_begone_revenue_ytd > 0 ? '+' : ''}${((kpiData.total_begone_revenue_ytd / Math.max(kpiData.total_case_revenue_ytd, 1)) * 100).toFixed(1)}%`
+    },
+    {
+      title: 'Churn Risk',
+      value: kpiData.churn_risk_customers.toString(),
+      description: 'Kunder med utgående avtal inom 90 dagar',
+      icon: AlertTriangle,
+      color: kpiData.churn_risk_customers > 5 ? 'text-red-500' : 'text-yellow-500',
+      bgColor: kpiData.churn_risk_customers > 5 ? 'bg-red-500/20' : 'bg-yellow-500/20',
+      trend: kpiData.churn_risk_customers > 0 ? 'Kräver åtgärd' : 'Inga risker'
+    }
+  ]
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-      <KpiCard
-        title="Total ARR"
-        value={formatCurrency(kpiData.total_arr)}
-        subtitle="Årlig återkommande intäkt"
-        icon={<TrendingUp className="w-6 h-6" />}
-        color="green"
-      />
-
-      <KpiCard
-        title="MRR"
-        value={formatCurrency(kpiData.monthly_recurring_revenue)}
-        subtitle="Månadsvis återkommande intäkt"
-        icon={<DollarSign className="w-6 h-6" />}
-        color="blue"
-      />
-
-      <KpiCard
-        title="Aktiva Kunder"
-        value={formatNumber(kpiData.active_customers)}
-        subtitle="Kunder med aktiva avtal"
-        icon={<Users className="w-6 h-6" />}
-        color="purple"
-      />
-
-      <KpiCard
-        title="Ärendeintäkter (YTD)"
-        value={formatCurrency(kpiData.total_case_revenue_ytd)}
-        subtitle="Intäkter från ärenden i år"
-        icon={<BarChart3 className="w-6 h-6" />}
-        color="indigo"
-      />
-
-      <KpiCard
-        title="Genomsnittskund"
-        value={formatCurrency(kpiData.avg_customer_value)}
-        subtitle="Årspremie per kund"
-        icon={<Target className="w-6 h-6" />}
-        color="yellow"
-      />
-
-      <KpiCard
-        title="Churn Risk"
-        value={formatNumber(kpiData.churn_risk_customers)}
-        subtitle="Avtal utgår inom 90 dagar"
-        icon={<AlertTriangle className="w-6 h-6" />}
-        color="red"
-      />
+      {kpiCards.map((card, index) => {
+        const IconComponent = card.icon
+        
+        return (
+          <Card key={index} className="relative overflow-hidden">
+            <div className="p-6">
+              {/* Icon och trend */}
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                  <IconComponent className={`w-5 h-5 ${card.color}`} />
+                </div>
+                <span className="text-xs font-medium text-slate-400">
+                  {card.trend}
+                </span>
+              </div>
+              
+              {/* Värde */}
+              <div className="mb-2">
+                <p className={`text-2xl font-bold ${card.color}`}>
+                  {card.value}
+                </p>
+              </div>
+              
+              {/* Titel och beskrivning */}
+              <div>
+                <p className="text-sm font-medium text-white mb-1">
+                  {card.title}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {card.description}
+                </p>
+              </div>
+            </div>
+            
+            {/* Gradient overlay */}
+            <div className={`absolute inset-0 ${card.bgColor} opacity-5 pointer-events-none`} />
+          </Card>
+        )
+      })}
     </div>
   )
 }
