@@ -24,6 +24,7 @@ interface TaskStatusExample {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 🔥 Temporärt - ingen auth för debug
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Endast GET tillåtet' })
   }
