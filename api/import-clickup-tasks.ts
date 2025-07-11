@@ -350,16 +350,16 @@ function findMatchingTechnician(assignee: any): { id: string, email: string } | 
   const assigneeName = assignee.username || assignee.name || ''
   const assigneeEmail = assignee.email || ''
   
-  // Kända tekniker från BeGone (uppdaterad lista)
+  // RIKTIGA UUID:er från Supabase technicians tabell
   const knownTechnicians = [
-    { id: 'sofia-id', name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' },
-    { id: 'benny-id', name: 'Benny Linden', email: 'benny.linden@begone.se' },
-    { id: 'kristian-id', name: 'Kristian Agnevik', email: 'kristian.agnevik@begone.se' },
-    { id: 'christian-id', name: 'Christian Karlsson', email: 'christian.karlsson@begone.se' },
-    { id: 'hans-id', name: 'Hans Norman', email: 'hans.norman@begone.se' },
-    { id: 'mathias-id', name: 'Mathias Carlsson', email: 'mathias.carlsson@begone.se' },
-    { id: 'kim-id', name: 'Kim Wahlberg', email: 'kim.wahlberg@begone.se' },
-    { id: 'jakob-id', name: 'Jakob Wahlberg', email: 'jakob.wahlberg@begone.se' }
+    { id: 'a9e21ebe-8994-4a49-ae31-859353457d3f', name: 'Benny Linden', email: 'benny.linden@begone.se' },
+    { id: '2296a1e9-b466-4be9-92ea-0ed83a4829ff', name: 'Christian Karlsson', email: 'christian.karlsson@begone.se' },
+    { id: '35e82f86-bcca-4d00-b079-d5dc3dad1b07', name: 'Hans Norman', email: 'hans.norman@begone.se' },
+    { id: 'c21d3048-95b5-453a-b39c-0eb47c3e688b', name: 'Jakob Wahlberg', email: 'jakob.wahlberg@begone.se' },
+    { id: '6a10fe98-d4d4-4e38-82a4-c4ecdf33a82c', name: 'Kim Walberg', email: 'kim.wahlberg@begone.se' },
+    { id: '8846933d-abac-47b5-b73c-b3fe6a6f3df5', name: 'Kristian Agnevik', email: 'kristian.agnevik@begone.se' },
+    { id: 'ecaf151a-44b2-4220-b105-998aa0f82d6e', name: 'Mathias Carlson', email: 'mathias.carlsson@begone.se' },
+    { id: 'e4db6838-f48d-4d7d-81cc-5ad3774acbf4', name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' }
   ]
   
   // Matcha på email först
