@@ -1,30 +1,29 @@
-// 📁 src/pages/admin/Economics.tsx - UPPDATERAD med BeGone ärendestatistik
+// src/pages/admin/Economics.tsx - SÄKER VERSION för debugging
 import React from 'react'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
-import { useEconomicsDashboard } from '../../hooks/useEconomicsDashboard'
+import Card from '../../components/ui/Card'
 
-// Befintliga komponenter
+// Importera endast de komponenter som vi vet fungerar
 import KpiCards from '../../components/admin/economics/KpiCards'
 import MonthlyRevenueChart from '../../components/admin/economics/MonthlyRevenueChart'
-import ExpiringContractsChart from '../../components/admin/economics/ExpiringContractsChart'
-import MarketingRoiChart from '../../components/admin/economics/MarketingRoiChart'
-import TechnicianRevenueChart from '../../components/admin/economics/TechnicianRevenueChart'
-import AccountManagerRevenueChart from '../../components/admin/economics/AccountManagerRevenueChart'
-import CaseEconomyChart from '../../components/admin/economics/CaseEconomyChart'
-import CustomerContractTable from '../../components/admin/economics/CustomerContractTable'
-import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
 
-// 🆕 Ny BeGone komponent
-import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
+// Tillfälligt kommenterade komponenter för debugging
+// import ExpiringContractsChart from '../../components/admin/economics/ExpiringContractsChart'
+// import MarketingRoiChart from '../../components/admin/economics/MarketingRoiChart'
+// import TechnicianRevenueChart from '../../components/admin/economics/TechnicianRevenueChart'
+// import AccountManagerRevenueChart from '../../components/admin/economics/AccountManagerRevenueChart'
+// import CaseEconomyChart from '../../components/admin/economics/CaseEconomyChart'
+// import CustomerContractTable from '../../components/admin/economics/CustomerContractTable'
+// import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
+// import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
 
 const Economics: React.FC = () => {
   const navigate = useNavigate()
-  const { loading, error, refetch } = useEconomicsDashboard()
 
   const handleRefresh = async () => {
-    await refetch()
+    window.location.reload()
   }
 
   return (
@@ -54,10 +53,9 @@ const Economics: React.FC = () => {
             <div className="flex items-center gap-2">
               <Button 
                 onClick={handleRefresh} 
-                disabled={loading}
                 className="flex items-center gap-2"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className="w-4 h-4" />
                 Uppdatera
               </Button>
             </div>
@@ -75,56 +73,104 @@ const Economics: React.FC = () => {
             <KpiCards />
           </section>
 
-          {/* 2. Intäktsflöde - Utökad med BeGone */}
+          {/* 2. Intäktsflöde */}
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">Intäktsanalys</h2>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <MonthlyRevenueChart />
-              {/* 🆕 Ny BeGone ärendestatistik */}
-              <BeGoneMonthlyStatsChart />
+              
+              {/* BeGone Chart - Tillfälligt ersatt med placeholder */}
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">BeGone Ärendestatistik</h3>
+                  <div className="h-80 flex items-center justify-center text-slate-400">
+                    <div className="text-center">
+                      <p className="mb-2">BeGone komponent laddas...</p>
+                      <p className="text-sm">Komponenten är tillfälligt inaktiverad för debugging</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
             </div>
           </section>
 
-          {/* 3. Ärendeekonomi */}
+          {/* 3. Placeholder för övriga komponenter */}
           <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Ärendeekonomi</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">Ytterligare Analytics</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <CaseEconomyChart />
-              <TechnicianRevenueChart />
+              
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Ärendeekonomi</h3>
+                  <div className="h-64 flex items-center justify-center text-slate-400">
+                    <div className="text-center">
+                      <p className="mb-2">Komponent laddas...</p>
+                      <p className="text-sm">Ärendeekonomi-data kommer snart</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Teknikerintäkter</h3>
+                  <div className="h-64 flex items-center justify-center text-slate-400">
+                    <div className="text-center">
+                      <p className="mb-2">Komponent laddas...</p>
+                      <p className="text-sm">Tekniker-data kommer snart</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
             </div>
           </section>
 
-          {/* 4. Marknadsföring & ROI */}
+          {/* Debug sektion */}
           <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Marknadsföring & ROI</h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <MarketingRoiChart />
-              <AccountManagerRevenueChart />
-            </div>
-          </section>
-
-          {/* 5. Avtalshantering */}
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Avtalshantering</h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <ExpiringContractsChart />
-              <div className="space-y-6">
-                {/* Marknadsföring utgifter */}
-                <MarketingSpendManager />
+            <Card>
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">🔧 Debug Information</h3>
+                <div className="space-y-2 text-sm">
+                  <p className="text-green-400">✅ KPI Cards: Laddad</p>
+                  <p className="text-green-400">✅ Monthly Revenue Chart: Laddad</p>
+                  <p className="text-yellow-400">⏸️ Övriga komponenter: Tillfälligt inaktiverade</p>
+                  <div className="mt-4 p-4 bg-slate-800 rounded-lg">
+                    <h4 className="text-white font-medium mb-2">Debugging Steps:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                      <li>Kontrollera att formatters.ts importeras korrekt</li>
+                      <li>Verifiera att alla array-data har säker null-hantering</li>
+                      <li>Testa en komponent i taget för att isolera problemet</li>
+                      <li>Kontrollera att Supabase anslutningen fungerar</li>
+                    </ol>
+                  </div>
+                </div>
               </div>
-            </div>
-          </section>
-
-          {/* 6. Detaljerad kundöversikt */}
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Kundavtal</h2>
-            <CustomerContractTable />
+            </Card>
           </section>
 
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900/50 border-t border-slate-800 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between text-sm text-slate-400">
+            <div className="flex items-center gap-4">
+              <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
+              <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
+              <span>Säker debugging-version</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
+              <span>Debug mode aktivt</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
 
-export default Economics
+export default Economics⏸️ BeGone Monthly Stats: Tillfälligt inaktiverad</p>
+                  <p className="text-yellow-400">

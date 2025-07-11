@@ -1,4 +1,4 @@
-// src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - NY komponent för BeGone ärendeanalys
+// src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - FIXAD med säker null-hantering
 import React, { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart } from 'recharts'
 import { Briefcase, TrendingUp, Users, Calendar, DollarSign } from 'lucide-react'
@@ -19,7 +19,7 @@ interface BeGoneMonthlyStats {
 }
 
 const BeGoneMonthlyStatsChart: React.FC = () => {
-  const [data, setData] = useState<BeGoneMonthlyStats[]>([])
+  const [data, setData] = useState<BeGoneMonthlyStats[]>([]) // 🆕 Tom array som default
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m'>('6m')
@@ -32,25 +32,39 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   const fetchBeGoneStats = async () => {
     try {
       setLoading(true)
+      setError(null) // 🆕 Rensa tidigare fel
+      
       const twelveMonthsAgo = new Date()
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
       // Hämta avslutade privatpersonsärenden
-      const { data: privateCases } = await supabase
+      const { data: privateCases, error: privateError } = await supabase
         .from('private_cases')
         .select('pris, completed_date')
         .eq('status', 'Avslutat')
         .gte('completed_date', dateString)
         .not('completed_date', 'is', null)
 
+      // 🆕 Hantera Supabase fel
+      if (privateError) {
+        console.error('❌ Private cases fetch error:', privateError)
+        throw new Error(`Fel vid hämtning av privatpersons ärenden: ${privateError.message}`)
+      }
+
       // Hämta avslutade företagsärenden
-      const { data: businessCases } = await supabase
+      const { data: businessCases, error: businessError } = await supabase
         .from('business_cases')
         .select('pris, completed_date')
         .eq('status', 'Avslutat')
         .gte('completed_date', dateString)
         .not('completed_date', 'is', null)
+
+      // 🆕 Hantera Supabase fel
+      if (businessError) {
+        console.error('❌ Business cases fetch error:', businessError)
+        throw new Error(`Fel vid hämtning av företags ärenden: ${businessError.message}`)
+      }
 
       // Gruppera per månad
       const monthlyStats: { [key: string]: BeGoneMonthlyStats } = {}
@@ -73,32 +87,36 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
         }
       }
 
-      // Lägg till privatpersonsdata
-      privateCases?.forEach(case_ => {
-        if (case_.completed_date) {
-          const monthKey = case_.completed_date.slice(0, 7)
-          if (monthlyStats[monthKey]) {
-            monthlyStats[monthKey].private_cases_count++
-            monthlyStats[monthKey].private_revenue += case_.pris || 0
+      // 🆕 Säker array-hantering för privatpersonsdata
+      if (Array.isArray(privateCases)) {
+        privateCases.forEach(case_ => {
+          if (case_?.completed_date) {
+            const monthKey = case_.completed_date.slice(0, 7)
+            if (monthlyStats[monthKey]) {
+              monthlyStats[monthKey].private_cases_count++
+              monthlyStats[monthKey].private_revenue += case_.pris || 0
+            }
           }
-        }
-      })
+        })
+      }
 
-      // Lägg till företagsdata
-      businessCases?.forEach(case_ => {
-        if (case_.completed_date) {
-          const monthKey = case_.completed_date.slice(0, 7)
-          if (monthlyStats[monthKey]) {
-            monthlyStats[monthKey].business_cases_count++
-            monthlyStats[monthKey].business_revenue += case_.pris || 0
+      // 🆕 Säker array-hantering för företagsdata
+      if (Array.isArray(businessCases)) {
+        businessCases.forEach(case_ => {
+          if (case_?.completed_date) {
+            const monthKey = case_.completed_date.slice(0, 7)
+            if (monthlyStats[monthKey]) {
+              monthlyStats[monthKey].business_cases_count++
+              monthlyStats[monthKey].business_revenue += case_.pris || 0
+            }
           }
-        }
-      })
+        })
+      }
 
       // Beräkna totaler och genomsnitt
       Object.values(monthlyStats).forEach(month => {
-        month.total_begone_revenue = month.private_revenue + month.business_revenue
-        month.total_begone_cases = month.private_cases_count + month.business_cases_count
+        month.total_begone_revenue = (month.private_revenue || 0) + (month.business_revenue || 0)
+        month.total_begone_cases = (month.private_cases_count || 0) + (month.business_cases_count || 0)
         month.avg_case_value = month.total_begone_cases > 0 
           ? month.total_begone_revenue / month.total_begone_cases 
           : 0
@@ -106,8 +124,11 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
 
       const sortedData = Object.values(monthlyStats).sort((a, b) => a.month.localeCompare(b.month))
       setData(sortedData)
+      
     } catch (err) {
+      console.error('❌ fetchBeGoneStats error:', err)
       setError(err instanceof Error ? err.message : 'Fel vid hämtning av BeGone data')
+      setData([]) // 🆕 Tom array vid fel
     } finally {
       setLoading(false)
     }
@@ -135,7 +156,30 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
           <h2 className="text-lg font-semibold text-white">BeGone Ärendestatistik</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-red-400">
-          <span>Fel vid laddning: {error}</span>
+          <div className="text-center">
+            <p className="mb-2">Fel vid laddning: {error}</p>
+            <Button onClick={fetchBeGoneStats} size="sm">
+              Försök igen
+            </Button>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  // 🆕 Säker array-kontroll
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <Card>
+        <div className="flex items-center mb-6">
+          <Briefcase className="w-5 h-5 text-slate-500 mr-2" />
+          <h2 className="text-lg font-semibold text-white">BeGone Ärendestatistik</h2>
+        </div>
+        <div className="h-80 flex items-center justify-center text-slate-400">
+          <div className="text-center">
+            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Ingen BeGone data tillgänglig</p>
+          </div>
         </div>
       </Card>
     )
@@ -149,42 +193,42 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
 
   const filteredData = getFilteredData()
 
-  // Formatera data för chart
+  // 🆕 Säker formatering av chart data
   const chartData = filteredData.map(item => ({
     month: new Date(item.month + '-01').toLocaleDateString('sv-SE', { 
       month: 'short', 
       year: '2-digit' 
     }),
     fullMonth: item.month,
-    'Privatperson Ärenden': item.private_cases_count,
-    'Företag Ärenden': item.business_cases_count,
-    'Privatperson Intäkt': item.private_revenue,
-    'Företag Intäkt': item.business_revenue,
-    'Total Intäkt': item.total_begone_revenue,
-    'Genomsnittspris': item.avg_case_value,
-    'Totala Ärenden': item.total_begone_cases
+    'Privatperson Ärenden': item.private_cases_count || 0,
+    'Företag Ärenden': item.business_cases_count || 0,
+    'Privatperson Intäkt': item.private_revenue || 0,
+    'Företag Intäkt': item.business_revenue || 0,
+    'Total Intäkt': item.total_begone_revenue || 0,
+    'Genomsnittspris': item.avg_case_value || 0,
+    'Totala Ärenden': item.total_begone_cases || 0
   }))
 
-  // Beräkna totaler för period
-  const totalPrivateCases = filteredData.reduce((sum, item) => sum + item.private_cases_count, 0)
-  const totalBusinessCases = filteredData.reduce((sum, item) => sum + item.business_cases_count, 0)
-  const totalPrivateRevenue = filteredData.reduce((sum, item) => sum + item.private_revenue, 0)
-  const totalBusinessRevenue = filteredData.reduce((sum, item) => sum + item.business_revenue, 0)
+  // Beräkna totaler för period - med säker hantering
+  const totalPrivateCases = filteredData.reduce((sum, item) => sum + (item.private_cases_count || 0), 0)
+  const totalBusinessCases = filteredData.reduce((sum, item) => sum + (item.business_cases_count || 0), 0)
+  const totalPrivateRevenue = filteredData.reduce((sum, item) => sum + (item.private_revenue || 0), 0)
+  const totalBusinessRevenue = filteredData.reduce((sum, item) => sum + (item.business_revenue || 0), 0)
   const totalRevenue = totalPrivateRevenue + totalBusinessRevenue
   const totalCases = totalPrivateCases + totalBusinessCases
   const avgCaseValue = totalCases > 0 ? totalRevenue / totalCases : 0
 
   const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload && Array.isArray(payload) && payload.length > 0) {
       return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg">
           <p className="text-white font-semibold mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
               {entry.name}: {
-                entry.name.includes('Intäkt') || entry.name.includes('pris') 
-                  ? formatCurrency(entry.value)
-                  : entry.value
+                entry.name && (entry.name.includes('Intäkt') || entry.name.includes('pris'))
+                  ? formatCurrency(entry.value || 0)
+                  : (entry.value || 0)
               }
             </p>
           ))}

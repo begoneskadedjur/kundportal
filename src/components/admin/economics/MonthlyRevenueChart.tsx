@@ -1,4 +1,4 @@
-// src/components/admin/economics/MonthlyRevenueChart.tsx - UPPDATERAD med BeGone ärendeintäkter
+// src/components/admin/economics/MonthlyRevenueChart.tsx - FIXAD med säker array-hantering
 import React, { useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, Calendar, Filter } from 'lucide-react'
@@ -38,13 +38,17 @@ const MonthlyRevenueChart: React.FC = () => {
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-red-400">
-          <span>Fel vid laddning: {error}</span>
+          <div className="text-center">
+            <p className="mb-2">Fel vid laddning: {error}</p>
+            <p className="text-sm text-slate-400">Kontrollera nätverksanslutningen och försök igen</p>
+          </div>
         </div>
       </Card>
     )
   }
 
-  if (!monthlyData || monthlyData.length === 0) {
+  // 🆕 Säker array-kontroll
+  if (!Array.isArray(monthlyData) || monthlyData.length === 0) {
     return (
       <Card>
         <div className="flex items-center mb-6">
@@ -52,7 +56,11 @@ const MonthlyRevenueChart: React.FC = () => {
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-slate-400">
-          <span>Ingen intäktsdata tillgänglig</span>
+          <div className="text-center">
+            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Ingen intäktsdata tillgänglig</p>
+            <p className="text-sm mt-2">Data kommer att visas när ärenden registreras</p>
+          </div>
         </div>
       </Card>
     )
@@ -66,40 +74,42 @@ const MonthlyRevenueChart: React.FC = () => {
 
   const filteredData = getFilteredData()
 
-  // Formatera data för chart
+  // 🆕 Säker formatering av chart data med null-hantering
   const chartData = filteredData.map(item => ({
     month: new Date(item.month + '-01').toLocaleDateString('sv-SE', { 
       month: 'short', 
       year: '2-digit' 
     }),
     fullMonth: item.month,
-    'Kontraktsintäkter': showDataTypes.contract ? item.contract_revenue : 0,
-    'Ärendeintäkter': showDataTypes.case ? item.case_revenue : 0,
-    'BeGone Intäkter': showDataTypes.begone ? item.begone_revenue : 0, // 🆕 BeGone data
-    'Total': item.total_revenue
+    'Kontraktsintäkter': showDataTypes.contract ? (item.contract_revenue || 0) : 0,
+    'Ärendeintäkter': showDataTypes.case ? (item.case_revenue || 0) : 0,
+    'BeGone Intäkter': showDataTypes.begone ? (item.begone_revenue || 0) : 0, // 🆕 BeGone data
+    'Total': (item.total_revenue || 0)
   }))
 
-  // Beräkna totaler för period
-  const totalContractRevenue = filteredData.reduce((sum, item) => sum + item.contract_revenue, 0)
-  const totalCaseRevenue = filteredData.reduce((sum, item) => sum + item.case_revenue, 0)
-  const totalBeGoneRevenue = filteredData.reduce((sum, item) => sum + item.begone_revenue, 0) // 🆕
-  const totalRevenue = filteredData.reduce((sum, item) => sum + item.total_revenue, 0)
+  // Beräkna totaler för period - med säker null-hantering
+  const totalContractRevenue = filteredData.reduce((sum, item) => sum + (item.contract_revenue || 0), 0)
+  const totalCaseRevenue = filteredData.reduce((sum, item) => sum + (item.case_revenue || 0), 0)
+  const totalBeGoneRevenue = filteredData.reduce((sum, item) => sum + (item.begone_revenue || 0), 0) // 🆕
+  const totalRevenue = filteredData.reduce((sum, item) => sum + (item.total_revenue || 0), 0)
 
-  // Beräkna tillväxt
+  // Beräkna tillväxt - med säker hantering
   const currentMonth = filteredData[filteredData.length - 1]
   const previousMonth = filteredData[filteredData.length - 2]
-  const growth = previousMonth && previousMonth.total_revenue > 0
-    ? ((currentMonth.total_revenue - previousMonth.total_revenue) / previousMonth.total_revenue) * 100
-    : 0
+  
+  let growth = 0
+  if (currentMonth && previousMonth && (previousMonth.total_revenue || 0) > 0) {
+    growth = (((currentMonth.total_revenue || 0) - (previousMonth.total_revenue || 0)) / (previousMonth.total_revenue || 0)) * 100
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload && Array.isArray(payload) && payload.length > 0) {
       return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-lg">
           <p className="text-white font-semibold mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value)}
+              {entry.name}: {formatCurrency(entry.value || 0)}
             </p>
           ))}
         </div>
