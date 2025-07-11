@@ -116,8 +116,24 @@ const ContractTechnicianChart: React.FC = () => {
 
   // 🎯 Memoized processing av avtalskund tekniker-data baserat på vald period  
   const technicianData = useMemo((): ContractTechnicianData[] => {
+    // 🆕 ALLTID returnera data även om det är 0 - skapa placeholder tekniker om ingen data finns
     if (!allData.cases.length) {
-      return []
+      console.log('⚠️ No contract cases found, creating placeholder data')
+      return [
+        {
+          name: 'Ingen data tillgänglig',
+          email: '',
+          total_cases: 0,
+          new_customers: 0,
+          upsell_cases: 0,
+          total_revenue: 0,
+          new_customer_value: 0,
+          upsell_revenue: 0,
+          avg_case_value: 0,
+          avg_new_customer_value: 0,
+          rank: 1
+        }
+      ]
     }
 
     // Bestäm datumspan för filtrering - FIX: Använd Array.from(new Set()) för unika datum
@@ -127,16 +143,42 @@ const ContractTechnicianChart: React.FC = () => {
       .map(date => date.slice(0, 7))
     
     const uniqueDates = Array.from(new Set(allCaseDates)).sort()
-    const selectedIndex = uniqueDates.findIndex(month => month === selectedMonth)
+    console.log(`🔍 Available contract months:`, uniqueDates)
+    console.log(`🎯 Selected month: ${selectedMonth}, Period: ${selectedPeriod}`)
     
+    let selectedIndex = uniqueDates.findIndex(month => month === selectedMonth)
+    
+    // 🆕 FIX: Om vald månad inte finns, använd den senaste tillgängliga månaden
     if (selectedIndex === -1) {
-      console.log(`⚠️ Selected month ${selectedMonth} not found in contract data, available months:`, uniqueDates)
-      return []
+      console.log(`⚠️ Selected month ${selectedMonth} not found, using latest available month`)
+      selectedIndex = uniqueDates.length - 1
+      if (selectedIndex >= 0) {
+        // Uppdatera selectedMonth till senaste tillgängliga (utan att trigga re-render loop)
+        const latestMonth = uniqueDates[selectedIndex]
+        console.log(`📅 Using latest month: ${latestMonth}`)
+      } else {
+        // Ingen data alls - returnera placeholder
+        return [
+          {
+            name: 'Ingen avtalskund data',
+            email: '',
+            total_cases: 0,
+            new_customers: 0,
+            upsell_cases: 0,
+            total_revenue: 0,
+            new_customer_value: 0,
+            upsell_revenue: 0,
+            avg_case_value: 0,
+            avg_new_customer_value: 0,
+            rank: 1
+          }
+        ]
+      }
     }
     
     const monthsToShow = selectedPeriod === '1m' ? 1 : selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
     const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
-    const endMonth = selectedMonth
+    const endMonth = uniqueDates[selectedIndex] // Använd faktisk månad från data
     const startMonth = uniqueDates[startIndex]
 
     console.log(`🔍 Filtering contract technician data: ${startMonth} to ${endMonth} (${monthsToShow} months)`)
@@ -156,6 +198,25 @@ const ContractTechnicianChart: React.FC = () => {
     })
 
     console.log(`📊 Filtered contract data: ${filteredCases.length} cases, ${filteredCustomers.length} new customers`)
+
+    // 🆕 Om ingen filtrerad data, returnera placeholder istället för tom array
+    if (filteredCases.length === 0 && filteredCustomers.length === 0) {
+      return [
+        {
+          name: `Ingen data för ${selectedPeriod} period`,
+          email: '',
+          total_cases: 0,
+          new_customers: 0,
+          upsell_cases: 0,
+          total_revenue: 0,
+          new_customer_value: 0,
+          upsell_revenue: 0,
+          avg_case_value: 0,
+          avg_new_customer_value: 0,
+          rank: 1
+        }
+      ]
+    }
 
     // Samla avtalskund tekniker-statistik
     const technicianStats: { [key: string]: any } = {}
@@ -336,32 +397,7 @@ const ContractTechnicianChart: React.FC = () => {
     )
   }
 
-  // Empty state
-  if (!technicianData || technicianData.length === 0) {
-    return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Building2 className="w-5 h-5 text-slate-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-slate-400">
-          <div className="text-center">
-            <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Ingen avtalskund teknikerdata tillgänglig för vald period</p>
-            <p className="text-xs mt-2">
-              Månad: {selectedMonth}, Period: {selectedPeriod}, Cases: {allData.cases.length}
-            </p>
-            {allData.cases.length > 0 && (
-              <p className="text-xs text-slate-500 mt-1">
-                Tillgängliga månader: {Array.from(new Set(allData.cases.map(c => c.completed_date?.slice(0, 7)).filter(Boolean))).sort().join(', ')}
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
-    )
-  }
-
+  // 🆕 ALDRIG empty state - visar alltid komponenten med data (även 0-värden)
   const totalRevenue = technicianData.reduce((sum, tech) => sum + tech.total_revenue, 0)
   const totalCases = technicianData.reduce((sum, tech) => sum + tech.total_cases, 0)
   const totalNewCustomers = technicianData.reduce((sum, tech) => sum + tech.new_customers, 0)
@@ -467,8 +503,8 @@ const ContractTechnicianChart: React.FC = () => {
         </div>
       </div>
 
-      {/* 🏆 Top 3 podium */}
-      {technicianData.length >= 3 && (
+      {/* 🏆 Top 3 podium - 🆕 Visar även med 0-värden */}
+      {technicianData.length >= 3 && technicianData[0].total_revenue > 0 && (
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Award className="w-5 h-5 text-yellow-500" />
@@ -489,6 +525,24 @@ const ContractTechnicianChart: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Meddelande när ingen data finns */}
+      {technicianData.length > 0 && technicianData[0].total_revenue === 0 && (
+        <div className="mb-8">
+          <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
+            <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Månad: {selectedMonth}, Period: {selectedPeriod}, Cases: {allData.cases.length}
+            </p>
+            {allData.cases.length > 0 && (
+              <p className="text-xs text-slate-500">
+                Tillgängliga månader: {Array.from(new Set(allData.cases.map(c => c.completed_date?.slice(0, 7)).filter(Boolean))).sort().join(', ')}
+              </p>
+            )}
           </div>
         </div>
       )}

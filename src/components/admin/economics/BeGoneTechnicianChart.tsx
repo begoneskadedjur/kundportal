@@ -373,8 +373,8 @@ const BeGoneTechnicianChart: React.FC = () => {
           <span className="ml-2 text-sm text-slate-400">(Bara engångsjobb)</span>
         </div>
         
-        {/* Navigation */}
-        <div className="flex items-center gap-4">
+        {/* Navigation - 🔧 FIXAD: Responsiv layout för period-knappar */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Månadväljare */}
           <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
             <Button
@@ -413,7 +413,7 @@ const BeGoneTechnicianChart: React.FC = () => {
             </Button>
           )}
 
-          {/* Period filter */}
+          {/* Period filter - 🔧 FIXAD: Mindre knappar för bättre passform */}
           <div className="flex bg-slate-800 rounded-lg p-1">
             {(['1m', '3m', '6m', '12m'] as const).map((period) => (
               <Button
@@ -421,9 +421,9 @@ const BeGoneTechnicianChart: React.FC = () => {
                 variant={selectedPeriod === period ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setSelectedPeriod(period)}
-                className="text-xs"
+                className="text-xs px-2 py-1"
               >
-                {period === '1m' ? '1 mån' : period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
+                {period === '1m' ? '1' : period === '3m' ? '3' : period === '6m' ? '6' : '12'}
               </Button>
             ))}
           </div>
