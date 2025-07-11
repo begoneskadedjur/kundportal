@@ -1,26 +1,32 @@
-// api/clickup-webhook.ts - KORRIGERAD VERSION
+// api/clickup-webhook.ts - UPPDATERAD VERSION med BeGone listor support
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.VITE_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 const CLICKUP_WEBHOOK_SECRET = process.env.CLICKUP_WEBHOOK_SECRET
 
+// BeGone listor för automatisk synkronisering
+const BEGONE_LISTS = {
+  PRIVATPERSON: '901204857438',
+  FORETAG: '901204857574'
+}
+
 interface ClickUpWebhookPayload {
-  event: 'taskCreated' | 'taskUpdated' | 'taskDeleted' // m.fl.
+  event: 'taskCreated' | 'taskUpdated' | 'taskDeleted' | 'taskStatusUpdated' | 'taskAssigneeUpdated'
   task_id: string
-  list_id?: string // Kan vara undefined, särskilt vid 'taskUpdated'
+  list_id?: string
   webhook_id: string
   history_items?: Array<{
     id: string
     type: number
     date: string
     field: string
-    parent_id: string // Detta är oftast listans ID
+    parent_id: string
     data: object
     source: null | any
     user: object
@@ -54,14 +60,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('✅ Payload parsed successfully:', {
         event: payload.event,
         task_id: payload.task_id,
-        list_id: payload.list_id, // Loggar det som kommer in från början
+        list_id: payload.list_id,
         webhook_id: payload.webhook_id
       })
-      console.log('📄 Full payload:', JSON.stringify(payload, null, 2))
       
     } catch (parseError) {
       console.error('❌ Failed to parse webhook payload:', parseError)
-      console.error('Raw body content:', rawBody.substring(0, 500))
       return res.status(400).json({ error: 'Invalid JSON payload' })
     }
 
@@ -89,53 +93,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing task_id' })
     }
 
-    // *** NY ROBUST LOGIK FÖR ATT HANTERA LIST-ID ***
-    let listId: string | undefined = payload.list_id;
+    // Robust logik för att hantera list-ID
+    let listId: string | undefined = payload.list_id
 
-    // Om list_id saknas på toppnivån (vanligt vid 'taskUpdated'), hämta från history_items
     if (!listId && payload.history_items && payload.history_items.length > 0) {
-      // parent_id i det första history item är oftast listans ID.
-      listId = payload.history_items[0].parent_id;
-      console.log(`ℹ️ list_id saknades. Hittade parent_id i history_items: ${listId}`);
+      listId = payload.history_items[0].parent_id
+      console.log(`ℹ️ list_id saknades. Hittade parent_id i history_items: ${listId}`)
     }
 
-    // Validera att vi nu har ett list-ID innan vi fortsätter
     if (!listId) {
-      console.error(`❌ Kunde inte fastställa list_id för task ${payload.task_id}.`);
-      // Vi returnerar 200 OK så att ClickUp inte försöker skicka igen.
-      return res.status(200).json({ message: 'Kunde inte fastställa list_id, ignorerar.' });
-    }
-    // *** SLUT PÅ NY LOGIK ***
-
-
-    // Kontrollera om tasken tillhör en kundlista (använder den nya, pålitliga `listId`-variabeln)
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('id, company_name, clickup_list_id')
-      .eq('clickup_list_id', listId) // Använder den nya variabeln här!
-      .single()
-
-    if (customerError || !customer) {
-      console.log(`ℹ️ Task ${payload.task_id} is not in a customer list (list_id: ${listId})`)
-      return res.status(200).json({ message: 'Not a customer task' })
+      console.error(`❌ Kunde inte fastställa list_id för task ${payload.task_id}`)
+      return res.status(200).json({ message: 'Kunde inte fastställa list_id, ignorerar.' })
     }
 
-    console.log(`📋 Processing ${payload.event} for customer: ${customer.company_name}`)
-
-    switch (payload.event) {
-      case 'taskCreated':
-      case 'taskUpdated':
-        await syncTaskFromClickUp(payload.task_id, customer.id)
+    // Kontrollera vilken typ av lista detta är
+    const listType = getListType(listId)
+    
+    switch (listType) {
+      case 'customer':
+        await handleCustomerTask(payload, listId)
         break
-      
-      case 'taskDeleted':
-        await handleTaskDeleted(payload.task_id, customer.id)
+      case 'privatperson':
+        await handleBeGoneTask(payload, listId, 'private_cases')
         break
+      case 'foretag':
+        await handleBeGoneTask(payload, listId, 'business_cases')
+        break
+      default:
+        console.log(`ℹ️ Task ${payload.task_id} is not in a tracked list (list_id: ${listId})`)
+        return res.status(200).json({ message: 'Not a tracked task' })
     }
 
     return res.status(200).json({ 
       success: true, 
-      message: `${payload.event} processed for customer ${customer.company_name}` 
+      message: `${payload.event} processed for ${listType} list` 
     })
 
   } catch (error) {
@@ -147,42 +138,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// Hjälpfunktion för att läsa raw body från request
-async function getRawBody(req: VercelRequest): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = ''
-    req.setEncoding('utf8')
-    
-    req.on('data', (chunk) => {
-      data += chunk
-    })
-    
-    req.on('end', () => {
-      resolve(data)
-    })
-    
-    req.on('error', (err) => {
-      reject(err)
-    })
-  })
+// Bestäm vilken typ av lista task:en tillhör
+function getListType(listId: string): 'customer' | 'privatperson' | 'foretag' | 'unknown' {
+  if (listId === BEGONE_LISTS.PRIVATPERSON) return 'privatperson'
+  if (listId === BEGONE_LISTS.FORETAG) return 'foretag'
+  
+  // Om det inte är en BeGone-lista, antag att det är en kundlista
+  // (kommer verifieras i handleCustomerTask)
+  return 'customer'
 }
 
-// Verifiera webhook-signatur från ClickUp
-function verifyWebhookSignature(body: string, signature: string | null, secret: string): boolean {
-  if (!signature) return false
-  
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(body)
-    .digest('hex')
-  
-  return signature === expectedSignature
+// Hantera ärenden för avtalskunder (befintlig logik)
+async function handleCustomerTask(payload: ClickUpWebhookPayload, listId: string) {
+  const { data: customer, error: customerError } = await supabase
+    .from('customers')
+    .select('id, company_name, clickup_list_id')
+    .eq('clickup_list_id', listId)
+    .single()
+
+  if (customerError || !customer) {
+    console.log(`ℹ️ Task ${payload.task_id} is not in a customer list (list_id: ${listId})`)
+    return
+  }
+
+  console.log(`📋 Processing ${payload.event} for customer: ${customer.company_name}`)
+
+  switch (payload.event) {
+    case 'taskCreated':
+    case 'taskUpdated':
+      await syncCustomerTaskFromClickUp(payload.task_id, customer.id)
+      break
+    
+    case 'taskDeleted':
+      await handleCustomerTaskDeleted(payload.task_id, customer.id)
+      break
+  }
 }
 
-// Synkronisera task från ClickUp till vår databas
-async function syncTaskFromClickUp(taskId: string, customerId: string) {
+// Hantera ärenden för BeGone listor (ny logik)
+async function handleBeGoneTask(payload: ClickUpWebhookPayload, listId: string, tableName: 'private_cases' | 'business_cases') {
+  const listDisplayName = tableName === 'private_cases' ? 'Privatperson' : 'Företag'
+  console.log(`📋 Processing ${payload.event} for BeGone ${listDisplayName} list`)
+
+  switch (payload.event) {
+    case 'taskCreated':
+    case 'taskUpdated':
+      await syncBeGoneTaskFromClickUp(payload.task_id, tableName)
+      break
+    
+    case 'taskDeleted':
+      await handleBeGoneTaskDeleted(payload.task_id, tableName)
+      break
+  }
+}
+
+// Synkronisera avtalskund task (befintlig logik)
+async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
   try {
-    console.log(`🔄 Syncing task ${taskId} for customer ${customerId}`)
+    console.log(`🔄 Syncing customer task ${taskId} for customer ${customerId}`)
     
     const taskData = await fetchClickUpTask(taskId)
     if (!taskData) {
@@ -190,24 +203,7 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
       return
     }
 
-    console.log(`📋 Task data fetched:`, {
-      id: taskData.id,
-      name: taskData.name,
-      status: taskData.status?.status,
-      list_id: taskData.list?.id,
-      custom_fields_count: taskData.custom_fields?.length || 0
-    })
-
-    const caseData = mapClickUpTaskToCaseData(taskData, customerId)
-    
-    console.log(`💾 Saving case data:`, {
-      customer_id: caseData.customer_id,
-      clickup_task_id: caseData.clickup_task_id,
-      case_number: caseData.case_number,
-      title: caseData.title,
-      status: caseData.status,
-      case_type: caseData.case_type // Loggar för att verifiera
-    })
+    const caseData = mapClickUpTaskToCustomerCaseData(taskData, customerId)
     
     const { error } = await supabase
       .from('cases')
@@ -220,10 +216,42 @@ async function syncTaskFromClickUp(taskId: string, customerId: string) {
       throw error
     }
 
-    console.log(`✅ Successfully synced task ${taskId}`)
+    console.log(`✅ Successfully synced customer task ${taskId}`)
     
   } catch (error) {
-    console.error(`❌ Error syncing task ${taskId}:`, error)
+    console.error(`❌ Error syncing customer task ${taskId}:`, error)
+    throw error
+  }
+}
+
+// Synkronisera BeGone task (ny logik)
+async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cases' | 'business_cases') {
+  try {
+    console.log(`🔄 Syncing BeGone task ${taskId} to ${tableName}`)
+    
+    const taskData = await fetchClickUpTask(taskId)
+    if (!taskData) {
+      console.error(`❌ Could not fetch task ${taskId} from ClickUp`)
+      return
+    }
+
+    const caseData = mapClickUpTaskToBeGoneCaseData(taskData, tableName)
+    
+    const { error } = await supabase
+      .from(tableName)
+      .upsert(caseData, {
+        onConflict: 'clickup_task_id'
+      })
+
+    if (error) {
+      console.error('❌ Database error:', error)
+      throw error
+    }
+
+    console.log(`✅ Successfully synced BeGone task ${taskId} to ${tableName}`)
+    
+  } catch (error) {
+    console.error(`❌ Error syncing BeGone task ${taskId}:`, error)
     throw error
   }
 }
@@ -245,7 +273,6 @@ async function fetchClickUpTask(taskId: string) {
     }
 
     const data = await response.json()
-    // Vissa API-endpoints returnerar datan direkt, andra under en "task"-nyckel.
     return data.task || data 
     
   } catch (error) {
@@ -254,115 +281,216 @@ async function fetchClickUpTask(taskId: string) {
   }
 }
 
-// Mappa ClickUp status till våra tillåtna värden
-function mapStatusValue(clickupStatus: string | undefined): string {
-  if (!clickupStatus) return 'open'
-  
-  const statusMap: { [key: string]: string } = {
-    // ClickUp svenska statusar till engelska databas-värden
-    'att göra': 'open',
-    'under hantering': 'in_progress', 
-    'bokat': 'in_progress',
-    'pågående': 'in_progress',
-    'slutförd': 'completed',
-    'klar': 'completed',
-    'avslutad': 'completed',
-    'stängd': 'closed',
-    'avbruten': 'closed',
-    
-    // Engelska ClickUp statusar
-    'to do': 'open',
-    'in progress': 'in_progress',
-    'review': 'in_progress', 
-    'done': 'completed',
-    'complete': 'completed',
-    'completed': 'completed',
-    'closed': 'closed',
-    'cancelled': 'closed',
-    
-    // Fallbacks
-    'open': 'open',
-    'pending': 'open'
-  }
-  
-  return statusMap[clickupStatus.toLowerCase()] || 'open'
-}
-
-// Mappa ClickUp priority till våra tillåtna värden
-function mapPriorityValue(clickupPriority: string | undefined): string {
-  if (!clickupPriority) return 'low'
-  
-  const priorityMap: { [key: string]: string } = {
-    'urgent': 'urgent',
-    'high': 'high', 
-    'normal': 'low',  // Mappa 'normal' till 'low' eftersom 'normal' inte är tillåtet
-    'low': 'low',
-    '1': 'urgent',
-    '2': 'high',
-    '3': 'low',
-    '4': 'low'
-  }
-  
-  return priorityMap[clickupPriority.toLowerCase()] || 'low'
-}
-
-// Mappa ClickUp task-data till vårt cases-format
-function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
+// Mappa BeGone task till databas-format (ny funktion)
+function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases' | 'business_cases') {
   const getCustomField = (name: string) => {
     return taskData.custom_fields?.find((field: any) => 
       field.name.toLowerCase() === name.toLowerCase()
-    );
-  };
+    )
+  }
 
-  // *** HÄR ÄR DEN ENDA ÄNDRINGEN - DEN KORRIGERADE FUNKTIONEN ***
   const getDropdownText = (field: any): string | null => {
-    if (!field) {
-      return null;
-    }
-
-    // Ett fält utan värde har oftast value: null eller value: undefined.
-    // VIKTIGT: Vi kollar INTE mot 0, eftersom 0 är ett giltigt orderindex!
-    if (field.value === null || field.value === undefined) {
-      console.log(`🔍 Field '${field.name}' has a null or undefined value.`);
-      return null;
+    if (!field || field.value === null || field.value === undefined) {
+      return null
     }
 
     if (field.type_config?.options && Array.isArray(field.type_config.options)) {
-      let option: any = null;
+      let option: any = null
 
-      // ClickUp använder antingen ett numeriskt 'orderindex' eller en text-baserad UUID ('id') som värde.
       if (typeof field.value === 'number') {
         option = field.type_config.options.find(
           (opt: any) => opt.orderindex === field.value
-        );
+        )
       } else if (typeof field.value === 'string') {
         option = field.type_config.options.find(
           (opt: any) => opt.id === field.value
-        );
+        )
       }
       
       if (option) {
-        console.log(`✅ Matched dropdown option for '${field.name}': '${option.name}'`);
-        return option.name;
-      } else {
-        console.warn(`⚠️ Could not find a matching dropdown option for '${field.name}' with value:`, field.value);
+        return option.name
       }
     }
 
-    // Fallback om ingen option matchades eller om det inte är en standard dropdown.
-    console.log(`🔍 Fallback: returning value as string for field '${field.name}'`);
-    return field.value.toString();
-  };
-  // *** SLUT PÅ DEN KORRIGERADE FUNKTIONEN ***
+    return field.value.toString()
+  }
 
-  const addressField = getCustomField('Adress');
-  const pestField = getCustomField('Skadedjur');
-  const caseTypeField = getCustomField('Ärende');
-  const priceField = getCustomField('Pris');
-  const reportField = getCustomField('Rapport');
-  const filesField = getCustomField('Filer');
+  // Mappa assignees till tekniker
+  const assignees = taskData.assignees || []
+  const assigneeData = mapAssignees(assignees)
 
-  const assignee = taskData.assignees?.[0];
+  // Mappa datum
+  const dateData = mapTaskDates(taskData)
+
+  // Grundläggande data
+  const baseData = {
+    clickup_task_id: taskData.id,
+    case_number: taskData.custom_id || `${taskData.id.slice(-6)}`,
+    title: taskData.name,
+    description: taskData.description || null,
+    status: mapStatusValue(taskData.status?.status),
+    priority: mapPriorityValue(taskData.priority?.priority),
+    ...assigneeData,
+    ...dateData,
+    updated_at: new Date().toISOString()
+  }
+
+  // Custom fields
+  const customFieldData: any = {}
+  
+  if (taskData.custom_fields) {
+    taskData.custom_fields.forEach((field: any) => {
+      const columnName = sanitizeFieldName(field.name)
+      let value = field.value
+
+      switch (field.type) {
+        case 'location':
+          if (value && typeof value === 'object') {
+            customFieldData[columnName] = JSON.stringify(value)
+          }
+          break
+        
+        case 'attachment':
+          if (value && Array.isArray(value)) {
+            customFieldData[columnName] = JSON.stringify(value)
+          }
+          break
+        
+        case 'drop_down':
+          customFieldData[columnName] = getDropdownText(field)
+          break
+        
+        case 'currency':
+        case 'number':
+          customFieldData[columnName] = value !== null && value !== undefined ? parseFloat(value) : null
+          break
+        
+        case 'checkbox':
+          customFieldData[columnName] = Boolean(value)
+          break
+        
+        default:
+          if (value !== null && value !== undefined) {
+            customFieldData[columnName] = value.toString()
+          }
+      }
+    })
+  }
+
+  return { ...baseData, ...customFieldData }
+}
+
+// Mappa assignees till tekniker (återanvänd från import)
+function mapAssignees(assignees: any[]): any {
+  const assigneeData: any = {}
+  
+  const knownTechnicians = [
+    { id: 'a9e21ebe-8994-4a49-ae31-859353457d3f', name: 'Benny Linden', email: 'benny.linden@begone.se' },
+    { id: '2296a1e9-b466-4be9-92ea-0ed83a4829ff', name: 'Christian Karlsson', email: 'christian.karlsson@begone.se' },
+    { id: '35e82f86-bcca-4d00-b079-d5dc3dad1b07', name: 'Hans Norman', email: 'hans.norman@begone.se' },
+    { id: 'c21d3048-95b5-453a-b39c-0eb47c3e688b', name: 'Jakob Wahlberg', email: 'jakob.wahlberg@begone.se' },
+    { id: '6a10fe98-d4d4-4e38-82a4-c4ecdf33a82c', name: 'Kim Walberg', email: 'kim.wahlberg@begone.se' },
+    { id: '8846933d-abac-47b5-b73c-b3fe6a6f3df5', name: 'Kristian Agnevik', email: 'kristian.agnevik@begone.se' },
+    { id: 'ecaf151a-44b2-4220-b105-998aa0f82d6e', name: 'Mathias Carlson', email: 'mathias.carlsson@begone.se' },
+    { id: 'e4db6838-f48d-4d7d-81cc-5ad3774acbf4', name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' }
+  ]
+
+  const limitedAssignees = assignees.slice(0, 3)
+  
+  limitedAssignees.forEach((assignee, index) => {
+    const prefix = index === 0 ? 'primary' : index === 1 ? 'secondary' : 'tertiary'
+    
+    const matchedTechnician = knownTechnicians.find(tech =>
+      tech.email.toLowerCase() === assignee.email?.toLowerCase() ||
+      tech.name.toLowerCase().includes(assignee.username?.toLowerCase() || '') ||
+      (assignee.username?.toLowerCase() || '').includes(tech.name.toLowerCase())
+    )
+    
+    assigneeData[`${prefix}_assignee_id`] = matchedTechnician?.id || null
+    assigneeData[`${prefix}_assignee_name`] = assignee.username || assignee.name || null
+    assigneeData[`${prefix}_assignee_email`] = assignee.email || matchedTechnician?.email || null
+  })
+  
+  return assigneeData
+}
+
+// Mappa task-datum (återanvänd från import)
+function mapTaskDates(task: any): any {
+  const dateData: any = {}
+  
+  if (task.start_date) {
+    const startDate = new Date(parseInt(task.start_date))
+    dateData.start_date = startDate.toISOString().split('T')[0]
+  } else if (task.date_created) {
+    const createdDate = new Date(parseInt(task.date_created))
+    dateData.start_date = createdDate.toISOString().split('T')[0]
+  }
+  
+  if (task.due_date) {
+    const dueDate = new Date(parseInt(task.due_date))
+    dateData.due_date = dueDate.toISOString().split('T')[0]
+  }
+  
+  if (task.date_closed && task.status?.status && 
+      ['slutförd', 'klar', 'genomförd', 'avslutad', 'closed'].includes(task.status.status.toLowerCase())) {
+    const completedDate = new Date(parseInt(task.date_closed))
+    dateData.completed_date = completedDate.toISOString().split('T')[0]
+  }
+  
+  return dateData
+}
+
+// Sanitera fältnamn (återanvänd från import)
+function sanitizeFieldName(name: string): string {
+  return name.toLowerCase()
+    .replace(/[åäö]/g, (match: string) => ({ 'å': 'a', 'ä': 'a', 'ö': 'o' }[match] || match))
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+// Mappa avtalskund task (befintlig logik)
+function mapClickUpTaskToCustomerCaseData(taskData: any, customerId: string) {
+  const getCustomField = (name: string) => {
+    return taskData.custom_fields?.find((field: any) => 
+      field.name.toLowerCase() === name.toLowerCase()
+    )
+  }
+
+  const getDropdownText = (field: any): string | null => {
+    if (!field || field.value === null || field.value === undefined) {
+      return null
+    }
+
+    if (field.type_config?.options && Array.isArray(field.type_config.options)) {
+      let option: any = null
+
+      if (typeof field.value === 'number') {
+        option = field.type_config.options.find(
+          (opt: any) => opt.orderindex === field.value
+        )
+      } else if (typeof field.value === 'string') {
+        option = field.type_config.options.find(
+          (opt: any) => opt.id === field.value
+        )
+      }
+      
+      if (option) {
+        return option.name
+      }
+    }
+
+    return field.value.toString()
+  }
+
+  const addressField = getCustomField('Adress')
+  const pestField = getCustomField('Skadedjur')
+  const caseTypeField = getCustomField('Ärende')
+  const priceField = getCustomField('Pris')
+  const reportField = getCustomField('Rapport')
+  const filesField = getCustomField('Filer')
+
+  const assignee = taskData.assignees?.[0]
 
   return {
     customer_id: customerId,
@@ -372,7 +500,7 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     status: mapStatusValue(taskData.status?.status || taskData.status),
     priority: mapPriorityValue(taskData.priority?.priority),
     pest_type: getDropdownText(pestField),
-    case_type: getDropdownText(caseTypeField), // Denna kommer nu fungera korrekt!
+    case_type: getDropdownText(caseTypeField),
     description: taskData.description || '',
     
     address_formatted: addressField?.value?.formatted_address || null,
@@ -394,13 +522,59 @@ function mapClickUpTaskToCaseData(taskData: any, customerId: string) {
     completed_date: taskData.date_closed ? new Date(parseInt(taskData.date_closed)).toISOString() : null,
     
     updated_at: new Date().toISOString()
-  };
+  }
 }
 
+// Status mappning
+function mapStatusValue(clickupStatus: string | undefined): string {
+  if (!clickupStatus) return 'open'
+  
+  const statusMap: { [key: string]: string } = {
+    'att göra': 'open',
+    'under hantering': 'in_progress', 
+    'bokat': 'in_progress',
+    'pågående': 'in_progress',
+    'slutförd': 'completed',
+    'klar': 'completed',
+    'avslutad': 'completed',
+    'stängd': 'closed',
+    'avbruten': 'closed',
+    'to do': 'open',
+    'in progress': 'in_progress',
+    'review': 'in_progress', 
+    'done': 'completed',
+    'complete': 'completed',
+    'completed': 'completed',
+    'closed': 'closed',
+    'cancelled': 'closed',
+    'open': 'open',
+    'pending': 'open'
+  }
+  
+  return statusMap[clickupStatus.toLowerCase()] || 'open'
+}
 
-// Hantera när en task tas bort
-async function handleTaskDeleted(taskId: string, customerId: string) {
-  console.log(`🗑️ Handling deleted task ${taskId}`)
+// Priority mappning
+function mapPriorityValue(clickupPriority: string | undefined): string {
+  if (!clickupPriority) return 'normal'
+  
+  const priorityMap: { [key: string]: string } = {
+    'urgent': 'urgent',
+    'high': 'high', 
+    'normal': 'normal',
+    'low': 'normal',
+    '1': 'urgent',
+    '2': 'high',
+    '3': 'normal',
+    '4': 'normal'
+  }
+  
+  return priorityMap[clickupPriority.toLowerCase()] || 'normal'
+}
+
+// Hantera raderade avtalskund tasks
+async function handleCustomerTaskDeleted(taskId: string, customerId: string) {
+  console.log(`🗑️ Handling deleted customer task ${taskId}`)
   
   const { error } = await supabase
     .from('cases')
@@ -412,9 +586,60 @@ async function handleTaskDeleted(taskId: string, customerId: string) {
     .eq('customer_id', customerId)
 
   if (error) {
-    console.error('❌ Error handling deleted task:', error)
+    console.error('❌ Error handling deleted customer task:', error)
     throw error
   }
 
-  console.log(`✅ Marked task ${taskId} as deleted`)
+  console.log(`✅ Marked customer task ${taskId} as deleted`)
+}
+
+// Hantera raderade BeGone tasks
+async function handleBeGoneTaskDeleted(taskId: string, tableName: 'private_cases' | 'business_cases') {
+  console.log(`🗑️ Handling deleted BeGone task ${taskId} from ${tableName}`)
+  
+  const { error } = await supabase
+    .from(tableName)
+    .update({ 
+      status: 'deleted',
+      updated_at: new Date().toISOString()
+    })
+    .eq('clickup_task_id', taskId)
+
+  if (error) {
+    console.error('❌ Error handling deleted BeGone task:', error)
+    throw error
+  }
+
+  console.log(`✅ Marked BeGone task ${taskId} as deleted in ${tableName}`)
+}
+
+// Hjälpfunktioner
+async function getRawBody(req: VercelRequest): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.setEncoding('utf8')
+    
+    req.on('data', (chunk) => {
+      data += chunk
+    })
+    
+    req.on('end', () => {
+      resolve(data)
+    })
+    
+    req.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
+function verifyWebhookSignature(body: string, signature: string | null, secret: string): boolean {
+  if (!signature) return false
+  
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(body)
+    .digest('hex')
+  
+  return signature === expectedSignature
 }
