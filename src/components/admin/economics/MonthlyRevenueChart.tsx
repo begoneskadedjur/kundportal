@@ -1,4 +1,4 @@
-// src/components/admin/economics/MonthlyRevenueChart.tsx - MED MÅNAD-FÖR-MÅNAD NAVIGATION
+// src/components/admin/economics/MonthlyRevenueChart.tsx - MED 1 MÅNAD + MÅNAD-FÖR-MÅNAD NAVIGATION
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, Calendar, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -10,14 +10,14 @@ import { formatCurrency } from '../../../utils/formatters'
 const MonthlyRevenueChart: React.FC = () => {
   const { data: monthlyData, loading, error } = useMonthlyRevenue()
   
-  // 🆕 Månad-för-månad navigation
+  // 🆕 Månad-för-månad navigation med 1m option
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     // Default till nuvarande månad
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   
-  const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m'>('6m')
+  const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
   const [showDataTypes, setShowDataTypes] = useState({
     contract: true,
     case: true,
@@ -127,12 +127,12 @@ const MonthlyRevenueChart: React.FC = () => {
     )
   }
 
-  // 🆕 Filtrera data baserat på vald månad + period
+  // 🆕 Filtrera data baserat på vald månad + period (inklusive 1m)
   const getFilteredData = () => {
     const selectedIndex = monthlyData.findIndex(item => item.month === selectedMonth)
     if (selectedIndex === -1) return []
     
-    const monthsToShow = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
+    const monthsToShow = selectedPeriod === '1m' ? 1 : selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12
     const startIndex = Math.max(0, selectedIndex - monthsToShow + 1)
     const endIndex = selectedIndex + 1
     
@@ -263,9 +263,9 @@ const MonthlyRevenueChart: React.FC = () => {
             </Button>
           )}
 
-          {/* Period filter */}
+          {/* 🆕 Period filter med 1m option */}
           <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['3m', '6m', '12m'] as const).map((period) => (
+            {(['1m', '3m', '6m', '12m'] as const).map((period) => (
               <Button
                 key={period}
                 variant={selectedPeriod === period ? 'primary' : 'secondary'}
@@ -273,33 +273,46 @@ const MonthlyRevenueChart: React.FC = () => {
                 onClick={() => setSelectedPeriod(period)}
                 className="text-xs"
               >
-                {period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
+                {period === '1m' ? '1 mån' : period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
               </Button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* 🆕 Statistik för vald månad */}
+      {/* 🆕 Statistik för vald månad/period */}
       <div className="mb-6">
         <h3 className="text-sm text-slate-400 mb-3">
-          {formatSelectedMonth(selectedMonth)} - Detaljerade intäkter
+          {selectedPeriod === '1m' 
+            ? `${formatSelectedMonth(selectedMonth)} - Detaljerade intäkter`
+            : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Detaljerade intäkter`
+          }
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-400 font-bold text-lg">{formatCurrency(selectedMonthTotal)}</p>
-            <p className="text-blue-300 text-sm">Total intäkt</p>
+            <p className="text-blue-400 font-bold text-lg">
+              {selectedPeriod === '1m' ? formatCurrency(selectedMonthTotal) : formatCurrency(totalRevenue)}
+            </p>
+            <p className="text-blue-300 text-sm">
+              {selectedPeriod === '1m' ? 'Total intäkt' : `Total intäkt (${selectedPeriod})`}
+            </p>
           </div>
           <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-bold text-lg">{formatCurrency(selectedMonthContract)}</p>
+            <p className="text-green-400 font-bold text-lg">
+              {selectedPeriod === '1m' ? formatCurrency(selectedMonthContract) : formatCurrency(totalContractRevenue)}
+            </p>
             <p className="text-green-300 text-sm">Kontraktsintäkter</p>
           </div>
           <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-yellow-400 font-bold text-lg">{formatCurrency(selectedMonthCase)}</p>
+            <p className="text-yellow-400 font-bold text-lg">
+              {selectedPeriod === '1m' ? formatCurrency(selectedMonthCase) : formatCurrency(totalCaseRevenue)}
+            </p>
             <p className="text-yellow-300 text-sm">Merförsäljning Avtal</p>
           </div>
           <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 font-bold text-lg">{formatCurrency(selectedMonthEngangsjobb)}</p>
+            <p className="text-orange-400 font-bold text-lg">
+              {selectedPeriod === '1m' ? formatCurrency(selectedMonthEngangsjobb) : formatCurrency(totalEngangsjobb)}
+            </p>
             <p className="text-orange-300 text-sm">Intäkter Engångsjobb</p>
           </div>
         </div>
@@ -407,10 +420,12 @@ const MonthlyRevenueChart: React.FC = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* Tillväxt jämfört med föregående månad */}
+      {/* 🆕 Tillväxt jämfört med föregående månad - visar alltid för vald månad */}
       <div className="mt-4 pt-4 border-t border-slate-800">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-400">Jämfört med föregående månad:</span>
+          <span className="text-slate-400">
+            {formatSelectedMonth(selectedMonth)} jämfört med föregående månad:
+          </span>
           <div className="flex items-center gap-4">
             <span className="text-white">
               {formatCurrency(selectedMonthTotal)}
