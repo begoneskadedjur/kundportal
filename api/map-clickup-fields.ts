@@ -1,4 +1,4 @@
-// api/map-clickup-fields.ts - Mappa alla custom fields från BeGone listor
+// api/map-clickup-fields.ts - Mappa custom fields för SEPARATA tabeller
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
@@ -11,10 +11,13 @@ interface CustomField {
   type_config?: any
 }
 
-interface ListInfo {
-  id: string
-  name: string
+interface ListAnalysis {
+  list_id: string
+  list_name: string
   fields: CustomField[]
+  table_name: string
+  sql_schema: string
+  typescript_types: string
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -22,29 +25,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Härda listor från skärmdump - du kan uppdatera dessa med riktiga IDs
-  const BEGONE_LISTS = [
-    { id: 'PRIVATPERSON_LIST_ID', name: 'Privatperson' },
-    { id: 'FÖRETAG_LIST_ID', name: 'Företag' }
-  ]
-
-  // Om specifika list IDs skickas som query params
   const { privatperson_id, foretag_id } = req.query
-  
-  if (privatperson_id) BEGONE_LISTS[0].id = privatperson_id as string
-  if (foretag_id) BEGONE_LISTS[1].id = foretag_id as string
+
+  if (!privatperson_id || !foretag_id) {
+    return res.status(400).json({
+      error: 'Både privatperson_id och foretag_id krävs',
+      usage: '/api/map-clickup-fields?privatperson_id=901204857438&foretag_id=901204857574'
+    })
+  }
 
   try {
-    const allListData: ListInfo[] = []
+    const lists = [
+      { id: privatperson_id as string, name: 'Privatperson', table: 'private_cases' },
+      { id: foretag_id as string, name: 'Företag', table: 'business_cases' }
+    ]
 
-    // Hämta custom fields för varje lista
-    for (const list of BEGONE_LISTS) {
-      if (list.id.includes('LIST_ID')) {
-        console.log(`Skippar ${list.name} - inget riktigt ID angivet`)
-        continue
-      }
+    const analyses: ListAnalysis[] = []
 
+    // Analysera varje lista separat
+    for (const list of lists) {
       try {
+        console.log(`Hämtar custom fields för ${list.name}...`)
+        
         const response = await fetch(`https://api.clickup.com/api/v2/list/${list.id}/field`, {
           headers: {
             'Authorization': CLICKUP_API_TOKEN,
@@ -52,163 +54,195 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          const fields: CustomField[] = data.fields?.map((field: any) => ({
-            id: field.id,
-            name: field.name,
-            type: field.type,
-            required: field.required,
-            type_config: field.type_config
-          })) || []
-
-          allListData.push({
-            id: list.id,
-            name: list.name,
-            fields: fields
-          })
-        } else {
-          console.error(`Fel vid hämtning av ${list.name}:`, response.status)
+        if (!response.ok) {
+          console.error(`Fel för ${list.name}:`, response.status, response.statusText)
+          continue
         }
+
+        const data = await response.json()
+        const fields: CustomField[] = data.fields?.map((field: any) => ({
+          id: field.id,
+          name: field.name,
+          type: field.type,
+          required: field.required,
+          type_config: field.type_config
+        })) || []
+
+        // Generera SQL schema för denna specifika lista
+        const sqlSchema = generateTableSchema(list.table, fields)
+        
+        // Generera TypeScript types för denna lista
+        const typescriptTypes = generateListTypes(list.table, fields)
+
+        analyses.push({
+          list_id: list.id,
+          list_name: list.name,
+          fields: fields,
+          table_name: list.table,
+          sql_schema: sqlSchema,
+          typescript_types: typescriptTypes
+        })
+
+        console.log(`✅ ${list.name}: ${fields.length} custom fields hittade`)
+
       } catch (error) {
-        console.error(`Fel för lista ${list.name}:`, error)
+        console.error(`Fel vid analys av ${list.name}:`, error)
       }
     }
 
-    // Analysera alla unika fälttyper och namn
-    const allFields = allListData.flatMap(list => 
-      list.fields.map(field => ({ ...field, source_list: list.name }))
-    )
-
-    const fieldTypes = [...new Set(allFields.map(f => f.type))]
-    const fieldNames = [...new Set(allFields.map(f => f.name))]
-
-    // Skapa Supabase tabell-förslag
-    const supabaseSchema = generateSupabaseSchema(allFields)
-
-    // Generera uppdaterade TypeScript types
-    const typescriptTypes = generateTypescriptTypes(allFields)
-
-    return res.status(200).json({
+    // Skapa sammansatt resultat
+    const result = {
       success: true,
+      timestamp: new Date().toISOString(),
       summary: {
-        total_lists: allListData.length,
-        total_fields: allFields.length,
-        unique_field_types: fieldTypes.length,
-        unique_field_names: fieldNames.length
+        privatperson_fields: analyses.find(a => a.list_name === 'Privatperson')?.fields.length || 0,
+        foretag_fields: analyses.find(a => a.list_name === 'Företag')?.fields.length || 0,
+        total_unique_fields: [...new Set(analyses.flatMap(a => a.fields.map(f => f.name)))].length
       },
-      lists: allListData,
-      analysis: {
-        field_types: fieldTypes,
-        field_names: fieldNames,
-        common_fields: findCommonFields(allListData)
-      },
-      supabase_schema: supabaseSchema,
-      typescript_types: typescriptTypes,
-      next_steps: [
-        "1. Kör denna API med riktiga list IDs",
-        "2. Använd supabase_schema för att skapa/uppdatera cases tabellen",
-        "3. Uppdatera TypeScript types i database.ts",
-        "4. Modifiera clickup-webhook.ts för att mappa nya fält",
-        "5. Skapa admin-komponenter för att visa/sortera datan"
-      ]
-    })
+      analyses: analyses,
+      implementation_steps: [
+        "1. Kopiera SQL schemas nedan och kör i Supabase",
+        "2. Uppdatera src/types/database.ts med nya TypeScript types",
+        "3. Skapa services för private_cases och business_cases",
+        "4. Uppdatera clickup-webhook.ts för att hantera båda tabellerna",
+        "5. Skapa admin-komponenter för att visa och hantera båda typerna",
+        "6. Uppdatera create-case.ts för att skapa rätt typ baserat på lista"
+      ],
+      combined_sql: generateCombinedSQL(analyses),
+      combined_typescript: generateCombinedTypeScript(analyses)
+    }
+
+    return res.status(200).json(result)
 
   } catch (error: any) {
     return res.status(500).json({
-      error: 'Kunde inte mappa ClickUp fields',
+      error: 'Kunde inte mappa ClickUp custom fields',
       details: error.message
     })
   }
 }
 
-function findCommonFields(lists: ListInfo[]): any {
-  if (lists.length < 2) return {}
+function generateTableSchema(tableName: string, fields: CustomField[]): string {
+  let schema = `-- ${tableName.toUpperCase()} TABELL\n`
+  schema += `CREATE TABLE IF NOT EXISTS ${tableName} (\n`
+  
+  // Grundläggande fält som alla tabeller behöver
+  schema += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`
+  schema += `  clickup_task_id TEXT NOT NULL UNIQUE,\n`
+  schema += `  case_number TEXT,\n`
+  schema += `  title TEXT NOT NULL,\n`
+  schema += `  description TEXT,\n`
+  schema += `  status TEXT DEFAULT 'open',\n`
+  schema += `  priority TEXT DEFAULT 'normal',\n`
+  schema += `  created_at TIMESTAMPTZ DEFAULT NOW(),\n`
+  schema += `  updated_at TIMESTAMPTZ DEFAULT NOW(),\n`
+  schema += `  \n`
+  schema += `  -- Custom fields från ClickUp\n`
 
-  const [first, ...rest] = lists
-  const commonFields: any = {}
-
-  first.fields.forEach(field => {
-    const isCommon = rest.every(list => 
-      list.fields.some(f => f.name === field.name && f.type === field.type)
-    )
-    
-    if (isCommon) {
-      commonFields[field.name] = {
-        type: field.type,
-        id_privatperson: lists.find(l => l.name === 'Privatperson')?.fields.find(f => f.name === field.name)?.id,
-        id_foretag: lists.find(l => l.name === 'Företag')?.fields.find(f => f.name === field.name)?.id
-      }
-    }
-  })
-
-  return commonFields
-}
-
-function generateSupabaseSchema(fields: any[]): string {
-  const uniqueFields = fields.reduce((acc, field) => {
-    if (!acc.find((f: any) => f.name === field.name)) {
-      acc.push(field)
-    }
-    return acc
-  }, [])
-
-  let schema = `-- Uppdaterad cases tabell med alla custom fields från ClickUp\n`
-  schema += `ALTER TABLE cases ADD COLUMN IF NOT EXISTS\n`
-
-  uniqueFields.forEach((field, index) => {
+  fields.forEach((field, index) => {
     const sqlType = mapFieldTypeToSQL(field.type)
-    const columnName = field.name.toLowerCase()
-      .replace(/[åäö]/g, (match: string) => ({ 'å': 'a', 'ä': 'a', 'ö': 'o' }[match] || match))
-      .replace(/[^a-z0-9]/g, '_')
-      .replace(/_{2,}/g, '_')
-      .replace(/^_|_$/g, '')
-
+    const columnName = sanitizeColumnName(field.name)
+    
     schema += `  ${columnName} ${sqlType}`
-    if (index < uniqueFields.length - 1) schema += `,`
+    if (index < fields.length - 1) {
+      schema += `,`
+    }
     schema += ` -- ${field.name} (${field.type})\n`
   })
 
-  schema += `;`
+  schema += `);\n\n`
+  
+  // Lägg till index
+  schema += `-- Index för prestanda\n`
+  schema += `CREATE INDEX IF NOT EXISTS idx_${tableName}_clickup_task_id ON ${tableName}(clickup_task_id);\n`
+  schema += `CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(status);\n`
+  schema += `CREATE INDEX IF NOT EXISTS idx_${tableName}_created_at ON ${tableName}(created_at);\n\n`
+
   return schema
 }
 
-function generateTypescriptTypes(fields: any[]): string {
-  const uniqueFields = fields.reduce((acc, field) => {
-    if (!acc.find((f: any) => f.name === field.name)) {
-      acc.push(field)
-    }
-    return acc
-  }, [])
+function generateListTypes(tableName: string, fields: CustomField[]): string {
+  const interfaceName = tableName.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join('') + 'Row'
 
-  let types = `// Uppdaterade TypeScript types för cases tabellen\n`
-  types += `interface CasesRow {\n`
-  types += `  // Befintliga fält\n`
+  let types = `// ${tableName.toUpperCase()} TypeScript Interface\n`
+  types += `export interface ${interfaceName} {\n`
+  
+  // Grundläggande fält
   types += `  id: string\n`
-  types += `  customer_id: string\n`
   types += `  clickup_task_id: string\n`
-  types += `  case_number: string\n`
+  types += `  case_number?: string\n`
   types += `  title: string\n`
+  types += `  description?: string\n`
   types += `  status: string\n`
   types += `  priority: string\n`
-  types += `  description: string\n`
   types += `  created_at: string\n`
-  types += `  updated_at: string\n\n`
-  types += `  // Custom fields från ClickUp\n`
+  types += `  updated_at: string\n`
+  types += `  \n`
+  types += `  // Custom fields\n`
 
-  uniqueFields.forEach(field => {
+  fields.forEach(field => {
     const tsType = mapFieldTypeToTypeScript(field.type)
-    const propertyName = field.name.toLowerCase()
-      .replace(/[åäö]/g, (match: string) => ({ 'å': 'a', 'ä': 'a', 'ö': 'o' }[match] || match))
-      .replace(/[^a-z0-9]/g, '_')
-      .replace(/_{2,}/g, '_')
-      .replace(/^_|_$/g, '')
-
+    const propertyName = sanitizeColumnName(field.name)
+    
     types += `  ${propertyName}?: ${tsType} // ${field.name}\n`
   })
 
-  types += `}`
+  types += `}\n\n`
   return types
+}
+
+function generateCombinedSQL(analyses: ListAnalysis[]): string {
+  let combined = `-- KOMPLETT SQL SCHEMA FÖR BEGONE ÄRENDEN\n`
+  combined += `-- Kör detta i Supabase SQL Editor\n\n`
+  
+  analyses.forEach(analysis => {
+    combined += analysis.sql_schema + '\n'
+  })
+
+  // Lägg till RLS policies
+  combined += `-- Row Level Security Policies\n`
+  analyses.forEach(analysis => {
+    combined += `ALTER TABLE ${analysis.table_name} ENABLE ROW LEVEL SECURITY;\n`
+    combined += `\n`
+    combined += `-- Admin kan se allt\n`
+    combined += `CREATE POLICY "${analysis.table_name}_admin_all" ON ${analysis.table_name}\n`
+    combined += `  FOR ALL USING (true);\n`
+    combined += `\n`
+  })
+
+  return combined
+}
+
+function generateCombinedTypeScript(analyses: ListAnalysis[]): string {
+  let combined = `// KOMPLETTA TYPESCRIPT TYPES FÖR database.ts\n`
+  combined += `// Lägg till dessa i src/types/database.ts\n\n`
+  
+  analyses.forEach(analysis => {
+    combined += analysis.typescript_types + '\n'
+  })
+
+  // Lägg till union types
+  combined += `// Union types för flexibel hantering\n`
+  combined += `export type BeGoneCaseRow = PrivateCasesRow | BusinessCasesRow\n\n`
+  
+  combined += `// Helper type för att identifiera case-typ\n`
+  combined += `export interface CaseTypeInfo {\n`
+  combined += `  table: 'private_cases' | 'business_cases'\n`
+  combined += `  list_id: string\n`
+  combined += `  display_name: string\n`
+  combined += `}\n\n`
+
+  return combined
+}
+
+function sanitizeColumnName(name: string): string {
+  return name.toLowerCase()
+    .replace(/[åäö]/g, (match: string) => ({ 'å': 'a', 'ä': 'a', 'ö': 'o' }[match] || match))
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_|_$/g, '')
 }
 
 function mapFieldTypeToSQL(clickupType: string): string {
@@ -229,7 +263,9 @@ function mapFieldTypeToSQL(clickupType: string): string {
     'attachment': 'JSONB',
     'formula': 'TEXT',
     'rating': 'INTEGER',
-    'automatic_progress': 'INTEGER'
+    'automatic_progress': 'INTEGER',
+    'short_text': 'TEXT',
+    'long_text': 'TEXT'
   }
   
   return typeMap[clickupType] || 'TEXT'
@@ -253,7 +289,9 @@ function mapFieldTypeToTypeScript(clickupType: string): string {
     'attachment': 'any[]',
     'formula': 'string',
     'rating': 'number',
-    'automatic_progress': 'number'
+    'automatic_progress': 'number',
+    'short_text': 'string',
+    'long_text': 'string'
   }
   
   return typeMap[clickupType] || 'any'
