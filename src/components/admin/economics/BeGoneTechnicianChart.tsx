@@ -1,10 +1,14 @@
-// 📁 src/components/admin/economics/BeGoneTechnicianChart.tsx - FIXAD VERSION
+// 📁 src/components/admin/economics/BeGoneTechnicianChart.tsx - MODERN VERSION
 import React, { useState, useEffect, useMemo } from 'react'
-import { Wrench, Award, Target, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
-import Card from '../../ui/Card'
-import Button from '../../ui/Button'
+import { Wrench, Target, TrendingUp } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
+
+// Nya moderna komponenter
+import ModernCard from '../../ui/ModernCard'
+import { CombinedNavigation } from '../../ui/ModernNavigation'
+import ModernPodium, { formatTechnicianForPodium } from '../../ui/ModernPodium'
+import ModernList, { createListItem } from '../../ui/ModernList'
 
 interface TechnicianData {
   name: string
@@ -44,7 +48,7 @@ const BeGoneTechnicianChart: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Månad och period navigation
+  // Navigation state
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -52,11 +56,19 @@ const BeGoneTechnicianChart: React.FC = () => {
   
   const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
 
+  // Period options för navigation
+  const periodOptions = [
+    { key: '1m', label: '1 månad', shortLabel: '1M' },
+    { key: '3m', label: '3 månader', shortLabel: '3M' },
+    { key: '6m', label: '6 månader', shortLabel: '6M' },
+    { key: '12m', label: '12 månader', shortLabel: '12M' }
+  ]
+
   useEffect(() => {
     fetchBeGoneTechnicianData()
   }, [])
 
-  // 🔄 Hämta BARA BeGone tekniker data
+  // 🔄 Hämta BeGone tekniker data
   const fetchBeGoneTechnicianData = async () => {
     try {
       setLoading(true)
@@ -64,12 +76,11 @@ const BeGoneTechnicianChart: React.FC = () => {
       
       console.log('🔄 Fetching BeGone technician data...')
       
-      // Hämta data från senaste 12 månaderna
       const twelveMonthsAgo = new Date()
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // 1. BeGone privatpersonsärenden
+      // Hämta privatpersonsärenden
       const { data: privateCases, error: privateError } = await supabase
         .from('private_cases')
         .select('primary_assignee_name, primary_assignee_email, pris, completed_date')
@@ -83,7 +94,7 @@ const BeGoneTechnicianChart: React.FC = () => {
         throw new Error(`Private cases: ${privateError.message}`)
       }
 
-      // 2. BeGone företagsärenden
+      // Hämta företagsärenden
       const { data: businessCases, error: businessError } = await supabase
         .from('business_cases')
         .select('primary_assignee_name, primary_assignee_email, pris, completed_date')
@@ -114,7 +125,7 @@ const BeGoneTechnicianChart: React.FC = () => {
     }
   }
 
-  // 🎯 Memoized processing av BeGone tekniker-data baserat på vald period
+  // 🎯 Processad tekniker-data baserat på vald period
   const technicianData = useMemo((): TechnicianData[] => {
     if (!allData.privateCases.length && !allData.businessCases.length) {
       return []
@@ -141,7 +152,7 @@ const BeGoneTechnicianChart: React.FC = () => {
 
     console.log(`🔍 Filtering BeGone technician data: ${startMonth} to ${endMonth} (${monthsToShow} months)`)
 
-    // Filtrera BeGone cases baserat på period
+    // Filtrera cases baserat på period
     const filteredPrivateCases = allData.privateCases.filter(case_ => {
       if (!case_.completed_date) return false
       const caseMonth = case_.completed_date.slice(0, 7)
@@ -156,7 +167,7 @@ const BeGoneTechnicianChart: React.FC = () => {
 
     console.log(`📊 Filtered BeGone data: ${filteredPrivateCases.length} private, ${filteredBusinessCases.length} business cases`)
 
-    // Samla BeGone tekniker-statistik
+    // Samla tekniker-statistik
     const technicianStats: { [key: string]: any } = {}
 
     // BeGone privatpersoner
@@ -224,26 +235,6 @@ const BeGoneTechnicianChart: React.FC = () => {
   }, [allData, selectedMonth, selectedPeriod])
 
   // Navigation functions
-  const goToPreviousMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const prevDate = new Date(year, month - 2)
-    const newMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const nextDate = new Date(year, month)
-    const newMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToCurrentMonth = () => {
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(currentMonth)
-  }
-
   const canGoPrevious = () => {
     if (!allData.privateCases.length && !allData.businessCases.length) return false
     
@@ -276,259 +267,209 @@ const BeGoneTechnicianChart: React.FC = () => {
     return selectedMonth === currentMonth
   }
 
-  const formatSelectedMonth = (monthStr: string) => {
-    const date = new Date(monthStr + '-01')
-    return date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
-  }
-
-  // 🏆 Medal components
-  const getMedalIcon = (rank: number) => {
-    switch (rank) {
-      case 1: return '🥇'
-      case 2: return '🥈'
-      case 3: return '🥉'
-      default: return `#${rank}`
-    }
-  }
-
-  const getMedalColor = (rank: number) => {
-    switch (rank) {
-      case 1: return 'from-yellow-500 to-yellow-600 border-yellow-500'
-      case 2: return 'from-gray-400 to-gray-500 border-gray-400'
-      case 3: return 'from-amber-600 to-amber-700 border-amber-600'
-      default: return 'from-slate-600 to-slate-700 border-slate-600'
-    }
+  const goToCurrentMonth = () => {
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(currentMonth)
   }
 
   // Loading state
   if (loading) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Wrench className="w-5 h-5 text-blue-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">BeGone Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-            <p className="text-slate-400 text-sm">Laddar BeGone tekniker statistik...</p>
+      <ModernCard gradient="blue" glowing>
+        <ModernCard.Header
+          icon={Wrench}
+          iconColor="text-blue-500"
+          title="BeGone Tekniker-prestanda"
+          subtitle="Laddar data..."
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+              <p className="text-slate-400 text-sm">Laddar BeGone tekniker statistik...</p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
   // Error state
   if (error) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Wrench className="w-5 h-5 text-red-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">BeGone Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-red-400">
-          <div className="text-center">
-            <Target className="w-12 h-12 mx-auto mb-4" />
-            <p className="mb-2">Fel vid laddning: {error}</p>
-            <Button onClick={fetchBeGoneTechnicianData} size="sm" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Försök igen
-            </Button>
+      <ModernCard gradient="red" glowing>
+        <ModernCard.Header
+          icon={Wrench}
+          iconColor="text-red-500"
+          title="BeGone Tekniker-prestanda"
+          subtitle="Fel vid laddning"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-red-400">
+            <div className="text-center">
+              <Target className="w-12 h-12 mx-auto mb-4" />
+              <p className="mb-2">Fel vid laddning: {error}</p>
+              <button
+                onClick={fetchBeGoneTechnicianData}
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Försök igen
+              </button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
   // Empty state
   if (!technicianData || technicianData.length === 0) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Wrench className="w-5 h-5 text-slate-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">BeGone Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-slate-400">
-          <div className="text-center">
-            <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Ingen BeGone teknikerdata tillgänglig för vald period</p>
+      <ModernCard>
+        <ModernCard.Header
+          icon={Wrench}
+          iconColor="text-slate-500"
+          title="BeGone Tekniker-prestanda"
+          subtitle="Ingen data tillgänglig"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-slate-400">
+            <div className="text-center">
+              <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Ingen BeGone teknikerdata tillgänglig för vald period</p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
+  // Beräkna sammanfattning
   const totalRevenue = technicianData.reduce((sum, tech) => sum + tech.total_revenue, 0)
   const totalCases = technicianData.reduce((sum, tech) => sum + tech.total_cases, 0)
   const totalPrivateRevenue = technicianData.reduce((sum, tech) => sum + tech.private_revenue, 0)
   const totalBusinessRevenue = technicianData.reduce((sum, tech) => sum + tech.business_revenue, 0)
 
+  // Formatera data för podium
+  const podiumData = technicianData.slice(0, 3).map(tech => 
+    formatTechnicianForPodium(tech, formatCurrency)
+  )
+
+  // Formatera data för lista
+  const listData = technicianData.map(tech => 
+    createListItem(
+      tech.name,
+      tech.name,
+      tech.total_revenue,
+      `${tech.total_cases} ärenden`,
+      {
+        rank: tech.rank,
+        status: 'active',
+        metadata: [
+          { label: 'Privatpersoner', value: `${tech.private_cases} (${formatCurrency(tech.private_revenue)})` },
+          { label: 'Företag', value: `${tech.business_cases} (${formatCurrency(tech.business_revenue)})` },
+          { label: 'Genomsnitt', value: formatCurrency(tech.avg_case_value) }
+        ]
+      }
+    )
+  )
+
+  const formatSelectedMonth = (monthStr: string) => {
+    const date = new Date(monthStr + '-01')
+    return date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
+  }
+
   return (
-    <Card>
+    <div className="space-y-8">
       {/* Header med navigation */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Wrench className="w-5 h-5 text-blue-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">BeGone Tekniker-prestanda</h2>
-          <span className="ml-2 text-sm text-slate-400">(Bara engångsjobb)</span>
-        </div>
-        
-        {/* Navigation - 🔧 FIXAD: Responsiv layout för period-knappar */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Månadväljare */}
-          <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={goToPreviousMonth}
-              disabled={!canGoPrevious()}
-              className="p-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            
-            <div className="px-3 py-1 text-white font-medium min-w-[140px] text-center">
-              {formatSelectedMonth(selectedMonth)}
-            </div>
-            
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={goToNextMonth}
-              disabled={!canGoNext()}
-              className="p-1"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {!isCurrentMonth() && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={goToCurrentMonth}
-              className="text-xs"
-            >
-              Nuvarande
-            </Button>
-          )}
-
-          {/* Period filter - 🔧 FIXAD: Mindre knappar för bättre passform */}
-          <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['1m', '3m', '6m', '12m'] as const).map((period) => (
-              <Button
-                key={period}
-                variant={selectedPeriod === period ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setSelectedPeriod(period)}
-                className="text-xs px-2 py-1"
-              >
-                {period === '1m' ? '1' : period === '3m' ? '3' : period === '6m' ? '6' : '12'}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Period översikt */}
-      <div className="mb-6">
-        <h3 className="text-sm text-slate-400 mb-3">
-          {selectedPeriod === '1m' 
-            ? `${formatSelectedMonth(selectedMonth)} - BeGone tekniker översikt`
-            : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - BeGone tekniker översikt`
+      <ModernCard gradient="blue" glowing>
+        <ModernCard.Header
+          icon={Wrench}
+          iconColor="text-blue-500"
+          title="BeGone Tekniker-prestanda"
+          subtitle="Bara engångsjobb"
+          rightElement={
+            <CombinedNavigation
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
+              periods={periodOptions}
+              canGoPrevious={canGoPrevious()}
+              canGoNext={canGoNext()}
+              onGoToCurrent={goToCurrentMonth}
+              isCurrentMonth={isCurrentMonth()}
+              compact
+            />
           }
-        </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-400 font-bold text-lg">{formatCurrency(totalRevenue)}</p>
-            <p className="text-blue-300 text-sm">Total intäkt</p>
+        />
+        
+        {/* Period översikt med moderna stat cards */}
+        <ModernCard.Content>
+          <div className="mb-6">
+            <h3 className="text-sm text-slate-400 mb-4">
+              {selectedPeriod === '1m' 
+                ? `${formatSelectedMonth(selectedMonth)} - BeGone tekniker översikt`
+                : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - BeGone tekniker översikt`
+              }
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <ModernCard.Stat
+                icon={TrendingUp}
+                iconGradient="from-blue-500 to-blue-600"
+                label="Total intäkt"
+                value={formatCurrency(totalRevenue)}
+                change={{ value: '↗️', positive: true }}
+              />
+              <ModernCard.Stat
+                icon={Wrench}
+                iconGradient="from-purple-500 to-purple-600"
+                label="Privatpersoner"
+                value={formatCurrency(totalPrivateRevenue)}
+              />
+              <ModernCard.Stat
+                icon={Target}
+                iconGradient="from-orange-500 to-orange-600"
+                label="Företag"
+                value={formatCurrency(totalBusinessRevenue)}
+              />
+              <ModernCard.Stat
+                icon={Wrench}
+                iconGradient="from-green-500 to-green-600"
+                label="Totala ärenden"
+                value={totalCases}
+              />
+            </div>
           </div>
-          <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-            <p className="text-purple-400 font-bold text-lg">{formatCurrency(totalPrivateRevenue)}</p>
-            <p className="text-purple-300 text-sm">Privatpersoner</p>
-          </div>
-          <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 font-bold text-lg">{formatCurrency(totalBusinessRevenue)}</p>
-            <p className="text-orange-300 text-sm">Företag</p>
-          </div>
-          <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-bold text-lg">{totalCases}</p>
-            <p className="text-green-300 text-sm">Totala ärenden</p>
-          </div>
-        </div>
-      </div>
+        </ModernCard.Content>
+      </ModernCard>
 
-      {/* 🏆 Top 3 podium */}
+      {/* 🏆 Topp 3 podium */}
       {technicianData.length >= 3 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-yellow-500" />
-            Topp 3 BeGone Tekniker
-          </h3>
-          <div className="grid grid-cols-3 gap-4">
-            {technicianData.slice(0, 3).map((tech, index) => (
-              <div key={tech.name} className={`relative bg-gradient-to-br ${getMedalColor(tech.rank)} p-4 rounded-lg border-2`}>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">{getMedalIcon(tech.rank)}</div>
-                  <h4 className="text-white font-bold text-lg mb-1">{tech.name}</h4>
-                  <p className="text-white/90 font-semibold text-xl mb-2">{formatCurrency(tech.total_revenue)}</p>
-                  <div className="space-y-1 text-white/80 text-sm">
-                    <p>{tech.total_cases} ärenden totalt</p>
-                    <p>{tech.private_cases} privatperson • {tech.business_cases} företag</p>
-                    <p>⌀ {formatCurrency(tech.avg_case_value)}/ärende</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ModernPodium
+          items={podiumData}
+          title="Topp 3 BeGone Tekniker"
+          subtitle="Bäst presterande tekniker för vald period"
+          valueLabel="Baserat på total intäkt från avslutade ärenden"
+          variant="detailed"
+          showMetrics
+          formatValue={formatCurrency}
+        />
       )}
 
       {/* 📊 Fullständig tekniker-lista */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Target className="w-5 h-5 text-blue-500" />
-          Alla BeGone Tekniker
-          <span className="text-sm text-slate-400 font-normal">({technicianData.length} tekniker)</span>
-        </h3>
-        
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {technicianData.map((tech) => (
-            <div 
-              key={tech.name} 
-              className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
-                tech.rank <= 3 
-                  ? `bg-gradient-to-r ${getMedalColor(tech.rank)} bg-opacity-20 border-opacity-40` 
-                  : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                  tech.rank <= 3 ? 'bg-white/20' : 'bg-slate-700'
-                }`}>
-                  {getMedalIcon(tech.rank)}
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold">{tech.name}</h4>
-                  <p className="text-slate-400 text-sm">
-                    {tech.total_cases} ärenden ({tech.private_cases} privatperson + {tech.business_cases} företag)
-                  </p>
-                </div>
-              </div>
-              
-              <div className="text-right">
-                <p className="text-green-400 font-bold text-lg">{formatCurrency(tech.total_revenue)}</p>
-                <div className="text-slate-400 text-sm space-y-1">
-                  <p>Privatperson: {formatCurrency(tech.private_revenue)}</p>
-                  <p>Företag: {formatCurrency(tech.business_revenue)}</p>
-                  <p>⌀ {formatCurrency(tech.avg_case_value)}/ärende</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Card>
+      <ModernList
+        items={listData}
+        title="Alla BeGone Tekniker"
+        subtitle="Komplett lista över alla tekniker med prestanda-data"
+        formatPrimaryValue={formatCurrency}
+        showRanking
+        searchable
+        sortable
+      />
+    </div>
   )
 }
 

@@ -1,10 +1,14 @@
-// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - KOMPLETT FIXAD VERSION
+// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - MODERN VERSION
 import React, { useState, useEffect, useMemo } from 'react'
-import { Building2, Award, Target, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
-import Card from '../../ui/Card'
-import Button from '../../ui/Button'
+import { Building2, Target, TrendingUp } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
+
+// Nya moderna komponenter
+import ModernCard from '../../ui/ModernCard'
+import { CombinedNavigation } from '../../ui/ModernNavigation'
+import ModernPodium from '../../ui/ModernPodium'
+import ModernList, { createListItem } from '../../ui/ModernList'
 
 interface ContractTechnicianData {
   name: string
@@ -16,7 +20,7 @@ interface ContractTechnicianData {
   new_customer_value: number
   upsell_revenue: number
   avg_case_value: number
-  avg_contract_value: number  // Nytt: genomsnittligt avtalsvärde
+  avg_contract_value: number
   rank: number
 }
 
@@ -49,13 +53,21 @@ const ContractTechnicianChart: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Månad och period navigation
+  // Navigation state
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   
   const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
+
+  // Period options för navigation
+  const periodOptions = [
+    { key: '1m', label: '1 månad', shortLabel: '1M' },
+    { key: '3m', label: '3 månader', shortLabel: '3M' },
+    { key: '6m', label: '6 månader', shortLabel: '6M' },
+    { key: '12m', label: '12 månader', shortLabel: '12M' }
+  ]
 
   useEffect(() => {
     fetchContractTechnicianData()
@@ -69,12 +81,11 @@ const ContractTechnicianChart: React.FC = () => {
       
       console.log('🔄 Fetching contract technician data...')
       
-      // Hämta data från senaste 12 månaderna
       const twelveMonthsAgo = new Date()
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // 1. Avtalskunder ärenden (merförsäljning från cases-tabellen)
+      // 1. Avtalskunder ärenden (merförsäljning)
       const { data: cases, error: casesError } = await supabase
         .from('cases')
         .select('assigned_technician_name, assigned_technician_email, price, completed_date, case_type, customer_id')
@@ -87,7 +98,7 @@ const ContractTechnicianChart: React.FC = () => {
         throw new Error(`Contract cases: ${casesError.message}`)
       }
 
-      // 2. Nya avtalskunder (från customers-tabellen)
+      // 2. Nya avtalskunder
       const { data: customers, error: customersError } = await supabase
         .from('customers')
         .select('id, annual_premium, total_contract_value, created_at, assigned_account_manager, company_name')
@@ -116,7 +127,7 @@ const ContractTechnicianChart: React.FC = () => {
     }
   }
 
-  // 🎯 Memoized processing av avtalskund tekniker-data baserat på vald period  
+  // 🎯 Processad avtalskund tekniker-data baserat på vald period  
   const technicianData = useMemo((): ContractTechnicianData[] => {
     // Skapa placeholder om ingen data finns
     if (!allData.cases.length && !allData.customers.length) {
@@ -240,7 +251,7 @@ const ContractTechnicianChart: React.FC = () => {
           total_revenue: 0,
           new_customer_value: 0,
           upsell_revenue: 0,
-          customer_contracts: [] // Lista över kontrakt för genomsnitt
+          customer_contracts: []
         }
       }
       
@@ -251,13 +262,11 @@ const ContractTechnicianChart: React.FC = () => {
     })
 
     // Nya avtalskunder från customers-tabellen
-    // Koppla nya kunder till tekniker baserat på account_manager
     filteredCustomers.forEach(customer => {
       // Mappa account manager email till tekniker namn
       const accountManagerEmail = customer.assigned_account_manager
       let technicianName = 'Ej tilldelad'
       
-      // Enkel mappning från account manager till tekniker
       if (accountManagerEmail?.includes('christian.karlsson')) {
         technicianName = 'Christian Karlsson'
       } else if (accountManagerEmail?.includes('kristian.agnevik')) {
@@ -308,26 +317,6 @@ const ContractTechnicianChart: React.FC = () => {
   }, [allData, selectedMonth, selectedPeriod])
 
   // Navigation functions
-  const goToPreviousMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const prevDate = new Date(year, month - 2)
-    const newMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const nextDate = new Date(year, month)
-    const newMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToCurrentMonth = () => {
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(currentMonth)
-  }
-
   const canGoPrevious = () => {
     if (!allData.cases.length && !allData.customers.length) return false
     
@@ -360,67 +349,65 @@ const ContractTechnicianChart: React.FC = () => {
     return selectedMonth === currentMonth
   }
 
+  const goToCurrentMonth = () => {
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(currentMonth)
+  }
+
   const formatSelectedMonth = (monthStr: string) => {
     const date = new Date(monthStr + '-01')
     return date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
   }
 
-  // 🏆 Medal components
-  const getMedalIcon = (rank: number) => {
-    switch (rank) {
-      case 1: return '🥇'
-      case 2: return '🥈'
-      case 3: return '🥉'
-      default: return `#${rank}`
-    }
-  }
-
-  const getMedalColor = (rank: number) => {
-    switch (rank) {
-      case 1: return 'from-yellow-500 to-yellow-600 border-yellow-500'
-      case 2: return 'from-gray-400 to-gray-500 border-gray-400'
-      case 3: return 'from-amber-600 to-amber-700 border-amber-600'
-      default: return 'from-slate-600 to-slate-700 border-slate-600'
-    }
-  }
-
   // Loading state
   if (loading) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Building2 className="w-5 h-5 text-green-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
-            <p className="text-slate-400 text-sm">Laddar avtalskund tekniker statistik...</p>
+      <ModernCard gradient="green" glowing>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-green-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Laddar data..."
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
+              <p className="text-slate-400 text-sm">Laddar avtalskund tekniker statistik...</p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
   // Error state
   if (error) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Building2 className="w-5 h-5 text-red-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-red-400">
-          <div className="text-center">
-            <Target className="w-12 h-12 mx-auto mb-4" />
-            <p className="mb-2">Fel vid laddning: {error}</p>
-            <Button onClick={fetchContractTechnicianData} size="sm" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Försök igen
-            </Button>
+      <ModernCard gradient="red" glowing>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-red-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Fel vid laddning"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-red-400">
+            <div className="text-center">
+              <Target className="w-12 h-12 mx-auto mb-4" />
+              <p className="mb-2">Fel vid laddning: {error}</p>
+              <button
+                onClick={fetchContractTechnicianData}
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Försök igen
+              </button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
@@ -431,192 +418,160 @@ const ContractTechnicianChart: React.FC = () => {
   const totalNewCustomerValue = technicianData.reduce((sum, tech) => sum + tech.new_customer_value, 0)
   const totalUpsellRevenue = technicianData.reduce((sum, tech) => sum + tech.upsell_revenue, 0)
 
+  // Formatera data för podium
+  const podiumData = technicianData
+    .slice(0, 3)
+    .filter(tech => tech.total_revenue > 0)
+    .map(tech => ({
+      id: tech.name,
+      name: tech.name,
+      value: formatCurrency(tech.total_revenue),
+      secondaryValue: `${tech.new_customers} nya avtal`,
+      description: `Avtalsvärde: ${formatCurrency(tech.new_customer_value)} • Merförsäljning: ${formatCurrency(tech.upsell_revenue)}`,
+      rank: tech.rank,
+      metrics: [
+        { label: 'Nya avtal', value: tech.new_customers },
+        { label: 'Merförsäljning', value: formatCurrency(tech.upsell_revenue) },
+        { label: 'Genomsnitt/avtal', value: formatCurrency(tech.avg_contract_value) }
+      ]
+    }))
+
+  // Formatera data för lista
+  const listData = technicianData
+    .filter(tech => tech.total_revenue > 0)
+    .map(tech => 
+      createListItem(
+        tech.name,
+        tech.name,
+        tech.total_revenue,
+        `${tech.new_customers} nya avtal • ${tech.upsell_cases} merförsäljning`,
+        {
+          rank: tech.rank,
+          status: 'active',
+          metadata: [
+            { label: 'Avtalsvärde', value: formatCurrency(tech.new_customer_value) },
+            { label: 'Merförsäljning', value: formatCurrency(tech.upsell_revenue) },
+            { label: 'Genomsnitt/avtal', value: formatCurrency(tech.avg_contract_value) }
+          ]
+        }
+      )
+    )
+
   return (
-    <Card>
-      {/* Header med navigation - FIXAD: Bättre responsiv layout */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-        <div className="flex items-center">
-          <Building2 className="w-5 h-5 text-green-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-          <span className="ml-2 text-sm text-slate-400">(Nya avtal + Merförsäljning)</span>
-        </div>
-        
-        {/* Navigation - FIXAD: Bättre layout och mindre knappar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {/* Månadväljare */}
-          <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={goToPreviousMonth}
-              disabled={!canGoPrevious()}
-              className="p-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            
-            <div className="px-3 py-1 text-white font-medium min-w-[120px] text-center text-sm">
-              {formatSelectedMonth(selectedMonth)}
-            </div>
-            
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={goToNextMonth}
-              disabled={!canGoNext()}
-              className="p-1"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {!isCurrentMonth() && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={goToCurrentMonth}
-              className="text-xs px-3 py-1"
-            >
-              Nuvarande
-            </Button>
-          )}
-
-          {/* Period filter - FIXAD: Kompakta knappar */}
-          <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['1m', '3m', '6m', '12m'] as const).map((period) => (
-              <Button
-                key={period}
-                variant={selectedPeriod === period ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setSelectedPeriod(period)}
-                className="text-xs px-2 py-1"
-              >
-                {period === '1m' ? '1' : period === '3m' ? '3' : period === '6m' ? '6' : '12'}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Period översikt - FIXAD: Responsiv grid */}
-      <div className="mb-6">
-        <h3 className="text-sm text-slate-400 mb-3">
-          {selectedPeriod === '1m' 
-            ? `${formatSelectedMonth(selectedMonth)} - Avtalskund tekniker översikt`
-            : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Avtalskund tekniker översikt`
+    <div className="space-y-8">
+      {/* Header med navigation */}
+      <ModernCard gradient="green" glowing>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-green-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Nya avtal + Merförsäljning"
+          rightElement={
+            <CombinedNavigation
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
+              periods={periodOptions}
+              canGoPrevious={canGoPrevious()}
+              canGoNext={canGoNext()}
+              onGoToCurrent={goToCurrentMonth}
+              isCurrentMonth={isCurrentMonth()}
+              compact
+            />
           }
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-bold text-lg">{formatCurrency(totalRevenue)}</p>
-            <p className="text-green-300 text-sm">Total intäkt</p>
+        />
+        
+        {/* Period översikt med moderna stat cards */}
+        <ModernCard.Content>
+          <div className="mb-6">
+            <h3 className="text-sm text-slate-400 mb-4">
+              {selectedPeriod === '1m' 
+                ? `${formatSelectedMonth(selectedMonth)} - Avtalskund tekniker översikt`
+                : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Avtalskund tekniker översikt`
+              }
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <ModernCard.Stat
+                icon={TrendingUp}
+                iconGradient="from-green-500 to-green-600"
+                label="Total intäkt"
+                value={formatCurrency(totalRevenue)}
+                change={{ value: '↗️', positive: true }}
+              />
+              <ModernCard.Stat
+                icon={Building2}
+                iconGradient="from-blue-500 to-blue-600"
+                label="Nya avtal"
+                value={totalNewCustomers}
+              />
+              <ModernCard.Stat
+                icon={Target}
+                iconGradient="from-purple-500 to-purple-600"
+                label="Avtalsvärde"
+                value={formatCurrency(totalNewCustomerValue)}
+              />
+              <ModernCard.Stat
+                icon={TrendingUp}
+                iconGradient="from-yellow-500 to-yellow-600"
+                label="Merförsäljning"
+                value={formatCurrency(totalUpsellRevenue)}
+              />
+              <ModernCard.Stat
+                icon={Target}
+                iconGradient="from-orange-500 to-orange-600"
+                label="Totala ärenden"
+                value={totalCases}
+              />
+            </div>
           </div>
-          <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-400 font-bold text-lg">{totalNewCustomers}</p>
-            <p className="text-blue-300 text-sm">Nya avtal</p>
-          </div>
-          <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-            <p className="text-purple-400 font-bold text-lg">{formatCurrency(totalNewCustomerValue)}</p>
-            <p className="text-purple-300 text-sm">Avtalsvärde</p>
-          </div>
-          <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-yellow-400 font-bold text-lg">{formatCurrency(totalUpsellRevenue)}</p>
-            <p className="text-yellow-300 text-sm">Merförsäljning</p>
-          </div>
-          <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 font-bold text-lg">{totalCases}</p>
-            <p className="text-orange-300 text-sm">Totala ärenden</p>
-          </div>
-        </div>
-      </div>
+        </ModernCard.Content>
+      </ModernCard>
 
-      {/* 🏆 Top 3 podium - Visar även med 0-värden */}
-      {technicianData.length >= 3 && technicianData[0].total_revenue > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-yellow-500" />
-            Topp 3 Avtalskund Tekniker
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {technicianData.slice(0, 3).map((tech, index) => (
-              <div key={tech.name} className={`relative bg-gradient-to-br ${getMedalColor(tech.rank)} p-4 rounded-lg border-2`}>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">{getMedalIcon(tech.rank)}</div>
-                  <h4 className="text-white font-bold text-lg mb-1">{tech.name}</h4>
-                  <p className="text-white/90 font-semibold text-xl mb-2">{formatCurrency(tech.total_revenue)}</p>
-                  <div className="space-y-1 text-white/80 text-sm">
-                    <p>{tech.new_customers} nya avtal • {tech.upsell_cases} merförsäljning</p>
-                    <p>Avtalsvärde: {formatCurrency(tech.new_customer_value)}</p>
-                    <p>{formatCurrency(tech.avg_contract_value)}/avtal</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* 🏆 Topp 3 podium - Visar endast om det finns data */}
+      {podiumData.length > 0 && (
+        <ModernPodium
+          items={podiumData}
+          title="Topp 3 Avtalskund Tekniker"
+          subtitle="Bäst presterande tekniker för nya avtal och merförsäljning"
+          valueLabel="Baserat på total intäkt från nya avtal och merförsäljning"
+          variant="detailed"
+          showMetrics
+          formatValue={formatCurrency}
+        />
       )}
 
       {/* Meddelande när ingen data finns */}
-      {technicianData.length > 0 && technicianData[0].total_revenue === 0 && (
-        <div className="mb-8">
-          <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
-            <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
-            <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
-            <p className="text-slate-400 text-sm mb-4">
-              Månad: {selectedMonth}, Period: {selectedPeriod}
-            </p>
-            <p className="text-xs text-slate-500">
-              Cases: {allData.cases.length}, Customers: {allData.customers.length}
-            </p>
-          </div>
-        </div>
+      {listData.length === 0 && (
+        <ModernCard>
+          <ModernCard.Content>
+            <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
+              <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
+              <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
+              <p className="text-slate-400 text-sm mb-4">
+                Månad: {selectedMonth}, Period: {selectedPeriod}
+              </p>
+              <p className="text-xs text-slate-500">
+                Cases: {allData.cases.length}, Customers: {allData.customers.length}
+              </p>
+            </div>
+          </ModernCard.Content>
+        </ModernCard>
       )}
 
-      {/* 📊 Fullständig tekniker-lista */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Target className="w-5 h-5 text-green-500" />
-          Alla Avtalskund Tekniker
-          <span className="text-sm text-slate-400 font-normal">({technicianData.length} tekniker)</span>
-        </h3>
-        
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {technicianData.map((tech) => (
-            <div 
-              key={tech.name} 
-              className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border transition-all gap-3 ${
-                tech.rank <= 3 
-                  ? `bg-gradient-to-r ${getMedalColor(tech.rank)} bg-opacity-20 border-opacity-40` 
-                  : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                  tech.rank <= 3 ? 'bg-white/20' : 'bg-slate-700'
-                }`}>
-                  {getMedalIcon(tech.rank)}
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold">{tech.name}</h4>
-                  <p className="text-slate-400 text-sm">
-                    {tech.new_customers} nya avtal • {tech.upsell_cases} merförsäljning
-                  </p>
-                </div>
-              </div>
-              
-              <div className="text-left sm:text-right">
-                <p className="text-green-400 font-bold text-lg">{formatCurrency(tech.total_revenue)}</p>
-                <div className="text-slate-400 text-sm space-y-1">
-                  <p>Avtalsvärde: {formatCurrency(tech.new_customer_value)}</p>
-                  <p>Merförsäljning: {formatCurrency(tech.upsell_revenue)}</p>
-                  <p>{formatCurrency(tech.avg_contract_value)}/avtal</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Card>
+      {/* 📊 Fullständig tekniker-lista - Visar endast om det finns data */}
+      {listData.length > 0 && (
+        <ModernList
+          items={listData}
+          title="Alla Avtalskund Tekniker"
+          subtitle="Komplett lista över alla tekniker med avtalskund-prestanda"
+          formatPrimaryValue={formatCurrency}
+          showRanking
+          searchable
+          sortable
+        />
+      )}
+    </div>
   )
 }
 
