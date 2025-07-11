@@ -261,41 +261,57 @@ const ContractTechnicianChart: React.FC = () => {
       technicianStats[name].upsell_revenue += case_.price || 0
     })
 
-    // Nya avtalskunder från customers-tabellen
-    filteredCustomers.forEach(customer => {
-      // Mappa account manager email till tekniker namn
-      const accountManagerEmail = customer.assigned_account_manager
-      let technicianName = 'Ej tilldelad'
-      
-      if (accountManagerEmail?.includes('christian.karlsson')) {
-        technicianName = 'Christian Karlsson'
-      } else if (accountManagerEmail?.includes('kristian.agnevik')) {
-        technicianName = 'Kristian Agnevik'
-      } else if (accountManagerEmail?.includes('sofia.palshagen')) {
-        technicianName = 'Sofia Pålshagen'
-      } else if (accountManagerEmail?.includes('hans.norman')) {
-        technicianName = 'Hans Norman'
-      }
-
-      if (!technicianStats[technicianName]) {
-        technicianStats[technicianName] = {
-          name: technicianName,
-          email: accountManagerEmail || '',
-          total_cases: 0,
-          new_customers: 0,
-          upsell_cases: 0,
-          total_revenue: 0,
-          new_customer_value: 0,
-          upsell_revenue: 0,
-          customer_contracts: []
+      // Nya avtalskunder från customers-tabellen - FIXAD: Bättre mappning
+      filteredCustomers.forEach(customer => {
+        // FIXAD: Bättre email-till-tekniker mappning
+        const accountManagerEmail = customer.assigned_account_manager?.toLowerCase() || ''
+        let technicianName = 'Ej tilldelad'
+        
+        // Expanderad mappning för att fånga fler tekniker
+        if (accountManagerEmail.includes('christian.karlsson') || accountManagerEmail.includes('christian')) {
+          technicianName = 'Christian Karlsson'
+        } else if (accountManagerEmail.includes('kristian.agnevik') || accountManagerEmail.includes('kristian')) {
+          technicianName = 'Kristian Agnevik'
+        } else if (accountManagerEmail.includes('sofia.palshagen') || accountManagerEmail.includes('sofia')) {
+          technicianName = 'Sofia Pålshagen'
+        } else if (accountManagerEmail.includes('hans.norman') || accountManagerEmail.includes('hans')) {
+          technicianName = 'Hans Norman'
+        } else if (accountManagerEmail.includes('mathias') || accountManagerEmail.includes('carlsson')) {
+          technicianName = 'Mathias Carlsson'
+        } else if (accountManagerEmail.includes('kim') || accountManagerEmail.includes('wahlberg')) {
+          technicianName = 'Kim Wahlberg'
+        } else if (customer.assigned_account_manager && customer.assigned_account_manager.trim() !== '') {
+          // Om det finns en account manager men vi inte kan matcha, använd det som finns
+          technicianName = customer.assigned_account_manager.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase())
         }
-      }
 
-      technicianStats[technicianName].new_customers++
-      technicianStats[technicianName].new_customer_value += customer.total_contract_value || 0
-      technicianStats[technicianName].total_revenue += customer.annual_premium || 0
-      technicianStats[technicianName].customer_contracts.push(customer.total_contract_value || 0)
-    })
+        if (!technicianStats[technicianName]) {
+          technicianStats[technicianName] = {
+            name: technicianName,
+            email: customer.assigned_account_manager || '',
+            total_cases: 0,
+            new_customers: 0,
+            upsell_cases: 0,
+            total_revenue: 0,
+            new_customer_value: 0,
+            upsell_revenue: 0,
+            customer_contracts: []
+          }
+        }
+
+        technicianStats[technicianName].new_customers++
+        technicianStats[technicianName].total_cases++ // FIXAD: Räkna nya kunder som cases också
+        
+        // FIXAD: Använd annual_premium för intäkt istället för total_contract_value
+        const customerRevenue = customer.annual_premium || 0
+        const contractValue = customer.total_contract_value || 0
+        
+        technicianStats[technicianName].new_customer_value += contractValue
+        technicianStats[technicianName].total_revenue += customerRevenue // Detta är vad som räknas för ranking
+        technicianStats[technicianName].customer_contracts.push(contractValue)
+
+        console.log(`📊 Customer mapped: ${customer.company_name} → ${technicianName} (Revenue: ${customerRevenue}, Contract: ${contractValue})`)
+      })
 
     // Konvertera till array och beräkna genomsnitt + ranking
     const technicianArray = Object.values(technicianStats)
@@ -418,40 +434,40 @@ const ContractTechnicianChart: React.FC = () => {
   const totalNewCustomerValue = technicianData.reduce((sum, tech) => sum + tech.new_customer_value, 0)
   const totalUpsellRevenue = technicianData.reduce((sum, tech) => sum + tech.upsell_revenue, 0)
 
-  // Formatera data för podium
+  // Formatera data för podium - FIXAD: Använd nummer-värden och säkerställ data
   const podiumData = technicianData
     .slice(0, 3)
     .filter(tech => tech.total_revenue > 0)
     .map(tech => ({
       id: tech.name,
       name: tech.name,
-      value: formatCurrency(tech.total_revenue),
-      secondaryValue: `${tech.new_customers} nya avtal`,
-      description: `Avtalsvärde: ${formatCurrency(tech.new_customer_value)} • Merförsäljning: ${formatCurrency(tech.upsell_revenue)}`,
+      value: tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+      secondaryValue: `${tech.new_customers || 0} nya avtal`,
+      description: `Avtalsvärde: ${formatCurrency(tech.new_customer_value || 0)} • Merförsäljning: ${formatCurrency(tech.upsell_revenue || 0)}`,
       rank: tech.rank,
       metrics: [
-        { label: 'Nya avtal', value: tech.new_customers },
-        { label: 'Merförsäljning', value: formatCurrency(tech.upsell_revenue) },
-        { label: 'Genomsnitt/avtal', value: formatCurrency(tech.avg_contract_value) }
+        { label: 'Nya avtal', value: tech.new_customers || 0 },
+        { label: 'Merförsäljning', value: tech.upsell_revenue || 0 },
+        { label: 'Genomsnitt/avtal', value: tech.avg_contract_value || 0 }
       ]
     }))
 
-  // Formatera data för lista
+  // Formatera data för lista - FIXAD: Använd nummer-värden
   const listData = technicianData
     .filter(tech => tech.total_revenue > 0)
     .map(tech => 
       createListItem(
         tech.name,
         tech.name,
-        tech.total_revenue,
-        `${tech.new_customers} nya avtal • ${tech.upsell_cases} merförsäljning`,
+        tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+        `${tech.new_customers || 0} nya avtal • ${tech.upsell_cases || 0} merförsäljning`,
         {
           rank: tech.rank,
           status: 'active',
           metadata: [
-            { label: 'Avtalsvärde', value: formatCurrency(tech.new_customer_value) },
-            { label: 'Merförsäljning', value: formatCurrency(tech.upsell_revenue) },
-            { label: 'Genomsnitt/avtal', value: formatCurrency(tech.avg_contract_value) }
+            { label: 'Avtalsvärde', value: formatCurrency(tech.new_customer_value || 0) },
+            { label: 'Merförsäljning', value: formatCurrency(tech.upsell_revenue || 0) },
+            { label: 'Genomsnitt/avtal', value: formatCurrency(tech.avg_contract_value || 0) }
           ]
         }
       )
@@ -528,7 +544,7 @@ const ContractTechnicianChart: React.FC = () => {
         </ModernCard.Content>
       </ModernCard>
 
-      {/* 🏆 Topp 3 podium - Visar endast om det finns data */}
+      {/* 🏆 Topp 3 podium - Visar endast om det finns data med FIXAD formatering */}
       {podiumData.length > 0 && (
         <ModernPodium
           items={podiumData}
@@ -537,7 +553,7 @@ const ContractTechnicianChart: React.FC = () => {
           valueLabel="Baserat på total intäkt från nya avtal och merförsäljning"
           variant="detailed"
           showMetrics
-          formatValue={formatCurrency}
+          formatValue={(value) => formatCurrency(Number(value))} // FIXAD: Explicit Number conversion
         />
       )}
 

@@ -352,25 +352,35 @@ const BeGoneTechnicianChart: React.FC = () => {
   const totalPrivateRevenue = technicianData.reduce((sum, tech) => sum + tech.private_revenue, 0)
   const totalBusinessRevenue = technicianData.reduce((sum, tech) => sum + tech.business_revenue, 0)
 
-  // Formatera data för podium
-  const podiumData = technicianData.slice(0, 3).map(tech => 
-    formatTechnicianForPodium(tech, formatCurrency)
-  )
+  // Formatera data för podium - FIXAD: Säkerställ nummer-värden
+  const podiumData = technicianData.slice(0, 3).map(tech => ({
+    id: tech.name,
+    name: tech.name,
+    value: tech.total_revenue || 0, // FIXAD: Använd nummer istället för sträng
+    secondaryValue: `${tech.total_cases || 0} ärenden`,
+    description: `${tech.private_cases || 0} privat • ${tech.business_cases || 0} företag`,
+    rank: tech.rank,
+    metrics: [
+      { label: 'Genomsnitt/ärende', value: tech.avg_case_value || 0 },
+      { label: 'Privatpersoner', value: tech.private_revenue || 0 },
+      { label: 'Företag', value: tech.business_revenue || 0 }
+    ]
+  }))
 
-  // Formatera data för lista
+  // Formatera data för lista - FIXAD: Använd nummer-värden
   const listData = technicianData.map(tech => 
     createListItem(
       tech.name,
       tech.name,
-      tech.total_revenue,
-      `${tech.total_cases} ärenden`,
+      tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+      `${tech.total_cases || 0} ärenden`,
       {
         rank: tech.rank,
         status: 'active',
         metadata: [
-          { label: 'Privatpersoner', value: `${tech.private_cases} (${formatCurrency(tech.private_revenue)})` },
-          { label: 'Företag', value: `${tech.business_cases} (${formatCurrency(tech.business_revenue)})` },
-          { label: 'Genomsnitt', value: formatCurrency(tech.avg_case_value) }
+          { label: 'Privatpersoner', value: `${tech.private_cases || 0} (${formatCurrency(tech.private_revenue || 0)})` },
+          { label: 'Företag', value: `${tech.business_cases || 0} (${formatCurrency(tech.business_revenue || 0)})` },
+          { label: 'Genomsnitt', value: formatCurrency(tech.avg_case_value || 0) }
         ]
       }
     )
@@ -383,31 +393,40 @@ const BeGoneTechnicianChart: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header med navigation */}
+      {/* Header med navigation - FIXAD: Bättre responsiv layout */}
       <ModernCard gradient="blue" glowing>
-        <ModernCard.Header
-          icon={Wrench}
-          iconColor="text-blue-500"
-          title="BeGone Tekniker-prestanda"
-          subtitle="Bara engångsjobb"
-          rightElement={
-            <CombinedNavigation
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              selectedPeriod={selectedPeriod}
-              onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
-              periods={periodOptions}
-              canGoPrevious={canGoPrevious()}
-              canGoNext={canGoNext()}
-              onGoToCurrent={goToCurrentMonth}
-              isCurrentMonth={isCurrentMonth()}
-              compact
-            />
-          }
-        />
+        <div className="p-6">
+          <div className="flex flex-col gap-4 mb-6">
+            {/* Titel rad */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">BeGone Tekniker-prestanda</h2>
+                <p className="text-sm text-slate-400">Bara engångsjobb</p>
+              </div>
+            </div>
+
+            {/* Navigation - FIXAD: Inuti kortet */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <CombinedNavigation
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
+                periods={periodOptions}
+                canGoPrevious={canGoPrevious()}
+                canGoNext={canGoNext()}
+                onGoToCurrent={goToCurrentMonth}
+                isCurrentMonth={isCurrentMonth()}
+                compact
+                className="flex-1"
+              />
+            </div>
+          </div>
         
-        {/* Period översikt med moderna stat cards */}
-        <ModernCard.Content>
+          {/* Period översikt med moderna stat cards - FIXAD: Mindre kort */}
           <div className="mb-6">
             <h3 className="text-sm text-slate-400 mb-4">
               {selectedPeriod === '1m' 
@@ -415,38 +434,29 @@ const BeGoneTechnicianChart: React.FC = () => {
                 : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - BeGone tekniker översikt`
               }
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <ModernCard.Stat
-                icon={TrendingUp}
-                iconGradient="from-blue-500 to-blue-600"
-                label="Total intäkt"
-                value={formatCurrency(totalRevenue)}
-                change={{ value: '↗️', positive: true }}
-              />
-              <ModernCard.Stat
-                icon={Wrench}
-                iconGradient="from-purple-500 to-purple-600"
-                label="Privatpersoner"
-                value={formatCurrency(totalPrivateRevenue)}
-              />
-              <ModernCard.Stat
-                icon={Target}
-                iconGradient="from-orange-500 to-orange-600"
-                label="Företag"
-                value={formatCurrency(totalBusinessRevenue)}
-              />
-              <ModernCard.Stat
-                icon={Wrench}
-                iconGradient="from-green-500 to-green-600"
-                label="Totala ärenden"
-                value={totalCases}
-              />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-blue-400 font-bold text-sm">{formatCurrency(totalRevenue)}</p>
+                <p className="text-blue-300 text-xs">Total intäkt</p>
+              </div>
+              <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                <p className="text-purple-400 font-bold text-sm">{formatCurrency(totalPrivateRevenue)}</p>
+                <p className="text-purple-300 text-xs">Privatpersoner</p>
+              </div>
+              <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                <p className="text-orange-400 font-bold text-sm">{formatCurrency(totalBusinessRevenue)}</p>
+                <p className="text-orange-300 text-xs">Företag</p>
+              </div>
+              <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-green-400 font-bold text-sm">{totalCases}</p>
+                <p className="text-green-300 text-xs">Totala ärenden</p>
+              </div>
             </div>
           </div>
-        </ModernCard.Content>
+        </div>
       </ModernCard>
 
-      {/* 🏆 Topp 3 podium */}
+      {/* 🏆 Topp 3 podium - FIXAD: Använd formatCurrency korrekt */}
       {technicianData.length >= 3 && (
         <ModernPodium
           items={podiumData}
@@ -455,7 +465,7 @@ const BeGoneTechnicianChart: React.FC = () => {
           valueLabel="Baserat på total intäkt från avslutade ärenden"
           variant="detailed"
           showMetrics
-          formatValue={formatCurrency}
+          formatValue={(value) => formatCurrency(Number(value))} // FIXAD: Explicit Number conversion
         />
       )}
 
