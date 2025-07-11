@@ -1,6 +1,7 @@
-// api/clickup-webhook.ts - UPPDATERAD VERSION med BeGone listor support
+// api/clickup-webhook.ts - UPPDATERAD med nya ClickUp status-mappningar och completed_date
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getStatusName, isCompletedStatus } from '../src/types/database'
 import crypto from 'crypto'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
@@ -192,7 +193,7 @@ async function handleBeGoneTask(payload: ClickUpWebhookPayload, listId: string, 
   }
 }
 
-// Synkronisera avtalskund task (befintlig logik)
+// Synkronisera avtalskund task (befintlig logik med nya statusar)
 async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
   try {
     console.log(`🔄 Syncing customer task ${taskId} for customer ${customerId}`)
@@ -216,7 +217,7 @@ async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
       throw error
     }
 
-    console.log(`✅ Successfully synced customer task ${taskId}`)
+    console.log(`✅ Successfully synced customer task ${taskId} -> Status: ${caseData.status}`)
     
   } catch (error) {
     console.error(`❌ Error syncing customer task ${taskId}:`, error)
@@ -224,7 +225,7 @@ async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
   }
 }
 
-// Synkronisera BeGone task (ny logik)
+// Synkronisera BeGone task (ny logik med korrekta statusar)
 async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cases' | 'business_cases') {
   try {
     console.log(`🔄 Syncing BeGone task ${taskId} to ${tableName}`)
@@ -248,7 +249,7 @@ async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cas
       throw error
     }
 
-    console.log(`✅ Successfully synced BeGone task ${taskId} to ${tableName}`)
+    console.log(`✅ Successfully synced BeGone task ${taskId} to ${tableName} -> Status: ${caseData.status}`)
     
   } catch (error) {
     console.error(`❌ Error syncing BeGone task ${taskId}:`, error)
@@ -281,8 +282,20 @@ async function fetchClickUpTask(taskId: string) {
   }
 }
 
-// Mappa BeGone task till databas-format (ny funktion)
+// 🆕 UPPDATERAD: Mappa BeGone task till databas-format med nya statusar
 function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases' | 'business_cases') {
+  // 🆕 KORREKT STATUS-MAPPNING från ClickUp ID till namn
+  const clickupStatusId = taskData.status?.id
+  const statusName = getStatusName(clickupStatusId) // "Bokad", "Avslutat" etc.
+  const isCompleted = isCompletedStatus(statusName)
+  
+  console.log(`📊 BeGone task ${taskData.id} status mapping:`, {
+    clickup_status_id: clickupStatusId,
+    clickup_status_name: taskData.status?.status,
+    mapped_status_name: statusName,
+    is_completed: isCompleted
+  })
+
   const getCustomField = (name: string) => {
     return taskData.custom_fields?.find((field: any) => 
       field.name.toLowerCase() === name.toLowerCase()
@@ -319,8 +332,8 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
   const assignees = taskData.assignees || []
   const assigneeData = mapAssignees(assignees)
 
-  // Mappa datum
-  const dateData = mapTaskDates(taskData)
+  // 🆕 FÖRBÄTTRAD DATUM-MAPPNING med completed_date
+  const dateData = mapTaskDates(taskData, isCompleted)
 
   // Grundläggande data
   const baseData = {
@@ -328,7 +341,8 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
     case_number: taskData.custom_id || `${taskData.id.slice(-6)}`,
     title: taskData.name,
     description: taskData.description || null,
-    status: mapStatusValue(taskData.status?.status),
+    status: statusName,                    // 🆕 Kapitaliserad status ("Bokad")
+    status_id: clickupStatusId,           // 🆕 ClickUp status ID för exakt mappning
     priority: mapPriorityValue(taskData.priority?.priority),
     ...assigneeData,
     ...dateData,
@@ -380,7 +394,49 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
   return { ...baseData, ...customFieldData }
 }
 
-// Mappa assignees till tekniker (återanvänd från import)
+// 🆕 FÖRBÄTTRAD DATUM-MAPPNING med completed_date logik (samma som import)
+function mapTaskDates(task: any, isCompleted: boolean): any {
+  const dateData: any = {}
+  
+  // Start datum (från ClickUp start_date eller date_created)
+  if (task.start_date) {
+    const startDate = new Date(parseInt(task.start_date))
+    dateData.start_date = startDate.toISOString().split('T')[0] // YYYY-MM-DD format
+  } else if (task.date_created) {
+    const createdDate = new Date(parseInt(task.date_created))
+    dateData.start_date = createdDate.toISOString().split('T')[0]
+  }
+  
+  // Due datum (förfallodatum)
+  if (task.due_date) {
+    const dueDate = new Date(parseInt(task.due_date))
+    dateData.due_date = dueDate.toISOString().split('T')[0] // YYYY-MM-DD format
+  }
+  
+  // 🆕 COMPLETED DATE - baserat på status och date_closed
+  if (isCompleted) {
+    if (task.date_closed) {
+      // Använd ClickUp:s date_closed om det finns
+      const completedDate = new Date(parseInt(task.date_closed))
+      dateData.completed_date = completedDate.toISOString().split('T')[0]
+    } else if (task.date_updated) {
+      // Fallback till senaste uppdateringsdatum
+      const completedDate = new Date(parseInt(task.date_updated))
+      dateData.completed_date = completedDate.toISOString().split('T')[0]
+    } else {
+      // Sista fallback till idag
+      dateData.completed_date = new Date().toISOString().split('T')[0]
+    }
+    
+    console.log(`📅 BeGone task ${task.id} completed_date set to: ${dateData.completed_date}`)
+  } else {
+    dateData.completed_date = null
+  }
+  
+  return dateData
+}
+
+// Mappa assignees till tekniker (samma som import)
 function mapAssignees(assignees: any[]): any {
   const assigneeData: any = {}
   
@@ -389,9 +445,9 @@ function mapAssignees(assignees: any[]): any {
     { id: '2296a1e9-b466-4be9-92ea-0ed83a4829ff', name: 'Christian Karlsson', email: 'christian.karlsson@begone.se' },
     { id: '35e82f86-bcca-4d00-b079-d5dc3dad1b07', name: 'Hans Norman', email: 'hans.norman@begone.se' },
     { id: 'c21d3048-95b5-453a-b39c-0eb47c3e688b', name: 'Jakob Wahlberg', email: 'jakob.wahlberg@begone.se' },
-    { id: '6a10fe98-d4d4-4e38-82a4-c4ecdf33a82c', name: 'Kim Walberg', email: 'kim.wahlberg@begone.se' },
+    { id: '6a10fe98-d4d4-4e38-82a4-c4ecdf33a82c', name: 'Kim Wahlberg', email: 'kim.wahlberg@begone.se' },
     { id: '8846933d-abac-47b5-b73c-b3fe6a6f3df5', name: 'Kristian Agnevik', email: 'kristian.agnevik@begone.se' },
-    { id: 'ecaf151a-44b2-4220-b105-998aa0f82d6e', name: 'Mathias Carlson', email: 'mathias.carlsson@begone.se' },
+    { id: 'ecaf151a-44b2-4220-b105-998aa0f82d6e', name: 'Mathias Carlsson', email: 'mathias.carlsson@begone.se' },
     { id: 'e4db6838-f48d-4d7d-81cc-5ad3774acbf4', name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' }
   ]
 
@@ -400,47 +456,43 @@ function mapAssignees(assignees: any[]): any {
   limitedAssignees.forEach((assignee, index) => {
     const prefix = index === 0 ? 'primary' : index === 1 ? 'secondary' : 'tertiary'
     
-    const matchedTechnician = knownTechnicians.find(tech =>
-      tech.email.toLowerCase() === assignee.email?.toLowerCase() ||
-      tech.name.toLowerCase().includes(assignee.username?.toLowerCase() || '') ||
-      (assignee.username?.toLowerCase() || '').includes(tech.name.toLowerCase())
-    )
+    const matchedTechnician = knownTechnicians.find(tech => {
+      const assigneeName = assignee.username || assignee.name || ''
+      const assigneeEmail = assignee.email || ''
+      
+      // Matcha på email först (mest exakt)
+      if (assigneeEmail && tech.email.toLowerCase() === assigneeEmail.toLowerCase()) {
+        return true
+      }
+      
+      // Matcha på namn (fuzzy matching)
+      if (assigneeName) {
+        const techFirstName = tech.name.split(' ')[0].toLowerCase()
+        const techLastName = tech.name.split(' ')[1]?.toLowerCase() || ''
+        const assigneeNameLower = assigneeName.toLowerCase()
+        
+        return assigneeNameLower.includes(techFirstName) || 
+               assigneeNameLower.includes(techLastName) ||
+               techFirstName.includes(assigneeNameLower) ||
+               tech.name.toLowerCase().includes(assigneeNameLower)
+      }
+      
+      return false
+    })
     
     assigneeData[`${prefix}_assignee_id`] = matchedTechnician?.id || null
     assigneeData[`${prefix}_assignee_name`] = assignee.username || assignee.name || null
     assigneeData[`${prefix}_assignee_email`] = assignee.email || matchedTechnician?.email || null
+    
+    if (matchedTechnician) {
+      console.log(`👤 Webhook matched ${prefix} assignee: ${assignee.username} -> ${matchedTechnician.name} (${matchedTechnician.id})`)
+    }
   })
   
   return assigneeData
 }
 
-// Mappa task-datum (återanvänd från import)
-function mapTaskDates(task: any): any {
-  const dateData: any = {}
-  
-  if (task.start_date) {
-    const startDate = new Date(parseInt(task.start_date))
-    dateData.start_date = startDate.toISOString().split('T')[0]
-  } else if (task.date_created) {
-    const createdDate = new Date(parseInt(task.date_created))
-    dateData.start_date = createdDate.toISOString().split('T')[0]
-  }
-  
-  if (task.due_date) {
-    const dueDate = new Date(parseInt(task.due_date))
-    dateData.due_date = dueDate.toISOString().split('T')[0]
-  }
-  
-  if (task.date_closed && task.status?.status && 
-      ['slutförd', 'klar', 'genomförd', 'avslutad', 'closed'].includes(task.status.status.toLowerCase())) {
-    const completedDate = new Date(parseInt(task.date_closed))
-    dateData.completed_date = completedDate.toISOString().split('T')[0]
-  }
-  
-  return dateData
-}
-
-// Sanitera fältnamn (återanvänd från import)
+// Sanitera fältnamn (samma som import)
 function sanitizeFieldName(name: string): string {
   return name.toLowerCase()
     .replace(/[åäö]/g, (match: string) => ({ 'å': 'a', 'ä': 'a', 'ö': 'o' }[match] || match))
@@ -449,8 +501,20 @@ function sanitizeFieldName(name: string): string {
     .replace(/^_|_$/g, '')
 }
 
-// Mappa avtalskund task (befintlig logik)
+// 🆕 UPPDATERAD: Mappa avtalskund task med nya statusar
 function mapClickUpTaskToCustomerCaseData(taskData: any, customerId: string) {
+  // 🆕 KORREKT STATUS-MAPPNING även för avtalskunder
+  const clickupStatusId = taskData.status?.id
+  const statusName = getStatusName(clickupStatusId) // "Bokad", "Avslutat" etc.
+  const isCompleted = isCompletedStatus(statusName)
+  
+  console.log(`📊 Customer task ${taskData.id} status mapping:`, {
+    clickup_status_id: clickupStatusId,
+    clickup_status_name: taskData.status?.status,
+    mapped_status_name: statusName,
+    is_completed: isCompleted
+  })
+
   const getCustomField = (name: string) => {
     return taskData.custom_fields?.find((field: any) => 
       field.name.toLowerCase() === name.toLowerCase()
@@ -497,7 +561,8 @@ function mapClickUpTaskToCustomerCaseData(taskData: any, customerId: string) {
     clickup_task_id: taskData.id,
     case_number: taskData.custom_id || taskData.id,
     title: taskData.name,
-    status: mapStatusValue(taskData.status?.status || taskData.status),
+    status: statusName,                    // 🆕 Kapitaliserad status
+    status_id: clickupStatusId,           // 🆕 ClickUp status ID
     priority: mapPriorityValue(taskData.priority?.priority),
     pest_type: getDropdownText(pestField),
     case_type: getDropdownText(caseTypeField),
@@ -519,42 +584,18 @@ function mapClickUpTaskToCustomerCaseData(taskData: any, customerId: string) {
     
     created_date: new Date(parseInt(taskData.date_created)).toISOString(),
     scheduled_date: taskData.due_date ? new Date(parseInt(taskData.due_date)).toISOString() : null,
-    completed_date: taskData.date_closed ? new Date(parseInt(taskData.date_closed)).toISOString() : null,
+    // 🆕 COMPLETED DATE för avtalskunder också
+    completed_date: isCompleted ? (
+      taskData.date_closed ? new Date(parseInt(taskData.date_closed)).toISOString() :
+      taskData.date_updated ? new Date(parseInt(taskData.date_updated)).toISOString() :
+      new Date().toISOString()
+    ) : null,
     
     updated_at: new Date().toISOString()
   }
 }
 
-// Status mappning
-function mapStatusValue(clickupStatus: string | undefined): string {
-  if (!clickupStatus) return 'open'
-  
-  const statusMap: { [key: string]: string } = {
-    'att göra': 'open',
-    'under hantering': 'in_progress', 
-    'bokat': 'in_progress',
-    'pågående': 'in_progress',
-    'slutförd': 'completed',
-    'klar': 'completed',
-    'avslutad': 'completed',
-    'stängd': 'closed',
-    'avbruten': 'closed',
-    'to do': 'open',
-    'in progress': 'in_progress',
-    'review': 'in_progress', 
-    'done': 'completed',
-    'complete': 'completed',
-    'completed': 'completed',
-    'closed': 'closed',
-    'cancelled': 'closed',
-    'open': 'open',
-    'pending': 'open'
-  }
-  
-  return statusMap[clickupStatus.toLowerCase()] || 'open'
-}
-
-// Priority mappning
+// 🆕 UPPDATERAD PRIORITY MAPPNING (samma som import)
 function mapPriorityValue(clickupPriority: string | undefined): string {
   if (!clickupPriority) return 'normal'
   
@@ -569,7 +610,7 @@ function mapPriorityValue(clickupPriority: string | undefined): string {
     '4': 'normal'
   }
   
-  return priorityMap[clickupPriority.toLowerCase()] || 'normal'
+  return priorityMap[clickupPriority.toString().toLowerCase()] || 'normal'
 }
 
 // Hantera raderade avtalskund tasks
@@ -579,7 +620,7 @@ async function handleCustomerTaskDeleted(taskId: string, customerId: string) {
   const { error } = await supabase
     .from('cases')
     .update({ 
-      status: 'deleted',
+      status: 'Borttagen',  // 🆕 Använd kapitaliserad status
       updated_at: new Date().toISOString()
     })
     .eq('clickup_task_id', taskId)
@@ -600,7 +641,7 @@ async function handleBeGoneTaskDeleted(taskId: string, tableName: 'private_cases
   const { error } = await supabase
     .from(tableName)
     .update({ 
-      status: 'deleted',
+      status: 'Borttagen',  // 🆕 Använd kapitaliserad status
       updated_at: new Date().toISOString()
     })
     .eq('clickup_task_id', taskId)

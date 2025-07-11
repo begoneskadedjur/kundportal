@@ -1,4 +1,4 @@
-// src/types/database.ts - Komplett uppdaterad med BeGone cases tabeller + befintlig struktur
+// src/types/database.ts - Komplett uppdaterad med ClickUp status-mappning + ALLA befintliga funktioner
 export type Database = {
   public: {
     Tables: {
@@ -73,14 +73,15 @@ export type Database = {
           clickup_task_id: string
           case_number: string
           title: string
-          status: string
+          status: ClickUpStatus  // 🆕 Använd ClickUp status type
+          status_id: string | null  // 🆕 ClickUp status ID
           priority: string
           pest_type: string
           location_details: string
           description: string
           created_date: string | null
           scheduled_date: string | null
-          completed_date: string | null
+          completed_date: string | null  // 🆕 När ärendet stängdes
           created_at: string
           updated_at: string
           // Utökade fält
@@ -93,13 +94,12 @@ export type Database = {
           files: any | null // jsonb
           assigned_technician_name: string | null
           assigned_technician_email: string | null
-          // TEKNIKER-RELATIONER
           assigned_technician_id: string | null // FK till technicians
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
       }
-      // NYA BEGONE TABELLER
+      // 🆕 NYA BEGONE TABELLER
       private_cases: {
         Row: {
           id: string
@@ -107,8 +107,9 @@ export type Database = {
           case_number: string | null
           title: string
           description: string | null
-          status: string
-          priority: string
+          status: ClickUpStatus  // 🆕 Samma status som ClickUp
+          status_id: string | null  // 🆕 ClickUp status ID för exakt mappning
+          priority: string | null
           created_at: string
           updated_at: string
           
@@ -123,32 +124,32 @@ export type Database = {
           tertiary_assignee_name: string | null
           tertiary_assignee_email: string | null
           
-          // Datum (svenska format via DATE kolumner)
-          start_date: string | null        // YYYY-MM-DD format
-          due_date: string | null         // YYYY-MM-DD format
-          completed_date: string | null   // YYYY-MM-DD format
+          // Svenska datum (YYYY-MM-DD)
+          start_date: string | null
+          due_date: string | null
+          completed_date: string | null  // 🆕 När ärendet stängdes/avslutades
           
-          // Custom fields från ClickUp
-          adress: any | null // Adress (JSONB)
-          r_arbetskostnad: number | null // R - Arbetskostnad
-          avvikelser_tillbud_olyckor: string | null // Avvikelser, tillbud & Olyckor
-          r_rot_rut: string | null // R - ROT/RUT
-          rapport: string | null // Rapport
-          status_saneringsrapport: string | null // Status Saneringsrapport
-          r_fastighetsbeteckning: string | null // R - Fastighetsbeteckning
-          personnummer: string | null // Personnummer
-          r_material_utrustning: number | null // R -  Material & Utrustning 
-          kontaktperson: string | null // Kontaktperson
-          skadedjur: string | null // Skadedjur
-          skicka_bokningsbekraftelse: string | null // Skicka bokningsbekräftelse?
-          reklamation: string | null // Reklamation
-          e_post_kontaktperson: string | null // E-post Kontaktperson
-          telefon_kontaktperson: string | null // Telefon Kontaktperson
-          vaggloss_angade_rum: string | null // Vägglöss - Ångade rum
-          pris: number | null // Pris
-          filer: any | null // Filer (JSONB)
-          r_servicebil: number | null // R - Servicebil
-          annat_skadedjur: string | null // Annat Skadedjur
+          // 20 Custom fields från ClickUp (privatpersoner)
+          adress: any | null // JSONB
+          r_arbetskostnad: number | null
+          avvikelser_tillbud_olyckor: string | null
+          r_rot_rut: string | null
+          rapport: string | null
+          status_saneringsrapport: string | null
+          r_fastighetsbeteckning: string | null
+          personnummer: string | null
+          r_material_utrustning: number | null
+          kontaktperson: string | null
+          skadedjur: string | null
+          skicka_bokningsbekraftelse: string | null
+          reklamation: string | null
+          e_post_kontaktperson: string | null
+          telefon_kontaktperson: string | null
+          vaggloss_angade_rum: string | null
+          pris: number | null
+          filer: any | null // JSONB
+          r_servicebil: number | null
+          annat_skadedjur: string | null
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -160,8 +161,9 @@ export type Database = {
           case_number: string | null
           title: string
           description: string | null
-          status: string
-          priority: string
+          status: ClickUpStatus  // 🆕 Samma status som ClickUp
+          status_id: string | null  // 🆕 ClickUp status ID för exakt mappning
+          priority: string | null
           created_at: string
           updated_at: string
           
@@ -176,31 +178,31 @@ export type Database = {
           tertiary_assignee_name: string | null
           tertiary_assignee_email: string | null
           
-          // Datum (svenska format via DATE kolumner)
-          start_date: string | null        // YYYY-MM-DD format
-          due_date: string | null         // YYYY-MM-DD format
-          completed_date: string | null   // YYYY-MM-DD format
+          // Svenska datum (YYYY-MM-DD)
+          start_date: string | null
+          due_date: string | null
+          completed_date: string | null  // 🆕 När ärendet stängdes/avslutades
           
-          // Custom fields från ClickUp
-          adress: any | null // Adress (JSONB)
-          avvikelser_tillbud_olyckor: string | null // Avvikelser, tillbud & Olyckor
-          rapport: string | null // Rapport
-          status_saneringsrapport: string | null // Status Saneringsrapport
-          markning_faktura: string | null // Märkning faktura
-          kontaktperson: string | null // Kontaktperson
-          e_post_faktura: string | null // E-post Faktura
-          skadedjur: string | null // Skadedjur
-          skicka_bokningsbekraftelse: string | null // Skicka bokningsbekräftelse?
-          org_nr: string | null // Org nr
-          reklamation: string | null // Reklamation
-          e_post_kontaktperson: string | null // E-post Kontaktperson
-          telefon_kontaktperson: string | null // Telefon Kontaktperson
-          skicka_erbjudande: string | null // Skicka erbjudande?
-          vaggloss_angade_rum: string | null // Vägglöss - Ångade rum
-          bestallare: string | null // Beställare
-          pris: number | null // Pris
-          filer: any | null // Filer (JSONB)
-          annat_skadedjur: string | null // Annat Skadedjur
+          // 19 Custom fields från ClickUp (företag)
+          adress: any | null // JSONB
+          avvikelser_tillbud_olyckor: string | null
+          rapport: string | null
+          status_saneringsrapport: string | null
+          markning_faktura: string | null
+          kontaktperson: string | null
+          e_post_faktura: string | null
+          skadedjur: string | null
+          skicka_bokningsbekraftelse: string | null
+          org_nr: string | null
+          reklamation: string | null
+          e_post_kontaktperson: string | null
+          telefon_kontaktperson: string | null
+          skicka_erbjudande: string | null
+          vaggloss_angade_rum: string | null
+          bestallare: string | null
+          pris: number | null
+          filer: any | null // JSONB
+          annat_skadedjur: string | null
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>
@@ -235,7 +237,6 @@ export type Database = {
           status: string | null
           created_at: string
           updated_at: string
-          // TEKNIKER-RELATIONER
           technician_id: string | null // FK till technicians
         }
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'created_at' | 'updated_at'>
@@ -270,34 +271,108 @@ export type Database = {
   }
 }
 
-// Hjälptyper - BEFINTLIGA
-export type Customer = Database['public']['Tables']['customers']['Row']
-export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
-export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+// 🎯 CLICKUP STATUS SYSTEM - Med kapitalisering för portal-visning
+export type ClickUpStatus = 
+  | 'Öppen'
+  | 'Bokad'
+  | 'Återbesök 1'
+  | 'Återbesök 2'
+  | 'Återbesök 3'
+  | 'Återbesök 4'
+  | 'Återbesök 5'
+  | 'Privatperson - review'
+  | 'Bomkörning'
+  | 'Generera saneringsrapport'
+  | 'Ombokning'
+  | 'Offert skickad'
+  | 'Offert signerad - boka in'
+  | 'Reklamation'
+  | 'Stängt - slasklogg'
+  | 'Avslutat'
 
-export type ContractType = Database['public']['Tables']['contract_types']['Row']
+// 🆔 STATUS ID TILL NAMN MAPPNING - Med kapitalisering
+export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
+  'c127553498_fwlMbGKH': 'Öppen',
+  'c127553498_E9tR4uKl': 'Bokad',
+  'c127553498_vUiYm1mz': 'Återbesök 1',
+  'c127553498_oWvoXUqP': 'Återbesök 2',
+  'c127553498_Pk6EAmNr': 'Återbesök 3',
+  'c127553498_navJy7RM': 'Återbesök 4',
+  'c127553498_i96gm2m8': 'Återbesök 5',
+  'c127553498_aGFV5SBN': 'Privatperson - review',
+  'c127553498_LeA7jRkh': 'Bomkörning',
+  'c127553498_F7cDxTYZ': 'Generera saneringsrapport',
+  'c127553498_f4QLnpo0': 'Ombokning',
+  'c127553498_ozSZTPqg': 'Offert skickad',
+  'c127553498_u6NXTUe8': 'Offert signerad - boka in',
+  'c127553498_V0p3wG0L': 'Reklamation',
+  'c127553498_PSuyPIHA': 'Stängt - slasklogg',
+  'c127553498_wQT5njhJ': 'Avslutat',
+}
 
-export type Technician = Database['public']['Tables']['technicians']['Row']
-export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
-export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
+// 📝 STATUS NAMN TILL ID MAPPNING
+export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
+  'Öppen': 'c127553498_fwlMbGKH',
+  'Bokad': 'c127553498_E9tR4uKl',
+  'Återbesök 1': 'c127553498_vUiYm1mz',
+  'Återbesök 2': 'c127553498_oWvoXUqP',
+  'Återbesök 3': 'c127553498_Pk6EAmNr',
+  'Återbesök 4': 'c127553498_navJy7RM',
+  'Återbesök 5': 'c127553498_i96gm2m8',
+  'Privatperson - review': 'c127553498_aGFV5SBN',
+  'Bomkörning': 'c127553498_LeA7jRkh',
+  'Generera saneringsrapport': 'c127553498_F7cDxTYZ',
+  'Ombokning': 'c127553498_f4QLnpo0',
+  'Offert skickad': 'c127553498_ozSZTPqg',
+  'Offert signerad - boka in': 'c127553498_u6NXTUe8',
+  'Reklamation': 'c127553498_V0p3wG0L',
+  'Stängt - slasklogg': 'c127553498_PSuyPIHA',
+  'Avslutat': 'c127553498_wQT5njhJ',
+}
 
-export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
-export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
-export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
+// 🎨 STATUS KONFIGURATION med färger och typer
+export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: string; type: string; orderindex: number } } = {
+  'Öppen': { id: 'c127553498_fwlMbGKH', color: '#87909e', type: 'open', orderindex: 0 },
+  'Bokad': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
+  'Återbesök 1': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
+  'Återbesök 2': { id: 'c127553498_oWvoXUqP', color: '#1090e0', type: 'custom', orderindex: 3 },
+  'Återbesök 3': { id: 'c127553498_Pk6EAmNr', color: '#1090e0', type: 'custom', orderindex: 4 },
+  'Återbesök 4': { id: 'c127553498_navJy7RM', color: '#1090e0', type: 'custom', orderindex: 5 },
+  'Återbesök 5': { id: 'c127553498_i96gm2m8', color: '#1090e0', type: 'custom', orderindex: 6 },
+  'Privatperson - review': { id: 'c127553498_aGFV5SBN', color: '#ee5e99', type: 'custom', orderindex: 7 },
+  'Bomkörning': { id: 'c127553498_LeA7jRkh', color: '#d33d44', type: 'custom', orderindex: 8 },
+  'Generera saneringsrapport': { id: 'c127553498_F7cDxTYZ', color: '#aa8d80', type: 'custom', orderindex: 9 },
+  'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 10 },
+  'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 11 },
+  'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 12 },
+  'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 13 },
+  'Stängt - slasklogg': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 14 },
+  'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 15 },
+}
 
-// NYA BEGONE CASE TYPER
-export type PrivateCasesRow = Database['public']['Tables']['private_cases']['Row']
-export type PrivateCasesInsert = Database['public']['Tables']['private_cases']['Insert']
-export type PrivateCasesUpdate = Database['public']['Tables']['private_cases']['Update']
+// 🔧 HJÄLPFUNKTIONER för status-hantering
+export const getStatusName = (statusId: string): ClickUpStatus => {
+  return STATUS_ID_TO_NAME[statusId] || 'Öppen'
+}
 
-export type BusinessCasesRow = Database['public']['Tables']['business_cases']['Row']
-export type BusinessCasesInsert = Database['public']['Tables']['business_cases']['Insert']
-export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']['Update']
+export const getStatusId = (statusName: ClickUpStatus): string => {
+  return STATUS_NAME_TO_ID[statusName]
+}
 
-// Union type för flexibel hantering
-export type BeGoneCaseRow = PrivateCasesRow | BusinessCasesRow
+export const getStatusColor = (status: ClickUpStatus): string => {
+  return STATUS_CONFIG[status]?.color || '#87909e'
+}
 
-// Hjälp-interfaces för assignee-hantering
+export const getStatusType = (status: ClickUpStatus): string => {
+  return STATUS_CONFIG[status]?.type || 'open'
+}
+
+// 🎯 IDENTIFIERA STÄNGDA ÄRENDEN baserat på status
+export const isCompletedStatus = (status: ClickUpStatus): boolean => {
+  return status === 'Avslutat' || status === 'Stängt - slasklogg'
+}
+
+// 👥 ASSIGNEE & DATUM INTERFACES
 export interface CaseAssignee {
   id?: string
   name: string
@@ -306,9 +381,9 @@ export interface CaseAssignee {
 }
 
 export interface CaseDateInfo {
-  start_date?: string
-  due_date?: string
-  completed_date?: string
+  start_date?: string        // YYYY-MM-DD
+  due_date?: string         // YYYY-MM-DD  
+  completed_date?: string   // YYYY-MM-DD - 🆕 När ärendet stängdes
   // Hjälpfunktioner för svenska format
   start_date_swedish?: string    // DD/MM YYYY
   due_date_swedish?: string      // DD/MM YYYY  
@@ -322,7 +397,38 @@ export interface CaseTypeInfo {
   display_name: string
 }
 
-// Konstanter för tekniker-matching
+// 🆕 BEGONE CASE TYPER
+export type PrivateCasesRow = Database['public']['Tables']['private_cases']['Row']
+export type PrivateCasesInsert = Database['public']['Tables']['private_cases']['Insert']
+export type PrivateCasesUpdate = Database['public']['Tables']['private_cases']['Update']
+
+export type BusinessCasesRow = Database['public']['Tables']['business_cases']['Row']
+export type BusinessCasesInsert = Database['public']['Tables']['business_cases']['Insert']
+export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']['Update']
+
+// Union type för flexibel hantering
+export type BeGoneCaseRow = PrivateCasesRow | BusinessCasesRow
+
+// Befintliga hjälptyper
+export type Customer = Database['public']['Tables']['customers']['Row']
+export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
+export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+
+export type ContractType = Database['public']['Tables']['contract_types']['Row']
+
+export type Technician = Database['public']['Tables']['technicians']['Row']
+export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
+export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
+
+export type Case = Database['public']['Tables']['cases']['Row']
+export type CaseInsert = Database['public']['Tables']['cases']['Insert']
+export type CaseUpdate = Database['public']['Tables']['cases']['Update']
+
+export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
+export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
+export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
+
+// 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [
   { name: 'Sofia Pålshagen', email: 'sofia.palshagen@begone.se' },
   { name: 'Benny Linden', email: 'benny.linden@begone.se' },
@@ -345,7 +451,7 @@ export const TECHNICIAN_ROLES = [
 
 export type TechnicianRole = typeof TECHNICIAN_ROLES[number]
 
-// Formulärdata-typer
+// Formulärdata-typer (från gamla filen)
 export type CustomerFormData = {
   company_name: string
   org_number: string
@@ -380,7 +486,7 @@ export type SpendFormData = {
   notes: string
 }
 
-// Konstanter & Hjälpfunktioner
+// Konstanter & Hjälpfunktioner (från gamla filen)
 export const ACCOUNT_MANAGERS = [
   { value: 'christian.karlsson@begone.se', label: 'Christian Karlsson' },
   { value: 'kristian.agnevik@begone.se', label: 'Kristian Agnevik' },
@@ -390,30 +496,40 @@ export const ACCOUNT_MANAGERS = [
 
 export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']
 
-// DATUM-HJÄLPFUNKTIONER (NYA)
+// 📅 DATUM-HJÄLPFUNKTIONER
 export const formatSwedishDate = (dateString?: string): string => {
   if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('sv-SE', {
-    day: '2-digit',
-    month: '2-digit', 
-    year: 'numeric'
-  })
+  
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('sv-SE', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
+    })
+  } catch {
+    return 'Ogiltigt datum'
+  }
 }
 
 export const formatSwedishDateTime = (timestamp?: string): string => {
   if (!timestamp) return '-'
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('sv-SE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  
+  try {
+    const date = new Date(timestamp)
+    return date.toLocaleDateString('sv-SE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return 'Ogiltigt datum'
+  }
 }
 
-// BEFINTLIGA HJÄLPFUNKTIONER
+// BEFINTLIGA HJÄLPFUNKTIONER (från gamla filen)
 export const calculateContractEndDate = (startDate: string, lengthInMonths: number): string => {
   const start = new Date(startDate)
   const end = new Date(start)
