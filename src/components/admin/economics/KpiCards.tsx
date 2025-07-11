@@ -1,4 +1,4 @@
-// src/components/admin/economics/KpiCards.tsx - UPPDATERAD med BeGone ärendeintäkter
+// src/components/admin/economics/KpiCards.tsx - UPPDATERAD med nya intäktslabels
 import React from 'react'
 import { TrendingUp, DollarSign, Users, BarChart3, AlertTriangle, Briefcase } from 'lucide-react'
 import Card from '../../ui/Card'
@@ -62,18 +62,18 @@ const KpiCards: React.FC = () => {
       trend: '+3 nya'
     },
     {
-      title: 'Ärendeintäkter (YTD)',
+      title: 'Merförsäljning Avtal (YTD)', // ✅ Uppdaterad label
       value: formatCurrency(kpiData.total_case_revenue_ytd),
-      description: 'Intäkter från ärenden i år',
+      description: 'Intäkter från merförsäljning i år', // ✅ Uppdaterad beskrivning
       icon: BarChart3,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-500/20',
       trend: '+12.1%'
     },
     {
-      title: 'BeGone Intäkter (YTD)', // 🆕 Ny KPI
+      title: 'Intäkter Engångsjobb (YTD)', // ✅ Uppdaterad label
       value: formatCurrency(kpiData.total_begone_revenue_ytd),
-      description: 'Intäkter från BeGone ärenden',
+      description: 'Intäkter från engångsjobb', // ✅ Uppdaterad beskrivning
       icon: Briefcase,
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/20',

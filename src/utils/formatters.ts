@@ -1,4 +1,4 @@
-// 📁 src/utils/formatters.ts - Formaterings-utilities för BeGone ekonomiska dashboard
+// 📁 src/utils/formatters.ts - UPPDATERAD med nya intäktslabels
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('sv-SE', {
     style: 'currency',
@@ -199,7 +199,21 @@ export const formatGrowth = (current: number, previous: number): { percentage: s
   return { percentage, color, arrow }
 }
 
-// Formatera för BeGone case types
+// 🆕 UPPDATERAD: Formatera för intäktstyper med nya namn
+export const formatRevenueType = (type: 'contract' | 'case' | 'engangsjobb'): { text: string; color: string; icon: string } => {
+  switch (type) {
+    case 'contract':
+      return { text: 'Kontraktsintäkter', color: 'text-green-500', icon: '📋' }
+    case 'case':
+      return { text: 'Merförsäljning Avtal', color: 'text-yellow-500', icon: '💼' } // 🆕 Nytt namn
+    case 'engangsjobb':
+      return { text: 'Intäkter Engångsjobb', color: 'text-orange-500', icon: '🔧' } // 🆕 Nytt namn
+    default:
+      return { text: 'Okänt', color: 'text-slate-400', icon: '❓' }
+  }
+}
+
+// 🆕 UPPDATERAD: Formatera för BeGone case types med nya namn
 export const formatBeGoneCaseType = (type: 'private' | 'business'): { text: string; color: string; icon: string } => {
   switch (type) {
     case 'private':
@@ -211,9 +225,14 @@ export const formatBeGoneCaseType = (type: 'private' | 'business'): { text: stri
   }
 }
 
-// Utility för att formatera chart tooltips
+// 🆕 UPPDATERAD: Utility för att formatera chart tooltips med nya namn
 export const formatTooltipValue = (value: any, name: string): string => {
-  if (name.toLowerCase().includes('intäkt') || name.toLowerCase().includes('kostnad') || name.toLowerCase().includes('pris')) {
+  // Hantera nya namn
+  if (name.toLowerCase().includes('merförsäljning') || 
+      name.toLowerCase().includes('engångsjobb') || 
+      name.toLowerCase().includes('intäkt') || 
+      name.toLowerCase().includes('kostnad') || 
+      name.toLowerCase().includes('pris')) {
     return formatCurrency(Number(value))
   }
   
@@ -221,11 +240,28 @@ export const formatTooltipValue = (value: any, name: string): string => {
     return formatPercentage(Number(value))
   }
   
-  if (name.toLowerCase().includes('kunder') || name.toLowerCase().includes('ärenden') || name.toLowerCase().includes('antal')) {
+  if (name.toLowerCase().includes('kunder') || 
+      name.toLowerCase().includes('ärenden') || 
+      name.toLowerCase().includes('antal')) {
     return Number(value).toString()
   }
   
   return String(value)
+}
+
+// 🆕 UPPDATERAD: Mappning för chart labels med nya namn
+export const getRevenueChartLabel = (key: string): string => {
+  const labelMap: { [key: string]: string } = {
+    'contract_revenue': 'Kontraktsintäkter',
+    'case_revenue': 'Merförsäljning Avtal', // 🆕 Nytt namn
+    'begone_revenue': 'Intäkter Engångsjobb', // 🆕 Nytt namn
+    'total_revenue': 'Total Intäkt',
+    'private_revenue': 'Privatpersoner',
+    'business_revenue': 'Företag',
+    'total_begone_revenue': 'Totala Engångsjobb' // 🆕 Nytt namn
+  }
+  
+  return labelMap[key] || key
 }
 
 // Export all formatters as a utility object
@@ -250,6 +286,8 @@ export const formatters = {
   completionTime: formatCompletionTime,
   cac: formatCAC,
   growth: formatGrowth,
+  revenueType: formatRevenueType, // 🆕 Ny funktion
   begoneCaseType: formatBeGoneCaseType,
-  tooltipValue: formatTooltipValue
+  tooltipValue: formatTooltipValue,
+  revenueChartLabel: getRevenueChartLabel // 🆕 Ny funktion
 }
