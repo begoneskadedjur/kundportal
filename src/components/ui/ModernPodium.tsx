@@ -259,5 +259,38 @@ const ModernPodium: React.FC<ModernPodiumProps> = ({
 // Export component with additional utilities
 export default ModernPodium
 
-// Export additional podium-related components
-export { PodiumCar
+// Utility functions for podium data
+export const createPodiumItem = (
+  id: string | number,
+  name: string,
+  value: string | number,
+  secondaryValue?: string | number,
+  description?: string,
+  metrics?: Array<{ label: string; value: string | number }>
+): PodiumItem => ({
+  id,
+  name,
+  value,
+  secondaryValue,
+  description,
+  rank: 0, // Will be set by the podium component
+  metrics
+})
+
+// Helper function to format technician data for podium
+export const formatTechnicianForPodium = (
+  technician: any,
+  formatCurrency: (value: number) => string
+): PodiumItem => ({
+  id: technician.name,
+  name: technician.name,
+  value: formatCurrency(technician.total_revenue || 0),
+  secondaryValue: `${technician.total_cases || 0} ärenden`,
+  description: `${technician.private_cases || 0} privat • ${technician.business_cases || 0} företag`,
+  rank: technician.rank || 0,
+  metrics: [
+    { label: 'Genomsnitt/ärende', value: formatCurrency(technician.avg_case_value || 0) },
+    { label: 'Privatpersoner', value: formatCurrency(technician.private_revenue || 0) },
+    { label: 'Företag', value: formatCurrency(technician.business_revenue || 0) }
+  ]
+})
