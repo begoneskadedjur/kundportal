@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - KOMPLETT SÄKER VERSION för debugging
+// src/pages/admin/Economics.tsx - UPPDATERAD LAYOUT MED FULLBREDDSGRAF
 import React from 'react'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -73,13 +73,18 @@ const Economics: React.FC = () => {
             <KpiCards />
           </section>
 
-          {/* 2. Intäktsflöde */}
+          {/* 2. Månadsvis Intäktsflöde (Fullbredd) - ✅ NY LAYOUT */}
           <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Intäktsanalys</h2>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <MonthlyRevenueChart />
+            <h2 className="text-xl font-semibold text-white mb-4">Månadsvis Intäktsflöde</h2>
+            <MonthlyRevenueChart />
+          </section>
+
+          {/* 3. Detaljerad Analys (Grid-layout) */}
+          <section>
+            <h2 className="text-xl font-semibold text-white mb-4">Detaljerad Analys</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* BeGone Chart - Tillfälligt ersatt med placeholder */}
+              {/* BeGone Chart - Platshållare flyttad hit */}
               <Card>
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">BeGone Ärendestatistik</h3>
@@ -94,18 +99,12 @@ const Economics: React.FC = () => {
                   </div>
                 </div>
               </Card>
-            </div>
-          </section>
 
-          {/* 3. Placeholder för övriga komponenter */}
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Ytterligare Analytics</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
+              {/* Platshållare för Ärendeekonomi */}
               <Card>
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">Ärendeekonomi</h3>
-                  <div className="h-64 flex items-center justify-center text-slate-400">
+                  <div className="h-80 flex items-center justify-center text-slate-400">
                     <div className="text-center">
                       <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-lg">💼</span>
@@ -117,10 +116,11 @@ const Economics: React.FC = () => {
                 </div>
               </Card>
 
+              {/* Platshållare för Teknikerintäkter */}
               <Card>
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">Teknikerintäkter</h3>
-                  <div className="h-64 flex items-center justify-center text-slate-400">
+                  <div className="h-80 flex items-center justify-center text-slate-400">
                     <div className="text-center">
                       <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-lg">👷</span>
@@ -132,31 +132,17 @@ const Economics: React.FC = () => {
                 </div>
               </Card>
 
+              {/* Platshållare för Marknadsföring & ROI */}
               <Card>
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">Marknadsföring & ROI</h3>
-                  <div className="h-64 flex items-center justify-center text-slate-400">
+                  <div className="h-80 flex items-center justify-center text-slate-400">
                     <div className="text-center">
                       <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-lg">📈</span>
                       </div>
                       <p className="mb-2 font-medium">Komponent laddas...</p>
                       <p className="text-sm">ROI-data kommer snart</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Utgående Avtal</h3>
-                  <div className="h-64 flex items-center justify-center text-slate-400">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <span className="text-lg">⚠️</span>
-                      </div>
-                      <p className="mb-2 font-medium">Komponent laddas...</p>
-                      <p className="text-sm">Avtalsdata kommer snart</p>
                     </div>
                   </div>
                 </div>
@@ -279,4 +265,4 @@ const Economics: React.FC = () => {
   )
 }
 
-export default Economics
+export default Economics```
