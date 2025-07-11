@@ -1,4 +1,4 @@
-// src/pages/admin/Economics.tsx - UPPDATERAD MED FULLBREDDSCHARTS
+// src/pages/admin/Economics.tsx - UPPDATERAD MED TEKNIKER KOMPONENTER
 import React from 'react'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -8,13 +8,13 @@ import Card from '../../components/ui/Card'
 // Importera komponenter som fungerar
 import KpiCards from '../../components/admin/economics/KpiCards'
 import MonthlyRevenueChart from '../../components/admin/economics/MonthlyRevenueChart'
-import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart' // 🆕 Nu aktiverad
+import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
+import TechnicianRevenueChart from '../../components/admin/economics/TechnicianRevenueChart' // 🆕 BeGone tekniker
+import AccountManagerRevenueChart from '../../components/admin/economics/AccountManagerRevenueChart' // 🆕 Avtalskund tekniker (döpt om)
 
 // Tillfälligt kommenterade komponenter för debugging
 // import ExpiringContractsChart from '../../components/admin/economics/ExpiringContractsChart'
 // import MarketingRoiChart from '../../components/admin/economics/MarketingRoiChart'
-// import TechnicianRevenueChart from '../../components/admin/economics/TechnicianRevenueChart'
-// import AccountManagerRevenueChart from '../../components/admin/economics/AccountManagerRevenueChart'
 // import CaseEconomyChart from '../../components/admin/economics/CaseEconomyChart'
 // import CustomerContractTable from '../../components/admin/economics/CustomerContractTable'
 // import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
@@ -46,7 +46,7 @@ const Economics: React.FC = () => {
                 <h1 className="text-2xl font-bold text-white">Ekonomisk Översikt</h1>
                 <p className="text-slate-400 text-sm">
                   Komplett analys av intäkter, kostnader och tillväxt
-                  <span className="ml-2 text-orange-400">• Nu med fullständig engångsjobb-analys</span>
+                  <span className="ml-2 text-orange-400">• Nu med tekniker-prestanda analys</span>
                 </p>
               </div>
             </div>
@@ -91,7 +91,28 @@ const Economics: React.FC = () => {
             <BeGoneMonthlyStatsChart />
           </section>
 
-          {/* 4. Övriga Komponenter (Grid-layout för mindre komponenter) */}
+          {/* 4. 🆕 TEKNIKER-PRESTANDA: BeGone vs Avtalskunder */}
+          <section>
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Tekniker-prestanda
+              <span className="ml-2 text-sm text-slate-400">Engångsjobb vs Avtalskunder med pokaler</span>
+            </h2>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              
+              {/* BeGone Tekniker (Vänster) */}
+              <div>
+                <TechnicianRevenueChart />
+              </div>
+
+              {/* Avtalskund Tekniker (Höger) */}
+              <div>
+                <AccountManagerRevenueChart />
+              </div>
+
+            </div>
+          </section>
+
+          {/* 5. Övriga Komponenter (Grid-layout för mindre komponenter) */}
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">Övrig Ekonomisk Analys</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -107,22 +128,6 @@ const Economics: React.FC = () => {
                       </div>
                       <p className="mb-2 font-medium">Komponent laddas...</p>
                       <p className="text-sm">Ärendeekonomi-data kommer snart</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Platshållare för Teknikerintäkter */}
-              <Card>
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Teknikerintäkter</h3>
-                  <div className="h-64 flex items-center justify-center text-slate-400">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <span className="text-lg">👷</span>
-                      </div>
-                      <p className="mb-2 font-medium">Komponent laddas...</p>
-                      <p className="text-sm">Tekniker-data kommer snart</p>
                     </div>
                   </div>
                 </div>
@@ -160,10 +165,26 @@ const Economics: React.FC = () => {
                 </div>
               </Card>
 
+              {/* Platshållare för Account Manager Performance */}
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Account Manager Performance</h3>
+                  <div className="h-64 flex items-center justify-center text-slate-400">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span className="text-lg">👔</span>
+                      </div>
+                      <p className="mb-2 font-medium">Komponent laddas...</p>
+                      <p className="text-sm">Account manager-data kommer snart</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
             </div>
           </section>
 
-          {/* 5. Debug sektion (Kompakt) */}
+          {/* 6. Debug sektion (Kompakt) */}
           <section>
             <Card>
               <div className="p-6">
@@ -175,7 +196,9 @@ const Economics: React.FC = () => {
                     <h4 className="text-white font-medium">Aktiva Komponenter:</h4>
                     <p className="text-green-400">✅ KPI Cards</p>
                     <p className="text-green-400">✅ Månadsvis Intäktsflöde</p>
-                    <p className="text-green-400">✅ Intäkter Engångsjobb</p> {/* 🆕 Nu aktiverad */}
+                    <p className="text-green-400">✅ Intäkter Engångsjobb</p>
+                    <p className="text-green-400">✅ BeGone Tekniker-prestanda</p> {/* 🆕 */}
+                    <p className="text-green-400">✅ Avtalskund Tekniker-prestanda</p> {/* 🆕 */}
                     <p className="text-yellow-400">⏸️ Övriga komponenter</p>
                   </div>
                   
@@ -186,6 +209,7 @@ const Economics: React.FC = () => {
                     <p className="text-green-400">✅ Supabase</p>
                     <p className="text-green-400">✅ Formatters</p>
                     <p className="text-blue-400">🔄 Real-time data</p>
+                    <p className="text-purple-400">🏆 Medal system</p> {/* 🆕 */}
                   </div>
 
                   {/* Data Sources */}
@@ -195,6 +219,7 @@ const Economics: React.FC = () => {
                     <p className="text-green-400">✅ cases (merförsäljning)</p>
                     <p className="text-green-400">✅ private_cases (privatpersoner)</p>
                     <p className="text-green-400">✅ business_cases (företag)</p>
+                    <p className="text-blue-400">👷 technician assignments</p> {/* 🆕 */}
                   </div>
 
                 </div>
@@ -203,11 +228,17 @@ const Economics: React.FC = () => {
                 <div className="mt-6 pt-4 border-t border-slate-700">
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-slate-400">
-                      Dashboard v2.0 - Fullständig ekonomisk analys
+                      Dashboard v2.1 - Med tekniker-prestanda och pokalsystem
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-green-400 text-sm">System operationellt</span>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-green-400 text-sm">5 aktiva komponenter</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-400 text-sm">
+                        <span>🥇🥈🥉</span>
+                        <span>Pokalsystem aktivt</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -226,11 +257,17 @@ const Economics: React.FC = () => {
             <div className="flex items-center gap-4">
               <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
               <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
-              <span>Economics Dashboard v2.0</span>
+              <span>Economics Dashboard v2.1</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-              <span>2 aktiva fullbreddscharts</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <span>3 aktiva fullbreddscharts</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>🏆</span>
+                <span>2 tekniker-komponenter</span>
+              </div>
             </div>
           </div>
         </div>
