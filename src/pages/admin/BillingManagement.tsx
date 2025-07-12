@@ -23,6 +23,7 @@ interface BillingCase {
   skadedjur: string
   adress?: any
   description?: string
+  rapport?: string  // 🆕 Lägg till rapport-fält
   kontaktperson?: string
   telefon_kontaktperson?: string
   e_post_kontaktperson?: string
@@ -48,10 +49,27 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
 
   const formatAddress = (address: any) => {
     if (!address) return 'Ingen adress angiven'
+    
+    // Om det är en sträng, returnera direkt
     if (typeof address === 'string') return address
+    
+    // Om det är ett objekt, extrahera formatted_address först
     if (typeof address === 'object') {
-      return `${address.street || ''} ${address.city || ''}`.trim() || 'Ingen adress angiven'
+      // Kolla efter formatted_address från ClickUp
+      if (address.formatted_address) {
+        return address.formatted_address
+      }
+      
+      // Fallback till manuell formatering
+      const parts = []
+      if (address.street) parts.push(address.street)
+      if (address.city) parts.push(address.city)
+      if (address.postalCode || address.postal_code) parts.push(address.postalCode || address.postal_code)
+      if (address.country) parts.push(address.country)
+      
+      return parts.length > 0 ? parts.join(', ') : 'Ingen adress angiven'
     }
+    
     return 'Ingen adress angiven'
   }
 
@@ -252,6 +270,16 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
               </p>
             </div>
           )}
+
+          {/* Rapport */}
+          {case_.rapport && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-slate-300">Tekniker-rapport</h3>
+              <div className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
+                <div className="whitespace-pre-wrap">{case_.rapport}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -298,8 +326,8 @@ const BillingManagement: React.FC = () => {
           .select(`
             id, case_number, title, pris, completed_date,
             primary_assignee_name, primary_assignee_email,
-            skadedjur, adress, description, kontaktperson,
-            telefon_kontaktperson, e_post_kontaktperson,
+            skadedjur, adress, description, rapport,
+            kontaktperson, telefon_kontaktperson, e_post_kontaktperson,
             billing_status, billing_updated_at
           `)
           .eq('status', 'Avslutat')
@@ -312,8 +340,8 @@ const BillingManagement: React.FC = () => {
           .select(`
             id, case_number, title, pris, completed_date,
             primary_assignee_name, primary_assignee_email,
-            skadedjur, adress, description, kontaktperson,
-            telefon_kontaktperson, e_post_kontaktperson,
+            skadedjur, adress, description, rapport,
+            kontaktperson, telefon_kontaktperson, e_post_kontaktperson,
             org_nr, bestallare, billing_status, billing_updated_at
           `)
           .eq('status', 'Avslutat')
