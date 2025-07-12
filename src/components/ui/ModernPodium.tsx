@@ -87,14 +87,14 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
     <div className="relative group">
       {/* Rank Badge */}
       <div className={`
-        absolute -top-3 -right-3 w-12 h-12 rounded-full 
+        absolute -top-2 -right-2 w-8 h-8 rounded-full 
         bg-gradient-to-r ${config.gradient} 
         flex items-center justify-center 
-        font-bold text-lg shadow-xl ${config.shadow}
+        font-bold text-sm shadow-lg ${config.shadow}
         border-2 ${config.border}
         z-10 group-hover:scale-110 transition-transform duration-300
       `}>
-        <span className="text-white">{item.rank}</span>
+        <span className="text-white text-xs">{item.rank}</span>
       </div>
 
       <ModernCard 
@@ -103,27 +103,27 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
           h-full bg-gradient-to-br ${config.bgGradient} 
           border-2 ${config.border} ${config.shadow}
           group-hover:scale-105 transition-all duration-300
-          ${variant === 'compact' ? 'p-4' : 'p-6'}
+          ${variant === 'compact' ? 'p-3' : 'p-4'}
         `}
       >
         <div className="text-center h-full flex flex-col justify-between">
           {/* Icon/Avatar */}
-          <div className="mb-4">
+          <div className="mb-3">
             {item.avatar ? (
               <img 
                 src={item.avatar} 
                 alt={item.name}
-                className="w-16 h-16 rounded-full mx-auto border-4 border-white/20 shadow-lg"
+                className="w-12 h-12 rounded-full mx-auto border-4 border-white/20 shadow-lg"
               />
             ) : (
-              <div className="text-4xl mb-2">{config.icon}</div>
+              <div className="text-2xl mb-2">{config.icon}</div>
             )}
           </div>
 
           {/* Name */}
           <h4 className={`
-            text-xl font-bold text-white mb-2
-            ${variant === 'compact' ? 'text-lg' : 'text-xl'}
+            font-bold text-white mb-2
+            ${variant === 'compact' ? 'text-sm' : 'text-base'}
             group-hover:${config.textGlow} transition-colors duration-300
           `}>
             {item.name}
@@ -131,24 +131,24 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
 
           {/* Badge */}
           {item.badge && (
-            <div className="mb-3">
-              <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium text-white">
+            <div className="mb-2">
+              <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-medium text-white">
                 {item.badge}
               </span>
             </div>
           )}
 
-          {/* Main Value */}
-          <div className="mb-4">
+          {/* Main Value - FIXAD: Mindre text och inga decimaler */}
+          <div className="mb-3">
             <div className={`
               font-bold text-white group-hover:scale-110 transition-transform duration-300
-              ${variant === 'compact' ? 'text-2xl' : 'text-3xl'}
+              ${variant === 'compact' ? 'text-lg' : 'text-xl'}
             `}>
               {displayValue}
             </div>
             
             {displaySecondaryValue && (
-              <div className="text-white/80 text-sm mt-1">
+              <div className="text-white/80 text-xs mt-1">
                 {displaySecondaryValue}
               </div>
             )}
@@ -156,17 +156,21 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
 
           {/* Description */}
           {item.description && variant !== 'compact' && (
-            <p className="text-white/70 text-sm mb-4">{item.description}</p>
+            <p className="text-white/70 text-xs mb-3">{item.description}</p>
           )}
 
-          {/* Metrics */}
+          {/* Metrics - FIXAD: Kompaktare */}
           {showMetrics && item.metrics && variant === 'detailed' && (
-            <div className="space-y-2 mt-auto">
-              <div className="h-px bg-white/20 mb-3"></div>
-              {item.metrics.map((metric, index) => (
-                <div key={index} className="flex justify-between items-center text-sm">
+            <div className="space-y-1 mt-auto">
+              <div className="h-px bg-white/20 mb-2"></div>
+              {item.metrics.slice(0, 3).map((metric, index) => (
+                <div key={index} className="flex justify-between items-center text-xs">
                   <span className="text-white/70">{metric.label}</span>
-                  <span className="text-white font-medium">{metric.value}</span>
+                  <span className="text-white font-medium">
+                    {typeof metric.value === 'number' ? 
+                      (metric.value > 999 ? formatCurrency ? formatCurrency(metric.value) : metric.value : metric.value) 
+                      : metric.value}
+                  </span>
                 </div>
               ))}
             </div>

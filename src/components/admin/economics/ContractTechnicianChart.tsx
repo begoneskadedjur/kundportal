@@ -551,9 +551,17 @@ const ContractTechnicianChart: React.FC = () => {
           title="Topp 3 Avtalskund Tekniker"
           subtitle="Bäst presterande tekniker för nya avtal och merförsäljning"
           valueLabel="Baserat på total intäkt från nya avtal och merförsäljning"
-          variant="detailed"
+          variant="compact" // FIXAD: Mindre kort
           showMetrics
-          formatValue={(value) => formatCurrency(Number(value))} // FIXAD: Explicit Number conversion
+          formatValue={(value) => {
+            const num = Number(value)
+            return new Intl.NumberFormat('sv-SE', {
+              style: 'currency',
+              currency: 'SEK',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(num)
+          }}
         />
       )}
 
