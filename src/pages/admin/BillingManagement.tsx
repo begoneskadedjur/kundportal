@@ -1,13 +1,14 @@
 // 📁 src/pages/admin/BillingManagement.tsx - KOMPLETT FAKTURERINGSSIDA
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Filter, Search, Calendar, DollarSign, User, Building2, Phone, Mail, MapPin } from 'lucide-react'
+import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, User, Building2, MapPin, Calendar, DollarSign } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatters'
 
 // Moderna komponenter
-import ModernCard from '../../components/ui/ModernCard'
 import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
 
 // 🎯 Interfaces
 interface BillingCase {
@@ -20,7 +21,7 @@ interface BillingCase {
   primary_assignee_name: string
   primary_assignee_email?: string
   skadedjur: string
-  address?: any
+  adress?: any
   description?: string
   kontaktperson?: string
   telefon_kontaktperson?: string
@@ -238,7 +239,7 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
               Adress
             </h3>
             <p className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-              {formatAddress(case_.address)}
+              {formatAddress(case_.adress)}
             </p>
           </div>
 
@@ -546,14 +547,11 @@ const BillingManagement: React.FC = () => {
         </header>
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ModernCard>
+          <Card>
             <div className="p-8 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                <p className="text-slate-400 text-sm">Laddar faktureringslista...</p>
-              </div>
+              <LoadingSpinner size="lg" />
             </div>
-          </ModernCard>
+          </Card>
         </main>
       </div>
     )
@@ -584,14 +582,14 @@ const BillingManagement: React.FC = () => {
         </header>
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ModernCard gradient="red">
+          <Card className="bg-red-500/10 border-red-500/20">
             <div className="p-8 text-center text-red-400">
               <p className="mb-4">Fel vid laddning: {error}</p>
               <Button onClick={fetchBillingCases}>
                 Försök igen
               </Button>
             </div>
-          </ModernCard>
+          </Card>
         </main>
       </div>
     )
@@ -635,20 +633,53 @@ const BillingManagement: React.FC = () => {
           
           {/* Sammanfattning */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ModernCard className="p-4">
+            <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-400">Väntar på fakturering</p>
                   <p className="text-2xl font-bold text-yellow-400">{summary.pending.count}</p>
+                  <p className="text-xs text-slate-500">{formatCurrency(summary.pending.total)}</p>
+                </div>
+                <Clock className="w-8 h-8 text-yellow-500" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Faktura skickad</p>
+                  <p className="text-2xl font-bold text-blue-400">{summary.sent.count}</p>
+                  <p className="text-xs text-slate-500">{formatCurrency(summary.sent.total)}</p>
+                </div>
+                <FileText className="w-8 h-8 text-blue-500" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Faktura betald</p>
+                  <p className="text-2xl font-bold text-green-400">{summary.paid.count}</p>
+                  <p className="text-xs text-slate-500">{formatCurrency(summary.paid.total)}</p>
+                </div>
+                <Check className="w-8 h-8 text-green-500" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Ska ej faktureras</p>
+                  <p className="text-2xl font-bold text-gray-400">{summary.skip.count}</p>
                   <p className="text-xs text-slate-500">{formatCurrency(summary.skip.total)}</p>
                 </div>
                 <X className="w-8 h-8 text-gray-500" />
               </div>
-            </ModernCard>
+            </Card>
           </div>
 
           {/* Filter och sök */}
-          <ModernCard>
+          <Card>
             <div className="p-6">
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 
@@ -688,17 +719,19 @@ const BillingManagement: React.FC = () => {
                 </div>
               </div>
             </div>
-          </ModernCard>
+          </Card>
 
           {/* Faktureringslista */}
-          <ModernCard>
-            <ModernCard.Header
-              icon={FileText}
-              iconColor="text-blue-500"
-              title="Faktureringslista"
-              subtitle={`${filteredAndSortedCases.length} ärenden visas`}
-            />
-            <ModernCard.Content>
+          <Card>
+            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-blue-500" />
+                <h2 className="text-lg font-semibold text-white">Faktureringslista</h2>
+              </div>
+              <p className="text-sm text-slate-400">{filteredAndSortedCases.length} ärenden visas</p>
+            </div>
+            
+            <div className="p-6">
               {filteredAndSortedCases.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -889,8 +922,8 @@ const BillingManagement: React.FC = () => {
                   )}
                 </div>
               )}
-            </ModernCard.Content>
-          </ModernCard>
+            </div>
+          </Card>
         </div>
       </main>
 
@@ -904,37 +937,4 @@ const BillingManagement: React.FC = () => {
   )
 }
 
-export default BillingManagement</p>
-                </div>
-                <Clock className="w-8 h-8 text-yellow-500" />
-              </div>
-            </ModernCard>
-            
-            <ModernCard className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Faktura skickad</p>
-                  <p className="text-2xl font-bold text-blue-400">{summary.sent.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.sent.total)}</p>
-                </div>
-                <FileText className="w-8 h-8 text-blue-500" />
-              </div>
-            </ModernCard>
-            
-            <ModernCard className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Faktura betald</p>
-                  <p className="text-2xl font-bold text-green-400">{summary.paid.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.paid.total)}</p>
-                </div>
-                <Check className="w-8 h-8 text-green-500" />
-              </div>
-            </ModernCard>
-            
-            <ModernCard className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Ska ej faktureras</p>
-                  <p className="text-2xl font-bold text-gray-400">{summary.skip.count}</p>
-                  <p className="text-xs text-slate-500">{
+export default BillingManagement
