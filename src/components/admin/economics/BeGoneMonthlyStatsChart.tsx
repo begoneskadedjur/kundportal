@@ -8,7 +8,6 @@ import { formatCurrency } from '../../../utils/formatters'
 // Nya moderna komponenter
 import ModernCard from '../../ui/ModernCard'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
-import ModernTabs from '../../ui/ModernTabs'
 
 // 🎯 Interface structure
 interface BeGoneStats {
@@ -80,12 +79,12 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     { key: '12m', label: '12 månader', shortLabel: '12M' }
   ]
 
-  // Tab options
+  // Tab options - enkla objekt för manuell rendering
   const tabOptions = [
-    { key: 'overview', label: 'Översikt', icon: TrendingUp },
-    { key: 'technicians', label: 'Tekniker', icon: Users },
-    { key: 'skadedjur', label: 'Skadedjur', icon: Bug },
-    { key: 'status', label: 'Status', icon: Calendar }
+    { key: 'overview', label: 'Översikt', icon: TrendingUp, color: 'text-orange-500' },
+    { key: 'technicians', label: 'Tekniker', icon: Users, color: 'text-blue-500' },
+    { key: 'skadedjur', label: 'Skadedjur', icon: Bug, color: 'text-red-500' },
+    { key: 'status', label: 'Status', icon: Calendar, color: 'text-yellow-500' }
   ]
 
   useEffect(() => {
@@ -538,7 +537,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               </div>
             </div>
 
-            {/* Navigation och Tabs */}
+            {/* Navigation och enkla Tabs */}
             <div className="flex flex-col sm:flex-row gap-3">
               <CombinedNavigation
                 selectedMonth={selectedMonth}
@@ -553,12 +552,28 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                 compact
                 className="flex-1"
               />
-              <ModernTabs
-                value={activeTab}
-                onValueChange={(value) => setActiveTab(value as any)}
-                options={tabOptions}
-                variant="compact"
-              />
+              
+              {/* Enkla tabs utan extern komponent */}
+              <div className="flex bg-slate-800/50 border border-slate-700/50 rounded-lg p-1">
+                {tabOptions.map((tab) => {
+                  const IconComponent = tab.icon
+                  const isActive = activeTab === tab.key
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as any)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-slate-700 text-white border border-slate-600 shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <IconComponent className={`w-3 h-3 ${isActive ? tab.color : 'text-slate-500'}`} />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
