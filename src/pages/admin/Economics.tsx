@@ -1,6 +1,6 @@
-// 📁 src/pages/admin/Economics.tsx - UPPDATERAD MED MODERNA KOMPONENTER
+// 📁 src/pages/admin/Economics.tsx - UPPDATERAD MED ECONOMICINSIGHTSCHART
 import React, { useState } from 'react'
-import { ArrowLeft, RefreshCw, Wrench, Building2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Wrench, Building2, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -10,9 +10,10 @@ import KpiCards from '../../components/admin/economics/KpiCards'
 import MonthlyRevenueChart from '../../components/admin/economics/MonthlyRevenueChart'
 import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
 
-// 🆕 NYA MODERNA KOMPONENTER
+// 🆕 MODERNA KOMPONENTER
 import BeGoneTechnicianChart from '../../components/admin/economics/BeGoneTechnicianChart'
 import ContractTechnicianChart from '../../components/admin/economics/ContractTechnicianChart'
+import EconomicInsightsChart from '../../components/admin/economics/EconomicInsightsChart'
 import ModernViewSelector, { commonViewOptions } from '../../components/ui/ModernViewSelector'
 
 // Tillfälligt kommenterade komponenter för debugging
@@ -63,7 +64,7 @@ const Economics: React.FC = () => {
                 <h1 className="text-2xl font-bold text-white">Ekonomisk Översikt</h1>
                 <p className="text-slate-400 text-sm">
                   Komplett analys av intäkter, kostnader och tillväxt
-                  <span className="ml-2 text-green-400">• Nu med moderna tekniker-prestanda komponenter</span>
+                  <span className="ml-2 text-green-400">• Nu med moderna insights & försäljningsmöjligheter</span>
                 </p>
               </div>
             </div>
@@ -108,7 +109,24 @@ const Economics: React.FC = () => {
             <BeGoneMonthlyStatsChart />
           </section>
 
-          {/* 4. 🆕 MODERNA TEKNIKER-PRESTANDA med View Selector */}
+          {/* 4. 🆕 EKONOMISKA INSIGHTS - NYA KOMPONENTEN */}
+          <section>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <TrendingUp className="w-6 h-6 text-purple-500" />
+                  Ekonomiska Insights
+                  <span className="ml-2 text-sm text-slate-400">Topp ärenden, skadedjur & avtalsmöjligheter</span>
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Identifiera högsta ärenden, mest lönsamma skadedjur och potentiella avtalskunder
+                </p>
+              </div>
+            </div>
+            <EconomicInsightsChart />
+          </section>
+
+          {/* 5. 🆕 MODERNA TEKNIKER-PRESTANDA med View Selector */}
           <section>
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
               <div>
@@ -170,7 +188,7 @@ const Economics: React.FC = () => {
             )}
           </section>
 
-          {/* 5. Övriga Komponenter */}
+          {/* 6. Övriga Komponenter */}
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">Övrig Ekonomisk Analys</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -242,12 +260,12 @@ const Economics: React.FC = () => {
             </div>
           </section>
 
-          {/* 6. 🆕 Modern System Status */}
+          {/* 7. 🆕 Modern System Status - UPPDATERAD med nya komponenten */}
           <section>
             <Card className="bg-gradient-to-br from-green-600/10 to-emerald-600/10 border-green-500/20">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  ✅ System Status - Moderna Komponenter Aktiva
+                  ✅ System Status - Moderna Komponenter Aktiva + NYA INSIGHTS
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -265,26 +283,27 @@ const Economics: React.FC = () => {
                     <p className="text-green-400">✅ ModernViewSelector</p>
                     <p className="text-green-400">✅ BeGone Tekniker Chart</p>
                     <p className="text-green-400">✅ Contract Tekniker Chart</p>
+                    <p className="text-purple-400 font-bold">🆕 Economic Insights Chart</p>
                   </div>
                   
-                  {/* Moderna Funktioner */}
+                  {/* Nya Insights Funktioner */}
                   <div className="space-y-2 text-sm">
-                    <h4 className="text-blue-400 font-medium">🎨 Moderna Funktioner:</h4>
-                    <p className="text-blue-400">🎨 Gradient bakgrunder</p>
-                    <p className="text-blue-400">✨ Glow effekter</p>
-                    <p className="text-blue-400">🏃‍♂️ Hover animationer</p>
-                    <p className="text-blue-400">🔍 Sökfunktionalitet</p>
-                    <p className="text-blue-400">📊 Sorterbara listor</p>
-                    <p className="text-blue-400">🥇 Medal rankingsystem</p>
-                    <p className="text-blue-400">📱 Responsiv design</p>
-                    <p className="text-blue-400">🗓️ Period navigation</p>
-                    <p className="text-blue-400">⚡ Loading states</p>
-                    <p className="text-blue-400">❌ Error handling</p>
+                    <h4 className="text-purple-400 font-medium">🆕 Insights Funktioner:</h4>
+                    <p className="text-purple-400">🏆 Topp 10 Högsta Ärenden</p>
+                    <p className="text-purple-400">🐛 Mest Lönsamma Skadedjur</p>
+                    <p className="text-purple-400">🏢 Avtalsmöjligheter</p>
+                    <p className="text-purple-400">👁️ Klickbara Ärendedetaljer</p>
+                    <p className="text-purple-400">📊 Försäljningsanalys</p>
+                    <p className="text-purple-400">🎯 Smart Prioritering</p>
+                    <p className="text-purple-400">📱 Modal med Kundinfo</p>
+                    <p className="text-purple-400">🔍 Period-baserad Filtrering</p>
+                    <p className="text-purple-400">💡 Automatisk Kundgruppering</p>
+                    <p className="text-purple-400">🔥 Prioritetsindikatorer</p>
                   </div>
 
-                  {/* Data Källor */}
+                  {/* Data Källor & Funktioner */}
                   <div className="space-y-2 text-sm">
-                    <h4 className="text-purple-400 font-medium">📊 Data Källor:</h4>
+                    <h4 className="text-blue-400 font-medium">📊 Data & Funktioner:</h4>
                     <p className="text-green-400">✅ customers (avtalskunder)</p>
                     <p className="text-green-400">✅ cases (merförsäljning)</p>
                     <p className="text-green-400">✅ private_cases (privatpersoner)</p>
@@ -293,22 +312,24 @@ const Economics: React.FC = () => {
                     <p className="text-blue-400">🔄 Real-time synkronisering</p>
                     <p className="text-purple-400">📈 Advanced analytics</p>
                     <p className="text-yellow-400">⚡ Performance optimering</p>
+                    <p className="text-orange-400">🎨 Gradient bakgrunder</p>
+                    <p className="text-pink-400">✨ Glow effekter</p>
                   </div>
 
                 </div>
 
-                {/* Progress Bar - 100% Complete! */}
+                {/* Progress Bar - 100% Complete + Insights! */}
                 <div className="mt-6 pt-4 border-t border-green-700/30">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-slate-400">Moderna Komponenter Status</span>
-                    <span className="text-sm text-green-400 font-semibold">✅ 100% Complete!</span>
+                    <span className="text-sm text-slate-400">Ekonomisk Dashboard Status</span>
+                    <span className="text-sm text-purple-400 font-semibold">🆕 Insights Added! 100% + Bonus</span>
                   </div>
                   <div className="w-full bg-slate-800 rounded-full h-3">
-                    <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-1000 shadow-lg shadow-green-500/25" style={{ width: '100%' }}></div>
+                    <div className="bg-gradient-to-r from-green-500 via-purple-500 to-pink-500 h-3 rounded-full transition-all duration-1000 shadow-lg shadow-purple-500/25" style={{ width: '100%' }}></div>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                    <span>Alla tekniker-komponenter implementerade</span>
-                    <span>🚀 Redo för produktion</span>
+                    <span>Alla komponenter + avancerade insights implementerade</span>
+                    <span>🚀 Enterprise-klass ekonomisk analys</span>
                   </div>
                 </div>
 
@@ -319,27 +340,31 @@ const Economics: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - UPPDATERAD */}
       <footer className="bg-slate-900/50 border-t border-slate-800 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between text-sm text-slate-400">
             <div className="flex items-center gap-4">
               <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
               <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
-              <span>Economics Dashboard v3.0 - Modern UI</span>
+              <span>Economics Dashboard v4.0 - Med Insights</span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>11 aktiva komponenter</span>
+                <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse"></div>
+                <span>12 aktiva komponenter</span>
               </div>
               <div className="flex items-center gap-2">
                 <span>🏆</span>
                 <span>Medal rankingsystem</span>
               </div>
               <div className="flex items-center gap-2">
-                <span>✨</span>
-                <span>Moderna animationer</span>
+                <span>👁️</span>
+                <span>Klickbara insights</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>🎯</span>
+                <span>Försäljningsmöjligheter</span>
               </div>
             </div>
           </div>
