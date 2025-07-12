@@ -1,6 +1,6 @@
 // 📁 src/pages/admin/BillingManagement.tsx - KOMPLETT FAKTURERINGSSIDA
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, User, Building2, MapPin, Calendar, DollarSign } from 'lucide-react'
+import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, User, Building2, MapPin, Calendar, DollarSign, Phone, Mail } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatters'
@@ -51,12 +51,28 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
     if (!address) return 'Ingen adress angiven'
     
     // Om det är en sträng, returnera direkt
-    if (typeof address === 'string') return address
+    if (typeof address === 'string') {
+      // Om strängen ser ut som JSON, försök parsa den
+      if (address.startsWith('{') && address.includes('formatted_address')) {
+        try {
+          const parsed = JSON.parse(address)
+          return parsed.formatted_address || 'Ingen adress angiven'
+        } catch (e) {
+          return address
+        }
+      }
+      return address
+    }
     
-    // Om det är ett objekt, extrahera formatted_address först
+    // Om det är ett objekt
     if (typeof address === 'object') {
-      // Kolla efter formatted_address från ClickUp
+      // Kolla efter formatted_address direkt
       if (address.formatted_address) {
+        return address.formatted_address
+      }
+      
+      // Kolla efter nested struktur
+      if (address.location && typeof address === 'object' && address.formatted_address) {
         return address.formatted_address
       }
       
@@ -216,33 +232,51 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
               {case_.type === 'private' ? <User className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
               Kunduppgifter
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-4 text-sm">
               {case_.kontaktperson && (
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Kontaktperson:</span>
                   <span className="text-white">{case_.kontaktperson}</span>
                 </div>
               )}
               {case_.telefon_kontaktperson && (
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Telefon:</span>
-                  <span className="text-white">{case_.telefon_kontaktperson}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white">{case_.telefon_kontaktperson}</span>
+                    <a
+                      href={`tel:${case_.telefon_kontaktperson}`}
+                      className="p-1 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded transition-colors"
+                      title="Ring kund"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
+                  </div>
                 </div>
               )}
               {case_.e_post_kontaktperson && (
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Email:</span>
-                  <span className="text-white">{case_.e_post_kontaktperson}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white">{case_.e_post_kontaktperson}</span>
+                    <a
+                      href={`mailto:${case_.e_post_kontaktperson}`}
+                      className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-colors"
+                      title="Skicka email"
+                    >
+                      <Mail className="w-4 h-4" />
+                    </a>
+                  </div>
                 </div>
               )}
               {case_.org_nr && (
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Org.nr:</span>
                   <span className="text-white">{case_.org_nr}</span>
                 </div>
               )}
               {case_.bestallare && (
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400">Beställare:</span>
                   <span className="text-white">{case_.bestallare}</span>
                 </div>
