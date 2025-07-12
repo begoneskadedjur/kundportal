@@ -380,20 +380,23 @@ const ContractTechnicianChart: React.FC = () => {
   if (loading) {
     return (
       <ModernCard gradient="green" glowing>
-        <ModernCard.Header
-          icon={Building2}
-          iconColor="text-green-500"
-          title="Avtalskund Tekniker-prestanda"
-          subtitle="Laddar data..."
-        />
-        <ModernCard.Content>
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-green-500" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
+              <p className="text-sm text-slate-400">Laddar data...</p>
+            </div>
+          </div>
           <div className="h-80 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
               <p className="text-slate-400 text-sm">Laddar avtalskund tekniker statistik...</p>
             </div>
           </div>
-        </ModernCard.Content>
+        </div>
       </ModernCard>
     )
   }
@@ -402,13 +405,16 @@ const ContractTechnicianChart: React.FC = () => {
   if (error) {
     return (
       <ModernCard gradient="red" glowing>
-        <ModernCard.Header
-          icon={Building2}
-          iconColor="text-red-500"
-          title="Avtalskund Tekniker-prestanda"
-          subtitle="Fel vid laddning"
-        />
-        <ModernCard.Content>
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
+              <p className="text-sm text-slate-400">Fel vid laddning</p>
+            </div>
+          </div>
           <div className="h-80 flex items-center justify-center text-red-400">
             <div className="text-center">
               <Target className="w-12 h-12 mx-auto mb-4" />
@@ -422,7 +428,7 @@ const ContractTechnicianChart: React.FC = () => {
               </button>
             </div>
           </div>
-        </ModernCard.Content>
+        </div>
       </ModernCard>
     )
   }
@@ -568,7 +574,7 @@ const ContractTechnicianChart: React.FC = () => {
       {/* Meddelande när ingen data finns */}
       {listData.length === 0 && (
         <ModernCard>
-          <ModernCard.Content>
+          <div className="p-6">
             <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
               <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
               <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
@@ -579,7 +585,7 @@ const ContractTechnicianChart: React.FC = () => {
                 Cases: {allData.cases.length}, Customers: {allData.customers.length}
               </p>
             </div>
-          </ModernCard.Content>
+          </div>
         </ModernCard>
       )}
 
