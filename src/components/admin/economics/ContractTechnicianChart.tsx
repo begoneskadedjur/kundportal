@@ -7,7 +7,6 @@ import { formatCurrency } from '../../../utils/formatters'
 // Nya moderna komponenter
 import ModernCard from '../../ui/ModernCard'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
-import ModernPodium from '../../ui/ModernPodium'
 import ModernList, { createListItem } from '../../ui/ModernList'
 
 interface ContractTechnicianData {
@@ -411,24 +410,6 @@ const ContractTechnicianChart: React.FC = () => {
   const totalNewCustomerValue = technicianData.reduce((sum, tech) => sum + tech.new_customer_value, 0)
   const totalUpsellRevenue = technicianData.reduce((sum, tech) => sum + tech.upsell_revenue, 0)
 
-  // Formatera data för podium
-  const podiumData = technicianData
-    .slice(0, 3)
-    .filter(tech => tech.total_revenue > 0)
-    .map(tech => ({
-      id: tech.name,
-      name: tech.name,
-      value: tech.total_revenue || 0,
-      secondaryValue: `${tech.new_customers || 0} nya avtal`,
-      description: `${tech.upsell_cases || 0} merförsäljning • ${formatCurrency(tech.avg_contract_value || 0)} genomsnitt`,
-      rank: tech.rank,
-      metrics: [
-        { label: 'Nya avtal', value: tech.new_customers || 0 },
-        { label: 'Merförsäljning', value: tech.upsell_revenue || 0 },
-        { label: 'Genomsnitt/avtal', value: tech.avg_contract_value || 0 }
-      ]
-    }))
-
   // Formatera data för lista
   const listData = technicianData
     .filter(tech => tech.total_revenue > 0)
@@ -518,27 +499,6 @@ const ContractTechnicianChart: React.FC = () => {
           </div>
         </div>
       </ModernCard>
-
-      {/* 🏆 Topp 3 podium - Visar endast om det finns data */}
-      {podiumData.length > 0 && (
-        <ModernPodium
-          items={podiumData}
-          title="Topp 3 Avtalskund Tekniker"
-          subtitle="Bäst presterande tekniker för nya avtal och merförsäljning"
-          valueLabel="Baserat på total intäkt från nya avtal och merförsäljning"
-          variant="compact"
-          showMetrics
-          formatValue={(value) => {
-            const num = Number(value)
-            return new Intl.NumberFormat('sv-SE', {
-              style: 'currency',
-              currency: 'SEK',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0
-            }).format(num)
-          }}
-        />
-      )}
 
       {/* Meddelande när ingen data finns */}
       {listData.length === 0 && (

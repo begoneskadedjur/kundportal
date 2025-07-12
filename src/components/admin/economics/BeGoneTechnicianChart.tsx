@@ -7,7 +7,6 @@ import { formatCurrency } from '../../../utils/formatters'
 // Nya moderna komponenter
 import ModernCard from '../../ui/ModernCard'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
-import ModernPodium, { formatTechnicianForPodium } from '../../ui/ModernPodium'
 import ModernList, { createListItem } from '../../ui/ModernList'
 
 interface TechnicianData {
@@ -352,27 +351,12 @@ const BeGoneTechnicianChart: React.FC = () => {
   const totalPrivateRevenue = technicianData.reduce((sum, tech) => sum + tech.private_revenue, 0)
   const totalBusinessRevenue = technicianData.reduce((sum, tech) => sum + tech.business_revenue, 0)
 
-  // Formatera data för podium - FIXAD: Säkerställ nummer-värden
-  const podiumData = technicianData.slice(0, 3).map(tech => ({
-    id: tech.name,
-    name: tech.name,
-    value: tech.total_revenue || 0, // FIXAD: Använd nummer istället för sträng
-    secondaryValue: `${tech.total_cases || 0} ärenden`,
-    description: `${tech.private_cases || 0} privat • ${tech.business_cases || 0} företag`,
-    rank: tech.rank,
-    metrics: [
-      { label: 'Genomsnitt/ärende', value: tech.avg_case_value || 0 },
-      { label: 'Privatpersoner', value: tech.private_revenue || 0 },
-      { label: 'Företag', value: tech.business_revenue || 0 }
-    ]
-  }))
-
-  // Formatera data för lista - FIXAD: Använd nummer-värden
+  // Formatera data för lista
   const listData = technicianData.map(tech => 
     createListItem(
       tech.name,
       tech.name,
-      tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+      tech.total_revenue || 0,
       `${tech.total_cases || 0} ärenden`,
       {
         rank: tech.rank,
@@ -393,7 +377,7 @@ const BeGoneTechnicianChart: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header med navigation - FIXAD: Bättre responsiv layout */}
+      {/* Header med navigation */}
       <ModernCard gradient="blue" glowing>
         <div className="p-6">
           <div className="flex flex-col gap-4 mb-6">
@@ -408,7 +392,7 @@ const BeGoneTechnicianChart: React.FC = () => {
               </div>
             </div>
 
-            {/* Navigation - FIXAD: Inuti kortet */}
+            {/* Navigation */}
             <div className="flex flex-col sm:flex-row gap-3">
               <CombinedNavigation
                 selectedMonth={selectedMonth}
@@ -426,7 +410,7 @@ const BeGoneTechnicianChart: React.FC = () => {
             </div>
           </div>
         
-          {/* Period översikt med moderna stat cards - FIXAD: Mindre kort */}
+          {/* Period översikt med moderna stat cards */}
           <div className="mb-6">
             <h3 className="text-sm text-slate-400 mb-4">
               {selectedPeriod === '1m' 
@@ -455,27 +439,6 @@ const BeGoneTechnicianChart: React.FC = () => {
           </div>
         </div>
       </ModernCard>
-
-      {/* 🏆 Topp 3 podium - FIXAD: Använd formatCurrency korrekt */}
-      {technicianData.length >= 3 && (
-        <ModernPodium
-          items={podiumData}
-          title="Topp 3 BeGone Tekniker"
-          subtitle="Bäst presterande tekniker för vald period"
-          valueLabel="Baserat på total intäkt från avslutade ärenden"
-          variant="compact" // FIXAD: Mindre kort
-          showMetrics
-          formatValue={(value) => {
-            const num = Number(value)
-            return new Intl.NumberFormat('sv-SE', {
-              style: 'currency',
-              currency: 'SEK',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0
-            }).format(num)
-          }}
-        />
-      )}
 
       {/* 📊 Fullständig tekniker-lista */}
       <ModernList
