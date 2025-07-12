@@ -904,7 +904,7 @@ const BillingManagement: React.FC = () => {
   )
 }
 
-export default BillingManagementformatCurrency(summary.pending.total)}</p>
+export default BillingManagement</p>
                 </div>
                 <Clock className="w-8 h-8 text-yellow-500" />
               </div>
