@@ -270,7 +270,7 @@ const EconomicInsightsChart: React.FC = () => {
     fetchInsightsData()
   }, [])
 
-  // 🔄 Hämta insights data
+  // 🔄 Hämta insights data - FIXAD: Hämta ALL data, inte bara top 10
   const fetchInsightsData = async () => {
     try {
       setLoading(true)
@@ -282,7 +282,7 @@ const EconomicInsightsChart: React.FC = () => {
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // Hämta alla avslutade ärenden från BeGone
+      // Hämta ALLA avslutade ärenden från BeGone (INTE bara top 10)
       const [privateResult, businessResult] = await Promise.all([
         supabase
           .from('private_cases')
@@ -296,7 +296,7 @@ const EconomicInsightsChart: React.FC = () => {
           .gte('completed_date', dateString)
           .not('completed_date', 'is', null)
           .not('pris', 'is', null)
-          .order('pris', { ascending: false }),
+          .order('pris', { ascending: false }), // Hämta ALLA, inte bara top 10
         
         supabase
           .from('business_cases')
@@ -311,7 +311,7 @@ const EconomicInsightsChart: React.FC = () => {
           .gte('completed_date', dateString)
           .not('completed_date', 'is', null)
           .not('pris', 'is', null)
-          .order('pris', { ascending: false })
+          .order('pris', { ascending: false }) // Hämta ALLA, inte bara top 10
       ])
 
       if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`)
@@ -323,12 +323,16 @@ const EconomicInsightsChart: React.FC = () => {
       ]
 
       console.log(`📊 Loaded ${allCases.length} total cases for insights analysis`)
+      console.log(`📊 Private cases: ${privateResult.data?.length || 0}, Business cases: ${businessResult.data?.length || 0}`)
 
-      // Processa data
-      const insights = processInsightsData(allCases)
-      setData(insights)
+      // Spara ALL rådata (inte processad data)
+      setData({
+        topCases: allCases, // Spara ALLA cases, inte bara top 10
+        topSkadedjur: [], // Kommer beräknas i getFilteredData
+        potentialContracts: [] // Kommer beräknas i getFilteredData
+      })
       
-      console.log('✅ Insights data processed successfully')
+      console.log('✅ Insights raw data loaded successfully')
       
     } catch (err) {
       console.error('❌ fetchInsightsData error:', err)
@@ -463,9 +467,18 @@ const EconomicInsightsChart: React.FC = () => {
     }
   }
 
-  // 🎯 Filtrerad data baserat på period - FIXAD FILTERLOGIK
+  // 🎯 Filtrerad data baserat på period - HELT OMSKRIVEN LOGIK
   const getFilteredData = useMemo(() => {
     console.log(`🔍 Filtering data for period: ${selectedPeriod}, month: ${selectedMonth}`)
+    console.log(`📊 Raw data available: ${data.topCases.length} cases`)
+    
+    if (!data.topCases.length) {
+      return {
+        topCases: [],
+        topSkadedjur: [],
+        potentialContracts: []
+      }
+    }
     
     // Bestäm datumspan
     const selectedDate = new Date(selectedMonth + '-01')
@@ -494,21 +507,18 @@ const EconomicInsightsChart: React.FC = () => {
       return caseDate >= startDate && caseDate <= endDate
     }
 
-    // Filtrera rådata baserat på period och skapa nya aggregeringar
-    const filteredRawCases = [
-      ...data.topCases.filter(case_ => filterByDate(case_.completed_date)),
-      // Hämta även från andra cases som inte är i top 10 men inom period
-    ]
-
-    // 1. TOPP CASES - alltid från ALL rådata, filtrera och sortera om
+    // Filtrera ALLA cases baserat på period
     const allFilteredCases = data.topCases.filter(case_ => filterByDate(case_.completed_date))
+    console.log(`📊 Filtered cases: ${allFilteredCases.length} från ${data.topCases.length} totala`)
+
+    // 1. TOPP CASES - ta top 10 från alla filtrerade
     const topCasesForPeriod = allFilteredCases
       .sort((a, b) => b.pris - a.pris)
       .slice(0, 10)
 
-    console.log(`📊 Top cases for period: ${topCasesForPeriod.length} (från ${allFilteredCases.length} filtrerade)`)
+    console.log(`🏆 Top cases for period: ${topCasesForPeriod.length}`)
 
-    // 2. SKADEDJUR - omberäkna från grunden för period
+    // 2. SKADEDJUR - beräkna från scratch
     const skadedjurStatsForPeriod: { [key: string]: { revenue: number; cases: any[]; count: number } } = {}
     
     allFilteredCases.forEach(case_ => {
@@ -540,77 +550,88 @@ const EconomicInsightsChart: React.FC = () => {
       .slice(0, 10)
 
     console.log(`🐛 Skadedjur for period: ${topSkadedjurForPeriod.length}`)
-    console.log('Top skadedjur:', topSkadedjurForPeriod.slice(0, 3).map(s => `${s.type}: ${s.total_revenue}kr`))
 
-    // 3. FÖRSÄLJNINGSMÖJLIGHETER - omberäkna från grunden baserat på org_nr
-    const businessCustomersForPeriod: { [key: string]: { 
-      cases: any[]; 
-      contact_person: string; 
-      phone?: string; 
-      email?: string; 
-      org_nr: string;
+    // 3. FÖRSÄLJNINGSMÖJLIGHETER - enkelt org_nr baserat
+    const orgNrStats: { [key: string]: { 
+      count: number; 
+      revenue: number; 
+      contact_person: string;
+      phone?: string;
+      email?: string;
       company_name?: string;
+      latest_date: string;
+      cases: any[];
     } } = {}
     
-    const businessCasesForPeriod = allFilteredCases.filter(case_ => case_.type === 'business' && case_.org_nr)
+    // Räkna bara business cases med org_nr
+    const businessCasesForPeriod = allFilteredCases.filter(case_ => 
+      case_.type === 'business' && case_.org_nr && case_.org_nr.trim() !== ''
+    )
+    
+    console.log(`🏢 Business cases with org_nr: ${businessCasesForPeriod.length}`)
     
     businessCasesForPeriod.forEach(case_ => {
-      const orgNr = case_.org_nr
-      if (!orgNr) return
+      const orgNr = case_.org_nr.trim()
       
-      if (!businessCustomersForPeriod[orgNr]) {
-        businessCustomersForPeriod[orgNr] = {
-          cases: [],
+      if (!orgNrStats[orgNr]) {
+        orgNrStats[orgNr] = {
+          count: 0,
+          revenue: 0,
           contact_person: case_.kontaktperson || case_.bestallare || 'Okänd kontakt',
           phone: case_.telefon_kontaktperson,
           email: case_.e_post_kontaktperson,
-          org_nr: orgNr,
-          company_name: case_.bestallare || case_.kontaktperson
+          company_name: case_.bestallare || case_.kontaktperson,
+          latest_date: case_.completed_date,
+          cases: []
         }
       }
       
-      businessCustomersForPeriod[orgNr].cases.push({
+      orgNrStats[orgNr].count++
+      orgNrStats[orgNr].revenue += case_.pris
+      orgNrStats[orgNr].cases.push({
         id: case_.id,
         pris: case_.pris,
         completed_date: case_.completed_date,
         skadedjur: case_.skadedjur || 'Okänt'
       })
+      
+      // Uppdatera senaste datum
+      if (case_.completed_date > orgNrStats[orgNr].latest_date) {
+        orgNrStats[orgNr].latest_date = case_.completed_date
+      }
     })
 
-    const potentialContractsForPeriod = Object.entries(businessCustomersForPeriod)
-      .filter(([_, customer]) => customer.cases.length >= 2) // Minst 2 ärenden
-      .map(([orgNr, customer]) => {
-        const totalRevenue = customer.cases.reduce((sum, case_) => sum + case_.pris, 0)
-        const latestCase = customer.cases.sort((a, b) => 
+    // Bara företag med 2+ ärenden
+    const potentialContractsForPeriod = Object.entries(orgNrStats)
+      .filter(([_, stats]) => stats.count >= 2)
+      .map(([orgNr, stats]) => ({
+        customer_identifier: `${stats.company_name} (${orgNr})`,
+        contact_person: stats.contact_person,
+        phone: stats.phone,
+        email: stats.email,
+        org_nr: orgNr,
+        case_count: stats.count,
+        total_revenue: stats.revenue,
+        avg_case_value: stats.revenue / stats.count,
+        latest_case_date: stats.latest_date,
+        case_details: stats.cases.sort((a, b) => 
           new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
-        )[0]
-        
-        return {
-          customer_identifier: `${customer.company_name} (${orgNr})`,
-          contact_person: customer.contact_person,
-          phone: customer.phone,
-          email: customer.email,
-          org_nr: orgNr,
-          case_count: customer.cases.length,
-          total_revenue: totalRevenue,
-          avg_case_value: totalRevenue / customer.cases.length,
-          latest_case_date: latestCase.completed_date,
-          case_details: customer.cases.sort((a, b) => 
-            new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
-          )
-        }
-      })
-      .sort((a, b) => b.total_revenue - a.total_revenue)
+        )
+      }))
+      .sort((a, b) => b.case_count - a.case_count) // Sortera efter antal ärenden
       .slice(0, 15)
 
-    console.log(`🏢 Försäljningsmöjligheter for period: ${potentialContractsForPeriod.length}`)
+    console.log(`🏢 Försäljningsmöjligheter: ${potentialContractsForPeriod.length}`)
+    console.log('Top companies by case count:', potentialContractsForPeriod.slice(0, 3).map(c => 
+      `${c.contact_person}: ${c.case_count} ärenden`
+    ))
 
     return {
       topCases: topCasesForPeriod,
       topSkadedjur: topSkadedjurForPeriod,
       potentialContracts: potentialContractsForPeriod
     }
-  }, [data, selectedMonth, selectedPeriod])
+  }, [data.topCases, selectedMonth, selectedPeriod])
 
   // Navigation functions
   const canGoPrevious = () => {
