@@ -1,11 +1,11 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED FAKTURERINGSLÄNK
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED TEKNIKER-LÄNK
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { 
   Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, 
-  BarChart3, DollarSign, Activity
+  BarChart3, DollarSign, Activity, Wrench
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -245,11 +245,11 @@ export default function AdminDashboard() {
               </Button>
               <Button 
                 variant="secondary" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
                 onClick={() => navigate('/admin/technicians')}
               >
-                <UserCheck className="w-4 h-4 mr-2" />
-                Hantera tekniker
+                <Wrench className="w-4 h-4 mr-2" />
+                Tekniker Performance
               </Button>
               <Button 
                 variant="secondary" 
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
             </div>
           </Card>
 
-          {/* Avancerad Statistik - NYA SEPARATA LÄNKAR */}
+          {/* Avancerad Statistik */}
           <Card>
             <h3 className="text-lg font-semibold text-white mb-4">Avancerad Statistik</h3>
             <div className="space-y-2">
@@ -273,14 +273,6 @@ export default function AdminDashboard() {
               >
                 <DollarSign className="w-4 h-4 mr-2" />
                 Ekonomisk Statistik & ARR
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
-                onClick={() => navigate('/admin/technicians-statistics')}
-              >
-                <Activity className="w-4 h-4 mr-2" />
-                Tekniker-prestanda
               </Button>
               <Button 
                 variant="secondary" 
@@ -319,9 +311,9 @@ export default function AdminDashboard() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-300">Faktureringssystem</span>
-                <span className="flex items-center text-green-400 text-sm">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span className="text-slate-300">Tekniker Dashboard</span>
+                <span className="flex items-center text-blue-400 text-sm">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
                   Ready
                 </span>
               </div>

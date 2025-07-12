@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED BILLING ROUTE
+// src/App.tsx - UPPDATERAD MED TEKNIKER ROUTE
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -14,7 +14,8 @@ import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
 import Economics from './pages/admin/Economics'
-import BillingManagement from './pages/admin/BillingManagement'  // 🆕 NY IMPORT
+import BillingManagement from './pages/admin/BillingManagement'
+import Technicians from './pages/admin/Technicians'  // 🆕 NY TEKNIKER IMPORT
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -84,6 +85,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <BillingManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/technicians" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Technicians />
                 </ProtectedRoute>
               } 
             />
