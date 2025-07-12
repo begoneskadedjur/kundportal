@@ -577,7 +577,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             </div>
           </div>
 
-          {/* KPI för vald månad */}
+          {/* KPI för vald period - UPPDATERAD för att visa period-data */}
           <div className="mb-6">
             <h3 className="text-sm text-slate-400 mb-4">
               {selectedPeriod === '1m' 
@@ -587,23 +587,54 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                <p className="text-orange-400 font-bold text-sm">{selectedMonthData?.total_cases || 0}</p>
+                <p className="text-orange-400 font-bold text-sm">
+                  {selectedPeriod === '1m' 
+                    ? (selectedMonthData?.total_cases || 0)
+                    : getFilteredData.reduce((sum, item) => sum + item.total_cases, 0)
+                  }
+                </p>
                 <p className="text-orange-300 text-xs">Totala ärenden</p>
               </div>
               <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                <p className="text-purple-400 font-bold text-sm">{selectedMonthData?.private_cases || 0}</p>
+                <p className="text-purple-400 font-bold text-sm">
+                  {selectedPeriod === '1m' 
+                    ? (selectedMonthData?.private_cases || 0)
+                    : getFilteredData.reduce((sum, item) => sum + item.private_cases, 0)
+                  }
+                </p>
                 <p className="text-purple-300 text-xs">Privatpersoner</p>
               </div>
               <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-blue-400 font-bold text-sm">{selectedMonthData?.business_cases || 0}</p>
+                <p className="text-blue-400 font-bold text-sm">
+                  {selectedPeriod === '1m' 
+                    ? (selectedMonthData?.business_cases || 0)
+                    : getFilteredData.reduce((sum, item) => sum + item.business_cases, 0)
+                  }
+                </p>
                 <p className="text-blue-300 text-xs">Företag</p>
               </div>
               <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <p className="text-green-400 font-bold text-sm">{formatCurrency(selectedMonthData?.total_revenue || 0)}</p>
+                <p className="text-green-400 font-bold text-sm">
+                  {formatCurrency(
+                    selectedPeriod === '1m' 
+                      ? (selectedMonthData?.total_revenue || 0)
+                      : getFilteredData.reduce((sum, item) => sum + item.total_revenue, 0)
+                  )}
+                </p>
                 <p className="text-green-300 text-xs">Total intäkt</p>
               </div>
               <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <p className="text-yellow-400 font-bold text-sm">{formatCurrency(selectedMonthData?.avg_case_value || 0)}</p>
+                <p className="text-yellow-400 font-bold text-sm">
+                  {formatCurrency(
+                    selectedPeriod === '1m' 
+                      ? (selectedMonthData?.avg_case_value || 0)
+                      : (() => {
+                          const totalCases = getFilteredData.reduce((sum, item) => sum + item.total_cases, 0)
+                          const totalRevenue = getFilteredData.reduce((sum, item) => sum + item.total_revenue, 0)
+                          return totalCases > 0 ? totalRevenue / totalCases : 0
+                        })()
+                  )}
+                </p>
                 <p className="text-yellow-300 text-xs">Snitt per ärende</p>
               </div>
             </div>
