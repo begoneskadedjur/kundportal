@@ -1,6 +1,6 @@
-// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - MODERN VERSION
+// 📁 src/components/admin/economics/ContractTechnicianChart.tsx - MODERNISERAD VERSION
 import React, { useState, useEffect, useMemo } from 'react'
-import { Building2, Target, TrendingUp } from 'lucide-react'
+import { Building2, Target, TrendingUp, Users, Briefcase } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -129,24 +129,8 @@ const ContractTechnicianChart: React.FC = () => {
 
   // 🎯 Processad avtalskund tekniker-data baserat på vald period  
   const technicianData = useMemo((): ContractTechnicianData[] => {
-    // Skapa placeholder om ingen data finns
     if (!allData.cases.length && !allData.customers.length) {
-      console.log('⚠️ No contract data found, creating placeholder data')
-      return [
-        {
-          name: 'Ingen data tillgänglig',
-          email: '',
-          total_cases: 0,
-          new_customers: 0,
-          upsell_cases: 0,
-          total_revenue: 0,
-          new_customer_value: 0,
-          upsell_revenue: 0,
-          avg_case_value: 0,
-          avg_contract_value: 0,
-          rank: 1
-        }
-      ]
+      return []
     }
 
     // Bestäm datumspan för filtrering
@@ -173,21 +157,7 @@ const ContractTechnicianChart: React.FC = () => {
       console.log(`⚠️ Selected month ${selectedMonth} not found, using latest available month`)
       selectedIndex = uniqueDates.length - 1
       if (selectedIndex < 0) {
-        return [
-          {
-            name: 'Ingen avtalskund data',
-            email: '',
-            total_cases: 0,
-            new_customers: 0,
-            upsell_cases: 0,
-            total_revenue: 0,
-            new_customer_value: 0,
-            upsell_revenue: 0,
-            avg_case_value: 0,
-            avg_contract_value: 0,
-            rank: 1
-          }
-        ]
+        return []
       }
     }
     
@@ -214,23 +184,9 @@ const ContractTechnicianChart: React.FC = () => {
 
     console.log(`📊 Filtered contract data: ${filteredCases.length} cases, ${filteredCustomers.length} new customers`)
 
-    // Om ingen filtrerad data, returnera placeholder
+    // Om ingen filtrerad data, returnera tom array
     if (filteredCases.length === 0 && filteredCustomers.length === 0) {
-      return [
-        {
-          name: `Ingen data för ${selectedPeriod} period`,
-          email: '',
-          total_cases: 0,
-          new_customers: 0,
-          upsell_cases: 0,
-          total_revenue: 0,
-          new_customer_value: 0,
-          upsell_revenue: 0,
-          avg_case_value: 0,
-          avg_contract_value: 0,
-          rank: 1
-        }
-      ]
+      return []
     }
 
     // Samla avtalskund tekniker-statistik
@@ -261,57 +217,56 @@ const ContractTechnicianChart: React.FC = () => {
       technicianStats[name].upsell_revenue += case_.price || 0
     })
 
-      // Nya avtalskunder från customers-tabellen - FIXAD: Bättre mappning
-      filteredCustomers.forEach(customer => {
-        // FIXAD: Bättre email-till-tekniker mappning
-        const accountManagerEmail = customer.assigned_account_manager?.toLowerCase() || ''
-        let technicianName = 'Ej tilldelad'
-        
-        // Expanderad mappning för att fånga fler tekniker
-        if (accountManagerEmail.includes('christian.karlsson') || accountManagerEmail.includes('christian')) {
-          technicianName = 'Christian Karlsson'
-        } else if (accountManagerEmail.includes('kristian.agnevik') || accountManagerEmail.includes('kristian')) {
-          technicianName = 'Kristian Agnevik'
-        } else if (accountManagerEmail.includes('sofia.palshagen') || accountManagerEmail.includes('sofia')) {
-          technicianName = 'Sofia Pålshagen'
-        } else if (accountManagerEmail.includes('hans.norman') || accountManagerEmail.includes('hans')) {
-          technicianName = 'Hans Norman'
-        } else if (accountManagerEmail.includes('mathias') || accountManagerEmail.includes('carlsson')) {
-          technicianName = 'Mathias Carlsson'
-        } else if (accountManagerEmail.includes('kim') || accountManagerEmail.includes('wahlberg')) {
-          technicianName = 'Kim Wahlberg'
-        } else if (customer.assigned_account_manager && customer.assigned_account_manager.trim() !== '') {
-          // Om det finns en account manager men vi inte kan matcha, använd det som finns
-          technicianName = customer.assigned_account_manager.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase())
+    // Nya avtalskunder från customers-tabellen - FÖRBÄTTRAD mappning
+    filteredCustomers.forEach(customer => {
+      const accountManagerEmail = customer.assigned_account_manager?.toLowerCase() || ''
+      let technicianName = 'Ej tilldelad'
+      
+      // Expanderad mappning för att fånga fler tekniker
+      if (accountManagerEmail.includes('christian.karlsson') || accountManagerEmail.includes('christian')) {
+        technicianName = 'Christian Karlsson'
+      } else if (accountManagerEmail.includes('kristian.agnevik') || accountManagerEmail.includes('kristian')) {
+        technicianName = 'Kristian Agnevik'
+      } else if (accountManagerEmail.includes('sofia.palshagen') || accountManagerEmail.includes('sofia')) {
+        technicianName = 'Sofia Pålshagen'
+      } else if (accountManagerEmail.includes('hans.norman') || accountManagerEmail.includes('hans')) {
+        technicianName = 'Hans Norman'
+      } else if (accountManagerEmail.includes('mathias') || accountManagerEmail.includes('carlsson')) {
+        technicianName = 'Mathias Carlsson'
+      } else if (accountManagerEmail.includes('kim') || accountManagerEmail.includes('wahlberg')) {
+        technicianName = 'Kim Wahlberg'
+      } else if (customer.assigned_account_manager && customer.assigned_account_manager.trim() !== '') {
+        // Om det finns en account manager men vi inte kan matcha, använd det som finns
+        technicianName = customer.assigned_account_manager.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }
+
+      if (!technicianStats[technicianName]) {
+        technicianStats[technicianName] = {
+          name: technicianName,
+          email: customer.assigned_account_manager || '',
+          total_cases: 0,
+          new_customers: 0,
+          upsell_cases: 0,
+          total_revenue: 0,
+          new_customer_value: 0,
+          upsell_revenue: 0,
+          customer_contracts: []
         }
+      }
 
-        if (!technicianStats[technicianName]) {
-          technicianStats[technicianName] = {
-            name: technicianName,
-            email: customer.assigned_account_manager || '',
-            total_cases: 0,
-            new_customers: 0,
-            upsell_cases: 0,
-            total_revenue: 0,
-            new_customer_value: 0,
-            upsell_revenue: 0,
-            customer_contracts: []
-          }
-        }
+      technicianStats[technicianName].new_customers++
+      technicianStats[technicianName].total_cases++
+      
+      // Använd annual_premium för intäkt istället för total_contract_value
+      const customerRevenue = customer.annual_premium || 0
+      const contractValue = customer.total_contract_value || 0
+      
+      technicianStats[technicianName].new_customer_value += contractValue
+      technicianStats[technicianName].total_revenue += customerRevenue
+      technicianStats[technicianName].customer_contracts.push(contractValue)
 
-        technicianStats[technicianName].new_customers++
-        technicianStats[technicianName].total_cases++ // FIXAD: Räkna nya kunder som cases också
-        
-        // FIXAD: Använd annual_premium för intäkt istället för total_contract_value
-        const customerRevenue = customer.annual_premium || 0
-        const contractValue = customer.total_contract_value || 0
-        
-        technicianStats[technicianName].new_customer_value += contractValue
-        technicianStats[technicianName].total_revenue += customerRevenue // Detta är vad som räknas för ranking
-        technicianStats[technicianName].customer_contracts.push(contractValue)
-
-        console.log(`📊 Customer mapped: ${customer.company_name} → ${technicianName} (Revenue: ${customerRevenue}, Contract: ${contractValue})`)
-      })
+      console.log(`📊 Customer mapped: ${customer.company_name} → ${technicianName} (Revenue: ${customerRevenue}, Contract: ${contractValue})`)
+    })
 
     // Konvertera till array och beräkna genomsnitt + ranking
     const technicianArray = Object.values(technicianStats)
@@ -380,23 +335,20 @@ const ContractTechnicianChart: React.FC = () => {
   if (loading) {
     return (
       <ModernCard gradient="green" glowing>
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-              <p className="text-sm text-slate-400">Laddar data...</p>
-            </div>
-          </div>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-green-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Laddar data..."
+        />
+        <ModernCard.Content>
           <div className="h-80 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
               <p className="text-slate-400 text-sm">Laddar avtalskund tekniker statistik...</p>
             </div>
           </div>
-        </div>
+        </ModernCard.Content>
       </ModernCard>
     )
   }
@@ -405,16 +357,13 @@ const ContractTechnicianChart: React.FC = () => {
   if (error) {
     return (
       <ModernCard gradient="red" glowing>
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-red-500" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
-              <p className="text-sm text-slate-400">Fel vid laddning</p>
-            </div>
-          </div>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-red-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Fel vid laddning"
+        />
+        <ModernCard.Content>
           <div className="h-80 flex items-center justify-center text-red-400">
             <div className="text-center">
               <Target className="w-12 h-12 mx-auto mb-4" />
@@ -428,28 +377,50 @@ const ContractTechnicianChart: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ModernCard.Content>
       </ModernCard>
     )
   }
 
-  // Sammanfattning för period
+  // Empty state
+  if (!technicianData || technicianData.length === 0) {
+    return (
+      <ModernCard>
+        <ModernCard.Header
+          icon={Building2}
+          iconColor="text-slate-500"
+          title="Avtalskund Tekniker-prestanda"
+          subtitle="Ingen data tillgänglig"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-slate-400">
+            <div className="text-center">
+              <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Ingen avtalskund teknikerdata tillgänglig för vald period</p>
+            </div>
+          </div>
+        </ModernCard.Content>
+      </ModernCard>
+    )
+  }
+
+  // Beräkna sammanfattning
   const totalRevenue = technicianData.reduce((sum, tech) => sum + tech.total_revenue, 0)
   const totalCases = technicianData.reduce((sum, tech) => sum + tech.total_cases, 0)
   const totalNewCustomers = technicianData.reduce((sum, tech) => sum + tech.new_customers, 0)
   const totalNewCustomerValue = technicianData.reduce((sum, tech) => sum + tech.new_customer_value, 0)
   const totalUpsellRevenue = technicianData.reduce((sum, tech) => sum + tech.upsell_revenue, 0)
 
-  // Formatera data för podium - FIXAD: Använd nummer-värden och säkerställ data
+  // Formatera data för podium
   const podiumData = technicianData
     .slice(0, 3)
     .filter(tech => tech.total_revenue > 0)
     .map(tech => ({
       id: tech.name,
       name: tech.name,
-      value: tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+      value: tech.total_revenue || 0,
       secondaryValue: `${tech.new_customers || 0} nya avtal`,
-      description: `Avtalsvärde: ${formatCurrency(tech.new_customer_value || 0)} • Merförsäljning: ${formatCurrency(tech.upsell_revenue || 0)}`,
+      description: `${tech.upsell_cases || 0} merförsäljning • ${formatCurrency(tech.avg_contract_value || 0)} genomsnitt`,
       rank: tech.rank,
       metrics: [
         { label: 'Nya avtal', value: tech.new_customers || 0 },
@@ -458,14 +429,14 @@ const ContractTechnicianChart: React.FC = () => {
       ]
     }))
 
-  // Formatera data för lista - FIXAD: Använd nummer-värden
+  // Formatera data för lista
   const listData = technicianData
     .filter(tech => tech.total_revenue > 0)
     .map(tech => 
       createListItem(
         tech.name,
         tech.name,
-        tech.total_revenue || 0, // FIXAD: Nummer istället för sträng
+        tech.total_revenue || 0,
         `${tech.new_customers || 0} nya avtal • ${tech.upsell_cases || 0} merförsäljning`,
         {
           rank: tech.rank,
@@ -483,29 +454,38 @@ const ContractTechnicianChart: React.FC = () => {
     <div className="space-y-8">
       {/* Header med navigation */}
       <ModernCard gradient="green" glowing>
-        <ModernCard.Header
-          icon={Building2}
-          iconColor="text-green-500"
-          title="Avtalskund Tekniker-prestanda"
-          subtitle="Nya avtal + Merförsäljning"
-          rightElement={
-            <CombinedNavigation
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              selectedPeriod={selectedPeriod}
-              onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
-              periods={periodOptions}
-              canGoPrevious={canGoPrevious()}
-              canGoNext={canGoNext()}
-              onGoToCurrent={goToCurrentMonth}
-              isCurrentMonth={isCurrentMonth()}
-              compact
-            />
-          }
-        />
+        <div className="p-6">
+          <div className="flex flex-col gap-4 mb-6">
+            {/* Titel rad */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Avtalskund Tekniker-prestanda</h2>
+                <p className="text-sm text-slate-400">Nya avtal + Merförsäljning</p>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <CombinedNavigation
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
+                periods={periodOptions}
+                canGoPrevious={canGoPrevious()}
+                canGoNext={canGoNext()}
+                onGoToCurrent={goToCurrentMonth}
+                isCurrentMonth={isCurrentMonth()}
+                compact
+                className="flex-1"
+              />
+            </div>
+          </div>
         
-        {/* Period översikt med moderna stat cards */}
-        <ModernCard.Content>
+          {/* Period översikt med moderna stat cards */}
           <div className="mb-6">
             <h3 className="text-sm text-slate-400 mb-4">
               {selectedPeriod === '1m' 
@@ -513,51 +493,40 @@ const ContractTechnicianChart: React.FC = () => {
                 : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Avtalskund tekniker översikt`
               }
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <ModernCard.Stat
-                icon={TrendingUp}
-                iconGradient="from-green-500 to-green-600"
-                label="Total intäkt"
-                value={formatCurrency(totalRevenue)}
-                change={{ value: '↗️', positive: true }}
-              />
-              <ModernCard.Stat
-                icon={Building2}
-                iconGradient="from-blue-500 to-blue-600"
-                label="Nya avtal"
-                value={totalNewCustomers}
-              />
-              <ModernCard.Stat
-                icon={Target}
-                iconGradient="from-purple-500 to-purple-600"
-                label="Avtalsvärde"
-                value={formatCurrency(totalNewCustomerValue)}
-              />
-              <ModernCard.Stat
-                icon={TrendingUp}
-                iconGradient="from-yellow-500 to-yellow-600"
-                label="Merförsäljning"
-                value={formatCurrency(totalUpsellRevenue)}
-              />
-              <ModernCard.Stat
-                icon={Target}
-                iconGradient="from-orange-500 to-orange-600"
-                label="Totala ärenden"
-                value={totalCases}
-              />
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-green-400 font-bold text-sm">{formatCurrency(totalRevenue)}</p>
+                <p className="text-green-300 text-xs">Total intäkt</p>
+              </div>
+              <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-blue-400 font-bold text-sm">{totalNewCustomers}</p>
+                <p className="text-blue-300 text-xs">Nya avtal</p>
+              </div>
+              <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                <p className="text-purple-400 font-bold text-sm">{formatCurrency(totalNewCustomerValue)}</p>
+                <p className="text-purple-300 text-xs">Avtalsvärde</p>
+              </div>
+              <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-400 font-bold text-sm">{formatCurrency(totalUpsellRevenue)}</p>
+                <p className="text-yellow-300 text-xs">Merförsäljning</p>
+              </div>
+              <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                <p className="text-orange-400 font-bold text-sm">{totalCases}</p>
+                <p className="text-orange-300 text-xs">Totala ärenden</p>
+              </div>
             </div>
           </div>
-        </ModernCard.Content>
+        </div>
       </ModernCard>
 
-      {/* 🏆 Topp 3 podium - Visar endast om det finns data med FIXAD formatering */}
+      {/* 🏆 Topp 3 podium - Visar endast om det finns data */}
       {podiumData.length > 0 && (
         <ModernPodium
           items={podiumData}
           title="Topp 3 Avtalskund Tekniker"
           subtitle="Bäst presterande tekniker för nya avtal och merförsäljning"
           valueLabel="Baserat på total intäkt från nya avtal och merförsäljning"
-          variant="compact" // FIXAD: Mindre kort
+          variant="compact"
           showMetrics
           formatValue={(value) => {
             const num = Number(value)
@@ -574,7 +543,7 @@ const ContractTechnicianChart: React.FC = () => {
       {/* Meddelande när ingen data finns */}
       {listData.length === 0 && (
         <ModernCard>
-          <div className="p-6">
+          <ModernCard.Content>
             <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
               <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
               <h3 className="text-lg font-semibold text-white mb-2">Ingen avtalskund data för vald period</h3>
@@ -585,7 +554,7 @@ const ContractTechnicianChart: React.FC = () => {
                 Cases: {allData.cases.length}, Customers: {allData.customers.length}
               </p>
             </div>
-          </div>
+          </ModernCard.Content>
         </ModernCard>
       )}
 
