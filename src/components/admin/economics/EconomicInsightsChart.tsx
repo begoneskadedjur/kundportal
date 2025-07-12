@@ -1,4 +1,4 @@
-// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - MODERN INSIGHTS KOMPONENT
+// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - FIXAD JSX STRUKTUR
 import React, { useState, useEffect, useMemo } from 'react'
 import { TrendingUp, Award, Bug, Building2, Eye, Calendar, User, DollarSign, Phone, Mail, MapPin, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
@@ -7,7 +7,6 @@ import { formatCurrency } from '../../../utils/formatters'
 // Moderna komponenter
 import ModernCard from '../../ui/ModernCard'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
-import ModernList, { createListItem } from '../../ui/ModernList'
 
 // 🎯 Interfaces
 interface TopCase {
@@ -502,7 +501,6 @@ const EconomicInsightsChart: React.FC = () => {
 
   // Navigation functions
   const canGoPrevious = () => {
-    // Implementera baserat på tillgänglig data
     return true
   }
 
@@ -676,3 +674,227 @@ const EconomicInsightsChart: React.FC = () => {
             </div>
           </div>
         </div>
+      </ModernCard>
+
+      {/* Innehåll baserat på vald view */}
+      {activeView === 'cases' && (
+        <ModernCard>
+          <ModernCard.Header
+            icon={Award}
+            iconColor="text-yellow-500"
+            title="Topp 10 Högsta Ärenden"
+            subtitle={`Sorterat efter intäkt för ${selectedPeriod.toUpperCase()} period`}
+          />
+          <ModernCard.Content>
+            {filteredData.topCases.length > 0 ? (
+              <div className="space-y-3">
+                {filteredData.topCases.map((case_, index) => (
+                  <div
+                    key={case_.id}
+                    onClick={() => handleCaseClick(case_)}
+                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Ranking */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-400' :
+                        index === 2 ? 'bg-amber-600' :
+                        'bg-slate-600'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      
+                      {/* Case info */}
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                        }`}>
+                          {case_.type === 'private' ? (
+                            <User className="w-4 h-4 text-purple-500" />
+                          ) : (
+                            <Building2 className="w-4 h-4 text-blue-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">
+                            {case_.case_number || case_.title || `Ärende ${case_.id.slice(0, 8)}`}
+                          </p>
+                          <p className="text-sm text-slate-400">
+                            {case_.skadedjur} • {case_.primary_assignee_name} • {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-green-400 font-bold text-lg">{formatCurrency(case_.pris)}</p>
+                        <p className="text-xs text-slate-400">{case_.type === 'private' ? 'Privatperson' : 'Företag'}</p>
+                      </div>
+                      <Eye className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <Award className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Inga ärenden för vald period</p>
+              </div>
+            )}
+          </ModernCard.Content>
+        </ModernCard>
+      )}
+
+      {activeView === 'skadedjur' && (
+        <ModernCard>
+          <ModernCard.Header
+            icon={Bug}
+            iconColor="text-red-500"
+            title="Mest Lönsamma Skadedjur"
+            subtitle={`Sorterat efter total intäkt för ${selectedPeriod.toUpperCase()} period`}
+          />
+          <ModernCard.Content>
+            {filteredData.topSkadedjur.length > 0 ? (
+              <div className="space-y-3">
+                {filteredData.topSkadedjur.map((skadedjur, index) => (
+                  <div
+                    key={skadedjur.type}
+                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Ranking */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                        index === 0 ? 'bg-red-500' :
+                        index === 1 ? 'bg-orange-500' :
+                        index === 2 ? 'bg-yellow-500' :
+                        'bg-slate-600'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      
+                      {/* Skadedjur info */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                          <Bug className="w-4 h-4 text-red-500" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{skadedjur.type}</p>
+                          <p className="text-sm text-slate-400">
+                            {skadedjur.case_count} ärenden • Snitt: {formatCurrency(skadedjur.avg_price)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className="text-green-400 font-bold text-lg">{formatCurrency(skadedjur.total_revenue)}</p>
+                      <p className="text-xs text-slate-400">Total intäkt</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <Bug className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Inga skadedjur för vald period</p>
+              </div>
+            )}
+          </ModernCard.Content>
+        </ModernCard>
+      )}
+
+      {activeView === 'contracts' && (
+        <ModernCard>
+          <ModernCard.Header
+            icon={Building2}
+            iconColor="text-green-500"
+            title="Potentiella Avtalskunder"
+            subtitle={`Företag med flera ärenden - Avtalsmöjligheter för ${selectedPeriod.toUpperCase()} period`}
+          />
+          <ModernCard.Content>
+            {filteredData.potentialContracts.length > 0 ? (
+              <div className="space-y-3">
+                {filteredData.potentialContracts.map((contract, index) => (
+                  <div
+                    key={contract.customer_identifier}
+                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Priority indicator */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                        contract.case_count >= 5 ? 'bg-red-500' :
+                        contract.case_count >= 3 ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`}>
+                        {contract.case_count >= 5 ? '🔥' :
+                         contract.case_count >= 3 ? '⚡' : '💡'}
+                      </div>
+                      
+                      {/* Customer info */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                          <Building2 className="w-4 h-4 text-green-500" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{contract.contact_person}</p>
+                          <div className="flex items-center gap-4 text-sm text-slate-400">
+                            <span>{contract.case_count} ärenden</span>
+                            {contract.phone && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {contract.phone}
+                              </span>
+                            )}
+                            {contract.email && (
+                              <span className="flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {contract.email}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className="text-green-400 font-bold text-lg">{formatCurrency(contract.total_revenue)}</p>
+                      <p className="text-xs text-slate-400">
+                        Snitt: {formatCurrency(contract.avg_case_value)} • Senaste: {new Date(contract.latest_case_date).toLocaleDateString('sv-SE')}
+                      </p>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          contract.case_count >= 5 ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                          contract.case_count >= 3 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                          'bg-green-500/10 text-green-400 border border-green-500/20'
+                        }`}>
+                          {contract.case_count >= 5 ? 'Hög prioritet' :
+                           contract.case_count >= 3 ? 'Medel prioritet' : 'Låg prioritet'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Inga avtalsmöjligheter för vald period</p>
+              </div>
+            )}
+          </ModernCard.Content>
+        </ModernCard>
+      )}
+
+      {/* Case Details Modal */}
+      <CaseDetailsModal
+        case_={selectedCase}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </div>
+  )
+}
+
+export default EconomicInsightsChart
