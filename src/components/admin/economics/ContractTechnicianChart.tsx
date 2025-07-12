@@ -474,7 +474,7 @@ const ContractTechnicianChart: React.FC = () => {
                 : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Avtalskund tekniker översikt`
               }
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                 <p className="text-green-400 font-bold text-sm">{formatCurrency(totalRevenue)}</p>
                 <p className="text-green-300 text-xs">Total intäkt</p>

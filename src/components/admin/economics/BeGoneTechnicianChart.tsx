@@ -418,7 +418,7 @@ const BeGoneTechnicianChart: React.FC = () => {
                 : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - BeGone tekniker översikt`
               }
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="text-blue-400 font-bold text-sm">{formatCurrency(totalRevenue)}</p>
                 <p className="text-blue-300 text-xs">Total intäkt</p>
@@ -434,6 +434,12 @@ const BeGoneTechnicianChart: React.FC = () => {
               <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                 <p className="text-green-400 font-bold text-sm">{totalCases}</p>
                 <p className="text-green-300 text-xs">Totala ärenden</p>
+              </div>
+              <div className="text-center p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg">
+                <p className="text-teal-400 font-bold text-sm">
+                  {totalCases > 0 ? formatCurrency(totalRevenue / totalCases) : formatCurrency(0)}
+                </p>
+                <p className="text-teal-300 text-xs">Genomsnitt/ärende</p>
               </div>
             </div>
           </div>
