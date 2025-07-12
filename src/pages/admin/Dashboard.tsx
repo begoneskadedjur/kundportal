@@ -1,4 +1,4 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA STATISTIK-LÄNKAR
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED FAKTURERINGSLÄNK
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -251,6 +251,14 @@ export default function AdminDashboard() {
                 <UserCheck className="w-4 h-4 mr-2" />
                 Hantera tekniker
               </Button>
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/20 hover:from-orange-500/20 hover:to-yellow-500/20"
+                onClick={() => navigate('/admin/billing')}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Fakturering
+              </Button>
             </div>
           </Card>
 
@@ -308,6 +316,13 @@ export default function AdminDashboard() {
                 <span className="flex items-center text-green-400 text-sm">
                   <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                   Active
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Faktureringssystem</span>
+                <span className="flex items-center text-green-400 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  Ready
                 </span>
               </div>
               <div className="pt-3 border-t border-slate-700">
