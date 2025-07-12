@@ -259,11 +259,11 @@ const EconomicInsightsChart: React.FC = () => {
     { key: '12m', label: '12 månader', shortLabel: '12M' }
   ]
 
-  // View tabs
+  // View tabs - UPPDATERAD med "Försäljningsmöjligheter"
   const viewOptions = [
     { key: 'cases', label: 'Topp Ärenden', icon: Award, color: 'text-yellow-500' },
     { key: 'skadedjur', label: 'Skadedjur', icon: Bug, color: 'text-red-500' },
-    { key: 'contracts', label: 'Avtalsmöjligheter', icon: Building2, color: 'text-green-500' }
+    { key: 'contracts', label: 'Försäljningsmöjligheter', icon: Building2, color: 'text-green-500' }
   ]
 
   useEffect(() => {
@@ -395,31 +395,34 @@ const EconomicInsightsChart: React.FC = () => {
       .sort((a, b) => b.total_revenue - a.total_revenue)
       .slice(0, 10)
 
-    // 3. POTENTIAL CONTRACTS - hitta företagskunder med flera ärenden
+    // 3. POTENTIAL CONTRACTS - använd org_nr för korrekt företagsidentifiering
     const businessCustomers: { [key: string]: { 
       cases: any[]; 
       contact_person: string; 
       phone?: string; 
       email?: string; 
-      org_nr?: string 
+      org_nr: string;
+      company_name?: string;
     } } = {}
     
     allCases
-      .filter(case_ => case_.type === 'business' && case_.kontaktperson)
+      .filter(case_ => case_.type === 'business' && case_.org_nr)
       .forEach(case_ => {
-        const identifier = case_.kontaktperson || case_.org_nr || case_.e_post_kontaktperson || 'Okänd kund'
+        const orgNr = case_.org_nr
+        if (!orgNr) return
         
-        if (!businessCustomers[identifier]) {
-          businessCustomers[identifier] = {
+        if (!businessCustomers[orgNr]) {
+          businessCustomers[orgNr] = {
             cases: [],
-            contact_person: case_.kontaktperson || 'Okänd kontakt',
+            contact_person: case_.kontaktperson || case_.bestallare || 'Okänd kontakt',
             phone: case_.telefon_kontaktperson,
             email: case_.e_post_kontaktperson,
-            org_nr: case_.org_nr
+            org_nr: orgNr,
+            company_name: case_.bestallare || case_.kontaktperson
           }
         }
         
-        businessCustomers[identifier].cases.push({
+        businessCustomers[orgNr].cases.push({
           id: case_.id,
           pris: case_.pris,
           completed_date: case_.completed_date,
@@ -429,18 +432,18 @@ const EconomicInsightsChart: React.FC = () => {
 
     const potentialContracts = Object.entries(businessCustomers)
       .filter(([_, customer]) => customer.cases.length >= 2) // Minst 2 ärenden
-      .map(([identifier, customer]) => {
+      .map(([orgNr, customer]) => {
         const totalRevenue = customer.cases.reduce((sum, case_) => sum + case_.pris, 0)
         const latestCase = customer.cases.sort((a, b) => 
           new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
         )[0]
         
         return {
-          customer_identifier: identifier,
+          customer_identifier: `${customer.company_name} (${orgNr})`,
           contact_person: customer.contact_person,
           phone: customer.phone,
           email: customer.email,
-          org_nr: customer.org_nr,
+          org_nr: orgNr,
           case_count: customer.cases.length,
           total_revenue: totalRevenue,
           avg_case_value: totalRevenue / customer.cases.length,
@@ -460,8 +463,10 @@ const EconomicInsightsChart: React.FC = () => {
     }
   }
 
-  // 🎯 Filtrerad data baserat på period
+  // 🎯 Filtrerad data baserat på period - FIXAD FILTERLOGIK
   const getFilteredData = useMemo(() => {
+    console.log(`🔍 Filtering data for period: ${selectedPeriod}, month: ${selectedMonth}`)
+    
     // Bestäm datumspan
     const selectedDate = new Date(selectedMonth + '-01')
     const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)
@@ -482,20 +487,128 @@ const EconomicInsightsChart: React.FC = () => {
         break
     }
 
+    console.log(`📅 Date range: ${startDate.toISOString().slice(0, 10)} to ${endDate.toISOString().slice(0, 10)}`)
+
     const filterByDate = (dateString: string) => {
       const caseDate = new Date(dateString)
       return caseDate >= startDate && caseDate <= endDate
     }
 
+    // Filtrera rådata baserat på period och skapa nya aggregeringar
+    const filteredRawCases = [
+      ...data.topCases.filter(case_ => filterByDate(case_.completed_date)),
+      // Hämta även från andra cases som inte är i top 10 men inom period
+    ]
+
+    // 1. TOPP CASES - alltid från ALL rådata, filtrera och sortera om
+    const allFilteredCases = data.topCases.filter(case_ => filterByDate(case_.completed_date))
+    const topCasesForPeriod = allFilteredCases
+      .sort((a, b) => b.pris - a.pris)
+      .slice(0, 10)
+
+    console.log(`📊 Top cases for period: ${topCasesForPeriod.length} (från ${allFilteredCases.length} filtrerade)`)
+
+    // 2. SKADEDJUR - omberäkna från grunden för period
+    const skadedjurStatsForPeriod: { [key: string]: { revenue: number; cases: any[]; count: number } } = {}
+    
+    allFilteredCases.forEach(case_ => {
+      const skadedjur = case_.skadedjur || 'Okänt'
+      if (!skadedjurStatsForPeriod[skadedjur]) {
+        skadedjurStatsForPeriod[skadedjur] = { revenue: 0, cases: [], count: 0 }
+      }
+      skadedjurStatsForPeriod[skadedjur].revenue += case_.pris
+      skadedjurStatsForPeriod[skadedjur].count++
+      skadedjurStatsForPeriod[skadedjur].cases.push({
+        id: case_.id,
+        pris: case_.pris,
+        completed_date: case_.completed_date,
+        technician: case_.primary_assignee_name || 'Ej tilldelad'
+      })
+    })
+
+    const topSkadedjurForPeriod = Object.entries(skadedjurStatsForPeriod)
+      .map(([type, stats]) => ({
+        type,
+        total_revenue: stats.revenue,
+        case_count: stats.count,
+        avg_price: stats.count > 0 ? stats.revenue / stats.count : 0,
+        recent_cases: stats.cases
+          .sort((a, b) => new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime())
+          .slice(0, 5)
+      }))
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 10)
+
+    console.log(`🐛 Skadedjur for period: ${topSkadedjurForPeriod.length}`)
+    console.log('Top skadedjur:', topSkadedjurForPeriod.slice(0, 3).map(s => `${s.type}: ${s.total_revenue}kr`))
+
+    // 3. FÖRSÄLJNINGSMÖJLIGHETER - omberäkna från grunden baserat på org_nr
+    const businessCustomersForPeriod: { [key: string]: { 
+      cases: any[]; 
+      contact_person: string; 
+      phone?: string; 
+      email?: string; 
+      org_nr: string;
+      company_name?: string;
+    } } = {}
+    
+    const businessCasesForPeriod = allFilteredCases.filter(case_ => case_.type === 'business' && case_.org_nr)
+    
+    businessCasesForPeriod.forEach(case_ => {
+      const orgNr = case_.org_nr
+      if (!orgNr) return
+      
+      if (!businessCustomersForPeriod[orgNr]) {
+        businessCustomersForPeriod[orgNr] = {
+          cases: [],
+          contact_person: case_.kontaktperson || case_.bestallare || 'Okänd kontakt',
+          phone: case_.telefon_kontaktperson,
+          email: case_.e_post_kontaktperson,
+          org_nr: orgNr,
+          company_name: case_.bestallare || case_.kontaktperson
+        }
+      }
+      
+      businessCustomersForPeriod[orgNr].cases.push({
+        id: case_.id,
+        pris: case_.pris,
+        completed_date: case_.completed_date,
+        skadedjur: case_.skadedjur || 'Okänt'
+      })
+    })
+
+    const potentialContractsForPeriod = Object.entries(businessCustomersForPeriod)
+      .filter(([_, customer]) => customer.cases.length >= 2) // Minst 2 ärenden
+      .map(([orgNr, customer]) => {
+        const totalRevenue = customer.cases.reduce((sum, case_) => sum + case_.pris, 0)
+        const latestCase = customer.cases.sort((a, b) => 
+          new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
+        )[0]
+        
+        return {
+          customer_identifier: `${customer.company_name} (${orgNr})`,
+          contact_person: customer.contact_person,
+          phone: customer.phone,
+          email: customer.email,
+          org_nr: orgNr,
+          case_count: customer.cases.length,
+          total_revenue: totalRevenue,
+          avg_case_value: totalRevenue / customer.cases.length,
+          latest_case_date: latestCase.completed_date,
+          case_details: customer.cases.sort((a, b) => 
+            new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
+          )
+        }
+      })
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 15)
+
+    console.log(`🏢 Försäljningsmöjligheter for period: ${potentialContractsForPeriod.length}`)
+
     return {
-      topCases: data.topCases.filter(case_ => filterByDate(case_.completed_date)),
-      topSkadedjur: data.topSkadedjur.map(skadedjur => ({
-        ...skadedjur,
-        recent_cases: skadedjur.recent_cases.filter(case_ => filterByDate(case_.completed_date))
-      })).filter(skadedjur => skadedjur.recent_cases.length > 0),
-      potentialContracts: data.potentialContracts.filter(contract => 
-        filterByDate(contract.latest_case_date)
-      )
+      topCases: topCasesForPeriod,
+      topSkadedjur: topSkadedjurForPeriod,
+      potentialContracts: potentialContractsForPeriod
     }
   }, [data, selectedMonth, selectedPeriod])
 
@@ -666,7 +779,7 @@ const EconomicInsightsChart: React.FC = () => {
               </div>
               <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                 <p className="text-green-400 font-bold text-lg">{filteredData.potentialContracts.length}</p>
-                <p className="text-green-300 text-sm">Avtalsmöjligheter</p>
+                <p className="text-green-300 text-sm">Försäljningsmöjligheter</p>
                 <p className="text-xs text-slate-400 mt-1">
                   Totalt värde: {formatCurrency(filteredData.potentialContracts.reduce((sum, c) => sum + c.total_revenue, 0))}
                 </p>
@@ -810,8 +923,8 @@ const EconomicInsightsChart: React.FC = () => {
           <ModernCard.Header
             icon={Building2}
             iconColor="text-green-500"
-            title="Potentiella Avtalskunder"
-            subtitle={`Företag med flera ärenden - Avtalsmöjligheter för ${selectedPeriod.toUpperCase()} period`}
+            title="Försäljningsmöjligheter"
+            subtitle={`Företag med flera ärenden - Potentiella avtalskunder för ${selectedPeriod.toUpperCase()} period`}
           />
           <ModernCard.Content>
             {filteredData.potentialContracts.length > 0 ? (
@@ -880,7 +993,7 @@ const EconomicInsightsChart: React.FC = () => {
             ) : (
               <div className="text-center py-12 text-slate-400">
                 <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Inga avtalsmöjligheter för vald period</p>
+                <p>Inga försäljningsmöjligheter för vald period</p>
               </div>
             )}
           </ModernCard.Content>
