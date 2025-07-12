@@ -1,11 +1,14 @@
-// src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - FIXAD VERSION MED INTÄKTER
+// 📁 src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - MODERNISERAD VERSION
 import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, PieChart, Pie, Cell } from 'recharts'
-import { Briefcase, TrendingUp, Users, Calendar, DollarSign, ChevronLeft, ChevronRight, Bug, MapPin, AlertTriangle, RefreshCw } from 'lucide-react'
-import Card from '../../ui/Card'
-import Button from '../../ui/Button'
+import { Briefcase, TrendingUp, Users, Calendar, DollarSign, Bug, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
+
+// Nya moderna komponenter
+import ModernCard from '../../ui/ModernCard'
+import { CombinedNavigation } from '../../ui/ModernNavigation'
+import ModernTabs from '../../ui/ModernTabs'
 
 // 🎯 Interface structure
 interface BeGoneStats {
@@ -68,6 +71,22 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   
   const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
   const [activeTab, setActiveTab] = useState<'overview' | 'technicians' | 'skadedjur' | 'status'>('overview')
+
+  // Period options för navigation
+  const periodOptions = [
+    { key: '1m', label: '1 månad', shortLabel: '1M' },
+    { key: '3m', label: '3 månader', shortLabel: '3M' },
+    { key: '6m', label: '6 månader', shortLabel: '6M' },
+    { key: '12m', label: '12 månader', shortLabel: '12M' }
+  ]
+
+  // Tab options
+  const tabOptions = [
+    { key: 'overview', label: 'Översikt', icon: TrendingUp },
+    { key: 'technicians', label: 'Tekniker', icon: Users },
+    { key: 'skadedjur', label: 'Skadedjur', icon: Bug },
+    { key: 'status', label: 'Status', icon: Calendar }
+  ]
 
   useEffect(() => {
     fetchBeGoneData()
@@ -324,26 +343,6 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   }, [data.allCasesData, data.ongoingCasesData, data.monthlyData, selectedMonth, selectedPeriod])
 
   // Navigation functions
-  const goToPreviousMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const prevDate = new Date(year, month - 2)
-    const newMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const nextDate = new Date(year, month)
-    const newMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(newMonth)
-  }
-
-  const goToCurrentMonth = () => {
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    setSelectedMonth(currentMonth)
-  }
-
   const canGoPrevious = () => {
     if (data.monthlyData.length === 0) return false
     const earliestMonth = data.monthlyData[0].month
@@ -362,6 +361,12 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     return selectedMonth === currentMonth
   }
 
+  const goToCurrentMonth = () => {
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(currentMonth)
+  }
+
   const formatSelectedMonth = (monthStr: string) => {
     const date = new Date(monthStr + '-01')
     return date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
@@ -370,58 +375,73 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Briefcase className="w-5 h-5 text-orange-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
-            <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
+      <ModernCard gradient="orange" glowing>
+        <ModernCard.Header
+          icon={Briefcase}
+          iconColor="text-orange-500"
+          title="Intäkter Engångsjobb"
+          subtitle="Laddar data..."
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+              <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
   // Error state
   if (error) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Briefcase className="w-5 h-5 text-red-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-red-400">
-          <div className="text-center">
-            <AlertTriangle className="w-12 h-12 mx-auto mb-4" />
-            <p className="mb-2">Fel vid laddning: {error}</p>
-            <Button onClick={fetchBeGoneData} size="sm" className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Försök igen
-            </Button>
+      <ModernCard gradient="red" glowing>
+        <ModernCard.Header
+          icon={Briefcase}
+          iconColor="text-red-500"
+          title="Intäkter Engångsjobb"
+          subtitle="Fel vid laddning"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-red-400">
+            <div className="text-center">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-4" />
+              <p className="mb-2">Fel vid laddning: {error}</p>
+              <button
+                onClick={fetchBeGoneData}
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Försök igen
+              </button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
   // Empty state
   if (!data.monthlyData || data.monthlyData.length === 0) {
     return (
-      <Card>
-        <div className="flex items-center mb-6">
-          <Briefcase className="w-5 h-5 text-slate-500 mr-2" />
-          <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
-        </div>
-        <div className="h-80 flex items-center justify-center text-slate-400">
-          <div className="text-center">
-            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Ingen engångsjobb data tillgänglig</p>
+      <ModernCard>
+        <ModernCard.Header
+          icon={Briefcase}
+          iconColor="text-slate-500"
+          title="Intäkter Engångsjobb"
+          subtitle="Ingen data tillgänglig"
+        />
+        <ModernCard.Content>
+          <div className="h-80 flex items-center justify-center text-slate-400">
+            <div className="text-center">
+              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Ingen engångsjobb data tillgänglig</p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </ModernCard.Content>
+      </ModernCard>
     )
   }
 
@@ -476,7 +496,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     return null
   }
 
-  // 🆕 Custom tooltip för tekniker/skadedjur med intäkter
+  // Custom tooltip för tekniker/skadedjur med intäkter
   const RevenueTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length > 0) {
       const data = payload[0]?.payload
@@ -503,268 +523,224 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Huvudkort med navigation */}
-      <Card>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <Briefcase className="w-5 h-5 text-orange-500 mr-2" />
-            <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
-            <span className="ml-2 text-sm text-slate-400">(Endast avslutade ärenden)</span>
-          </div>
-          
-          {/* Navigation */}
-          <div className="flex items-center gap-4">
-            {/* Månadväljare */}
-            <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-1">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goToPreviousMonth}
-                disabled={!canGoPrevious()}
-                className="p-1"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              
-              <div className="px-3 py-1 text-white font-medium min-w-[140px] text-center">
-                {formatSelectedMonth(selectedMonth)}
+      {/* Huvudkort med modern design */}
+      <ModernCard gradient="orange" glowing>
+        <div className="p-6">
+          <div className="flex flex-col gap-4 mb-6">
+            {/* Titel rad */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-orange-500" />
               </div>
-              
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goToNextMonth}
-                disabled={!canGoNext()}
-                className="p-1"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
+                <p className="text-sm text-slate-400">Endast avslutade ärenden</p>
+              </div>
             </div>
 
-            {!isCurrentMonth() && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={goToCurrentMonth}
-                className="text-xs"
-              >
-                Nuvarande
-              </Button>
-            )}
-
-            {/* Tab filter */}
-            <div className="flex bg-slate-800 rounded-lg p-1">
-              {(['overview', 'technicians', 'skadedjur', 'status'] as const).map((tab) => (
-                <Button
-                  key={tab}
-                  variant={activeTab === tab ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => setActiveTab(tab)}
-                  className="text-xs"
-                >
-                  {tab === 'overview' ? 'Översikt' : 
-                   tab === 'technicians' ? 'Tekniker' :
-                   tab === 'skadedjur' ? 'Skadedjur' : 'Status'}
-                </Button>
-              ))}
-            </div>
-
-            {/* Period filter */}
-            <div className="flex bg-slate-800 rounded-lg p-1">
-              {(['1m', '3m', '6m', '12m'] as const).map((period) => (
-                <Button
-                  key={period}
-                  variant={selectedPeriod === period ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => setSelectedPeriod(period)}
-                  className="text-xs"
-                >
-                  {period === '1m' ? '1 mån' : period === '3m' ? '3 mån' : period === '6m' ? '6 mån' : '12 mån'}
-                </Button>
-              ))}
+            {/* Navigation och Tabs */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <CombinedNavigation
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
+                periods={periodOptions}
+                canGoPrevious={canGoPrevious()}
+                canGoNext={canGoNext()}
+                onGoToCurrent={goToCurrentMonth}
+                isCurrentMonth={isCurrentMonth()}
+                compact
+                className="flex-1"
+              />
+              <ModernTabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as any)}
+                options={tabOptions}
+                variant="compact"
+              />
             </div>
           </div>
-        </div>
 
-        {/* KPI för vald månad */}
-        <div className="mb-6">
-          <h3 className="text-sm text-slate-400 mb-3">
-            {selectedPeriod === '1m' 
-              ? `${formatSelectedMonth(selectedMonth)} - Engångsjobb översikt`
-              : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Engångsjobb översikt`
-            }
-          </h3>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-              <p className="text-orange-400 font-bold text-lg">{selectedMonthData?.total_cases || 0}</p>
-              <p className="text-orange-300 text-sm">Totala ärenden</p>
-            </div>
-            <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-              <p className="text-purple-400 font-bold text-lg">{selectedMonthData?.private_cases || 0}</p>
-              <p className="text-purple-300 text-sm">Privatpersoner</p>
-            </div>
-            <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-blue-400 font-bold text-lg">{selectedMonthData?.business_cases || 0}</p>
-              <p className="text-blue-300 text-sm">Företag</p>
-            </div>
-            <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="text-green-400 font-bold text-lg">{formatCurrency(selectedMonthData?.total_revenue || 0)}</p>
-              <p className="text-green-300 text-sm">Total intäkt</p>
-            </div>
-            <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-yellow-400 font-bold text-lg">{formatCurrency(selectedMonthData?.avg_case_value || 0)}</p>
-              <p className="text-yellow-300 text-sm">Snitt per ärende</p>
+          {/* KPI för vald månad */}
+          <div className="mb-6">
+            <h3 className="text-sm text-slate-400 mb-4">
+              {selectedPeriod === '1m' 
+                ? `${formatSelectedMonth(selectedMonth)} - Engångsjobb översikt`
+                : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Engångsjobb översikt`
+              }
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                <p className="text-orange-400 font-bold text-sm">{selectedMonthData?.total_cases || 0}</p>
+                <p className="text-orange-300 text-xs">Totala ärenden</p>
+              </div>
+              <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                <p className="text-purple-400 font-bold text-sm">{selectedMonthData?.private_cases || 0}</p>
+                <p className="text-purple-300 text-xs">Privatpersoner</p>
+              </div>
+              <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-blue-400 font-bold text-sm">{selectedMonthData?.business_cases || 0}</p>
+                <p className="text-blue-300 text-xs">Företag</p>
+              </div>
+              <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-green-400 font-bold text-sm">{formatCurrency(selectedMonthData?.total_revenue || 0)}</p>
+                <p className="text-green-300 text-xs">Total intäkt</p>
+              </div>
+              <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-400 font-bold text-sm">{formatCurrency(selectedMonthData?.avg_case_value || 0)}</p>
+                <p className="text-yellow-300 text-xs">Snitt per ärende</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Dynamisk innehåll baserat på activeTab */}
-        {activeTab === 'overview' && (
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
-                <YAxis yAxisId="left" stroke="#94a3b8" fontSize={12} />
-                <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                <Bar yAxisId="left" dataKey="Totala Ärenden" fill="#f97316" name="Antal ärenden" />
-                <Line yAxisId="right" type="monotone" dataKey="Total Intäkt" stroke="#10b981" strokeWidth={3} name="Total intäkt" dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {activeTab === 'technicians' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="text-white font-medium flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-500" />
-                Top Tekniker ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
-              </h4>
-              {getFilteredAnalysisData.technicianData.slice(0, 6).map((tech, index) => (
-                <div key={tech.name} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm`} 
-                         style={{ backgroundColor: COLORS[index % COLORS.length] }}>
-                      {tech.name.charAt(0)}
-                    </div>
-                    <span className="text-white">{tech.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-green-400 font-semibold">{formatCurrency(tech.revenue)}</p>
-                    <p className="text-slate-400 text-xs">{tech.cases} ärenden</p>
-                  </div>
-                </div>
-              ))}
-              {getFilteredAnalysisData.technicianData.length === 0 && (
-                <div className="text-center text-slate-400 py-8">
-                  <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Inga tekniker för denna period</p>
-                </div>
-              )}
-            </div>
-            <div className="h-64">
+          {/* Dynamisk innehåll baserat på activeTab */}
+          {activeTab === 'overview' && (
+            <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={getFilteredAnalysisData.technicianData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} angle={-45} textAnchor="end" height={60} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
-                  <Tooltip content={<RevenueTooltip />} />
-                  <Bar dataKey="revenue" fill="#3b82f6" />
-                </BarChart>
+                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="#94a3b8" fontSize={12} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                  <Bar yAxisId="left" dataKey="Totala Ärenden" fill="#f97316" name="Antal ärenden" />
+                  <Line yAxisId="right" type="monotone" dataKey="Total Intäkt" stroke="#10b981" strokeWidth={3} name="Total intäkt" dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'skadedjur' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={getFilteredAnalysisData.skadedjurData.slice(0, 6)}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ type, percentage }) => `${type}: ${percentage.toFixed(1)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="revenue"
-                  >
-                    {getFilteredAnalysisData.skadedjurData.slice(0, 6).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<RevenueTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-3">
-              <h4 className="text-white font-medium flex items-center gap-2">
-                <Bug className="w-4 h-4 text-red-500" />
-                Top Skadedjurstyper ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
-              </h4>
-              {getFilteredAnalysisData.skadedjurData.slice(0, 8).map((item, index) => (
-                <div key={item.type} className="flex justify-between items-center p-3 bg-slate-800 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 rounded" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                    <span className="text-slate-300">{item.type}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
+          {activeTab === 'technicians' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <h4 className="text-white font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-500" />
+                  Top Tekniker ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
+                </h4>
+                {getFilteredAnalysisData.technicianData.slice(0, 6).map((tech, index) => (
+                  <div key={tech.name} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm`} 
+                           style={{ backgroundColor: COLORS[index % COLORS.length] }}>
+                        {tech.name.charAt(0)}
+                      </div>
+                      <span className="text-white">{tech.name}</span>
+                    </div>
                     <div className="text-right">
-                      <p className="text-green-400 font-semibold text-sm">{formatCurrency(item.revenue)}</p>
-                      <p className="text-slate-400 text-xs">{item.count} ärenden ({item.percentage.toFixed(1)}%)</p>
+                      <p className="text-green-400 font-semibold">{formatCurrency(tech.revenue)}</p>
+                      <p className="text-slate-400 text-xs">{tech.cases} ärenden</p>
                     </div>
                   </div>
-                </div>
-              ))}
-              {getFilteredAnalysisData.skadedjurData.length === 0 && (
+                ))}
+                {getFilteredAnalysisData.technicianData.length === 0 && (
+                  <div className="text-center text-slate-400 py-8">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Inga tekniker för denna period</p>
+                  </div>
+                )}
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={getFilteredAnalysisData.technicianData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} angle={-45} textAnchor="end" height={60} />
+                    <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
+                    <Tooltip content={<RevenueTooltip />} />
+                    <Bar dataKey="revenue" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'skadedjur' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getFilteredAnalysisData.skadedjurData.slice(0, 6)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ type, percentage }) => `${type}: ${percentage.toFixed(1)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="revenue"
+                    >
+                      {getFilteredAnalysisData.skadedjurData.slice(0, 6).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<RevenueTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-white font-medium flex items-center gap-2">
+                  <Bug className="w-4 h-4 text-red-500" />
+                  Top Skadedjurstyper ({selectedPeriod.toUpperCase()} period) - Sorterat efter intäkt
+                </h4>
+                {getFilteredAnalysisData.skadedjurData.slice(0, 8).map((item, index) => (
+                  <div key={item.type} className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                      <span className="text-slate-300">{item.type}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-green-400 font-semibold text-sm">{formatCurrency(item.revenue)}</p>
+                        <p className="text-slate-400 text-xs">{item.count} ärenden ({item.percentage.toFixed(1)}%)</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {getFilteredAnalysisData.skadedjurData.length === 0 && (
+                  <div className="text-center text-slate-400 py-8">
+                    <Bug className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Inga skadedjur för denna period</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'status' && (
+            <div className="space-y-3">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-yellow-500" />
+                Pågående Ärenden Status (Alla)
+              </h4>
+              {getFilteredAnalysisData.statusData.length > 0 ? (
+                getFilteredAnalysisData.statusData.map((status, index) => (
+                  <div key={status.status} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <span className="text-slate-300">{status.status}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white font-medium">{status.count}</span>
+                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full"
+                          style={{ 
+                            width: `${(status.count / Math.max(...getFilteredAnalysisData.statusData.map(s => s.count))) * 100}%`,
+                            backgroundColor: COLORS[index % COLORS.length]
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
                 <div className="text-center text-slate-400 py-8">
-                  <Bug className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Inga skadedjur för denna period</p>
+                  <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Inga pågående ärenden</p>
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {activeTab === 'status' && (
-          <div className="space-y-3">
-            <h4 className="text-white font-medium flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-yellow-500" />
-              Pågående Ärenden Status (Alla)
-            </h4>
-            {getFilteredAnalysisData.statusData.length > 0 ? (
-              getFilteredAnalysisData.statusData.map((status, index) => (
-                <div key={status.status} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                  <span className="text-slate-300">{status.status}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white font-medium">{status.count}</span>
-                    <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full"
-                        style={{ 
-                          width: `${(status.count / Math.max(...getFilteredAnalysisData.statusData.map(s => s.count))) * 100}%`,
-                          backgroundColor: COLORS[index % COLORS.length]
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center text-slate-400 py-8">
-                <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Inga pågående ärenden</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
+          )}
+        </div>
+      </ModernCard>
     </div>
   )
 }
