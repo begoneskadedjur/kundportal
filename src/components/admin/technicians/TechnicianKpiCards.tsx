@@ -95,34 +95,34 @@ const TechnicianKpiCards: React.FC = () => {
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       {kpiCards.map((card, index) => (
         <Card 
           key={index} 
           className="relative overflow-hidden hover:scale-105 transition-transform duration-300"
         >
-          <div className="p-6">
-            {/* Icon */}
-            <div className={`w-12 h-12 ${card.bgColor} rounded-lg flex items-center justify-center mb-4`}>
-              <card.icon className={`w-6 h-6 ${card.color}`} />
+          <div className="p-4">
+            {/* Icon - mindre */}
+            <div className={`w-8 h-8 ${card.bgColor} rounded-lg flex items-center justify-center mb-3`}>
+              <card.icon className={`w-4 h-4 ${card.color}`} />
             </div>
 
-            {/* Värde */}
+            {/* Värde - mindre text */}
             <div className="mb-2">
-              <h3 className="text-2xl font-bold text-white">{card.value}</h3>
-              <p className="text-sm font-medium text-slate-300">{card.title}</p>
+              <h3 className="text-lg font-bold text-white leading-tight">{card.value}</h3>
+              <p className="text-xs font-medium text-slate-300 leading-tight">{card.title}</p>
             </div>
 
-            {/* Beskrivning */}
-            <p className="text-xs text-slate-400 mb-2">{card.description}</p>
+            {/* Beskrivning - mindre text */}
+            <p className="text-xs text-slate-400 mb-1 line-clamp-2">{card.description}</p>
 
-            {/* Trend */}
+            {/* Trend - mindre text */}
             <div className="flex items-center">
-              <span className="text-xs text-slate-500">{card.trend}</span>
+              <span className="text-xs text-slate-500 line-clamp-1">{card.trend}</span>
             </div>
 
-            {/* Gradient overlay */}
-            <div className={`absolute top-0 right-0 w-20 h-20 ${card.bgColor} rounded-full blur-2xl opacity-20 -translate-y-10 translate-x-10`}></div>
+            {/* Gradient overlay - mindre */}
+            <div className={`absolute top-0 right-0 w-12 h-12 ${card.bgColor} rounded-full blur-xl opacity-20 -translate-y-6 translate-x-6`}></div>
           </div>
         </Card>
       ))}

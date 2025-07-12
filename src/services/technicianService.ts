@@ -191,6 +191,20 @@ export const getTechnicianPerformance = async (): Promise<TechnicianPerformance[
 
     console.log(`📊 Found cases: ${privateCases.length} private, ${businessCases.length} business, ${contractCases.length} contract`)
 
+    // Debug: Visa exempel på tekniker-namn från data
+    if (privateCases.length > 0) {
+      console.log('🔍 Sample private case technician names:', privateCases.slice(0, 3).map(c => c.primary_assignee_name))
+    }
+    if (businessCases.length > 0) {
+      console.log('🔍 Sample business case technician names:', businessCases.slice(0, 3).map(c => c.primary_assignee_name))
+    }
+    if (contractCases.length > 0) {
+      console.log('🔍 Sample contract case technician names:', contractCases.slice(0, 3).map(c => c.assigned_technician_name))
+    }
+
+    // Debug: Visa tekniker från databasen
+    console.log('🔍 Technicians from database:', technicians.map(t => t.name))
+
     // Bygga prestanda-data per tekniker
     const technicianMap = new Map<string, TechnicianPerformance>()
 
@@ -217,31 +231,79 @@ export const getTechnicianPerformance = async (): Promise<TechnicianPerformance[
 
     // Aggregera BeGone privatpersoner
     privateCases.forEach(case_ => {
-      const techName = case_.primary_assignee_name
+      const techName = case_.primary_assignee_name?.trim()
+      if (!techName) return
+      
       const tech = technicianMap.get(techName)
       if (tech) {
         tech.private_cases++
         tech.private_revenue += case_.pris || 0
+        console.log(`🔍 Added private case for ${techName}: ${case_.pris} kr`)
+      } else {
+        // Försök hitta tekniker med liknande namn (case-insensitive)
+        const similarTech = Array.from(technicianMap.keys()).find(name => 
+          name.toLowerCase() === techName.toLowerCase()
+        )
+        if (similarTech) {
+          const tech = technicianMap.get(similarTech)!
+          tech.private_cases++
+          tech.private_revenue += case_.pris || 0
+          console.log(`🔍 Added private case for ${similarTech} (matched ${techName}): ${case_.pris} kr`)
+        } else {
+          console.log(`⚠️ Unknown technician in private cases: "${techName}" - Available: ${Array.from(technicianMap.keys()).join(', ')}`)
+        }
       }
     })
 
     // Aggregera BeGone företag
     businessCases.forEach(case_ => {
-      const techName = case_.primary_assignee_name
+      const techName = case_.primary_assignee_name?.trim()
+      if (!techName) return
+      
       const tech = technicianMap.get(techName)
       if (tech) {
         tech.business_cases++
         tech.business_revenue += case_.pris || 0
+        console.log(`🔍 Added business case for ${techName}: ${case_.pris} kr`)
+      } else {
+        // Försök hitta tekniker med liknande namn (case-insensitive)
+        const similarTech = Array.from(technicianMap.keys()).find(name => 
+          name.toLowerCase() === techName.toLowerCase()
+        )
+        if (similarTech) {
+          const tech = technicianMap.get(similarTech)!
+          tech.business_cases++
+          tech.business_revenue += case_.pris || 0
+          console.log(`🔍 Added business case for ${similarTech} (matched ${techName}): ${case_.pris} kr`)
+        } else {
+          console.log(`⚠️ Unknown technician in business cases: "${techName}" - Available: ${Array.from(technicianMap.keys()).join(', ')}`)
+        }
       }
     })
 
     // Aggregera avtalskunder
     contractCases.forEach(case_ => {
-      const techName = case_.assigned_technician_name
+      const techName = case_.assigned_technician_name?.trim()
+      if (!techName) return
+      
       const tech = technicianMap.get(techName)
       if (tech) {
         tech.contract_cases++
         tech.contract_revenue += case_.price || 0
+        console.log(`🔍 Added contract case for ${techName}: ${case_.price} kr`)
+      } else {
+        // Försök hitta tekniker med liknande namn (case-insensitive)
+        const similarTech = Array.from(technicianMap.keys()).find(name => 
+          name.toLowerCase() === techName.toLowerCase()
+        )
+        if (similarTech) {
+          const tech = technicianMap.get(similarTech)!
+          tech.contract_cases++
+          tech.contract_revenue += case_.price || 0
+          console.log(`🔍 Added contract case for ${similarTech} (matched ${techName}): ${case_.price} kr`)
+        } else {
+          console.log(`⚠️ Unknown technician in contract cases: "${techName}" - Available: ${Array.from(technicianMap.keys()).join(', ')}`)
+        }
       }
     })
 
