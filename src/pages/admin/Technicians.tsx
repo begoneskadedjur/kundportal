@@ -5,12 +5,14 @@ import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 
-// Importera komponenter
+// Importera komponenter som faktiskt existerar
 import TechnicianKpiCards from '../../components/admin/technicians/TechnicianKpiCards'
-import TechnicianPerformanceChart from '../../components/admin/technicians/TechnicianPerformanceChart'
 import TechnicianRankingTable from '../../components/admin/technicians/TechnicianRankingTable'
-import TechnicianMonthlyChart from '../../components/admin/technicians/TechnicianMonthlyChart'
-import PestSpecializationChart from '../../components/admin/technicians/PestSpecializationChart'
+
+// Dessa komponenter skapas senare:
+// import TechnicianPerformanceChart from '../../components/admin/technicians/TechnicianPerformanceChart'
+// import TechnicianMonthlyChart from '../../components/admin/technicians/TechnicianMonthlyChart'
+// import PestSpecializationChart from '../../components/admin/technicians/PestSpecializationChart'
 
 // Moderna UI komponenter
 import ModernViewSelector, { commonViewOptions } from '../../components/ui/ModernViewSelector'
@@ -144,39 +146,43 @@ const Technicians: React.FC = () => {
 
             {selectedView === 'performance' && (
               <div className="space-y-8">
-                {/* Prestanda trends */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-500" />
-                    Prestanda Utveckling
-                    <span className="text-sm text-slate-400 font-normal">(Månadsvis trends)</span>
-                  </h3>
-                  <TechnicianPerformanceChart />
-                </div>
-
-                {/* Månadsvis detaljer */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-500" />
-                    Månadsvis Översikt
-                    <span className="text-sm text-slate-400 font-normal">(Per tekniker och affärstyp)</span>
-                  </h3>
-                  <TechnicianMonthlyChart />
-                </div>
+                {/* Prestanda trends - Tillfälligt meddelande */}
+                <Card>
+                  <div className="p-8 text-center">
+                    <TrendingUp className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                    <h4 className="text-lg font-semibold text-white mb-2">Prestanda Trends</h4>
+                    <p className="text-slate-400 mb-4">
+                      Månadsvis prestanda-diagram kommer snart
+                    </p>
+                    <div className="text-sm text-slate-500">
+                      <p>Kommer att visa:</p>
+                      <p>• Månadsvis intäktsutveckling per tekniker</p>
+                      <p>• Trendlinjer och säsongsmönster</p>
+                      <p>• Affärsområdes-fördelning över tid</p>
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
 
             {selectedView === 'specialization' && (
               <div className="space-y-8">
-                {/* Skadedjurs-specialisering */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Wrench className="w-5 h-5 text-purple-500" />
-                    Skadedjurs Specialiseringar
-                    <span className="text-sm text-slate-400 font-normal">(Expertområden per tekniker)</span>
-                  </h3>
-                  <PestSpecializationChart />
-                </div>
+                {/* Skadedjurs-specialisering - Tillfälligt meddelande */}
+                <Card>
+                  <div className="p-8 text-center">
+                    <Wrench className="w-12 h-12 mx-auto text-purple-500 mb-4" />
+                    <h4 className="text-lg font-semibold text-white mb-2">Skadedjurs Specialiseringar</h4>
+                    <p className="text-slate-400 mb-4">
+                      Specialiserings-analys kommer snart
+                    </p>
+                    <div className="text-sm text-slate-500">
+                      <p>Kommer att visa:</p>
+                      <p>• Skadedjurstyper per tekniker</p>
+                      <p>• Intäktsfördelning per specialitet</p>
+                      <p>• Expertområden och rekommendationer</p>
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
 
@@ -238,8 +244,8 @@ const Technicians: React.FC = () => {
                     <h4 className="text-green-400 font-medium">✅ Implementerade Funktioner:</h4>
                     <p className="text-green-400">✅ KPI Cards (dynamiska totaler)</p>
                     <p className="text-green-400">✅ Prestanda Ranking (live data)</p>
-                    <p className="text-green-400">✅ Månadsvis Trends (12 månader)</p>
-                    <p className="text-green-400">✅ Skadedjurs Specialisering</p>
+                    <p className="text-yellow-400">🚧 Månadsvis Trends (kommer snart)</p>
+                    <p className="text-yellow-400">🚧 Skadedjurs Specialisering (kommer snart)</p>
                     <p className="text-green-400">✅ Multi-affärsområde Support</p>
                     <p className="text-green-400">✅ Automatisk Skalning</p>
                   </div>
