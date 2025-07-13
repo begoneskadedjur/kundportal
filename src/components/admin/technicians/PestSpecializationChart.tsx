@@ -1,7 +1,7 @@
-// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - UPPDATERAD FÖR NY SERVICE
+// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - FIXAD MED BÄTTRE FELHANTERING
 import React, { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { Bug, Target, Filter, TrendingUp } from 'lucide-react'
+import { Bug, Target, Filter, TrendingUp, AlertTriangle } from 'lucide-react'
 import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import { usePestSpecialization } from '../../../hooks/useTechnicianDashboard'
@@ -11,6 +11,8 @@ const PestSpecializationChart: React.FC = () => {
   const { data: pestData, loading, error } = usePestSpecialization()
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'overview' | 'technician'>('overview')
+
+  console.log('🐛 PestSpecializationChart render:', { pestData, loading, error })
 
   // Loading state
   if (loading) {
@@ -32,21 +34,27 @@ const PestSpecializationChart: React.FC = () => {
 
   // Error state
   if (error) {
+    console.error('🐛 PestSpecializationChart error:', error)
     return (
       <Card className="p-6 bg-red-500/10 border-red-500/20">
         <div className="flex items-center gap-3 mb-6">
-          <Bug className="w-6 h-6 text-red-500" />
+          <AlertTriangle className="w-6 h-6 text-red-500" />
           <div>
             <h2 className="text-lg font-semibold text-white">Skadedjurs Specialiseringar</h2>
             <p className="text-sm text-slate-400">Fel vid laddning: {error}</p>
           </div>
+        </div>
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <p className="text-red-400">Ett fel uppstod vid laddning av specialiseringsdata.</p>
+          <p className="text-slate-400 text-sm mt-1">Kontrollera konsolen för mer information.</p>
         </div>
       </Card>
     )
   }
 
   // Empty state
-  if (!pestData || pestData.length === 0) {
+  if (!pestData || !Array.isArray(pestData) || pestData.length === 0) {
+    console.log('🐛 PestSpecializationChart: No data available')
     return (
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -60,43 +68,64 @@ const PestSpecializationChart: React.FC = () => {
           <div className="text-center">
             <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Ingen skadedjursdata tillgänglig</p>
+            <p className="text-sm mt-2">Data kommer att visas när tekniker har arbetat med ärenden</p>
           </div>
         </div>
       </Card>
     )
   }
 
-  // 🆕 UPPDATERAD: Processad data för ny service-struktur
+  // 🆕 Säker processad data med try-catch
   const processedData = useMemo(() => {
-    const uniqueTechnicians = Array.from(new Set(pestData.map(p => p.technician_name)))
-    
-    // Aggregera skadedjur per typ (totalt över alla tekniker och källor)
-    const pestTypeMap = new Map<string, { cases: number, revenue: number, technicians: Set<string> }>()
-    
-    pestData.forEach(item => {
-      if (!pestTypeMap.has(item.pest_type)) {
-        pestTypeMap.set(item.pest_type, { cases: 0, revenue: 0, technicians: new Set() })
+    try {
+      console.log('🐛 Processing pest data:', pestData)
+      
+      const uniqueTechnicians = Array.from(new Set(pestData.map(p => p?.technician_name).filter(Boolean)))
+      console.log('🐛 Unique technicians:', uniqueTechnicians)
+      
+      // Aggregera skadedjur per typ (totalt över alla tekniker och källor)
+      const pestTypeMap = new Map<string, { cases: number, revenue: number, technicians: Set<string> }>()
+      
+      pestData.forEach(item => {
+        try {
+          if (!item || !item.pest_type || !item.technician_name) return
+          
+          if (!pestTypeMap.has(item.pest_type)) {
+            pestTypeMap.set(item.pest_type, { cases: 0, revenue: 0, technicians: new Set() })
+          }
+          const pest = pestTypeMap.get(item.pest_type)!
+          pest.cases += item.case_count || 0
+          pest.revenue += item.total_revenue || 0
+          pest.technicians.add(item.technician_name)
+        } catch (itemError) {
+          console.error('🐛 Error processing pest item:', itemError, item)
+        }
+      })
+
+      const pestOverview = Array.from(pestTypeMap.entries()).map(([type, data]) => ({
+        pest_type: type,
+        total_cases: data.cases,
+        total_revenue: data.revenue,
+        avg_case_value: data.cases > 0 ? data.revenue / data.cases : 0,
+        technician_count: data.technicians.size
+      })).sort((a, b) => b.total_revenue - a.total_revenue)
+
+      console.log('🐛 Processed pest overview:', pestOverview)
+
+      return {
+        uniqueTechnicians,
+        pestOverview,
+        technicianData: selectedTechnician 
+          ? pestData.filter(p => p?.technician_name === selectedTechnician)
+          : []
       }
-      const pest = pestTypeMap.get(item.pest_type)!
-      pest.cases += item.case_count
-      pest.revenue += item.total_revenue
-      pest.technicians.add(item.technician_name)
-    })
-
-    const pestOverview = Array.from(pestTypeMap.entries()).map(([type, data]) => ({
-      pest_type: type,
-      total_cases: data.cases,
-      total_revenue: data.revenue,
-      avg_case_value: data.cases > 0 ? data.revenue / data.cases : 0,
-      technician_count: data.technicians.size
-    })).sort((a, b) => b.total_revenue - a.total_revenue)
-
-    return {
-      uniqueTechnicians,
-      pestOverview,
-      technicianData: selectedTechnician 
-        ? pestData.filter(p => p.technician_name === selectedTechnician)
-        : []
+    } catch (processError) {
+      console.error('🐛 Error in processedData useMemo:', processError)
+      return {
+        uniqueTechnicians: [],
+        pestOverview: [],
+        technicianData: []
+      }
     }
   }, [pestData, selectedTechnician])
 
@@ -108,19 +137,24 @@ const PestSpecializationChart: React.FC = () => {
   ]
 
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
-          <p className="text-white font-medium">{data.pest_type}</p>
-          <p className="text-slate-300 text-sm">Ärenden: {data.total_cases}</p>
-          <p className="text-slate-300 text-sm">Intäkt: {formatCurrency(data.total_revenue)}</p>
-          <p className="text-slate-300 text-sm">Genomsnitt: {formatCurrency(data.avg_case_value)}</p>
-          <p className="text-slate-300 text-sm">Tekniker: {data.technician_count}</p>
-        </div>
-      )
+    try {
+      if (active && payload && payload.length) {
+        const data = payload[0].payload
+        return (
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
+            <p className="text-white font-medium">{data.pest_type || 'Okänt'}</p>
+            <p className="text-slate-300 text-sm">Ärenden: {data.total_cases || 0}</p>
+            <p className="text-slate-300 text-sm">Intäkt: {formatCurrency(data.total_revenue || 0)}</p>
+            <p className="text-slate-300 text-sm">Genomsnitt: {formatCurrency(data.avg_case_value || 0)}</p>
+            <p className="text-slate-300 text-sm">Tekniker: {data.technician_count || 0}</p>
+          </div>
+        )
+      }
+      return null
+    } catch (tooltipError) {
+      console.error('🐛 Tooltip error:', tooltipError)
+      return null
     }
-    return null
   }
 
   return (
@@ -193,8 +227,8 @@ const PestSpecializationChart: React.FC = () => {
           <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
             <p className="text-blue-400 font-bold text-sm">
               {viewMode === 'overview'
-                ? processedData.pestOverview.reduce((sum, p) => sum + p.total_cases, 0)
-                : processedData.technicianData.reduce((sum, p) => sum + p.case_count, 0)
+                ? processedData.pestOverview.reduce((sum, p) => sum + (p.total_cases || 0), 0)
+                : processedData.technicianData.reduce((sum, p) => sum + (p.case_count || 0), 0)
               }
             </p>
             <p className="text-blue-300 text-xs">Totala ärenden</p>
@@ -203,8 +237,8 @@ const PestSpecializationChart: React.FC = () => {
             <p className="text-green-400 font-bold text-sm">
               {formatCurrency(
                 viewMode === 'overview'
-                  ? processedData.pestOverview.reduce((sum, p) => sum + p.total_revenue, 0)
-                  : processedData.technicianData.reduce((sum, p) => sum + p.total_revenue, 0)
+                  ? processedData.pestOverview.reduce((sum, p) => sum + (p.total_revenue || 0), 0)
+                  : processedData.technicianData.reduce((sum, p) => sum + (p.total_revenue || 0), 0)
               )}
             </p>
             <p className="text-green-300 text-xs">Total intäkt</p>
@@ -224,60 +258,78 @@ const PestSpecializationChart: React.FC = () => {
           {/* Pie Chart - Intäktsfördelning */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Intäktsfördelning per Skadedjur</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={processedData.pestOverview.slice(0, 10)} // Top 10
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="total_revenue"
-                    nameKey="pest_type"
-                  >
-                    {processedData.pestOverview.slice(0, 10).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {processedData.pestOverview.length > 0 ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={processedData.pestOverview.slice(0, 10)} // Top 10
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      dataKey="total_revenue"
+                      nameKey="pest_type"
+                    >
+                      {processedData.pestOverview.slice(0, 10).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-slate-400">
+                <div className="text-center">
+                  <Bug className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Ingen data för pie chart</p>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Bar Chart - Genomsnittspriser */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Genomsnittspris per Ärende</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={processedData.pestOverview.slice(0, 8)}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis 
-                    dataKey="pest_type" 
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis 
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickFormatter={(value) => formatCurrency(value).replace(' kr', 'k')}
-                  />
-                  <Tooltip 
-                    formatter={(value) => [formatCurrency(Number(value)), 'Genomsnittspris']}
-                    labelStyle={{ color: '#ffffff' }}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
-                  />
-                  <Bar 
-                    dataKey="avg_case_value" 
-                    fill="#8b5cf6" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {processedData.pestOverview.length > 0 ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={processedData.pestOverview.slice(0, 8)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis 
+                      dataKey="pest_type" 
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis 
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickFormatter={(value) => formatCurrency(value).replace(' kr', 'k')}
+                    />
+                    <Tooltip 
+                      formatter={(value) => [formatCurrency(Number(value)), 'Genomsnittspris']}
+                      labelStyle={{ color: '#ffffff' }}
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+                    />
+                    <Bar 
+                      dataKey="avg_case_value" 
+                      fill="#8b5cf6" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-slate-400">
+                <div className="text-center">
+                  <Bug className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Ingen data för bar chart</p>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -294,14 +346,14 @@ const PestSpecializationChart: React.FC = () => {
             {processedData.technicianData.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {processedData.technicianData
-                  .sort((a, b) => b.total_revenue - a.total_revenue)
+                  .sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))
                   .map((item, index) => (
                     <div 
-                      key={`${item.pest_type}-${item.source}`}
+                      key={`${item.pest_type}-${item.source}-${index}`}
                       className="p-4 bg-slate-800/50 rounded-lg border border-slate-700"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-white">{item.pest_type}</h4>
+                        <h4 className="font-semibold text-white">{item.pest_type || 'Okänt'}</h4>
                         <span className={`text-xs px-2 py-1 rounded ${
                           item.source === 'private' ? 'bg-purple-500/20 text-purple-400' :
                           item.source === 'business' ? 'bg-blue-500/20 text-blue-400' :
@@ -315,15 +367,15 @@ const PestSpecializationChart: React.FC = () => {
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span className="text-slate-400">Ärenden:</span>
-                          <span className="text-white">{item.case_count}</span>
+                          <span className="text-white">{item.case_count || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Total intäkt:</span>
-                          <span className="text-white">{formatCurrency(item.total_revenue)}</span>
+                          <span className="text-white">{formatCurrency(item.total_revenue || 0)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Genomsnitt:</span>
-                          <span className="text-white">{formatCurrency(item.avg_case_value)}</span>
+                          <span className="text-white">{formatCurrency(item.avg_case_value || 0)}</span>
                         </div>
                       </div>
                     </div>
@@ -362,7 +414,7 @@ const PestSpecializationChart: React.FC = () => {
             <p className="text-slate-400">
               {processedData.pestOverview.length > 0 
                 ? `${processedData.pestOverview[0].pest_type}: ${formatCurrency(processedData.pestOverview[0].avg_case_value)}/ärende`
-                : 'Ingen data'
+                : 'Ingen data tillgänglig'
               }
             </p>
           </div>
@@ -372,10 +424,10 @@ const PestSpecializationChart: React.FC = () => {
             <p className="text-slate-400">
               {(() => {
                 const mostCommon = processedData.pestOverview.reduce((max, curr) => 
-                  curr.total_cases > (max?.total_cases || 0) ? curr : max, processedData.pestOverview[0])
+                  (curr.total_cases || 0) > (max?.total_cases || 0) ? curr : max, processedData.pestOverview[0])
                 return mostCommon 
                   ? `${mostCommon.pest_type}: ${mostCommon.total_cases} ärenden`
-                  : 'Ingen data'
+                  : 'Ingen data tillgänglig'
               })()}
             </p>
           </div>
@@ -385,7 +437,8 @@ const PestSpecializationChart: React.FC = () => {
             <p className="text-slate-400">
               {(() => {
                 // Hitta skadedjur med få tekniker men hög intäkt
-                const specialized = processedData.pestOverview.filter(p => p.technician_count <= 2 && p.total_revenue > 50000)
+                const specialized = processedData.pestOverview.filter(p => 
+                  (p.technician_count || 0) <= 2 && (p.total_revenue || 0) > 50000)
                 return specialized.length > 0
                   ? `Utbilda fler inom ${specialized[0].pest_type}`
                   : 'Bra spridning av kompetens'
