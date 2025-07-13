@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - SKADEDJURS SPECIALISERING
+// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - UPPDATERAD FÖR NY SERVICE
 import React, { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Bug, Target, Filter, TrendingUp } from 'lucide-react'
@@ -66,11 +66,11 @@ const PestSpecializationChart: React.FC = () => {
     )
   }
 
-  // Processad data
+  // 🆕 UPPDATERAD: Processad data för ny service-struktur
   const processedData = useMemo(() => {
     const uniqueTechnicians = Array.from(new Set(pestData.map(p => p.technician_name)))
     
-    // Aggregera skadedjur per typ (totalt över alla tekniker)
+    // Aggregera skadedjur per typ (totalt över alla tekniker och källor)
     const pestTypeMap = new Map<string, { cases: number, revenue: number, technicians: Set<string> }>()
     
     pestData.forEach(item => {

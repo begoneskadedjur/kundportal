@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/Technicians.tsx - KOMPLETT TEKNIKER DASHBOARD
+// 📁 src/pages/admin/Technicians.tsx - UPPDATERAD MED INDIVIDUELL ANALYS
 import React, { useState } from 'react'
 import { ArrowLeft, RefreshCw, Wrench, TrendingUp, Users, Target } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -10,14 +10,14 @@ import TechnicianKpiCards from '../../components/admin/technicians/TechnicianKpi
 import TechnicianRankingTable from '../../components/admin/technicians/TechnicianRankingTable'
 import TechnicianPerformanceChart from '../../components/admin/technicians/TechnicianPerformanceChart'
 import PestSpecializationChart from '../../components/admin/technicians/PestSpecializationChart'
+import IndividualTechnicianAnalysis from '../../components/admin/technicians/IndividualTechnicianAnalysis'
 
 // Moderna UI komponenter
-import ModernViewSelector, { commonViewOptions } from '../../components/ui/ModernViewSelector'
+import ModernViewSelector from '../../components/ui/ModernViewSelector'
 
 const Technicians: React.FC = () => {
   const navigate = useNavigate()
   const [selectedView, setSelectedView] = useState<'overview' | 'performance' | 'specialization' | 'individual'>('overview')
-  const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null)
 
   const handleRefresh = async () => {
     window.location.reload()
@@ -171,31 +171,14 @@ const Technicians: React.FC = () => {
 
             {selectedView === 'individual' && (
               <div className="space-y-8">
-                {/* Individuell tekniker-analys */}
+                {/* 🆕 Individuell tekniker-analys */}
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Users className="w-5 h-5 text-orange-500" />
                     Individuell Tekniker Analys
                     <span className="text-sm text-slate-400 font-normal">(Djupanalys per person)</span>
                   </h3>
-                  
-                  {/* Tekniker-väljare och individuell vy kommer här */}
-                  <Card>
-                    <div className="p-8 text-center">
-                      <Target className="w-12 h-12 mx-auto text-orange-500 mb-4" />
-                      <h4 className="text-lg font-semibold text-white mb-2">Individuell Analys</h4>
-                      <p className="text-slate-400 mb-4">
-                        Välj en tekniker för djupgående prestanda-analys
-                      </p>
-                      <div className="text-sm text-slate-500">
-                        <p>Kommer att inkludera:</p>
-                        <p>• Personlig prestanda-historik</p>
-                        <p>• Specialiseringsanalys</p>
-                        <p>• Jämförelse med teamgenomsnittet</p>
-                        <p>• Utvecklingsmöjligheter</p>
-                      </div>
-                    </div>
-                  </Card>
+                  <IndividualTechnicianAnalysis />
                 </div>
               </div>
             )}
@@ -206,7 +189,7 @@ const Technicians: React.FC = () => {
             <Card className="bg-gradient-to-br from-blue-600/10 to-cyan-600/10 border-blue-500/20">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  ✅ Tekniker Dashboard Status - Dynamisk Data
+                  ✅ Tekniker Dashboard Status - Komplett System
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -229,19 +212,19 @@ const Technicians: React.FC = () => {
                     <p className="text-green-400">✅ Prestanda Ranking (live data)</p>
                     <p className="text-green-400">✅ Månadsvis Trends (12 månader)</p>
                     <p className="text-green-400">✅ Skadedjurs Specialisering</p>
+                    <p className="text-green-400">✅ Individuell Analys (NY!)</p>
                     <p className="text-green-400">✅ Multi-affärsområde Support</p>
-                    <p className="text-green-400">✅ Automatisk Skalning</p>
                   </div>
 
                   {/* Tekniska Funktioner */}
                   <div className="space-y-2 text-sm">
-                    <h4 className="text-purple-400 font-medium">🔧 Tekniska Funktioner:</h4>
+                    <h4 className="text-purple-400 font-medium">🔧 Avancerade Funktioner:</h4>
                     <p className="text-purple-400">🎯 Intelligent Data Aggregering</p>
                     <p className="text-purple-400">📊 Cross-Table Queries</p>
-                    <p className="text-purple-400">🔄 Auto-refresh Capable</p>
+                    <p className="text-purple-400">🔄 Service Layer Architecture</p>
                     <p className="text-purple-400">📱 Responsiv Design</p>
                     <p className="text-purple-400">🏆 Ranking Algorithms</p>
-                    <p className="text-purple-400">✨ Modern UI Components</p>
+                    <p className="text-purple-400">👤 Per-tekniker Djupanalys</p>
                   </div>
 
                 </div>
@@ -250,14 +233,14 @@ const Technicians: React.FC = () => {
                 <div className="mt-6 pt-4 border-t border-blue-700/30">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-400">Tekniker Dashboard Implementation</span>
-                    <span className="text-sm text-blue-400 font-semibold">100% Verklig Data</span>
+                    <span className="text-sm text-blue-400 font-semibold">100% Verklig Data + Individuell Analys</span>
                   </div>
                   <div className="w-full bg-slate-800 rounded-full h-3">
                     <div className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-1000 shadow-lg shadow-blue-500/25" style={{ width: '100%' }}></div>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                    <span>Komplett med verklig data från alla tekniker</span>
-                    <span>🚀 Skalbar för framtida tekniker</span>
+                    <span>Komplett med verklig data från alla tekniker + individuell djupanalys</span>
+                    <span>🚀 Full funktionalitet implementerad</span>
                   </div>
                 </div>
 
@@ -275,7 +258,7 @@ const Technicians: React.FC = () => {
             <div className="flex items-center gap-4">
               <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
               <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
-              <span>Technician Dashboard v1.0</span>
+              <span>Technician Dashboard v2.0</span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -287,8 +270,8 @@ const Technicians: React.FC = () => {
                 <span>Performance ranking</span>
               </div>
               <div className="flex items-center gap-2">
-                <span>📊</span>
-                <span>Multi-source analytics</span>
+                <span>👤</span>
+                <span>Individuell analys</span>
               </div>
             </div>
           </div>
