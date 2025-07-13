@@ -1,5 +1,5 @@
 // 📁 src/services/technicianAnalyticsService.ts - ANALYTICS FUNKTIONER FÖR TEKNIKER
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'  // 🔧 FIXAD IMPORT-SÖKVÄG
 
 // Types för tekniker analytics
 export interface TechnicianKpi {
@@ -325,7 +325,7 @@ export const getTechnicianMonthlyData = async (monthsBack: number = 12): Promise
   }
 }
 
-// 🎯 4. Pest Specialization Service - FIXAD
+// 🎯 4. Pest Specialization Service
 export const getPestSpecialization = async (): Promise<PestSpecialization[]> => {
   try {
     console.log('🔄 Fetching pest specialization data...')
