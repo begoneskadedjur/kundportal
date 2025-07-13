@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - FIXAD MED BÄTTRE FELHANTERING
+// 📁 src/components/admin/technicians/PestSpecializationChart.tsx - FIXAD VERSION
 import React, { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Bug, Target, Filter, TrendingUp, AlertTriangle } from 'lucide-react'
@@ -75,12 +75,19 @@ const PestSpecializationChart: React.FC = () => {
     )
   }
 
-  // 🆕 Säker processad data med try-catch
-  const processedData = useMemo(() => {
+  // 🔥 FIXAD processedData - Borttagen från useMemo för att undvika oändlig loop
+  const processData = () => {
     try {
       console.log('🐛 Processing pest data:', pestData)
       
-      const uniqueTechnicians = Array.from(new Set(pestData.map(p => p?.technician_name).filter(Boolean)))
+      // Säker extraktion av unika tekniker
+      const uniqueTechnicians: string[] = []
+      pestData.forEach(p => {
+        if (p?.technician_name && !uniqueTechnicians.includes(p.technician_name)) {
+          uniqueTechnicians.push(p.technician_name)
+        }
+      })
+      
       console.log('🐛 Unique technicians:', uniqueTechnicians)
       
       // Aggregera skadedjur per typ (totalt över alla tekniker och källor)
@@ -120,14 +127,17 @@ const PestSpecializationChart: React.FC = () => {
           : []
       }
     } catch (processError) {
-      console.error('🐛 Error in processedData useMemo:', processError)
+      console.error('🐛 Error in processData:', processError)
       return {
         uniqueTechnicians: [],
         pestOverview: [],
         technicianData: []
       }
     }
-  }, [pestData, selectedTechnician])
+  }
+
+  // 🔥 Anropa processData direkt istället för useMemo
+  const processedData = processData()
 
   // Färger för pie chart
   const colors = [
