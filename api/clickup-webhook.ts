@@ -1,4 +1,4 @@
-// api/clickup-webhook.ts - UPPDATERAD med nya ClickUp status-mappningar och completed_date
+// api/clickup-webhook.ts - UPPDATERAD med nya ClickUp status-mappningar och completed_date + PROVISIONER
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getStatusName, isCompletedStatus } from '../src/types/database'
@@ -34,6 +34,28 @@ interface ClickUpWebhookPayload {
     before: any
     after: any
   }>
+}
+
+// 🆕 PROVISIONSBERÄKNING - ENDAST VID COMPLETION
+function calculateCommission(price: number, tableName: 'private_cases' | 'business_cases'): number | null {
+  if (!price || price <= 0) return null
+  
+  let netAmount: number
+  
+  if (tableName === 'business_cases') {
+    // Företag: Ta bort 25% moms först
+    netAmount = price / 1.25
+  } else {
+    // Privatperson: Ingen moms
+    netAmount = price
+  }
+  
+  // 5% provision på nettobeloppet, avrunda till 2 decimaler
+  const commission = Math.round(netAmount * 0.05 * 100) / 100
+  
+  console.log(`💰 Commission calculation: ${price}kr → ${netAmount.toFixed(2)}kr (net) → ${commission}kr (5%)`)
+  
+  return commission
 }
 
 // VIKTIGT: Disable body parsing för att hantera raw data
@@ -225,7 +247,7 @@ async function syncCustomerTaskFromClickUp(taskId: string, customerId: string) {
   }
 }
 
-// Synkronisera BeGone task (ny logik med korrekta statusar)
+// Synkronisera BeGone task (uppdaterad med provisionslogik)
 async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cases' | 'business_cases') {
   try {
     console.log(`🔄 Syncing BeGone task ${taskId} to ${tableName}`)
@@ -237,6 +259,17 @@ async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cas
     }
 
     const caseData = mapClickUpTaskToBeGoneCaseData(taskData, tableName)
+    
+    // 🆕 EXTRA LOGGING FÖR COMMISSION
+    if (caseData.commission_amount) {
+      console.log(`🏆 NEW COMMISSION RECORDED:`, {
+        task_id: taskId,
+        table: tableName,
+        technician: caseData.primary_assignee_name,
+        amount: caseData.commission_amount,
+        price: taskData.custom_fields?.find((f: any) => f.name.toLowerCase() === 'pris')?.value
+      })
+    }
     
     const { error } = await supabase
       .from(tableName)
@@ -250,6 +283,11 @@ async function syncBeGoneTaskFromClickUp(taskId: string, tableName: 'private_cas
     }
 
     console.log(`✅ Successfully synced BeGone task ${taskId} to ${tableName} -> Status: ${caseData.status}`)
+    
+    // 🆕 EXTRA SUCCESS LOGGING FÖR COMMISSION
+    if (caseData.commission_amount) {
+      console.log(`💰 Commission ${caseData.commission_amount}kr recorded for ${caseData.primary_assignee_name}`)
+    }
     
   } catch (error) {
     console.error(`❌ Error syncing BeGone task ${taskId}:`, error)
@@ -282,7 +320,7 @@ async function fetchClickUpTask(taskId: string) {
   }
 }
 
-// 🆕 UPPDATERAD: Mappa BeGone task till databas-format med nya statusar
+// 🆕 UPPDATERAD: Mappa BeGone task till databas-format med nya statusar + PROVISIONER
 function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases' | 'business_cases') {
   // 🆕 KORREKT STATUS-MAPPNING från ClickUp ID till namn
   const clickupStatusId = taskData.status?.id
@@ -328,6 +366,25 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
     return field.value.toString()
   }
 
+  // Hämta viktiga custom fields
+  const priceField = getCustomField('Pris')
+  
+  // 🆕 PROVISIONSBERÄKNING - ENDAST VID COMPLETION
+  let commissionAmount: number | null = null
+  let commissionCalculatedAt: string | null = null
+  
+  if (isCompleted && priceField?.value && priceField.value > 0) {
+    commissionAmount = calculateCommission(priceField.value, tableName)
+    commissionCalculatedAt = new Date().toISOString()
+    
+    console.log(`🏆 COMMISSION CALCULATED for ${tableName} task ${taskData.id}:`, {
+      price: priceField.value,
+      commission: commissionAmount,
+      technician: taskData.assignees?.[0]?.username || 'Ej tilldelad',
+      calculated_at: commissionCalculatedAt
+    })
+  }
+
   // Mappa assignees till tekniker
   const assignees = taskData.assignees || []
   const assigneeData = mapAssignees(assignees)
@@ -346,6 +403,11 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
     priority: mapPriorityValue(taskData.priority?.priority),
     ...assigneeData,
     ...dateData,
+    
+    // 🆕 PROVISIONSDATA - ENDAST VID COMPLETION
+    commission_amount: commissionAmount,
+    commission_calculated_at: commissionCalculatedAt,
+    
     updated_at: new Date().toISOString()
   }
 
@@ -613,14 +675,14 @@ function mapPriorityValue(clickupPriority: string | undefined): string {
   return priorityMap[clickupPriority.toString().toLowerCase()] || 'normal'
 }
 
-// Hantera raderade avtalskund tasks
+// Hantera raderade avtalskund tasks (KORRIGERAD)
 async function handleCustomerTaskDeleted(taskId: string, customerId: string) {
   console.log(`🗑️ Handling deleted customer task ${taskId}`)
   
   const { error } = await supabase
     .from('cases')
     .update({ 
-      status: 'Borttagen',  // 🆕 Använd kapitaliserad status
+      status: 'Borttagen',
       updated_at: new Date().toISOString()
     })
     .eq('clickup_task_id', taskId)
@@ -634,20 +696,20 @@ async function handleCustomerTaskDeleted(taskId: string, customerId: string) {
   console.log(`✅ Marked customer task ${taskId} as deleted`)
 }
 
-// Hantera raderade BeGone tasks
+// Hantera raderade BeGone tasks (KORRIGERAD)
 async function handleBeGoneTaskDeleted(taskId: string, tableName: 'private_cases' | 'business_cases') {
   console.log(`🗑️ Handling deleted BeGone task ${taskId} from ${tableName}`)
   
   const { error } = await supabase
     .from(tableName)
     .update({ 
-      status: 'Borttagen',  // 🆕 Använd kapitaliserad status
+      status: 'Borttagen',
       updated_at: new Date().toISOString()
     })
     .eq('clickup_task_id', taskId)
 
   if (error) {
-    console.error('❌ Error handling deleted BeGone task:', error)
+    console.error(`❌ Error handling deleted BeGone task in ${tableName}:`, error)
     throw error
   }
 

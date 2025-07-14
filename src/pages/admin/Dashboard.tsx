@@ -1,11 +1,11 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR + PROVISIONER
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { 
   Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, 
-  BarChart3, DollarSign, Activity, Wrench
+  BarChart3, DollarSign, Activity, Wrench, Wallet
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -260,6 +260,15 @@ export default function AdminDashboard() {
                 <FileText className="w-4 h-4 mr-2" />
                 Fakturering
               </Button>
+              {/* 🆕 NY KNAPP: Provisioner - under Fakturering */}
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-emerald-500/10 to-green-500/10 border-emerald-500/20 hover:from-emerald-500/20 hover:to-green-500/20"
+                onClick={() => navigate('/admin/commissions')}
+              >
+                <Wallet className="w-4 h-4 mr-2" />
+                Provisioner
+              </Button>
             </div>
           </Card>
 
@@ -325,6 +334,14 @@ export default function AdminDashboard() {
                 <span className="flex items-center text-blue-400 text-sm">
                   <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
                   Ready
+                </span>
+              </div>
+              {/* 🆕 NY STATUS: Provisionsystem */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Provisionsystem</span>
+                <span className="flex items-center text-emerald-400 text-sm">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
+                  Active
                 </span>
               </div>
               <div className="pt-3 border-t border-slate-700">
