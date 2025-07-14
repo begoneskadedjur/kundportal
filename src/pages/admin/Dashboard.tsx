@@ -1,4 +1,4 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED TEKNIKER-LÄNK
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -243,13 +243,14 @@ export default function AdminDashboard() {
                 <Users className="w-4 h-4 mr-2" />
                 Hantera kunder
               </Button>
+              {/* 🆕 NY KNAPP: Hantera tekniker (CRUD) */}
               <Button 
                 variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
-                onClick={() => navigate('/admin/technicians')}
+                className="w-full justify-start"
+                onClick={() => navigate('/admin/technician-management')}
               >
-                <Wrench className="w-4 h-4 mr-2" />
-                Tekniker Performance
+                <UserCheck className="w-4 h-4 mr-2" />
+                Hantera tekniker
               </Button>
               <Button 
                 variant="secondary" 
@@ -273,6 +274,15 @@ export default function AdminDashboard() {
               >
                 <DollarSign className="w-4 h-4 mr-2" />
                 Ekonomisk Statistik & ARR
+              </Button>
+              {/* 🔄 FLYTTAD: Tekniker Performance till Avancerad Statistik */}
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
+                onClick={() => navigate('/admin/technicians')}
+              >
+                <Wrench className="w-4 h-4 mr-2" />
+                Tekniker Performance
               </Button>
               <Button 
                 variant="secondary" 

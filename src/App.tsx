@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED TEKNIKER ROUTE
+// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -15,7 +15,8 @@ import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
 import Economics from './pages/admin/Economics'
 import BillingManagement from './pages/admin/BillingManagement'
-import Technicians from './pages/admin/Technicians'  // 🆕 NY TEKNIKER IMPORT
+import Technicians from './pages/admin/Technicians'          // Tekniker Performance/Statistik
+import TechnicianManagement from './pages/admin/TechnicianManagement'  // 🆕 NY TEKNIKER CRUD
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -88,11 +89,21 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* 🔧 TEKNIKER ROUTES - SEPARATA FUNKTIONER */}
             <Route 
               path="/admin/technicians" 
               element={
                 <ProtectedRoute requiredRole="admin">
                   <Technicians />
+                </ProtectedRoute>
+              } 
+            />
+            {/* 🆕 NY ROUTE: Tekniker Management (CRUD) */}
+            <Route 
+              path="/admin/technician-management" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <TechnicianManagement />
                 </ProtectedRoute>
               } 
             />
