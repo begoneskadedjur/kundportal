@@ -1,20 +1,18 @@
-// 📁 src/hooks/useProvisionDashboard.ts - HOOKS FÖR PROVISION SYSTEMET
-import { useState, useEffect, useMemo } from 'react'
+// 📁 src/hooks/useTechnicianDashboard.ts - REN VERSION UTAN DUBBLETTKOD
+import { useState, useEffect } from 'react'
 import { 
-  calculateTechnicianProvisions,
-  getMonthlyProvisionSummary,
-  getProvisionGraphData,
-  getTechnicianProvisionDetails,
-  getProvisionKpiSummary,
-  getProvisionCases,
-  type TechnicianProvision,
-  type MonthlyProvisionSummary,
-  type ProvisionGraphData,
-  type ProvisionCase
-} from '../services/provisionService'
+  getTechnicianKpi,
+  getTechnicianPerformance,
+  getTechnicianMonthlyData,
+  getPestSpecialization,
+  type TechnicianKpi,
+  type TechnicianPerformance,
+  type TechnicianMonthlyData,
+  type PestSpecialization
+} from '../services/technicianAnalyticsService'
 
-// Huvudhook för provision dashboard
-export const useProvisionDashboard = () => {
+// Huvudhook för tekniker dashboard
+export const useTechnicianDashboard = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,7 +20,7 @@ export const useProvisionDashboard = () => {
     setLoading(true)
     setError(null)
     try {
-      // Trigga re-fetch av alla data
+      // Trigger re-fetch av alla data
       await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fel vid uppdatering')
@@ -34,9 +32,9 @@ export const useProvisionDashboard = () => {
   return { loading, error, refetch }
 }
 
-// Hook för provision KPI data
-export const useProvisionKpi = (monthsBack: number = 12) => {
-  const [data, setData] = useState<any>(null)
+// Hook för KPI data
+export const useTechnicianKpi = () => {
+  const [data, setData] = useState<TechnicianKpi | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,15 +43,15 @@ export const useProvisionKpi = (monthsBack: number = 12) => {
       try {
         setLoading(true)
         setError(null)
-        console.log('🔄 Fetching provision KPI data...')
+        console.log('🔄 Fetching technician KPI data...')
         
-        const result = await getProvisionKpiSummary(monthsBack)
+        const result = await getTechnicianKpi()
         setData(result)
         
-        console.log('✅ Provision KPI data loaded successfully')
+        console.log('✅ Technician KPI data loaded successfully')
       } catch (err) {
-        console.error('❌ useProvisionKpi error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av provision KPI')
+        console.error('❌ useTechnicianKpi error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av KPI data')
         setData(null)
       } finally {
         setLoading(false)
@@ -61,14 +59,14 @@ export const useProvisionKpi = (monthsBack: number = 12) => {
     }
 
     fetchData()
-  }, [monthsBack])
+  }, [])
 
   return { data, loading, error }
 }
 
-// Hook för tekniker provisioner
-export const useTechnicianProvisions = (monthsBack: number = 12) => {
-  const [data, setData] = useState<TechnicianProvision[]>([])
+// Hook för tekniker prestanda
+export const useTechnicianPerformance = () => {
+  const [data, setData] = useState<TechnicianPerformance[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,15 +75,47 @@ export const useTechnicianProvisions = (monthsBack: number = 12) => {
       try {
         setLoading(true)
         setError(null)
-        console.log('🔄 Fetching technician provisions...')
+        console.log('🔄 Fetching technician performance data...')
         
-        const result = await calculateTechnicianProvisions(monthsBack)
+        const result = await getTechnicianPerformance()
         setData(Array.isArray(result) ? result : [])
         
-        console.log(`✅ Loaded ${result.length} technician provisions`)
+        console.log(`✅ Loaded ${result.length} technician performance records`)
       } catch (err) {
-        console.error('❌ useTechnicianProvisions error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av tekniker provisioner')
+        console.error('❌ useTechnicianPerformance error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av prestanda data')
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  return { data, loading, error }
+}
+
+// Hook för månadsvis data med period-filtrering
+export const useTechnicianMonthlyData = (monthsBack: number = 12) => {
+  const [data, setData] = useState<TechnicianMonthlyData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        console.log(`🔄 Fetching monthly data for last ${monthsBack} months...`)
+        
+        const result = await getTechnicianMonthlyData(monthsBack)
+        setData(Array.isArray(result) ? result : [])
+        
+        console.log(`✅ Loaded ${result.length} monthly data records`)
+      } catch (err) {
+        console.error('❌ useTechnicianMonthlyData error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av månadsdata')
         setData([])
       } finally {
         setLoading(false)
@@ -98,9 +128,9 @@ export const useTechnicianProvisions = (monthsBack: number = 12) => {
   return { data, loading, error }
 }
 
-// Hook för månadsvis provision sammanfattning
-export const useMonthlyProvisionSummary = (monthsBack: number = 12) => {
-  const [data, setData] = useState<MonthlyProvisionSummary[]>([])
+// Hook för skadedjurs-specialisering
+export const usePestSpecialization = () => {
+  const [data, setData] = useState<PestSpecialization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -109,15 +139,15 @@ export const useMonthlyProvisionSummary = (monthsBack: number = 12) => {
       try {
         setLoading(true)
         setError(null)
-        console.log('🔄 Fetching monthly provision summary...')
+        console.log('🔄 Fetching pest specialization data...')
         
-        const result = await getMonthlyProvisionSummary(monthsBack)
+        const result = await getPestSpecialization()
         setData(Array.isArray(result) ? result : [])
         
-        console.log(`✅ Loaded ${result.length} monthly provision summaries`)
+        console.log(`✅ Loaded ${result.length} pest specialization records`)
       } catch (err) {
-        console.error('❌ useMonthlyProvisionSummary error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av månadsvis provision sammanfattning')
+        console.error('❌ usePestSpecialization error:', err)
+        setError(err instanceof Error ? err.message : 'Fel vid hämtning av specialisering data')
         setData([])
       } finally {
         setLoading(false)
@@ -125,340 +155,43 @@ export const useMonthlyProvisionSummary = (monthsBack: number = 12) => {
     }
 
     fetchData()
-  }, [monthsBack])
+  }, [])
 
   return { data, loading, error }
 }
 
-// Hook för provision graf data med tekniker-filter
-export const useProvisionGraphData = (
-  monthsBack: number = 12, 
-  selectedTechnicians: string[] = []
-) => {
-  const [data, setData] = useState<ProvisionGraphData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+// Kombinerad hook för komplett dashboard data
+export const useCompleteTechnicianDashboard = () => {
+  const kpi = useTechnicianKpi()
+  const performance = useTechnicianPerformance()
+  const monthlyData = useTechnicianMonthlyData(12)
+  const pestData = usePestSpecialization()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        console.log('🔄 Fetching provision graph data...')
-        
-        const result = await getProvisionGraphData(
-          monthsBack, 
-          selectedTechnicians.length > 0 ? selectedTechnicians : undefined
-        )
-        setData(Array.isArray(result) ? result : [])
-        
-        console.log(`✅ Loaded graph data for ${result.length} months`)
-      } catch (err) {
-        console.error('❌ useProvisionGraphData error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av graf data')
-        setData([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [monthsBack, selectedTechnicians])
-
-  return { data, loading, error }
-}
-
-// Hook för enskild tekniker provision detaljer
-export const useTechnicianProvisionDetails = (
-  technicianId: string, 
-  monthsBack: number = 12
-) => {
-  const [data, setData] = useState<TechnicianProvision | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!technicianId) {
-      setData(null)
-      setLoading(false)
-      return
-    }
-
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        console.log(`🔄 Fetching provision details for technician ${technicianId}...`)
-        
-        const result = await getTechnicianProvisionDetails(technicianId, monthsBack)
-        setData(result)
-        
-        console.log('✅ Loaded technician provision details')
-      } catch (err) {
-        console.error('❌ useTechnicianProvisionDetails error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av tekniker detaljer')
-        setData(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [technicianId, monthsBack])
-
-  return { data, loading, error }
-}
-
-// Hook för alla provision ärenden med filter-möjligheter
-export const useProvisionCases = (
-  monthsBack: number = 12,
-  technicianId?: string,
-  filters?: {
-    source?: 'private' | 'business'
-    minAmount?: number
-    maxAmount?: number
-    startDate?: string
-    endDate?: string
-  }
-) => {
-  const [data, setData] = useState<ProvisionCase[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filtrera data baserat på filters
-  const filteredData = useMemo(() => {
-    if (!filters) return data
-
-    return data.filter(case_ => {
-      // Source filter
-      if (filters.source && case_.source !== filters.source) return false
-      
-      // Amount filters
-      if (filters.minAmount !== undefined && (case_.pris || 0) < filters.minAmount) return false
-      if (filters.maxAmount !== undefined && (case_.pris || 0) > filters.maxAmount) return false
-      
-      // Date filters
-      if (filters.startDate && case_.completed_date < filters.startDate) return false
-      if (filters.endDate && case_.completed_date > filters.endDate) return false
-      
-      return true
-    })
-  }, [data, filters])
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        console.log('🔄 Fetching provision cases...')
-        
-        const result = await getProvisionCases(monthsBack, technicianId)
-        setData(Array.isArray(result) ? result : [])
-        
-        console.log(`✅ Loaded ${result.length} provision cases`)
-      } catch (err) {
-        console.error('❌ useProvisionCases error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av provision ärenden')
-        setData([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [monthsBack, technicianId])
-
-  return { 
-    data: filteredData, 
-    rawData: data,
-    loading, 
-    error,
-    totalCases: filteredData.length,
-    totalRevenue: filteredData.reduce((sum, c) => sum + (c.pris || 0), 0),
-    totalProvision: filteredData.reduce((sum, c) => sum + ((c.pris || 0) * 0.05), 0)
-  }
-}
-
-// Hook för komplett provision dashboard data
-export const useCompleteProvisionDashboard = (monthsBack: number = 12) => {
-  const kpi = useProvisionKpi(monthsBack)
-  const technicianProvisions = useTechnicianProvisions(monthsBack)
-  const monthlySummary = useMonthlyProvisionSummary(monthsBack)
-  const graphData = useProvisionGraphData(monthsBack)
-
-  const loading = kpi.loading || technicianProvisions.loading || monthlySummary.loading || graphData.loading
-  const error = kpi.error || technicianProvisions.error || monthlySummary.error || graphData.error
-
-  // Beräkna ytterligare insights
-  const insights = useMemo(() => {
-    if (!technicianProvisions.data.length || !monthlySummary.data.length) {
-      return null
-    }
-
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const lastMonth = new Date()
-    lastMonth.setMonth(lastMonth.getMonth() - 1)
-    const lastMonthKey = lastMonth.toISOString().slice(0, 7)
-
-    const currentMonthSummary = monthlySummary.data.find(m => m.month === currentMonth)
-    const lastMonthSummary = monthlySummary.data.find(m => m.month === lastMonthKey)
-
-    const monthOverMonthChange = lastMonthSummary && lastMonthSummary.total_provision > 0
-      ? ((currentMonthSummary?.total_provision || 0) - lastMonthSummary.total_provision) / lastMonthSummary.total_provision * 100
-      : 0
-
-    // Topp 3 tekniker
-    const topTechnicians = technicianProvisions.data
-      .slice(0, 3)
-      .map(t => ({
-        name: t.technician_name,
-        provision: t.total_provision_amount,
-        cases: t.total_cases
-      }))
-
-    // Månad med högst provision
-    const bestMonth = monthlySummary.data
-      .reduce((best, current) => 
-        (current.total_provision > (best?.total_provision || 0)) ? current : best, 
-        monthlySummary.data[0]
-      )
-
-    return {
-      monthOverMonthChange,
-      topTechnicians,
-      bestMonth: bestMonth ? {
-        month: bestMonth.month,
-        provision: bestMonth.total_provision,
-        cases: bestMonth.total_cases
-      } : null,
-      averageProvisionPerCase: kpi.data?.total_revenue_ytd && kpi.data.total_revenue_ytd > 0
-        ? (kpi.data.total_provision_ytd / kpi.data.total_revenue_ytd) * 100
-        : 0
-    }
-  }, [technicianProvisions.data, monthlySummary.data, kpi.data])
+  const loading = kpi.loading || performance.loading || monthlyData.loading || pestData.loading
+  const error = kpi.error || performance.error || monthlyData.error || pestData.error
 
   return {
     kpi: kpi.data,
-    technicianProvisions: technicianProvisions.data,
-    monthlySummary: monthlySummary.data,
-    graphData: graphData.data,
-    insights,
+    performance: performance.data,
+    monthlyData: monthlyData.data,
+    pestSpecialization: pestData.data,
     loading,
     error
   }
 }
 
-// Hook för tekniker-lista med provision info
-export const useTechniciansList = () => {
-  const [technicians, setTechnicians] = useState<Array<{
-    id: string
-    name: string
-    email: string | null
-    is_active: boolean
-  }>>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+// Hook för individuell tekniker-analys
+export const useIndividualTechnician = (technicianName: string) => {
+  const { performance, monthlyData, pestSpecialization } = useCompleteTechnicianDashboard()
+  
+  const technicianPerformance = performance.find(t => t.name === technicianName)
+  const technicianMonthlyData = monthlyData.filter(m => m.technician_name === technicianName)
+  const technicianPestData = pestSpecialization.filter(p => p.technician_name === technicianName)
 
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        
-        // Importera supabase direkt här för att undvika cirkelberoende
-        const { supabase } = await import('../lib/supabase')
-        
-        const { data, error: fetchError } = await supabase
-          .from('technicians')
-          .select('id, name, email, is_active')
-          .eq('is_active', true)
-          .order('name')
-
-        if (fetchError) throw fetchError
-
-        setTechnicians(data || [])
-        console.log(`✅ Loaded ${data?.length || 0} active technicians`)
-      } catch (err) {
-        console.error('❌ useTechniciansList error:', err)
-        setError(err instanceof Error ? err.message : 'Fel vid hämtning av tekniker-lista')
-        setTechnicians([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTechnicians()
-  }, [])
-
-  return { data: technicians, loading, error }
-}
-
-// Hook för provision statistics och trends
-export const useProvisionStatistics = (monthsBack: number = 12) => {
-  const { monthlySummary, technicianProvisions } = useCompleteProvisionDashboard(monthsBack)
-
-  const statistics = useMemo(() => {
-    if (!monthlySummary.length || !technicianProvisions.length) {
-      return null
-    }
-
-    // Beräkna trends
-    const recentMonths = monthlySummary.slice(-6) // Senaste 6 månaderna
-    const provisionTrend = recentMonths.map(m => m.total_provision)
-    
-    // Enkel trend-beräkning (stigande/fallande)
-    const isIncreasing = provisionTrend.length >= 2 && 
-      provisionTrend[provisionTrend.length - 1] > provisionTrend[provisionTrend.length - 2]
-
-    // Genomsnittlig provision per månad
-    const averageMonthlyProvision = monthlySummary.length > 0
-      ? monthlySummary.reduce((sum, m) => sum + m.total_provision, 0) / monthlySummary.length
-      : 0
-
-    // Tekniker med högst variation i provision
-    const technicianVariations = technicianProvisions.map(tech => {
-      const monthlyAmounts = tech.monthly_breakdown.map(m => m.provision_amount)
-      const average = monthlyAmounts.reduce((sum, a) => sum + a, 0) / monthlyAmounts.length
-      const variance = monthlyAmounts.reduce((sum, a) => sum + Math.pow(a - average, 2), 0) / monthlyAmounts.length
-      
-      return {
-        name: tech.technician_name,
-        variance: Math.sqrt(variance),
-        average
-      }
-    }).sort((a, b) => b.variance - a.variance)
-
-    // Säsongsanalys
-    const monthlyAverages = new Array(12).fill(0)
-    const monthlyCounts = new Array(12).fill(0)
-    
-    monthlySummary.forEach(m => {
-      const monthIndex = parseInt(m.month.split('-')[1]) - 1
-      monthlyAverages[monthIndex] += m.total_provision
-      monthlyCounts[monthIndex]++
-    })
-
-    const seasonalData = monthlyAverages.map((total, index) => ({
-      month: index + 1,
-      averageProvision: monthlyCounts[index] > 0 ? total / monthlyCounts[index] : 0
-    }))
-
-    return {
-      trend: {
-        isIncreasing,
-        direction: isIncreasing ? 'up' : 'down',
-        recentMonths: provisionTrend
-      },
-      averageMonthlyProvision,
-      mostVariableTechnicians: technicianVariations.slice(0, 3),
-      seasonalData,
-      totalUniqueMonths: monthlySummary.length,
-      consistency: {
-        mostConsistent: technicianVariations[technicianVariations.length - 1],
-        leastConsistent: technicianVariations[0]
-      }
-    }
-  }, [monthlySummary, technicianProvisions])
-
-  return statistics
+  return {
+    performance: technicianPerformance,
+    monthlyData: technicianMonthlyData,
+    pestSpecialization: technicianPestData,
+    isValid: !!technicianPerformance
+  }
 }

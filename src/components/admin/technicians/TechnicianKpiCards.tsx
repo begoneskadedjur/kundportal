@@ -1,56 +1,19 @@
-// 📁 src/components/admin/technicians/TechnicianKpiCards.tsx - TEKNIKER KPI CARDS MED KORREKT IMPORT
+// 📁 src/components/admin/technicians/TechnicianKpiCards.tsx - KPI CARDS MED VERKLIG DATA
 import React from 'react'
 import { Users, DollarSign, TrendingUp, Target, AlertTriangle, Wrench } from 'lucide-react'
 import Card from '../../ui/Card'
-// ✅ FIXED: Korrigerad import från provision hooks istället för tekniker dashboard
-import { useTechnicianProvisions } from '../../../hooks/useProvisionDashboard'
+import { useTechnicianKpi } from '../../../hooks/useTechnicianDashboard'
 import { formatCurrency, formatNumber } from '../../../utils/formatters'
 
-interface TechnicianKpiCardsProps {
-  monthsBack?: number
-}
-
-const TechnicianKpiCards: React.FC<TechnicianKpiCardsProps> = ({ monthsBack = 12 }) => {
-  // ✅ FIXED: Använd provision hooks istället för saknad useTechnicianKpi
-  const { data: technicianProvisions, loading, error } = useTechnicianProvisions(monthsBack)
-
-  // Beräkna KPI från provision data
-  const kpiData = React.useMemo(() => {
-    if (!technicianProvisions.length) return null
-
-    const totalTechnicians = technicianProvisions.length
-    const activeTechnicians = technicianProvisions.filter(t => t.total_cases > 0).length
-    const totalProvision = technicianProvisions.reduce((sum, t) => sum + t.total_provision_amount, 0)
-    const totalRevenue = technicianProvisions.reduce((sum, t) => sum + t.total_revenue, 0)
-    const totalCases = technicianProvisions.reduce((sum, t) => sum + t.total_cases, 0)
-    const avgProvisionPerTechnician = activeTechnicians > 0 ? totalProvision / activeTechnicians : 0
-    const avgCasesPerTechnician = activeTechnicians > 0 ? totalCases / activeTechnicians : 0
-    
-    // Topp presterare
-    const topPerformer = technicianProvisions[0] // Already sorted by provision amount
-
-    return {
-      totalTechnicians,
-      activeTechnicians,
-      totalProvision,
-      totalRevenue,
-      totalCases,
-      avgProvisionPerTechnician,
-      avgCasesPerTechnician,
-      topPerformer: topPerformer ? {
-        name: topPerformer.technician_name,
-        provision: topPerformer.total_provision_amount,
-        cases: topPerformer.total_cases
-      } : null
-    }
-  }, [technicianProvisions])
+const TechnicianKpiCards: React.FC = () => {
+  const { data: kpiData, loading, error } = useTechnicianKpi()
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        {[...Array(6)].map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <div className="h-20 bg-gray-200 rounded"></div>
+            <div className="h-24 bg-slate-700 rounded"></div>
           </Card>
         ))}
       </div>
@@ -62,118 +25,107 @@ const TechnicianKpiCards: React.FC<TechnicianKpiCardsProps> = ({ monthsBack = 12
       <Card className="p-6">
         <div className="flex items-center text-red-400">
           <AlertTriangle className="w-5 h-5 mr-2" />
-          <span>Fel vid laddning av tekniker data: {error}</span>
+          <span>Fel vid laddning av tekniker KPI: {error}</span>
         </div>
       </Card>
     )
   }
 
-  if (!kpiData) {
-    return (
-      <Card className="p-6">
-        <div className="text-center text-gray-500">
-          Ingen tekniker data tillgänglig
-        </div>
-      </Card>
-    )
-  }
+  if (!kpiData) return null
 
   const kpiCards = [
     {
       title: 'Aktiva Tekniker',
-      value: `${kpiData.activeTechnicians}/${kpiData.totalTechnicians}`,
-      description: 'Tekniker med provision ärenden',
+      value: kpiData.active_technicians.toString(),
+      description: `${kpiData.total_technicians} totalt registrerade`,
       icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50'
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/20',
+      trend: kpiData.active_technicians === kpiData.total_technicians ? 'Alla aktiva' : `${kpiData.total_technicians - kpiData.active_technicians} inaktiva`
     },
     {
-      title: 'Total Provision',
-      value: formatCurrency(kpiData.totalProvision),
-      description: `${monthsBack} månader`,
+      title: 'Total Intäkt YTD',
+      value: formatCurrency(kpiData.total_revenue_ytd),
+      description: 'Alla avslutade ärenden i år',
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50'
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/20',
+      trend: `${formatNumber(kpiData.total_cases_ytd)} ärenden`
     },
     {
-      title: 'Snitt Provision/Tekniker',
-      value: formatCurrency(kpiData.avgProvisionPerTechnician),
-      description: 'Genomsnitt per aktiv tekniker',
+      title: 'Genomsnitt/Tekniker',
+      value: formatCurrency(kpiData.avg_revenue_per_technician),
+      description: 'Intäkt per aktiv tekniker YTD',
+      icon: TrendingUp,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/20',
+      trend: `${formatNumber(kpiData.avg_cases_per_technician)} ärenden/tekniker`
+    },
+    {
+      title: 'Genomsnitt/Ärende',
+      value: formatCurrency(kpiData.avg_case_value_all),
+      description: 'Alla avslutade ärenden YTD',
       icon: Target,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/20',
+      trend: 'Över alla affärstyper'
     },
     {
-      title: 'Snitt Ärenden/Tekniker',
-      value: formatNumber(kpiData.avgCasesPerTechnician, 1),
-      description: 'Genomsnitt per aktiv tekniker',
+      title: 'Totala Ärenden YTD',
+      value: formatNumber(kpiData.total_cases_ytd),
+      description: 'Avslutade ärenden i år',
       icon: Wrench,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50'
+      color: 'text-cyan-500',
+      bgColor: 'bg-cyan-500/20',
+      trend: kpiData.active_technicians > 0 
+        ? `${Math.round(kpiData.total_cases_ytd / kpiData.active_technicians)} per tekniker`
+        : 'Ingen data'
+    },
+    {
+      title: 'Produktivitet',
+      value: kpiData.active_technicians > 0 && kpiData.total_cases_ytd > 0
+        ? `${Math.round((kpiData.total_cases_ytd / kpiData.active_technicians) * 12 / new Date().getMonth() || 1)}`
+        : '0',
+      description: 'Uppskattat ärenden/år/tekniker',
+      icon: TrendingUp,
+      color: 'text-pink-500',
+      bgColor: 'bg-pink-500/20',
+      trend: 'Baserat på YTD-trend'
     }
   ]
 
   return (
-    <div className="space-y-6">
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpiCards.map((card, index) => {
-          const Icon = card.icon
-          return (
-            <Card key={index} className="relative overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                    <Icon className={`h-5 w-5 ${card.color}`} />
-                  </div>
-                </div>
-                
-                <div className="mb-2">
-                  <p className={`text-2xl font-bold ${card.color}`}>
-                    {card.value}
-                  </p>
-                </div>
-                
-                <div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">
-                    {card.title}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {card.description}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Top Performer Highlight */}
-      {kpiData.topPerformer && (
-        <Card>
-          <div className="p-6">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <TrendingUp className="h-5 w-5" />
-              Topp Presterare - {monthsBack} månader
-            </h3>
-            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-gray-900 text-lg">
-                    🏆 {kpiData.topPerformer.name}
-                  </h4>
-                  <div className="mt-2 space-y-1 text-sm text-gray-600">
-                    <div>Provision: <span className="font-semibold text-green-600">{formatCurrency(kpiData.topPerformer.provision)}</span></div>
-                    <div>Ärenden: <span className="font-semibold">{kpiData.topPerformer.cases} st</span></div>
-                    <div>Snitt/ärende: <span className="font-semibold">{formatCurrency(kpiData.topPerformer.provision / kpiData.topPerformer.cases)}</span></div>
-                  </div>
-                </div>
-                <div className="text-4xl">🥇</div>
-              </div>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {kpiCards.map((card, index) => (
+        <Card 
+          key={index} 
+          className="relative overflow-hidden hover:scale-105 transition-transform duration-300"
+        >
+          <div className="p-4">
+            {/* Icon - mindre */}
+            <div className={`w-8 h-8 ${card.bgColor} rounded-lg flex items-center justify-center mb-3`}>
+              <card.icon className={`w-4 h-4 ${card.color}`} />
             </div>
+
+            {/* Värde - mindre text */}
+            <div className="mb-2">
+              <h3 className="text-lg font-bold text-white leading-tight">{card.value}</h3>
+              <p className="text-xs font-medium text-slate-300 leading-tight">{card.title}</p>
+            </div>
+
+            {/* Beskrivning - mindre text */}
+            <p className="text-xs text-slate-400 mb-1 line-clamp-2">{card.description}</p>
+
+            {/* Trend - mindre text */}
+            <div className="flex items-center">
+              <span className="text-xs text-slate-500 line-clamp-1">{card.trend}</span>
+            </div>
+
+            {/* Gradient overlay - mindre */}
+            <div className={`absolute top-0 right-0 w-12 h-12 ${card.bgColor} rounded-full blur-xl opacity-20 -translate-y-6 translate-x-6`}></div>
           </div>
         </Card>
-      )}
+      ))}
     </div>
   )
 }

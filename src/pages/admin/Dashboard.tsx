@@ -1,4 +1,4 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR & PROVISIONS
+// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
                 <Users className="w-4 h-4 mr-2" />
                 Hantera kunder
               </Button>
-              {/* Hantera tekniker (CRUD) */}
+              {/* 🆕 NY KNAPP: Hantera tekniker (CRUD) */}
               <Button 
                 variant="secondary" 
                 className="w-full justify-start"
@@ -260,15 +260,6 @@ export default function AdminDashboard() {
                 <FileText className="w-4 h-4 mr-2" />
                 Fakturering
               </Button>
-              {/* 🆕 NY KNAPP: Provisioner (EFTER fakturering) */}
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 hover:from-green-500/20 hover:to-emerald-500/20"
-                onClick={() => navigate('/admin/provisions')}
-              >
-                <DollarSign className="w-4 h-4 mr-2" />
-                Provisioner
-              </Button>
             </div>
           </Card>
 
@@ -284,7 +275,7 @@ export default function AdminDashboard() {
                 <DollarSign className="w-4 h-4 mr-2" />
                 Ekonomisk Statistik & ARR
               </Button>
-              {/* Tekniker Performance till Avancerad Statistik */}
+              {/* 🔄 FLYTTAD: Tekniker Performance till Avancerad Statistik */}
               <Button 
                 variant="secondary" 
                 className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
