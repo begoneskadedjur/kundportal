@@ -6,7 +6,7 @@ import {
   useTechniciansList 
 } from '../../hooks/useProvisionDashboard'
 import TechnicianProvisionDetails from '../../components/admin/technicians/TechnicianProvisionDetails'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Card from '../../components/ui/Card'
 import { TrendingUp, TrendingDown, Users, DollarSign, Calendar, Trophy, Briefcase, Target } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts'
 
@@ -17,13 +17,13 @@ const ProvisionKpiCards: React.FC<{ kpiData: any; loading: boolean }> = ({ kpiDa
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <CardHeader className="pb-2">
+            <div className="pb-2">
               <div className="h-4 bg-gray-200 rounded w-24"></div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
               <div className="h-3 bg-gray-200 rounded w-20"></div>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
@@ -83,17 +83,17 @@ const ProvisionKpiCards: React.FC<{ kpiData: any; loading: boolean }> = ({ kpiDa
         const Icon = kpi.icon
         return (
           <Card key={index} className="relative overflow-hidden">
-            <CardHeader className="pb-2">
+            <div className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600">
+                <h3 className="text-sm font-medium text-gray-600">
                   {kpi.title}
-                </CardTitle>
+                </h3>
                 <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
                   <Icon className={`h-4 w-4 ${kpi.color}`} />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className="text-2xl font-bold text-gray-900 mb-1">
                 {formatValue(kpi.value, kpi.format)}
               </div>
@@ -102,7 +102,7 @@ const ProvisionKpiCards: React.FC<{ kpiData: any; loading: boolean }> = ({ kpiDa
                   Topp: {kpiData.top_earner.name} ({formatValue(kpiData.top_earner.amount, 'currency')})
                 </p>
               )}
-            </CardContent>
+            </div>
           </Card>
         )
       })}
@@ -223,13 +223,13 @@ const ProvisionChart: React.FC<{
 
   return (
     <Card className="mb-8">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
           <TrendingUp className="h-5 w-5" />
           Provision Utveckling
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h2>
+      </div>
+      <div>
         <div className="h-96 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -302,7 +302,7 @@ const ProvisionChart: React.FC<{
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </CardContent>
+      </div>
     </Card>
   )
 }
@@ -333,13 +333,13 @@ const TechnicianRankingTable: React.FC<{
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
           <Trophy className="h-5 w-5" />
           Tekniker Ranking - Provision
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h2>
+      </div>
+      <div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -402,7 +402,7 @@ const TechnicianRankingTable: React.FC<{
             </tbody>
           </table>
         </div>
-      </CardContent>
+      </div>
     </Card>
   )
 }
@@ -546,13 +546,13 @@ const Provisions: React.FC = () => {
 
         {/* Monthly Summary */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <Briefcase className="h-5 w-5" />
               Månadsvis Sammanfattning
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div>
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -605,19 +605,51 @@ const Provisions: React.FC = () => {
                 Ingen månadsdata tillgänglig
               </div>
             )}
+          </div>
+        </Card>{month.total_provision.toLocaleString('sv-SE')} kr
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Ärenden:</span>
+                        <span>{month.total_cases} st</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Intäkt:</span>
+                        <span>{month.total_revenue.toLocaleString('sv-SE')} kr</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tekniker:</span>
+                        <span>{month.technician_count} st</span>
+                      </div>
+                      {month.top_earner && (
+                        <div className="flex justify-between">
+                          <span>Topp:</span>
+                          <span className="font-medium">{month.top_earner.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Ingen månadsdata tillgänglig
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Provision Breakdown Chart */}
       <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <BarChart className="h-5 w-5" />
             Provision Fördelning - Privatpersoner vs Företag
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </h2>
+        </div>
+        <div>
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="animate-pulse text-gray-500">Laddar chart data...</div>
@@ -678,19 +710,19 @@ const Provisions: React.FC = () => {
               Ingen data tillgänglig för chart
             </div>
           )}
-        </CardContent>
+        </div>
       </Card>
 
       {/* Top Performers Highlight */}
       {insights && insights.topTechnicians.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <Trophy className="h-5 w-5" />
               Topp Presterare - Period
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {insights.topTechnicians.map((tech, index) => {
                 const medals = ['🥇', '🥈', '🥉']
@@ -723,7 +755,7 @@ const Provisions: React.FC = () => {
                 )
               })}
             </div>
-          </CardContent>
+          </div>
         </Card>
       )}
 

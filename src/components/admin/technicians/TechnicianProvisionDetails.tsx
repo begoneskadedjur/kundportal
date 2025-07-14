@@ -4,7 +4,7 @@ import {
   useTechnicianProvisionDetails, 
   useProvisionCases 
 } from '../../../hooks/useProvisionDashboard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Card from '../../../components/ui/Card'
 import { 
   X, User, DollarSign, Briefcase, Calendar, MapPin, Phone, Mail, 
   ExternalLink, Filter, Search, ChevronDown, ChevronUp, Star, Trophy,
@@ -195,7 +195,7 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
               {kpis && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card>
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-green-100 rounded-lg">
                           <DollarSign className="h-5 w-5 text-green-600" />
@@ -208,11 +208,11 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                           <p className="text-xs text-gray-500">5% av ärendebelopp</p>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </Card>
 
                   <Card>
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-100 rounded-lg">
                           <Briefcase className="h-5 w-5 text-blue-600" />
@@ -223,11 +223,11 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                           <p className="text-xs text-gray-500">Som huvudtekniker</p>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </Card>
 
                   <Card>
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-purple-100 rounded-lg">
                           <Target className="h-5 w-5 text-purple-600" />
@@ -240,11 +240,11 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                           <p className="text-xs text-gray-500">Genomsnittlig provision</p>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </Card>
 
                   <Card>
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-orange-100 rounded-lg">
                           <Trophy className="h-5 w-5 text-orange-600" />
@@ -257,7 +257,7 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                           <p className="text-xs text-gray-500">Ärendeomsättning</p>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </Card>
                 </div>
               )}
@@ -265,13 +265,13 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
               {/* Månadsvis Trend Chart */}
               {technicianDetails && technicianDetails.monthly_breakdown.length > 0 && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                  <div>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
                       <TrendingUp className="h-5 w-5" />
                       Månadsvis Provision Trend
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                    </h2>
+                  </div>
+                  <div>
                     <div className="h-64 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={technicianDetails.monthly_breakdown}>
@@ -309,13 +309,13 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               )}
 
               {/* Filters och Search */}
               <Card>
-                <CardContent className="p-4">
+                <div className="p-4">
                   <div className="flex flex-wrap gap-4 items-center">
                     {/* Search */}
                     <div className="flex-1 min-w-64">
@@ -355,6 +355,27 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                       <option value="date-desc">Datum (senaste först)</option>
                       <option value="date-asc">Datum (äldsta först)</option>
                       <option value="amount-desc">Belopp (högst först)</option>
+                      <option value="amount-asc">Belopp (lägst först)</option>
+                      <option value="provision-desc">Provision (högst först)</option>
+                      <option value="provision-asc">Provision (lägst först)</option>
+                    </select>
+
+                    <div className="text-sm text-gray-600">
+                      {filteredAndSortedCases.length} av {casesWithProvision.length} ärenden
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Cases Table */}
+              <Card>
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
+                    <Briefcase className="h-5 w-5" />
+                    Provision Ärenden (Endast Primär Tekniker)
+                  </h2>
+                </div>
+                <div> value="amount-desc">Belopp (högst först)</option>
                       <option value="amount-asc">Belopp (lägst först)</option>
                       <option value="provision-desc">Provision (högst först)</option>
                       <option value="provision-asc">Provision (lägst först)</option>
