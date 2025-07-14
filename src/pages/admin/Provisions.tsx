@@ -17,13 +17,9 @@ const ProvisionKpiCards: React.FC<{ kpiData: any; loading: boolean }> = ({ kpiDa
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <div className="pb-2">
-              <div className="h-4 bg-gray-200 rounded w-24"></div>
-            </div>
-            <div>
-              <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-20"></div>
-            </div>
+            <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+            <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-20"></div>
           </Card>
         ))}
       </div>
@@ -83,26 +79,22 @@ const ProvisionKpiCards: React.FC<{ kpiData: any; loading: boolean }> = ({ kpiDa
         const Icon = kpi.icon
         return (
           <Card key={index} className="relative overflow-hidden">
-            <div className="pb-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-600">
-                  {kpi.title}
-                </h3>
-                <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                  <Icon className={`h-4 w-4 ${kpi.color}`} />
-                </div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">
+                {kpi.title}
+              </h3>
+              <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
+                <Icon className={`h-4 w-4 ${kpi.color}`} />
               </div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">
-                {formatValue(kpi.value, kpi.format)}
-              </div>
-              {kpi.title === 'Total Provision YTD' && kpiData.top_earner && (
-                <p className="text-xs text-gray-500">
-                  Topp: {kpiData.top_earner.name} ({formatValue(kpiData.top_earner.amount, 'currency')})
-                </p>
-              )}
+            <div className="text-2xl font-bold text-gray-900 mb-1">
+              {formatValue(kpi.value, kpi.format)}
             </div>
+            {kpi.title === 'Total Provision YTD' && kpiData.top_earner && (
+              <p className="text-xs text-gray-500">
+                Topp: {kpiData.top_earner.name} ({formatValue(kpiData.top_earner.amount, 'currency')})
+              </p>
+            )}
           </Card>
         )
       })}
@@ -206,13 +198,11 @@ const ProvisionChart: React.FC<{
   if (!chartData.length) {
     return (
       <Card className="mb-8">
-        <div>
+        <div className="p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <TrendingUp className="h-5 w-5" />
             Provision Utveckling
           </h2>
-        </div>
-        <div>
           <div className="h-64 flex items-center justify-center text-gray-500">
             Ingen data tillgänglig
           </div>
@@ -223,13 +213,11 @@ const ProvisionChart: React.FC<{
 
   return (
     <Card className="mb-8">
-      <div>
+      <div className="p-6">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
           <TrendingUp className="h-5 w-5" />
           Provision Utveckling
         </h2>
-      </div>
-      <div>
         <div className="h-96 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -316,13 +304,11 @@ const TechnicianRankingTable: React.FC<{
   if (!technicianProvisions.length) {
     return (
       <Card>
-        <div>
+        <div className="p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <Trophy className="h-5 w-5" />
             Tekniker Ranking
           </h2>
-        </div>
-        <div>
           <div className="text-center py-8 text-gray-500">
             Ingen data tillgänglig
           </div>
@@ -333,13 +319,11 @@ const TechnicianRankingTable: React.FC<{
 
   return (
     <Card>
-      <div>
+      <div className="p-6">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
           <Trophy className="h-5 w-5" />
           Tekniker Ranking - Provision
         </h2>
-      </div>
-      <div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -546,13 +530,11 @@ const Provisions: React.FC = () => {
 
         {/* Monthly Summary */}
         <Card>
-          <div>
+          <div className="p-6">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <Briefcase className="h-5 w-5" />
               Månadsvis Sammanfattning
             </h2>
-          </div>
-          <div>
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -611,13 +593,11 @@ const Provisions: React.FC = () => {
 
       {/* Provision Breakdown Chart */}
       <Card className="mb-8">
-        <div>
+        <div className="p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <BarChart className="h-5 w-5" />
             Provision Fördelning - Privatpersoner vs Företag
           </h2>
-        </div>
-        <div>
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="animate-pulse text-gray-500">Laddar chart data...</div>
@@ -684,13 +664,11 @@ const Provisions: React.FC = () => {
       {/* Top Performers Highlight */}
       {insights && insights.topTechnicians.length > 0 && (
         <Card>
-          <div>
+          <div className="p-6">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <Trophy className="h-5 w-5" />
               Topp Presterare - Period
             </h2>
-          </div>
-          <div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {insights.topTechnicians.map((tech, index) => {
                 const medals = ['🥇', '🥈', '🥉']

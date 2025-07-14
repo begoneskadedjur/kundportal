@@ -4,7 +4,7 @@ import {
   useTechnicianProvisionDetails, 
   useProvisionCases 
 } from '../../../hooks/useProvisionDashboard'
-import Card from '../../../components/ui/Card'
+import Card from '../../ui/Card'
 import { 
   X, User, DollarSign, Briefcase, Calendar, MapPin, Phone, Mail, 
   ExternalLink, Filter, Search, ChevronDown, ChevronUp, Star, Trophy,
@@ -195,67 +195,59 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
               {kpis && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card>
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                          <DollarSign className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Total Provision</p>
-                          <p className="text-xl font-bold text-gray-900">
-                            {kpis.totalProvision.toLocaleString('sv-SE')} kr
-                          </p>
-                          <p className="text-xs text-gray-500">5% av ärendebelopp</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Provision</p>
+                        <p className="text-xl font-bold text-gray-900">
+                          {kpis.totalProvision.toLocaleString('sv-SE')} kr
+                        </p>
+                        <p className="text-xs text-gray-500">5% av ärendebelopp</p>
                       </div>
                     </div>
                   </Card>
 
                   <Card>
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <Briefcase className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Ärenden (Primär)</p>
-                          <p className="text-xl font-bold text-gray-900">{kpis.totalCases}</p>
-                          <p className="text-xs text-gray-500">Som huvudtekniker</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Briefcase className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Ärenden (Primär)</p>
+                        <p className="text-xl font-bold text-gray-900">{kpis.totalCases}</p>
+                        <p className="text-xs text-gray-500">Som huvudtekniker</p>
                       </div>
                     </div>
                   </Card>
 
                   <Card>
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                          <Target className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Snitt/Ärende</p>
-                          <p className="text-xl font-bold text-gray-900">
-                            {kpis.avgProvisionPerCase.toLocaleString('sv-SE', { maximumFractionDigits: 0 })} kr
-                          </p>
-                          <p className="text-xs text-gray-500">Genomsnittlig provision</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Target className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Snitt/Ärende</p>
+                        <p className="text-xl font-bold text-gray-900">
+                          {kpis.avgProvisionPerCase.toLocaleString('sv-SE', { maximumFractionDigits: 0 })} kr
+                        </p>
+                        <p className="text-xs text-gray-500">Genomsnittlig provision</p>
                       </div>
                     </div>
                   </Card>
 
                   <Card>
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-orange-100 rounded-lg">
-                          <Trophy className="h-5 w-5 text-orange-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Total Intäkt</p>
-                          <p className="text-xl font-bold text-gray-900">
-                            {kpis.totalRevenue.toLocaleString('sv-SE')} kr
-                          </p>
-                          <p className="text-xs text-gray-500">Ärendeomsättning</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Trophy className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Intäkt</p>
+                        <p className="text-xl font-bold text-gray-900">
+                          {kpis.totalRevenue.toLocaleString('sv-SE')} kr
+                        </p>
+                        <p className="text-xs text-gray-500">Ärendeomsättning</p>
                       </div>
                     </div>
                   </Card>
@@ -265,13 +257,11 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
               {/* Månadsvis Trend Chart */}
               {technicianDetails && technicianDetails.monthly_breakdown.length > 0 && (
                 <Card>
-                  <div>
+                  <div className="p-6">
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
                       <TrendingUp className="h-5 w-5" />
                       Månadsvis Provision Trend
                     </h2>
-                  </div>
-                  <div>
                     <div className="h-64 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={technicianDetails.monthly_breakdown}>
@@ -315,88 +305,63 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
 
               {/* Filters och Search */}
               <Card>
-                <div className="p-4">
-                  <div className="flex flex-wrap gap-4 items-center">
-                    {/* Search */}
-                    <div className="flex-1 min-w-64">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Sök ärenden, kunder, skadedjur..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                <div className="flex flex-wrap gap-4 items-center">
+                  {/* Search */}
+                  <div className="flex-1 min-w-64">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Sök ärenden, kunder, skadedjur..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
+                  </div>
 
-                    {/* Source Filter */}
-                    <select
-                      value={sourceFilter}
-                      onChange={(e) => setSourceFilter(e.target.value as any)}
-                      className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Alla källor</option>
-                      <option value="private">Privatpersoner</option>
-                      <option value="business">Företag</option>
-                    </select>
+                  {/* Source Filter */}
+                  <select
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value as any)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Alla källor</option>
+                    <option value="private">Privatpersoner</option>
+                    <option value="business">Företag</option>
+                  </select>
 
-                    {/* Sort */}
-                    <select
-                      value={`${sortBy}-${sortOrder}`}
-                      onChange={(e) => {
-                        const [newSortBy, newSortOrder] = e.target.value.split('-')
-                        setSortBy(newSortBy as any)
-                        setSortOrder(newSortOrder as any)
-                      }}
-                      className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="date-desc">Datum (senaste först)</option>
-                      <option value="date-asc">Datum (äldsta först)</option>
-                      <option value="amount-desc">Belopp (högst först)</option>
-                      <option value="amount-asc">Belopp (lägst först)</option>
-                      <option value="provision-desc">Provision (högst först)</option>
-                      <option value="provision-asc">Provision (lägst först)</option>
-                    </select>
+                  {/* Sort */}
+                  <select
+                    value={`${sortBy}-${sortOrder}`}
+                    onChange={(e) => {
+                      const [newSortBy, newSortOrder] = e.target.value.split('-')
+                      setSortBy(newSortBy as any)
+                      setSortOrder(newSortOrder as any)
+                    }}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="date-desc">Datum (senaste först)</option>
+                    <option value="date-asc">Datum (äldsta först)</option>
+                    <option value="amount-desc">Belopp (högst först)</option>
+                    <option value="amount-asc">Belopp (lägst först)</option>
+                    <option value="provision-desc">Provision (högst först)</option>
+                    <option value="provision-asc">Provision (lägst först)</option>
+                  </select>
 
-                    <div className="text-sm text-gray-600">
-                      {filteredAndSortedCases.length} av {casesWithProvision.length} ärenden
-                    </div>
+                  <div className="text-sm text-gray-600">
+                    {filteredAndSortedCases.length} av {casesWithProvision.length} ärenden
                   </div>
                 </div>
               </Card>
 
               {/* Cases Table */}
               <Card>
-                <div>
+                <div className="p-6">
                   <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
                     <Briefcase className="h-5 w-5" />
                     Provision Ärenden (Endast Primär Tekniker)
                   </h2>
-                </div>
-                <div> value="amount-desc">Belopp (högst först)</option>
-                      <option value="amount-asc">Belopp (lägst först)</option>
-                      <option value="provision-desc">Provision (högst först)</option>
-                      <option value="provision-asc">Provision (lägst först)</option>
-                    </select>
-
-                    <div className="text-sm text-gray-600">
-                      {filteredAndSortedCases.length} av {casesWithProvision.length} ärenden
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Cases Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    Provision Ärenden (Endast Primär Tekniker)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
                   {filteredAndSortedCases.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       Inga ärenden hittades med aktuella filter
@@ -558,104 +523,99 @@ const TechnicianProvisionDetails: React.FC<TechnicianProvisionDetailsProps> = ({
                       </table>
                     </div>
                   )}
-                </CardContent>
+                </div>
               </Card>
 
               {/* Summary Stats - Uppdaterad utan rollfördelning */}
               {kpis && (
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
-                  {/* Källa fördelning */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="h-5 w-5" />
-                        Provision Analys - Källa Fördelning
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-purple-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium text-purple-800">Privatpersoner</span>
-                            <span className="font-semibold">{kpis.sourceBreakdown.private.length} ärenden</span>
-                          </div>
-                          <div className="text-sm text-gray-600 space-y-2">
-                            <div className="flex justify-between">
-                              <span>Total provision:</span>
-                              <span className="font-medium text-green-600">
-                                {kpis.sourceBreakdown.private
-                                  .reduce((sum, c) => sum + c.provision_amount, 0)
-                                  .toLocaleString('sv-SE')} kr
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Total intäkt:</span>
-                              <span className="font-medium">
-                                {kpis.sourceBreakdown.private
-                                  .reduce((sum, c) => sum + c.pris, 0)
-                                  .toLocaleString('sv-SE')} kr
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Snitt provision/ärende:</span>
-                              <span>
-                                {kpis.sourceBreakdown.private.length > 0
-                                  ? (kpis.sourceBreakdown.private.reduce((sum, c) => sum + c.provision_amount, 0) / kpis.sourceBreakdown.private.length).toLocaleString('sv-SE', { maximumFractionDigits: 0 })
-                                  : '0'} kr
-                              </span>
-                            </div>
-                          </div>
+                <Card>
+                  <div className="p-6">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
+                      <Target className="h-5 w-5" />
+                      Provision Analys - Källa Fördelning
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-purple-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium text-purple-800">Privatpersoner</span>
+                          <span className="font-semibold">{kpis.sourceBreakdown.private.length} ärenden</span>
                         </div>
-                        
-                        <div className="p-4 bg-orange-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium text-orange-800">Företag</span>
-                            <span className="font-semibold">{kpis.sourceBreakdown.business.length} ärenden</span>
+                        <div className="text-sm text-gray-600 space-y-2">
+                          <div className="flex justify-between">
+                            <span>Total provision:</span>
+                            <span className="font-medium text-green-600">
+                              {kpis.sourceBreakdown.private
+                                .reduce((sum, c) => sum + c.provision_amount, 0)
+                                .toLocaleString('sv-SE')} kr
+                            </span>
                           </div>
-                          <div className="text-sm text-gray-600 space-y-2">
-                            <div className="flex justify-between">
-                              <span>Total provision:</span>
-                              <span className="font-medium text-green-600">
-                                {kpis.sourceBreakdown.business
-                                  .reduce((sum, c) => sum + c.provision_amount, 0)
-                                  .toLocaleString('sv-SE')} kr
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Total intäkt:</span>
-                              <span className="font-medium">
-                                {kpis.sourceBreakdown.business
-                                  .reduce((sum, c) => sum + c.pris, 0)
-                                  .toLocaleString('sv-SE')} kr
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Snitt provision/ärende:</span>
-                              <span>
-                                {kpis.sourceBreakdown.business.length > 0
-                                  ? (kpis.sourceBreakdown.business.reduce((sum, c) => sum + c.provision_amount, 0) / kpis.sourceBreakdown.business.length).toLocaleString('sv-SE', { maximumFractionDigits: 0 })
-                                  : '0'} kr
-                              </span>
-                            </div>
+                          <div className="flex justify-between">
+                            <span>Total intäkt:</span>
+                            <span className="font-medium">
+                              {kpis.sourceBreakdown.private
+                                .reduce((sum, c) => sum + c.pris, 0)
+                                .toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Snitt provision/ärende:</span>
+                            <span>
+                              {kpis.sourceBreakdown.private.length > 0
+                                ? (kpis.sourceBreakdown.private.reduce((sum, c) => sum + c.provision_amount, 0) / kpis.sourceBreakdown.private.length).toLocaleString('sv-SE', { maximumFractionDigits: 0 })
+                                : '0'} kr
+                            </span>
                           </div>
                         </div>
                       </div>
                       
-                      {/* Provision Rate Info */}
-                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <DollarSign className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium text-blue-800">Provision Information</span>
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium text-orange-800">Företag</span>
+                          <span className="font-semibold">{kpis.sourceBreakdown.business.length} ärenden</span>
                         </div>
-                        <div className="text-sm text-gray-700 space-y-1">
-                          <div>• Provision: 5% av ärendebelopp</div>
-                          <div>• Endast primär tekniker erhåller provision</div>
-                          <div>• Beräknas automatiskt vid ärendeavslut</div>
+                        <div className="text-sm text-gray-600 space-y-2">
+                          <div className="flex justify-between">
+                            <span>Total provision:</span>
+                            <span className="font-medium text-green-600">
+                              {kpis.sourceBreakdown.business
+                                .reduce((sum, c) => sum + c.provision_amount, 0)
+                                .toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Total intäkt:</span>
+                            <span className="font-medium">
+                              {kpis.sourceBreakdown.business
+                                .reduce((sum, c) => sum + c.pris, 0)
+                                .toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Snitt provision/ärende:</span>
+                            <span>
+                              {kpis.sourceBreakdown.business.length > 0
+                                ? (kpis.sourceBreakdown.business.reduce((sum, c) => sum + c.provision_amount, 0) / kpis.sourceBreakdown.business.length).toLocaleString('sv-SE', { maximumFractionDigits: 0 })
+                                : '0'} kr
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                    </div>
+                    
+                    {/* Provision Rate Info */}
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-800">Provision Information</span>
+                      </div>
+                      <div className="text-sm text-gray-700 space-y-1">
+                        <div>• Provision: 5% av ärendebelopp</div>
+                        <div>• Endast primär tekniker erhåller provision</div>
+                        <div>• Beräknas automatiskt vid ärendeavslut</div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               )}
             </div>
           )}
