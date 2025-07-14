@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/Provisions.tsx - TEKNIKER PROVISION DASHBOARD
+// 📁 src/pages/admin/Provisions.tsx - TEKNIKER PROVISION DASHBOARD - REN VERSION
 import React, { useState, useMemo } from 'react'
 import { 
   useCompleteProvisionDashboard, 
@@ -206,17 +206,17 @@ const ProvisionChart: React.FC<{
   if (!chartData.length) {
     return (
       <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <TrendingUp className="h-5 w-5" />
             Provision Utveckling
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </h2>
+        </div>
+        <div>
           <div className="h-64 flex items-center justify-center text-gray-500">
             Ingen data tillgänglig
           </div>
-        </CardContent>
+        </div>
       </Card>
     )
   }
@@ -316,17 +316,17 @@ const TechnicianRankingTable: React.FC<{
   if (!technicianProvisions.length) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
             <Trophy className="h-5 w-5" />
             Tekniker Ranking
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </h2>
+        </div>
+        <div>
           <div className="text-center py-8 text-gray-500">
             Ingen data tillgänglig
           </div>
-        </CardContent>
+        </div>
       </Card>
     )
   }
@@ -606,38 +606,6 @@ const Provisions: React.FC = () => {
               </div>
             )}
           </div>
-        </Card>{month.total_provision.toLocaleString('sv-SE')} kr
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Ärenden:</span>
-                        <span>{month.total_cases} st</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Intäkt:</span>
-                        <span>{month.total_revenue.toLocaleString('sv-SE')} kr</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tekniker:</span>
-                        <span>{month.technician_count} st</span>
-                      </div>
-                      {month.top_earner && (
-                        <div className="flex justify-between">
-                          <span>Topp:</span>
-                          <span className="font-medium">{month.top_earner.name}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Ingen månadsdata tillgänglig
-              </div>
-            )}
-          </CardContent>
         </Card>
       </div>
 
