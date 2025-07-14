@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE
+// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE & PROVISIONS
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -16,7 +16,8 @@ import NewCustomer from './pages/admin/NewCustomer'
 import Economics from './pages/admin/Economics'
 import BillingManagement from './pages/admin/BillingManagement'
 import Technicians from './pages/admin/Technicians'          // Tekniker Performance/Statistik
-import TechnicianManagement from './pages/admin/TechnicianManagement'  // 🆕 NY TEKNIKER CRUD
+import TechnicianManagement from './pages/admin/TechnicianManagement'  // Tekniker CRUD
+import Provisions from './pages/admin/Provisions'            // 🆕 NY: Tekniker Provisioner
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -89,6 +90,15 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* 🆕 NY ROUTE: Tekniker Provisioner (EFTER billing) */}
+            <Route 
+              path="/admin/provisions" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Provisions />
+                </ProtectedRoute>
+              } 
+            />
             {/* 🔧 TEKNIKER ROUTES - SEPARATA FUNKTIONER */}
             <Route 
               path="/admin/technicians" 
@@ -98,7 +108,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 🆕 NY ROUTE: Tekniker Management (CRUD) */}
+            {/* Tekniker Management (CRUD) */}
             <Route 
               path="/admin/technician-management" 
               element={
