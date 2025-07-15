@@ -1,8 +1,8 @@
-// 📁 src/components/admin/billing/BillingModal.tsx
+// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD SÖKVÄG
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../../lib/supabase'; // <-- KORRIGERAD SÖKVÄG
 import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-import { formatCurrency, formatAddress } from '../../utils/formatters';
+import { formatCurrency, formatAddress } from '../../../utils/formatters';
 import { EditableBillingFields } from './EditableBillingFields';
 import { BillingActions } from './BillingActions';
 import type { BillingCase, EditableFields } from '../../../types/billing';
