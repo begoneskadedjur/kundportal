@@ -1,4 +1,4 @@
-// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - UTAN FÖRSÄLJNINGSMÖJLIGHETER
+// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - UTAN FÖRSÄLJNINGSMÖJLIGHETER (FIXED)
 import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
@@ -15,7 +15,7 @@ import {
   Wrench 
 } from 'lucide-react'
 
-import { ModernCard } from '../../ui/ModernCard'
+import Card from '../../ui/Card'  // ✅ Använder befintlig Card istället för ModernCard
 import LoadingSpinner from '../../shared/LoadingSpinner'
 
 // 🎯 Interfaces
@@ -427,31 +427,27 @@ const EconomicInsightsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <ModernCard>
-        <ModernCard.Content>
-          <div className="flex items-center justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        </ModernCard.Content>
-      </ModernCard>
+      <Card className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner />
+        </div>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <ModernCard>
-        <ModernCard.Content>
-          <div className="text-center py-12">
-            <p className="text-red-400 mb-4">{error}</p>
-            <button 
-              onClick={fetchInsightsData}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Försök igen
-            </button>
-          </div>
-        </ModernCard.Content>
-      </ModernCard>
+      <Card className="p-6">
+        <div className="text-center py-12">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button 
+            onClick={fetchInsightsData}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Försök igen
+          </button>
+        </div>
+      </Card>
     )
   }
 
@@ -535,103 +531,21 @@ const EconomicInsightsChart: React.FC = () => {
 
       {/* Content */}
       {selectedView === 'cases' && (
-        <ModernCard>
-          <ModernCard.Header>
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-yellow-500" />
-              <h2 className="text-lg font-semibold text-white">Topp Ärenden</h2>
-            </div>
-          </ModernCard.Header>
-          <ModernCard.Content>
-            {filteredData.topCases.length > 0 ? (
-              <div className="space-y-3">
-                {filteredData.topCases.map((case_, index) => (
-                  <div
-                    key={case_.id}
-                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
-                    onClick={() => handleCaseClick(case_)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-yellow-500' :
-                          index === 1 ? 'bg-gray-400' :
-                          index === 2 ? 'bg-amber-600' :
-                          'bg-slate-600'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          case_.type === 'business' ? 'bg-blue-500/20' : 'bg-purple-500/20'
-                        }`}>
-                          {case_.type === 'business' ? 
-                            <Building2 className="w-4 h-4 text-blue-400" /> : 
-                            <User className="w-4 h-4 text-purple-400" />
-                          }
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-white">
-                            {case_.case_number || case_.title || `Ärende ${case_.id.slice(0, 8)}`}
-                          </h3>
-                          <span className="text-xs px-2 py-1 bg-slate-700 text-slate-300 rounded">
-                            {case_.skadedjur}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />
-                            {case_.primary_assignee_name}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Award className="w-5 h-5 text-yellow-500" />
+            <h2 className="text-lg font-semibold text-white">Topp Ärenden</h2>
+          </div>
+          {filteredData.topCases.length > 0 ? (
+            <div className="space-y-3">
+              {filteredData.topCases.map((case_, index) => (
+                <div
+                  key={case_.id}
+                  className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
+                  onClick={() => handleCaseClick(case_)}
+                >
+                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-green-400">
-                          {formatCurrency(case_.type === 'business' ? case_.pris * 1.25 : case_.pris)}
-                        </div>
-                        {case_.type === 'business' && (
-                          <div className="text-xs text-slate-400">inkl. moms</div>
-                        )}
-                      </div>
-                      <Eye className="w-4 h-4 text-slate-400" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <Award className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Inga ärenden för vald period</p>
-              </div>
-            )}
-          </ModernCard.Content>
-        </ModernCard>
-      )}
-
-      {selectedView === 'skadedjur' && (
-        <ModernCard>
-          <ModernCard.Header>
-            <div className="flex items-center gap-2">
-              <Bug className="w-5 h-5 text-red-500" />
-              <h2 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h2>
-            </div>
-          </ModernCard.Header>
-          <ModernCard.Content>
-            {filteredData.topSkadedjur.length > 0 ? (
-              <div className="space-y-3">
-                {filteredData.topSkadedjur.map((skadedjur, index) => (
-                  <div
-                    key={skadedjur.type}
-                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
                         index === 0 ? 'bg-yellow-500' :
                         index === 1 ? 'bg-gray-400' :
@@ -640,34 +554,108 @@ const EconomicInsightsChart: React.FC = () => {
                       }`}>
                         {index + 1}
                       </div>
-                      <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
-                        <Bug className="w-4 h-4 text-red-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-white">{skadedjur.type}</h3>
-                        <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span>{skadedjur.case_count} ärenden</span>
-                          <span>∅ {formatCurrency(skadedjur.avg_price)}</span>
-                        </div>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        case_.type === 'business' ? 'bg-blue-500/20' : 'bg-purple-500/20'
+                      }`}>
+                        {case_.type === 'business' ? 
+                          <Building2 className="w-4 h-4 text-blue-400" /> : 
+                          <User className="w-4 h-4 text-purple-400" />
+                        }
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-400">
-                        {formatCurrency(skadedjur.total_revenue)}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-white">
+                          {case_.case_number || case_.title || `Ärende ${case_.id.slice(0, 8)}`}
+                        </h3>
+                        <span className="text-xs px-2 py-1 bg-slate-700 text-slate-300 rounded">
+                          {case_.skadedjur}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-400">total intäkt</div>
+                      <div className="flex items-center gap-4 text-sm text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Wrench className="w-3 h-3" />
+                          {case_.primary_assignee_name}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <Bug className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Inga skadedjur för vald period</p>
-              </div>
-            )}
-          </ModernCard.Content>
-        </ModernCard>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-green-400">
+                        {formatCurrency(case_.type === 'business' ? case_.pris * 1.25 : case_.pris)}
+                      </div>
+                      {case_.type === 'business' && (
+                        <div className="text-xs text-slate-400">inkl. moms</div>
+                      )}
+                    </div>
+                    <Eye className="w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <Award className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Inga ärenden för vald period</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {selectedView === 'skadedjur' && (
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Bug className="w-5 h-5 text-red-500" />
+            <h2 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h2>
+          </div>
+          {filteredData.topSkadedjur.length > 0 ? (
+            <div className="space-y-3">
+              {filteredData.topSkadedjur.map((skadedjur, index) => (
+                <div
+                  key={skadedjur.type}
+                  className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                      index === 0 ? 'bg-yellow-500' :
+                      index === 1 ? 'bg-gray-400' :
+                      index === 2 ? 'bg-amber-600' :
+                      'bg-slate-600'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                      <Bug className="w-4 h-4 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">{skadedjur.type}</h3>
+                      <div className="flex items-center gap-4 text-sm text-slate-400">
+                        <span>{skadedjur.case_count} ärenden</span>
+                        <span>∅ {formatCurrency(skadedjur.avg_price)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-green-400">
+                      {formatCurrency(skadedjur.total_revenue)}
+                    </div>
+                    <div className="text-xs text-slate-400">total intäkt</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <Bug className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Inga skadedjur för vald period</p>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Case Details Modal */}

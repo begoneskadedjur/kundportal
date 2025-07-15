@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/SalesOpportunities.tsx - FÖRSÄLJNINGSMÖJLIGHETER SIDA
+// 📁 src/pages/admin/SalesOpportunities.tsx - FÖRSÄLJNINGSMÖJLIGHETER SIDA (FIXED)
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -20,9 +20,8 @@ import {
 } from 'lucide-react'
 
 import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
+import Card from '../../components/ui/Card'  // ✅ Använder befintlig Card istället för ModernCard
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { ModernCard } from '../../components/ui/ModernCard'
 
 // 🎯 Interfaces
 interface PotentialContract {
@@ -495,7 +494,9 @@ const SalesOpportunities: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
             <div className="flex items-center gap-3">
-              <Building2 className="w-8 h-8 text-green-500" />
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-green-400" />
+              </div>
               <div>
                 <p className="text-sm text-slate-400">Potentiella Kunder</p>
                 <p className="text-2xl font-bold text-white">{summary.totalCompanies}</p>
@@ -505,7 +506,9 @@ const SalesOpportunities: React.FC = () => {
 
           <Card className="p-6">
             <div className="flex items-center gap-3">
-              <TrendingUp className="w-8 h-8 text-blue-500" />
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-blue-400" />
+              </div>
               <div>
                 <p className="text-sm text-slate-400">Total Omsättning</p>
                 <p className="text-2xl font-bold text-white">{formatCurrency(summary.totalRevenue * 1.25)}</p>
@@ -515,7 +518,9 @@ const SalesOpportunities: React.FC = () => {
 
           <Card className="p-6">
             <div className="flex items-center gap-3">
-              <Award className="w-8 h-8 text-purple-500" />
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <Award className="w-6 h-6 text-purple-400" />
+              </div>
               <div>
                 <p className="text-sm text-slate-400">Totala Ärenden</p>
                 <p className="text-2xl font-bold text-white">{summary.totalCases}</p>
@@ -525,7 +530,9 @@ const SalesOpportunities: React.FC = () => {
 
           <Card className="p-6">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-8 h-8 text-red-500" />
+              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-400" />
+              </div>
               <div>
                 <p className="text-sm text-slate-400">Hög Prioritet</p>
                 <p className="text-2xl font-bold text-white">{summary.highPriority}</p>
@@ -535,65 +542,61 @@ const SalesOpportunities: React.FC = () => {
         </div>
 
         {/* Sales Opportunities List */}
-        <ModernCard>
-          <ModernCard.Header>
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-green-500" />
-              <h2 className="text-lg font-semibold text-white">Försäljningsmöjligheter</h2>
-            </div>
-          </ModernCard.Header>
-          <ModernCard.Content>
-            {potentialContracts.length > 0 ? (
-              <div className="space-y-4">
-                {potentialContracts.map((contract) => (
-                  <div
-                    key={contract.org_nr}
-                    className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
-                    onClick={() => handleCaseClick(contract)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Building2 className="w-6 h-6 text-green-400" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-white">{contract.company_name || contract.contact_person}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              contract.case_count >= 5 ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                              contract.case_count >= 3 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                              'bg-green-500/10 text-green-400 border border-green-500/20'
-                            }`}>
-                              {contract.case_count >= 5 ? 'Hög prioritet' :
-                               contract.case_count >= 3 ? 'Medel prioritet' : 'Låg prioritet'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
-                            <span>{contract.case_count} ärenden</span>
-                            <span>∅ {formatCurrency(contract.avg_revenue)}</span>
-                            <span>Senast: {new Date(contract.latest_case_date).toLocaleDateString('sv-SE')}</span>
-                          </div>
-                        </div>
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Building2 className="w-5 h-5 text-green-500" />
+            <h2 className="text-lg font-semibold text-white">Försäljningsmöjligheter</h2>
+          </div>
+          {potentialContracts.length > 0 ? (
+            <div className="space-y-4">
+              {potentialContracts.map((contract) => (
+                <div
+                  key={contract.org_nr}
+                  className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
+                  onClick={() => handleCaseClick(contract)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-6 h-6 text-green-400" />
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-green-400">
-                          {formatCurrency(contract.total_revenue * 1.25)}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-white">{contract.company_name || contract.contact_person}</h3>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            contract.case_count >= 5 ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                            contract.case_count >= 3 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                            'bg-green-500/10 text-green-400 border border-green-500/20'
+                          }`}>
+                            {contract.case_count >= 5 ? 'Hög prioritet' :
+                             contract.case_count >= 3 ? 'Medel prioritet' : 'Låg prioritet'}
+                          </span>
                         </div>
-                        <div className="text-sm text-slate-400">+ 25% moms</div>
+                        <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
+                          <span>{contract.case_count} ärenden</span>
+                          <span>∅ {formatCurrency(contract.avg_revenue)}</span>
+                          <span>Senast: {new Date(contract.latest_case_date).toLocaleDateString('sv-SE')}</span>
+                        </div>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-green-400">
+                        {formatCurrency(contract.total_revenue * 1.25)}
+                      </div>
+                      <div className="text-sm text-slate-400">+ 25% moms</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Inga försäljningsmöjligheter för vald period</p>
-                <p className="text-sm mt-2">Prova att välja en längre tidsperiod</p>
-              </div>
-            )}
-          </ModernCard.Content>
-        </ModernCard>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Inga försäljningsmöjligheter för vald period</p>
+              <p className="text-sm mt-2">Prova att välja en längre tidsperiod</p>
+            </div>
+          )}
+        </Card>
       </main>
 
       {/* Case Details Modal */}
