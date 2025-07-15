@@ -1,6 +1,6 @@
-// 📁 src/pages/admin/BillingManagement.tsx - KOMPLETT FAKTURERINGSSIDA
+// 📁 src/pages/admin/BillingManagement.tsx - UPPDATERAD MED FIXES
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, User, Building2, MapPin, Calendar, DollarSign, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, User, Building2, MapPin, Calendar, DollarSign, Phone, Mail, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/formatters'
@@ -23,12 +23,15 @@ interface BillingCase {
   skadedjur: string
   adress?: any
   description?: string
-  rapport?: string  // 🆕 Lägg till rapport-fält
+  rapport?: string
+  // 🆕 FÖRETAG-SPECIFIKA FÄLT
+  markning_faktura?: string
   kontaktperson?: string
-  telefon_kontaktperson?: string
+  e_post_faktura?: string
   e_post_kontaktperson?: string
-  org_nr?: string
+  telefon_kontaktperson?: string
   bestallare?: string
+  org_nr?: string
   billing_status: 'pending' | 'sent' | 'paid' | 'skip'
   billing_updated_at?: string
 }
@@ -43,16 +46,17 @@ interface CaseDetailsModalProps {
   onClose: () => void
 }
 
-// 🔍 Modal för ärendedetaljer
+// 🔍 Modal för ärendedetaljer - UPPDATERAD
 const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onClose }) => {
+  const [showDescription, setShowDescription] = useState(false)
+  const [showReport, setShowReport] = useState(false)
+
   if (!isOpen || !case_) return null
 
   const formatAddress = (address: any) => {
     if (!address) return 'Ingen adress angiven'
     
-    // Om det är en sträng, returnera direkt
     if (typeof address === 'string') {
-      // Om strängen ser ut som JSON, försök parsa den
       if (address.startsWith('{') && address.includes('formatted_address')) {
         try {
           const parsed = JSON.parse(address)
@@ -64,19 +68,11 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
       return address
     }
     
-    // Om det är ett objekt
     if (typeof address === 'object') {
-      // Kolla efter formatted_address direkt
       if (address.formatted_address) {
         return address.formatted_address
       }
       
-      // Kolla efter nested struktur
-      if (address.location && typeof address === 'object' && address.formatted_address) {
-        return address.formatted_address
-      }
-      
-      // Fallback till manuell formatering
       const parts = []
       if (address.street) parts.push(address.street)
       if (address.city) parts.push(address.city)
@@ -116,7 +112,7 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700">
           <div className="flex items-center gap-3">
@@ -175,28 +171,30 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
             </div>
           </div>
 
-          {/* Grundläggande info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Ärendeinfo */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-400" />
                 Ärendeinfo
               </h3>
-              <div className="space-y-3 text-sm">
+              
+              <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Slutfört:</span>
-                  <span className="text-white">
-                    {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
-                  </span>
+                  <span className="text-white">{new Date(case_.completed_date).toLocaleDateString('sv-SE')}</span>
                 </div>
+                
                 <div className="flex justify-between">
                   <span className="text-slate-400">Skadedjur:</span>
-                  <span className="text-white">{case_.skadedjur || 'Ej angivet'}</span>
+                  <span className="text-white">{case_.skadedjur || 'Ej specificerat'}</span>
                 </div>
+                
                 <div className="flex justify-between">
                   <span className="text-slate-400">Arbetskostnad:</span>
                   <span className="text-white">{formatCurrency(case_.pris)}</span>
                 </div>
+                
                 {case_.type === 'business' && (
                   <div className="flex justify-between">
                     <span className="text-slate-400">Moms (25%):</span>
@@ -206,16 +204,19 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
               </div>
             </div>
 
+            {/* Tekniker */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <User className="w-4 h-4" />
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-green-400" />
                 Tekniker
               </h3>
-              <div className="space-y-3 text-sm">
+              
+              <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Namn:</span>
-                  <span className="text-white">{case_.primary_assignee_name || 'Ej tilldelad'}</span>
+                  <span className="text-white">{case_.primary_assignee_name}</span>
                 </div>
+                
                 {case_.primary_assignee_email && (
                   <div className="flex justify-between">
                     <span className="text-slate-400">Email:</span>
@@ -224,102 +225,189 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Kundinfo */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-              {case_.type === 'private' ? <User className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
-              Kunduppgifter
-            </h3>
-            <div className="grid grid-cols-1 gap-4 text-sm">
-              {case_.kontaktperson && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Kontaktperson:</span>
-                  <span className="text-white">{case_.kontaktperson}</span>
-                </div>
-              )}
-              {case_.telefon_kontaktperson && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Telefon:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white">{case_.telefon_kontaktperson}</span>
-                    <a
-                      href={`tel:${case_.telefon_kontaktperson}`}
-                      className="p-1 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded transition-colors"
-                      title="Ring kund"
-                    >
-                      <Phone className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-              )}
-              {case_.e_post_kontaktperson && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Email:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white">{case_.e_post_kontaktperson}</span>
-                    <a
-                      href={`mailto:${case_.e_post_kontaktperson}`}
-                      className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-colors"
-                      title="Skicka email"
-                    >
-                      <Mail className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-              )}
-              {case_.org_nr && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Org.nr:</span>
-                  <span className="text-white">{case_.org_nr}</span>
-                </div>
-              )}
-              {case_.bestallare && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Beställare:</span>
-                  <span className="text-white">{case_.bestallare}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Adress */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Adress
-            </h3>
-            <p className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-              {formatAddress(case_.adress)}
-            </p>
-          </div>
-
-          {/* Beskrivning */}
-          {case_.description && (
+            {/* Kunduppgifter - UPPDATERAD FÖR FÖRETAG */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-slate-300">Beskrivning</h3>
-              <p className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-                {case_.description}
-              </p>
-            </div>
-          )}
-
-          {/* Rapport */}
-          {case_.rapport && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-slate-300">Tekniker-rapport</h3>
-              <div className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-                <div className="whitespace-pre-wrap">{case_.rapport}</div>
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                {case_.type === 'private' ? (
+                  <User className="w-5 h-5 text-purple-400" />
+                ) : (
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                )}
+                {case_.type === 'private' ? 'Kunduppgifter' : 'Företagsuppgifter'}
+              </h3>
+              
+              <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+                {case_.type === 'business' ? (
+                  // 🆕 FÖRETAG - Visa företagsnamn och alla relevanta fält
+                  <>
+                    {case_.title && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Företag:</span>
+                        <span className="text-white font-medium">{case_.title}</span>
+                      </div>
+                    )}
+                    
+                    {case_.org_nr && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Org.nr:</span>
+                        <span className="text-white">{case_.org_nr}</span>
+                      </div>
+                    )}
+                    
+                    {case_.kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Kontaktperson:</span>
+                        <span className="text-white">{case_.kontaktperson}</span>
+                      </div>
+                    )}
+                    
+                    {case_.telefon_kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Telefon:</span>
+                        <span className="text-white">{case_.telefon_kontaktperson}</span>
+                      </div>
+                    )}
+                    
+                    {case_.e_post_kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Email:</span>
+                        <span className="text-white">{case_.e_post_kontaktperson}</span>
+                      </div>
+                    )}
+                    
+                    {case_.bestallare && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Beställare:</span>
+                        <span className="text-white">{case_.bestallare}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Privatperson - ursprunglig logik
+                  <>
+                    {case_.kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Kontaktperson:</span>
+                        <span className="text-white">{case_.kontaktperson}</span>
+                      </div>
+                    )}
+                    
+                    {case_.telefon_kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Telefon:</span>
+                        <span className="text-white">{case_.telefon_kontaktperson}</span>
+                      </div>
+                    )}
+                    
+                    {case_.e_post_kontaktperson && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Email:</span>
+                        <span className="text-white">{case_.e_post_kontaktperson}</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-          )}
+
+            {/* 🆕 FAKTURERINGSINFORMATION - Endast för företag */}
+            {case_.type === 'business' && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-green-400" />
+                  Faktureringsinformation
+                </h3>
+                
+                <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+                  {case_.e_post_faktura && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Faktura email:</span>
+                      <span className="text-white">{case_.e_post_faktura}</span>
+                    </div>
+                  )}
+                  
+                  {case_.markning_faktura && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Fakturamärkning:</span>
+                      <span className="text-white">{case_.markning_faktura}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Adress */}
+            <div className="md:col-span-2 space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-red-400" />
+                Adress
+              </h3>
+              
+              <div className="bg-slate-800/50 rounded-lg p-4">
+                <p className="text-white">{formatAddress(case_.adress)}</p>
+              </div>
+            </div>
+
+            {/* Beskrivning - KLICKBAR */}
+            {case_.description && (
+              <div className="md:col-span-2 space-y-4">
+                <button
+                  onClick={() => setShowDescription(!showDescription)}
+                  className="flex items-center gap-2 text-lg font-semibold text-white hover:text-blue-400 transition-colors"
+                >
+                  <FileText className="w-5 h-5 text-blue-400" />
+                  Beskrivning
+                  {showDescription ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {showDescription && (
+                  <div className="bg-slate-800/50 rounded-lg p-4">
+                    <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {case_.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tekniker-rapport - KLICKBAR */}
+            {case_.rapport && (
+              <div className="md:col-span-2 space-y-4">
+                <button
+                  onClick={() => setShowReport(!showReport)}
+                  className="flex items-center gap-2 text-lg font-semibold text-white hover:text-green-400 transition-colors"
+                >
+                  <FileText className="w-5 h-5 text-green-400" />
+                  Tekniker-rapport
+                  {showReport ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {showReport && (
+                  <div className="bg-slate-800/50 rounded-lg p-4">
+                    <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {case_.rapport}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
+// 🎯 Huvudkomponent
 const BillingManagement: React.FC = () => {
   const navigate = useNavigate()
   
@@ -327,33 +415,28 @@ const BillingManagement: React.FC = () => {
   const [cases, setCases] = useState<BillingCase[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Filtering & sorting
-  const [statusFilter, setStatusFilter] = useState<BillingStatus>('pending')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [sortField, setSortField] = useState<SortField>('completed_date')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  
-  // Modal
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [selectedCase, setSelectedCase] = useState<BillingCase | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
-  // Processing state
-  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  // Filters & Sorting
+  const [statusFilter, setStatusFilter] = useState<BillingStatus>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortField, setSortField] = useState<SortField>('completed_date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  const isProcessing = (caseId: string) => processingIds.has(caseId)
 
   useEffect(() => {
     fetchBillingCases()
   }, [])
 
-  // 🔄 Hämta alla avslutade ärenden
+  // 📊 Hämta faktureringslista
   const fetchBillingCases = async () => {
     try {
       setLoading(true)
       setError(null)
-      
-      console.log('🔄 Fetching billing cases...')
-      
-      // Hämta alla avslutade ärenden från båda tabellerna
+
       const [privateResult, businessResult] = await Promise.all([
         supabase
           .from('private_cases')
@@ -375,8 +458,9 @@ const BillingManagement: React.FC = () => {
             id, case_number, title, pris, completed_date,
             primary_assignee_name, primary_assignee_email,
             skadedjur, adress, description, rapport,
-            kontaktperson, telefon_kontaktperson, e_post_kontaktperson,
-            org_nr, bestallare, billing_status, billing_updated_at
+            markning_faktura, kontaktperson, e_post_faktura,
+            e_post_kontaktperson, telefon_kontaktperson,
+            bestallare, org_nr, billing_status, billing_updated_at
           `)
           .eq('status', 'Avslutat')
           .not('completed_date', 'is', null)
@@ -411,9 +495,9 @@ const BillingManagement: React.FC = () => {
     }
   }
 
-  // 🔄 Uppdatera faktureringsstatus
+  // 🔄 Uppdatera faktureringsstatus - UPPDATERAD MED SENT→PENDING
   const updateBillingStatus = async (caseId: string, type: 'private' | 'business', status: BillingStatus) => {
-    if (status === 'all') return // 'all' är bara för filtrering
+    if (status === 'all') return
     
     try {
       setProcessingIds(prev => new Set(prev).add(caseId))
@@ -455,16 +539,15 @@ const BillingManagement: React.FC = () => {
   const filteredAndSortedCases = useMemo(() => {
     let filtered = cases
 
-    // Filtrera efter status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(case_ => case_.billing_status === statusFilter)
     }
 
-    // Filtrera efter sökterm
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(case_ =>
         (case_.case_number?.toLowerCase().includes(term)) ||
+        (case_.title?.toLowerCase().includes(term)) ||
         (case_.primary_assignee_name?.toLowerCase().includes(term)) ||
         (case_.kontaktperson?.toLowerCase().includes(term)) ||
         (case_.skadedjur?.toLowerCase().includes(term)) ||
@@ -472,7 +555,6 @@ const BillingManagement: React.FC = () => {
       )
     }
 
-    // Sortera
     filtered.sort((a, b) => {
       let aValue: any, bValue: any
 
@@ -584,6 +666,17 @@ const BillingManagement: React.FC = () => {
     }
   }
 
+  // 🎯 DISPLAYNAME FUNCTION - FIXAD FÖR FÖRETAG
+  const getDisplayName = (case_: BillingCase) => {
+    if (case_.type === 'business') {
+      // För företag: Visa företagsnamn (title) istället för kontaktperson
+      return case_.title || case_.kontaktperson || `BE-${case_.id.slice(0, 8)}`
+    } else {
+      // För privatpersoner: Visa kontaktperson som vanligt
+      return case_.kontaktperson || case_.title || `BE-${case_.id.slice(0, 8)}`
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -597,24 +690,16 @@ const BillingManagement: React.FC = () => {
                 onClick={() => navigate('/admin/dashboard')} 
                 className="flex items-center gap-2"
               >
-                <ArrowLeft className="w-4 h-4" /> 
+                <ArrowLeft className="w-4 h-4" />
                 Tillbaka
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Fakturering</h1>
-                <p className="text-slate-400 text-sm">Laddar faktureringslista...</p>
-              </div>
+              <h1 className="text-2xl font-bold text-white">Fakturering</h1>
             </div>
           </div>
         </header>
-        
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <div className="p-8 flex items-center justify-center">
-              <LoadingSpinner size="lg" />
-            </div>
-          </Card>
-        </main>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner />
+        </div>
       </div>
     )
   }
@@ -632,27 +717,25 @@ const BillingManagement: React.FC = () => {
                 onClick={() => navigate('/admin/dashboard')} 
                 className="flex items-center gap-2"
               >
-                <ArrowLeft className="w-4 h-4" /> 
+                <ArrowLeft className="w-4 h-4" />
                 Tillbaka
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Fakturering</h1>
-                <p className="text-slate-400 text-sm">Fel vid laddning</p>
-              </div>
+              <h1 className="text-2xl font-bold text-white">Fakturering</h1>
             </div>
           </div>
         </header>
-        
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card className="bg-red-500/10 border-red-500/20">
-            <div className="p-8 text-center text-red-400">
-              <p className="mb-4">Fel vid laddning: {error}</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card className="p-6">
+            <div className="text-center">
+              <X className="w-12 h-12 text-red-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Fel vid laddning</h3>
+              <p className="text-slate-400 mb-4">{error}</p>
               <Button onClick={fetchBillingCases}>
                 Försök igen
               </Button>
             </div>
           </Card>
-        </main>
+        </div>
       </div>
     )
   }
@@ -670,330 +753,339 @@ const BillingManagement: React.FC = () => {
                 onClick={() => navigate('/admin/dashboard')} 
                 className="flex items-center gap-2"
               >
-                <ArrowLeft className="w-4 h-4" /> 
+                <ArrowLeft className="w-4 h-4" />
                 Tillbaka
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-white">Fakturering</h1>
-                <p className="text-slate-400 text-sm">
-                  Hantera fakturering för avslutade ärenden
-                  <span className="ml-2 text-green-400">• {cases.length} totala ärenden</span>
+                <p className="text-sm text-slate-400">
+                  Hantera fakturering för avslutade ärenden • {cases.length} totala ärenden
                 </p>
               </div>
             </div>
-            <Button onClick={fetchBillingCases} className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
+            
+            <Button 
+              onClick={fetchBillingCases}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
               Uppdatera
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          
-          {/* Sammanfattning */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Väntar på fakturering</p>
-                  <p className="text-2xl font-bold text-yellow-400">{summary.pending.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.pending.total)}</p>
-                </div>
-                <Clock className="w-8 h-8 text-yellow-500" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Väntar på fakturering</p>
+                <p className="text-2xl font-bold text-yellow-400">{summary.pending.count}</p>
+                <p className="text-xs text-slate-500">{formatCurrency(summary.pending.total)}</p>
               </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Faktura skickad</p>
-                  <p className="text-2xl font-bold text-blue-400">{summary.sent.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.sent.total)}</p>
-                </div>
-                <FileText className="w-8 h-8 text-blue-500" />
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Faktura betald</p>
-                  <p className="text-2xl font-bold text-green-400">{summary.paid.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.paid.total)}</p>
-                </div>
-                <Check className="w-8 h-8 text-green-500" />
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400">Ska ej faktureras</p>
-                  <p className="text-2xl font-bold text-gray-400">{summary.skip.count}</p>
-                  <p className="text-xs text-slate-500">{formatCurrency(summary.skip.total)}</p>
-                </div>
-                <X className="w-8 h-8 text-gray-500" />
-              </div>
-            </Card>
-          </div>
-
-          {/* Filter och sök */}
-          <Card>
-            <div className="p-6">
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                
-                {/* Status filter */}
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: 'pending', label: 'Väntar', count: summary.pending.count },
-                    { key: 'sent', label: 'Skickad', count: summary.sent.count },
-                    { key: 'all', label: 'Alla', count: cases.length },
-                    { key: 'paid', label: 'Betald', count: summary.paid.count },
-                    { key: 'skip', label: 'Ej faktura', count: summary.skip.count }
-                  ].map((filter) => (
-                    <button
-                      key={filter.key}
-                      onClick={() => setStatusFilter(filter.key as BillingStatus)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        statusFilter === filter.key
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {filter.label} ({filter.count})
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sök */}
-                <div className="relative w-full lg:w-80">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Sök efter ärende, tekniker, kund..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+              <Clock className="w-8 h-8 text-yellow-400" />
             </div>
           </Card>
-
-          {/* Faktureringslista */}
-          <Card>
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-blue-500" />
-                <h2 className="text-lg font-semibold text-white">Faktureringslista</h2>
+          
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Faktura skickad</p>
+                <p className="text-2xl font-bold text-blue-400">{summary.sent.count}</p>
+                <p className="text-xs text-slate-500">{formatCurrency(summary.sent.total)}</p>
               </div>
-              <p className="text-sm text-slate-400">{filteredAndSortedCases.length} ärenden visas</p>
+              <FileText className="w-8 h-8 text-blue-400" />
             </div>
-            
-            <div className="p-6">
-              {filteredAndSortedCases.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-3 px-4 text-slate-300 font-medium">
-                          <button
-                            onClick={() => handleSort('completed_date')}
-                            className="flex items-center gap-2 hover:text-white transition-colors"
-                          >
-                            Datum
-                            {sortField === 'completed_date' && (
-                              sortDirection === 'asc' ? '↑' : '↓'
-                            )}
-                          </button>
-                        </th>
-                        <th className="text-left py-3 px-4 text-slate-300 font-medium">Ärende</th>
-                        <th className="text-left py-3 px-4 text-slate-300 font-medium">
-                          <button
-                            onClick={() => handleSort('primary_assignee_name')}
-                            className="flex items-center gap-2 hover:text-white transition-colors"
-                          >
-                            Tekniker
-                            {sortField === 'primary_assignee_name' && (
-                              sortDirection === 'asc' ? '↑' : '↓'
-                            )}
-                          </button>
-                        </th>
-                        <th className="text-left py-3 px-4 text-slate-300 font-medium">Kund</th>
-                        <th className="text-right py-3 px-4 text-slate-300 font-medium">
-                          <button
-                            onClick={() => handleSort('pris')}
-                            className="flex items-center gap-2 hover:text-white transition-colors ml-auto"
-                          >
-                            Att fakturera
-                            {sortField === 'pris' && (
-                              sortDirection === 'asc' ? '↑' : '↓'
-                            )}
-                          </button>
-                        </th>
-                        <th className="text-left py-3 px-4 text-slate-300 font-medium">
-                          <button
-                            onClick={() => handleSort('billing_status')}
-                            className="flex items-center gap-2 hover:text-white transition-colors"
-                          >
-                            Status
-                            {sortField === 'billing_status' && (
-                              sortDirection === 'asc' ? '↑' : '↓'
-                            )}
-                          </button>
-                        </th>
-                        <th className="text-center py-3 px-4 text-slate-300 font-medium">Åtgärder</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAndSortedCases.map((case_) => {
-                        const isProcessing = processingIds.has(case_.id)
-                        const totalAmount = case_.type === 'private' ? case_.pris : case_.pris * 1.25
-                        
-                        return (
-                          <tr 
-                            key={case_.id} 
-                            className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors"
-                          >
-                            <td className="py-4 px-4 text-sm text-slate-300">
-                              {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                  case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
-                                }`}>
-                                  {case_.type === 'private' ? (
-                                    <User className="w-4 h-4 text-purple-500" />
-                                  ) : (
-                                    <Building2 className="w-4 h-4 text-blue-500" />
-                                  )}
-                                </div>
-                                <div>
-                                  <button
-                                    onClick={() => handleCaseClick(case_)}
-                                    className="text-white hover:text-blue-400 transition-colors font-medium"
-                                  >
-                                    {case_.case_number || case_.title || `BE-${case_.id.slice(0, 4)}`}
-                                  </button>
-                                  <p className="text-xs text-slate-400">
-                                    {case_.skadedjur} • {case_.type === 'private' ? 'Privatperson' : 'Företag'}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-4 text-sm text-slate-300">
-                              {case_.primary_assignee_name || 'Ej tilldelad'}
-                            </td>
-                            <td className="py-4 px-4 text-sm text-slate-300">
-                              <div>
-                                <p className="text-white">{case_.kontaktperson || case_.bestallare || 'Okänd'}</p>
-                                {case_.org_nr && (
-                                  <p className="text-xs text-slate-400">Org.nr: {case_.org_nr}</p>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-4 px-4 text-right">
-                              <div>
-                                <p className="text-white font-semibold">{formatCurrency(totalAmount)}</p>
-                                {case_.type === 'business' && (
-                                  <p className="text-xs text-slate-400">
-                                    {formatCurrency(case_.pris)} + moms
-                                  </p>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-4 px-4">
-                              {getBillingStatusBadge(case_.billing_status)}
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex items-center justify-center gap-1">
-                                {case_.billing_status === 'pending' && (
-                                  <button
-                                    onClick={() => updateBillingStatus(case_.id, case_.type, 'sent')}
-                                    disabled={isProcessing}
-                                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                    title="Markera som skickad"
-                                  >
-                                    <FileText className="w-4 h-4" />
-                                  </button>
-                                )}
-                                
-                                {(case_.billing_status === 'pending' || case_.billing_status === 'sent') && (
-                                  <>
-                                    <button
-                                      onClick={() => updateBillingStatus(case_.id, case_.type, 'paid')}
-                                      disabled={isProcessing}
-                                      className="p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                      title="Markera som betald"
-                                    >
-                                      <Check className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => updateBillingStatus(case_.id, case_.type, 'skip')}
-                                      disabled={isProcessing}
-                                      className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                      title="Markera som ska ej faktureras"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                                
-                                {(case_.billing_status === 'paid' || case_.billing_status === 'skip') && (
-                                  <button
-                                    onClick={() => updateBillingStatus(case_.id, case_.type, 'pending')}
-                                    disabled={isProcessing}
-                                    className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                    title="Återställ till väntande"
-                                  >
-                                    <Clock className="w-4 h-4" />
-                                  </button>
-                                )}
-                                
-                                <button
-                                  onClick={() => handleCaseClick(case_)}
-                                  className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition-colors"
-                                  title="Visa detaljer"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-slate-400">
-                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>Inga ärenden matchar de valda filtren</p>
-                  {statusFilter !== 'all' && (
-                    <button
-                      onClick={() => setStatusFilter('all')}
-                      className="mt-2 text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      Visa alla ärenden
-                    </button>
-                  )}
-                </div>
-              )}
+          </Card>
+          
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Faktura betald</p>
+                <p className="text-2xl font-bold text-green-400">{summary.paid.count}</p>
+                <p className="text-xs text-slate-500">{formatCurrency(summary.paid.total)}</p>
+              </div>
+              <Check className="w-8 h-8 text-green-400" />
+            </div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Ska ej faktureras</p>
+                <p className="text-2xl font-bold text-slate-400">{summary.skip.count}</p>
+                <p className="text-xs text-slate-500">{formatCurrency(summary.skip.total)}</p>
+              </div>
+              <X className="w-8 h-8 text-slate-400" />
             </div>
           </Card>
         </div>
-      </main>
+
+        {/* Filters och Controls */}
+        <Card className="p-6 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            {/* Status Filter */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { key: 'all' as BillingStatus, label: `Alla (${cases.length})`, count: cases.length },
+                { key: 'pending' as BillingStatus, label: `Väntar (${summary.pending.count})`, count: summary.pending.count },
+                { key: 'sent' as BillingStatus, label: `Skickad (${summary.sent.count})`, count: summary.sent.count },
+                { key: 'paid' as BillingStatus, label: `Betald (${summary.paid.count})`, count: summary.paid.count },
+                { key: 'skip' as BillingStatus, label: `Ej faktura (${summary.skip.count})`, count: summary.skip.count }
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setStatusFilter(key)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === key
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Sök efter ärende, tekniker, kund..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Faktureringslista */}
+        <Card>
+          <div className="p-6 border-b border-slate-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                Faktureringslista
+              </h2>
+              <p className="text-sm text-slate-400">
+                {filteredAndSortedCases.length} ärenden visas
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">
+                    <button 
+                      onClick={() => handleSort('completed_date')}
+                      className="flex items-center gap-1 hover:text-white"
+                    >
+                      Datum
+                      {sortField === 'completed_date' && (
+                        sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">Ärende</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">
+                    <button 
+                      onClick={() => handleSort('primary_assignee_name')}
+                      className="flex items-center gap-1 hover:text-white"
+                    >
+                      Tekniker
+                      {sortField === 'primary_assignee_name' && (
+                        sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">Kund</th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-slate-300">
+                    <button 
+                      onClick={() => handleSort('pris')}
+                      className="flex items-center gap-1 hover:text-white ml-auto"
+                    >
+                      Att fakturera
+                      {sortField === 'pris' && (
+                        sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">
+                    <button 
+                      onClick={() => handleSort('billing_status')}
+                      className="flex items-center gap-1 hover:text-white"
+                    >
+                      Status
+                      {sortField === 'billing_status' && (
+                        sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Åtgärder</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredAndSortedCases.map((case_) => (
+                  <tr key={case_.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="text-sm text-slate-300">
+                        {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
+                      </div>
+                    </td>
+                    
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          case_.type === 'private' ? 'bg-purple-500' : 'bg-blue-500'
+                        }`} />
+                        <div>
+                          <div className="text-sm font-medium text-white">
+                            {case_.case_number || case_.title || `BE-${case_.id.slice(0, 8)}`}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {case_.skadedjur} • {case_.type === 'private' ? 'Privatperson' : 'Företag'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td className="py-4 px-4">
+                      <div className="text-sm text-slate-300">
+                        {case_.primary_assignee_name}
+                      </div>
+                      {case_.primary_assignee_email && (
+                        <div className="text-xs text-slate-400">
+                          {case_.primary_assignee_email}
+                        </div>
+                      )}
+                    </td>
+                    
+                    <td className="py-4 px-4">
+                      <div className="text-sm text-slate-300">
+                        {getDisplayName(case_)}
+                      </div>
+                      {case_.type === 'business' && case_.org_nr && (
+                        <div className="text-xs text-slate-400">
+                          Org.nr: {case_.org_nr}
+                        </div>
+                      )}
+                    </td>
+                    
+                    <td className="py-4 px-4 text-right">
+                      <div className="text-sm font-medium text-white">
+                        {formatCurrency(case_.type === 'private' ? case_.pris : case_.pris * 1.25)}
+                      </div>
+                      {case_.type === 'business' && (
+                        <div className="text-xs text-slate-400">
+                          {formatCurrency(case_.pris)} + moms
+                        </div>
+                      )}
+                    </td>
+                    
+                    <td className="py-4 px-4 text-center">
+                      {getBillingStatusBadge(case_.billing_status)}
+                    </td>
+                    
+                    <td className="py-4 px-4">
+                      <div className="flex items-center justify-center gap-1">
+                        {/* 🆕 UPPDATERAD LOGIC - TILLÅTER SENT→PENDING */}
+                        {case_.billing_status === 'pending' && (
+                          <button
+                            onClick={() => updateBillingStatus(case_.id, case_.type, 'sent')}
+                            disabled={isProcessing(case_.id)}
+                            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50"
+                            title="Markera som skickad"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        {/* 🆕 SENT STATUS - KAN FLYTTA TILLBAKA TILL PENDING */}
+                        {case_.billing_status === 'sent' && (
+                          <button
+                            onClick={() => updateBillingStatus(case_.id, case_.type, 'pending')}
+                            disabled={isProcessing(case_.id)}
+                            className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors disabled:opacity-50"
+                            title="Flytta tillbaka till väntande"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        {(case_.billing_status === 'pending' || case_.billing_status === 'sent') && (
+                          <>
+                            <button
+                              onClick={() => updateBillingStatus(case_.id, case_.type, 'paid')}
+                              disabled={isProcessing(case_.id)}
+                              className="p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50"
+                              title="Markera som betald"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            
+                            <button
+                              onClick={() => updateBillingStatus(case_.id, case_.type, 'skip')}
+                              disabled={isProcessing(case_.id)}
+                              className="p-2 text-gray-400 hover:text-gray-300 hover:bg-gray-500/10 rounded-lg transition-colors disabled:opacity-50"
+                              title="Markera som ska ej faktureras"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        
+                        {(case_.billing_status === 'paid' || case_.billing_status === 'skip') && (
+                          <button
+                            onClick={() => updateBillingStatus(case_.id, case_.type, 'pending')}
+                            disabled={isProcessing(case_.id)}
+                            className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors disabled:opacity-50"
+                            title="Återställ till väntande"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={() => handleCaseClick(case_)}
+                          className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 rounded-lg transition-colors"
+                          title="Visa detaljer"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredAndSortedCases.length === 0 && (
+            <div className="p-8 text-center">
+              <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Inga ärenden hittades</h3>
+              <p className="text-slate-400">
+                {searchTerm ? 'Prova att ändra sökfilter eller rensa söktermen.' : 'Det finns inga ärenden med den valda statusen.'}
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Case Details Modal */}
       <CaseDetailsModal
         case_={selectedCase}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedCase(null)
+        }}
       />
     </div>
   )
