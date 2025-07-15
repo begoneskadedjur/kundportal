@@ -1,4 +1,4 @@
-// 📁 src/components/admin/billing/EditableBillingFields.tsx - KOMPRIMERAD LAYOUT + KLICKBARA LÄNKAR
+// 📁 src/components/admin/billing/EditableBillingFields.tsx
 import React from 'react'
 import { User, Building2, DollarSign, Mail, Phone } from 'lucide-react'
 import Input from '../../ui/Input'
@@ -40,24 +40,37 @@ export const EditableBillingFields: React.FC<Props> = ({
       );
     }
 
-    const renderClickableLink = () => {
+    const renderContactInfo = () => {
       if (!value) {
         return <span className="italic text-orange-400">{required ? 'Saknas' : 'Ej angivet'}</span>;
       }
-      if (type === 'tel') {
-        return <a href={`tel:${value}`} className="text-blue-400 hover:underline flex items-center gap-1.5"><Phone size={14} />{value}</a>;
-      }
-      if (type === 'email') {
-        return <a href={`mailto:${value}`} className="text-blue-400 hover:underline flex items-center gap-1.5"><Mail size={14} />{value}</a>;
-      }
-      return <span className="text-white">{value}</span>;
+
+      const iconClasses = "text-blue-400 hover:text-blue-300 transition-colors cursor-pointer";
+
+      return (
+        <div className="flex items-center justify-between w-full">
+          <span className="text-white">{value}</span>
+          <div className="flex items-center gap-3 pl-4">
+            {type === 'tel' && (
+              <a href={`tel:${value}`} title={`Ring ${value}`} onClick={e => e.stopPropagation()}>
+                <Phone size={16} className={iconClasses} />
+              </a>
+            )}
+            {type === 'email' && (
+              <a href={`mailto:${value}`} title={`Maila ${value}`} onClick={e => e.stopPropagation()}>
+                <Mail size={16} className={iconClasses} />
+              </a>
+            )}
+          </div>
+        </div>
+      );
     };
 
     return (
       <div>
         <label className="block text-sm font-medium text-slate-400 mb-2">{label}</label>
         <div className="p-2.5 min-h-[46px] flex items-center">
-            {renderClickableLink()}
+          {renderContactInfo()}
         </div>
       </div>
     );

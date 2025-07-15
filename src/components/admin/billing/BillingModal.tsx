@@ -1,7 +1,7 @@
 // 📁 src/components/admin/billing/BillingModal.tsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { X, User, Building2, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
 import { EditableBillingFields } from './EditableBillingFields';
 import { BillingActions } from './BillingActions';
@@ -56,8 +56,6 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   }, [case_]);
 
   if (!isOpen || !case_) return null;
-
-  const calculateTotal = (price: number, isPrivate: boolean) => isPrivate ? price : price * 1.25;
 
   const getBillingStatusInfo = (status: string) => {
     switch (status) {
@@ -115,7 +113,6 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
       if (error) throw error;
       
       const updatedCaseWithType = { ...data, type: case_.type };
-
       onCaseUpdate(updatedCaseWithType as BillingCase);
       setIsEditing(false);
 
@@ -130,7 +127,10 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   const handleFieldChange = (field: keyof EditableFields, value: string) => {
     setEditableFields(prev => ({ ...prev, [field]: value }));
   };
-
+  
+  const isBusiness = case_.type === 'business';
+  const vatAmount = isBusiness ? case_.pris * 0.25 : 0;
+  const totalAmount = case_.pris + vatAmount;
   const statusInfo = getBillingStatusInfo(case_.billing_status);
   
   return (
@@ -138,12 +138,15 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <header className="flex items-start sm:items-center justify-between p-6 border-b border-slate-800 flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
-                    {case_.type === 'private' ? <User className="w-5 h-5 text-purple-400" /> : <Building2 className="w-5 h-5 text-blue-400" />}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
+                    {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
                 </div>
                 <div>
                     <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
-                    <p className="text-sm text-slate-400">{case_.type === 'private' ? 'Privatperson' : 'Företag'} • {formatCurrency(case_.pris)}</p>
+                    <p className="text-sm text-slate-400">
+                      {isBusiness ? 'Företag' : 'Privatperson'} • {formatCurrency(case_.pris)}
+                      {isBusiness && <span className="text-xs"> + moms ({formatCurrency(vatAmount)})</span>}
+                    </p>
                 </div>
             </div>
             <div className="flex items-center gap-3 self-end sm:self-center">
@@ -163,7 +166,12 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-slate-400">Summa att fakturera</p>
-                        <p className="text-xl font-bold text-green-400">{formatCurrency(calculateTotal(case_.pris, case_.type === 'private'))}</p>
+                        {isBusiness && (
+                          <div className="text-xs text-slate-400">
+                            {formatCurrency(case_.pris)} + {formatCurrency(vatAmount)} moms
+                          </div>
+                        )}
+                        <p className="text-xl font-bold text-green-400">{formatCurrency(totalAmount)}</p>
                     </div>
                 </div>
             </div>
