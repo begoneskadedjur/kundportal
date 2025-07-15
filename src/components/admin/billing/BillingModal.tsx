@@ -1,9 +1,8 @@
-// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD MED BEFINTLIG FORMATTER
+// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD SPARFUNKTION
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-// 🎯 KORRIGERING: Importera BARA de funktioner som faktiskt finns i formatters.ts
-import { formatCurrency, formatSwedishDate } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/formatters';
 import { EditableBillingFields } from './EditableBillingFields';
 import { BillingActions } from './BillingActions';
 import type { BillingCase, EditableFields } from '../../../types/billing';
@@ -15,22 +14,21 @@ interface Props {
   onCaseUpdate: (updatedCase: BillingCase) => void;
 }
 
-// 🎯 Den här funktionen definierar vi lokalt eftersom den är specifik för hur adress-objektet ser ut
 const formatAddressLocal = (address: any): string => {
-  if (!address) return 'Adress saknas';
-  if (typeof address === 'string') {
-    try {
-      if (!address.startsWith('{') || !address.includes('formatted_address')) return address;
-      const parsed = JSON.parse(address);
-      return parsed.formatted_address || address;
-    } catch { return address; }
-  }
-  if (typeof address === 'object' && address !== null) {
-    if (address.formatted_address) return address.formatted_address;
-    const parts = [address.street, address.postalCode, address.city].filter(Boolean);
-    if (parts.length > 0) return parts.join(', ');
-  }
-  return 'Okänt adressformat';
+    if (!address) return 'Adress saknas';
+    if (typeof address === 'string') {
+        try {
+            if (!address.startsWith('{') || !address.includes('formatted_address')) return address;
+            const parsed = JSON.parse(address);
+            return parsed.formatted_address || address;
+        } catch { return address; }
+    }
+    if (typeof address === 'object' && address !== null) {
+        if (address.formatted_address) return address.formatted_address;
+        const parts = [address.street, address.postalCode, address.city].filter(Boolean);
+        if (parts.length > 0) return parts.join(', ');
+    }
+    return 'Okänt adressformat';
 };
 
 export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUpdate }) => {
@@ -88,23 +86,47 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   const handleSave = async () => {
     if (!case_) return;
     setIsSaving(true); setSaveError(null);
+    
     try {
       const table = case_.type === 'private' ? 'private_cases' : 'business_cases';
-      const updateData: Partial<EditableFields & { updated_at: string }> = {
-        kontaktperson: editableFields.kontaktperson.trim() || null, telefon_kontaktperson: editableFields.telefon_kontaktperson.trim() || null, e_post_kontaktperson: editableFields.e_post_kontaktperson.trim() || null,
-        updated_at: new Date().toISOString()
+      const updateData: Partial<EditableFields> = {
+        kontaktperson: editableFields.kontaktperson.trim() || null,
+        telefon_kontaktperson: editableFields.telefon_kontaktperson.trim() || null,
+        e_post_kontaktperson: editableFields.e_post_kontaktperson.trim() || null,
       };
+
       if (case_.type === 'business') {
-        updateData.markning_faktura = editableFields.markning_faktura.trim() || null; updateData.e_post_faktura = editableFields.e_post_faktura.trim() || null;
-        updateData.bestallare = editableFields.bestallare.trim() || null; updateData.org_nr = editableFields.org_nr.trim() || null;
+        updateData.markning_faktura = editableFields.markning_faktura.trim() || null;
+        updateData.e_post_faktura = editableFields.e_post_faktura.trim() || null;
+        updateData.bestallare = editableFields.bestallare.trim() || null;
+        updateData.org_nr = editableFields.org_nr.trim() || null;
       } else {
-        updateData.personnummer = editableFields.personnummer.trim() || null; updateData.r_fastighetsbeteckning = editableFields.r_fastighetsbeteckning.trim() || null;
+        updateData.personnummer = editableFields.personnummer.trim() || null;
+        updateData.r_fastighetsbeteckning = editableFields.r_fastighetsbeteckning.trim() || null;
       }
-      const { data, error } = await supabase.from(table).update(updateData).eq('id', case_.id).select().single();
+
+      // 🎯 KORRIGERING: Skapa en specifik select-sträng för att hämta tillbaka den uppdaterade raden
+      const commonFields = 'id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport, kontaktperson, e_post_kontaktperson, telefon_kontaktperson, billing_status, billing_updated_at';
+      const selectString = case_.type === 'private'
+        ? `${commonFields}, personnummer, r_fastighetsbeteckning`
+        : `${commonFields}, markning_faktura, e_post_faktura, bestallare, org_nr`;
+
+      const { data, error } = await supabase.from(table)
+        .update(updateData)
+        .eq('id', case_.id)
+        .select(selectString) // Använd den korrekta select-strängen
+        .single();
+
       if (error) throw error;
-      onCaseUpdate(data as BillingCase);
+      
+      // Lägg till 'type' manuellt eftersom den inte finns i databasen
+      const updatedCaseWithType = { ...data, type: case_.type };
+
+      onCaseUpdate(updatedCaseWithType as BillingCase);
       setIsEditing(false);
+
     } catch (err) {
+      console.error('❌ handleSave error:', err);
       setSaveError(err instanceof Error ? err.message : 'Ett okänt fel uppstod.');
     } finally {
       setIsSaving(false);
