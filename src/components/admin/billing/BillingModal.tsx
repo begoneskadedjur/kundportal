@@ -1,4 +1,4 @@
-// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD SÖKVÄG
+// 📁 src/components/admin/billing/BillingModal.tsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase'; // <-- KORRIGERAD SÖKVÄG
 import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
@@ -22,9 +22,8 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   const [saveError, setSaveError] = useState<string | null>(null);
   
   const [editableFields, setEditableFields] = useState<EditableFields>({
-    kontaktperson: '', telefon_kontaktperson: '', e_post_kontaktperson: '',
-    markning_faktura: '', e_post_faktura: '', bestallare: '', org_nr: '',
-    personnummer: '', r_fastighetsbeteckning: ''
+    kontaktperson: '', telefon_kontaktperson: '', e_post_kontaktperson: '', markning_faktura: '',
+    e_post_faktura: '', bestallare: '', org_nr: '', personnummer: '', r_fastighetsbeteckning: ''
   });
 
   useEffect(() => {
@@ -45,34 +44,31 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
 
   const getBillingStatusInfo = (status: string) => {
     switch (status) {
-      case 'pending': return { label: 'Väntar på fakturering', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' };
-      case 'sent': return { label: 'Faktura skickad', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' };
-      case 'paid': return { label: 'Faktura betald', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' };
-      case 'skip': return { label: 'Ska ej faktureras', color: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/20' };
-      default: return { label: 'Okänd status', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20' };
+      case 'pending': return { label: 'Väntar på fakturering', color: 'text-yellow-400', bg: 'bg-yellow-500/10' };
+      case 'sent': return { label: 'Faktura skickad', color: 'text-blue-400', bg: 'bg-blue-500/10' };
+      case 'paid': return { label: 'Faktura betald', color: 'text-green-400', bg: 'bg-green-500/10' };
+      case 'skip': return { label: 'Ska ej faktureras', color: 'text-gray-400', bg: 'bg-gray-500/10' };
+      default: return { label: 'Okänd status', color: 'text-slate-400', bg: 'bg-slate-500/10' };
     }
   };
 
   const getMissingFields = (): string[] => {
     const missing: string[] = [];
+    if (!case_) return [];
     if (case_.type === 'business') {
-      if (!editableFields.kontaktperson) missing.push('Kontaktperson');
-      if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
-      if (!editableFields.e_post_kontaktperson) missing.push('Email');
-      if (!editableFields.e_post_faktura) missing.push('Faktura email');
-      if (!editableFields.org_nr) missing.push('Org.nr');
-      if (!editableFields.bestallare) missing.push('Beställare');
+      if (!editableFields.kontaktperson) missing.push('Kontaktperson'); if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
+      if (!editableFields.e_post_kontaktperson) missing.push('Email'); if (!editableFields.e_post_faktura) missing.push('Faktura email');
+      if (!editableFields.org_nr) missing.push('Org.nr'); if (!editableFields.bestallare) missing.push('Beställare');
     } else {
-      if (!editableFields.kontaktperson) missing.push('Kontaktperson');
-      if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
+      if (!editableFields.kontaktperson) missing.push('Kontaktperson'); if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
       if (!editableFields.e_post_kontaktperson) missing.push('Email');
     }
     return missing;
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
-    setSaveError(null);
+    if (!case_) return;
+    setIsSaving(true); setSaveError(null);
     try {
       const table = case_.type === 'private' ? 'private_cases' : 'business_cases';
       const updateData: Partial<EditableFields & { updated_at: string }> = {
@@ -90,8 +86,7 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
       onCaseUpdate(data as BillingCase);
       setIsEditing(false);
     } catch (err) {
-      console.error('❌ handleSave error:', err);
-      setSaveError(err instanceof Error ? err.message : 'Ett okänt fel uppstod vid sparande.');
+      setSaveError(err instanceof Error ? err.message : 'Ett okänt fel uppstod.');
     } finally {
       setIsSaving(false);
     }
@@ -106,7 +101,7 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-start sm:items-center justify-between p-6 border-b border-slate-800 flex-col sm:flex-row gap-4">
+        <header className="flex items-start sm:items-center justify-between p-6 border-b border-slate-800 flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
                     {case_.type === 'private' ? <User className="w-5 h-5 text-purple-400" /> : <Building2 className="w-5 h-5 text-blue-400" />}
@@ -120,10 +115,10 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
                 <BillingActions isEditing={isEditing} isSaving={isSaving} missingFieldsCount={getMissingFields().length} onStartEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => setIsEditing(false)} />
                 <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
             </div>
-        </div>
+        </header>
         <div className="p-6 space-y-8 overflow-y-auto">
             {saveError && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-400" /><span className="text-sm text-red-400">{saveError}</span></div>}
-            <div className={`p-4 rounded-lg border ${statusInfo.bg} ${statusInfo.border}`}>
+            <div className={`p-4 rounded-lg border ${statusInfo.bg} border-transparent`}>
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-sm font-medium text-slate-300 mb-1">Faktureringsstatus</h3>
