@@ -1,18 +1,17 @@
-// 📁 src/pages/admin/Technicians.tsx - UPPDATERAD MED INDIVIDUELL ANALYS
+// 📁 src/pages/admin/Technicians.tsx - UTAN SYSTEM STATUS KORT
 import React, { useState } from 'react'
-import { ArrowLeft, RefreshCw, Wrench, TrendingUp, Users, Target } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
 
-// Importera komponenter som faktiskt existerar
+// Tekniker komponenter
 import TechnicianKpiCards from '../../components/admin/technicians/TechnicianKpiCards'
 import TechnicianRankingTable from '../../components/admin/technicians/TechnicianRankingTable'
 import TechnicianPerformanceChart from '../../components/admin/technicians/TechnicianPerformanceChart'
 import PestSpecializationChart from '../../components/admin/technicians/PestSpecializationChart'
 import IndividualTechnicianAnalysis from '../../components/admin/technicians/IndividualTechnicianAnalysis'
 
-// Moderna UI komponenter
+// UI komponenter
 import ModernViewSelector from '../../components/ui/ModernViewSelector'
 
 const Technicians: React.FC = () => {
@@ -23,35 +22,35 @@ const Technicians: React.FC = () => {
     window.location.reload()
   }
 
-  // View options för tekniker-komponenter
+  // View options för tekniker-analys
   const technicianViewOptions = [
     {
       key: 'overview',
       label: 'Översikt',
-      description: 'KPI och ranking',
+      description: 'Ranking och sammanfattning',
       gradient: 'blue',
-      badge: 'Huvudvy'
+      badge: 'Ranking'
     },
     {
       key: 'performance',
-      label: 'Prestanda Trends',
+      label: 'Prestanda',
       description: 'Månadsvis utveckling',
       gradient: 'green',
       badge: 'Trends'
     },
     {
       key: 'specialization',
-      label: 'Specialiseringar',
-      description: 'Skadedjur & expertis',
+      label: 'Specialisering',
+      description: 'Skadedjur-expertis',
       gradient: 'purple',
       badge: 'Expertis'
     },
     {
       key: 'individual',
-      label: 'Individuell Analys',
-      description: 'Djupanalys per tekniker',
+      label: 'Individuell',
+      description: 'Detaljerad tekniker-analys',
       gradient: 'orange',
-      badge: 'Detaljerad'
+      badge: 'Djupdyk'
     }
   ]
 
@@ -115,7 +114,7 @@ const Technicians: React.FC = () => {
                 </p>
               </div>
               
-              {/* 🆕 Moderna View Selector */}
+              {/* Moderna View Selector */}
               <ModernViewSelector
                 options={technicianViewOptions}
                 selectedView={selectedView}
@@ -129,123 +128,27 @@ const Technicians: React.FC = () => {
             {/* Innehåll baserat på vald vy */}
             {selectedView === 'overview' && (
               <div className="space-y-8">
-                {/* Huvudranking */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-blue-500" />
-                    Tekniker Ranking
-                    <span className="text-sm text-slate-400 font-normal">(Baserat på total intäkt)</span>
-                  </h3>
-                  <TechnicianRankingTable />
-                </div>
+                <TechnicianRankingTable />
               </div>
             )}
 
             {selectedView === 'performance' && (
               <div className="space-y-8">
-                {/* Prestanda trends */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-500" />
-                    Prestanda Utveckling
-                    <span className="text-sm text-slate-400 font-normal">(Månadsvis trends)</span>
-                  </h3>
-                  <TechnicianPerformanceChart />
-                </div>
+                <TechnicianPerformanceChart />
               </div>
             )}
 
             {selectedView === 'specialization' && (
               <div className="space-y-8">
-                {/* Skadedjurs-specialisering */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Wrench className="w-5 h-5 text-purple-500" />
-                    Skadedjurs Specialiseringar
-                    <span className="text-sm text-slate-400 font-normal">(Expertområden per tekniker)</span>
-                  </h3>
-                  <PestSpecializationChart />
-                </div>
+                <PestSpecializationChart />
               </div>
             )}
 
             {selectedView === 'individual' && (
               <div className="space-y-8">
-                {/* 🆕 Individuell tekniker-analys */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-orange-500" />
-                    Individuell Tekniker Analys
-                    <span className="text-sm text-slate-400 font-normal">(Djupanalys per person)</span>
-                  </h3>
-                  <IndividualTechnicianAnalysis />
-                </div>
+                <IndividualTechnicianAnalysis />
               </div>
             )}
-          </section>
-
-          {/* 3. System Status */}
-          <section>
-            <Card className="bg-gradient-to-br from-blue-600/10 to-cyan-600/10 border-blue-500/20">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  ✅ Tekniker Dashboard Status - Komplett System
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
-                  {/* Data Källor */}
-                  <div className="space-y-2 text-sm">
-                    <h4 className="text-blue-400 font-medium">📊 Aktiva Data Källor:</h4>
-                    <p className="text-green-400">✅ technicians (alla aktiva tekniker)</p>
-                    <p className="text-green-400">✅ private_cases (BeGone privatpersoner)</p>
-                    <p className="text-green-400">✅ business_cases (BeGone företag)</p>
-                    <p className="text-green-400">✅ cases (avtalskunder)</p>
-                    <p className="text-blue-400">🔄 Realtidssynkronisering</p>
-                    <p className="text-purple-400">📈 Historisk data (alla tider)</p>
-                  </div>
-                  
-                  {/* Implementerade Funktioner */}
-                  <div className="space-y-2 text-sm">
-                    <h4 className="text-green-400 font-medium">✅ Implementerade Funktioner:</h4>
-                    <p className="text-green-400">✅ KPI Cards (dynamiska totaler)</p>
-                    <p className="text-green-400">✅ Prestanda Ranking (live data)</p>
-                    <p className="text-green-400">✅ Månadsvis Trends (12 månader)</p>
-                    <p className="text-green-400">✅ Skadedjurs Specialisering</p>
-                    <p className="text-green-400">✅ Individuell Analys (NY!)</p>
-                    <p className="text-green-400">✅ Multi-affärsområde Support</p>
-                  </div>
-
-                  {/* Tekniska Funktioner */}
-                  <div className="space-y-2 text-sm">
-                    <h4 className="text-purple-400 font-medium">🔧 Avancerade Funktioner:</h4>
-                    <p className="text-purple-400">🎯 Intelligent Data Aggregering</p>
-                    <p className="text-purple-400">📊 Cross-Table Queries</p>
-                    <p className="text-purple-400">🔄 Service Layer Architecture</p>
-                    <p className="text-purple-400">📱 Responsiv Design</p>
-                    <p className="text-purple-400">🏆 Ranking Algorithms</p>
-                    <p className="text-purple-400">👤 Per-tekniker Djupanalys</p>
-                  </div>
-
-                </div>
-
-                {/* Progress Bar */}
-                <div className="mt-6 pt-4 border-t border-blue-700/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-slate-400">Tekniker Dashboard Implementation</span>
-                    <span className="text-sm text-blue-400 font-semibold">100% Verklig Data + Individuell Analys</span>
-                  </div>
-                  <div className="w-full bg-slate-800 rounded-full h-3">
-                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-1000 shadow-lg shadow-blue-500/25" style={{ width: '100%' }}></div>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                    <span>Komplett med verklig data från alla tekniker + individuell djupanalys</span>
-                    <span>🚀 Full funktionalitet implementerad</span>
-                  </div>
-                </div>
-
-              </div>
-            </Card>
           </section>
 
         </div>
