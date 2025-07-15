@@ -1,7 +1,7 @@
-// 📁 src/components/admin/billing/BillingModal.tsx
+// 📁 src/components/admin/billing/BillingModal.tsx - KOMPAKT DESIGN
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { X, User, Building2, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { X, User, Building2, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
 import { EditableBillingFields } from './EditableBillingFields';
 import { BillingActions } from './BillingActions';
@@ -136,53 +136,64 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <header className="flex items-start sm:items-center justify-between p-6 border-b border-slate-800 flex-col sm:flex-row gap-4">
-            <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
-                    {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
+        {/* 🎯 KOMPAKT HEADER med integrerad statusinfo */}
+        <header className="p-6 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
+                        {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
+                        <p className="text-sm text-slate-400">
+                          {isBusiness ? 'Företag' : 'Privatperson'} • {case_.skadedjur}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
-                    <p className="text-sm text-slate-400">
-                      {isBusiness ? 'Företag' : 'Privatperson'} • {formatCurrency(case_.pris)}
-                      {isBusiness && <span className="text-xs"> + moms ({formatCurrency(vatAmount)})</span>}
-                    </p>
+                <div className="flex items-center gap-3">
+                    <BillingActions isEditing={isEditing} isSaving={isSaving} missingFieldsCount={getMissingFields().length} onStartEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => setIsEditing(false)} />
+                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
                 </div>
             </div>
-            <div className="flex items-center gap-3 self-end sm:self-center">
-                <BillingActions isEditing={isEditing} isSaving={isSaving} missingFieldsCount={getMissingFields().length} onStartEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => setIsEditing(false)} />
-                <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
+            
+            {/* 💰 INLINE STATUS & PRICING CARD */}
+            <div className={`flex items-center justify-between p-4 rounded-lg border ${statusInfo.bg} border-slate-700`}>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <p className="text-xs text-slate-400 mb-1">Status</p>
+                        <p className={`font-semibold ${statusInfo.color}`}>{statusInfo.label}</p>
+                    </div>
+                    <div className="w-px h-8 bg-slate-700"></div>
+                    <div>
+                        <p className="text-xs text-slate-400 mb-1">Tekniker</p>
+                        <p className="text-sm text-white">{case_.primary_assignee_name}</p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-xs text-slate-400 mb-1">Att fakturera</p>
+                    {isBusiness && (
+                      <div className="text-xs text-slate-400">
+                        {formatCurrency(case_.pris)} + {formatCurrency(vatAmount)} moms
+                      </div>
+                    )}
+                    <p className="text-xl font-bold text-green-400">{formatCurrency(totalAmount)}</p>
+                </div>
             </div>
         </header>
 
         <div className="p-6 space-y-6 overflow-y-auto">
             {saveError && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-400" /><span className="text-sm text-red-400">{saveError}</span></div>}
             
-            <div className={`p-4 rounded-lg border ${statusInfo.bg} border-transparent`}>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-sm font-medium text-slate-300 mb-1">Faktureringsstatus</h3>
-                        <p className={`font-semibold ${statusInfo.color}`}>{statusInfo.label}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-sm text-slate-400">Summa att fakturera</p>
-                        {isBusiness && (
-                          <div className="text-xs text-slate-400">
-                            {formatCurrency(case_.pris)} + {formatCurrency(vatAmount)} moms
-                          </div>
-                        )}
-                        <p className="text-xl font-bold text-green-400">{formatCurrency(totalAmount)}</p>
-                    </div>
-                </div>
-            </div>
-
-            <EditableBillingFields case_={case_} isEditing={isEditing} onFieldChange={handleFieldChange} editableFields={editableFields} />
+            {/* 📋 REDIGERBARA FÄLT med adress integrerad */}
+            <EditableBillingFields 
+              case_={case_} 
+              isEditing={isEditing} 
+              onFieldChange={handleFieldChange} 
+              editableFields={editableFields}
+              formattedAddress={formatAddressLocal(case_.adress)}
+            />
             
-            <div className="bg-slate-800/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><MapPin className="w-5 h-5 text-red-400" /> Adress</h3>
-                <p className="text-white">{formatAddressLocal(case_.adress)}</p>
-            </div>
-            
+            {/* 📝 BESKRIVNING & RAPPORT - Collapsible */}
             {case_.description && (
                 <div className="space-y-2">
                     <button onClick={() => setShowDescription(!showDescription)} className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"><FileText className="w-5 h-5" /> Beskrivning {showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
