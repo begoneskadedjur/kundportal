@@ -419,8 +419,8 @@ const BillingManagement: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<BillingCase | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
-  // Filters & Sorting
-  const [statusFilter, setStatusFilter] = useState<BillingStatus>('all')
+  // Filters & Sorting - 🆕 DEFAULT TILL PENDING
+  const [statusFilter, setStatusFilter] = useState<BillingStatus>('pending')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortField, setSortField] = useState<SortField>('completed_date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -940,11 +940,19 @@ const BillingManagement: React.FC = () => {
                     </td>
                     
                     <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          case_.type === 'private' ? 'bg-purple-500' : 'bg-blue-500'
-                        }`} />
-                        <div>
+                      <div className="flex items-center gap-3">
+                        {/* 🆕 IKONER FÖR FÖRETAG/PRIVATPERSON */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                        }`}>
+                          {case_.type === 'private' ? (
+                            <User className="w-4 h-4 text-purple-400" />
+                          ) : (
+                            <Building2 className="w-4 h-4 text-blue-400" />
+                          )}
+                        </div>
+                        
+                        <div className="flex-1">
                           <div className="text-sm font-medium text-white">
                             {case_.case_number || case_.title || `BE-${case_.id.slice(0, 8)}`}
                           </div>
