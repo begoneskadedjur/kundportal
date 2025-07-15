@@ -1,4 +1,4 @@
-// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD SPARFUNKTION
+// 📁 src/components/admin/billing/BillingModal.tsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
@@ -104,22 +104,16 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
         updateData.personnummer = editableFields.personnummer.trim() || null;
         updateData.r_fastighetsbeteckning = editableFields.r_fastighetsbeteckning.trim() || null;
       }
-
-      // 🎯 KORRIGERING: Skapa en specifik select-sträng för att hämta tillbaka den uppdaterade raden
+      
       const commonFields = 'id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport, kontaktperson, e_post_kontaktperson, telefon_kontaktperson, billing_status, billing_updated_at';
       const selectString = case_.type === 'private'
         ? `${commonFields}, personnummer, r_fastighetsbeteckning`
         : `${commonFields}, markning_faktura, e_post_faktura, bestallare, org_nr`;
 
-      const { data, error } = await supabase.from(table)
-        .update(updateData)
-        .eq('id', case_.id)
-        .select(selectString) // Använd den korrekta select-strängen
-        .single();
+      const { data, error } = await supabase.from(table).update(updateData).eq('id', case_.id).select(selectString).single();
 
       if (error) throw error;
       
-      // Lägg till 'type' manuellt eftersom den inte finns i databasen
       const updatedCaseWithType = { ...data, type: case_.type };
 
       onCaseUpdate(updatedCaseWithType as BillingCase);
@@ -141,7 +135,7 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
   
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <header className="flex items-start sm:items-center justify-between p-6 border-b border-slate-800 flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
@@ -157,8 +151,10 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
                 <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
             </div>
         </header>
-        <div className="p-6 space-y-8 overflow-y-auto">
+
+        <div className="p-6 space-y-6 overflow-y-auto">
             {saveError && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-400" /><span className="text-sm text-red-400">{saveError}</span></div>}
+            
             <div className={`p-4 rounded-lg border ${statusInfo.bg} border-transparent`}>
                 <div className="flex items-center justify-between">
                     <div>
@@ -171,17 +167,21 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
                     </div>
                 </div>
             </div>
+
             <EditableBillingFields case_={case_} isEditing={isEditing} onFieldChange={handleFieldChange} editableFields={editableFields} />
-            <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2"><MapPin className="w-5 h-5 text-red-400" /> Adress</h3>
-                <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-white">{formatAddressLocal(case_.adress)}</p></div>
+            
+            <div className="bg-slate-800/50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><MapPin className="w-5 h-5 text-red-400" /> Adress</h3>
+                <p className="text-white">{formatAddressLocal(case_.adress)}</p>
             </div>
+            
             {case_.description && (
                 <div className="space-y-2">
                     <button onClick={() => setShowDescription(!showDescription)} className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"><FileText className="w-5 h-5" /> Beskrivning {showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
                     {showDescription && <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{case_.description}</p></div>}
                 </div>
             )}
+            
             {case_.rapport && (
                 <div className="space-y-2">
                     <button onClick={() => setShowReport(!showReport)} className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"><FileText className="w-5 h-5" /> Tekniker-rapport {showReport ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
