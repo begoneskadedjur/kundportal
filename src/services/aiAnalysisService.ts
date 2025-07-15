@@ -1,5 +1,6 @@
 // src/services/aiAnalysisService.ts
 // UPPDATERAD: 2025-07-15 - Fullständig omskrivning med ny datastruktur och förbättrad fallback.
+// FIX: Ersatt JSX-baserad toast.custom med vanlig toast för att behålla filen som .ts
 
 import { toast } from 'react-hot-toast';
 
@@ -189,12 +190,19 @@ class AIAnalysisService {
         throw new Error(errorMsg);
       }
       
+      // ================================================================
+      // FIX: Ersatt toast.custom med en vanlig text-baserad toast
+      // för att undvika JSX i en .ts-fil.
+      // ================================================================
       if (data.warning) {
-        toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-yellow-500 text-white p-4 rounded-lg shadow-lg`}>
-            <b>Varning:</b> {data.warning}
-          </div>
-        ), { duration: 6000 });
+        toast(`Varning: ${data.warning}`, {
+          duration: 6000,
+          icon: '⚠️',
+          style: {
+            background: '#f59e0b', // Gul varningsfärg
+            color: '#ffffff',
+          },
+        });
       } else {
         toast.success(`AI-analys klar för ${request.technician.name}!`, {
           style: { background: '#059669', color: '#ffffff' },
@@ -292,4 +300,4 @@ class AIAnalysisService {
 // =================================================================================
 
 export const aiAnalysisService = new AIAnalysisService();
-export default aiAnalysisService;```
+export default aiAnalysisService;
