@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/BillingManagement.tsx
+// 📁 src/pages/admin/BillingManagement.tsx - KORRIGERAD DATABASFRÅGA
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -32,14 +32,32 @@ const BillingManagement: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const selectQuery = `
+      // 1. Definiera de kolumner som är GEMENSAMMA för båda tabellerna
+      const commonFields = `
         id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport,
-        markning_faktura, kontaktperson, e_post_faktura, e_post_kontaktperson, telefon_kontaktperson,
-        bestallare, org_nr, personnummer, r_fastighetsbeteckning, billing_status, billing_updated_at
+        kontaktperson, e_post_kontaktperson, telefon_kontaktperson,
+        billing_status, billing_updated_at
       `;
+
+      // 2. Skapa en specifik query för varje tabell
+      const privateSelectQuery = `
+        ${commonFields},
+        personnummer,
+        r_fastighetsbeteckning
+      `;
+
+      const businessSelectQuery = `
+        ${commonFields},
+        markning_faktura,
+        e_post_faktura,
+        bestallare,
+        org_nr
+      `;
+
+      // 3. Använd rätt query för rätt tabell
       const [privateResult, businessResult] = await Promise.all([
-        supabase.from('private_cases').select(selectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('business_cases').select(selectQuery).eq('status', 'Avslutat').not('pris', 'is', null)
+        supabase.from('private_cases').select(privateSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('business_cases').select(businessSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null)
       ]);
 
       if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`);
@@ -139,7 +157,13 @@ const BillingManagement: React.FC = () => {
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-950"><LoadingSpinner /></div>;
-  if (error) return <div className="p-8 text-center text-red-400">{error} <Button onClick={fetchBillingCases}>Försök igen</Button></div>;
+  if (error) return (
+    <div className="p-8 text-center bg-slate-950 text-red-400 min-h-screen">
+      <h2 className="text-xl mb-4">Ett fel uppstod</h2>
+      <pre className="p-4 bg-slate-800 rounded-md text-left text-sm whitespace-pre-wrap">{error}</pre>
+      <Button onClick={fetchBillingCases} className="mt-6">Försök igen</Button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-950">
