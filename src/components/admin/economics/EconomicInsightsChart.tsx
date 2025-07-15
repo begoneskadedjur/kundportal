@@ -1,31 +1,39 @@
-// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - FIXAD JSX STRUKTUR
+// 📁 src/components/admin/economics/EconomicInsightsChart.tsx - UTAN FÖRSÄLJNINGSMÖJLIGHETER
 import React, { useState, useEffect, useMemo } from 'react'
-import { TrendingUp, Award, Bug, Building2, Eye, Calendar, User, DollarSign, Phone, Mail, MapPin, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
+import { 
+  Award, 
+  Bug, 
+  ChevronLeft, 
+  ChevronRight, 
+  Eye, 
+  User, 
+  Building2, 
+  MapPin, 
+  Calendar, 
+  Wrench 
+} from 'lucide-react'
 
-// Moderna komponenter
-import ModernCard from '../../ui/ModernCard'
-import { CombinedNavigation } from '../../ui/ModernNavigation'
+import { ModernCard } from '../../ui/ModernCard'
+import LoadingSpinner from '../../shared/LoadingSpinner'
 
 // 🎯 Interfaces
 interface TopCase {
   id: string
   case_number?: string
   title?: string
-  type: 'private' | 'business'
   pris: number
   completed_date: string
   primary_assignee_name: string
   primary_assignee_email?: string
   skadedjur: string
-  address?: any
+  adress?: any
   description?: string
   kontaktperson?: string
   telefon_kontaktperson?: string
   e_post_kontaktperson?: string
-  org_nr?: string
-  bestallare?: string
+  type: 'private' | 'business'
 }
 
 interface TopSkadedjur {
@@ -41,186 +49,147 @@ interface TopSkadedjur {
   }>
 }
 
-interface PotentialContract {
-  customer_identifier: string
-  contact_person: string
-  phone?: string
-  email?: string
-  org_nr?: string
-  case_count: number
-  total_revenue: number
-  avg_case_value: number
-  latest_case_date: string
-  case_details: Array<{
-    id: string
-    pris: number
-    completed_date: string
-    skadedjur: string
-  }>
-}
-
-interface InsightsData {
-  topCases: TopCase[]
-  topSkadedjur: TopSkadedjur[]
-  potentialContracts: PotentialContract[]
-}
-
 interface CaseDetailsModalProps {
   case_: TopCase | null
   isOpen: boolean
   onClose: () => void
 }
 
-// 🔍 Modal för ärendedetaljer
+// Modal för ärendedetaljer
 const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onClose }) => {
   if (!isOpen || !case_) return null
 
-  const formatAddress = (address: any) => {
+  const formatAddress = (address: any): string => {
     if (!address) return 'Ingen adress angiven'
-    if (typeof address === 'string') return address
-    if (typeof address === 'object') {
-      return `${address.street || ''} ${address.city || ''}`.trim() || 'Ingen adress angiven'
+    
+    if (typeof address === 'string') {
+      if (address.startsWith('{') && address.includes('formatted_address')) {
+        try {
+          const parsed = JSON.parse(address)
+          return parsed.formatted_address || 'Ingen adress angiven'
+        } catch (e) {
+          return address
+        }
+      }
+      return address
     }
+    
+    if (typeof address === 'object') {
+      if (address.formatted_address) {
+        return address.formatted_address
+      }
+      
+      const parts = []
+      if (address.street) parts.push(address.street)
+      if (address.city) parts.push(address.city)
+      if (address.postalCode || address.postal_code) parts.push(address.postalCode || address.postal_code)
+      
+      return parts.length > 0 ? parts.join(', ') : 'Ingen adress angiven'
+    }
+    
     return 'Ingen adress angiven'
   }
 
+  const isBusiness = case_.type === 'business'
+  const vatAmount = isBusiness ? case_.pris * 0.25 : 0
+  const totalAmount = case_.pris + vatAmount
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
-            }`}>
-              {case_.type === 'private' ? (
-                <User className="w-5 h-5 text-purple-500" />
-              ) : (
-                <Building2 className="w-5 h-5 text-blue-500" />
-              )}
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'
+              }`}>
+                {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
+                <p className="text-sm text-slate-400">
+                  {isBusiness ? 'Företag' : 'Privatperson'} • {case_.skadedjur}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                {case_.case_number || case_.title || `Ärende ${case_.id.slice(0, 8)}`}
-              </h2>
-              <p className="text-sm text-slate-400">
-                {case_.type === 'private' ? 'Privatperson' : 'Företag'} • {formatCurrency(case_.pris)}
-              </p>
-            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+              ✕
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
         </div>
 
-        {/* Innehåll */}
-        <div className="p-6 space-y-6">
-          {/* Grundläggande info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Ärendeinfo
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Slutfört:</span>
-                  <span className="text-white">
-                    {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Skadedjur:</span>
-                  <span className="text-white">{case_.skadedjur || 'Ej angivet'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Pris:</span>
-                  <span className="text-green-400 font-semibold">{formatCurrency(case_.pris)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Tekniker
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Namn:</span>
-                  <span className="text-white">{case_.primary_assignee_name || 'Ej tilldelad'}</span>
-                </div>
-                {case_.primary_assignee_email && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Email:</span>
-                    <span className="text-white">{case_.primary_assignee_email}</span>
-                  </div>
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-4">
+          {/* Pricing */}
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-slate-400">Ärendets värde</p>
+                <p className="text-xl font-bold text-green-400">{formatCurrency(totalAmount)}</p>
+                {isBusiness && (
+                  <p className="text-xs text-slate-400">
+                    {formatCurrency(case_.pris)} + {formatCurrency(vatAmount)} moms
+                  </p>
                 )}
               </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-400">Tekniker</p>
+                <p className="text-white font-medium">{case_.primary_assignee_name}</p>
+              </div>
             </div>
           </div>
 
-          {/* Kundinfo */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-              {case_.type === 'private' ? <User className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
-              Kunduppgifter
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              {case_.kontaktperson && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Kontaktperson:</span>
-                  <span className="text-white">{case_.kontaktperson}</span>
+          {/* Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Contact Info */}
+            {case_.kontaktperson && (
+              <div className="bg-slate-800/50 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2">Kontakt</h3>
+                <div className="space-y-1 text-sm">
+                  <p className="text-slate-300">{case_.kontaktperson}</p>
+                  {case_.telefon_kontaktperson && (
+                    <p className="text-blue-400">{case_.telefon_kontaktperson}</p>
+                  )}
+                  {case_.e_post_kontaktperson && (
+                    <p className="text-blue-400">{case_.e_post_kontaktperson}</p>
+                  )}
                 </div>
-              )}
-              {case_.telefon_kontaktperson && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Telefon:</span>
-                  <span className="text-white">{case_.telefon_kontaktperson}</span>
-                </div>
-              )}
-              {case_.e_post_kontaktperson && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Email:</span>
-                  <span className="text-white">{case_.e_post_kontaktperson}</span>
-                </div>
-              )}
-              {case_.org_nr && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Org.nr:</span>
-                  <span className="text-white">{case_.org_nr}</span>
-                </div>
-              )}
-              {case_.bestallare && (
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Beställare:</span>
-                  <span className="text-white">{case_.bestallare}</span>
-                </div>
-              )}
+              </div>
+            )}
+
+            {/* Address */}
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Adress
+              </h3>
+              <p className="text-slate-300 text-sm">{formatAddress(case_.adress)}</p>
             </div>
-          </div>
 
-          {/* Adress */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Adress
-            </h3>
-            <p className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-              {formatAddress(case_.address)}
-            </p>
-          </div>
-
-          {/* Beskrivning */}
-          {case_.description && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-300">Beskrivning</h3>
-              <p className="text-sm text-white bg-slate-800/50 p-3 rounded-lg">
-                {case_.description}
+            {/* Date */}
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Slutfört
+              </h3>
+              <p className="text-slate-300 text-sm">
+                {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
               </p>
+            </div>
+
+            {/* Case Type */}
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <h3 className="font-semibold text-white mb-2">Skadedjur</h3>
+              <p className="text-slate-300 text-sm">{case_.skadedjur}</p>
+            </div>
+          </div>
+
+          {/* Description */}
+          {case_.description && (
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <h3 className="font-semibold text-white mb-2">Beskrivning</h3>
+              <p className="text-slate-300 text-sm whitespace-pre-wrap">{case_.description}</p>
             </div>
           )}
         </div>
@@ -230,26 +199,22 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
 }
 
 const EconomicInsightsChart: React.FC = () => {
-  // State
-  const [data, setData] = useState<InsightsData>({
-    topCases: [],
-    topSkadedjur: [],
-    potentialContracts: []
-  })
-  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
-  
-  const [selectedPeriod, setSelectedPeriod] = useState<'1m' | '3m' | '6m' | '12m'>('6m')
-  const [activeView, setActiveView] = useState<'cases' | 'skadedjur' | 'contracts'>('cases')
-  
-  // Modal state
+  const [selectedView, setSelectedView] = useState<'cases' | 'skadedjur'>('cases')
+  const [selectedMonth, setSelectedMonth] = useState<string>('')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('3m')
   const [selectedCase, setSelectedCase] = useState<TopCase | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Data states
+  const [data, setData] = useState<{
+    topCases: TopCase[]
+    topSkadedjur: TopSkadedjur[]
+  }>({
+    topCases: [],
+    topSkadedjur: []
+  })
 
   // Period options
   const periodOptions = [
@@ -259,18 +224,26 @@ const EconomicInsightsChart: React.FC = () => {
     { key: '12m', label: '12 månader', shortLabel: '12M' }
   ]
 
-  // View tabs - UPPDATERAD med "Försäljningsmöjligheter"
+  // View tabs - UPPDATERAD utan försäljningsmöjligheter
   const viewOptions = [
     { key: 'cases', label: 'Topp Ärenden', icon: Award, color: 'text-yellow-500' },
-    { key: 'skadedjur', label: 'Skadedjur', icon: Bug, color: 'text-red-500' },
-    { key: 'contracts', label: 'Försäljningsmöjligheter', icon: Building2, color: 'text-green-500' }
+    { key: 'skadedjur', label: 'Skadedjur', icon: Bug, color: 'text-red-500' }
   ]
 
   useEffect(() => {
-    fetchInsightsData()
+    // Sätt aktuell månad som default
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(currentMonth)
   }, [])
 
-  // 🔄 Hämta insights data - FIXAD: Hämta ALL data, inte bara top 10
+  useEffect(() => {
+    if (selectedMonth) {
+      fetchInsightsData()
+    }
+  }, [selectedMonth, selectedPeriod])
+
+  // 🔄 Hämta insights data
   const fetchInsightsData = async () => {
     try {
       setLoading(true)
@@ -282,7 +255,7 @@ const EconomicInsightsChart: React.FC = () => {
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
       const dateString = twelveMonthsAgo.toISOString().split('T')[0]
 
-      // Hämta ALLA avslutade ärenden från BeGone (INTE bara top 10)
+      // Hämta ALLA avslutade ärenden från BeGone
       const [privateResult, businessResult] = await Promise.all([
         supabase
           .from('private_cases')
@@ -296,220 +269,69 @@ const EconomicInsightsChart: React.FC = () => {
           .gte('completed_date', dateString)
           .not('completed_date', 'is', null)
           .not('pris', 'is', null)
-          .order('pris', { ascending: false }), // Hämta ALLA, inte bara top 10
+          .order('pris', { ascending: false }),
         
         supabase
           .from('business_cases')
           .select(`
-            id, case_number, title, pris, completed_date,
+            id, case_number, title, pris, completed_date, 
             primary_assignee_name, primary_assignee_email,
             skadedjur, adress, description, kontaktperson,
-            telefon_kontaktperson, e_post_kontaktperson,
-            org_nr, bestallare
+            telefon_kontaktperson, e_post_kontaktperson, org_nr
           `)
           .eq('status', 'Avslutat')
           .gte('completed_date', dateString)
           .not('completed_date', 'is', null)
           .not('pris', 'is', null)
-          .order('pris', { ascending: false }) // Hämta ALLA, inte bara top 10
+          .order('pris', { ascending: false })
       ])
 
-      if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`)
-      if (businessResult.error) throw new Error(`Business cases: ${businessResult.error.message}`)
+      if (privateResult.error) throw privateResult.error
+      if (businessResult.error) throw businessResult.error
 
+      // Kombinera och tagga data
       const allCases = [
-        ...(privateResult.data || []).map(case_ => ({ ...case_, type: 'private' as const })),
-        ...(businessResult.data || []).map(case_ => ({ ...case_, type: 'business' as const }))
+        ...(privateResult.data || []).map(c => ({ ...c, type: 'private' as const })),
+        ...(businessResult.data || []).map(c => ({ ...c, type: 'business' as const }))
       ]
 
-      console.log(`📊 Loaded ${allCases.length} total cases for insights analysis`)
-      console.log(`📊 Private cases: ${privateResult.data?.length || 0}, Business cases: ${businessResult.data?.length || 0}`)
+      console.log(`📊 Total cases loaded: ${allCases.length}`)
 
-      // Spara ALL rådata (inte processad data)
       setData({
-        topCases: allCases, // Spara ALLA cases, inte bara top 10
-        topSkadedjur: [], // Kommer beräknas i getFilteredData
-        potentialContracts: [] // Kommer beräknas i getFilteredData
+        topCases: allCases,
+        topSkadedjur: []  // Kommer att beräknas i useMemo
       })
-      
-      console.log('✅ Insights raw data loaded successfully')
-      
+
     } catch (err) {
-      console.error('❌ fetchInsightsData error:', err)
-      setError(err instanceof Error ? err.message : 'Fel vid hämtning av insights data')
+      console.error('❌ Error fetching insights data:', err)
+      setError(err instanceof Error ? err.message : 'Ett okänt fel uppstod')
     } finally {
       setLoading(false)
     }
   }
 
-  // 📊 Processa insights data
-  const processInsightsData = (allCases: any[]): InsightsData => {
-    // 1. TOP CASES - sortera efter pris
-    const topCases = allCases
-      .filter(case_ => case_.pris > 0)
-      .sort((a, b) => b.pris - a.pris)
-      .slice(0, 10)
-      .map(case_ => ({
-        id: case_.id,
-        case_number: case_.case_number,
-        title: case_.title,
-        type: case_.type,
-        pris: case_.pris,
-        completed_date: case_.completed_date,
-        primary_assignee_name: case_.primary_assignee_name || 'Ej tilldelad',
-        primary_assignee_email: case_.primary_assignee_email,
-        skadedjur: case_.skadedjur || 'Okänt',
-        address: case_.adress,
-        description: case_.description,
-        kontaktperson: case_.kontaktperson,
-        telefon_kontaktperson: case_.telefon_kontaktperson,
-        e_post_kontaktperson: case_.e_post_kontaktperson,
-        org_nr: case_.org_nr,
-        bestallare: case_.bestallare
-      }))
+  // Filtrera data baserat på period och månad
+  const filteredData = useMemo(() => {
+    if (!data.topCases.length) return { topCases: [], topSkadedjur: [] }
 
-    // 2. TOP SKADEDJUR - gruppera efter skadedjur och summera intäkter
-    const skadedjurStats: { [key: string]: { revenue: number; cases: any[]; count: number } } = {}
+    // Beräkna datumperiod
+    const selectedDate = new Date(selectedMonth + '-01')
+    const endDate = new Date(selectedDate)
+    endDate.setMonth(endDate.getMonth() + 1)
     
-    allCases.forEach(case_ => {
-      const skadedjur = case_.skadedjur || 'Okänt'
-      if (!skadedjurStats[skadedjur]) {
-        skadedjurStats[skadedjur] = { revenue: 0, cases: [], count: 0 }
-      }
-      skadedjurStats[skadedjur].revenue += case_.pris
-      skadedjurStats[skadedjur].count++
-      skadedjurStats[skadedjur].cases.push({
-        id: case_.id,
-        pris: case_.pris,
-        completed_date: case_.completed_date,
-        technician: case_.primary_assignee_name || 'Ej tilldelad'
-      })
+    const periodMonths = parseInt(selectedPeriod.replace('m', ''))
+    const startDate = new Date(selectedDate)
+    startDate.setMonth(startDate.getMonth() - periodMonths)
+
+    console.log(`🔍 Filtering data from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`)
+
+    // Filtrera ärenden baserat på period
+    const allFilteredCases = data.topCases.filter(case_ => {
+      const caseDate = new Date(case_.completed_date)
+      return caseDate >= startDate && caseDate < endDate
     })
 
-    const topSkadedjur = Object.entries(skadedjurStats)
-      .map(([type, stats]) => ({
-        type,
-        total_revenue: stats.revenue,
-        case_count: stats.count,
-        avg_price: stats.count > 0 ? stats.revenue / stats.count : 0,
-        recent_cases: stats.cases
-          .sort((a, b) => new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime())
-          .slice(0, 5)
-      }))
-      .sort((a, b) => b.total_revenue - a.total_revenue)
-      .slice(0, 10)
-
-    // 3. POTENTIAL CONTRACTS - använd org_nr för korrekt företagsidentifiering
-    const businessCustomers: { [key: string]: { 
-      cases: any[]; 
-      contact_person: string; 
-      phone?: string; 
-      email?: string; 
-      org_nr: string;
-      company_name?: string;
-    } } = {}
-    
-    allCases
-      .filter(case_ => case_.type === 'business' && case_.org_nr)
-      .forEach(case_ => {
-        const orgNr = case_.org_nr
-        if (!orgNr) return
-        
-        if (!businessCustomers[orgNr]) {
-          businessCustomers[orgNr] = {
-            cases: [],
-            contact_person: case_.kontaktperson || case_.bestallare || 'Okänd kontakt',
-            phone: case_.telefon_kontaktperson,
-            email: case_.e_post_kontaktperson,
-            org_nr: orgNr,
-            company_name: case_.bestallare || case_.kontaktperson
-          }
-        }
-        
-        businessCustomers[orgNr].cases.push({
-          id: case_.id,
-          pris: case_.pris,
-          completed_date: case_.completed_date,
-          skadedjur: case_.skadedjur || 'Okänt'
-        })
-      })
-
-    const potentialContracts = Object.entries(businessCustomers)
-      .filter(([_, customer]) => customer.cases.length >= 2) // Minst 2 ärenden
-      .map(([orgNr, customer]) => {
-        const totalRevenue = customer.cases.reduce((sum, case_) => sum + case_.pris, 0)
-        const latestCase = customer.cases.sort((a, b) => 
-          new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
-        )[0]
-        
-        return {
-          customer_identifier: `${customer.company_name} (${orgNr})`,
-          contact_person: customer.contact_person,
-          phone: customer.phone,
-          email: customer.email,
-          org_nr: orgNr,
-          case_count: customer.cases.length,
-          total_revenue: totalRevenue,
-          avg_case_value: totalRevenue / customer.cases.length,
-          latest_case_date: latestCase.completed_date,
-          case_details: customer.cases.sort((a, b) => 
-            new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
-          )
-        }
-      })
-      .sort((a, b) => b.total_revenue - a.total_revenue)
-      .slice(0, 15)
-
-    return {
-      topCases,
-      topSkadedjur,
-      potentialContracts
-    }
-  }
-
-  // 🎯 Filtrerad data baserat på period - HELT OMSKRIVEN LOGIK
-  const getFilteredData = useMemo(() => {
-    console.log(`🔍 Filtering data for period: ${selectedPeriod}, month: ${selectedMonth}`)
-    console.log(`📊 Raw data available: ${data.topCases.length} cases`)
-    
-    if (!data.topCases.length) {
-      return {
-        topCases: [],
-        topSkadedjur: [],
-        potentialContracts: []
-      }
-    }
-    
-    // Bestäm datumspan
-    const selectedDate = new Date(selectedMonth + '-01')
-    const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0)
-    
-    let startDate: Date
-    switch (selectedPeriod) {
-      case '1m':
-        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
-        break
-      case '3m':
-        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 2, 1)
-        break
-      case '6m':
-        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 5, 1)
-        break
-      case '12m':
-        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 11, 1)
-        break
-    }
-
-    console.log(`📅 Date range: ${startDate.toISOString().slice(0, 10)} to ${endDate.toISOString().slice(0, 10)}`)
-
-    const filterByDate = (dateString: string) => {
-      const caseDate = new Date(dateString)
-      return caseDate >= startDate && caseDate <= endDate
-    }
-
-    // Filtrera ALLA cases baserat på period
-    const allFilteredCases = data.topCases.filter(case_ => filterByDate(case_.completed_date))
-    console.log(`📊 Filtered cases: ${allFilteredCases.length} från ${data.topCases.length} totala`)
+    console.log(`📋 Filtered cases: ${allFilteredCases.length}`)
 
     // 1. TOPP CASES - ta top 10 från alla filtrerade
     const topCasesForPeriod = allFilteredCases
@@ -551,93 +373,14 @@ const EconomicInsightsChart: React.FC = () => {
 
     console.log(`🐛 Skadedjur for period: ${topSkadedjurForPeriod.length}`)
 
-    // 3. FÖRSÄLJNINGSMÖJLIGHETER - enkelt org_nr baserat
-    const orgNrStats: { [key: string]: { 
-      count: number; 
-      revenue: number; 
-      contact_person: string;
-      phone?: string;
-      email?: string;
-      company_name?: string;
-      latest_date: string;
-      cases: any[];
-    } } = {}
-    
-    // Räkna bara business cases med org_nr
-    const businessCasesForPeriod = allFilteredCases.filter(case_ => 
-      case_.type === 'business' && case_.org_nr && case_.org_nr.trim() !== ''
-    )
-    
-    console.log(`🏢 Business cases with org_nr: ${businessCasesForPeriod.length}`)
-    
-    businessCasesForPeriod.forEach(case_ => {
-      const orgNr = case_.org_nr.trim()
-      
-      if (!orgNrStats[orgNr]) {
-        orgNrStats[orgNr] = {
-          count: 0,
-          revenue: 0,
-          contact_person: case_.kontaktperson || case_.bestallare || 'Okänd kontakt',
-          phone: case_.telefon_kontaktperson,
-          email: case_.e_post_kontaktperson,
-          company_name: case_.bestallare || case_.kontaktperson,
-          latest_date: case_.completed_date,
-          cases: []
-        }
-      }
-      
-      orgNrStats[orgNr].count++
-      orgNrStats[orgNr].revenue += case_.pris
-      orgNrStats[orgNr].cases.push({
-        id: case_.id,
-        pris: case_.pris,
-        completed_date: case_.completed_date,
-        skadedjur: case_.skadedjur || 'Okänt'
-      })
-      
-      // Uppdatera senaste datum
-      if (case_.completed_date > orgNrStats[orgNr].latest_date) {
-        orgNrStats[orgNr].latest_date = case_.completed_date
-      }
-    })
-
-    // Bara företag med 2+ ärenden
-    const potentialContractsForPeriod = Object.entries(orgNrStats)
-      .filter(([_, stats]) => stats.count >= 2)
-      .map(([orgNr, stats]) => ({
-        customer_identifier: `${stats.company_name} (${orgNr})`,
-        contact_person: stats.contact_person,
-        phone: stats.phone,
-        email: stats.email,
-        org_nr: orgNr,
-        case_count: stats.count,
-        total_revenue: stats.revenue,
-        avg_case_value: stats.revenue / stats.count,
-        latest_case_date: stats.latest_date,
-        case_details: stats.cases.sort((a, b) => 
-          new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
-        )
-      }))
-      .sort((a, b) => b.case_count - a.case_count) // Sortera efter antal ärenden
-      .slice(0, 15)
-
-    console.log(`🏢 Försäljningsmöjligheter: ${potentialContractsForPeriod.length}`)
-    console.log('Top companies by case count:', potentialContractsForPeriod.slice(0, 3).map(c => 
-      `${c.contact_person}: ${c.case_count} ärenden`
-    ))
-
     return {
       topCases: topCasesForPeriod,
-      topSkadedjur: topSkadedjurForPeriod,
-      potentialContracts: potentialContractsForPeriod
+      topSkadedjur: topSkadedjurForPeriod
     }
   }, [data.topCases, selectedMonth, selectedPeriod])
 
   // Navigation functions
-  const canGoPrevious = () => {
-    return true
-  }
-
+  const canGoPrevious = () => true
   const canGoNext = () => {
     const now = new Date()
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -648,6 +391,20 @@ const EconomicInsightsChart: React.FC = () => {
     const now = new Date()
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     return selectedMonth === currentMonth
+  }
+
+  const goToPreviousMonth = () => {
+    const date = new Date(selectedMonth + '-01')
+    date.setMonth(date.getMonth() - 1)
+    const newMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(newMonth)
+  }
+
+  const goToNextMonth = () => {
+    const date = new Date(selectedMonth + '-01')
+    date.setMonth(date.getMonth() + 1)
+    const newMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(newMonth)
   }
 
   const goToCurrentMonth = () => {
@@ -670,203 +427,180 @@ const EconomicInsightsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <ModernCard gradient="purple" glowing>
-        <ModernCard.Header
-          icon={TrendingUp}
-          iconColor="text-purple-500"
-          title="Ekonomiska Insights"
-          subtitle="Laddar data..."
-        />
+      <ModernCard>
         <ModernCard.Content>
-          <div className="h-80 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
-              <p className="text-slate-400 text-sm">Laddar insights data...</p>
-            </div>
+          <div className="flex items-center justify-center py-12">
+            <LoadingSpinner />
           </div>
         </ModernCard.Content>
       </ModernCard>
     )
   }
 
-  // Error state
   if (error) {
     return (
-      <ModernCard gradient="red" glowing>
-        <ModernCard.Header
-          icon={TrendingUp}
-          iconColor="text-red-500"
-          title="Ekonomiska Insights"
-          subtitle="Fel vid laddning"
-        />
+      <ModernCard>
         <ModernCard.Content>
-          <div className="h-80 flex items-center justify-center text-red-400">
-            <div className="text-center">
-              <p className="mb-2">Fel vid laddning: {error}</p>
-              <button
-                onClick={fetchInsightsData}
-                className="flex items-center gap-2 mx-auto px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
-                Försök igen
-              </button>
-            </div>
+          <div className="text-center py-12">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={fetchInsightsData}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Försök igen
+            </button>
           </div>
         </ModernCard.Content>
       </ModernCard>
     )
   }
-
-  const filteredData = getFilteredData
 
   return (
     <div className="space-y-6">
-      {/* Header med navigation och tabs */}
-      <ModernCard gradient="purple" glowing>
-        <div className="p-6">
-          <div className="flex flex-col gap-4 mb-6">
-            {/* Titel rad */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Ekonomiska Insights</h2>
-                <p className="text-sm text-slate-400">Topp ärenden, skadedjur & avtalsmöjligheter</p>
-              </div>
-            </div>
+      {/* Controls */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+        {/* View Tabs */}
+        <div className="flex gap-2">
+          {viewOptions.map(view => {
+            const Icon = view.icon
+            return (
+              <button
+                key={view.key}
+                onClick={() => setSelectedView(view.key as any)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedView === view.key
+                    ? 'bg-slate-700 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${view.color}`} />
+                {view.label}
+              </button>
+            )
+          })}
+        </div>
 
-            {/* Navigation och View Tabs */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <CombinedNavigation
-                selectedMonth={selectedMonth}
-                onMonthChange={setSelectedMonth}
-                selectedPeriod={selectedPeriod}
-                onPeriodChange={(period) => setSelectedPeriod(period as '1m' | '3m' | '6m' | '12m')}
-                periods={periodOptions}
-                canGoPrevious={canGoPrevious()}
-                canGoNext={canGoNext()}
-                onGoToCurrent={goToCurrentMonth}
-                isCurrentMonth={isCurrentMonth()}
-                compact
-                className="flex-1"
-              />
-              
-              {/* View tabs */}
-              <div className="flex bg-slate-800/50 border border-slate-700/50 rounded-lg p-1">
-                {viewOptions.map((view) => {
-                  const IconComponent = view.icon
-                  const isActive = activeView === view.key
-                  return (
-                    <button
-                      key={view.key}
-                      onClick={() => setActiveView(view.key as any)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
-                        isActive
-                          ? 'bg-slate-700 text-white border border-slate-600 shadow-sm'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                      }`}
-                    >
-                      <IconComponent className={`w-3 h-3 ${isActive ? view.color : 'text-slate-500'}`} />
-                      <span className="hidden sm:inline">{view.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+        {/* Period + Month Navigation */}
+        <div className="flex items-center gap-4">
+          {/* Period selector */}
+          <div className="flex gap-2">
+            {periodOptions.map(period => (
+              <button
+                key={period.key}
+                onClick={() => setSelectedPeriod(period.key)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedPeriod === period.key
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {period.shortLabel}
+              </button>
+            ))}
           </div>
 
-          {/* Sammanfattning för period */}
-          <div className="mb-6">
-            <h3 className="text-sm text-slate-400 mb-4">
-              {selectedPeriod === '1m' 
-                ? `${formatSelectedMonth(selectedMonth)} - Insights översikt`
-                : `${formatSelectedMonth(selectedMonth)} (${selectedPeriod.toUpperCase()} period) - Insights översikt`
-              }
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <p className="text-yellow-400 font-bold text-lg">{filteredData.topCases.length}</p>
-                <p className="text-yellow-300 text-sm">Topp ärenden</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Högsta: {filteredData.topCases[0] ? formatCurrency(filteredData.topCases[0].pris) : 'N/A'}
-                </p>
-              </div>
-              <div className="text-center p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <p className="text-red-400 font-bold text-lg">{filteredData.topSkadedjur.length}</p>
-                <p className="text-red-300 text-sm">Skadedjurstyper</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Mest lönsamt: {filteredData.topSkadedjur[0]?.type || 'N/A'}
-                </p>
-              </div>
-              <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <p className="text-green-400 font-bold text-lg">{filteredData.potentialContracts.length}</p>
-                <p className="text-green-300 text-sm">Försäljningsmöjligheter</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Totalt värde: {formatCurrency(filteredData.potentialContracts.reduce((sum, c) => sum + c.total_revenue, 0))}
-                </p>
-              </div>
+          {/* Month navigation */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={goToPreviousMonth}
+              disabled={!canGoPrevious()}
+              className="p-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="text-center min-w-[140px]">
+              <p className="text-white font-medium">{formatSelectedMonth(selectedMonth)}</p>
+              <p className="text-xs text-slate-400">
+                {periodOptions.find(p => p.key === selectedPeriod)?.label} bakåt
+              </p>
             </div>
+            <button 
+              onClick={goToNextMonth}
+              disabled={!canGoNext()}
+              className="p-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            {!isCurrentMonth() && (
+              <button 
+                onClick={goToCurrentMonth}
+                className="ml-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+              >
+                Idag
+              </button>
+            )}
           </div>
         </div>
-      </ModernCard>
+      </div>
 
-      {/* Innehåll baserat på vald view */}
-      {activeView === 'cases' && (
+      {/* Content */}
+      {selectedView === 'cases' && (
         <ModernCard>
-          <ModernCard.Header
-            icon={Award}
-            iconColor="text-yellow-500"
-            title="Topp 10 Högsta Ärenden"
-            subtitle={`Sorterat efter intäkt för ${selectedPeriod.toUpperCase()} period`}
-          />
+          <ModernCard.Header>
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-yellow-500" />
+              <h2 className="text-lg font-semibold text-white">Topp Ärenden</h2>
+            </div>
+          </ModernCard.Header>
           <ModernCard.Content>
             {filteredData.topCases.length > 0 ? (
               <div className="space-y-3">
                 {filteredData.topCases.map((case_, index) => (
                   <div
                     key={case_.id}
+                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
                     onClick={() => handleCaseClick(case_)}
-                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors cursor-pointer group"
                   >
                     <div className="flex items-center gap-4">
-                      {/* Ranking */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-amber-600' :
-                        'bg-slate-600'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      
-                      {/* Case info */}
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                          index === 0 ? 'bg-yellow-500' :
+                          index === 1 ? 'bg-gray-400' :
+                          index === 2 ? 'bg-amber-600' :
+                          'bg-slate-600'
                         }`}>
-                          {case_.type === 'private' ? (
-                            <User className="w-4 h-4 text-purple-500" />
-                          ) : (
-                            <Building2 className="w-4 h-4 text-blue-500" />
-                          )}
+                          {index + 1}
                         </div>
-                        <div>
-                          <p className="text-white font-medium">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          case_.type === 'business' ? 'bg-blue-500/20' : 'bg-purple-500/20'
+                        }`}>
+                          {case_.type === 'business' ? 
+                            <Building2 className="w-4 h-4 text-blue-400" /> : 
+                            <User className="w-4 h-4 text-purple-400" />
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-white">
                             {case_.case_number || case_.title || `Ärende ${case_.id.slice(0, 8)}`}
-                          </p>
-                          <p className="text-sm text-slate-400">
-                            {case_.skadedjur} • {case_.primary_assignee_name} • {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
-                          </p>
+                          </h3>
+                          <span className="text-xs px-2 py-1 bg-slate-700 text-slate-300 rounded">
+                            {case_.skadedjur}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Wrench className="w-3 h-3" />
+                            {case_.primary_assignee_name}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(case_.completed_date).toLocaleDateString('sv-SE')}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-green-400 font-bold text-lg">{formatCurrency(case_.pris)}</p>
-                        <p className="text-xs text-slate-400">{case_.type === 'private' ? 'Privatperson' : 'Företag'}</p>
+                        <div className="text-lg font-bold text-green-400">
+                          {formatCurrency(case_.type === 'business' ? case_.pris * 1.25 : case_.pris)}
+                        </div>
+                        {case_.type === 'business' && (
+                          <div className="text-xs text-slate-400">inkl. moms</div>
+                        )}
                       </div>
-                      <Eye className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
+                      <Eye className="w-4 h-4 text-slate-400" />
                     </div>
                   </div>
                 ))}
@@ -881,50 +615,47 @@ const EconomicInsightsChart: React.FC = () => {
         </ModernCard>
       )}
 
-      {activeView === 'skadedjur' && (
+      {selectedView === 'skadedjur' && (
         <ModernCard>
-          <ModernCard.Header
-            icon={Bug}
-            iconColor="text-red-500"
-            title="Mest Lönsamma Skadedjur"
-            subtitle={`Sorterat efter total intäkt för ${selectedPeriod.toUpperCase()} period`}
-          />
+          <ModernCard.Header>
+            <div className="flex items-center gap-2">
+              <Bug className="w-5 h-5 text-red-500" />
+              <h2 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h2>
+            </div>
+          </ModernCard.Header>
           <ModernCard.Content>
             {filteredData.topSkadedjur.length > 0 ? (
               <div className="space-y-3">
                 {filteredData.topSkadedjur.map((skadedjur, index) => (
                   <div
                     key={skadedjur.type}
-                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-lg"
                   >
                     <div className="flex items-center gap-4">
-                      {/* Ranking */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                        index === 0 ? 'bg-red-500' :
-                        index === 1 ? 'bg-orange-500' :
-                        index === 2 ? 'bg-yellow-500' :
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-400' :
+                        index === 2 ? 'bg-amber-600' :
                         'bg-slate-600'
                       }`}>
                         {index + 1}
                       </div>
-                      
-                      {/* Skadedjur info */}
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
-                          <Bug className="w-4 h-4 text-red-500" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">{skadedjur.type}</p>
-                          <p className="text-sm text-slate-400">
-                            {skadedjur.case_count} ärenden • Snitt: {formatCurrency(skadedjur.avg_price)}
-                          </p>
+                      <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                        <Bug className="w-4 h-4 text-red-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">{skadedjur.type}</h3>
+                        <div className="flex items-center gap-4 text-sm text-slate-400">
+                          <span>{skadedjur.case_count} ärenden</span>
+                          <span>∅ {formatCurrency(skadedjur.avg_price)}</span>
                         </div>
                       </div>
                     </div>
-                    
                     <div className="text-right">
-                      <p className="text-green-400 font-bold text-lg">{formatCurrency(skadedjur.total_revenue)}</p>
-                      <p className="text-xs text-slate-400">Total intäkt</p>
+                      <div className="text-lg font-bold text-green-400">
+                        {formatCurrency(skadedjur.total_revenue)}
+                      </div>
+                      <div className="text-xs text-slate-400">total intäkt</div>
                     </div>
                   </div>
                 ))}
@@ -933,88 +664,6 @@ const EconomicInsightsChart: React.FC = () => {
               <div className="text-center py-12 text-slate-400">
                 <Bug className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>Inga skadedjur för vald period</p>
-              </div>
-            )}
-          </ModernCard.Content>
-        </ModernCard>
-      )}
-
-      {activeView === 'contracts' && (
-        <ModernCard>
-          <ModernCard.Header
-            icon={Building2}
-            iconColor="text-green-500"
-            title="Försäljningsmöjligheter"
-            subtitle={`Företag med flera ärenden - Potentiella avtalskunder för ${selectedPeriod.toUpperCase()} period`}
-          />
-          <ModernCard.Content>
-            {filteredData.potentialContracts.length > 0 ? (
-              <div className="space-y-3">
-                {filteredData.potentialContracts.map((contract, index) => (
-                  <div
-                    key={contract.customer_identifier}
-                    className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Priority indicator */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                        contract.case_count >= 5 ? 'bg-red-500' :
-                        contract.case_count >= 3 ? 'bg-yellow-500' :
-                        'bg-green-500'
-                      }`}>
-                        {contract.case_count >= 5 ? '🔥' :
-                         contract.case_count >= 3 ? '⚡' : '💡'}
-                      </div>
-                      
-                      {/* Customer info */}
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                          <Building2 className="w-4 h-4 text-green-500" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">{contract.contact_person}</p>
-                          <div className="flex items-center gap-4 text-sm text-slate-400">
-                            <span>{contract.case_count} ärenden</span>
-                            {contract.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3 h-3" />
-                                {contract.phone}
-                              </span>
-                            )}
-                            {contract.email && (
-                              <span className="flex items-center gap-1">
-                                <Mail className="w-3 h-3" />
-                                {contract.email}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className="text-green-400 font-bold text-lg">{formatCurrency(contract.total_revenue)}</p>
-                      <p className="text-xs text-slate-400">
-                        Snitt: {formatCurrency(contract.avg_case_value)} • Senaste: {new Date(contract.latest_case_date).toLocaleDateString('sv-SE')}
-                      </p>
-                      <div className="mt-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          contract.case_count >= 5 ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                          contract.case_count >= 3 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
-                          'bg-green-500/10 text-green-400 border border-green-500/20'
-                        }`}>
-                          {contract.case_count >= 5 ? 'Hög prioritet' :
-                           contract.case_count >= 3 ? 'Medel prioritet' : 'Låg prioritet'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Inga försäljningsmöjligheter för vald period</p>
               </div>
             )}
           </ModernCard.Content>

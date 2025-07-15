@@ -1,148 +1,165 @@
-// src/pages/admin/Dashboard.tsx - UPPDATERAD MED SEPARATA TEKNIKER-KNAPPAR + PROVISIONER
-import { useEffect, useState } from 'react'
+// 📁 src/pages/admin/AdminDashboard.tsx - MED FÖRSÄLJNINGSMÖJLIGHETER KNAPP
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import { 
-  Users, FileText, Calendar, Plus, LogOut, Bug, AlertTriangle, UserCheck, 
-  BarChart3, DollarSign, Activity, Wrench, Wallet
+  Users, 
+  FileText, 
+  TrendingUp, 
+  DollarSign, 
+  BarChart3, 
+  Calendar,
+  Settings,
+  Building2,
+  User,
+  Shield,
+  LogOut,
+  Wrench,
+  Star,
+  Target
 } from 'lucide-react'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
 
-type Stats = {
+import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import { formatCurrency } from '../../utils/formatters'
+
+interface DashboardStats {
   totalCustomers: number
-  activeCustomers: number
   totalCases: number
-  upcomingVisits: number
+  totalPrivateCases: number
+  totalBusinessCases: number
+  totalRevenue: number
+  activeTechnicians: number
+  pendingCases: number
+  recentActivity: Array<{
+    id: string
+    type: string
+    description: string
+    timestamp: string
+  }>
 }
 
-export default function AdminDashboard() {
-  const { profile, signOut } = useAuth()
+const AdminDashboard: React.FC = () => {
   const navigate = useNavigate()
-  const [stats, setStats] = useState<Stats>({
-    totalCustomers: 0,
-    activeCustomers: 0,
-    totalCases: 0,
-    upcomingVisits: 0
-  })
+  const { user, signOut } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    console.log('📊 AdminDashboard: Component mounted')
-    console.log('👤 Current profile:', profile)
-    fetchStats()
+    fetchDashboardStats()
   }, [])
 
-  const fetchStats = async () => {
-    console.log('📊 Starting stats fetch...')
-    setLoading(true)
-    setError(null)
-    
+  const fetchDashboardStats = async () => {
     try {
-      console.log('🔗 Testing Supabase connection...')
-      
-      // Test basic connection först
-      const { data: connectionTest, error: connectionError } = await supabase
-        .from('customers')
-        .select('count', { count: 'exact', head: true })
+      setLoading(true)
+      setError(null)
 
-      if (connectionError) {
-        console.error('💥 Supabase connection failed:', connectionError)
-        throw new Error(`Database connection failed: ${connectionError.message}`)
-      }
-      
-      console.log('✅ Supabase connection OK')
+      // Hämta parallella queries för bättre prestanda
+      const [
+        customersResult,
+        casesResult,
+        privateCasesResult,
+        businessCasesResult,
+        techniciansResult
+      ] = await Promise.all([
+        supabase.from('customers').select('id, annual_premium').eq('is_active', true),
+        supabase.from('cases').select('id, price').not('completed_date', 'is', null),
+        supabase.from('private_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('business_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('technicians').select('id, name').eq('is_active', true)
+      ])
 
-      // Hämta kundstatistik
-      console.log('👥 Fetching customer stats...')
-      const { data: customers, error: customersError } = await supabase
-        .from('customers')
-        .select('is_active')
+      if (customersResult.error) throw customersResult.error
+      if (casesResult.error) throw casesResult.error
+      if (privateCasesResult.error) throw privateCasesResult.error
+      if (businessCasesResult.error) throw businessCasesResult.error
+      if (techniciansResult.error) throw techniciansResult.error
 
-      if (customersError) {
-        console.error('💥 Customers query failed:', customersError)
-        throw customersError
-      }
-      
-      console.log('✅ Customers fetched:', customers?.length || 0)
+      // Beräkna total revenue
+      const contractRevenue = customersResult.data?.reduce((sum, c) => sum + (c.annual_premium || 0), 0) || 0
+      const caseRevenue = casesResult.data?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+      const privateRevenue = privateCasesResult.data?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
+      const businessRevenue = businessCasesResult.data?.reduce((sum, c) => sum + (c.pris * 1.25 || 0), 0) || 0
 
-      // Hämta ärenden
-      console.log('📋 Fetching cases...')
-      const { data: cases, error: casesError } = await supabase
-        .from('cases')
-        .select('id')
+      const totalRevenue = contractRevenue + caseRevenue + privateRevenue + businessRevenue
 
-      if (casesError) {
-        console.error('💥 Cases query failed:', casesError)
-        throw casesError
-      }
-      
-      console.log('✅ Cases fetched:', cases?.length || 0)
+      // Räkna pågående ärenden
+      const [activeCasesResult] = await Promise.all([
+        supabase.from('cases').select('id').is('completed_date', null)
+      ])
 
-      // Hämta kommande besök
-      console.log('📅 Fetching upcoming visits...')
-      const { data: visits, error: visitsError } = await supabase
-        .from('visits')
-        .select('id')
-        .gte('visit_date', new Date().toISOString())
-
-      if (visitsError) {
-        console.error('💥 Visits query failed:', visitsError)
-        throw visitsError
-      }
-      
-      console.log('✅ Visits fetched:', visits?.length || 0)
-
-      const newStats = {
-        totalCustomers: customers?.length || 0,
-        activeCustomers: customers?.filter(c => c.is_active)?.length || 0,
-        totalCases: cases?.length || 0,
-        upcomingVisits: visits?.length || 0
+      const dashboardStats: DashboardStats = {
+        totalCustomers: customersResult.data?.length || 0,
+        totalCases: casesResult.data?.length || 0,
+        totalPrivateCases: privateCasesResult.data?.length || 0,
+        totalBusinessCases: businessCasesResult.data?.length || 0,
+        totalRevenue,
+        activeTechnicians: techniciansResult.data?.length || 0,
+        pendingCases: activeCasesResult.data?.length || 0,
+        recentActivity: [] // Kan implementeras senare
       }
 
-      console.log('📊 Final stats:', newStats)
-      setStats(newStats)
-
-    } catch (error: any) {
-      console.error('💥 Stats fetch failed:', error)
-      setError(error.message || 'Kunde inte hämta statistik')
+      setStats(dashboardStats)
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err)
+      setError(err instanceof Error ? err.message : 'Ett fel uppstod')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     try {
       await signOut()
-      navigate('/auth/login')
-    } catch (error) {
-      console.error('Logout error:', error)
+      navigate('/login')
+    } catch (err) {
+      console.error('Error signing out:', err)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8 max-w-md">
+          <div className="text-center">
+            <div className="text-red-400 mb-4">Fel vid laddning av dashboard</div>
+            <p className="text-slate-400 mb-6">{error}</p>
+            <Button onClick={fetchDashboardStats}>Försök igen</Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                  <Bug className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">BeGone Admin</span>
-              </div>
+      <header className="bg-slate-900/50 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+              <p className="text-slate-400">Välkommen tillbaka, {user?.email}</p>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-400">
-                Inloggad som: <span className="text-white">{profile?.email}</span>
-              </span>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
+            <div className="flex items-center gap-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSignOut}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
                 Logga ut
               </Button>
             </div>
@@ -152,219 +169,266 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Välkommen tillbaka!</h1>
-          <p className="text-slate-400">Här är en snabb översikt över din verksamhet</p>
-        </div>
-
-        {error && (
-          <Card className="mb-8 bg-red-500/10 border-red-500/50">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-red-400" />
-              <div>
-                <h3 className="text-red-400 font-medium">Kunde inte ladda statistik</h3>
-                <p className="text-red-300 text-sm mt-1">{error}</p>
-                <Button 
-                  variant="secondary" 
-                  size="sm" 
-                  onClick={fetchStats}
-                  className="mt-2"
-                >
-                  Försök igen
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt antal kunder</p>
-                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.totalCustomers}</p>
-              </div>
-              <Users className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Aktiva kunder</p>
-                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.activeCustomers}</p>
-              </div>
-              <UserCheck className="w-8 h-8 text-green-500" />
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Totalt antal ärenden</p>
-                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.totalCases}</p>
-              </div>
-              <FileText className="w-8 h-8 text-purple-500" />
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Kommande besök</p>
-                <p className="text-2xl font-bold text-white">{loading ? '-' : stats.upcomingVisits}</p>
-              </div>
-              <Calendar className="w-8 h-8 text-orange-500" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Quick Actions & Navigation */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-8">
           
-          {/* Hantering */}
-          <Card>
-            <h3 className="text-lg font-semibold text-white mb-4">Hantering</h3>
-            <div className="space-y-2">
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start"
-                onClick={() => navigate('/admin/customers/new')}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Lägg till ny kund
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start"
-                onClick={() => navigate('/admin/customers')}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Hantera kunder
-              </Button>
-              {/* 🆕 NY KNAPP: Hantera tekniker (CRUD) */}
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start"
-                onClick={() => navigate('/admin/technician-management')}
-              >
-                <UserCheck className="w-4 h-4 mr-2" />
-                Hantera tekniker
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/20 hover:from-orange-500/20 hover:to-yellow-500/20"
-                onClick={() => navigate('/admin/billing')}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Fakturering
-              </Button>
-              {/* 🆕 NY KNAPP: Provisioner - under Fakturering */}
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-emerald-500/10 to-green-500/10 border-emerald-500/20 hover:from-emerald-500/20 hover:to-green-500/20"
-                onClick={() => navigate('/admin/commissions')}
-              >
-                <Wallet className="w-4 h-4 mr-2" />
-                Provisioner
-              </Button>
-            </div>
-          </Card>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Avtalskunder</p>
+                  <p className="text-2xl font-bold text-white">{stats?.totalCustomers || 0}</p>
+                </div>
+              </div>
+            </Card>
 
-          {/* Avancerad Statistik */}
-          <Card>
-            <h3 className="text-lg font-semibold text-white mb-4">Avancerad Statistik</h3>
-            <div className="space-y-2">
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20 hover:from-green-500/20 hover:to-emerald-500/20"
-                onClick={() => navigate('/admin/economics')}
-              >
-                <DollarSign className="w-4 h-4 mr-2" />
-                Ekonomisk Statistik & ARR
-              </Button>
-              {/* 🔄 FLYTTAD: Tekniker Performance till Avancerad Statistik */}
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-cyan-500/20"
-                onClick={() => navigate('/admin/technicians')}
-              >
-                <Wrench className="w-4 h-4 mr-2" />
-                Tekniker Performance
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:from-purple-500/20 hover:to-pink-500/20"
-                onClick={() => navigate('/admin/customers')}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Kundanalys & Avtal
-              </Button>
-            </div>
-          </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Total Intäkt</p>
+                  <p className="text-2xl font-bold text-white">{formatCurrency(stats?.totalRevenue || 0)}</p>
+                </div>
+              </div>
+            </Card>
 
-          {/* Systemstatus */}
-          <Card>
-            <h3 className="text-lg font-semibold text-white mb-4">Systemstatus</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-300">Database</span>
-                <span className="flex items-center text-green-400 text-sm">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  Online
-                </span>
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">BeGone Ärenden</p>
+                  <p className="text-2xl font-bold text-white">
+                    {(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-300">ClickUp API</span>
-                <span className="flex items-center text-green-400 text-sm">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  Connected
-                </span>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                  <Wrench className="w-6 h-6 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Aktiva Tekniker</p>
+                  <p className="text-2xl font-bold text-white">{stats?.activeTechnicians || 0}</p>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-300">Email Service</span>
-                <span className="flex items-center text-green-400 text-sm">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  Active
-                </span>
+            </Card>
+          </div>
+
+          {/* Navigation Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Kundhantering */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/customers')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                  <Users className="w-8 h-8 text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Kundhantering</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Hantera avtalskunder, skapa nya listor och skicka inbjudningar
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      {stats?.totalCustomers} aktiva kunder
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-300">Tekniker Dashboard</span>
-                <span className="flex items-center text-blue-400 text-sm">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                  Ready
-                </span>
+            </Card>
+
+            {/* Ekonomisk Översikt */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/economics')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-green-500/20 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-8 h-8 text-green-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Ekonomisk Översikt</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Intäktsanalys, trender och ekonomiska insights
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      {formatCurrency(stats?.totalRevenue || 0)} total intäkt
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
               </div>
-              {/* 🆕 NY STATUS: Provisionsystem */}
-              <div className="flex items-center justify-between">
-                <span className="text-slate-300">Provisionsystem</span>
-                <span className="flex items-center text-emerald-400 text-sm">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
-                  Active
-                </span>
+            </Card>
+
+            {/* 🆕 Försäljningsmöjligheter */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/sales-opportunities')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                  <Target className="w-8 h-8 text-purple-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Försäljningsmöjligheter</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Identifiera potentiella avtalskunder från BeGone-ärenden
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      Analys av återkommande kunder
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
               </div>
-              <div className="pt-3 border-t border-slate-700">
-                <p className="text-xs text-slate-500">
-                  Statistik uppdaterad: {new Date().toLocaleTimeString('sv-SE', { 
-                    hour: '2-digit', 
-                    minute: '2-digit'
-                  })}
-                </p>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={fetchStats}
-                  className="mt-2 text-green-400 hover:text-green-300 w-full"
-                >
-                  <Activity className="w-4 h-4 mr-2" />
-                  Uppdatera översikt
-                </Button>
+            </Card>
+
+            {/* Tekniker Statistik */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/technicians')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                  <Wrench className="w-8 h-8 text-orange-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Tekniker Statistik</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Prestanda, ranking och arbetstider för tekniker
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      {stats?.activeTechnicians} aktiva tekniker
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+
+            {/* Fakturering */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/billing')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                  <FileText className="w-8 h-8 text-yellow-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Fakturering</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Hantera fakturering för avslutade BeGone-ärenden
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      {(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* System Inställningar */}
+            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/settings')}>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-slate-500/20 rounded-xl flex items-center justify-center">
+                  <Settings className="w-8 h-8 text-slate-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Inställningar</h3>
+                  <p className="text-sm text-slate-400 mb-3">
+                    Systemkonfiguration och användarhantering
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">
+                      Konfigurationer
+                    </span>
+                    <Button size="sm" variant="secondary">Öppna</Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Recent Activity */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-400" />
+                Senaste Aktivitet
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white">System uppdaterat</p>
+                    <p className="text-xs text-slate-400">Senaste synkronisering från ClickUp</p>
+                  </div>
+                  <span className="text-xs text-slate-500">Just nu</span>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white">Dashboard laddat</p>
+                    <p className="text-xs text-slate-400">Alla komponenter aktiva</p>
+                  </div>
+                  <span className="text-xs text-slate-500">Nu</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* System Status */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-green-400" />
+                System Status
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">Database</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-xs text-green-400">Online</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">ClickUp Integration</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-xs text-green-400">Synkroniserad</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">Webhook Status</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-xs text-green-400">Aktiv</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">API Endpoints</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-xs text-green-400">Tillgängliga</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </main>
     </div>
   )
 }
+
+export default AdminDashboard
