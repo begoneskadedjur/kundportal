@@ -1,8 +1,9 @@
-// 📁 src/components/admin/billing/BillingModal.tsx
+// 📁 src/components/admin/billing/BillingModal.tsx - KORRIGERAD MED BEFINTLIG FORMATTER
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase'; // <-- KORRIGERAD SÖKVÄG
+import { supabase } from '../../../lib/supabase';
 import { X, User, Building2, Calendar, MapPin, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-import { formatCurrency, formatAddress } from '../../../utils/formatters';
+// 🎯 KORRIGERING: Importera BARA de funktioner som faktiskt finns i formatters.ts
+import { formatCurrency, formatSwedishDate } from '../../../utils/formatters';
 import { EditableBillingFields } from './EditableBillingFields';
 import { BillingActions } from './BillingActions';
 import type { BillingCase, EditableFields } from '../../../types/billing';
@@ -13,6 +14,24 @@ interface Props {
   onClose: () => void;
   onCaseUpdate: (updatedCase: BillingCase) => void;
 }
+
+// 🎯 Den här funktionen definierar vi lokalt eftersom den är specifik för hur adress-objektet ser ut
+const formatAddressLocal = (address: any): string => {
+  if (!address) return 'Adress saknas';
+  if (typeof address === 'string') {
+    try {
+      if (!address.startsWith('{') || !address.includes('formatted_address')) return address;
+      const parsed = JSON.parse(address);
+      return parsed.formatted_address || address;
+    } catch { return address; }
+  }
+  if (typeof address === 'object' && address !== null) {
+    if (address.formatted_address) return address.formatted_address;
+    const parts = [address.street, address.postalCode, address.city].filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+  }
+  return 'Okänt adressformat';
+};
 
 export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUpdate }) => {
   const [showDescription, setShowDescription] = useState(false);
@@ -133,7 +152,7 @@ export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUp
             <EditableBillingFields case_={case_} isEditing={isEditing} onFieldChange={handleFieldChange} editableFields={editableFields} />
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2"><MapPin className="w-5 h-5 text-red-400" /> Adress</h3>
-                <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-white">{formatAddress(case_.adress)}</p></div>
+                <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-white">{formatAddressLocal(case_.adress)}</p></div>
             </div>
             {case_.description && (
                 <div className="space-y-2">
