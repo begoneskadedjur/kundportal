@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/Technicians.tsx - UTAN SYSTEM STATUS KORT
+// 📁 src/pages/admin/Technicians.tsx - UPPDATERAD MED AI ANALYSIS SUPPORT
 import React, { useState } from 'react'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -17,12 +17,15 @@ import ModernViewSelector from '../../components/ui/ModernViewSelector'
 const Technicians: React.FC = () => {
   const navigate = useNavigate()
   const [selectedView, setSelectedView] = useState<'overview' | 'performance' | 'specialization' | 'individual'>('overview')
+  
+  // 🔑 CRITICAL: State för individuell analys - detta löser onClick-felet
+  const [selectedTechnicianName, setSelectedTechnicianName] = useState<string>('')
 
   const handleRefresh = async () => {
     window.location.reload()
   }
 
-  // View options för tekniker-analys
+  // View options för tekniker-analys - uppdaterad med AI-badge
   const technicianViewOptions = [
     {
       key: 'overview',
@@ -48,11 +51,21 @@ const Technicians: React.FC = () => {
     {
       key: 'individual',
       label: 'Individuell',
-      description: 'Detaljerad tekniker-analys',
+      description: 'AI-driven djupanalys',
       gradient: 'orange',
-      badge: 'Djupdyk'
+      badge: 'AI-Powered' // 🤖 Uppdaterad badge
     }
   ]
+
+  // Reset selected technician när man byter vy
+  const handleViewChange = (view: string) => {
+    setSelectedView(view as 'overview' | 'performance' | 'specialization' | 'individual')
+    
+    // Rensa vald tekniker när man lämnar individual view
+    if (view !== 'individual') {
+      setSelectedTechnicianName('')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -75,6 +88,9 @@ const Technicians: React.FC = () => {
                 <p className="text-slate-400 text-sm">
                   Komplett analys av tekniker-prestanda och specialiseringar
                   <span className="ml-2 text-blue-400">• Realtidsdata från alla affärsområden</span>
+                  {selectedView === 'individual' && (
+                    <span className="ml-2 text-orange-400">• AI-driven personlig analys</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -110,7 +126,10 @@ const Technicians: React.FC = () => {
                   <span className="ml-2 text-sm text-slate-400">Välj analystyp</span>
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  Dynamisk data från alla tekniker och affärsområden
+                  {selectedView === 'individual' 
+                    ? 'AI-driven personlig utvecklingsanalys för varje tekniker'
+                    : 'Dynamisk data från alla tekniker och affärsområden'
+                  }
                 </p>
               </div>
               
@@ -118,7 +137,7 @@ const Technicians: React.FC = () => {
               <ModernViewSelector
                 options={technicianViewOptions}
                 selectedView={selectedView}
-                onViewChange={(view) => setSelectedView(view as 'overview' | 'performance' | 'specialization' | 'individual')}
+                onViewChange={handleViewChange}
                 variant="compact"
                 layout="horizontal"
                 size="sm"
@@ -146,7 +165,11 @@ const Technicians: React.FC = () => {
 
             {selectedView === 'individual' && (
               <div className="space-y-8">
-                <IndividualTechnicianAnalysis />
+                {/* 🎯 KRITISK FIX: Skicka state som props */}
+                <IndividualTechnicianAnalysis 
+                  selectedTechnicianName={selectedTechnicianName}
+                  setSelectedTechnicianName={setSelectedTechnicianName}
+                />
               </div>
             )}
           </section>
@@ -154,14 +177,14 @@ const Technicians: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - uppdaterad med AI-info */}
       <footer className="bg-slate-900/50 border-t border-slate-800 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between text-sm text-slate-400">
             <div className="flex items-center gap-4">
               <span>Senast uppdaterad: {new Date().toLocaleTimeString('sv-SE')}</span>
               <div className="h-1 w-1 bg-slate-600 rounded-full"></div>
-              <span>Technician Dashboard v2.0</span>
+              <span>Technician Dashboard v2.1</span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -176,6 +199,12 @@ const Technicians: React.FC = () => {
                 <span>👤</span>
                 <span>Individuell analys</span>
               </div>
+              {selectedView === 'individual' && (
+                <div className="flex items-center gap-2">
+                  <span>🤖</span>
+                  <span>AI-powered insights</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
