@@ -1,413 +1,254 @@
-// /api/ai-technician-analysis.ts - AI-driven tekniker analys med ChatGPT
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import OpenAI from 'openai'
+// /api/ai-technician-analysis.ts
+// UPPDATERAD: 2025-07-15 - Fullständig omskrivning med ny systemprompt och robust fallback.
 
-// Initialize OpenAI
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import OpenAI from 'openai';
+
+// =================================================================================
+// SECTION 1: CONFIGURATION & INITIALIZATION
+// =================================================================================
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Definition av den förväntade JSON-strukturen.
+// Detta är hjärtat av vår nya, djupgående analys.
+const systemPrompt = `Du är en elit-analytiker och strategisk coach för BeGone, ett ledande skadedjursföretag. Ditt uppdrag är att genomföra en djupgående, datadriven analys av en enskild tekniker. Du måste vara ärlig, direkt och ge konkreta, handlingsbara rekommendationer.
+
+Analysen ska generera ett JSON-objekt och **ENDAST** ett JSON-objekt, som strikt följer denna TypeScript-interface:
+
+interface AIAnalysis {
+  executiveSummary: { headline: string; summary: string; };
+  performanceDashboard: { overall_performance_grade: 'A+' | 'A' | 'B' | 'C' | 'D'; key_metrics: Array<{ metric: string; value: string; comparison_to_team_avg: number; comparison_to_top_performer: number; }>; };
+  revenueDeepDive: { breakdown: Array<{ source: 'Privat' | 'Företag' | 'Avtal'; revenue: number; case_count: number; avg_value: number; }>; profitability_analysis: string; };
+  specializationAnalysis: { primary_specialization: string; specialization_revenue: number; specialization_avg_case_value: number; comparison_to_team_avg_for_pest: number; recommendation: string; };
+  historicalTrends: { six_month_revenue_trend: 'stark uppgång' | 'stabil' | 'svag nedgång' | 'data saknas'; consistency_score: 'mycket konsekvent' | 'varierande' | 'oförutsägbar'; trend_analysis: string; };
+  strengths: Array<{ area: string; description: string; evidence: string; }>;
+  developmentAreas: Array<{ area: string; description: string; potential_impact: string; }>;
+  actionableDevelopmentPlan: { primary_focus_30_days: string; actions: Array<{ action: string; priority: 'Hög' | 'Medium' | 'Låg'; expected_outcome: string; how_to_measure: string; }>; };
+  mentorshipProfile: { profile: 'Idealisk Mentor' | 'Aktiv Adept' | 'Självgående Expert' | 'Potential att leda'; should_mentor: boolean; mentoring_areas: string[]; needs_mentoring: boolean; learning_focus: string[]; };
+  riskAssessment: { key_risks: Array<{ risk: string; mitigation_strategy: string; }>; retention_factor: 'Hög' | 'Medium' | 'Låg'; };
+}
+
+INSTRUKTIONER FÖR DIN ANALYS:
+- **executiveSummary**: Var brutal-ärlig. Ge en skarp, insiktsfull sammanfattning som en VD kan läsa på 10 sekunder.
+- **performanceDashboard**: Använd datan för att beräkna procentuella jämförelser mot teamets snitt och toppen. Var exakt. Betygsätt från A+ (exceptionell) till D (underpresterande).
+- **revenueDeepDive**: Analysera intäktsströmmarna. Identifiera var teknikern är mest (och minst) lönsam.
+- **specializationAnalysis**: Identifiera inte bara den vanligaste skadedjurstypen. Analysera den ekonomiska prestandan inom den nischen. Ge en strategisk rekommendation.
+- **historicalTrends**: Analysera de senaste 6 månadernas data. Är prestandan på väg upp eller ner? Är den stabil eller volatil? Förklara varför.
+- **actionableDevelopmentPlan**: VIKTIGAST. Skapa en 30-dagarsplan med SPECIFIKA, MÄTBARA mål. Exempel: "Öka genomsnittligt pris på privatärenden från 1800 kr till 2100 kr."
+- **mentorshipProfile**: Baserat på all data, definiera teknikerns roll. Är hen redo att leda? Behöver hen en mentor? Var specifik.
+- **riskAssessment**: Tänk som en företagsledare. Vilka är riskerna? Utbrändhet? Beroende av en kund? Stagnation?
+
+Du måste leverera en komplett, felfri JSON utan extra text före eller efter. Analysen ska vara på svenska.`;
+
+
+// =================================================================================
+// SECTION 2: API HANDLER
+// Huvudlogiken för Vercel Serverless Function.
+// =================================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
+  // Tillåt CORS för OPTIONS-anrop (pre-flight)
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return res.status(200).end();
   }
-
+  // Acceptera endast POST-anrop
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
   try {
-    const { 
-      technician, 
-      allTechnicians, 
-      monthlyData, 
-      pestSpecialization, 
-      teamStats,
-      validate 
-    } = req.body
+    const { technician, allTechnicians, monthlyData, pestSpecialization } = req.body;
 
-    // API Health Check
-    if (validate === true) {
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ 
-          error: 'OpenAI API key not configured',
-          health: 'unhealthy' 
-        })
-      }
-      return res.status(200).json({ 
-        health: 'healthy',
-        openai_configured: true,
-        timestamp: new Date().toISOString()
-      })
-    }
-
-    // Validera input
-    if (!technician || !allTechnicians) {
-      return res.status(400).json({ 
-        error: 'Tekniker data saknas',
-        details: 'Både technician och allTechnicians krävs'
-      })
-    }
-
-    // Validera OpenAI API key
+    // --- Input Validering ---
     if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ 
-        error: 'OpenAI API inte konfigurerad',
-        details: 'OPENAI_API_KEY environment variable saknas'
-      })
+      return res.status(500).json({ success: false, error: 'OpenAI API-nyckel är inte konfigurerad på servern.' });
+    }
+    if (!technician || !allTechnicians || allTechnicians.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nödvändig tekniker-data saknas i anropet.' });
+    }
+    if (!technician.name || typeof technician.rank !== 'number' || typeof technician.total_revenue !== 'number') {
+        return res.status(400).json({ success: false, error: 'Den valda teknikerns data är ofullständig eller korrupt.' });
     }
 
-    // Validera tekniker data struktur
-    if (!technician.name || !technician.rank || typeof technician.total_revenue !== 'number') {
-      return res.status(400).json({ 
-        error: 'Ogiltig tekniker data struktur',
-        details: 'Tekniker måste ha name, rank och total_revenue'
-      })
-    }
+    // --- Bygg Datakontext ---
+    const analysisContext = buildAnalysisContext(technician, allTechnicians, monthlyData, pestSpecialization);
+    const userPrompt = `Analysera följande teknikerdata och generera en JSON enligt systeminstruktionen:\n\n${JSON.stringify(analysisContext, null, 2)}`;
 
-    // Skapa omfattande datakontext för AI:n
-    const analysisContext = {
-      technician: {
-        name: technician.name,
-        role: technician.role,
-        rank: technician.rank,
-        total_revenue: technician.total_revenue,
-        total_cases: technician.total_cases,
-        avg_case_value: technician.avg_case_value,
-        private_revenue: technician.private_revenue,
-        business_revenue: technician.business_revenue,
-        contract_revenue: technician.contract_revenue,
-        private_cases: technician.private_cases,
-        business_cases: technician.business_cases,
-        contract_cases: technician.contract_cases
-      },
-      team_context: {
-        total_technicians: allTechnicians.length,
-        team_avg_revenue: allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length,
-        team_avg_cases: allTechnicians.reduce((sum, t) => sum + t.total_cases, 0) / allTechnicians.length,
-        team_avg_case_value: allTechnicians.reduce((sum, t) => sum + t.avg_case_value, 0) / allTechnicians.length,
-        top_performer: allTechnicians.find(t => t.rank === 1),
-        technician_percentile: ((allTechnicians.length - technician.rank + 1) / allTechnicians.length * 100).toFixed(1)
-      },
-      performance_trends: monthlyData?.slice(-6) || [], // Senaste 6 månaderna
-      specializations: pestSpecialization || [],
-      company_context: {
-        total_revenue_all: allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0),
-        business_type: 'Skadedjursbekämpning',
-        service_areas: ['Privatpersoner', 'Företag', 'Avtalskunder']
-      }
-    }
+    // --- Anropa OpenAI ---
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o', // Använder den senaste och mest kapabla modellen
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: "json_object" }, // Tvingar modellen att svara med JSON
+      temperature: 0.5, // Något kreativ men fortfarande grundad i data
+      max_tokens: 3000,
+    });
 
-    // Skapa AI prompt för djupanalys
-    const systemPrompt = `Du är en expert inom personalutveckling och performance coaching för skadedjursbekämpningsföretag. 
-
-Din uppgift är att analysera en teknikers prestanda och skapa personliga, konkreta utvecklingsrekommendationer baserat på verklig data.
-
-Analysera följande aspekter:
-1. Styrkor baserat på ranking, intäkt per ärende, specialisering
-2. Förbättringsområden jämfört med teamet
-3. Trender i månadsdata (om tillgänglig)
-4. Konkreta nästa steg inom 30 dagar
-5. Långsiktiga utvecklingsmål
-
-Svara ENDAST med en JSON-struktur enligt detta format:
-{
-  "summary": "Kort sammanfattning av teknikerns position och potential",
-  "strengths": [
-    {
-      "area": "Område (t.ex. Specialisering, Prissättning, Konsistens)",
-      "description": "Konkret beskrivning med siffror",
-      "evidence": "Specifik data som stödjer detta"
-    }
-  ],
-  "development_areas": [
-    {
-      "area": "Utvecklingsområde",
-      "description": "Vad som kan förbättras",
-      "impact": "Potential påverkan på prestanda"
-    }
-  ],
-  "next_steps": [
-    {
-      "action": "Konkret åtgärd",
-      "timeline": "30 dagar/3 månader/6 månader",
-      "priority": "high/medium/low",
-      "expected_outcome": "Förväntad förbättring"
-    }
-  ],
-  "mentorship_recommendations": {
-    "should_mentor": boolean,
-    "mentoring_areas": ["Area1", "Area2"],
-    "needs_mentoring": boolean,
-    "learning_focus": ["Focus1", "Focus2"]
-  },
-  "performance_predictions": {
-    "next_quarter_outlook": "Positiv/Neutral/Behöver fokus",
-    "growth_potential": "Hög/Medium/Stabil",
-    "key_risk_factors": ["Risk1", "Risk2"]
-  }
-}`
-
-    const userPrompt = `Analysera följande teknikerdata:
-
-${JSON.stringify(analysisContext, null, 2)}
-
-Fokusera på att:
-- Jämföra med teamgenomsnittet (${analysisContext.team_context.team_avg_revenue.toFixed(0)} kr, ${analysisContext.team_context.team_avg_cases} ärenden)
-- Identifiera styrkor i specialisering och prissättning
-- Ge konkreta, actionable råd för nästa 30 dagar
-- Föreslå mentorskap-möjligheter (både att ge och ta emot)
-- Använd svenska och branschspecifika termer för skadedjursbekämpning`
-
-    // Anropa OpenAI med timeout och retry logic
-    let completion
-    let attempts = 0
-    const maxAttempts = 3
-
-    while (attempts < maxAttempts) {
-      try {
-        attempts++
-        
-        completion = await Promise.race([
-          openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-            timeout: 45000 // 45 second timeout
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('OpenAI request timeout')), 50000)
-          )
-        ])
-        
-        break // Success, exit retry loop
-        
-      } catch (apiError: any) {
-        console.error(`OpenAI API attempt ${attempts} failed:`, apiError.message)
-        
-        if (attempts === maxAttempts) {
-          // Final attempt failed, return fallback
-          console.log('All OpenAI attempts failed, using fallback analysis')
-          
-          const fallbackAnalysis = createFallbackAnalysis(technician, allTechnicians)
-          
-          return res.status(200).json({
-            success: true,
-            analysis: fallbackAnalysis,
-            ai_model: 'fallback-template',
-            timestamp: new Date().toISOString(),
-            warning: 'AI-tjänsten var otillgänglig, fallback-analys användes'
-          })
-        }
-        
-        // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, attempts * 2000))
-      }
-    }
-
-    const aiResponse = completion?.choices[0]?.message?.content
-
+    const aiResponse = completion.choices[0]?.message?.content;
     if (!aiResponse) {
-      throw new Error('Tom respons från OpenAI')
+      throw new Error('Tom respons från OpenAI.');
     }
 
-    // Parse AI respons med förbättrad error handling
-    let analysis
+    // --- Parsa och Validera Svar ---
+    let analysis;
     try {
-      // Remove any potential markdown code blocks
-      const cleanedResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-      analysis = JSON.parse(cleanedResponse)
-      
-      // Validera att alla required fields finns
-      if (!analysis.summary || !analysis.strengths || !analysis.next_steps) {
-        throw new Error('AI response missing required fields')
+      analysis = JSON.parse(aiResponse);
+      // Simpel validering för att se om nyckel-delar finns
+      if (!analysis.executiveSummary || !analysis.actionableDevelopmentPlan) {
+        throw new Error('AI-svaret saknar nödvändiga nyckelfält.');
       }
-      
     } catch (parseError: any) {
-      console.error('JSON Parse Error:', parseError.message)
-      console.log('Raw AI Response:', aiResponse)
-      
-      // Fallback till template om parsing misslyckas
-      analysis = createFallbackAnalysis(technician, allTechnicians)
-      analysis.summary = `AI-parsning misslyckades för ${technician.name}. Template-analys användes baserat på ranking #${technician.rank} och prestanda-data.`
+      console.error('JSON Parse Error:', parseError.message);
+      console.log('Raw AI Response:', aiResponse);
+      // Om parsning misslyckas, använd vår robusta fallback
+      throw new Error('Misslyckades att tolka AI-svaret som giltig JSON.');
     }
 
-    // Lägg till metadata
-    analysis.metadata = {
-      generated_at: new Date().toISOString(),
-      technician_name: technician.name,
-      analysis_version: '1.0',
-      data_points_analyzed: Object.keys(analysisContext).length
-    }
-
+    // --- Returnera Framgångsrikt Svar ---
     return res.status(200).json({
       success: true,
-      analysis,
-      ai_model: 'gpt-4o',
-      timestamp: new Date().toISOString()
-    })
+      analysis: {
+        ...analysis,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          technician_name: technician.name,
+          analysis_version: '3.0-new',
+          data_points_analyzed: Object.keys(analysisContext).length,
+        }
+      },
+      ai_model: completion.model,
+      timestamp: new Date().toISOString(),
+    });
 
   } catch (error: any) {
-    console.error('AI Analysis Error:', error)
+    console.error('Fullständig AI Analysis Error:', error);
     
-    // Försök skapa fallback analys även vid kritiska fel
+    // --- FELHANTERING MED FALLBACK ---
+    // Om något går fel (API-nyckel, anrop, parsning), skapa och returnera en fallback-analys.
+    // Detta förhindrar att frontend kraschar och ger användaren ett meningsfullt svar.
     try {
-      const { technician, allTechnicians } = req.body
-      
+      const { technician, allTechnicians } = req.body;
       if (technician && allTechnicians) {
-        const fallbackAnalysis = createFallbackAnalysis(technician, allTechnicians)
-        
+        const fallbackAnalysis = createFallbackAnalysis(technician, allTechnicians);
         return res.status(200).json({
-          success: true,
+          success: true, // Notera: success är true eftersom vi levererar en fungerande fallback
           analysis: fallbackAnalysis,
-          ai_model: 'emergency-fallback',
+          ai_model: 'server-fallback-generator',
           timestamp: new Date().toISOString(),
-          warning: `AI-tjänsten otillgänglig (${error.message}). Emergency fallback användes.`
-        })
+          warning: `AI-tjänsten kunde inte nås (${error.message}). En förenklad fallback-analys visas.`
+        });
       }
     } catch (fallbackError: any) {
-      console.error('Fallback creation failed:', fallbackError)
+      console.error('Critical: Fallback creation also failed:', fallbackError);
     }
     
+    // Om allt annat misslyckas
     return res.status(500).json({
-      error: 'AI-analys misslyckades helt',
-      details: error.message,
-      fallback_message: 'Manuell analys rekommenderas för denna tekniker'
-    })
+      success: false,
+      error: 'Ett kritiskt fel uppstod under AI-analysen.',
+      details: error.message
+    });
   }
 }
 
-// Helper function för fallback analys
-function createFallbackAnalysis(technician: any, allTechnicians: any[]) {
-  const teamAvgRevenue = allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length
-  const teamAvgCases = allTechnicians.reduce((sum, t) => sum + t.total_cases, 0) / allTechnicians.length
-  const isTopPerformer = technician.rank <= 3
-  const isAboveAverage = technician.total_revenue > teamAvgRevenue
-  const percentile = ((allTechnicians.length - technician.rank + 1) / allTechnicians.length * 100).toFixed(0)
+// =================================================================================
+// SECTION 3: HELPER FUNCTIONS
+// =================================================================================
 
-  return {
-    summary: `${technician.name} presterar i topp ${percentile}% av teamet med ranking #${technician.rank} av ${allTechnicians.length} tekniker. ${isAboveAverage ? 'Över genomsnittlig intäkt indikerar stark prestanda.' : 'Finns potential för förbättring mot teamgenomsnittet.'} ${isTopPerformer ? 'Som topprestare är hen idealisk för mentorskap-roller.' : 'Kan dra nytta av coaching och målsättning.'}`,
+/**
+ * Bygger ett rikt och kontextuellt dataobjekt som ska skickas till AI:n.
+ */
+function buildAnalysisContext(technician: any, allTechnicians: any[], monthlyData: any[], pestSpecialization: any[]) {
+    const teamAvgRevenue = allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length;
+    const teamAvgCases = allTechnicians.reduce((sum, t) => sum + t.total_cases, 0) / allTechnicians.length;
+    const topPerformer = allTechnicians.find(t => t.rank === 1) || technician;
     
-    strengths: [
-      {
-        area: isTopPerformer ? "Elite prestanda" : isAboveAverage ? "Över genomsnitt" : "Stabil grund",
-        description: `${isTopPerformer ? `Toppranking #${technician.rank} visar exceptionell prestanda` : isAboveAverage ? `Presterar ${((technician.total_revenue / teamAvgRevenue) * 100).toFixed(0)}% av teamgenomsnittet` : `Solid bas med ${technician.total_cases} genomförda ärenden`}`,
-        evidence: `${technician.total_revenue.toLocaleString('sv-SE')} kr total intäkt från ${technician.total_cases} ärenden`
+    return {
+        technician_to_analyze: {
+            name: technician.name,
+            role: technician.role,
+            rank_in_team: `${technician.rank} av ${allTechnicians.length}`,
+            total_revenue: technician.total_revenue,
+            total_cases: technician.total_cases,
+            avg_revenue_per_case: technician.avg_case_value,
+            revenue_breakdown: {
+                private: { revenue: technician.private_revenue, cases: technician.private_cases },
+                business: { revenue: technician.business_revenue, cases: technician.business_cases },
+                contract: { revenue: technician.contract_revenue, cases: technician.contract_cases },
+            }
+        },
+        team_benchmark: {
+            total_technicians: allTechnicians.length,
+            average_revenue_per_technician: teamAvgRevenue,
+            average_cases_per_technician: teamAvgCases,
+            top_performer_stats: { name: topPerformer.name, revenue: topPerformer.total_revenue, avg_revenue_per_case: topPerformer.avg_case_value },
+        },
+        historical_performance_last_6_months: monthlyData?.slice(-6) || [],
+        pest_specialization_data: pestSpecialization || [],
+    };
+}
+
+/**
+ * Skapar en fullständig, men förenklad, analys som matchar den nya datastrukturen.
+ * Används när AI-anropet misslyckas av någon anledning.
+ */
+function createFallbackAnalysis(technician: any, allTechnicians: any[]) {
+    const teamAvgRevenue = allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length;
+    const topPerformer = allTechnicians.find(t => t.rank === 1) || technician;
+    const isTopPerformer = technician.rank <= 3;
+    const safeAvgRevenue = teamAvgRevenue > 0 ? teamAvgRevenue : 1;
+    const safeTopPerformerRevenue = topPerformer.total_revenue > 0 ? topPerformer.total_revenue : 1;
+
+
+    return {
+      executiveSummary: {
+        headline: "Förenklad Fallback-Analys",
+        summary: `Det gick inte att ansluta till AI-tjänsten. Denna analys är autogenererad. ${technician.name} har rank #${technician.rank} med en intäkt på ${technician.total_revenue.toLocaleString('sv-SE')} kr.`,
       },
-      ...(technician.avg_case_value > (teamAvgRevenue / teamAvgCases) ? [{
-        area: "Premium prissättning",
-        description: `Högre ärendepris än teamgenomsnittet indikerar kvalitetsarbete eller specialisering`,
-        evidence: `${technician.avg_case_value.toLocaleString('sv-SE')} kr/ärende vs team-genomsnitt ${Math.round(teamAvgRevenue / teamAvgCases).toLocaleString('sv-SE')} kr`
-      }] : []),
-      ...(isTopPerformer ? [{
-        area: "Naturlig ledarroll",
-        description: "Position som topprestare gör hen lämplig för mentorskap och kunskapsdelning",
-        evidence: `Ranking #${technician.rank} placerar hen i elitgruppen`
-      }] : [])
-    ],
-
-    development_areas: isTopPerformer ? [
-      {
-        area: "Mentorskap utveckling",
-        description: "Utveckla förmågan att coacha och utbilda andra tekniker",
-        impact: "Kan höja hela teamets prestanda och skapa succession planning"
-      }
-    ] : [
-      {
-        area: isAboveAverage ? "Konsistensförbättring" : "Prestationsökning",
-        description: isAboveAverage ? 
-          "Fokus på att bibehålla nuvarande nivå och minimera variation" : 
-          "Systematisk förbättring för att närma sig topprestatorernas nivå",
-        impact: isAboveAverage ? 
-          "Stabilare resultat över tid" : 
-          "Potential att öka intäkt med 20-40% baserat på team-gap"
-      }
-    ],
-
-    next_steps: [
-      {
-        action: isTopPerformer ? 
-          "Starta mentorskap-program: Ta ansvar för 1-2 utvecklande tekniker" :
-          isAboveAverage ?
-          "Prestanda-analys: Identifiera vad som driver bästa månader" :
-          "Kompetensutveckling: Delta i träning för ärendehantering och prissättning",
-        timeline: "30 dagar",
-        priority: isTopPerformer ? "medium" : "high",
-        expected_outcome: isTopPerformer ?
-          "Förbättrad teamprestanda och ledarskapsförmåga" :
-          "15-25% förbättring i prestanda-KPIs"
+      performanceDashboard: {
+        overall_performance_grade: isTopPerformer ? 'A' : 'C',
+        key_metrics: [
+          { metric: "Total Intäkt", value: `${technician.total_revenue.toLocaleString('sv-SE')} kr`, comparison_to_team_avg: technician.total_revenue / safeAvgRevenue, comparison_to_top_performer: technician.total_revenue / safeTopPerformerRevenue },
+          { metric: "Antal Ärenden", value: `${technician.total_cases}`, comparison_to_team_avg: 1.0, comparison_to_top_performer: 1.0 },
+        ],
       },
-      {
-        action: "Månatlig 1-on-1 med chef för målsättning och feedback",
-        timeline: "Återkommande",
-        priority: "medium",
-        expected_outcome: "Kontinuerlig utveckling och karriärplanering"
+      revenueDeepDive: {
+        breakdown: [{ source: 'Privat', revenue: technician.private_revenue || 0, case_count: technician.private_cases || 0, avg_value: (technician.private_revenue || 0) / (technician.private_cases || 1) }, { source: 'Företag', revenue: technician.business_revenue || 0, case_count: technician.business_cases || 0, avg_value: (technician.business_revenue || 0) / (technician.business_cases || 1) }],
+        profitability_analysis: "Detaljerad lönsamhetsanalys kräver en fullständig AI-analys.",
       },
-      {
-        action: isTopPerformer ?
-          "Dokumentera best practices för teamutbildning" :
-          "Benchmarking: Lär av topprestatorernas metoder",
-        timeline: "3 månader",
-        priority: "low",
-        expected_outcome: isTopPerformer ?
-          "Strukturerad kunskapsöverföring" :
-          "Förbättrade arbetsmetoder och resultat"
-      }
-    ],
-
-    mentorship_recommendations: {
-      should_mentor: isTopPerformer,
-      mentoring_areas: isTopPerformer ? [
-        "Ärendehantering och prioritering",
-        "Kundkommunikation och prissättning",
-        "Kvalitetssäkring och rapportering"
-      ] : [],
-      needs_mentoring: !isTopPerformer,
-      learning_focus: !isTopPerformer ? [
-        "Effektiv ärendehantering",
-        "Prissättningsstrategier",
-        "Kundrelationer och merförsäljning",
-        "Tidsplanering och prioritering"
-      ] : []
-    },
-
-    performance_predictions: {
-      next_quarter_outlook: isTopPerformer ? 
-        "Stabil på hög nivå" : 
-        isAboveAverage ? 
-        "Positiv utveckling förväntad" : 
-        "Förbättringspotential med rätt stöd",
-      growth_potential: isTopPerformer ? 
-        "Mentorskap-fokus" : 
-        isAboveAverage ? 
-        "Medium till hög" : 
-        "Hög med strukturerat stöd",
-      key_risk_factors: isTopPerformer ? [
-        "Risk för mentorskap-utbrändhet",
-        "Behöver nya utmaningar för motivation"
-      ] : isAboveAverage ? [
-        "Konsistens i leverans",
-        "Undvika självbelåtenhet"
-      ] : [
-        "Behöver kontinuerlig coaching",
-        "Risk för motivationsförlust utan tydliga mål"
-      ]
-    },
-
-    metadata: {
-      generated_at: new Date().toISOString(),
-      technician_name: technician.name,
-      analysis_version: "fallback-2.0",
-      data_points_analyzed: 8
-    }
-  }
+      specializationAnalysis: {
+        primary_specialization: "Okänd (Fallback)",
+        specialization_revenue: 0,
+        specialization_avg_case_value: 0,
+        comparison_to_team_avg_for_pest: 1.0,
+        recommendation: "Specialist-analys är inte tillgänglig i fallback-läget.",
+      },
+      historicalTrends: {
+        six_month_revenue_trend: 'data saknas',
+        consistency_score: 'varierande',
+        trend_analysis: "Historisk data kunde inte analyseras.",
+      },
+      strengths: [{ area: "Grundprestanda", description: "Hanterar en stadig volym ärenden.", evidence: `${technician.total_cases} ärenden totalt.` }],
+      developmentAreas: [{ area: "Strategisk utveckling", description: "Möjlighet att finslipa prissättning och specialisering.", potential_impact: "Ökad lönsamhet per ärende." }],
+      actionableDevelopmentPlan: {
+        primary_focus_30_days: "Fokusera på att bibehålla nuvarande arbetstakt och säkerställa kundnöjdhet.",
+        actions: [{ action: "Genomför en 1-on-1 med närmaste chef för att sätta personliga mål.", priority: 'Hög', expected_outcome: "Tydliga och uppföljningsbara mål för nästa kvartal.", how_to_measure: "Protokollfört möte med definierade mål." }],
+      },
+      mentorshipProfile: {
+        profile: isTopPerformer ? 'Potential att leda' : 'Aktiv Adept',
+        should_mentor: isTopPerformer,
+        mentoring_areas: isTopPerformer ? ["Grundläggande ärendehantering"] : [],
+        needs_mentoring: !isTopPerformer,
+        learning_focus: !isTopPerformer ? ["Effektivitet", "Prissättning"] : [],
+      },
+      riskAssessment: {
+        key_risks: [{ risk: "Avsaknad av djupdata", mitigation_strategy: "Kör en fullständig AI-analys vid ett senare tillfälle för att identifiera specifika risker och möjligheter." }],
+        retention_factor: 'Medium',
+      },
+    };
 }
