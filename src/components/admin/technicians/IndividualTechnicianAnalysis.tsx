@@ -1,41 +1,146 @@
-// 📁 src/components/admin/technicians/IndividualTechnicianAnalysis.tsx - FÖRBÄTTRAD VERSION
-import React, { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { User, TrendingUp, Award, Target, Bug, Calendar, DollarSign, BarChart3, AlertCircle, CheckCircle, Info } from 'lucide-react'
+// src/components/admin/technicians/IndividualTechnicianAnalysis.tsx - AI-ENHANCED VERSION
+import React, { useState, useEffect } from 'react'
+import { 
+  User, BarChart3, TrendingUp, CheckCircle, AlertCircle, 
+  Target, Brain, Sparkles, Clock, ArrowRight, RefreshCw,
+  Bot, Lightbulb, Users, Award, Zap
+} from 'lucide-react'
 import Card from '../../ui/Card'
 import Button from '../../ui/Button'
-import { useTechnicianPerformance, useIndividualTechnician } from '../../../hooks/useTechnicianDashboard'
-import { formatCurrency } from '../../../utils/formatters'
+import { formatCurrency } from '../../../utils/formatting'
+import { useCompleteTechnicianDashboard } from '../../../hooks/useTechnicianDashboard'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
-// Hjälpfunktion för att formatera månad till svenska
-const formatMonth = (monthStr: string): string => {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'
-  ]
-  const month = parseInt(monthStr.split('-')[1]) - 1
-  return months[month] || monthStr
+// AI Analysis Types
+interface AIStrength {
+  area: string
+  description: string
+  evidence: string
 }
 
-const IndividualTechnicianAnalysis: React.FC = () => {
-  const { data: allTechnicians, loading: loadingTechnicians } = useTechnicianPerformance()
-  const [selectedTechnicianName, setSelectedTechnicianName] = useState<string>('')
-  const individualData = useIndividualTechnician(selectedTechnicianName)
+interface AIDevelopmentArea {
+  area: string
+  description: string
+  impact: string
+}
 
-  // Färger för charts
-  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+interface AINextStep {
+  action: string
+  timeline: string
+  priority: 'high' | 'medium' | 'low'
+  expected_outcome: string
+}
 
-  // Loading state för tekniker-lista
-  if (loadingTechnicians) {
+interface AIMentorshipRecommendations {
+  should_mentor: boolean
+  mentoring_areas: string[]
+  needs_mentoring: boolean
+  learning_focus: string[]
+}
+
+interface AIPerformancePredictions {
+  next_quarter_outlook: string
+  growth_potential: string
+  key_risk_factors: string[]
+}
+
+interface AIAnalysis {
+  summary: string
+  strengths: AIStrength[]
+  development_areas: AIDevelopmentArea[]
+  next_steps: AINextStep[]
+  mentorship_recommendations: AIMentorshipRecommendations
+  performance_predictions: AIPerformancePredictions
+  metadata?: {
+    generated_at: string
+    technician_name: string
+    analysis_version: string
+    data_points_analyzed: number
+  }
+}
+
+interface IndividualTechnicianAnalysisProps {
+  selectedTechnicianName: string
+  setSelectedTechnicianName: (name: string) => void
+}
+
+const IndividualTechnicianAnalysis: React.FC<IndividualTechnicianAnalysisProps> = ({
+  selectedTechnicianName,
+  setSelectedTechnicianName
+}) => {
+  const { performance: allTechnicians, monthlyData, pestSpecialization, loading } = useCompleteTechnicianDashboard()
+  
+  // AI Analysis State
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false)
+
+  // Find current technician
+  const technician = allTechnicians.find(t => t.name === selectedTechnicianName)
+  const technicianMonthlyData = monthlyData.filter(m => m.technician_name === selectedTechnicianName)
+  const technicianPestData = pestSpecialization.filter(p => p.technician_name === selectedTechnicianName)
+
+  // Trigger AI analysis when technician is selected
+  useEffect(() => {
+    if (technician && selectedTechnicianName) {
+      setShowAiAnalysis(false)
+      setAiAnalysis(null)
+      setAiError(null)
+    }
+  }, [selectedTechnicianName, technician])
+
+  // Generate AI Analysis
+  const generateAIAnalysis = async () => {
+    if (!technician) return
+
+    setAiLoading(true)
+    setAiError(null)
+
+    try {
+      const response = await fetch('/api/ai-technician-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          technician,
+          allTechnicians,
+          monthlyData: technicianMonthlyData,
+          pestSpecialization: technicianPestData,
+          teamStats: {
+            avg_revenue: allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length,
+            avg_cases: allTechnicians.reduce((sum, t) => sum + t.total_cases, 0) / allTechnicians.length,
+            total_technicians: allTechnicians.length
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.analysis) {
+        setAiAnalysis(data.analysis)
+        setShowAiAnalysis(true)
+      } else {
+        throw new Error(data.error || 'AI-analys misslyckades')
+      }
+
+    } catch (error: any) {
+      console.error('AI Analysis Error:', error)
+      setAiError(error.message)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  // Loading state
+  if (loading) {
     return (
       <Card className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <User className="w-6 h-6 text-orange-500" />
-          <div>
-            <h2 className="text-lg font-semibold text-white">Individuell Tekniker Analys</h2>
-            <p className="text-sm text-slate-400">Laddar tekniker...</p>
-          </div>
-        </div>
         <div className="h-80 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
         </div>
@@ -43,41 +148,79 @@ const IndividualTechnicianAnalysis: React.FC = () => {
     )
   }
 
-  // Ingen tekniker vald
+  // Ingen tekniker vald - Show selection screen
   if (!selectedTechnicianName) {
     return (
       <div className="space-y-6">
-        {/* Tekniker-väljare */}
+        {/* Tekniker-väljare med enhanced UX */}
         <Card className="p-6 bg-gradient-to-br from-orange-600/10 to-red-600/10 border-orange-500/20">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-              <User className="w-5 h-5 text-orange-500" />
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+              <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Individuell Tekniker Analys</h2>
-              <p className="text-sm text-slate-400">Välj en tekniker för djupgående prestanda-analys med konkreta förbättringsförslag</p>
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                AI-Driven Tekniker Analys
+                <Sparkles className="w-5 h-5 text-yellow-400" />
+              </h2>
+              <p className="text-sm text-slate-400">
+                Välj en tekniker för djupgående AI-analys med personliga utvecklingsrekommendationer
+              </p>
             </div>
           </div>
 
-          {/* Tekniker-knappar */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {/* Enhanced tekniker-knappar med hover effects */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {allTechnicians.map((tech) => (
-              <Button
+              <div
                 key={tech.name}
-                variant="secondary"
-                onClick={() => setSelectedTechnicianName(tech.name)}
-                className="justify-start p-4 h-auto"
+                className="group relative overflow-hidden bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-orange-500/50 rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-orange-500/10"
               >
-                <div className="text-left">
-                  <div className="font-medium text-white">{tech.name}</div>
-                  <div className="text-xs text-slate-400">{tech.role}</div>
-                  <div className="text-xs text-green-400">{formatCurrency(tech.total_revenue)}</div>
-                </div>
-              </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedTechnicianName(tech.name)}
+                  className="w-full h-full p-4 justify-start text-left hover:bg-transparent"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-white group-hover:text-orange-300 transition-colors">
+                        {tech.name}
+                      </div>
+                      <div className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded-full">
+                        #{tech.rank}
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400">{tech.role}</div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-green-400">{formatCurrency(tech.total_revenue)}</span>
+                      <span className="text-blue-400">{tech.total_cases} ärenden</span>
+                    </div>
+                    
+                    {/* Performance indicator */}
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 bg-slate-700 rounded-full h-1.5">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            tech.rank <= 2 ? 'bg-gradient-to-r from-green-500 to-emerald-400' :
+                            tech.rank <= 4 ? 'bg-gradient-to-r from-yellow-500 to-orange-400' :
+                            'bg-gradient-to-r from-slate-500 to-slate-400'
+                          }`}
+                          style={{ 
+                            width: `${Math.max(20, 100 - (tech.rank - 1) * 15)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Button>
+                
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              </div>
             ))}
           </div>
 
-          {/* Quick stats om alla tekniker */}
+          {/* Quick team stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
             <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
               <p className="text-orange-400 font-bold text-sm">{allTechnicians.length}</p>
@@ -106,42 +249,42 @@ const IndividualTechnicianAnalysis: React.FC = () => {
           </div>
         </Card>
 
-        {/* Info om vad som kommer */}
+        {/* Preview of AI capabilities */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-slate-400" />
-            Vad ingår i individuell analys?
+            <Bot className="w-5 h-5 text-blue-400" />
+            Vad ingår i AI-analysen?
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-            <div className="space-y-2">
-              <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-500" />
-                Prestanda Jämförelse
-              </h4>
-              <p className="text-slate-400">Tydlig förklaring av procent vs team</p>
-              <p className="text-slate-400">Konkreta förbättringsområden</p>
-              <p className="text-slate-400">Månadsvis utveckling (svenska månader)</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-blue-400" />
+                <span className="text-blue-300 font-medium text-sm">Prestanda-analys</span>
+              </div>
+              <p className="text-slate-400 text-xs">
+                Jämförelse med team, trender och förbättringsområden
+              </p>
             </div>
             
-            <div className="space-y-2">
-              <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                <Bug className="w-4 h-4 text-purple-500" />
-                Specialisering & Prissättning
-              </h4>
-              <p className="text-slate-400">Vilka skadedjur du är expert på</p>
-              <p className="text-slate-400">Prissättningsrekommendationer</p>
-              <p className="text-slate-400">Kategorier för förbättring</p>
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-4 h-4 text-green-400" />
+                <span className="text-green-300 font-medium text-sm">Mentorskap</span>
+              </div>
+              <p className="text-slate-400 text-xs">
+                Rekommendationer för coaching och kompetensutveckling
+              </p>
             </div>
             
-            <div className="space-y-2">
-              <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                <Award className="w-4 h-4 text-yellow-500" />
-                Konkreta Åtgärder
-              </h4>
-              <p className="text-slate-400">Personliga utvecklingsmål</p>
-              <p className="text-slate-400">Mentorship-möjligheter</p>
-              <p className="text-slate-400">Specifika förbättringsområden</p>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-purple-400" />
+                <span className="text-purple-300 font-medium text-sm">Konkreta mål</span>
+              </div>
+              <p className="text-slate-400 text-xs">
+                30-dagars plan och långsiktiga utvecklingsstrategier
+              </p>
             </div>
           </div>
         </Card>
@@ -149,130 +292,36 @@ const IndividualTechnicianAnalysis: React.FC = () => {
     )
   }
 
-  // Hämta data för vald tekniker
-  const technician = individualData.performance
-  const monthlyData = individualData.monthlyData
-  const pestData = individualData.pestSpecialization
-
-  if (!individualData.isValid) {
+  // Tekniker är vald men ingen AI-analys än
+  if (!technician) {
     return (
-      <Card className="p-6 bg-red-500/10 border-red-500/20">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <User className="w-6 h-6 text-red-500" />
-            <div>
-              <h2 className="text-lg font-semibold text-white">Individuell Tekniker Analys</h2>
-              <p className="text-sm text-slate-400">Tekniker hittades inte</p>
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSelectedTechnicianName('')}
-          >
-            Tillbaka till val
-          </Button>
-        </div>
+      <Card className="p-6">
+        <p className="text-red-400">Tekniker hittades inte: {selectedTechnicianName}</p>
+        <Button onClick={() => setSelectedTechnicianName('')} className="mt-4">
+          Tillbaka till översikt
+        </Button>
       </Card>
     )
   }
 
-  if (!technician) return null
-
-  // Förbered chart data för månadsvis trend
-  const monthlyChartData = monthlyData
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map(m => ({
-      month: formatMonth(m.month), // Svenska månader
-      revenue: m.total_revenue,
-      cases: m.total_cases,
-      private: m.private_revenue,
-      business: m.business_revenue,
-      contract: m.contract_revenue
-    }))
-
-  // Specialisering pie data
-  const pestPieData = pestData
-    .reduce((acc, spec) => {
-      const existing = acc.find(p => p.name === spec.pest_type)
-      if (existing) {
-        existing.value += spec.total_revenue
-        existing.cases += spec.case_count
-      } else {
-        acc.push({
-          name: spec.pest_type,
-          value: spec.total_revenue,
-          cases: spec.case_count
-        })
-      }
-      return acc
-    }, [] as Array<{ name: string; value: number; cases: number }>)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6)
-
-  // 🎯 FÖRBÄTTRAD JÄMFÖRELSE MED TEAM - MED TYDLIGA FÖRKLARINGAR
+  // Calculate some basic stats
   const teamAvgRevenue = allTechnicians.reduce((sum, t) => sum + t.total_revenue, 0) / allTechnicians.length
   const teamAvgCases = allTechnicians.reduce((sum, t) => sum + t.total_cases, 0) / allTechnicians.length
   const teamAvgCaseValue = allTechnicians.reduce((sum, t) => sum + t.avg_case_value, 0) / allTechnicians.length
 
-  // Beräkna procent vs team med bättre förklaringar
-  const revenueVsTeam = teamAvgRevenue > 0 ? ((technician.total_revenue - teamAvgRevenue) / teamAvgRevenue * 100) : 0
-  const casesVsTeam = teamAvgCases > 0 ? ((technician.total_cases - teamAvgCases) / teamAvgCases * 100) : 0
-  const priceVsTeam = teamAvgCaseValue > 0 ? ((technician.avg_case_value - teamAvgCaseValue) / teamAvgCaseValue * 100) : 0
-
-  // 🆕 FÖRBÄTTRADE JÄMFÖRELSE-KORT MED FÖRKLARINGAR
-  const comparisonData = [
-    {
-      title: 'Intäkt vs Team',
-      value: revenueVsTeam,
-      explanation: revenueVsTeam > 0 
-        ? `${revenueVsTeam.toFixed(1)}% högre intäkt än teamgenomsnittet (${formatCurrency(teamAvgRevenue)})`
-        : `${Math.abs(revenueVsTeam).toFixed(1)}% lägre intäkt än teamgenomsnittet (${formatCurrency(teamAvgRevenue)})`,
-      color: revenueVsTeam >= 0 ? '#22c55e' : '#ef4444',
-      icon: revenueVsTeam >= 0 ? CheckCircle : AlertCircle,
-      actionable: revenueVsTeam < -10 ? 'Fokusera på värdehöjande tjänster' : revenueVsTeam > 20 ? 'Dela kunskap med teamet' : null
-    },
-    {
-      title: 'Ärenden vs Team',
-      value: casesVsTeam,
-      explanation: casesVsTeam > 0 
-        ? `${casesVsTeam.toFixed(1)}% fler ärenden än teamgenomsnittet (${teamAvgCases.toFixed(0)} ärenden)`
-        : `${Math.abs(casesVsTeam).toFixed(1)}% färre ärenden än teamgenomsnittet (${teamAvgCases.toFixed(0)} ärenden)`,
-      color: casesVsTeam >= 0 ? '#22c55e' : '#ef4444',
-      icon: casesVsTeam >= 0 ? CheckCircle : AlertCircle,
-      actionable: casesVsTeam < -15 ? 'Öka aktivitetsnivån' : casesVsTeam > 25 ? 'Hög produktivitet!' : null
-    },
-    {
-      title: 'Genomsnittspris vs Team',
-      value: priceVsTeam,
-      explanation: priceVsTeam > 0 
-        ? `${priceVsTeam.toFixed(1)}% högre priser än teamgenomsnittet (${formatCurrency(teamAvgCaseValue)})`
-        : `${Math.abs(priceVsTeam).toFixed(1)}% lägre priser än teamgenomsnittet (${formatCurrency(teamAvgCaseValue)})`,
-      color: priceVsTeam >= 0 ? '#22c55e' : '#ef4444',
-      icon: priceVsTeam >= 0 ? CheckCircle : AlertCircle,
-      actionable: priceVsTeam < -10 ? 'Utbilda i premium-tjänster' : priceVsTeam > 15 ? 'Mentor andra i prissättning' : null
+  // Priority color mapping
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'border-red-500/30 bg-red-500/10 text-red-300'
+      case 'medium': return 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
+      case 'low': return 'border-green-500/30 bg-green-500/10 text-green-300'
+      default: return 'border-slate-500/30 bg-slate-500/10 text-slate-300'
     }
-  ]
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
-          <p className="text-white font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.dataKey === 'cases' ? `${entry.value} ärenden` : formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      )
-    }
-    return null
   }
 
   return (
     <div className="space-y-6">
-      {/* Header med tekniker-info */}
+      {/* Header med tekniker-info och AI-knapp */}
       <Card className="p-6 bg-gradient-to-br from-orange-600/10 to-red-600/10 border-orange-500/20">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -289,386 +338,353 @@ const IndividualTechnicianAnalysis: React.FC = () => {
               </div>
             </div>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSelectedTechnicianName('')}
-          >
-            Välj annan tekniker
-          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSelectedTechnicianName('')}
+            >
+              Tillbaka
+            </Button>
+            
+            {!showAiAnalysis && (
+              <Button
+                onClick={generateAIAnalysis}
+                disabled={aiLoading}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6"
+              >
+                {aiLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    AI Analyserar...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="w-4 h-4 mr-2" />
+                    Starta AI-Analys
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* KPI för vald tekniker */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 font-bold text-sm">{formatCurrency(technician.total_revenue)}</p>
-            <p className="text-orange-300 text-xs">Total intäkt</p>
+        {/* Performance overview cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="text-xs text-slate-400 mb-1">Intäkt vs Team</div>
+            <div className="text-lg font-semibold text-white">
+              {((technician.total_revenue / teamAvgRevenue) * 100).toFixed(0)}%
+            </div>
+            <div className="text-xs text-orange-400">
+              {technician.total_revenue > teamAvgRevenue ? 'Över genomsnitt' : 'Under genomsnitt'}
+            </div>
           </div>
-          <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-            <p className="text-purple-400 font-bold text-sm">{formatCurrency(technician.private_revenue)}</p>
-            <p className="text-purple-300 text-xs">BeGone Privatpersoner</p>
+          
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="text-xs text-slate-400 mb-1">Ärendepris</div>
+            <div className="text-lg font-semibold text-white">
+              {formatCurrency(technician.avg_case_value)}
+            </div>
+            <div className="text-xs text-green-400">
+              {technician.avg_case_value > teamAvgCaseValue ? 'Premium' : 'Standard'}
+            </div>
           </div>
-          <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-400 font-bold text-sm">{formatCurrency(technician.business_revenue)}</p>
-            <p className="text-blue-300 text-xs">BeGone Företag</p>
+          
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="text-xs text-slate-400 mb-1">Specialisering</div>
+            <div className="text-lg font-semibold text-white">
+              {technicianPestData.length > 0 ? technicianPestData[0]?.pest_type : 'Generalist'}
+            </div>
+            <div className="text-xs text-purple-400">
+              {technicianPestData.length > 0 ? `${technicianPestData[0]?.case_count} ärenden` : 'Alla typer'}
+            </div>
           </div>
-          <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-bold text-sm">{formatCurrency(technician.contract_revenue)}</p>
-            <p className="text-green-300 text-xs">Avtalskunder</p>
-          </div>
-          <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-yellow-400 font-bold text-sm">{formatCurrency(technician.avg_case_value)}</p>
-            <p className="text-yellow-300 text-xs">Genomsnitt/ärende</p>
+          
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="text-xs text-slate-400 mb-1">Team Position</div>
+            <div className="text-lg font-semibold text-white">
+              Top {Math.ceil((technician.rank / allTechnicians.length) * 100)}%
+            </div>
+            <div className="text-xs text-blue-400">
+              {technician.rank <= 3 ? 'Elite' : technician.rank <= 6 ? 'Strong' : 'Developing'}
+            </div>
           </div>
         </div>
       </Card>
 
-      {/* 🆕 FÖRBÄTTRAD JÄMFÖRELSE MED TEAM - TYDLIGARE FÖRKLARINGAR */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Target className="w-5 h-5 text-blue-500" />
-          Prestanda jämfört med Team
-          <span className="text-sm text-slate-400 font-normal">(förklaring av procentsatserna)</span>
-        </h3>
-        
+      {/* AI Error */}
+      {aiError && (
+        <Card className="p-4 bg-red-500/10 border-red-500/20">
+          <div className="flex items-center gap-2 text-red-400">
+            <AlertCircle className="w-5 h-5" />
+            <span>AI-analys misslyckades: {aiError}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={generateAIAnalysis}
+              className="ml-auto text-red-300 hover:text-red-200"
+            >
+              Försök igen
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* AI Analysis Results */}
+      {showAiAnalysis && aiAnalysis && (
         <div className="space-y-6">
-          {comparisonData.map((comp, index) => (
-            <div key={index} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <comp.icon className="w-5 h-5" style={{ color: comp.color }} />
-                  <span className="text-slate-300 font-medium">{comp.title}</span>
-                  <span 
-                    className="font-bold text-lg px-2 py-1 rounded"
-                    style={{ 
-                      color: comp.color,
-                      backgroundColor: comp.color + '20'
-                    }}
-                  >
-                    {comp.value >= 0 ? '+' : ''}{comp.value.toFixed(1)}%
-                  </span>
+          {/* AI Summary */}
+          <Card className="p-6 bg-gradient-to-br from-blue-600/10 to-purple-600/10 border-blue-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  AI-Analys Sammanfattning
+                  <Sparkles className="w-4 h-4 text-yellow-400" />
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Genererad {aiAnalysis.metadata?.generated_at ? new Date(aiAnalysis.metadata.generated_at).toLocaleString('sv-SE') : 'nyss'}
+                </p>
+              </div>
+            </div>
+            <p className="text-slate-300 leading-relaxed">{aiAnalysis.summary}</p>
+          </Card>
+
+          {/* Personliga Utvecklingsrekommendationer */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-yellow-500" />
+              Personliga Utvecklingsrekommendationer för {technician.name}
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Styrkör */}
+              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <h4 className="text-green-400 font-medium mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  Styrkör att bygga vidare på
+                </h4>
+                <div className="space-y-3">
+                  {aiAnalysis.strengths.map((strength, index) => (
+                    <div key={index} className="space-y-1">
+                      <p className="text-slate-300 text-sm font-medium">• {strength.area}</p>
+                      <p className="text-slate-400 text-xs pl-4">{strength.description}</p>
+                      {strength.evidence && (
+                        <p className="text-green-400 text-xs pl-4 italic">({strength.evidence})</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
               
-              {/* Förklaring */}
-              <div className="ml-8 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                <p className="text-slate-300 text-sm mb-2">{comp.explanation}</p>
-                {comp.actionable && (
-                  <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4 text-blue-400" />
-                    <p className="text-blue-400 text-sm font-medium">Rekommendation: {comp.actionable}</p>
+              {/* Utvecklingsområden */}
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <h4 className="text-yellow-400 font-medium mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  Utvecklingsområden
+                </h4>
+                <div className="space-y-3">
+                  {aiAnalysis.development_areas.length > 0 ? (
+                    aiAnalysis.development_areas.map((area, index) => (
+                      <div key={index} className="space-y-1">
+                        <p className="text-slate-300 text-sm font-medium">🎯 {area.area}</p>
+                        <p className="text-slate-400 text-xs pl-4">{area.description}</p>
+                        <p className="text-yellow-400 text-xs pl-4 italic">Påverkan: {area.impact}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-slate-300 text-sm">🎉 Stark prestanda över alla områden! Fortsätt utveckla dina styrkor.</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Konkreta nästa steg */}
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Konkreta nästa steg
+                </h4>
+                <div className="space-y-3">
+                  {aiAnalysis.next_steps.map((step, index) => (
+                    <div key={index} className="space-y-1">
+                      <p className="text-slate-300 text-sm">• {step.action}</p>
+                      <div className="flex items-center gap-2 pl-4">
+                        <span className="text-xs text-slate-400">{step.timeline}</span>
+                        <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(step.priority)}`}>
+                          {step.priority === 'high' ? 'Hög' : step.priority === 'medium' ? 'Medium' : 'Låg'} prioritet
+                        </span>
+                      </div>
+                      <p className="text-blue-400 text-xs pl-4 italic">{step.expected_outcome}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Prioriterade Åtgärder */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-purple-500" />
+              Prioriterade Åtgärder (nästa 30 dagar)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {aiAnalysis.next_steps
+                .filter(step => step.priority === 'high')
+                .map((step, index) => (
+                  <div key={index} className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-4 h-4 text-red-400" />
+                      <span className="text-red-300 font-medium text-sm">Hög Prioritet</span>
+                    </div>
+                    <p className="text-slate-300 text-sm">{step.action}</p>
+                  </div>
+                ))}
+              
+              {aiAnalysis.next_steps
+                .filter(step => step.priority === 'medium')
+                .map((step, index) => (
+                  <div key={index} className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-yellow-400" />
+                      <span className="text-yellow-300 font-medium text-sm">Medium Prioritet</span>
+                    </div>
+                    <p className="text-slate-300 text-sm">{step.action}</p>
+                  </div>
+                ))}
+              
+              {aiAnalysis.next_steps
+                .filter(step => step.priority === 'low')
+                .map((step, index) => (
+                  <div key={index} className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-4 h-4 text-green-400" />
+                      <span className="text-green-300 font-medium text-sm">Långsiktigt</span>
+                    </div>
+                    <p className="text-slate-300 text-sm">{step.action}</p>
+                  </div>
+                ))}
+            </div>
+          </Card>
+
+          {/* Mentorskap & Utveckling */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Mentorskap */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-400" />
+                Mentorskap & Coaching
+              </h3>
+              
+              <div className="space-y-4">
+                {aiAnalysis.mentorship_recommendations.should_mentor && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <h4 className="text-blue-300 font-medium mb-2 flex items-center gap-2">
+                      <Award className="w-4 h-4" />
+                      Kan mentorera andra
+                    </h4>
+                    <div className="space-y-1">
+                      {aiAnalysis.mentorship_recommendations.mentoring_areas.map((area, index) => (
+                        <p key={index} className="text-slate-300 text-sm">• {area}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {aiAnalysis.mentorship_recommendations.needs_mentoring && (
+                  <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                    <h4 className="text-orange-300 font-medium mb-2 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4" />
+                      Utvecklingsområden
+                    </h4>
+                    <div className="space-y-1">
+                      {aiAnalysis.mentorship_recommendations.learning_focus.map((focus, index) => (
+                        <p key={index} className="text-slate-300 text-sm">• {focus}</p>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+            </Card>
 
-              {/* Visuell bar */}
-              <div className="ml-8">
-                <div className="w-full bg-slate-800 rounded-full h-3">
-                  <div 
-                    className="h-3 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
-                    style={{ 
-                      backgroundColor: comp.color + '80',
-                      width: `${Math.min(Math.abs(comp.value), 100)}%` 
-                    }}
-                  >
-                    <span className="text-xs text-white font-bold">
-                      {comp.value >= 0 ? '+' : ''}{comp.value.toFixed(0)}%
-                    </span>
-                  </div>
+            {/* Performance Predictions */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-green-400" />
+                Prestanda Prognos
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                  <h4 className="text-slate-300 font-medium mb-1">Nästa kvartal</h4>
+                  <p className="text-green-400 text-sm">{aiAnalysis.performance_predictions.next_quarter_outlook}</p>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Månadsvis prestanda trend med svenska månader */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-green-500" />
-          Månadsvis Prestanda Utveckling
-          <span className="text-sm text-slate-400 font-normal">({monthlyData.length} månader data)</span>
-        </h3>
-        
-        {monthlyChartData.length > 0 ? (
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(value) => formatCurrency(value).replace(' kr', 'k')} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }} name="Total intäkt" />
-                <Line type="monotone" dataKey="private" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" name="Privatpersoner" />
-                <Line type="monotone" dataKey="business" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" name="Företag" />
-                <Line type="monotone" dataKey="contract" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" name="Avtalskunder" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="h-80 flex items-center justify-center text-slate-400">
-            <div className="text-center">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Ingen månadsdata tillgänglig för {technician.name}</p>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Skadedjurs specialisering */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Bug className="w-5 h-5 text-purple-500" />
-          Skadedjurs Specialiseringar och Prissättning
-        </h3>
-        
-        {pestPieData.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Pie Chart */}
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pestPieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    nameKey="name"
-                  >
-                    {pestPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                
+                <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                  <h4 className="text-slate-300 font-medium mb-1">Tillväxtpotential</h4>
+                  <p className="text-blue-400 text-sm">{aiAnalysis.performance_predictions.growth_potential}</p>
+                </div>
+                
+                {aiAnalysis.performance_predictions.key_risk_factors.length > 0 && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <h4 className="text-red-300 font-medium mb-2">Riskfaktorer att bevaka</h4>
+                    {aiAnalysis.performance_predictions.key_risk_factors.map((risk, index) => (
+                      <p key={index} className="text-slate-300 text-sm">• {risk}</p>
                     ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      formatCurrency(Number(value)), 
-                      name
-                    ]}
-                    labelStyle={{ color: '#ffffff' }}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Specialisering lista med prissättningsinfo */}
-            <div className="space-y-3">
-              {pestPieData.map((pest, index) => (
-                <div key={pest.name} className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: colors[index % colors.length] }}
-                    ></div>
-                    <h4 className="text-white font-semibold">{pest.name}</h4>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-slate-400">Intäkt:</span>
-                      <span className="text-white ml-2">{formatCurrency(pest.value)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Ärenden:</span>
-                      <span className="text-white ml-2">{pest.cases}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-slate-400">Genomsnittspris:</span>
-                      <span className="text-green-400 ml-2 font-semibold">
-                        {formatCurrency(pest.value / pest.cases)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            </Card>
           </div>
-        ) : (
-          <div className="h-64 flex items-center justify-center text-slate-400">
-            <div className="text-center">
-              <Bug className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Ingen specialiseringsdata för {technician.name}</p>
-            </div>
-          </div>
-        )}
-      </Card>
 
-      {/* 🆕 KONKRETA UTVECKLINGSREKOMMENDATIONER */}
-      <Card className="p-6 bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Award className="w-5 h-5 text-yellow-500" />
-          Personliga Utvecklingsrekommendationer för {technician.name}
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Styrkör */}
-          <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <h4 className="text-green-400 font-medium mb-3 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              Styrkör att bygga vidare på
-            </h4>
-            <div className="space-y-2 text-sm">
-              {pestPieData.length > 0 && (
-                <p className="text-slate-300">
-                  • Expert inom <span className="text-green-400 font-semibold">{pestPieData[0]?.name}</span> 
-                  <br />({formatCurrency(pestPieData[0]?.value / pestPieData[0]?.cases)}/ärende)
-                </p>
-              )}
-              {technician.avg_case_value > teamAvgCaseValue && (
-                <p className="text-slate-300">
-                  • Högre ärendepris än teamet indikerar kvalitetsarbete
-                </p>
-              )}
-              {technician.rank <= 3 && (
-                <p className="text-slate-300">
-                  • Toppranking #{technician.rank} - naturlig mentor för teamet
-                </p>
-              )}
-            </div>
-          </div>
-          
-          {/* Utvecklingsområden */}
-          <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <h4 className="text-yellow-400 font-medium mb-3 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              Utvecklingsområden
-            </h4>
-            <div className="space-y-2 text-sm">
-              {revenueVsTeam < -10 && (
-                <p className="text-slate-300">
-                  • Intäkt {Math.abs(revenueVsTeam).toFixed(0)}% under teamet
-                  <br />
-                  <span className="text-yellow-400">→ Fokusera på värdehöjande tjänster</span>
-                </p>
-              )}
-              {casesVsTeam < -15 && (
-                <p className="text-slate-300">
-                  • {Math.abs(casesVsTeam).toFixed(0)}% färre ärenden än teamet
-                  <br />
-                  <span className="text-yellow-400">→ Öka aktivitetsnivån och bokning</span>
-                </p>
-              )}
-              {priceVsTeam < -10 && (
-                <p className="text-slate-300">
-                  • Genomsnittspris {Math.abs(priceVsTeam).toFixed(0)}% under teamet
-                  <br />
-                  <span className="text-yellow-400">→ Utbildning i premium-tjänster behövs</span>
-                </p>
-              )}
-              {pestPieData.length < 3 && (
-                <p className="text-slate-300">
-                  • Begränsad specialisering ({pestPieData.length} områden)
-                  <br />
-                  <span className="text-yellow-400">→ Utöka kompetens inom nya skadedjur</span>
-                </p>
-              )}
-              {revenueVsTeam >= -10 && casesVsTeam >= -15 && priceVsTeam >= -10 && pestPieData.length >= 3 && (
-                <p className="text-green-400">
-                  🎉 Stark prestanda över alla områden! Fortsätt utveckla dina styrkor.
-                </p>
-              )}
-            </div>
-          </div>
-          
-          {/* Nästa steg */}
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              Konkreta nästa steg
-            </h4>
-            <div className="space-y-2 text-sm">
-              {/* Baserat på ranking */}
-              {technician.rank <= 2 && (
-                <p className="text-slate-300">
-                  • <span className="text-blue-400 font-semibold">Mentorskap:</span> Dela din expertis med andra tekniker
-                </p>
-              )}
-              
-              {/* Baserat på prissättning */}
-              {priceVsTeam < -10 && pestPieData.length > 0 && (
-                <p className="text-slate-300">
-                  • <span className="text-blue-400 font-semibold">Prissättning:</span> Höj priserna inom {pestPieData[0]?.name} med {Math.abs(priceVsTeam).toFixed(0)}%
-                </p>
-              )}
-              
-              {/* Baserat på volym */}
-              {casesVsTeam < -15 && (
-                <p className="text-slate-300">
-                  • <span className="text-blue-400 font-semibold">Aktivitet:</span> Mål att öka till {Math.ceil(teamAvgCases)} ärenden/månad
-                </p>
-              )}
-              
-              {/* Baserat på specialisering */}
-              {pestPieData.length > 0 && pestPieData[0].value > 50000 && (
-                <p className="text-slate-300">
-                  • <span className="text-blue-400 font-semibold">Expertis:</span> Utveckla {pestPieData[0]?.name}-kurser för teamet
-                </p>
-              )}
-              
-              {/* Baserat på månadsdata */}
-              {monthlyData.length >= 3 && (
-                <p className="text-slate-300">
-                  • <span className="text-blue-400 font-semibold">Effektivisering:</span> Analysera toppresultat från {formatMonth(monthlyData.reduce((max, curr) => curr.total_revenue > max.total_revenue ? curr : max).month)}
-                </p>
-              )}
-              
-              {/* Allmän utveckling */}
-              <p className="text-slate-300">
-                • <span className="text-blue-400 font-semibold">Uppföljning:</span> Månatlig prestanda-genomgång med chef
-              </p>
-            </div>
-          </div>
+          {/* AI Metadata */}
+          {aiAnalysis.metadata && (
+            <Card className="p-4 bg-slate-800/30 border-slate-700">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>AI-analys v{aiAnalysis.metadata.analysis_version}</span>
+                <span>{aiAnalysis.metadata.data_points_analyzed} datapunkter analyserade</span>
+                <span>Genererad: {new Date(aiAnalysis.metadata.generated_at).toLocaleString('sv-SE')}</span>
+                <Button
+                  variant="ghost" 
+                  size="sm"
+                  onClick={generateAIAnalysis}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Uppdatera analys
+                </Button>
+              </div>
+            </Card>
+          )}
         </div>
+      )}
 
-        {/* 🆕 SAMMANFATTNING MED TYDLIG PRIORITERING */}
-        <div className="mt-6 p-4 bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-500/20 rounded-lg">
-          <h4 className="text-purple-400 font-medium mb-3 flex items-center gap-2">
-            <Award className="w-5 h-5" />
-            Prioriterade Åtgärder (nästa 30 dagar)
-          </h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Högsta prioritet */}
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded">
-              <p className="text-red-400 font-semibold text-sm mb-1">🔥 Hög Prioritet</p>
-              {revenueVsTeam < -20 ? (
-                <p className="text-slate-300 text-sm">Intäktsmål: Öka med {Math.abs(revenueVsTeam / 2).toFixed(0)}% inom 30 dagar</p>
-              ) : priceVsTeam < -15 ? (
-                <p className="text-slate-300 text-sm">Prissättning: Justera uppåt med {Math.abs(priceVsTeam / 3).toFixed(0)}%</p>
-              ) : casesVsTeam < -20 ? (
-                <p className="text-slate-300 text-sm">Aktivitet: Öka till {Math.ceil(teamAvgCases * 0.9)} ärenden/månad</p>
-              ) : (
-                <p className="text-slate-300 text-sm">Behåll nuvarande prestandanivå</p>
-              )}
-            </div>
-
-            {/* Medium prioritet */}
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded">
-              <p className="text-yellow-400 font-semibold text-sm mb-1">⚡ Medium Prioritet</p>
-              {pestPieData.length < 3 ? (
-                <p className="text-slate-300 text-sm">Utöka specialisering: Lägg till 1 ny skadedjurstyp</p>
-              ) : technician.rank > 5 ? (
-                <p className="text-slate-300 text-sm">Ranking: Sikta på topp 5 genom förbättring av svagaste området</p>
-              ) : (
-                <p className="text-slate-300 text-sm">Kompetensutveckling: Delta i avancerad utbildning</p>
-              )}
-            </div>
-
-            {/* Låg prioritet */}
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded">
-              <p className="text-green-400 font-semibold text-sm mb-1">📈 Långsiktigt</p>
-              {technician.rank <= 3 ? (
-                <p className="text-slate-300 text-sm">Mentorskap: Hjälp 1-2 tekniker förbättra sina resultat</p>
-              ) : pestPieData.length > 0 ? (
-                <p className="text-slate-300 text-sm">Expertområde: Fördjupa dig inom {pestPieData[0]?.name}</p>
-              ) : (
-                <p className="text-slate-300 text-sm">Dokumentera bästa praxis för framtida utbildning</p>
-              )}
-            </div>
+      {/* Call-to-action when no AI analysis yet */}
+      {!showAiAnalysis && !aiLoading && !aiError && (
+        <Card className="p-8 text-center bg-gradient-to-br from-purple-600/10 to-blue-600/10 border-purple-500/20">
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Brain className="w-8 h-8 text-white" />
           </div>
-        </div>
-      </Card>
+          <h3 className="text-xl font-semibold text-white mb-2">
+            Redo för djupanalys?
+          </h3>
+          <p className="text-slate-400 mb-6 max-w-md mx-auto">
+            Låt vår AI analysera {technician.name}s prestanda och skapa personliga utvecklingsrekommendationer baserat på all tillgänglig data.
+          </p>
+          <Button
+            onClick={generateAIAnalysis}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3"
+          >
+            <Sparkles className="w-5 h-5 mr-2" />
+            Generera AI-Analys
+          </Button>
+        </Card>
+      )}
     </div>
   )
 }
