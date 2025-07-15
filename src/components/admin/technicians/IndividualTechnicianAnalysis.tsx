@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import Card from '../../ui/Card'
 import Button from '../../ui/Button'
-import { formatCurrency } from '../../../utils/formatting'
+import { formatCurrency } from '../../../utils/formatters'
 import { useCompleteTechnicianDashboard } from '../../../hooks/useTechnicianDashboard'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
