@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/BillingManagement.tsx - MED FAKTURERINGSHISTORIK
+// 📁 src/pages/admin/BillingManagement.tsx - DEBUG OCH FIX AUDIT LOG
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -7,7 +7,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { 
   ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, 
   ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, 
-  AlertTriangle, UserIcon, History, Calendar, Filter
+  AlertTriangle, UserIcon, History, Calendar, Filter, CalendarRange
 } from 'lucide-react';
 
 import Button from '../../components/ui/Button';
@@ -16,7 +16,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
 
-// 🆕 Interface för audit log
+// Interfaces (samma som tidigare)
 interface BillingAuditEntry {
   id: string;
   case_id: string;
@@ -31,13 +31,19 @@ interface BillingAuditEntry {
   customer_name?: string;
 }
 
-// 🆕 Utökad interface för användarspårning
 interface EnhancedBillingCase extends BillingCase {
   billing_updated_by?: string;
   billing_updated_by_id?: string;
 }
 
-// 📊 KPI-kort för faktureringsstatus
+interface DateFilter {
+  type: 'day' | 'week' | 'month' | 'custom';
+  startDate: string;
+  endDate: string;
+  label: string;
+}
+
+// KPI Cards (samma som tidigare)
 const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number; total: number }> }> = ({ summary }) => {
   return (
     <Card className="mb-6">
@@ -82,350 +88,95 @@ const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number
   );
 };
 
-// 🆕 Historik-komponent för ett specifikt ärende
-const CaseHistoryModal: React.FC<{
-  caseId: string;
-  caseNumber: string;
-  isOpen: boolean;
-  onClose: () => void;
-}> = ({ caseId, caseNumber, isOpen, onClose }) => {
-  const [history, setHistory] = useState<BillingAuditEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && caseId) {
-      fetchCaseHistory();
-    }
-  }, [isOpen, caseId]);
-
-  const fetchCaseHistory = async () => {
-    setLoading(true);
+// 🔧 DEBUG - Test audit log connection
+const TestAuditLogConnection: React.FC = () => {
+  const [testResult, setTestResult] = useState<string>('');
+  
+  const testAuditLog = async () => {
     try {
-      const { data, error } = await supabase
+      console.log('🧪 Testing audit log connection...');
+      
+      // Test 1: Kontrollera om tabellen finns och är tillgänglig
+      const { data: tableTest, error: tableError } = await supabase
+        .from('billing_audit_log')
+        .select('count', { count: 'exact', head: true });
+      
+      if (tableError) {
+        setTestResult(`❌ Tabell-test misslyckades: ${tableError.message}`);
+        return;
+      }
+      
+      console.log('✅ Tabell finns och är tillgänglig');
+      
+      // Test 2: Försök läsa existerande data
+      const { data: existingData, error: readError } = await supabase
         .from('billing_audit_log')
         .select('*')
-        .eq('case_id', caseId)
-        .order('changed_at', { ascending: false });
-
-      if (error) throw error;
-      setHistory(data || []);
-    } catch (err) {
-      console.error('Error fetching case history:', err);
-      setHistory([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'text-yellow-400';
-      case 'sent': return 'text-blue-400';
-      case 'paid': return 'text-green-400';
-      case 'skip': return 'text-gray-400';
-      default: return 'text-slate-400';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Väntar';
-      case 'sent': return 'Skickad';
-      case 'paid': return 'Betald';
-      case 'skip': return 'Ej faktura';
-      default: return status;
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
-        <div className="p-6 border-b border-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <History className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Faktureringshistorik</h2>
-                <p className="text-sm text-slate-400">{caseNumber}</p>
-              </div>
-            </div>
-            <Button variant="secondary" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <LoadingSpinner />
-            </div>
-          ) : history.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Ingen historik tillgänglig för detta ärende</p>
-              <p className="text-sm mt-2">Historik sparas från och med nu</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {history.map((entry, index) => (
-                <div 
-                  key={entry.id} 
-                  className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700"
-                >
-                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-white">
-                        Status ändrad från{' '}
-                        <span className={getStatusColor(entry.old_value)}>
-                          {getStatusLabel(entry.old_value)}
-                        </span>
-                        {' '}till{' '}
-                        <span className={getStatusColor(entry.new_value)}>
-                          {getStatusLabel(entry.new_value)}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      <div className="flex items-center gap-1">
-                        <UserIcon className="w-3 h-3" />
-                        <span>{entry.changed_by}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 🆕 Global historik-vy
-const GlobalHistoryModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-}> = ({ isOpen, onClose }) => {
-  const [history, setHistory] = useState<BillingAuditEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchGlobalHistory();
-    }
-  }, [isOpen, selectedMonth]);
-
-  const fetchGlobalHistory = async () => {
-    setLoading(true);
-    try {
-      // Hämta historik för vald månad
-      const startDate = `${selectedMonth}-01`;
-      const endDate = new Date(selectedMonth + '-01');
-      endDate.setMonth(endDate.getMonth() + 1);
-      const endDateStr = endDate.toISOString().slice(0, 10);
-
-      const { data, error } = await supabase
-        .from('billing_audit_log')
-        .select(`
-          *,
-          case_number:private_cases(case_number),
-          case_number_business:business_cases(case_number),
-          customer_name_private:private_cases(kontaktperson),
-          customer_name_business:business_cases(kontaktperson)
-        `)
-        .gte('changed_at', startDate)
-        .lt('changed_at', endDateStr)
-        .order('changed_at', { ascending: false });
-
-      if (error) throw error;
+        .limit(5);
       
-      // Bearbeta data för bättre visning
-      const processedData = (data || []).map(entry => ({
-        ...entry,
-        case_number: entry.case_number?.case_number || entry.case_number_business?.case_number || 'Okänt',
-        customer_name: entry.customer_name_private?.kontaktperson || entry.customer_name_business?.kontaktperson || 'Okänd kund'
-      }));
-
-      setHistory(processedData);
+      if (readError) {
+        setTestResult(`❌ Read-test misslyckades: ${readError.message}`);
+        return;
+      }
+      
+      console.log('✅ Kan läsa från tabellen, antal rader:', existingData?.length || 0);
+      
+      // Test 3: Försök skriva test-data
+      const testEntry = {
+        case_id: 'test-case-id',
+        case_type: 'private',
+        action: 'billing_status_change',
+        old_value: 'pending',
+        new_value: 'sent',
+        changed_by: 'test@example.com',
+        changed_at: new Date().toISOString(),
+        metadata: { test: true }
+      };
+      
+      const { data: insertData, error: insertError } = await supabase
+        .from('billing_audit_log')
+        .insert([testEntry])
+        .select()
+        .single();
+      
+      if (insertError) {
+        setTestResult(`❌ Insert-test misslyckades: ${insertError.message}`);
+        return;
+      }
+      
+      console.log('✅ Kan skriva till tabellen:', insertData);
+      
+      // Test 4: Rensa test-data
+      await supabase
+        .from('billing_audit_log')
+        .delete()
+        .eq('case_id', 'test-case-id');
+      
+      setTestResult(`✅ Audit log fungerar perfekt! Existerande rader: ${existingData?.length || 0}`);
+      
     } catch (err) {
-      console.error('Error fetching global history:', err);
-      setHistory([]);
-    } finally {
-      setLoading(false);
+      console.error('🔥 Test misslyckades:', err);
+      setTestResult(`❌ Oväntat fel: ${err}`);
     }
   };
-
-  const filteredHistory = useMemo(() => {
-    if (!searchTerm.trim()) return history;
-    
-    const term = searchTerm.toLowerCase();
-    return history.filter(entry => 
-      entry.case_number?.toLowerCase().includes(term) ||
-      entry.customer_name?.toLowerCase().includes(term) ||
-      entry.changed_by?.toLowerCase().includes(term)
-    );
-  }, [history, searchTerm]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'text-yellow-400';
-      case 'sent': return 'text-blue-400';
-      case 'paid': return 'text-green-400';
-      case 'skip': return 'text-gray-400';
-      default: return 'text-slate-400';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Väntar';
-      case 'sent': return 'Skickad';
-      case 'paid': return 'Betald';
-      case 'skip': return 'Ej faktura';
-      default: return status;
-    }
-  };
-
-  if (!isOpen) return null;
-
+  
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-slate-900 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b border-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <History className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Faktureringshistorik</h2>
-                <p className="text-sm text-slate-400">Alla ändringar av faktureringsstatus</p>
-              </div>
-            </div>
-            <Button variant="secondary" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Filter och sök */}
-        <div className="p-6 border-b border-slate-800 bg-slate-800/30">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Välj månad
-              </label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Search className="w-4 h-4 inline mr-1" />
-                Sök
-              </label>
-              <input
-                type="text"
-                placeholder="Ärende, kund eller användare..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <LoadingSpinner />
-            </div>
-          ) : filteredHistory.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Ingen historik tillgänglig för vald period</p>
-              <p className="text-sm mt-2">Prova en annan månad eller sökterm</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-sm text-slate-400 mb-4">
-                Visar {filteredHistory.length} ändringar för {new Date(selectedMonth).toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })}
-              </div>
-              
-              {filteredHistory.map((entry) => (
-                <div 
-                  key={entry.id} 
-                  className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:bg-slate-800/70 transition-colors"
-                >
-                  <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></div>
-                  
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
-                    <div>
-                      <p className="text-sm font-medium text-white">{entry.case_number}</p>
-                      <p className="text-xs text-slate-400">{entry.customer_name}</p>
-                    </div>
-                    
-                    <div className="text-sm">
-                      <span className={getStatusColor(entry.old_value)}>
-                        {getStatusLabel(entry.old_value)}
-                      </span>
-                      <span className="text-slate-400 mx-2">→</span>
-                      <span className={getStatusColor(entry.new_value)}>
-                        {getStatusLabel(entry.new_value)}
-                      </span>
-                    </div>
-                    
-                    <div className="text-xs text-slate-400">
-                      <div className="flex items-center gap-1">
-                        <UserIcon className="w-3 h-3" />
-                        <span>{entry.changed_by}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="text-xs text-slate-400">
-                      {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="mb-4 p-4 bg-slate-800 rounded-lg">
+      <div className="flex items-center gap-4">
+        <Button onClick={testAuditLog} size="sm" variant="secondary">
+          🧪 Testa Audit Log
+        </Button>
+        {testResult && (
+          <span className={`text-sm ${testResult.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
+            {testResult}
+          </span>
+        )}
       </div>
     </div>
   );
 };
 
+// 🔧 FÖRBÄTTRAD updateBillingStatus med detaljerad debugging
 const BillingManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -436,7 +187,7 @@ const BillingManagement: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<EnhancedBillingCase | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // 🆕 Historik-modal states
+  // Historik states
   const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
   const [isGlobalHistoryOpen, setIsGlobalHistoryOpen] = useState(false);
   const [selectedCaseForHistory, setSelectedCaseForHistory] = useState<{ id: string; number: string } | null>(null);
@@ -482,12 +233,25 @@ const BillingManagement: React.FC = () => {
     }
   };
 
+  // 🔧 KRAFTIGT FÖRBÄTTRAD updateBillingStatus med steg-för-steg debugging
   const updateBillingStatus = async (caseId: string, type: 'private' | 'business', status: Exclude<BillingStatus, 'all'>) => {
     setProcessingIds(prev => new Set(prev).add(caseId));
+    
     try {
       const userEmail = user?.email || 'Okänd användare';
       const userId = user?.id || null;
+      const currentCase = cases.find(c => c.id === caseId);
+      const oldStatus = currentCase?.billing_status || 'pending';
 
+      console.log('🔄 === BILLING STATUS UPDATE START ===');
+      console.log(`📋 Case ID: ${caseId}`);
+      console.log(`📝 Type: ${type}`);
+      console.log(`🔄 Status change: ${oldStatus} → ${status}`);
+      console.log(`👤 User: ${userEmail} (${userId})`);
+      console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+
+      // Steg 1: Uppdatera case-tabellen
+      console.log('🏗️ Step 1: Updating case table...');
       const updateData = {
         billing_status: status,
         billing_updated_at: new Date().toISOString(),
@@ -495,45 +259,83 @@ const BillingManagement: React.FC = () => {
         billing_updated_by_id: userId
       };
 
+      const table = type === 'private' ? 'private_cases' : 'business_cases';
+      console.log(`📊 Updating table: ${table}`);
+      console.log('📝 Update data:', updateData);
+
       const { data, error } = await supabase
-        .from(type === 'private' ? 'private_cases' : 'business_cases')
+        .from(table)
         .update(updateData)
         .eq('id', caseId)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Case table update failed:', error);
+        throw error;
+      }
+      
+      console.log('✅ Case table updated successfully:', data);
 
-      await createAuditLog(caseId, type, status, userEmail);
-      handleCaseUpdate(data);
-    } catch (err) {
-      console.error('❌ updateBillingStatus error:', err);
-      setError(err instanceof Error ? err.message : 'Fel vid uppdatering av faktureringsstatus');
-    } finally {
-      setProcessingIds(prev => { const newSet = new Set(prev); newSet.delete(caseId); return newSet });
-    }
-  };
-
-  const createAuditLog = async (caseId: string, caseType: string, newStatus: string, userEmail: string) => {
-    try {
+      // Steg 2: Skapa audit log entry
+      console.log('🏗️ Step 2: Creating audit log entry...');
       const auditData = {
         case_id: caseId,
-        case_type: caseType,
+        case_type: type,
         action: 'billing_status_change',
-        old_value: cases.find(c => c.id === caseId)?.billing_status || 'unknown',
-        new_value: newStatus,
+        old_value: oldStatus,
+        new_value: status,
         changed_by: userEmail,
         changed_at: new Date().toISOString(),
         metadata: {
-          user_id: user?.id,
-          user_agent: navigator.userAgent
+          user_id: userId,
+          user_agent: navigator.userAgent,
+          case_number: currentCase?.case_number || null,
+          timestamp: Date.now()
         }
       };
 
-      const { error } = await supabase.from('billing_audit_log').insert([auditData]);
-      if (error) console.warn('Audit log creation failed:', error.message);
+      console.log('📝 Audit data to insert:', auditData);
+
+      const { data: auditResult, error: auditError } = await supabase
+        .from('billing_audit_log')
+        .insert([auditData])
+        .select()
+        .single();
+
+      if (auditError) {
+        console.error('❌ Audit log creation failed:', auditError);
+        console.error('📊 Audit error details:', {
+          message: auditError.message,
+          details: auditError.details,
+          hint: auditError.hint,
+          code: auditError.code
+        });
+        
+        // Visa felmeddelande till användaren men fortsätt
+        setError(`Varning: Audit log misslyckades - ${auditError.message}. Status uppdaterades ändå.`);
+      } else {
+        console.log('✅ Audit log created successfully:', auditResult);
+        // Rensa eventuella tidigare felmeddelanden
+        setError(null);
+      }
+
+      // Steg 3: Uppdatera UI
+      console.log('🏗️ Step 3: Updating UI...');
+      handleCaseUpdate(data);
+      
+      console.log('✅ === BILLING STATUS UPDATE COMPLETE ===');
+      
     } catch (err) {
-      console.warn('Audit log creation failed:', err);
+      console.error('💥 === BILLING STATUS UPDATE FAILED ===');
+      console.error('Error details:', err);
+      setError(err instanceof Error ? err.message : 'Fel vid uppdatering av faktureringsstatus');
+    } finally {
+      setProcessingIds(prev => { 
+        const newSet = new Set(prev); 
+        newSet.delete(caseId); 
+        return newSet;
+      });
     }
   };
 
@@ -541,13 +343,293 @@ const BillingManagement: React.FC = () => {
     setCases(prev => prev.map(c => c.id === updatedCase.id ? updatedCase : c));
   };
 
-  // 🆕 Öppna historik för specifikt ärende
+  // 🔧 FÖRBÄTTRAD historik-hämtning med debugging
+  const CaseHistoryModal: React.FC<{
+    caseId: string;
+    caseNumber: string;
+    isOpen: boolean;
+    onClose: () => void;
+  }> = ({ caseId, caseNumber, isOpen, onClose }) => {
+    const [history, setHistory] = useState<BillingAuditEntry[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      if (isOpen && caseId) {
+        fetchCaseHistory();
+      }
+    }, [isOpen, caseId]);
+
+    const fetchCaseHistory = async () => {
+      setLoading(true);
+      try {
+        console.log(`🔍 === FETCHING CASE HISTORY ===`);
+        console.log(`📋 Case ID: ${caseId}`);
+        console.log(`📝 Case Number: ${caseNumber}`);
+
+        // Hämta från audit log
+        const { data: auditData, error: auditError } = await supabase
+          .from('billing_audit_log')
+          .select('*')
+          .eq('case_id', caseId)
+          .order('changed_at', { ascending: false });
+
+        if (auditError) {
+          console.error('❌ Audit log query failed:', auditError);
+          setHistory([]);
+        } else {
+          console.log(`✅ Found ${auditData?.length || 0} audit entries:`, auditData);
+          setHistory(auditData || []);
+        }
+
+      } catch (err) {
+        console.error('💥 Case history fetch failed:', err);
+        setHistory([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'pending': return 'text-yellow-400';
+        case 'sent': return 'text-blue-400';
+        case 'paid': return 'text-green-400';
+        case 'skip': return 'text-gray-400';
+        default: return 'text-slate-400';
+      }
+    };
+
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case 'pending': return 'Väntar';
+        case 'sent': return 'Skickad';
+        case 'paid': return 'Betald';
+        case 'skip': return 'Ej faktura';
+        default: return status;
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+          <div className="p-6 border-b border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <History className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Faktureringshistorik</h2>
+                  <p className="text-sm text-slate-400">{caseNumber}</p>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={onClose}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : history.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Ingen historik tillgänglig för detta ärende</p>
+                <p className="text-sm mt-2">Gör en statusändring så skapas historik</p>
+                <p className="text-xs mt-2 text-slate-500">Case ID: {caseId}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-400 mb-4">
+                  Visar {history.length} historikposter för {caseNumber}
+                </div>
+                
+                {history.map((entry, index) => (
+                  <div 
+                    key={entry.id} 
+                    className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700"
+                  >
+                    <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-white">
+                          Status ändrad från{' '}
+                          <span className={getStatusColor(entry.old_value)}>
+                            {getStatusLabel(entry.old_value)}
+                          </span>
+                          {' '}till{' '}
+                          <span className={getStatusColor(entry.new_value)}>
+                            {getStatusLabel(entry.new_value)}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-400">
+                        <div className="flex items-center gap-1">
+                          <UserIcon className="w-3 h-3" />
+                          <span>{entry.changed_by}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      {/* 🔧 DEBUG INFO */}
+                      <div className="mt-2 text-xs text-slate-500 bg-slate-900 p-2 rounded">
+                        ID: {entry.id} | Action: {entry.action}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Global historik-modal (förkortad version - samma logik som case history)
+  const GlobalHistoryModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+  }> = ({ isOpen, onClose }) => {
+    const [history, setHistory] = useState<BillingAuditEntry[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      return {
+        type: 'month',
+        startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0],
+        label: 'Denna månad'
+      };
+    });
+
+    useEffect(() => {
+      if (isOpen) {
+        fetchGlobalHistory();
+      }
+    }, [isOpen, dateFilter]);
+
+    const fetchGlobalHistory = async () => {
+      setLoading(true);
+      try {
+        console.log(`🔍 === FETCHING GLOBAL HISTORY ===`);
+        console.log(`📅 Date range: ${dateFilter.startDate} to ${dateFilter.endDate}`);
+
+        const { data, error } = await supabase
+          .from('billing_audit_log')
+          .select('*')
+          .gte('changed_at', `${dateFilter.startDate}T00:00:00`)
+          .lte('changed_at', `${dateFilter.endDate}T23:59:59`)
+          .order('changed_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Global history query failed:', error);
+          setHistory([]);
+        } else {
+          console.log(`✅ Found ${data?.length || 0} global history entries`);
+          setHistory(data || []);
+        }
+
+      } catch (err) {
+        console.error('💥 Global history fetch failed:', err);
+        setHistory([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-900 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+          <div className="p-6 border-b border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <History className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Global Faktureringshistorik</h2>
+                  <p className="text-sm text-slate-400">Alla statusändringar systemet</p>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={onClose}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-6 overflow-y-auto max-h-[70vh]">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : history.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Ingen historik för vald period</p>
+                <p className="text-sm mt-2">{dateFilter.label}</p>
+                <p className="text-xs mt-2 text-slate-500">Gör statusändringar så skapas historik</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm text-slate-400 mb-4">
+                  Visar {history.length} ändringar för {dateFilter.label}
+                </div>
+                
+                {history.map((entry) => (
+                  <div 
+                    key={entry.id} 
+                    className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700"
+                  >
+                    <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></div>
+                    
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-white">
+                        {entry.case_id} - {entry.old_value} → {entry.new_value}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">
+                        {entry.changed_by} • {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Övriga funktioner (samma som tidigare)
   const openCaseHistory = (caseId: string, caseNumber: string) => {
     setSelectedCaseForHistory({ id: caseId, number: caseNumber });
     setIsCaseHistoryOpen(true);
   };
-
-  // ... (resten av funktionerna som tidigare)
 
   const filteredAndSortedCases = useMemo(() => {
     let filtered = cases;
@@ -575,8 +657,6 @@ const BillingManagement: React.FC = () => {
         }
         return sortConfig.direction === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
-  }, [cases, statusFilter, searchTerm, sortConfig]);
-
   const summary = useMemo(() => {
     return cases.reduce((acc, c) => {
       const key = c.billing_status || 'pending';
@@ -663,7 +743,6 @@ const BillingManagement: React.FC = () => {
                   </div>
               </div>
               <div className="flex items-center gap-2">
-                  {/* 🆕 Historik-knapp */}
                   <Button 
                     variant="secondary" 
                     onClick={() => setIsGlobalHistoryOpen(true)}
@@ -678,6 +757,9 @@ const BillingManagement: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 🔧 DEBUG SECTION - Ta bort denna efter felsökning */}
+        <TestAuditLogConnection />
+        
         <BillingKpiCards summary={summary} />
         
         <Card className="p-6 mb-6">
@@ -711,7 +793,7 @@ const BillingManagement: React.FC = () => {
                         <th className="p-4 text-left text-sm font-semibold text-slate-300">Ärende</th>
                         <th className="p-4 text-left text-sm font-semibold text-slate-300"><button onClick={() => handleSort('primary_assignee_name')} className="flex items-center gap-1">Tekniker {sortConfig.field === 'primary_assignee_name' && (sortConfig.direction === 'asc' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>)}</button></th>
                         <th className="p-4 text-left text-sm font-semibold text-slate-300">Kund</th>
-                        <th className="p-4 text-right text-sm font-semibold text-slate-300"><button onClick={() => handleSort('pris')} className="flex items-center gap-1 ml-auto">Att fakturera {sortConfig.field === 'pris' && (sortConfig.direction === 'asc' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>)}</button></th>
+                        <th className="p-4 text-right text-sm font-semibold text-slate-300"><button onClick={() => handleSort('pris')} className="flex items-center gap-1 ml-auto">Att fakturera {sortConfig.field === 'pris' && (sortConfig.direction === 'asc' ? <ChevronUp size={16}/> : <ChevronDown size>{16}/>)}</button></th>
                         <th className="p-4 text-center text-sm font-semibold text-slate-300"><button onClick={() => handleSort('billing_status')} className="flex items-center gap-1 mx-auto">Status {sortConfig.field === 'billing_status' && (sortConfig.direction === 'asc' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>)}</button></th>
                         <th className="p-4 text-center text-sm font-semibold text-slate-300">Åtgärder</th>
                     </tr>
@@ -732,7 +814,6 @@ const BillingManagement: React.FC = () => {
                             </td>
                             <td className="p-4">
                                 <div className="flex items-center justify-center gap-1">
-                                    {/* 🆕 Historik-knapp för ärende */}
                                     <button 
                                       onClick={() => openCaseHistory(case_.id, case_.case_number || case_.title || 'Okänt')}
                                       className="p-2 text-purple-400 hover:text-white rounded-lg" 
@@ -768,7 +849,6 @@ const BillingManagement: React.FC = () => {
         onCaseUpdate={handleCaseUpdate}
       />
 
-      {/* 🆕 Ärendespecifik historik-modal */}
       <CaseHistoryModal
         caseId={selectedCaseForHistory?.id || ''}
         caseNumber={selectedCaseForHistory?.number || ''}
@@ -779,7 +859,6 @@ const BillingManagement: React.FC = () => {
         }}
       />
 
-      {/* 🆕 Global historik-modal */}
       <GlobalHistoryModal
         isOpen={isGlobalHistoryOpen}
         onClose={() => setIsGlobalHistoryOpen(false)}
