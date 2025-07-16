@@ -1,9 +1,10 @@
-// 📁 src/pages/admin/BillingManagement.tsx - KORRIGERAD DATABASFRÅGA MED KPI-KORT
+// 📁 src/pages/admin/BillingManagement.tsx - MED ANVÄNDARSPÅRNING
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext'; // Lägg till för att få användarinfo
 import { formatCurrency } from '../../utils/formatters';
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, AlertTriangle, UserIcon } from 'lucide-react';
 
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -11,7 +12,13 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
 
-// 📊 Kompakta KPI-kort för faktureringsstatus (flyttade från botten)
+// 🆕 Utökad interface för användarspårning
+interface EnhancedBillingCase extends BillingCase {
+  billing_updated_by?: string; // E-post eller namn på användaren som uppdaterade
+  billing_updated_by_id?: string; // User ID
+}
+
+// 📊 KPI-kort för faktureringsstatus (kompakt version)
 const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number; total: number }> }> = ({ summary }) => {
   return (
     <Card className="mb-6">
@@ -58,11 +65,12 @@ const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number
 
 const BillingManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [cases, setCases] = useState<BillingCase[]>([]);
+  const { user } = useAuth(); // 🆕 Hämta inloggad användare
+  const [cases, setCases] = useState<EnhancedBillingCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
-  const [selectedCase, setSelectedCase] = useState<BillingCase | null>(null);
+  const [selectedCase, setSelectedCase] = useState<EnhancedBillingCase | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [statusFilter, setStatusFilter] = useState<BillingStatus>('pending');
@@ -77,14 +85,13 @@ const BillingManagement: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Definiera de kolumner som är GEMENSAMMA för båda tabellerna
+      // 🆕 Utökade kolumner för användarspårning
       const commonFields = `
         id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport,
         kontaktperson, e_post_kontaktperson, telefon_kontaktperson,
-        billing_status, billing_updated_at
+        billing_status, billing_updated_at, billing_updated_by, billing_updated_by_id
       `;
 
-      // 2. Skapa en specifik query för varje tabell
       const privateSelectQuery = `
         ${commonFields},
         personnummer,
@@ -99,7 +106,6 @@ const BillingManagement: React.FC = () => {
         org_nr
       `;
 
-      // 3. Använd rätt query för rätt tabell
       const [privateResult, businessResult] = await Promise.all([
         supabase.from('private_cases').select(privateSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
         supabase.from('business_cases').select(businessSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null)
@@ -108,7 +114,7 @@ const BillingManagement: React.FC = () => {
       if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`);
       if (businessResult.error) throw new Error(`Business cases: ${businessResult.error.message}`);
 
-      const allCases: BillingCase[] = [
+      const allCases: EnhancedBillingCase[] = [
         ...(privateResult.data || []).map(c => ({...c, type: 'private' as const, billing_status: c.billing_status || 'pending'})),
         ...(businessResult.data || []).map(c => ({...c, type: 'business' as const, billing_status: c.billing_status || 'pending'}))
       ];
@@ -120,22 +126,80 @@ const BillingManagement: React.FC = () => {
     }
   };
 
+  // 🆕 Uppdaterad funktion med användarspårning (fokus på e-post)
   const updateBillingStatus = async (caseId: string, type: 'private' | 'business', status: Exclude<BillingStatus, 'all'>) => {
     setProcessingIds(prev => new Set(prev).add(caseId));
     try {
-      const { data, error } = await supabase.from(type === 'private' ? 'private_cases' : 'business_cases')
-        .update({ billing_status: status, billing_updated_at: new Date().toISOString() })
-        .eq('id', caseId).select().single();
+      // 🆕 Använd e-post som primär identifierare
+      const userEmail = user?.email || 'Okänd användare';
+      const userId = user?.id || null;
+
+      console.log(`🔄 Updating billing status for case ${caseId} to ${status} by ${userEmail}`);
+
+      const updateData = {
+        billing_status: status,
+        billing_updated_at: new Date().toISOString(),
+        billing_updated_by: userEmail, // Använd e-post för tydlighet
+        billing_updated_by_id: userId
+      };
+
+      const { data, error } = await supabase
+        .from(type === 'private' ? 'private_cases' : 'business_cases')
+        .update(updateData)
+        .eq('id', caseId)
+        .select()
+        .single();
+
       if (error) throw error;
+
+      // 🆕 Skapa audit log-post med e-post
+      await createAuditLog(caseId, type, status, userEmail);
+
       handleCaseUpdate(data);
+      console.log(`✅ Updated case ${caseId} to status: ${status} by ${userEmail}`);
     } catch (err) {
       console.error('❌ updateBillingStatus error:', err);
+      setError(err instanceof Error ? err.message : 'Fel vid uppdatering av faktureringsstatus');
     } finally {
       setProcessingIds(prev => { const newSet = new Set(prev); newSet.delete(caseId); return newSet });
     }
   };
 
-  const handleCaseUpdate = (updatedCase: BillingCase) => {
+  // 🆕 Skapa audit log-post för fullständig spårning
+  const createAuditLog = async (caseId: string, caseType: string, newStatus: string, userEmail: string) => {
+    try {
+      const auditData = {
+        case_id: caseId,
+        case_type: caseType,
+        action: 'billing_status_change',
+        old_value: cases.find(c => c.id === caseId)?.billing_status || 'unknown',
+        new_value: newStatus,
+        changed_by: userEmail,
+        changed_at: new Date().toISOString(),
+        metadata: {
+          user_id: user?.id,
+          ip_address: 'Unknown', // Kan läggas till senare
+          user_agent: navigator.userAgent
+        }
+      };
+
+      // Försök skapa audit log, men misslyckas inte om tabellen inte finns
+      const { error } = await supabase
+        .from('billing_audit_log')
+        .insert([auditData]);
+
+      if (error) {
+        console.warn('Audit log creation failed (table may not exist):', error.message);
+      } else {
+        console.log('✅ Audit log created successfully');
+      }
+    } catch (err) {
+      console.warn('Audit log creation failed:', err);
+      // Inte kritiskt, så vi fortsätter
+    }
+  };
+
+  const handleCaseUpdate = (updatedCase: EnhancedBillingCase) => {
     setCases(prev => prev.map(c => c.id === updatedCase.id ? updatedCase : c));
   };
 
@@ -152,8 +216,8 @@ const BillingManagement: React.FC = () => {
     }
     return [...filtered].sort((a, b) => {
         const field = sortConfig.field;
-        let aVal = a[field as keyof BillingCase] ?? '';
-        let bVal = b[field as keyof BillingCase] ?? '';
+        let aVal = a[field as keyof EnhancedBillingCase] ?? '';
+        let bVal = b[field as keyof EnhancedBillingCase] ?? '';
 
         if (field === 'completed_date') {
             aVal = new Date(a.completed_date || 0).getTime();
@@ -182,12 +246,12 @@ const BillingManagement: React.FC = () => {
     setSortConfig(prev => ({ field, direction: prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc' }));
   };
   
-  const handleCaseClick = (case_: BillingCase) => {
+  const handleCaseClick = (case_: EnhancedBillingCase) => {
     setSelectedCase(case_);
     setIsModalOpen(true);
   };
   
-  const getDisplayName = (case_: BillingCase) => case_.type === 'business' ? (case_.title || case_.kontaktperson || "Företagskund") : (case_.kontaktperson || case_.title || "Privatkund");
+  const getDisplayName = (case_: EnhancedBillingCase) => case_.type === 'business' ? (case_.title || case_.kontaktperson || "Företagskund") : (case_.kontaktperson || case_.title || "Privatkund");
   
   const getBillingStatusBadge = (status: BillingStatus) => {
     const statusMap = {
@@ -206,6 +270,34 @@ const BillingManagement: React.FC = () => {
     );
   }
 
+  // 🆕 Funktion för att visa vem som uppdaterade status (med e-post)
+  const getLastUpdatedInfo = (case_: EnhancedBillingCase) => {
+    if (!case_.billing_updated_at) return null;
+    
+    const updatedDate = new Date(case_.billing_updated_at).toLocaleDateString('sv-SE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    // Använd e-post och förkorta om den är för lång
+    const updatedBy = case_.billing_updated_by || 'Okänd användare';
+    const displayEmail = updatedBy.length > 20 
+      ? updatedBy.split('@')[0] + '@...' 
+      : updatedBy;
+    
+    return (
+      <div className="text-xs text-slate-400 mt-1 flex items-center gap-1" title={`Uppdaterad av: ${updatedBy}`}>
+        <UserIcon className="w-3 h-3" />
+        <span className="truncate max-w-32">{updatedDate}</span>
+        <br />
+        <span className="truncate max-w-32 text-slate-500">{displayEmail}</span>
+      </div>
+    );
+  };
+
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-950"><LoadingSpinner /></div>;
   if (error) return (
     <div className="p-8 text-center bg-slate-950 text-red-400 min-h-screen">
@@ -223,7 +315,7 @@ const BillingManagement: React.FC = () => {
                   <Button variant="secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Tillbaka</Button>
                   <div>
                       <h1 className="text-2xl font-bold text-white">Fakturering</h1>
-                      <p className="text-sm text-slate-400">{cases.length} totala ärenden</p>
+                      <p className="text-sm text-slate-400">{cases.length} totala ärenden • Inloggad som: <span className="text-blue-400 font-medium">{user?.email}</span></p>
                   </div>
               </div>
               <Button onClick={fetchBillingCases} disabled={loading} className="flex items-center gap-2"><RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Uppdatera</Button>
@@ -231,7 +323,7 @@ const BillingManagement: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* KPI Cards - Kompakta kort flyttade från botten */}
+        {/* KPI Cards */}
         <BillingKpiCards summary={summary} />
         
         <Card className="p-6 mb-6">
@@ -278,7 +370,13 @@ const BillingManagement: React.FC = () => {
                             <td className="p-4"><div className="text-sm text-slate-300">{case_.primary_assignee_name}</div></td>
                             <td className="p-4"><div className="text-sm text-slate-300">{getDisplayName(case_)}</div></td>
                             <td className="p-4 text-right whitespace-nowrap"><div className="text-sm font-medium text-white">{formatCurrency(case_.type === 'private' ? case_.pris : case_.pris * 1.25)}</div></td>
-                            <td className="p-4 text-center">{getBillingStatusBadge(case_.billing_status as BillingStatus)}</td>
+                            <td className="p-4 text-center">
+                              <div className="flex flex-col items-center">
+                                {getBillingStatusBadge(case_.billing_status as BillingStatus)}
+                                {/* 🆕 Visa vem som uppdaterade status */}
+                                {getLastUpdatedInfo(case_)}
+                              </div>
+                            </td>
                             <td className="p-4">
                                 <div className="flex items-center justify-center gap-1">
                                     {case_.billing_status === 'pending' && <button onClick={() => updateBillingStatus(case_.id, case_.type, 'sent')} disabled={processingIds.has(case_.id)} className="p-2 text-blue-400 hover:text-white rounded-lg" title="Markera som skickad"><FileText size={16} /></button>}
