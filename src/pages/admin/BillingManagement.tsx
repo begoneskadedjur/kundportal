@@ -1,15 +1,111 @@
-// 📁 src/pages/admin/BillingManagement.tsx - KORRIGERAD DATABASFRÅGA
+// 📁 src/pages/admin/BillingManagement.tsx - KORRIGERAD DATABASFRÅGA MED KPI-KORT
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatters';
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, ChevronDown, ChevronUp, User, Building2 } from 'lucide-react';
+import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
 
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
+
+// 📊 KPI-kort för faktureringsstatus
+const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number; total: number }> }> = ({ summary }) => {
+  // Säkerställ att alla status-typer finns i summary
+  const safeSummary = {
+    pending: summary.pending || { count: 0, total: 0 },
+    sent: summary.sent || { count: 0, total: 0 },
+    paid: summary.paid || { count: 0, total: 0 },
+    skip: summary.skip || { count: 0, total: 0 },
+    all: summary.all || { count: 0, total: 0 }
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Väntar på fakturering */}
+      <Card className="p-6 bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border-yellow-500/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Väntar på fakturering</p>
+            <p className="text-2xl font-bold text-yellow-400">{safeSummary.pending.count}</p>
+            <p className="text-xs text-slate-500 mt-1">{formatCurrency(safeSummary.pending.total)}</p>
+          </div>
+          <div className="p-3 bg-yellow-500/10 rounded-full">
+            <Clock className="w-8 h-8 text-yellow-500" />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-yellow-500/20">
+          <div className="flex items-center text-xs text-yellow-400">
+            <TrendingUp className="w-3 h-3 mr-1" />
+            Redo för fakturering
+          </div>
+        </div>
+      </Card>
+
+      {/* Faktura skickad */}
+      <Card className="p-6 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border-blue-500/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Faktura skickad</p>
+            <p className="text-2xl font-bold text-blue-400">{safeSummary.sent.count}</p>
+            <p className="text-xs text-slate-500 mt-1">{formatCurrency(safeSummary.sent.total)}</p>
+          </div>
+          <div className="p-3 bg-blue-500/10 rounded-full">
+            <FileText className="w-8 h-8 text-blue-500" />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-blue-500/20">
+          <div className="flex items-center text-xs text-blue-400">
+            <TrendingUp className="w-3 h-3 mr-1" />
+            Väntar på betalning
+          </div>
+        </div>
+      </Card>
+
+      {/* Faktura betald */}
+      <Card className="p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Faktura betald</p>
+            <p className="text-2xl font-bold text-green-400">{safeSummary.paid.count}</p>
+            <p className="text-xs text-slate-500 mt-1">{formatCurrency(safeSummary.paid.total)}</p>
+          </div>
+          <div className="p-3 bg-green-500/10 rounded-full">
+            <Check className="w-8 h-8 text-green-500" />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-green-500/20">
+          <div className="flex items-center text-xs text-green-400">
+            <DollarSign className="w-3 h-3 mr-1" />
+            Genomförd betalning
+          </div>
+        </div>
+      </Card>
+
+      {/* Ska ej faktureras */}
+      <Card className="p-6 bg-gradient-to-br from-gray-500/10 to-slate-500/5 border-gray-500/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-400">Ska ej faktureras</p>
+            <p className="text-2xl font-bold text-gray-400">{safeSummary.skip.count}</p>
+            <p className="text-xs text-slate-500 mt-1">{formatCurrency(safeSummary.skip.total)}</p>
+          </div>
+          <div className="p-3 bg-gray-500/10 rounded-full">
+            <X className="w-8 h-8 text-gray-500" />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-500/20">
+          <div className="flex items-center text-xs text-gray-400">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Exkluderad från fakturering
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
 
 const BillingManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -153,7 +249,12 @@ const BillingManagement: React.FC = () => {
         all: { label: 'Okänd', Icon: X, color: 'slate' },
     };
     const { label, Icon, color } = statusMap[status];
-    return <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${color}-500/10 text-${color}-400 border border-${color}-500/20`}><Icon className="w-3 h-3 mr-1" />{label}</span>;
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${color}-500/10 text-${color}-400 border border-${color}-500/20`}>
+        <Icon className="w-3 h-3 mr-1" />
+        {label}
+      </span>
+    );
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-slate-950"><LoadingSpinner /></div>;
@@ -181,17 +282,26 @@ const BillingManagement: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* KPI Cards */}
-        </div>
+        {/* KPI Cards - ÅTERSTÄLLDA! */}
+        <BillingKpiCards summary={summary} />
+        
         <Card className="p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
               <div className="flex gap-2 flex-wrap">
-                  {(['all', 'pending', 'sent', 'paid', 'skip'] as BillingStatus[]).map(key => (
+                  {(['all', 'pending', 'sent', 'paid', 'skip'] as BillingStatus[]).map(key => {
+                    const labels = {
+                      all: 'Alla',
+                      pending: 'Väntar',
+                      sent: 'Skickad', 
+                      paid: 'Betald',
+                      skip: 'Ej faktura'
+                    };
+                    return (
                       <button key={key} onClick={() => setStatusFilter(key)} className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === key ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                          {key.charAt(0).toUpperCase() + key.slice(1)} ({key === 'all' ? cases.length : (summary[key]?.count || 0)})
+                          {labels[key]} ({key === 'all' ? cases.length : (summary[key]?.count || 0)})
                       </button>
-                  ))}
+                    );
+                  })}
               </div>
               <div className="relative w-full lg:w-auto"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" /><input type="text" placeholder="Sök..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white w-full lg:w-80" /></div>
           </div>
@@ -238,6 +348,47 @@ const BillingManagement: React.FC = () => {
             </table>
           </div>
           {filteredAndSortedCases.length === 0 && <div className="p-8 text-center text-slate-400">Inga ärenden matchade dina filter.</div>}
+        </Card>
+
+        {/* Sammanfattning längst ner */}
+        <Card className="mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-medium text-white mb-4">Faktureringsammanfattning</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+              <div className="text-center p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <p className="text-yellow-400 font-medium">Väntar på fakturering</p>
+                <p className="text-2xl font-bold text-white mt-1">{formatCurrency(summary.pending?.total || 0)}</p>
+                <p className="text-yellow-400/70 text-xs">{summary.pending?.count || 0} ärenden</p>
+              </div>
+              
+              <div className="text-center p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <p className="text-blue-400 font-medium">Skickade fakturor</p>
+                <p className="text-2xl font-bold text-white mt-1">{formatCurrency(summary.sent?.total || 0)}</p>
+                <p className="text-blue-400/70 text-xs">{summary.sent?.count || 0} ärenden</p>
+              </div>
+              
+              <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                <p className="text-green-400 font-medium">Betalda fakturor</p>
+                <p className="text-2xl font-bold text-white mt-1">{formatCurrency(summary.paid?.total || 0)}</p>
+                <p className="text-green-400/70 text-xs">{summary.paid?.count || 0} ärenden</p>
+              </div>
+              
+              <div className="text-center p-4 bg-gray-500/10 rounded-lg border border-gray-500/20">
+                <p className="text-gray-400 font-medium">Ej faktureras</p>
+                <p className="text-2xl font-bold text-white mt-1">{formatCurrency(summary.skip?.total || 0)}</p>
+                <p className="text-gray-400/70 text-xs">{summary.skip?.count || 0} ärenden</p>
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-800">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Total potentiell intäkt:</span>
+                <span className="text-xl font-bold text-white">
+                  {formatCurrency((summary.pending?.total || 0) + (summary.sent?.total || 0) + (summary.paid?.total || 0))}
+                </span>
+              </div>
+            </div>
+          </div>
         </Card>
       </main>
 
