@@ -126,7 +126,7 @@ async function fetchContractFromOneflow(contractId: number) {
   try {
     const response = await fetch(`${process.env.ONEFLOW_API_URL}/contracts/${contractId}`, {
       headers: {
-        'Authorization': `Bearer ${process.env.ONEFLOW_API_TOKEN}`,
+        'x-oneflow-api-token': process.env.ONEFLOW_API_TOKEN!,
         'Content-Type': 'application/json'
       }
     })

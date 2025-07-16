@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Test 1: Hämta avtal (detta är det grundläggande API-anropet)
     const contractsResponse = await fetch(`${ONEFLOW_API_URL}/contracts?limit=5`, {
       headers: {
-        'Authorization': `Bearer ${ONEFLOW_API_TOKEN}`,
+        'x-oneflow-api-token': ONEFLOW_API_TOKEN,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Hämta detaljerad kontraktinfo
       const detailResponse = await fetch(`${ONEFLOW_API_URL}/contracts/${firstContract.id}`, {
         headers: {
-          'Authorization': `Bearer ${ONEFLOW_API_TOKEN}`,
+          'x-oneflow-api-token': ONEFLOW_API_TOKEN,
           'Content-Type': 'application/json'
         }
       })
