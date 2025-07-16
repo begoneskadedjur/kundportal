@@ -36,24 +36,45 @@ interface ClickUpWebhookPayload {
   }>
 }
 
-// 🆕 PROVISIONSBERÄKNING - ENDAST VID COMPLETION
-function calculateCommission(price: number, tableName: 'private_cases' | 'business_cases'): number | null {
-  if (!price || price <= 0) return null
+// 🆕 SÄKER PROVISIONSBERÄKNING - ENDAST VID COMPLETION
+function calculateCommission(price: any, tableName: 'private_cases' | 'business_cases'): number | null {
+  // 🔧 SÄKER KONVERTERING: Konvertera till nummer först
+  let numericPrice: number
+  
+  if (typeof price === 'number') {
+    numericPrice = price
+  } else if (typeof price === 'string') {
+    numericPrice = parseFloat(price)
+  } else {
+    numericPrice = Number(price)
+  }
+  
+  // 🔧 VALIDERING: Kontrollera att priset är giltigt
+  if (!numericPrice || numericPrice <= 0 || isNaN(numericPrice)) {
+    console.log(`⚠️ Invalid price for commission calculation: ${price} (converted: ${numericPrice}, type: ${typeof price})`)
+    return null
+  }
   
   let netAmount: number
   
   if (tableName === 'business_cases') {
     // Företag: Ta bort 25% moms först
-    netAmount = price / 1.25
+    netAmount = numericPrice / 1.25
   } else {
     // Privatperson: Ingen moms
-    netAmount = price
+    netAmount = numericPrice
+  }
+  
+  // 🔧 EXTRA SÄKERHET: Kontrollera netAmount
+  if (!netAmount || isNaN(netAmount)) {
+    console.log(`⚠️ Invalid netAmount after calculation: ${netAmount}`)
+    return null
   }
   
   // 5% provision på nettobeloppet, avrunda till 2 decimaler
   const commission = Math.round(netAmount * 0.05 * 100) / 100
   
-  console.log(`💰 Commission calculation: ${price}kr → ${netAmount.toFixed(2)}kr (net) → ${commission}kr (5%)`)
+  console.log(`💰 Commission calculation: ${numericPrice}kr → ${netAmount.toFixed(2)}kr (net) → ${commission}kr (5%)`)
   
   return commission
 }
@@ -320,7 +341,7 @@ async function fetchClickUpTask(taskId: string) {
   }
 }
 
-// 🆕 UPPDATERAD: Mappa BeGone task till databas-format med nya statusar + PROVISIONER
+// 🆕 UPPDATERAD: Mappa BeGone task till databas-format med nya statusar + SÄKRA PROVISIONER
 function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases' | 'business_cases') {
   // 🆕 KORREKT STATUS-MAPPNING från ClickUp ID till namn
   const clickupStatusId = taskData.status?.id
@@ -369,20 +390,32 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
   // Hämta viktiga custom fields
   const priceField = getCustomField('Pris')
   
-  // 🆕 PROVISIONSBERÄKNING - ENDAST VID COMPLETION
+  // 🔧 SÄKER PRISHANTERING: Debug-logging för pris
+  console.log(`🔍 DEBUG Price field for task ${taskData.id}:`, {
+    field_exists: !!priceField,
+    field_value: priceField?.value,
+    field_type: typeof priceField?.value,
+    field_raw: JSON.stringify(priceField)
+  })
+  
+  // 🆕 SÄKER PROVISIONSBERÄKNING - ENDAST VID COMPLETION
   let commissionAmount: number | null = null
   let commissionCalculatedAt: string | null = null
   
-  if (isCompleted && priceField?.value && priceField.value > 0) {
+  if (isCompleted && priceField?.value) {
+    // 🔧 SÄKER BERÄKNING: Använd den uppdaterade calculateCommission
     commissionAmount = calculateCommission(priceField.value, tableName)
-    commissionCalculatedAt = new Date().toISOString()
     
-    console.log(`🏆 COMMISSION CALCULATED for ${tableName} task ${taskData.id}:`, {
-      price: priceField.value,
-      commission: commissionAmount,
-      technician: taskData.assignees?.[0]?.username || 'Ej tilldelad',
-      calculated_at: commissionCalculatedAt
-    })
+    if (commissionAmount && commissionAmount > 0) {
+      commissionCalculatedAt = new Date().toISOString()
+      
+      console.log(`🏆 COMMISSION CALCULATED for ${tableName} task ${taskData.id}:`, {
+        price: priceField.value,
+        commission: commissionAmount,
+        technician: taskData.assignees?.[0]?.username || 'Ej tilldelad',
+        calculated_at: commissionCalculatedAt
+      })
+    }
   }
 
   // Mappa assignees till tekniker
@@ -404,7 +437,7 @@ function mapClickUpTaskToBeGoneCaseData(taskData: any, tableName: 'private_cases
     ...assigneeData,
     ...dateData,
     
-    // 🆕 PROVISIONSDATA - ENDAST VID COMPLETION
+    // 🆕 SÄKRA PROVISIONSDATA - ENDAST VID COMPLETION
     commission_amount: commissionAmount,
     commission_calculated_at: commissionCalculatedAt,
     
