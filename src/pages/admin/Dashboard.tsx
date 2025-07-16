@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/AdminDashboard.tsx - MED FÖRSÄLJNINGSMÖJLIGHETER KNAPP
+// 📁 src/pages/admin/AdminDashboard.tsx - KOMPLETT MED ALLA FUNKTIONER
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -10,14 +10,16 @@ import {
   DollarSign, 
   BarChart3, 
   Calendar,
-  Settings,
   Building2,
   User,
   Shield,
   LogOut,
   Wrench,
   Star,
-  Target
+  Target,
+  UserCheck,
+  Wallet,
+  Settings
 } from 'lucide-react'
 
 import Card from '../../components/ui/Card'
@@ -99,7 +101,7 @@ const AdminDashboard: React.FC = () => {
         totalRevenue,
         activeTechnicians: techniciansResult.data?.length || 0,
         pendingCases: activeCasesResult.data?.length || 0,
-        recentActivity: [] // Kan implementeras senare
+        recentActivity: []
       }
 
       setStats(dashboardStats)
@@ -224,134 +226,164 @@ const AdminDashboard: React.FC = () => {
             </Card>
           </div>
 
-          {/* Navigation Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* 📱 Navigation Grid - Sorterade efter funktionalitet som appar */}
+          <div className="space-y-6">
             
-            {/* Kundhantering */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/customers')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Users className="w-8 h-8 text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Kundhantering</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Hantera avtalskunder, skapa nya listor och skicka inbjudningar
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {stats?.totalCustomers} aktiva kunder
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+            {/* 👥 KUNDHANTERING */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-400" />
+                Kundhantering
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                {/* Hantera Kunder */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/customers')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
+                      <Users className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-blue-300 transition-colors">Hantera Kunder</h3>
+                      <p className="text-xs text-slate-400">Avtalskunder & ClickUp-listor</p>
+                      <p className="text-xs text-slate-500 mt-1">{stats?.totalCustomers} aktiva kunder</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
+                </Card>
 
-            {/* Ekonomisk Översikt */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/economics')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-green-500/20 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-8 h-8 text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Ekonomisk Översikt</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Intäktsanalys, trender och ekonomiska insights
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {formatCurrency(stats?.totalRevenue || 0)} total intäkt
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+                {/* Försäljningsmöjligheter */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/sales-opportunities')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
+                      <Target className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-purple-300 transition-colors">Försäljningsmöjligheter</h3>
+                      <p className="text-xs text-slate-400">Potentiella avtalskunder</p>
+                      <p className="text-xs text-slate-500 mt-1">BeGone → Avtal</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
+                </Card>
 
-            {/* 🆕 Försäljningsmöjligheter */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/sales-opportunities')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                  <Target className="w-8 h-8 text-purple-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Försäljningsmöjligheter</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Identifiera potentiella avtalskunder från BeGone-ärenden
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      Analys av återkommande kunder
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+                {/* Ny Kund */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/customers/new')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
+                      <Building2 className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-green-300 transition-colors">Lägg till Kund</h3>
+                      <p className="text-xs text-slate-400">Skapa ny avtalskund</p>
+                      <p className="text-xs text-slate-500 mt-1">Automatisk ClickUp-lista</p>
+                    </div>
                   </div>
-                </div>
+                </Card>
               </div>
-            </Card>
+            </div>
 
-            {/* Tekniker Statistik */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/technicians')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-orange-500/20 rounded-xl flex items-center justify-center">
-                  <Wrench className="w-8 h-8 text-orange-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Tekniker Statistik</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Prestanda, ranking och arbetstider för tekniker
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {stats?.activeTechnicians} aktiva tekniker
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+            {/* 🔧 TEKNIKER & PERSONAL */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-orange-400" />
+                Tekniker & Personal
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                {/* Tekniker Statistik */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/technicians')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
+                      <BarChart3 className="w-6 h-6 text-orange-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-orange-300 transition-colors">Tekniker Statistik</h3>
+                      <p className="text-xs text-slate-400">Prestanda & ranking</p>
+                      <p className="text-xs text-slate-500 mt-1">{stats?.activeTechnicians} aktiva tekniker</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
+                </Card>
 
-            {/* Fakturering */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/billing')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-yellow-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Fakturering</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Hantera fakturering för avslutade BeGone-ärenden
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+                {/* Hantera Tekniker */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/technician-management')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
+                      <UserCheck className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-blue-300 transition-colors">Hantera Tekniker</h3>
+                      <p className="text-xs text-slate-400">CRUD & administration</p>
+                      <p className="text-xs text-slate-500 mt-1">Lägg till/redigera personal</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
+                </Card>
 
-            {/* System Inställningar */}
-            <Card className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/settings')}>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-slate-500/20 rounded-xl flex items-center justify-center">
-                  <Settings className="w-8 h-8 text-slate-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Inställningar</h3>
-                  <p className="text-sm text-slate-400 mb-3">
-                    Systemkonfiguration och användarhantering
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      Konfigurationer
-                    </span>
-                    <Button size="sm" variant="secondary">Öppna</Button>
+                {/* Provisioner */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/commissions')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center group-hover:bg-yellow-500/30 transition-colors">
+                      <Wallet className="w-6 h-6 text-yellow-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-yellow-300 transition-colors">Provisioner</h3>
+                      <p className="text-xs text-slate-400">Beräkna & hantera</p>
+                      <p className="text-xs text-slate-500 mt-1">Tekniker-commissionsystem</p>
+                    </div>
                   </div>
-                </div>
+                </Card>
               </div>
-            </Card>
+            </div>
+
+            {/* 💰 EKONOMI & FAKTURERING */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-green-400" />
+                Ekonomi & Fakturering
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                {/* Ekonomisk Översikt */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/economics')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
+                      <TrendingUp className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-green-300 transition-colors">Ekonomisk Översikt</h3>
+                      <p className="text-xs text-slate-400">Intäktsanalys & KPI</p>
+                      <p className="text-xs text-slate-500 mt-1">{formatCurrency(stats?.totalRevenue || 0)} total</p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Fakturering */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/billing')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center group-hover:bg-yellow-500/30 transition-colors">
+                      <FileText className="w-6 h-6 text-yellow-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-yellow-300 transition-colors">Fakturering</h3>
+                      <p className="text-xs text-slate-400">BeGone-ärenden</p>
+                      <p className="text-xs text-slate-500 mt-1">{(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden</p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Placeholder för framtida ekonomifunktioner */}
+                <Card className="p-4 bg-slate-800/30 border-dashed border-slate-600">
+                  <div className="flex items-center gap-3 opacity-50">
+                    <div className="w-12 h-12 bg-slate-500/20 rounded-xl flex items-center justify-center">
+                      <Settings className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-slate-400">Kommande funktioner</h3>
+                      <p className="text-xs text-slate-500">Fler ekonomiverktyg</p>
+                      <p className="text-xs text-slate-600 mt-1">Under utveckling</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
           </div>
 
           {/* Quick Actions */}
