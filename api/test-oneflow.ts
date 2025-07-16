@@ -17,37 +17,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('🧪 Testing Oneflow API connection...')
 
-    // Test 1: Hämta workspace info
-    const workspaceResponse = await fetch(`${ONEFLOW_API_URL}/workspaces`, {
-      headers: {
-        'Authorization': `Bearer ${ONEFLOW_API_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!workspaceResponse.ok) {
-      throw new Error(`Workspace API error: ${workspaceResponse.status} ${workspaceResponse.statusText}`)
-    }
-
-    const workspaceData = await workspaceResponse.json()
-    console.log('✅ Workspace test passed')
-
-    // Test 2: Hämta avtal (begränsat antal)
+    // Test 1: Hämta avtal (detta är det grundläggande API-anropet)
     const contractsResponse = await fetch(`${ONEFLOW_API_URL}/contracts?limit=5`, {
       headers: {
         'Authorization': `Bearer ${ONEFLOW_API_TOKEN}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     })
 
+    console.log(`API Request: GET ${ONEFLOW_API_URL}/contracts?limit=5`)
+    console.log(`Response Status: ${contractsResponse.status}`)
+
     if (!contractsResponse.ok) {
-      throw new Error(`Contracts API error: ${contractsResponse.status} ${contractsResponse.statusText}`)
+      const errorText = await contractsResponse.text()
+      console.error(`API Error Response: ${errorText}`)
+      throw new Error(`Contracts API error: ${contractsResponse.status} ${contractsResponse.statusText}\nDetails: ${errorText}`)
     }
 
     const contractsData = await contractsResponse.json()
     console.log('✅ Contracts test passed')
+    console.log(`Found ${contractsData.data?.length || 0} contracts`)
 
-    // Test 3: Analysera datafält från första avtalet
+    // Test 2: Analysera datafält från första avtalet
     const firstContract = contractsData.data?.[0]
     let dataFieldsAnalysis = null
     
