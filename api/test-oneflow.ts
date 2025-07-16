@@ -1,75 +1,124 @@
-// api/test-oneflow.ts - SÄKER, MINIMAL VERSION FÖR FELSÖKNING
+// api/test-oneflow.ts - AVANCERAD VERSION FÖR ATT MAPPA KONTOT
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Huvudfunktionen som Vercel kör
+// --- HJÄLPAR-FUNKTION FÖR API-ANROP ---
+// Vi skapar en central funktion för att göra koden renare
+async function oneflowFetch(endpoint: string, token: string) {
+    const API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1';
+    
+    console.log(`...anropar Oneflow endpoint: ${endpoint}`);
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        headers: {
+            'x-oneflow-api-token': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Fel från Oneflow API: ${response.status} - ${errorText}`);
+        throw new Error(`Oneflow API Error: ${response.status}`);
+    }
+    
+    console.log(`✅ Svar mottaget från ${endpoint}`);
+    return response.json();
+}
+
+// --- HUVUDFUNKTION (HANDLER) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Sätt CORS-headers för att tillåta anrop från webbläsare
+    // Sätt CORS-headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Hantera OPTIONS-request (nödvändigt för CORS)
     if (req.method === 'OPTIONS') {
         return res.status(204).end();
     }
 
     try {
-        console.log('🧪 Startar test av Oneflow API-anslutning...');
-
-        // Hämta miljövariabler INUTI funktionen
         const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN;
-        const ONEFLOW_API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1';
-
-        // Validera att API-token finns
         if (!ONEFLOW_API_TOKEN) {
-            console.error('❌ FEL: Miljövariabeln ONEFLOW_API_TOKEN är inte satt.');
-            return res.status(500).json({
-                success: false,
-                error: 'Server configuration error: ONEFLOW_API_TOKEN is missing.'
+            throw new Error('Miljövariabeln ONEFLOW_API_TOKEN är inte satt.');
+        }
+
+        // Hämta query-parametrar från URL:en
+        const { listTemplates, templateId, contractId } = req.query;
+
+        // Välj vad vi ska göra baserat på URL:en
+        if (listTemplates) {
+            // --- LÄGE 1: Lista alla avtalsmallar ---
+            console.log('🧪 Diagnosläge: Listar alla avtalsmallar...');
+            const data = await oneflowFetch('/templates', ONEFLOW_API_TOKEN);
+            
+            // Plocka ut bara den viktigaste informationen
+            const templates = data.data.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                type: t.type?.name || 'Okänd typ'
+            }));
+
+            return res.status(200).json({
+                success: true,
+                message: `Hittade ${templates.length} avtalsmallar.`,
+                templates: templates
+            });
+
+        } else if (templateId) {
+            // --- LÄGE 2: Visa detaljer för en specifik mall ---
+            console.log(`🧪 Diagnosläge: Visar detaljer för mall-ID ${templateId}...`);
+            const data = await oneflowFetch(`/templates/${templateId}`, ONEFLOW_API_TOKEN);
+            
+            // Plocka ut datafälten från mallen
+            const dataFields = data.data_fields?.map((df: any) => ({
+                id: df.id,
+                key: df.key, // Detta är namnet du använder i koden
+                type: df.type,
+                default_value: df.default_value
+            })) || [];
+
+            return res.status(200).json({
+                success: true,
+                message: `Detaljer för mallen "${data.name}".`,
+                template: { id: data.id, name: data.name },
+                required_data_fields: dataFields
+            });
+
+        } else if (contractId) {
+            // --- LÄGE 3: Visa detaljer för ett specifikt kontrakt ---
+             console.log(`🧪 Diagnosläge: Visar detaljer för kontrakt-ID ${contractId}...`);
+            const data = await oneflowFetch(`/contracts/${contractId}`, ONEFLOW_API_TOKEN);
+
+            const dataFields = data.data_fields?.map((df: any) => ({
+                key: df.key,
+                value: df.value // Här ser vi det ifyllda värdet
+            })) || [];
+
+            return res.status(200).json({
+                success: true,
+                message: `Detaljer för kontraktet "${data.name}".`,
+                contract: { id: data.id, name: data.name, state: data.state },
+                filled_in_data_fields: dataFields
+            });
+
+        } else {
+            // --- GRUNDLÄGE: Standard anslutningstest ---
+            console.log('🧪 Diagnosläge: Grundläggande anslutningstest...');
+            const data = await oneflowFetch('/contracts?limit=1', ONEFLOW_API_TOKEN);
+            return res.status(200).json({
+                success: true,
+                message: 'Grundläggande anslutning till Oneflow API fungerar!',
+                data: {
+                    total_contracts_in_account: data.meta?.total || 0
+                }
             });
         }
-        
-        console.log(`...anropar Oneflow API på ${ONEFLOW_API_URL}...`);
-        
-        // Gör API-anropet till Oneflow
-        const response = await fetch(`${ONEFLOW_API_URL}/contracts?limit=1`, {
-            headers: {
-                'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
-        
-        console.log(`...svar mottaget från Oneflow med status: ${response.status}`);
-
-        // Kontrollera om anropet misslyckades
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Oneflow API Error: ${response.status} - ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Anrop till Oneflow lyckades!');
-        
-        // Skicka ett framgångsrikt svar
-        return res.status(200).json({
-            success: true,
-            message: 'Anslutningen till Oneflow API fungerar!',
-            data: {
-                contracts_found_in_test: data.data?.length || 0,
-                total_contracts_in_account: data.meta?.total || 0
-            }
-        });
 
     } catch (error) {
-        // Om något går fel, fånga felet här
-        console.error('❌ Oneflow-testet misslyckades:', error);
-        
-        // Skicka ett felmeddelande tillbaka
+        console.error('❌ Ett fel inträffade i test-scriptet:', error);
         return res.status(500).json({
             success: false,
-            error: 'Oneflow API test failed',
-            details: error instanceof Error ? error.message : 'An unknown error occurred'
+            error: error instanceof Error ? error.message : 'Okänt fel'
         });
     }
 }
