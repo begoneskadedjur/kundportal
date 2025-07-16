@@ -1,10 +1,14 @@
-// 📁 src/pages/admin/BillingManagement.tsx - MED ANVÄNDARSPÅRNING
+// 📁 src/pages/admin/BillingManagement.tsx - MED FAKTURERINGSHISTORIK
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext'; // Lägg till för att få användarinfo
+import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
-import { ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, AlertTriangle, UserIcon } from 'lucide-react';
+import { 
+  ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw, 
+  ChevronDown, ChevronUp, User, Building2, DollarSign, TrendingUp, 
+  AlertTriangle, UserIcon, History, Calendar, Filter
+} from 'lucide-react';
 
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -12,13 +16,28 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
 
-// 🆕 Utökad interface för användarspårning
-interface EnhancedBillingCase extends BillingCase {
-  billing_updated_by?: string; // E-post eller namn på användaren som uppdaterade
-  billing_updated_by_id?: string; // User ID
+// 🆕 Interface för audit log
+interface BillingAuditEntry {
+  id: string;
+  case_id: string;
+  case_type: 'private' | 'business';
+  action: string;
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_at: string;
+  metadata?: any;
+  case_number?: string;
+  customer_name?: string;
 }
 
-// 📊 KPI-kort för faktureringsstatus (kompakt version)
+// 🆕 Utökad interface för användarspårning
+interface EnhancedBillingCase extends BillingCase {
+  billing_updated_by?: string;
+  billing_updated_by_id?: string;
+}
+
+// 📊 KPI-kort för faktureringsstatus
 const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number; total: number }> }> = ({ summary }) => {
   return (
     <Card className="mb-6">
@@ -63,15 +82,364 @@ const BillingKpiCards: React.FC<{ summary: Record<BillingStatus, { count: number
   );
 };
 
+// 🆕 Historik-komponent för ett specifikt ärende
+const CaseHistoryModal: React.FC<{
+  caseId: string;
+  caseNumber: string;
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ caseId, caseNumber, isOpen, onClose }) => {
+  const [history, setHistory] = useState<BillingAuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && caseId) {
+      fetchCaseHistory();
+    }
+  }, [isOpen, caseId]);
+
+  const fetchCaseHistory = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('billing_audit_log')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('changed_at', { ascending: false });
+
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (err) {
+      console.error('Error fetching case history:', err);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'text-yellow-400';
+      case 'sent': return 'text-blue-400';
+      case 'paid': return 'text-green-400';
+      case 'skip': return 'text-gray-400';
+      default: return 'text-slate-400';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Väntar';
+      case 'sent': return 'Skickad';
+      case 'paid': return 'Betald';
+      case 'skip': return 'Ej faktura';
+      default: return status;
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <History className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Faktureringshistorik</h2>
+                <p className="text-sm text-slate-400">{caseNumber}</p>
+              </div>
+            </div>
+            <Button variant="secondary" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Ingen historik tillgänglig för detta ärende</p>
+              <p className="text-sm mt-2">Historik sparas från och med nu</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {history.map((entry, index) => (
+                <div 
+                  key={entry.id} 
+                  className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700"
+                >
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-white">
+                        Status ändrad från{' '}
+                        <span className={getStatusColor(entry.old_value)}>
+                          {getStatusLabel(entry.old_value)}
+                        </span>
+                        {' '}till{' '}
+                        <span className={getStatusColor(entry.new_value)}>
+                          {getStatusLabel(entry.new_value)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <UserIcon className="w-3 h-3" />
+                        <span>{entry.changed_by}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 🆕 Global historik-vy
+const GlobalHistoryModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+  const [history, setHistory] = useState<BillingAuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchGlobalHistory();
+    }
+  }, [isOpen, selectedMonth]);
+
+  const fetchGlobalHistory = async () => {
+    setLoading(true);
+    try {
+      // Hämta historik för vald månad
+      const startDate = `${selectedMonth}-01`;
+      const endDate = new Date(selectedMonth + '-01');
+      endDate.setMonth(endDate.getMonth() + 1);
+      const endDateStr = endDate.toISOString().slice(0, 10);
+
+      const { data, error } = await supabase
+        .from('billing_audit_log')
+        .select(`
+          *,
+          case_number:private_cases(case_number),
+          case_number_business:business_cases(case_number),
+          customer_name_private:private_cases(kontaktperson),
+          customer_name_business:business_cases(kontaktperson)
+        `)
+        .gte('changed_at', startDate)
+        .lt('changed_at', endDateStr)
+        .order('changed_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Bearbeta data för bättre visning
+      const processedData = (data || []).map(entry => ({
+        ...entry,
+        case_number: entry.case_number?.case_number || entry.case_number_business?.case_number || 'Okänt',
+        customer_name: entry.customer_name_private?.kontaktperson || entry.customer_name_business?.kontaktperson || 'Okänd kund'
+      }));
+
+      setHistory(processedData);
+    } catch (err) {
+      console.error('Error fetching global history:', err);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredHistory = useMemo(() => {
+    if (!searchTerm.trim()) return history;
+    
+    const term = searchTerm.toLowerCase();
+    return history.filter(entry => 
+      entry.case_number?.toLowerCase().includes(term) ||
+      entry.customer_name?.toLowerCase().includes(term) ||
+      entry.changed_by?.toLowerCase().includes(term)
+    );
+  }, [history, searchTerm]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'text-yellow-400';
+      case 'sent': return 'text-blue-400';
+      case 'paid': return 'text-green-400';
+      case 'skip': return 'text-gray-400';
+      default: return 'text-slate-400';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Väntar';
+      case 'sent': return 'Skickad';
+      case 'paid': return 'Betald';
+      case 'skip': return 'Ej faktura';
+      default: return status;
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-900 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <History className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Faktureringshistorik</h2>
+                <p className="text-sm text-slate-400">Alla ändringar av faktureringsstatus</p>
+              </div>
+            </div>
+            <Button variant="secondary" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter och sök */}
+        <div className="p-6 border-b border-slate-800 bg-slate-800/30">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Välj månad
+              </label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                <Search className="w-4 h-4 inline mr-1" />
+                Sök
+              </label>
+              <input
+                type="text"
+                placeholder="Ärende, kund eller användare..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : filteredHistory.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Ingen historik tillgänglig för vald period</p>
+              <p className="text-sm mt-2">Prova en annan månad eller sökterm</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-sm text-slate-400 mb-4">
+                Visar {filteredHistory.length} ändringar för {new Date(selectedMonth).toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })}
+              </div>
+              
+              {filteredHistory.map((entry) => (
+                <div 
+                  key={entry.id} 
+                  className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:bg-slate-800/70 transition-colors"
+                >
+                  <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></div>
+                  
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+                    <div>
+                      <p className="text-sm font-medium text-white">{entry.case_number}</p>
+                      <p className="text-xs text-slate-400">{entry.customer_name}</p>
+                    </div>
+                    
+                    <div className="text-sm">
+                      <span className={getStatusColor(entry.old_value)}>
+                        {getStatusLabel(entry.old_value)}
+                      </span>
+                      <span className="text-slate-400 mx-2">→</span>
+                      <span className={getStatusColor(entry.new_value)}>
+                        {getStatusLabel(entry.new_value)}
+                      </span>
+                    </div>
+                    
+                    <div className="text-xs text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <UserIcon className="w-3 h-3" />
+                        <span>{entry.changed_by}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-slate-400">
+                      {new Date(entry.changed_at).toLocaleDateString('sv-SE', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BillingManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth(); // 🆕 Hämta inloggad användare
+  const { user } = useAuth();
   const [cases, setCases] = useState<EnhancedBillingCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [selectedCase, setSelectedCase] = useState<EnhancedBillingCase | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // 🆕 Historik-modal states
+  const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
+  const [isGlobalHistoryOpen, setIsGlobalHistoryOpen] = useState(false);
+  const [selectedCaseForHistory, setSelectedCaseForHistory] = useState<{ id: string; number: string } | null>(null);
   
   const [statusFilter, setStatusFilter] = useState<BillingStatus>('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,26 +453,14 @@ const BillingManagement: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // 🆕 Utökade kolumner för användarspårning
       const commonFields = `
         id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport,
         kontaktperson, e_post_kontaktperson, telefon_kontaktperson,
         billing_status, billing_updated_at, billing_updated_by, billing_updated_by_id
       `;
 
-      const privateSelectQuery = `
-        ${commonFields},
-        personnummer,
-        r_fastighetsbeteckning
-      `;
-
-      const businessSelectQuery = `
-        ${commonFields},
-        markning_faktura,
-        e_post_faktura,
-        bestallare,
-        org_nr
-      `;
+      const privateSelectQuery = `${commonFields}, personnummer, r_fastighetsbeteckning`;
+      const businessSelectQuery = `${commonFields}, markning_faktura, e_post_faktura, bestallare, org_nr`;
 
       const [privateResult, businessResult] = await Promise.all([
         supabase.from('private_cases').select(privateSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
@@ -126,20 +482,16 @@ const BillingManagement: React.FC = () => {
     }
   };
 
-  // 🆕 Uppdaterad funktion med användarspårning (fokus på e-post)
   const updateBillingStatus = async (caseId: string, type: 'private' | 'business', status: Exclude<BillingStatus, 'all'>) => {
     setProcessingIds(prev => new Set(prev).add(caseId));
     try {
-      // 🆕 Använd e-post som primär identifierare
       const userEmail = user?.email || 'Okänd användare';
       const userId = user?.id || null;
-
-      console.log(`🔄 Updating billing status for case ${caseId} to ${status} by ${userEmail}`);
 
       const updateData = {
         billing_status: status,
         billing_updated_at: new Date().toISOString(),
-        billing_updated_by: userEmail, // Använd e-post för tydlighet
+        billing_updated_by: userEmail,
         billing_updated_by_id: userId
       };
 
@@ -152,11 +504,8 @@ const BillingManagement: React.FC = () => {
 
       if (error) throw error;
 
-      // 🆕 Skapa audit log-post med e-post
       await createAuditLog(caseId, type, status, userEmail);
-
       handleCaseUpdate(data);
-      console.log(`✅ Updated case ${caseId} to status: ${status} by ${userEmail}`);
     } catch (err) {
       console.error('❌ updateBillingStatus error:', err);
       setError(err instanceof Error ? err.message : 'Fel vid uppdatering av faktureringsstatus');
@@ -165,7 +514,6 @@ const BillingManagement: React.FC = () => {
     }
   };
 
-  // 🆕 Skapa audit log-post för fullständig spårning
   const createAuditLog = async (caseId: string, caseType: string, newStatus: string, userEmail: string) => {
     try {
       const auditData = {
@@ -178,30 +526,28 @@ const BillingManagement: React.FC = () => {
         changed_at: new Date().toISOString(),
         metadata: {
           user_id: user?.id,
-          ip_address: 'Unknown', // Kan läggas till senare
           user_agent: navigator.userAgent
         }
       };
 
-      // Försök skapa audit log, men misslyckas inte om tabellen inte finns
-      const { error } = await supabase
-        .from('billing_audit_log')
-        .insert([auditData]);
-
-      if (error) {
-        console.warn('Audit log creation failed (table may not exist):', error.message);
-      } else {
-        console.log('✅ Audit log created successfully');
-      }
+      const { error } = await supabase.from('billing_audit_log').insert([auditData]);
+      if (error) console.warn('Audit log creation failed:', error.message);
     } catch (err) {
       console.warn('Audit log creation failed:', err);
-      // Inte kritiskt, så vi fortsätter
     }
   };
 
   const handleCaseUpdate = (updatedCase: EnhancedBillingCase) => {
     setCases(prev => prev.map(c => c.id === updatedCase.id ? updatedCase : c));
   };
+
+  // 🆕 Öppna historik för specifikt ärende
+  const openCaseHistory = (caseId: string, caseNumber: string) => {
+    setSelectedCaseForHistory({ id: caseId, number: caseNumber });
+    setIsCaseHistoryOpen(true);
+  };
+
+  // ... (resten av funktionerna som tidigare)
 
   const filteredAndSortedCases = useMemo(() => {
     let filtered = cases;
@@ -270,7 +616,6 @@ const BillingManagement: React.FC = () => {
     );
   }
 
-  // 🆕 Funktion för att visa vem som uppdaterade status (med e-post)
   const getLastUpdatedInfo = (case_: EnhancedBillingCase) => {
     if (!case_.billing_updated_at) return null;
     
@@ -282,7 +627,6 @@ const BillingManagement: React.FC = () => {
       minute: '2-digit'
     });
     
-    // Använd e-post och förkorta om den är för lång
     const updatedBy = case_.billing_updated_by || 'Okänd användare';
     const displayEmail = updatedBy.length > 20 
       ? updatedBy.split('@')[0] + '@...' 
@@ -318,12 +662,22 @@ const BillingManagement: React.FC = () => {
                       <p className="text-sm text-slate-400">{cases.length} totala ärenden • Inloggad som: <span className="text-blue-400 font-medium">{user?.email}</span></p>
                   </div>
               </div>
-              <Button onClick={fetchBillingCases} disabled={loading} className="flex items-center gap-2"><RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Uppdatera</Button>
+              <div className="flex items-center gap-2">
+                  {/* 🆕 Historik-knapp */}
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => setIsGlobalHistoryOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <History className="w-4 h-4" />
+                    Historik
+                  </Button>
+                  <Button onClick={fetchBillingCases} disabled={loading} className="flex items-center gap-2"><RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Uppdatera</Button>
+              </div>
           </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* KPI Cards */}
         <BillingKpiCards summary={summary} />
         
         <Card className="p-6 mb-6">
@@ -373,12 +727,20 @@ const BillingManagement: React.FC = () => {
                             <td className="p-4 text-center">
                               <div className="flex flex-col items-center">
                                 {getBillingStatusBadge(case_.billing_status as BillingStatus)}
-                                {/* 🆕 Visa vem som uppdaterade status */}
                                 {getLastUpdatedInfo(case_)}
                               </div>
                             </td>
                             <td className="p-4">
                                 <div className="flex items-center justify-center gap-1">
+                                    {/* 🆕 Historik-knapp för ärende */}
+                                    <button 
+                                      onClick={() => openCaseHistory(case_.id, case_.case_number || case_.title || 'Okänt')}
+                                      className="p-2 text-purple-400 hover:text-white rounded-lg" 
+                                      title="Visa historik"
+                                    >
+                                      <History size={16} />
+                                    </button>
+                                    
                                     {case_.billing_status === 'pending' && <button onClick={() => updateBillingStatus(case_.id, case_.type, 'sent')} disabled={processingIds.has(case_.id)} className="p-2 text-blue-400 hover:text-white rounded-lg" title="Markera som skickad"><FileText size={16} /></button>}
                                     {case_.billing_status === 'sent' && <button onClick={() => updateBillingStatus(case_.id, case_.type, 'pending')} disabled={processingIds.has(case_.id)} className="p-2 text-yellow-400 hover:text-white rounded-lg" title="Flytta till väntande"><RotateCcw size={16} /></button>}
                                     {(case_.billing_status === 'pending' || case_.billing_status === 'sent') && (<>
@@ -398,11 +760,29 @@ const BillingManagement: React.FC = () => {
         </Card>
       </main>
 
+      {/* Modaler */}
       <BillingModal
         case_={selectedCase}
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setSelectedCase(null); }}
         onCaseUpdate={handleCaseUpdate}
+      />
+
+      {/* 🆕 Ärendespecifik historik-modal */}
+      <CaseHistoryModal
+        caseId={selectedCaseForHistory?.id || ''}
+        caseNumber={selectedCaseForHistory?.number || ''}
+        isOpen={isCaseHistoryOpen}
+        onClose={() => {
+          setIsCaseHistoryOpen(false);
+          setSelectedCaseForHistory(null);
+        }}
+      />
+
+      {/* 🆕 Global historik-modal */}
+      <GlobalHistoryModal
+        isOpen={isGlobalHistoryOpen}
+        onClose={() => setIsGlobalHistoryOpen(false)}
       />
     </div>
   );
