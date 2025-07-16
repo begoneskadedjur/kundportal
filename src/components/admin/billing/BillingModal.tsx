@@ -188,9 +188,58 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
     setSaving(true);
     try {
       const table = case_.type === 'private' ? 'private_cases' : 'business_cases';
+      
+      // Filtrera bort fält som inte finns i tabellen
+      const updateData: any = {};
+      
+      // Gemensamma fält för båda tabellerna
+      const commonFields = [
+        'kontaktperson', 
+        'telefon_kontaktperson', 
+        'e_post_kontaktperson'
+      ];
+      
+      // Lägg till gemensamma fält
+      commonFields.forEach(field => {
+        if (editableData[field as keyof EditableFields] !== undefined) {
+          updateData[field] = editableData[field as keyof EditableFields];
+        }
+      });
+      
+      // Lägg till tabellspecifika fält
+      if (case_.type === 'private') {
+        // Fält som bara finns i private_cases
+        if (editableData.personnummer !== undefined) {
+          updateData.personnummer = editableData.personnummer;
+        }
+        if (editableData.r_fastighetsbeteckning !== undefined) {
+          updateData.r_fastighetsbeteckning = editableData.r_fastighetsbeteckning;
+        }
+      } else {
+        // Fält som bara finns i business_cases
+        if (editableData.bestallare !== undefined) {
+          updateData.bestallare = editableData.bestallare;
+        }
+        if (editableData.org_nr !== undefined) {
+          updateData.org_nr = editableData.org_nr;
+        }
+        if (editableData.e_post_faktura !== undefined) {
+          updateData.e_post_faktura = editableData.e_post_faktura;
+        }
+        if (editableData.markning_faktura !== undefined) {
+          updateData.markning_faktura = editableData.markning_faktura;
+        }
+      }
+      
+      // Lägg till updated_at timestamp
+      updateData.updated_at = new Date().toISOString();
+      
+      console.log('Updating table:', table);
+      console.log('Update data:', updateData);
+      
       const { data, error } = await supabase
         .from(table)
-        .update(editableData)
+        .update(updateData)
         .eq('id', case_.id)
         .select()
         .single();
