@@ -1,212 +1,410 @@
-// 📁 src/components/admin/billing/BillingModal.tsx - KOMPAKT DESIGN
+// 📁 src/components/admin/billing/BillingModal.tsx - KORREKT OCH ICKE-DUPLICERAD
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { X, User, Building2, FileText, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
-import { EditableBillingFields } from './EditableBillingFields';
-import { BillingActions } from './BillingActions';
-import type { BillingCase, EditableFields } from '../../../types/billing';
+import {
+  X, User, Building2, MapPin, Phone, Mail, FileText,
+  ChevronDown, History, Clock, UserIcon, ChevronRight,
+  Edit, Save, RotateCcw
+} from 'lucide-react';
 
-interface Props {
+import Button from '../../ui/Button';
+import LoadingSpinner from '../../shared/LoadingSpinner';
+import type { BillingCase } from '../../../types/billing';
+
+interface BillingModalProps {
   case_: BillingCase | null;
   isOpen: boolean;
   onClose: () => void;
   onCaseUpdate: (updatedCase: BillingCase) => void;
 }
 
-const formatAddressLocal = (address: any): string => {
-    if (!address) return 'Adress saknas';
-    if (typeof address === 'string') {
-        try {
-            if (!address.startsWith('{') || !address.includes('formatted_address')) return address;
-            const parsed = JSON.parse(address);
-            return parsed.formatted_address || address;
-        } catch { return address; }
-    }
-    if (typeof address === 'object' && address !== null) {
-        if (address.formatted_address) return address.formatted_address;
-        const parts = [address.street, address.postalCode, address.city].filter(Boolean);
-        if (parts.length > 0) return parts.join(', ');
-    }
-    return 'Okänt adressformat';
+interface BillingAuditEntry {
+  id: string;
+  case_id: string;
+  case_type: 'private' | 'business';
+  action: string;
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_at: string;
+  metadata?: any;
+}
+
+// Svenska statusar
+const STATUS_TRANSLATIONS = {
+  'pending': 'Väntar på fakturering',
+  'sent': 'Skickad',
+  'paid': 'Betald',
+  'skip': 'Ej faktureras'
 };
 
-export const BillingModal: React.FC<Props> = ({ case_, isOpen, onClose, onCaseUpdate }) => {
-  const [showDescription, setShowDescription] = useState(false);
-  const [showReport, setShowReport] = useState(false);
+const STATUS_COLORS = {
+  'pending': 'text-yellow-400',
+  'sent': 'text-blue-400',
+  'paid': 'text-green-400',
+  'skip': 'text-gray-400'
+};
+
+// Historik-sektion komponent
+const CaseBillingHistory: React.FC<{ caseId: string; caseNumber: string }> = ({ caseId, caseNumber }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [history, setHistory] = useState<BillingAuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isExpanded && caseId) {
+      fetchHistory();
+    }
+  }, [isExpanded, caseId]);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('billing_audit_log')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('changed_at', { ascending: false });
+
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (err) {
+      console.error('Error fetching case history:', err);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusTransition = (oldValue: string, newValue: string) => {
+    const oldLabel = STATUS_TRANSLATIONS[oldValue as keyof typeof STATUS_TRANSLATIONS] || oldValue;
+    const newLabel = STATUS_TRANSLATIONS[newValue as keyof typeof STATUS_TRANSLATIONS] || newValue;
+    const oldColor = STATUS_COLORS[oldValue as keyof typeof STATUS_COLORS] || 'text-slate-400';
+    const newColor = STATUS_COLORS[newValue as keyof typeof STATUS_COLORS] || 'text-slate-400';
+    
+    return (
+      <span className="text-white">
+        <span className={oldColor}>{oldLabel}</span>
+        <ChevronRight className="inline w-4 h-4 mx-1 text-slate-400" />
+        <span className={newColor}>{newLabel}</span>
+      </span>
+    );
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('sv-SE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="border-t border-slate-700 pt-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between w-full p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+            <History className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="text-left">
+            <h4 className="text-sm font-medium text-white">Faktureringhistorik</h4>
+            <p className="text-xs text-slate-400">
+              {history.length > 0 ? `${history.length} ändringar` : 'Klicka för att visa historik'}
+            </p>
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <LoadingSpinner />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-6 text-slate-400">
+              <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Ingen faktureringhistorik tillgänglig</p>
+              <p className="text-xs mt-1">Detta ärende har inte haft några statusändringar än</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+              {history.map((entry, index) => (
+                <div key={entry.id} className="flex items-start gap-3 p-3 bg-slate-800/30 rounded-lg">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white mb-1">
+                          Status ändrad
+                        </div>
+                        <div className="text-sm mb-2">
+                          {getStatusTransition(entry.old_value, entry.new_value)}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-400">
+                          <div className="flex items-center gap-1">
+                            <UserIcon className="w-3 h-3" />
+                            <span>{entry.changed_by.split('@')[0]}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatDateTime(entry.changed_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-xs text-slate-500 flex-shrink-0">
+                        #{history.length - index}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Huvudkomponent
+export const BillingModal: React.FC<BillingModalProps> = ({ 
+  case_, 
+  isOpen, 
+  onClose, 
+  onCaseUpdate 
+}) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  
-  const [editableFields, setEditableFields] = useState<EditableFields>({
-    kontaktperson: '', telefon_kontaktperson: '', e_post_kontaktperson: '', markning_faktura: '',
-    e_post_faktura: '', bestallare: '', org_nr: '', personnummer: '', r_fastighetsbeteckning: ''
-  });
+  const [editedCase, setEditedCase] = useState<BillingCase | null>(null);
+  const [reportExpanded, setReportExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (case_) {
-      setEditableFields({
-        kontaktperson: case_.kontaktperson || '', telefon_kontaktperson: case_.telefon_kontaktperson || '', e_post_kontaktperson: case_.e_post_kontaktperson || '',
-        markning_faktura: case_.markning_faktura || '', e_post_faktura: case_.e_post_faktura || '', bestallare: case_.bestallare || '', org_nr: case_.org_nr || '',
-        personnummer: case_.personnummer || '', r_fastighetsbeteckning: case_.r_fastighetsbeteckning || ''
-      });
-      setIsEditing(false);
-      setSaveError(null);
+      setEditedCase({ ...case_ });
+      setIsEditing(false); // Återställ redigeringsläge när ett nytt case väljs
     }
   }, [case_]);
 
   if (!isOpen || !case_) return null;
 
-  const getBillingStatusInfo = (status: string) => {
-    switch (status) {
-      case 'pending': return { label: 'Väntar på fakturering', color: 'text-yellow-400', bg: 'bg-yellow-500/10' };
-      case 'sent': return { label: 'Faktura skickad', color: 'text-blue-400', bg: 'bg-blue-500/10' };
-      case 'paid': return { label: 'Faktura betald', color: 'text-green-400', bg: 'bg-green-500/10' };
-      case 'skip': return { label: 'Ska ej faktureras', color: 'text-gray-400', bg: 'bg-gray-500/10' };
-      default: return { label: 'Okänd status', color: 'text-slate-400', bg: 'bg-slate-500/10' };
+  const formatAddress = (address: any) => {
+    if (!address) return 'Ingen adress angiven';
+    
+    if (typeof address === 'string') {
+      try {
+        const parsed = JSON.parse(address);
+        return parsed.formatted_address || address;
+      } catch (e) { return address; }
     }
+    
+    if (typeof address === 'object' && address.formatted_address) {
+      return address.formatted_address;
+    }
+    
+    return 'Okänt adressformat';
   };
 
-  const getMissingFields = (): string[] => {
-    const missing: string[] = [];
-    if (!case_) return [];
-    if (case_.type === 'business') {
-      if (!editableFields.kontaktperson) missing.push('Kontaktperson'); if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
-      if (!editableFields.e_post_kontaktperson) missing.push('Email'); if (!editableFields.e_post_faktura) missing.push('Faktura email');
-      if (!editableFields.org_nr) missing.push('Org.nr'); if (!editableFields.bestallare) missing.push('Beställare');
-    } else {
-      if (!editableFields.kontaktperson) missing.push('Kontaktperson'); if (!editableFields.telefon_kontaktperson) missing.push('Telefon');
-      if (!editableFields.e_post_kontaktperson) missing.push('Email');
-    }
-    return missing;
+  const getStatusBadge = (status: string) => {
+    const config = STATUS_TRANSLATIONS[status as keyof typeof STATUS_TRANSLATIONS] 
+      ? { label: STATUS_TRANSLATIONS[status as keyof typeof STATUS_TRANSLATIONS], color: STATUS_COLORS[status as keyof typeof STATUS_COLORS] }
+      : { label: status, color: 'bg-slate-500/20 text-slate-400' };
+    
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const calculateTotal = () => {
+    if (!case_.pris) return 0;
+    return case_.type === 'private' ? case_.pris : case_.pris * 1.25;
   };
 
   const handleSave = async () => {
-    if (!case_) return;
-    setIsSaving(true); setSaveError(null);
-    
+    if (!editedCase) return;
+
+    setSaving(true);
     try {
       const table = case_.type === 'private' ? 'private_cases' : 'business_cases';
-      const updateData: Partial<EditableFields> = {
-        kontaktperson: editableFields.kontaktperson.trim() || null,
-        telefon_kontaktperson: editableFields.telefon_kontaktperson.trim() || null,
-        e_post_kontaktperson: editableFields.e_post_kontaktperson.trim() || null,
-      };
-
-      if (case_.type === 'business') {
-        updateData.markning_faktura = editableFields.markning_faktura.trim() || null;
-        updateData.e_post_faktura = editableFields.e_post_faktura.trim() || null;
-        updateData.bestallare = editableFields.bestallare.trim() || null;
-        updateData.org_nr = editableFields.org_nr.trim() || null;
-      } else {
-        updateData.personnummer = editableFields.personnummer.trim() || null;
-        updateData.r_fastighetsbeteckning = editableFields.r_fastighetsbeteckning.trim() || null;
-      }
-      
-      const commonFields = 'id, case_number, title, pris, completed_date, primary_assignee_name, skadedjur, adress, description, rapport, kontaktperson, e_post_kontaktperson, telefon_kontaktperson, billing_status, billing_updated_at';
-      const selectString = case_.type === 'private'
-        ? `${commonFields}, personnummer, r_fastighetsbeteckning`
-        : `${commonFields}, markning_faktura, e_post_faktura, bestallare, org_nr`;
-
-      const { data, error } = await supabase.from(table).update(updateData).eq('id', case_.id).select(selectString).single();
+      const { data, error } = await supabase
+        .from(table)
+        .update({
+          kontaktperson: editedCase.kontaktperson,
+          telefon_kontaktperson: editedCase.telefon_kontaktperson,
+          e_post_kontaktperson: editedCase.e_post_kontaktperson,
+          // Se till att du har en 'updated_at' kolumn med defaultvärde i din tabell
+        })
+        .eq('id', case_.id)
+        .select()
+        .single();
 
       if (error) throw error;
-      
-      const updatedCaseWithType = { ...data, type: case_.type };
-      onCaseUpdate(updatedCaseWithType as BillingCase);
-      setIsEditing(false);
 
+      onCaseUpdate(data);
+      setIsEditing(false);
     } catch (err) {
-      console.error('❌ handleSave error:', err);
-      setSaveError(err instanceof Error ? err.message : 'Ett okänt fel uppstod.');
+      console.error('Error saving case:', err);
+      // Här kan du lägga till ett felmeddelande till användaren
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleFieldChange = (field: keyof EditableFields, value: string) => {
-    setEditableFields(prev => ({ ...prev, [field]: value }));
-  };
-  
-  const isBusiness = case_.type === 'business';
-  const vatAmount = isBusiness ? case_.pris * 0.25 : 0;
-  const totalAmount = case_.pris + vatAmount;
-  const statusInfo = getBillingStatusInfo(case_.billing_status);
-  
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        {/* 🎯 KOMPAKT HEADER med integrerad statusinfo */}
-        <header className="p-6 border-b border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
-                        {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-semibold text-white">{case_.case_number || case_.title}</h2>
-                        <p className="text-sm text-slate-400">
-                          {isBusiness ? 'Företag' : 'Privatperson'} • {case_.skadedjur}
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <BillingActions isEditing={isEditing} isSaving={isSaving} missingFieldsCount={getMissingFields().length} onStartEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => setIsEditing(false)} />
-                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-                </div>
-            </div>
-            
-            {/* 💰 INLINE STATUS & PRICING CARD */}
-            <div className={`flex items-center justify-between p-4 rounded-lg border ${statusInfo.bg} border-slate-700`}>
-                <div className="flex items-center gap-4">
-                    <div>
-                        <p className="text-xs text-slate-400 mb-1">Status</p>
-                        <p className={`font-semibold ${statusInfo.color}`}>{statusInfo.label}</p>
-                    </div>
-                    <div className="w-px h-8 bg-slate-700"></div>
-                    <div>
-                        <p className="text-xs text-slate-400 mb-1">Tekniker</p>
-                        <p className="text-sm text-white">{case_.primary_assignee_name}</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-xs text-slate-400 mb-1">Att fakturera</p>
-                    {isBusiness && (
-                      <div className="text-xs text-slate-400">
-                        {formatCurrency(case_.pris)} + {formatCurrency(vatAmount)} moms
-                      </div>
-                    )}
-                    <p className="text-xl font-bold text-green-400">{formatCurrency(totalAmount)}</p>
-                </div>
-            </div>
-        </header>
+  const renderContactInfo = () => {
+    const isBusinessCase = case_.type === 'business';
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Kontaktinformation */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Kontaktinformation
+            </h3>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-xs"
+            >
+              {isEditing ? (
+                <><X className="w-3 h-3 mr-1" /> Avbryt</>
+              ) : (
+                <><Edit className="w-3 h-3 mr-1" /> Redigera</>
+              )}
+            </Button>
+          </div>
 
-        <div className="p-6 space-y-6 overflow-y-auto">
-            {saveError && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-400" /><span className="text-sm text-red-400">{saveError}</span></div>}
+          <div className="space-y-3">
+            {/* Fält för kontaktperson, telefon, email etc. */}
+            <div>
+              <label className="text-xs text-slate-400">Kontaktperson</label>
+              {isEditing ? (
+                <input type="text" value={editedCase?.kontaktperson || ''} onChange={(e) => setEditedCase(prev => prev ? { ...prev, kontaktperson: e.target.value } : null)} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+              ) : ( <p className="text-sm text-white">{case_.kontaktperson || 'Ej angiven'}</p> )}
+            </div>
             
-            {/* 📋 REDIGERBARA FÄLT med adress integrerad */}
-            <EditableBillingFields 
-              case_={case_} 
-              isEditing={isEditing} 
-              onFieldChange={handleFieldChange} 
-              editableFields={editableFields}
-              formattedAddress={formatAddressLocal(case_.adress)}
-            />
+            {isBusinessCase && <div><label className="text-xs text-slate-400">Beställare</label><p className="text-sm text-white">{(case_ as any).bestallare || 'Samma som kontakt'}</p></div>}
             
-            {/* 📝 BESKRIVNING & RAPPORT - Collapsible */}
-            {case_.description && (
-                <div className="space-y-2">
-                    <button onClick={() => setShowDescription(!showDescription)} className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"><FileText className="w-5 h-5" /> Beskrivning {showDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
-                    {showDescription && <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{case_.description}</p></div>}
-                </div>
+            <div>
+              <label className="text-xs text-slate-400">Telefon</label>
+              {isEditing ? (
+                <input type="text" value={editedCase?.telefon_kontaktperson || ''} onChange={(e) => setEditedCase(prev => prev ? { ...prev, telefon_kontaktperson: e.target.value } : null)} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+              ) : ( <p className="text-sm text-white flex items-center gap-2"><Phone className="w-3 h-3" />{case_.telefon_kontaktperson || 'Ej angiven'}</p> )}
+            </div>
+            
+            <div>
+              <label className="text-xs text-slate-400">Email</label>
+              {isEditing ? (
+                <input type="email" value={editedCase?.e_post_kontaktperson || ''} onChange={(e) => setEditedCase(prev => prev ? { ...prev, e_post_kontaktperson: e.target.value } : null)} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+              ) : ( <p className="text-sm text-white flex items-center gap-2"><Mail className="w-3 h-3" />{case_.e_post_kontaktperson || 'Ej angiven'}</p> )}
+            </div>
+
+            {isEditing && (
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleSave} disabled={saving} size="sm" className="flex items-center gap-2">
+                  {saving ? <RotateCcw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  {saving ? 'Sparar...' : 'Spara'}
+                </Button>
+              </div>
             )}
-            
-            {case_.rapport && (
-                <div className="space-y-2">
-                    <button onClick={() => setShowReport(!showReport)} className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"><FileText className="w-5 h-5" /> Tekniker-rapport {showReport ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
-                    {showReport && <div className="bg-slate-800/50 rounded-lg p-4"><p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{case_.rapport}</p></div>}
-                </div>
-            )}
+          </div>
+        </div>
+
+        {/* Adress & Identifiering */}
+        <div>
+          <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+            <MapPin className="w-4 h-4" /> Adress & Identifiering
+          </h3>
+          <div className="space-y-3">
+            <div><label className="text-xs text-slate-400">Adress</label><p className="text-sm text-white">{formatAddress(case_.adress)}</p></div>
+            <div><label className="text-xs text-slate-400">{isBusinessCase ? 'Org.nummer' : 'Personnummer'}</label><p className="text-sm text-white">{isBusinessCase ? ((case_ as any).org_nr || 'Ej angivet') : ((case_ as any).personnummer || 'Ej angivet')}</p></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBillingInfo = () => {
+    const isBusinessCase = case_.type === 'business';
+    
+    return (
+      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+          <FileText className="w-4 h-4" /> Faktureringsinformation
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div><label className="text-xs text-slate-400">Faktura email</label><p className="text-sm text-white">{isBusinessCase ? ((case_ as any).e_post_faktura || case_.e_post_kontaktperson || 'Ej angiven') : (case_.e_post_kontaktperson || 'Ej angiven')}</p></div>
+          {isBusinessCase && <div><label className="text-xs text-slate-400">Fakturamärkning</label><p className="text-sm text-white">{(case_ as any).markning_faktura || 'Ingen märkning'}</p></div>}
+          <div><label className="text-xs text-slate-400">Att fakturera</label><p className="text-xl font-bold text-white">{formatCurrency(case_.pris || 0)}</p></div>
+          <div><label className="text-xs text-slate-400">{isBusinessCase ? 'Inkl. moms (25%)' : 'Totalt (ROT-avdrag ej applicerat)'}</label><p className="text-xl font-bold text-green-400">{formatCurrency(calculateTotal())}</p></div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'}`}>
+                {case_.type === 'private' ? <User className="w-5 h-5 text-purple-400" /> : <Building2 className="w-5 h-5 text-blue-400" />}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">{case_.case_number || 'Okänt ärendenummer'}</h2>
+                <p className="text-sm text-slate-400">{case_.type === 'private' ? 'Privatperson' : 'Företag'} • {case_.skadedjur}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {getStatusBadge(case_.billing_status)}
+              <Button variant="secondary" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {renderContactInfo()}
+          {renderBillingInfo()}
+          
+          {case_.description && (
+            <div>
+              <h3 className="text-sm font-medium text-slate-300 mb-2">Beskrivning</h3>
+              <div className="p-3 bg-slate-800/50 rounded-lg">
+                <p className="text-sm text-slate-300">{case_.description}</p>
+              </div>
+            </div>
+          )}
+
+          {case_.rapport && (
+            <div>
+              <button onClick={() => setReportExpanded(!reportExpanded)} className="flex items-center justify-between w-full p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors mb-3">
+                <h3 className="text-sm font-medium text-slate-300">Tekniker-rapport</h3>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${reportExpanded ? 'rotate-180' : ''}`} />
+              </button>
+              {reportExpanded && <div className="p-4 bg-slate-800/30 rounded-lg"><p className="text-sm text-slate-300 whitespace-pre-wrap">{case_.rapport}</p></div>}
+            </div>
+          )}
+
+          <CaseBillingHistory 
+            caseId={case_.id} 
+            caseNumber={case_.case_number || case_.title || 'Okänt ärende'} 
+          />
         </div>
       </div>
     </div>
