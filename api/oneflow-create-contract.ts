@@ -81,9 +81,8 @@ async function createContractFromTemplate(
       value: value.trim()
     }))
 
-  // Skapa kontrakt-payload
+  // Skapa kontrakt-payload - UPPDATERAD för korrekt API
   const contractPayload = {
-    template_id: parseInt(templateId),
     name: `${contractData['foretag'] || 'Nytt företag'} - Skadedjursavtal`,
     
     // Lägg till mottagare som ska signera
@@ -105,8 +104,8 @@ async function createContractFromTemplate(
 
   console.log('📋 Contract payload:', JSON.stringify(contractPayload, null, 2))
 
-  // Skapa kontraktet
-  const response = await fetch(`${ONEFLOW_API_URL}/contracts`, {
+  // RÄTTAD ENDPOINT: Skapa från mall
+  const response = await fetch(`${ONEFLOW_API_URL}/templates/${templateId}/contracts`, {
     method: 'POST',
     headers: {
       'x-oneflow-api-token': ONEFLOW_API_TOKEN,
