@@ -57,10 +57,15 @@ export default async function handler(
     identification_number: ownerOrgNumber || '',
     participants: [
       {
-        name: 'Avsändare', // Eller ett specifikt namn om du vill
+        name: 'Avsändare',
         email: userEmail,
-        // Ägaren har fulla rättigheter
-        permissions: ['organizer', 'contract:update', 'contract:sign'],
+        // Korrekt struktur enligt Oneflow dokumentation
+        _permissions: {
+          'contract:update': true
+        },
+        signatory: true,        // Ägaren ska signera
+        organizer: false,       // Explicit false för ägaren
+        delivery_channel: 'email'
       },
     ],
   };
@@ -77,9 +82,13 @@ export default async function handler(
     {
       name: recipient.name,
       email: recipient.email,
-      permissions: sendForSigning
-        ? ['contract:update', 'contract:sign']
-        : ['contract:read'],
+      // Korrekt struktur för motpart
+      _permissions: {
+        'contract:update': sendForSigning  // true om ska signera, false för viewer
+      },
+      signatory: sendForSigning,           // true om ska signera
+      organizer: false,                    // Alltid false för counterparty
+      delivery_channel: 'email'
     },
   ];
 
