@@ -34,26 +34,26 @@ export default function OneflowTest() {
   // Förifyllda värden för snabb testning - KORRIGERADE FÄLTNAMN
   const [selectedTemplate, setSelectedTemplate] = useState('8486368')
   const [contractData, setContractData] = useState<ContractData>({
-    // ✅ KORRIGERADE baserat på Oneflow-mallens externa nycklar
+    // ✅ HÄR ÄR DE KORREKTA NYCKLARNA
     anstalld: 'Christian Karlsson',
-    avtalslangd: '12',                           // ✅ FIXAT: lade till 'a' + ändrat till 12 månader
-    avtalsobjekt: 'Komplett skadedjursbekämpning', // ✅ Mer realistisk beskrivning
-    begynnelsedag: new Date().toISOString().split('T')[0], // ✅ Dagens datum automatiskt
+    avtalslngd: '12',                              
+    avtalsobjekt: 'Komplett skadedjursbekämpning', 
+    begynnelsedag: new Date().toISOString().split('T')[0], 
     'dokument-skapat': new Date().toISOString().split('T')[0],
-    'e-post-anstalld': 'christian.karlsson@begone.se', // ✅ FIXAT: lade till 'a'
-    'e-post-kontaktperson': 'christian.karlsson@hotmail.se', // ✅ Din privata mail för test
-    'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    // ✅ Samma mail för faktura
-    foretag: 'Test Företag AB',                        // ✅ Mer professionellt namn
-    kontaktperson: 'Anna Andersson',                   // ✅ Mer realistiskt namn
-    'org-nr': '556123-4567',                          // ✅ Mer realistiskt org.nr
+    'e-post-anstlld': 'christian.karlsson@begone.se',    
+    'e-post-kontaktperson': 'christian.karlsson@hotmail.se', 
+    'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    
+    foretag: 'Test Företag AB',                        
+    Kontaktperson: 'Anna Andersson',
+    'org-nr': '556123-4567',                          
     'stycke-1': 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema',
-    'telefonnummer-kontaktperson': '08-123 45 67',    // ✅ Mer professionellt format
-    'utforande-adress': 'Storgatan 15, 111 22 Stockholm', // ✅ Mer central adress
+    'telefonnummer-kontaktperson': '08-123 45 67',    
+    'utforande-adress': 'Storgatan 15, 111 22 Stockholm', 
   })
   
   const [recipient, setRecipient] = useState<Recipient>({
     name: 'Anna Andersson',
-    email: 'christian.karlsson@hotmail.se', // ✅ Din privata mail för test
+    email: 'christian.karlsson@hotmail.se', 
     company_name: 'Test Företag AB',
     organization_number: '556123-4567',
   })
@@ -69,7 +69,7 @@ export default function OneflowTest() {
   const handleInputChange = (field: string, value: string) => {
     setContractData(prev => ({ ...prev, [field]: value }))
     // Synkronisera med recipient när relevanta fält ändras
-    if (field === 'kontaktperson') {
+    if (field === 'Kontaktperson') {
       setRecipient(prev => ({ ...prev, name: value }))
     } else if (field === 'e-post-kontaktperson') {
       setRecipient(prev => ({ ...prev, email: value }))
@@ -85,6 +85,13 @@ export default function OneflowTest() {
       toast.error('Välj mall och fyll i Mottagarens e-post.')
       return
     }
+
+    // --- TILLAGD DEBUG-LOGG FÖR ATT VERIFIERA FRONTEND-DATAN ---
+    console.log(
+      '--- DEBUG: Datan som skickas FRÅN webbläsaren ---', 
+      JSON.stringify(contractData, null, 2)
+    );
+    // -----------------------------------------------------------
 
     setIsCreating(true)
     try {
@@ -143,15 +150,15 @@ export default function OneflowTest() {
   const formatFieldLabel = (key: string): string => {
     const labelMap: { [key: string]: string } = {
       'anstalld': 'Anställd hos BeGone',
-      'avtalslangd': 'Avtalslängd (månader)',
+      'avtalslngd': 'Avtalslängd (månader)',
       'avtalsobjekt': 'Avtalsobjekt',
       'begynnelsedag': 'Begynnelsedag',
       'dokument-skapat': 'Dokument skapat',
-      'e-post-anstalld': 'E-post anställd',
+      'e-post-anstlld': 'E-post anställd',
       'e-post-kontaktperson': 'E-post kontaktperson',
       'faktura-adress-pdf': 'Faktura-adress (PDF)',
       'foretag': 'Företag',
-      'kontaktperson': 'Kontaktperson',
+      'Kontaktperson': 'Kontaktperson',
       'org-nr': 'Organisationsnummer',
       'stycke-1': 'Avtalstext (stycke 1)',
       'telefonnummer-kontaktperson': 'Telefonnummer kontaktperson',
@@ -173,8 +180,9 @@ export default function OneflowTest() {
             >
               <ArrowLeft className="w-4 h-4" /> Tillbaka
             </Button>
+            {/* ✅ HÄR ÄR DEN KORREKTA RUBRIKEN */}
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <TestTube className="w-6 h-6" /> Oneflow Test
+              <TestTube className="w-6 h-6" /> Oneflow Test - NY VERSION 26 JULI
             </h1>
             <div className="ml-auto text-sm text-slate-400">
               Template: {ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'Ingen vald'}
@@ -184,6 +192,7 @@ export default function OneflowTest() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-2 gap-8">
+        {/* Resten av JSX-koden är densamma */}
         <div className="space-y-6">
           {/* Mall-val */}
           <Card>
@@ -216,7 +225,7 @@ export default function OneflowTest() {
                     key.includes('e-post') ? 'email' : 
                     key.includes('telefonnummer') ? 'tel' : 
                     key.includes('dag') ? 'date' : 
-                    key === 'avtalslangd' ? 'number' :
+                    key === 'avtalslngd' ? 'number' :
                     'text'
                   }
                   value={value}
