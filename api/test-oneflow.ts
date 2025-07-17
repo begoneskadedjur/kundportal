@@ -36,11 +36,11 @@ export default function OneflowTest() {
   const [contractData, setContractData] = useState<ContractData>({
     // ✅ KORRIGERADE baserat på Oneflow-mallens externa nycklar
     anstalld: 'Christian Karlsson',
-    avtalslangd: '12',                           // ✅ FIXAT: lade till 'a' + ändrat till 12 månader
+    avtalslngd: '12',                              // ✅ UTAN 'a' enligt tabellen
     avtalsobjekt: 'Komplett skadedjursbekämpning', // ✅ Mer realistisk beskrivning
     begynnelsedag: new Date().toISOString().split('T')[0], // ✅ Dagens datum automatiskt
     'dokument-skapat': new Date().toISOString().split('T')[0],
-    'e-post-anstalld': 'christian.karlsson@begone.se', // ✅ FIXAT: lade till 'a'
+    'e-post-anstlld': 'christian.karlsson@begone.se',    // ✅ UTAN 'a' enligt tabellen
     'e-post-kontaktperson': 'christian.karlsson@hotmail.se', // ✅ Din privata mail för test
     'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    // ✅ Samma mail för faktura
     foretag: 'Test Företag AB',                        // ✅ Mer professionellt namn
@@ -143,11 +143,11 @@ export default function OneflowTest() {
   const formatFieldLabel = (key: string): string => {
     const labelMap: { [key: string]: string } = {
       'anstalld': 'Anställd hos BeGone',
-      'avtalslangd': 'Avtalslängd (månader)',
+      'avtalslngd': 'Avtalslängd (månader)',
       'avtalsobjekt': 'Avtalsobjekt',
       'begynnelsedag': 'Begynnelsedag',
       'dokument-skapat': 'Dokument skapat',
-      'e-post-anstalld': 'E-post anställd',
+      'e-post-anstlld': 'E-post anställd',
       'e-post-kontaktperson': 'E-post kontaktperson',
       'faktura-adress-pdf': 'Faktura-adress (PDF)',
       'foretag': 'Företag',
@@ -216,7 +216,7 @@ export default function OneflowTest() {
                     key.includes('e-post') ? 'email' : 
                     key.includes('telefonnummer') ? 'tel' : 
                     key.includes('dag') ? 'date' : 
-                    key === 'avtalslangd' ? 'number' :
+                    key === 'avtalslngd' ? 'number' :
                     'text'
                   }
                   value={value}
