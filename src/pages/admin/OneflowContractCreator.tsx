@@ -61,7 +61,7 @@ export default function OneflowContractCreator() {
   // Mottagardata
   const [recipient, setRecipient] = useState<Recipient>({
     name: 'Anna Andersson',
-    email: 'christian.karlsson@hotmail.se',
+    email: 'christian.karlsson@begone.se', // *** FIX: Använd BeGone email istället för Hotmail ***
     company_name: 'Test Företag AB',
     organization_number: '556123-4567',
   })
@@ -69,6 +69,8 @@ export default function OneflowContractCreator() {
   // UI states
   const [showPreview, setShowPreview] = useState(false)
   const [previewData, setPreviewData] = useState<any>(null)
+  const [createdContract, setCreatedContract] = useState<any>(null) // *** FIX: Lägg tillbaka denna state ***
+  const [isCreating, setIsCreating] = useState(false) // *** FIX: Lägg tillbaka denna state ***
 
   // Konstanter för textuppdelning
   const TEXT_LIMIT = 1024
@@ -144,6 +146,7 @@ export default function OneflowContractCreator() {
       return
     }
 
+    setIsCreating(true) // *** FIX: Använd lokal state ***
     try {
       const finalContractData = buildFinalContractData()
       
@@ -176,7 +179,7 @@ export default function OneflowContractCreator() {
       
       const result = await response.json()
       console.log('✅ Kontrakt skapat:', result)
-      setCreatedContract(result.contract)
+      setCreatedContract(result.contract) // *** FIX: Använd lokal state ***
       
       // Success meddelande
       const successMsg = sendForSigning 
@@ -188,6 +191,8 @@ export default function OneflowContractCreator() {
       const errorMsg = `Fel vid skapande av kontrakt: ${err.message}`
       console.error('❌', errorMsg, err)
       toast.error(errorMsg)
+    } finally {
+      setIsCreating(false) // *** FIX: Använd lokal state ***
     }
   }
 
@@ -655,7 +660,7 @@ export default function OneflowContractCreator() {
                       foretag: 'Restaurang Goda Biten AB',
                       'org-nr': '556789-0123',
                       Kontaktperson: 'Maria Svensson',
-                      'e-post-kontaktperson': 'maria@godabiten.se',
+                      'e-post-kontaktperson': 'maria@begone.se', // *** FIX: BeGone email för test ***
                       'telefonnummer-kontaktperson': '08-555 0123',
                       'utforande-adress': 'Drottninggatan 50, 111 21 Stockholm'
                     }))
@@ -675,7 +680,7 @@ export default function OneflowContractCreator() {
                       foretag: 'Lagerlogistik Stockholm AB',
                       'org-nr': '556123-9876',
                       Kontaktperson: 'Lars Andersson',
-                      'e-post-kontaktperson': 'lars@lagerlogistik.se',
+                      'e-post-kontaktperson': 'lars@begone.se', // *** FIX: BeGone email för test ***
                       'telefonnummer-kontaktperson': '08-666 0987',
                       'utforande-adress': 'Industrivägen 25, 125 30 Älvsjö'
                     }))
@@ -695,7 +700,7 @@ export default function OneflowContractCreator() {
                       foretag: 'Hotell Comfort Inn',
                       'org-nr': '556456-1234',
                       Kontaktperson: 'Anna Johansson',
-                      'e-post-kontaktperson': 'anna@comfortinn.se',
+                      'e-post-kontaktperson': 'anna@begone.se', // *** FIX: BeGone email för test ***
                       'telefonnummer-kontaktperson': '08-777 4567',
                       'utforande-adress': 'Vasagatan 10, 111 20 Stockholm'
                     }))
@@ -715,7 +720,7 @@ export default function OneflowContractCreator() {
                       foretag: 'Fastigheter Nordic AB',
                       'org-nr': '556321-6549',
                       Kontaktperson: 'Per Nilsson',
-                      'e-post-kontaktperson': 'per@nordicfastigheter.se',
+                      'e-post-kontaktperson': 'per@begone.se', // *** FIX: BeGone email för test ***
                       'telefonnummer-kontaktperson': '08-888 3210',
                       'utforande-adress': 'Storgatan 15, 114 44 Stockholm'
                     }))
