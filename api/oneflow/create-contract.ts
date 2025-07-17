@@ -1,4 +1,3 @@
-// api/oneflow/create-contract.ts - KORREKT STRUKTUR FÖR INDIVIDUAL VS COMPANY
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -47,24 +46,26 @@ export default async function handler(
     ([custom_id, value]) => ({ custom_id, value })
   )
 
-  // OLIKA STRUKTURER FÖR INDIVIDUAL VS COMPANY
+  // Skapa 'parties'-arrayen med korrekt struktur för både privatperson och företag
   const parties = []
 
   if (partyType === 'individual') {
-    // För privatperson - INGA participants, allt direkt på party-objektet
+    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON:
+    // Egenskaperna (name, email etc.) ligger direkt i party-objektet.
+    // Ingen 'participants'-array används här.
     parties.push({
       type: 'individual',
       name: recipient.name,
       email: recipient.email,
-      delivery_channel: 'email',
-      signatory: sendForSigning,
-      organizer: false,
       _permissions: {
         'contract:update': sendForSigning
-      }
+      },
+      signatory: sendForSigning,
+      delivery_channel: 'email'
     })
   } else {
-    // För företag - använd participants array (detta fungerar redan)
+    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD):
+    // Ett företag har en 'participants'-array för sina kontaktpersoner.
     parties.push({
       type: 'company',
       name: recipient.company_name,
@@ -73,12 +74,11 @@ export default async function handler(
         {
           name: recipient.name,
           email: recipient.email,
-          delivery_channel: 'email',
-          signatory: sendForSigning,
-          organizer: false,
           _permissions: {
             'contract:update': sendForSigning
-          }
+          },
+          signatory: sendForSigning,
+          delivery_channel: 'email'
         }
       ]
     })
