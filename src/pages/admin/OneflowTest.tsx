@@ -181,9 +181,20 @@ export default function OneflowTest() {
         })
       })
 
+      // Förbättrad error handling
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.details || 'Failed to create contract')
+        const contentType = response.headers.get('content-type')
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+        
+        if (contentType?.includes('application/json')) {
+          const error = await response.json()
+          errorMessage = error.details || error.message || errorMessage
+        } else {
+          const errorText = await response.text()
+          errorMessage = `Server error: ${errorText.slice(0, 200)}...`
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
@@ -198,8 +209,8 @@ export default function OneflowTest() {
       console.log('🎉 Contract created:', result)
       
     } catch (error) {
-      toast.error(`❌ Fel: ${error instanceof Error ? error.message : 'Unknown error'}`)
       console.error('Contract creation error:', error)
+      toast.error(`❌ Fel: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsCreating(false)
     }
