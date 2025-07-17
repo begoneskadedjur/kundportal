@@ -1,11 +1,11 @@
-// api/test-oneflow.ts - AVANCERAD VERSION FÖR ATT MAPPA KONTOT
+// api/test-oneflow.ts - KOMPLETT DIAGNOSTIKVERKTYG
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// --- HJÄLPAR-FUNKTION FÖR API-ANROP ---
+// --- Centraliserad hjälpfunktion för att göra API-anrop ---
 async function oneflowFetch(endpoint: string, token: string) {
     const API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1';
     
-    console.log(`...anropar Oneflow endpoint: ${endpoint}`);
+    console.log(`...anropar Oneflow endpoint: ${API_URL}${endpoint}`);
     const response = await fetch(`${API_URL}${endpoint}`, {
         headers: {
             'x-oneflow-api-token': token,
@@ -16,7 +16,7 @@ async function oneflowFetch(endpoint: string, token: string) {
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error(`❌ Fel från Oneflow API: ${response.status} - ${errorText}`);
+        console.error(`❌ Fel från Oneflow API (${response.status}): ${errorText}`);
         throw new Error(`Oneflow API Error: ${response.status}`);
     }
     
@@ -24,75 +24,79 @@ async function oneflowFetch(endpoint: string, token: string) {
     return response.json();
 }
 
-// --- HUVUDFUNKTION (HANDLER) ---
+// --- Huvudfunktion (Handler) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // Sätt CORS-headers för att tillåta anrop från webbläsare
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-oneflow-api-token');
 
-    if (req.method === 'OPTIONS') { return res.status(204).end(); }
+    // Hantera pre-flight OPTIONS-request
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
 
     try {
         const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN;
-        if (!ONEFLOW_API_TOKEN) { throw new Error('Miljövariabeln ONEFLOW_API_TOKEN är inte satt.'); }
+        if (!ONEFLOW_API_TOKEN) {
+            throw new Error('Miljövariabeln ONEFLOW_API_TOKEN är inte satt.');
+        }
 
-        const { templateId, contractId } = req.query;
+        // Hämta query-parametrar från URL:en för att bestämma läge
+        const { getWorkspaces, contractId, templateId } = req.query;
 
-        if (contractId) {
-            // --- LÄGE 1: VIKTIGAST! Undersök ett existerande kontrakt ---
-            console.log(`🧪 Diagnosläge: Visar detaljer för kontrakt-ID ${contractId}...`);
-            const data = await oneflowFetch(`/contracts/${contractId}`, ONEFLOW_API_TOKEN);
-
-            // Plocka ut ALLA typer av data för att få en komplett bild
-            const result = {
-                contract_info: {
-                    id: data.id,
-                    name: data.name,
-                    state: data.state,
-                },
-                participants: data.participants?.map((p: any) => ({
-                    name: p.name,
-                    email: p.email,
-                    company_name: p.company_name, // Detta fyller i "Företag"-fältet
-                    organization_number: p.organization_number, // Detta fyller i "Org nr"-fältet
-                    is_signer: p.is_signer
-                })) || [],
-                // Detta är de "Fria Datafälten" vi letar efter!
-                data_fields: data.data_fields?.map((df: any) => ({
-                    key: df.key, // Detta är det VIKTIGA namnet att använda i koden
-                    value: df.value
-                })) || []
-            };
-
+        if (getWorkspaces) {
+            // --- LÄGE 1: Hämta alla arbetsytor ---
+            console.log('🧪 Diagnosläge: Hämtar arbetsytor...');
+            const data = await oneflowFetch('/workspaces', ONEFLOW_API_TOKEN);
+            const workspaces = data.data.map((ws: any) => ({
+                name: ws.name,
+                id: ws.id
+            }));
             return res.status(200).json({
                 success: true,
-                message: `Komplett analys av kontraktet "${data.name}". Använd denna data för att bygga ditt API-anrop.`,
-                analysis: result
+                message: `Hittade ${workspaces.length} arbetsytor. Använd relevant ID som ONEFLOW_WORKSPACE_ID.`,
+                workspaces: workspaces
             });
+
+        } else if (contractId) {
+            // --- LÄGE 2: Analysera ett specifikt kontrakt (mest pålitliga metoden) ---
+            console.log(`🧪 Diagnosläge: Analyserar kontrakt-ID ${contractId}...`);
+            const data = await oneflowFetch(`/contracts/${contractId}`, ONEFLOW_API_TOKEN);
+            const analysis = {
+                contract_info: { id: data.id, name: data.name, state: data.state },
+                participants: data.participants?.map((p: any) => ({ name: p.name, email: p.email, company_name: p.company_name })) || [],
+                data_fields_with_keys: data.data_fields?.filter((df: any) => df.custom_id).map((df: any) => ({ key_for_api: df.custom_id, value: df.value })) || [],
+                data_fields_without_keys: data.data_fields?.filter((df: any) => !df.custom_id).map((df: any) => ({ value: df.value })) || []
+            };
+            return res.status(200).json({ success: true, message: `Komplett analys av kontrakt ${contractId}.`, analysis });
 
         } else if (templateId) {
-            // --- LÄGE 2: Undersök en mall (som vi ser kan vara vilseledande) ---
-            console.log(`🧪 Diagnosläge: Visar detaljer för mall-ID ${templateId}...`);
+            // --- LÄGE 3: Analysera en specifik mall ---
+            console.log(`🧪 Diagnosläge: Analyserar mall-ID ${templateId}...`);
             const data = await oneflowFetch(`/templates/${templateId}`, ONEFLOW_API_TOKEN);
-            
-            const dataFields = data.data_fields?.map((df: any) => ({
-                key: df.key, type: df.type,
-            })) || [];
-
-            return res.status(200).json({
-                success: true,
-                message: `Detaljer för mallen "${data.name}".`,
-                template: { id: data.id, name: data.name },
-                api_reported_data_fields: dataFields
-            });
+            const dataFields = data.data_fields?.map((df: any) => ({ key: df.key, type: df.type })) || [];
+            return res.status(200).json({ success: true, message: `Detaljer för mallen "${data.name}".`, template: { id: data.id, name: data.name }, api_reported_data_fields: dataFields });
+        
         } else {
-            return res.status(400).json({ success: false, error: "Ange antingen ?contractId=... eller ?templateId=... i URL:en." });
+            // --- Standardläge om inga parametrar anges ---
+            return res.status(400).json({ 
+                success: false, 
+                error: "Inget kommando angivet. Använd en query-parameter.",
+                available_commands: [
+                    "?getWorkspaces=true",
+                    "?contractId=<ett_kontrakts_id>",
+                    "?templateId=<ett_mall_id>"
+                ]
+            });
         }
 
     } catch (error) {
+        console.error('❌ Ett fel inträffade i diagnostik-scriptet:', error);
         return res.status(500).json({
             success: false,
-            error: error instanceof Error ? error.message : 'Okänt fel'
+            error: "Ett internt fel inträffade.",
+            details: error instanceof Error ? error.message : 'Okänt fel'
         });
     }
 }
