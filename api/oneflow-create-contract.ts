@@ -51,7 +51,6 @@ export default async function handler(
     {
       name: recipient.name,
       email: recipient.email,
-      // Signatory needs contract:update and contract:sign permissions
       _permissions: sendForSigning
         ? ['contract:update', 'contract:sign']
         : ['contract:read'],
@@ -64,7 +63,6 @@ export default async function handler(
     template_id: Number(templateId),
     data_fields,
     parties: [party],
-    // If sendForSigning=true, publish immediately
     publish: sendForSigning,
   }
 
@@ -88,7 +86,6 @@ export default async function handler(
       return res.status(response.status).json(body)
     }
 
-    // Return created contract
     return res.status(200).json({ contract: body })
   } catch (error) {
     console.error('Oneflow create-contract error:', error)
