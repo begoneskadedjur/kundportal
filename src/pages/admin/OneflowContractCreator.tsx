@@ -264,49 +264,7 @@ export default function OneflowContractCreator() {
                       className="sr-only"
                     />
                     {template.popular && (
-                      <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Status:</span>
-                      <span className={`px-3 py-1 rounded text-sm font-medium ${
-                        createdContract.state === 'published' 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-3 mt-6">
-                    {createdContract.url && (
-                      <Button 
-                        onClick={() => window.open(createdContract.url, '_blank')} 
-                        className="flex-1 flex items-center justify-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" /> 
-                        Öppna i Oneflow
-                      </Button>
-                    )}
-                    
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        setCreatedContract(null)
-                        setShowPreview(false)
-                      }}
-                      className="px-6"
-                    >
-                      Skapa nytt avtal
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
-  )
-}absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+                      <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
                         Populär
                       </div>
                     )}
@@ -680,4 +638,46 @@ export default function OneflowContractCreator() {
                       <span className="text-white font-medium">{createdContract.name}</span>
                     </div>
                     
-                    <div className="
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Status:</span>
+                      <span className={`px-3 py-1 rounded text-sm font-medium ${
+                        createdContract.state === 'published' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3 mt-6">
+                    {createdContract.url && (
+                      <Button 
+                        onClick={() => window.open(createdContract.url, '_blank')} 
+                        className="flex-1 flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" /> 
+                        Öppna i Oneflow
+                      </Button>
+                    )}
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setCreatedContract(null)
+                        setShowPreview(false)
+                      }}
+                      className="px-6"
+                    >
+                      Skapa nytt avtal
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
