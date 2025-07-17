@@ -1,17 +1,17 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import fetch from 'node-fetch'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import fetch from 'node-fetch';
 
 interface ContractRequestBody {
-  templateId: string
-  contractData: Record<string, string>
+  templateId: string;
+  contractData: Record<string, string>;
   recipient: {
-    name: string
-    email: string
-    company_name?: string
-    organization_number?: string
-  }
-  sendForSigning: boolean
-  partyType: 'company' | 'individual'
+    name: string;
+    email: string;
+    company_name?: string;
+    organization_number?: string;
+  };
+  sendForSigning: boolean;
+  partyType: 'company' | 'individual';
 }
 
 export default async function handler(
@@ -19,7 +19,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' })
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   const {
@@ -28,50 +28,73 @@ export default async function handler(
     recipient,
     sendForSigning,
     partyType,
-  } = req.body as ContractRequestBody
+  } = req.body as ContractRequestBody;
 
-  const token = process.env.ONEFLOW_API_TOKEN!
-  const userEmail = process.env.ONEFLOW_USER_EMAIL!
-  const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!
+  // Hämta alla nödvändiga miljövariabler
+  const token = process.env.ONEFLOW_API_TOKEN!;
+  const userEmail = process.env.ONEFLOW_USER_EMAIL!;
+  const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!;
+  
+  // ---- NYTT: Hämta information om ägarparten från miljövariabler ----
+  const ownerCompanyName = process.env.ONEFLOW_OWNER_COMPANY_NAME!;
+  const ownerOrgNumber = process.env.ONEFLOW_OWNER_ORGANIZATION_NUMBER; // Kan vara valfri
 
-  // Map all provided contractData keys to Oneflow data_fields
+  // Validera att nödvändiga variabler finns
+  if (!token || !userEmail || !workspaceId || !ownerCompanyName) {
+    console.error('Saknade miljövariabler för Oneflow-integrationen');
+    return res.status(500).json({ message: 'Server configuration error.' });
+  }
+
+  // Mappa datafält, precis som tidigare
   const data_fields = Object.entries(contractData).map(
     ([custom_id, value]) => ({ custom_id, value })
-  )
+  );
 
-  // Build party object with participants and proper permissions
-  const party: any = { type: partyType }
+  // ---- UPPDATERING: Bygg en komplett lista med BÅDA parter ----
+
+  // 1. Skapa objekt för ÄGARPARTEN (ert företag)
+  const ownerParty = {
+    type: 'company',
+    name: ownerCompanyName,
+    identification_number: ownerOrgNumber || '',
+    participants: [
+      {
+        name: 'Avsändare', // Eller ett specifikt namn om du vill
+        email: userEmail,
+        // Ägaren har fulla rättigheter
+        permissions: ['organizer', 'contract:update', 'contract:sign'],
+      },
+    ],
+  };
+
+  // 2. Skapa objekt för MOTPARTEN (kunden), precis som tidigare
+  const counterParty: any = { type: partyType };
   if (partyType === 'company') {
-    // Om parten är ett företag, använd företagsinformation
-    party.name = recipient.company_name
-    party.identification_number = recipient.organization_number
+    counterParty.name = recipient.company_name;
+    counterParty.identification_number = recipient.organization_number;
   } else {
-    // Om parten är en privatperson, använd personens namn
-    party.name = recipient.name
+    counterParty.name = recipient.name;
   }
-  
-  // Lägg till deltagaren (mottagaren) i parten
-  party.participants = [
+  counterParty.participants = [
     {
       name: recipient.name,
       email: recipient.email,
-      // ---- FIX: Nyckeln ska vara "permissions", inte "_permissions" ----
       permissions: sendForSigning
         ? ['contract:update', 'contract:sign']
         : ['contract:read'],
     },
-  ]
+  ];
 
   // Förbered den slutgiltiga payloaden som ska skickas till Oneflow
   const payload = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
     data_fields,
-    parties: [party],
+    // ---- FIX: Inkludera BÅDE ägaren och motparten ----
+    parties: [ownerParty, counterParty],
     publish: sendForSigning,
-  }
+  };
 
-  // ---- FELSÖKNING: Logga payloaden för att se exakt vad som skickas ----
   console.log('Skickar följande payload till Oneflow:', JSON.stringify(payload, null, 2));
 
   try {
@@ -87,24 +110,19 @@ export default async function handler(
         },
         body: JSON.stringify(payload),
       }
-    )
+    );
 
-    const body = await response.json()
+    const body = await response.json();
     
-    // Om anropet inte lyckades (status är inte 2xx)
     if (!response.ok) {
-      // ---- FELSÖKNING: Logga det specifika felet från Oneflow på servern ----
       console.error('Fel från Oneflows API:', JSON.stringify(body, null, 2));
-      // Skicka tillbaka Oneflows felmeddelande till klienten
-      return res.status(response.status).json(body)
+      return res.status(response.status).json(body);
     }
 
-    // Om anropet lyckades, returnera det skapade kontraktet
-    return res.status(200).json({ contract: body })
+    return res.status(200).json({ contract: body });
     
   } catch (error) {
-    // Om ett nätverksfel eller annat oväntat fel inträffar
-    console.error('Internt serverfel vid anrop till Oneflow:', error)
-    return res.status(500).json({ message: 'Internal server error' })
+    console.error('Internt serverfel vid anrop till Oneflow:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 }
