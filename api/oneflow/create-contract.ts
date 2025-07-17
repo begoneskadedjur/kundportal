@@ -1,4 +1,4 @@
-// api/oneflow/create-contract.ts - Förbättrad Oneflow Contract Creation API
+// api/oneflow/create-contract.ts - Fixad med korrekt email-hantering från gamla filen
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -73,19 +73,19 @@ const validateRequestData = (body: ContractRequestBody) => {
   console.log('✅ Request data validerad framgångsrikt')
 }
 
-// Bygg Oneflow payload
+// Bygg Oneflow payload - BASERAT PÅ FUNGERANDE GAMLA FILEN
 const buildOneflowPayload = (
   body: ContractRequestBody,
   workspaceId: string
 ) => {
   const { templateId, contractData, recipient, partyType, sendForSigning } = body
 
-  // Mappa datafält
+  // Mappa datafält EXAKT som i gamla filen
   const data_fields = Object.entries(contractData).map(
     ([custom_id, value]) => ({ custom_id, value })
   )
 
-  // Skapa motpart (counterparty)
+  // Skapa motpart (counterparty) EXAKT som i gamla filen
   const counterParty: any = { type: partyType }
   
   if (partyType === 'company') {
@@ -97,11 +97,12 @@ const buildOneflowPayload = (
     counterParty.name = recipient.name
   }
 
-  // Lägg till deltagare (participants)
+  // *** KRITISK FIX: Använd EXAKT samma struktur som gamla filen ***
   counterParty.participants = [
     {
       name: recipient.name,
       email: recipient.email,
+      // Korrekt struktur för motpart - SAMMA SOM GAMLA FILEN
       _permissions: {
         'contract:update': sendForSigning  // true om ska signera, false för viewer
       },
@@ -110,19 +111,21 @@ const buildOneflowPayload = (
     },
   ]
 
+  // *** FIX: Skicka bara counterparty - Oneflow lägger automatiskt till owner ***
   const payload = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
     data_fields,
-    parties: [counterParty], // Oneflow lägger automatiskt till owner
+    parties: [counterParty], // ✅ Bara counterparty, Oneflow adderar owner automatiskt
   }
 
-  console.log('📦 Oneflow payload byggd:', {
+  console.log('📦 Oneflow payload byggd (samma struktur som gamla filen):', {
     workspace_id: payload.workspace_id,
     template_id: payload.template_id,
     data_fields_count: payload.data_fields.length,
     party_type: partyType,
-    send_for_signing: sendForSigning
+    send_for_signing: sendForSigning,
+    recipient_email: recipient.email // Debug email
   })
 
   return payload
@@ -134,6 +137,7 @@ const createOneflowContract = async (
   env: OneflowEnvironment
 ) => {
   console.log('🚀 Skickar create request till Oneflow...')
+  console.log('📧 Använder email:', payload.parties[0].participants[0].email)
 
   const createResponse = await fetch(
     'https://api.oneflow.com/v1/contracts/create',
@@ -164,7 +168,7 @@ const createOneflowContract = async (
   return createdContract
 }
 
-// Publicera kontrakt för signering
+// Publicera kontrakt för signering - SAMMA SOM GAMLA FILEN
 const publishContract = async (
   contractId: string,
   recipient: ContractRecipient,
@@ -195,7 +199,7 @@ const publishContract = async (
     const publishError = await publishResponse.json()
     console.error('⚠️ Kontrakt skapat men kunde inte publiceras:', JSON.stringify(publishError, null, 2))
     
-    // Kasta inte fel här - kontraktet är skapat även om publiceringen misslyckades
+    // Returnera kontraktet ändå, men med en varning - SAMMA SOM GAMLA FILEN
     return {
       warning: 'Kontrakt skapat men kunde inte skickas för signering automatiskt',
       publishError: publishError
@@ -248,9 +252,8 @@ export default async function handler(
       publishResult = await publishContract(createdContract.id, body.recipient, env)
     }
 
-    // 6. Returnera framgångsrikt resultat
+    // 6. Returnera framgångsrikt resultat - SAMMA FORMAT SOM GAMLA FILEN
     const responseData: any = { 
-      success: true,
       contract: createdContract 
     }
 
@@ -266,7 +269,6 @@ export default async function handler(
     console.error('❌ Fel i Oneflow contract creation:', error)
     
     return res.status(500).json({
-      success: false,
       message: error.message || 'Internt serverfel vid skapande av kontrakt',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })

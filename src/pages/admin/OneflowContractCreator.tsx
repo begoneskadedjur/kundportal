@@ -147,17 +147,47 @@ export default function OneflowContractCreator() {
     try {
       const finalContractData = buildFinalContractData()
       
-      await createContract({
+      console.log('🚀 Skickar kontrakt-request:', {
         templateId: selectedTemplate,
         contractData: finalContractData,
         recipient,
         sendForSigning,
         partyType
       })
+
+      // *** FIX: Använd nya API-rutten ***
+      const response = await fetch('/api/oneflow/create-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          templateId: selectedTemplate, 
+          contractData: finalContractData, 
+          recipient, 
+          sendForSigning, 
+          partyType 
+        })
+      })
       
-    } catch (error) {
-      // Error hanteras redan i hooken
-      console.error('Fel vid skapande av kontrakt:', error)
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('❌ Oneflow API fel:', error)
+        throw new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
+      }
+      
+      const result = await response.json()
+      console.log('✅ Kontrakt skapat:', result)
+      setCreatedContract(result.contract)
+      
+      // Success meddelande
+      const successMsg = sendForSigning 
+        ? '✅ Kontrakt skapat och skickat för signering!' 
+        : '✅ Kontrakt skapat som utkast!'
+      toast.success(successMsg)
+      
+    } catch (err: any) {
+      const errorMsg = `Fel vid skapande av kontrakt: ${err.message}`
+      console.error('❌', errorMsg, err)
+      toast.error(errorMsg)
     }
   }
 
