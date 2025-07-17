@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             participants: [
                                 {
                                     name: 'Christian Karlsson',
-                                    email: 'christian.karlsson@hotmail.se', // ✅ Riktig testmail
+                                    email: 'christian.karlsson@begone.se', // ✅ BeGone skapar kontraktet
                                     _permissions: { 'contract:update': true },
                                     signatory: true,
                                     delivery_channel: 'email'
@@ -108,8 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             identification_number: '556123-4567',
                             participants: [
                                 {
-                                    name: 'Anna Andersson',
-                                    email: 'christian.karlsson@hotmail.se', // ✅ Samma testmail
+                                    name: 'Christian Karlsson',
+                                    email: 'christian.karlsson@hotmail.se', // ✅ Skickas till din privata mail
                                     _permissions: { 'contract:update': true },
                                     signatory: true,
                                     delivery_channel: 'email'
