@@ -1,6 +1,6 @@
 // src/pages/admin/OneflowTest.tsx - Testa kontraktsskapande utan att spara
 import React, { useState } from 'react'
-import { ArrowLeft, TestTube, Eye, FileText, Building2, User, Mail, Phone, MapPin, Calendar } from 'lucide-react'
+import { ArrowLeft, TestTube, Eye, FileText, Building2, User, Mail, Phone, MapPin, Calendar, Send, CheckCircle, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -38,19 +38,53 @@ interface ContractData {
   [key: string]: string
 }
 
+interface Recipient {
+  name: string
+  email: string
+  company_name: string
+  organization_number: string
+}
+
 export default function OneflowTest() {
   const navigate = useNavigate()
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [contractData, setContractData] = useState<ContractData>({})
+  const [recipient, setRecipient] = useState<Recipient>({
+    name: '',
+    email: '',
+    company_name: '',
+    organization_number: ''
+  })
+  const [sendForSigning, setSendForSigning] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [previewData, setPreviewData] = useState<any>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [createdContract, setCreatedContract] = useState<any>(null)
+
+  // Uppdatera mottagare automatiskt från kontraktdata
+  React.useEffect(() => {
+    setRecipient(prev => ({
+      ...prev,
+      name: contractData['kontaktperson'] || prev.name,
+      email: contractData['e-post-kontaktperson'] || prev.email,
+      company_name: contractData['foretag'] || prev.company_name,
+      organization_number: contractData['org-nr'] || prev.organization_number
+    }))
+  }, [contractData])
 
   // Uppdatera formulärdata
   const handleInputChange = (fieldKey: string, value: string) => {
     setContractData(prev => ({
       ...prev,
       [fieldKey]: value
+    }))
+  }
+
+  // Uppdatera mottagare
+  const handleRecipientChange = (field: keyof Recipient, value: string) => {
+    setRecipient(prev => ({
+      ...prev,
+      [field]: value
     }))
   }
 
@@ -121,34 +155,51 @@ export default function OneflowTest() {
     return 'Övrigt'
   }
 
-  // Testa att skapa kontrakt (utan att spara)
-  const handleTestCreate = async () => {
+  // Skapa riktigt kontrakt i Oneflow
+  const handleCreateContract = async () => {
     if (!selectedTemplate) {
       toast.error('Välj en mall först')
       return
     }
 
-    if (!contractData['foretag'] || !contractData['e-post-kontaktperson']) {
-      toast.error('Fyll i minst företag och e-post')
+    if (!contractData['foretag'] || !recipient.email) {
+      toast.error('Fyll i minst företag och mottagarens e-post')
       return
     }
 
     setIsCreating(true)
     
     try {
-      // Simulera API-anrop
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const response = await fetch('/api/oneflow-create-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: selectedTemplate,
+          contractData,
+          recipient,
+          sendForSigning
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.details || 'Failed to create contract')
+      }
+
+      const result = await response.json()
+      setCreatedContract(result.contract)
       
-      const mappedData = mapContractData(contractData)
-      console.log('🧪 Test Contract Data:', mappedData)
+      toast.success(
+        sendForSigning 
+          ? `✅ Kontrakt skapat och skickat till ${recipient.email}!`
+          : '✅ Kontrakt skapat som utkast!'
+      )
       
-      toast.success('Test lyckades! Kontraktsdata loggad i konsolen.')
-      setPreviewData(mappedData)
-      setShowPreview(true)
+      console.log('🎉 Contract created:', result)
       
     } catch (error) {
-      toast.error('Test misslyckades')
-      console.error('Test error:', error)
+      toast.error(`❌ Fel: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('Contract creation error:', error)
     } finally {
       setIsCreating(false)
     }
@@ -362,7 +413,82 @@ export default function OneflowTest() {
               </div>
             </Card>
 
-            {/* Test-knappar */}
+            {/* Mottagarinformation */}
+            <Card>
+              <div className="flex items-center mb-4">
+                <Mail className="w-5 h-5 text-red-500 mr-2" />
+                <h2 className="text-lg font-semibold text-white">Mottagare (Signering)</h2>
+              </div>
+              
+              <div className="space-y-4">
+                <Input
+                  label="Mottagarens namn *"
+                  type="text"
+                  value={recipient.name}
+                  onChange={(e) => handleRecipientChange('name', e.target.value)}
+                  placeholder="Marcus Jansson"
+                />
+                
+                <Input
+                  label="Mottagarens e-post *"
+                  type="email"
+                  value={recipient.email}
+                  onChange={(e) => handleRecipientChange('email', e.target.value)}
+                  placeholder="marcus@bobackengard.se"
+                />
+                
+                <Input
+                  label="Företagsnamn för signering"
+                  type="text"
+                  value={recipient.company_name}
+                  onChange={(e) => handleRecipientChange('company_name', e.target.value)}
+                  placeholder="Bobacken Gård AB"
+                />
+                
+                <Input
+                  label="Org.nr för signering"
+                  type="text"
+                  value={recipient.organization_number}
+                  onChange={(e) => handleRecipientChange('organization_number', e.target.value)}
+                  placeholder="559319-3757"
+                />
+              </div>
+            </Card>
+
+            {/* Sändningsalternativ */}
+            <Card>
+              <div className="flex items-center mb-4">
+                <TestTube className="w-5 h-5 text-yellow-500 mr-2" />
+                <h2 className="text-lg font-semibold text-white">Sändningsalternativ</h2>
+              </div>
+              
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={sendForSigning}
+                    onChange={(e) => setSendForSigning(e.target.checked)}
+                    className="w-4 h-4 text-blue-500 bg-slate-800 border-slate-600 rounded focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="text-white font-medium">Skicka för signering</span>
+                    <p className="text-sm text-slate-400">
+                      Om avmarkerat sparas kontraktet som utkast
+                    </p>
+                  </div>
+                </label>
+                
+                {sendForSigning && (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p className="text-yellow-400 text-sm">
+                      ⚠️ Kontraktet kommer skickas till {recipient.email || 'mottagaren'} för signering
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Åtgärdsknappar */}
             <div className="flex gap-3">
               <Button
                 onClick={handlePreview}
@@ -375,12 +501,12 @@ export default function OneflowTest() {
               </Button>
               
               <Button
-                onClick={handleTestCreate}
-                disabled={isCreating || !selectedTemplate}
+                onClick={handleCreateContract}
+                disabled={isCreating || !selectedTemplate || !recipient.email}
                 className="flex items-center gap-2"
               >
-                {isCreating ? <LoadingSpinner size="sm" /> : <TestTube className="w-4 h-4" />}
-                Testa skapa kontrakt
+                {isCreating ? <LoadingSpinner size="sm" /> : <FileText className="w-4 h-4" />}
+                {sendForSigning ? 'Skapa & skicka kontrakt' : 'Skapa som utkast'}
               </Button>
             </div>
           </div>
@@ -429,22 +555,41 @@ export default function OneflowTest() {
               )}
             </Card>
 
-            {/* Test resultat */}
-            {previewData && (
+            {/* Skapade kontrakt */}
+            {createdContract && (
               <Card>
-                <h3 className="text-lg font-semibold text-white mb-4">Test Information</h3>
-                <div className="space-y-2 text-sm">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  Kontrakt skapat!
+                </h3>
+                <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Vald mall:</span>
-                    <span className="text-white">{ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate)?.name}</span>
+                    <span className="text-slate-400">Kontrakt ID:</span>
+                    <span className="text-white font-mono">{createdContract.id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Test ID:</span>
-                    <span className="text-white">{previewData.oneflow_contract_id}</span>
+                    <span className="text-slate-400">Namn:</span>
+                    <span className="text-white">{createdContract.name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Status:</span>
-                    <span className="text-green-400">Endast test - ej sparat</span>
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      createdContract.state === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
+                      createdContract.state === 'draft' ? 'bg-slate-500/20 text-slate-400' :
+                      'bg-green-500/20 text-green-400'
+                    }`}>
+                      {createdContract.state === 'pending' ? 'Skickat för signering' :
+                       createdContract.state === 'draft' ? 'Utkast' : createdContract.state}
+                    </span>
+                  </div>
+                  <div className="pt-3">
+                    <Button
+                      onClick={() => window.open(createdContract.url, '_blank')}
+                      className="w-full flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Öppna i Oneflow
+                    </Button>
                   </div>
                 </div>
               </Card>
