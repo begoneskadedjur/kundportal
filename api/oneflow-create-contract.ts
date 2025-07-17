@@ -102,8 +102,8 @@ export default async function handler(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Oneflow-API-Token': token,
-          'X-Oneflow-User-Email': userEmail,
+          'x-oneflow-api-token': token,
+          'x-oneflow-user-email': userEmail,
           Accept: 'application/json',
         },
         body: JSON.stringify(createPayload),
@@ -134,8 +134,8 @@ export default async function handler(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Oneflow-API-Token': token,
-            'X-Oneflow-User-Email': userEmail,
+            'x-oneflow-api-token': token,
+            'x-oneflow-user-email': userEmail,
             Accept: 'application/json',
           },
           body: JSON.stringify(publishPayload),
