@@ -4,10 +4,10 @@
 import React, { useState } from 'react'
 import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import Button from '../ui/Button'
-import Card from '../ui/Card'
-import Input from '../ui/Input'
-import LoadingSpinner from '../shared/LoadingSpinner'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import Input from '../../components/ui/Input'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
 // Oneflow mallar - enkel version utan ikoner/beskrivningar
