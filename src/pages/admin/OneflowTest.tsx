@@ -31,13 +31,17 @@ interface Recipient {
 export default function OneflowTest() {
   const navigate = useNavigate()
   
-  // Förifyllda värden för snabb testning - KORRIGERADE FÄLTNAMN
   const [selectedTemplate, setSelectedTemplate] = useState('8486368')
+
+  // --- NYTT: En separat state för den långa texten ---
+  const [agreementObjectText, setAgreementObjectText] = useState(
+    'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser, såsom utplacering av ytterligare fällor eller alternativa bekämpningsmetoder. Kunden förbinder sig att följa de rekommendationer som ges av BeGone Skadedjur & Sanering AB för att minimera risken för nya angrepp, vilket inkluderar sophantering och tätning av fastigheten. Avtalet omfattar även telefonrådgivning och en årlig genomgång av fastighetens skadedjursskydd. Detta är en extra lång text för att säkerställa att vi överstiger gränsen på 1024 tecken och kan testa uppdelningslogiken korrekt. Vi lägger till ännu mer utfyllnadstext här för att vara på den säkra sidan. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Vi behöver ännu lite mer text för att nå över 1500 tecken och verkligen stresstesta systemet. Detta bör räcka.'
+  );
+
+  // --- ÄNDRAT: State för datafält utan de uppdelade styckena ---
   const [contractData, setContractData] = useState<ContractData>({
-    // ✅ HÄR ÄR DE KORREKTA NYCKLARNA
     anstalld: 'Christian Karlsson',
     avtalslngd: '12',                              
-    avtalsobjekt: 'Komplett skadedjursbekämpning', 
     begynnelsedag: new Date().toISOString().split('T')[0], 
     'dokument-skapat': new Date().toISOString().split('T')[0],
     'e-post-anstlld': 'christian.karlsson@begone.se',    
@@ -46,7 +50,6 @@ export default function OneflowTest() {
     foretag: 'Test Företag AB',                        
     Kontaktperson: 'Anna Andersson',
     'org-nr': '556123-4567',                          
-    'stycke-1': 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema',
     'telefonnummer-kontaktperson': '08-123 45 67',    
     'utforande-adress': 'Storgatan 15, 111 22 Stockholm', 
   })
@@ -65,10 +68,8 @@ export default function OneflowTest() {
   const [showPreview, setShowPreview] = useState(false)
   const [createdContract, setCreatedContract] = useState<any>(null)
 
-  // Uppdatera formulärdata
   const handleInputChange = (field: string, value: string) => {
     setContractData(prev => ({ ...prev, [field]: value }))
-    // Synkronisera med recipient när relevanta fält ändras
     if (field === 'Kontaktperson') {
       setRecipient(prev => ({ ...prev, name: value }))
     } else if (field === 'e-post-kontaktperson') {
@@ -86,18 +87,23 @@ export default function OneflowTest() {
       return
     }
 
-    // --- TILLAGD DEBUG-LOGG FÖR ATT VERIFIERA FRONTEND-DATAN ---
-    console.log(
-      '--- DEBUG: Datan som skickas FRÅN webbläsaren ---', 
-      JSON.stringify(contractData, null, 2)
-    );
-    // -----------------------------------------------------------
+    // --- NYTT: Uppdelningslogik ---
+    const LIMIT = 1024;
+    const part1 = agreementObjectText.substring(0, LIMIT);
+    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2); // Säkerställ att stycke 2 inte heller är för långt
+
+    const finalContractData = {
+      ...contractData,
+      'stycke-1': part1,
+      'stycke-2': part2,
+    };
+    // -----------------------------
 
     setIsCreating(true)
     try {
-      console.log('🚀 Skickar kontrakt-request:', {
+      console.log('🚀 Skickar kontrakt-request med uppdelad data:', {
         templateId: selectedTemplate,
-        contractData,
+        contractData: finalContractData,
         recipient,
         sendForSigning,
         partyType
@@ -108,7 +114,7 @@ export default function OneflowTest() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           templateId: selectedTemplate, 
-          contractData, 
+          contractData: finalContractData, 
           recipient, 
           sendForSigning, 
           partyType 
@@ -135,9 +141,19 @@ export default function OneflowTest() {
   }
 
   const handlePreview = () => {
+     const LIMIT = 1024;
+     const part1 = agreementObjectText.substring(0, LIMIT);
+     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2);
+
+     const finalContractData = {
+       ...contractData,
+       'stycke-1': part1,
+       'stycke-2': part2,
+     };
+
     setPreviewData({
       template: ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate),
-      contractData,
+      contractData: finalContractData,
       recipient,
       partyType,
       sendForSigning
@@ -146,12 +162,10 @@ export default function OneflowTest() {
     toast.success('📋 Förhandsgranskning genererad!')
   }
 
-  // Formatera fältnamn för bättre läsbarhet
   const formatFieldLabel = (key: string): string => {
     const labelMap: { [key: string]: string } = {
       'anstalld': 'Anställd hos BeGone',
       'avtalslngd': 'Avtalslängd (månader)',
-      'avtalsobjekt': 'Avtalsobjekt',
       'begynnelsedag': 'Begynnelsedag',
       'dokument-skapat': 'Dokument skapat',
       'e-post-anstlld': 'E-post anställd',
@@ -160,7 +174,6 @@ export default function OneflowTest() {
       'foretag': 'Företag',
       'Kontaktperson': 'Kontaktperson',
       'org-nr': 'Organisationsnummer',
-      'stycke-1': 'Avtalstext (stycke 1)',
       'telefonnummer-kontaktperson': 'Telefonnummer kontaktperson',
       'utforande-adress': 'Utförande adress',
     }
@@ -180,9 +193,8 @@ export default function OneflowTest() {
             >
               <ArrowLeft className="w-4 h-4" /> Tillbaka
             </Button>
-            {/* ✅ HÄR ÄR DEN KORREKTA RUBRIKEN */}
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <TestTube className="w-6 h-6" /> Oneflow Test - NY VERSION 26 JULI
+              <TestTube className="w-6 h-6" /> Oneflow Test
             </h1>
             <div className="ml-auto text-sm text-slate-400">
               Template: {ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'Ingen vald'}
@@ -192,9 +204,7 @@ export default function OneflowTest() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-2 gap-8">
-        {/* Resten av JSX-koden är densamma */}
         <div className="space-y-6">
-          {/* Mall-val */}
           <Card>
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <FileText className="w-5 h-5 text-blue-500" /> Välj Mall
@@ -211,7 +221,6 @@ export default function OneflowTest() {
             </select>
           </Card>
 
-          {/* Data Fields */}
           <Card>
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Building2 className="w-5 h-5 text-green-500" /> Avtalsdata
@@ -233,10 +242,25 @@ export default function OneflowTest() {
                   className="text-sm"
                 />
               ))}
+              
+              {/* --- NYTT: Textarea för avtalsobjektet --- */}
+              <div className="flex flex-col">
+                <label htmlFor="agreement-object" className="mb-2 text-sm font-medium text-white">Avtalsobjekt (delas automatiskt)</label>
+                <textarea
+                  id="agreement-object"
+                  value={agreementObjectText}
+                  onChange={(e) => setAgreementObjectText(e.target.value)}
+                  rows={8}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  placeholder="Beskriv avtalets omfattning här..."
+                />
+                <p className={`mt-1 text-xs ${agreementObjectText.length > LIMIT * 2 ? 'text-red-500' : 'text-slate-400'}`}>
+                  Tecken: {agreementObjectText.length} / {LIMIT * 2}
+                </p>
+              </div>
             </div>
           </Card>
 
-          {/* Mottagare */}
           <Card>
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Mail className="w-5 h-5 text-red-500" /> Mottagare
@@ -245,106 +269,52 @@ export default function OneflowTest() {
               <label className="text-sm text-white mb-2 block">Typ av motpart</label>
               <div className="flex gap-4">
                 <label className="flex items-center space-x-2 text-white cursor-pointer">
-                  <input 
-                    type="radio" 
-                    checked={partyType === 'company'} 
-                    onChange={() => setPartyType('company')} 
-                    className="text-blue-500"
-                  /> 
+                  <input type="radio" checked={partyType === 'company'} onChange={() => setPartyType('company')} className="text-blue-500" /> 
                   <span>Företag</span>
                 </label>
                 <label className="flex items-center space-x-2 text-white cursor-pointer">
-                  <input 
-                    type="radio" 
-                    checked={partyType === 'individual'} 
-                    onChange={() => setPartyType('individual')} 
-                    className="text-blue-500"
-                  /> 
+                  <input type="radio" checked={partyType === 'individual'} onChange={() => setPartyType('individual')} className="text-blue-500" /> 
                   <span>Privatperson</span>
                 </label>
               </div>
             </div>
             <div className="space-y-4">
-              <Input 
-                label="Namn" 
-                type="text" 
-                value={recipient.name} 
-                onChange={e => setRecipient(prev => ({ ...prev, name: e.target.value }))} 
-              />
-              <Input 
-                label="E-post" 
-                type="email" 
-                value={recipient.email} 
-                onChange={e => setRecipient(prev => ({ ...prev, email: e.target.value }))} 
-              />
+              <Input label="Namn" type="text" value={recipient.name} onChange={e => setRecipient(prev => ({ ...prev, name: e.target.value }))} />
+              <Input label="E-post" type="email" value={recipient.email} onChange={e => setRecipient(prev => ({ ...prev, email: e.target.value }))} />
               {partyType === 'company' && (
                 <>
-                  <Input 
-                    label="Företag" 
-                    type="text" 
-                    value={recipient.company_name} 
-                    onChange={e => setRecipient(prev => ({ ...prev, company_name: e.target.value }))} 
-                  />
-                  <Input 
-                    label="Organisationsnummer" 
-                    type="text" 
-                    value={recipient.organization_number} 
-                    onChange={e => setRecipient(prev => ({ ...prev, organization_number: e.target.value }))} 
-                  />
+                  <Input label="Företag" type="text" value={recipient.company_name} onChange={e => setRecipient(prev => ({ ...prev, company_name: e.target.value }))} />
+                  <Input label="Organisationsnummer" type="text" value={recipient.organization_number} onChange={e => setRecipient(prev => ({ ...prev, organization_number: e.target.value }))} />
                 </>
               )}
             </div>
           </Card>
 
-          {/* Signeringsalternativ */}
           <Card>
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Send className="w-5 h-5 text-yellow-400" /> Signeringsalternativ
             </h2>
             <label className="flex items-center space-x-2 text-white cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={sendForSigning} 
-                onChange={() => setSendForSigning(prev => !prev)} 
-                className="text-blue-500"
-              /> 
+              <input type="checkbox" checked={sendForSigning} onChange={() => setSendForSigning(prev => !prev)} className="text-blue-500" /> 
               <span>Skicka för signering direkt</span>
             </label>
             <p className="text-sm text-slate-400 mt-2">
-              {sendForSigning 
-                ? 'Kontraktet kommer att skickas för signering omedelbart' 
-                : 'Kontraktet skapas som utkast och kan skickas senare'
-              }
+              {sendForSigning ? 'Kontraktet kommer att skickas för signering omedelbart' : 'Kontraktet skapas som utkast och kan skickas senare'}
             </p>
           </Card>
 
-          {/* Action Buttons */}
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              onClick={handlePreview} 
-              className="flex items-center gap-2"
-            >
+            <Button variant="outline" onClick={handlePreview} className="flex items-center gap-2">
               <Eye className="w-4 h-4" /> Förhandsgranska
             </Button>
-            <Button 
-              disabled={isCreating || !selectedTemplate} 
-              onClick={handleCreateContract} 
-              className="flex items-center gap-2 flex-1"
-            >
-              {isCreating ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )} 
+            <Button disabled={isCreating || !selectedTemplate} onClick={handleCreateContract} className="flex items-center gap-2 flex-1">
+              {isCreating ? <LoadingSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />} 
               {sendForSigning ? 'Skapa & skicka' : 'Skapa utkast'}
             </Button>
           </div>
         </div>
 
-        {/* Right Column - Preview & Results */}
         <div className="space-y-6">
-          {/* Förhandsgranskning */}
           {showPreview && (
             <Card>
               <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
@@ -358,9 +328,7 @@ export default function OneflowTest() {
                   <div><strong>Signering:</strong> {sendForSigning ? 'Ja' : 'Nej'}</div>
                 </div>
                 <details className="text-xs">
-                  <summary className="text-slate-400 cursor-pointer hover:text-white">
-                    Visa fullständig payload
-                  </summary>
+                  <summary className="text-slate-400 cursor-pointer hover:text-white">Visa fullständig payload</summary>
                   <pre className="text-slate-400 bg-slate-900/50 p-3 rounded mt-2 overflow-x-auto">
                     {JSON.stringify(previewData, null, 2)}
                   </pre>
@@ -369,7 +337,6 @@ export default function OneflowTest() {
             </Card>
           )}
 
-          {/* Resultat */}
           {createdContract && (
             <Card>
               <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
@@ -381,20 +348,12 @@ export default function OneflowTest() {
                     <div><strong>ID:</strong> <span className="font-mono text-green-400">{createdContract.id}</span></div>
                     <div><strong>Namn:</strong> {createdContract.name}</div>
                     <div><strong>Status:</strong> 
-                      <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                        createdContract.state === 'published' 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-yellow-500/20 text-yellow-400'
-                      }`}>
+                      <span className={`ml-2 px-2 py-1 rounded text-xs ${createdContract.state === 'published' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                         {createdContract.state}
                       </span>
                     </div>
                     {createdContract.url && (
-                      <Button 
-                        onClick={() => window.open(createdContract.url, '_blank')} 
-                        className="w-full flex items-center justify-center gap-2 mt-3"
-                        size="sm"
-                      >
+                      <Button onClick={() => window.open(createdContract.url, '_blank')} className="w-full flex items-center justify-center gap-2 mt-3" size="sm">
                         <ExternalLink className="w-4 h-4" /> Öppna i Oneflow
                       </Button>
                     )}
@@ -404,7 +363,6 @@ export default function OneflowTest() {
             </Card>
           )}
 
-          {/* Hjälp/Tips */}
           <Card>
             <h3 className="text-lg font-semibold text-white mb-3">💡 Tips</h3>
             <div className="text-sm text-slate-300 space-y-2">
