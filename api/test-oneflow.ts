@@ -44,7 +44,7 @@ export default function OneflowTest() {
     'e-post-kontaktperson': 'christian.karlsson@hotmail.se', 
     'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    
     foretag: 'Test Företag AB',                        
-    Kontaktperson: 'Anna Andersson',  // <-- FIXAT: 'k' ändrat till 'K'
+    Kontaktperson: 'Anna Andersson',
     'org-nr': '556123-4567',                          
     'stycke-1': 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema',
     'telefonnummer-kontaktperson': '08-123 45 67',    
@@ -69,7 +69,7 @@ export default function OneflowTest() {
   const handleInputChange = (field: string, value: string) => {
     setContractData(prev => ({ ...prev, [field]: value }))
     // Synkronisera med recipient när relevanta fält ändras
-    if (field === 'Kontaktperson') { // <-- FIXAT: 'k' ändrat till 'K'
+    if (field === 'Kontaktperson') {
       setRecipient(prev => ({ ...prev, name: value }))
     } else if (field === 'e-post-kontaktperson') {
       setRecipient(prev => ({ ...prev, email: value }))
@@ -85,6 +85,13 @@ export default function OneflowTest() {
       toast.error('Välj mall och fyll i Mottagarens e-post.')
       return
     }
+
+    // --- TILLAGD DEBUG-LOGG FÖR ATT VERIFIERA FRONTEND-DATAN ---
+    console.log(
+      '--- DEBUG: Datan som skickas FRÅN webbläsaren ---', 
+      JSON.stringify(contractData, null, 2)
+    );
+    // -----------------------------------------------------------
 
     setIsCreating(true)
     try {
@@ -151,7 +158,7 @@ export default function OneflowTest() {
       'e-post-kontaktperson': 'E-post kontaktperson',
       'faktura-adress-pdf': 'Faktura-adress (PDF)',
       'foretag': 'Företag',
-      'Kontaktperson': 'Kontaktperson', // <-- FIXAT: 'k' ändrat till 'K'
+      'Kontaktperson': 'Kontaktperson',
       'org-nr': 'Organisationsnummer',
       'stycke-1': 'Avtalstext (stycke 1)',
       'telefonnummer-kontaktperson': 'Telefonnummer kontaktperson',
