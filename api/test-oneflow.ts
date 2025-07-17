@@ -90,12 +90,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     parties: [
                         {
                             type: 'company',
-                            name: 'Test Company',
-                            identification_number: '123456-7890',
+                            name: 'Begone Skadedjur & Sanering AB',
+                            identification_number: '559378-9208',
                             participants: [
                                 {
-                                    name: 'Test Person',
-                                    email: 'test@example.com',
+                                    name: 'Christian Karlsson',
+                                    email: 'christian.karlsson@hotmail.se', // ✅ Riktig testmail
+                                    _permissions: { 'contract:update': true },
+                                    signatory: true,
+                                    delivery_channel: 'email'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'company', 
+                            name: 'Test Företag AB',
+                            identification_number: '556123-4567',
+                            participants: [
+                                {
+                                    name: 'Anna Andersson',
+                                    email: 'christian.karlsson@hotmail.se', // ✅ Samma testmail
                                     _permissions: { 'contract:update': true },
                                     signatory: true,
                                     delivery_channel: 'email'
