@@ -1,114 +1,97 @@
-// api/oneflow-create-contract.ts - KOMPLETT VERSION MED DYNAMISK PART-TYP
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import fetch from 'node-fetch'
 
-const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
-const ONEFLOW_API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1'
-const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL! 
-const ONEFLOW_WORKSPACE_ID = process.env.ONEFLOW_WORKSPACE_ID!
-
-interface CreateContractRequest {
-  templateId: string;
-  contractData: { [key: string]: string };
-  recipient: { name: string; email: string; company_name?: string; organization_number?: string };
-  sendForSigning: boolean;
-  partyType: 'company' | 'individual';
+interface ContractRequestBody {
+  templateId: string
+  contractData: Record<string, string>
+  recipient: {
+    name: string
+    email: string
+    company_name?: string
+    organization_number?: string
+  }
+  sendForSigning: boolean
+  partyType: 'company' | 'individual'
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' })
+  }
 
-  if (req.method === 'OPTIONS') { return res.status(200).end(); }
-  if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
+  const {
+    templateId,
+    contractData,
+    recipient,
+    sendForSigning,
+    partyType,
+  } = req.body as ContractRequestBody
+
+  const token = process.env.ONEFLOW_API_TOKEN!
+  const userEmail = process.env.ONEFLOW_USER_EMAIL!
+  const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!
+
+  // Map all provided contractData keys to Oneflow data_fields
+  const data_fields = Object.entries(contractData).map(
+    ([custom_id, value]) => ({ custom_id, value })
+  )
+
+  // Build party object with participants and proper permissions
+  const party: any = { type: partyType }
+  if (partyType === 'company') {
+    party.name = recipient.company_name
+    party.identification_number = recipient.organization_number
+  } else {
+    party.name = recipient.name
+  }
+  party.participants = [
+    {
+      name: recipient.name,
+      email: recipient.email,
+      // Signatory needs contract:update and contract:sign permissions
+      _permissions: sendForSigning
+        ? ['contract:update', 'contract:sign']
+        : ['contract:read'],
+    },
+  ]
+
+  // Prepare create-contract payload
+  const payload = {
+    workspace_id: Number(workspaceId),
+    template_id: Number(templateId),
+    data_fields,
+    parties: [party],
+    // If sendForSigning=true, publish immediately
+    publish: sendForSigning,
+  }
 
   try {
-    const { templateId, contractData, recipient, sendForSigning, partyType }: CreateContractRequest = req.body;
+    const response = await fetch(
+      'https://api.oneflow.com/v1/contracts/create',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Oneflow-API-Token': token,
+          'X-Oneflow-User-Email': userEmail,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    )
 
-    if (!templateId || !recipient?.email || !ONEFLOW_WORKSPACE_ID || !partyType) {
-      return res.status(400).json({ error: 'Bad Request: Incomplete data or missing server configuration.' });
+    const body = await response.json()
+    if (!response.ok) {
+      return res.status(response.status).json(body)
     }
 
-    const contract = await createContract(templateId, contractData, recipient, partyType);
-    let finalState = contract.state;
-    if (sendForSigning) {
-      const publishedContract = await publishContract(contract.id);
-      finalState = publishedContract.state;
-    }
-    return res.status(200).json({
-      success: true,
-      contract: { id: contract.id, name: contract.name, state: finalState, url: `https://app.oneflow.com/contracts/${contract.id}` }
-    });
+    // Return created contract
+    return res.status(200).json({ contract: body })
   } catch (error) {
-    console.error('❌ Ett fel inträffade i huvudprocessen:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to process contract request',
-      details: error instanceof Error ? error.message : 'An unknown error occurred'
-    });
+    console.error('Oneflow create-contract error:', error)
+    return res.status(500).json({ message: 'Internal server error' })
   }
-}
-
-async function createContract(
-  templateId: string, 
-  contractData: { [key: string]: string },
-  recipient: CreateContractRequest['recipient'],
-  partyType: 'company' | 'individual'
-) {
-  const dataFields = Object.entries(contractData)
-    .filter(([, value]) => value && value.trim() !== '')
-    .map(([key, value]) => ({ custom_id: key, value: value.trim() }));
-
-  const contractPayload = {
-    workspace_id: parseInt(ONEFLOW_WORKSPACE_ID),
-    template_id: parseInt(templateId),
-    parties: [{
-      type: partyType,
-      name: partyType === 'company' ? (recipient.company_name || contractData['foretag']) : recipient.name,
-      country_code: "SE",
-      participants: [{
-        name: recipient.name,
-        email: recipient.email,
-        delivery_channel: 'email',
-        signatory: true
-      }]
-    }],
-    data_fields: dataFields
-  };
-  
-  const response = await fetch(`${ONEFLOW_API_URL}/contracts/create`, {
-    method: 'POST',
-    headers: {
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(contractPayload)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Oneflow API error (${response.status}): ${errorText}`);
-  }
-  return await response.json();
-}
-
-async function publishContract(contractId: number) {
-  const response = await fetch(`${ONEFLOW_API_URL}/contracts/${contractId}/publish`, {
-    method: 'POST',
-    headers: {
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      subject: 'Ditt avtal från Begone Skadedjur & Sanering AB',
-      message: 'Vänligen granska och signera det bifogade avtalet.'
-    })
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to publish contract (${response.status}): ${errorText}`);
-  }
-  return await response.json();
 }

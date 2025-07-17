@@ -1,4 +1,3 @@
-// src/pages/admin/OneflowTest.tsx - KOMPLETT OCH KORRIGERAD VERSION
 import React, { useState } from 'react'
 import { ArrowLeft, TestTube, Eye, FileText, Building2, User, Mail, Phone, MapPin, Calendar, Send, CheckCircle, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -32,21 +31,23 @@ interface Recipient {
 export default function OneflowTest() {
   const navigate = useNavigate()
   
-  // Hårdkodade värden för snabb testning
+  // Hårdkodade värden för snabb testning (alla data fields)
   const [selectedTemplate, setSelectedTemplate] = useState('8486368')
   const [contractData, setContractData] = useState<ContractData>({
-    'foretag': 'Testkund',
-    'org-nr': '002233-4455',
-    'kontaktperson': 'Test kontaktperson',
-    'e-post-kontaktperson': 'christian.karlsson@hotmail.se',
-    'telefonnummer-kontaktperson': '0704466235',
-    'utforande-adress': 'Rankhusvägen 31, 196 31 Kungsängen',
-    'faktura-adress-pdf': 'test@faktura.se',
-    'begynnelsedag': '2025-07-17',
+    'anstalld': 'Christian Karlsson',
     'avtalslngd': '3',
     'avtalsobjekt': '9st mekaniska fällor',
-    'anstlld': 'Christian Karlsson',
-    'e-post-anstlld': 'christian.karlsson@begone.se'
+    'begynnelsedag': '2025-07-17',
+    'dokument-skapat': new Date().toISOString().split('T')[0],
+    'e-post-anstlld': 'christian.karlsson@begone.se',
+    'e-post-kontaktperson': 'christian.karlsson@hotmail.se',
+    'faktura-adress-pdf': 'test@faktura.se',
+    'foretag': 'Testkund',
+    'kontaktperson': 'Test kontaktperson',
+    'org-nr': '002233-4455',
+    'stycke-1': 'Standardpunkt 1',
+    'telefonnummer-kontaktperson': '0704466235',
+    'utforande-adress': 'Rankhusvägen 31, 196 31 Kungsängen',
   })
   const [recipient, setRecipient] = useState<Recipient>({
     name: 'Test kontaktperson',
@@ -56,8 +57,7 @@ export default function OneflowTest() {
   })
 
   // State för att välja part-typ
-  const [partyType, setPartyType] = useState<'company' | 'individual'>('company');
-
+  const [partyType, setPartyType] = useState<'company' | 'individual'>('company')
   const [sendForSigning, setSendForSigning] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [previewData, setPreviewData] = useState<any>(null)
@@ -76,46 +76,9 @@ export default function OneflowTest() {
 
   // Förhandsgranska mappning
   const handlePreview = () => {
-    const mappedData = mapContractData(contractData)
-    setPreviewData(mappedData)
+    setPreviewData(contractData)
     setShowPreview(true)
     toast.success('Mappning genererad! Se förhandsgranskning till höger.')
-  }
-
-  // Mappa Oneflow-data till customers-format (behålls för din preview-logik)
-  const mapContractData = (data: ContractData) => ({
-    company_name: data['foretag'] || '',
-    org_number: data['org-nr'] || '',
-    contact_person: data['kontaktperson'] || '',
-    email: data['e-post-kontaktperson'] || '',
-    phone: data['telefonnummer-kontaktperson'] || '',
-    address: data['utforande-adress'] || '',
-    contract_start_date: data['begynnelsedag'] || '',
-    contract_length_months: data['avtalslngd'] ? parseInt(data['avtalslngd']) * 12 : 36,
-    service_description: data['avtalsobjekt'] || '',
-    assigned_account_manager: data['anstlld'] || 'Kristian Agnevik',
-    oneflow_contract_id: 'PREVIEW_' + Date.now(),
-    contract_status: 'active',
-    contract_end_date: calculateEndDate(data['begynnelsedag'], data['avtalslngd']),
-    business_type: detectBusinessType(data['avtalsobjekt']),
-    invoicing_address: data['faktura-adress-pdf'] || data['utforande-adress'] || '',
-    account_manager_email: data['e-post-anstlld'] || 'kristian.agnevik@begone.se'
-  })
-
-  // Hjälpfunktioner för preview
-  const calculateEndDate = (startDate: string, lengthYears: string) => {
-    if (!startDate || !lengthYears) return ''
-    try {
-      const start = new Date(startDate);
-      const end = new Date(start.setFullYear(start.getFullYear() + parseInt(lengthYears)));
-      return end.toISOString().split('T')[0]
-    } catch { return '' }
-  }
-
-  const detectBusinessType = (text: string) => {
-    const lowerText = text.toLowerCase();
-    if (lowerText.includes('gård') || lowerText.includes('lantbruk')) return 'Jordbruk';
-    return 'Övrigt';
   }
 
   // Skapa riktigt kontrakt i Oneflow
@@ -136,22 +99,22 @@ export default function OneflowTest() {
           contractData,
           recipient,
           sendForSigning,
-          partyType // Skickar med den nya informationen
+          partyType
         })
       })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || 'Ett okänt serverfel inträffade');
+        const error = await response.json()
+        throw new Error(error.detail || 'Ett okänt serverfel inträffade')
       }
 
-      const result = await response.json();
-      setCreatedContract(result.contract);
-      toast.success(`✅ Kontrakt skapat!`);
+      const result = await response.json()
+      setCreatedContract(result.contract)
+      toast.success('✅ Kontrakt skapat!')
       
-    } catch (error) {
-      console.error('Fel vid skapande av kontrakt:', error);
-      toast.error(`❌ Fel: ${error instanceof Error ? error.message : 'Okänt fel'}`);
+    } catch (err: any) {
+      console.error('Fel vid skapande av kontrakt:', err)
+      toast.error(`❌ Fel: ${err.message}`)
     } finally {
       setIsCreating(false)
     }
@@ -192,13 +155,8 @@ export default function OneflowTest() {
 
             <Card>
               <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><Building2 className="w-5 h-5 text-green-500" /> Företagsinformation</h2>
-              <div className="space-y-4">
-                <Input label="Företag *" type="text" value={contractData['foretag'] || ''} onChange={(e) => handleInputChange('foretag', e.target.value)} />
-                <Input label="Organisationsnummer" type="text" value={contractData['org-nr'] || ''} onChange={(e) => handleInputChange('org-nr', e.target.value)} />
-                <Input label="Kontaktperson" type="text" value={contractData['kontaktperson'] || ''} onChange={(e) => handleInputChange('kontaktperson', e.target.value)} />
-                <Input label="E-post kontaktperson *" type="email" value={contractData['e-post-kontaktperson'] || ''} onChange={(e) => handleInputChange('e-post-kontaktperson', e.target.value)} />
-                <Input label="Telefonnummer" type="tel" value={contractData['telefonnummer-kontaktperson'] || ''} onChange={(e) => handleInputChange('telefonnummer-kontaktperson', e.target.value)} />
-              </div>
+              {/* Alla fält är hårdkodade, ingen inmatning */}
+              <pre className="text-sm text-slate-400 bg-slate-800/50 p-4 rounded-lg">{JSON.stringify(contractData, null, 2)}</pre>
             </Card>
 
             <Card>
@@ -222,10 +180,18 @@ export default function OneflowTest() {
               </div>
             </Card>
 
+            <Card>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><Send className="w-5 h-5 text-yellow-400" /> Signeringsalternativ</h2>
+              <label className="flex items-center space-x-2 text-white">
+                <input type="checkbox" checked={sendForSigning} onChange={() => setSendForSigning(prev => !prev)} className="w-4 h-4 text-green-500 bg-slate-800 border-slate-600" />
+                <span>Skicka för signering direkt (annars skapas utkast)</span>
+              </label>
+            </Card>
+
             <div className="flex gap-3">
               <Button onClick={handlePreview} variant="outline" className="flex items-center gap-2"><Eye className="w-4 h-4" /> Förhandsgranska</Button>
               <Button onClick={handleCreateContract} disabled={isCreating} className="flex items-center gap-2">
-                {isCreating ? <LoadingSpinner size="sm" /> : <Send className="w-4 h-4" />}
+                {isCreating ? <LoadingSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />}
                 {sendForSigning ? 'Skapa & skicka' : 'Skapa utkast'}
               </Button>
             </div>
@@ -234,7 +200,7 @@ export default function OneflowTest() {
           <div className="space-y-6">
             {showPreview && (
                 <Card>
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><Eye className="w-5 h-5 text-cyan-400"/> Förhandsgranskning av Mappning</h2>
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4"><Eye className="w-5 h-5 text-cyan-400"/> Förhandsgranskning av Data Fields</h2>
                     <pre className="text-xs text-slate-400 bg-slate-800/50 p-4 rounded-lg overflow-x-auto">{JSON.stringify(previewData, null, 2)}</pre>
                 </Card>
             )}
