@@ -374,3 +374,288 @@ export default function OneflowDiagnostics() {
                                   </div>
                                   <div className="text-slate-400 text-sm">ID: {ws.id}</div>
                                 </div>
+                              ))}
+                            </div>
+                            <div className="text-slate-400 text-sm mt-2">
+                              {results.result.recommendation}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Template resultat */}
+                        {results.mode === 'template' && results.result.template && (
+                          <div>
+                            <div className="text-white font-medium mb-2">
+                              Mall: {results.result.template.name}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                              <div>
+                                <span className="text-slate-400">ID:</span>
+                                <div className="text-white">{results.result.template.id}</div>
+                              </div>
+                              <div>
+                                <span className="text-slate-400">Status:</span>
+                                <div className="text-white">{results.result.template.state}</div>
+                              </div>
+                            </div>
+                            
+                            {results.result.data_fields && results.result.data_fields.length > 0 && (
+                              <div className="mb-4">
+                                <div className="text-white font-medium mb-2">Data Fields:</div>
+                                <div className="space-y-2">
+                                  {results.result.data_fields.map((field: any, index: number) => (
+                                    <div key={index} className="bg-slate-800/50 p-2 rounded text-sm">
+                                      <span className="text-white">{field.name || field.key}</span>
+                                      <span className="text-slate-400 ml-2">({field.type})</span>
+                                      {field.required && <span className="text-red-400 ml-1">*</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {results.result.test_result && (
+                              <div className="bg-slate-800/50 p-3 rounded">
+                                <div className="text-white font-medium mb-1">Test Resultat:</div>
+                                <div className={`text-sm ${results.result.test_result.success ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {results.result.test_result.message}
+                                </div>
+                                {results.result.test_result.required_fields && (
+                                  <div className="text-xs text-slate-400 mt-1">
+                                    Krävs: {results.result.test_result.required_fields.join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Contract resultat */}
+                        {results.mode === 'contract' && results.result.contract_info && (
+                          <div>
+                            <div className="text-white font-medium mb-2">
+                              Kontrakt: {results.result.contract_info.name}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                              <div>
+                                <span className="text-slate-400">ID:</span>
+                                <div className="text-white">{results.result.contract_info.id}</div>
+                              </div>
+                              <div>
+                                <span className="text-slate-400">Status:</span>
+                                <div className="text-white">{results.result.contract_info.state}</div>
+                              </div>
+                            </div>
+
+                            {results.result.participants && results.result.participants.length > 0 && (
+                              <div className="mb-4">
+                                <div className="text-white font-medium mb-2">Deltagare:</div>
+                                <div className="space-y-2">
+                                  {results.result.participants.map((participant: any, index: number) => (
+                                    <div key={index} className="bg-slate-800/50 p-2 rounded text-sm">
+                                      <div className="text-white">{participant.name}</div>
+                                      <div className="text-slate-400">{participant.email}</div>
+                                      {participant.company_name && (
+                                        <div className="text-slate-400">{participant.company_name}</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <div className="text-red-400 font-medium mb-2">❌ Diagnostik misslyckades</div>
+                    <div className="text-red-300 text-sm">{results.error}</div>
+                  </div>
+                )}
+
+                {/* Rå data för debugging */}
+                <details className="mt-4">
+                  <summary className="text-slate-400 cursor-pointer hover:text-white text-sm">
+                    Visa rå data
+                  </summary>
+                  <pre className="text-slate-400 bg-slate-900/50 p-3 rounded mt-2 overflow-x-auto text-xs">
+                    {JSON.stringify(results, null, 2)}
+                  </pre>
+                </details>
+              </Card>
+            )}
+
+            {/* Webhook logs */}
+            {activeTab === 'webhooks' && (
+              <Card>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                  <Zap className="w-5 h-5 text-yellow-500" /> 
+                  Webhook Logs 
+                  <span className="text-sm text-slate-400">({webhookLogs.length})</span>
+                </h2>
+                
+                {webhookLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <LoadingSpinner />
+                    <span className="ml-2 text-slate-400">Laddar webhook logs...</span>
+                  </div>
+                ) : webhookLogs.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {webhookLogs.map((log, index) => (
+                      <div key={log.id || index} className="bg-slate-800/50 p-4 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${
+                              log.status === 'processed' ? 'bg-green-500' :
+                              log.status === 'verified' ? 'bg-blue-500' :
+                              log.status === 'error' ? 'bg-red-500' :
+                              'bg-yellow-500'
+                            }`} />
+                            <span className="text-white font-medium">
+                              {formatWebhookEventType(log.event_type)}
+                            </span>
+                          </div>
+                          <span className="text-slate-400 text-xs">
+                            {new Date(log.created_at).toLocaleString('sv-SE')}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-slate-400">Kontrakt ID:</span>
+                            <div className="text-white font-mono">{log.oneflow_contract_id}</div>
+                          </div>
+                          <div>
+                            <span className="text-slate-400">Status:</span>
+                            <div className={`font-medium ${
+                              log.status === 'processed' ? 'text-green-400' :
+                              log.status === 'verified' ? 'text-blue-400' :
+                              log.status === 'error' ? 'text-red-400' :
+                              'text-yellow-400'
+                            }`}>
+                              {log.status}
+                            </div>
+                          </div>
+                        </div>
+
+                        {log.details && (
+                          <details className="mt-3">
+                            <summary className="text-slate-400 cursor-pointer hover:text-white text-sm">
+                              Visa detaljer
+                            </summary>
+                            <pre className="text-slate-400 bg-slate-900/50 p-2 rounded mt-2 overflow-x-auto text-xs">
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Wifi className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                    <div className="text-slate-400 mb-2">Inga webhook logs än</div>
+                    <div className="text-slate-500 text-sm">
+                      Webhook logs visas här när Oneflow skickar events
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Quick Actions */}
+            <Card>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-orange-500" /> Snabbåtgärder
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  onClick={() => navigate('/admin/oneflow-contract-creator')}
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Skapa Kontrakt
+                </Button>
+                
+                <Button
+                  onClick={() => window.open('https://app.oneflow.com', '_blank')}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Öppna Oneflow
+                </Button>
+                
+                <Button
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.origin + '/api/oneflow/webhook')
+                    toast.success('Webhook URL kopierad!')
+                  }}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Database className="w-4 h-4" />
+                  Kopiera Webhook URL
+                </Button>
+                
+                <Button
+                  onClick={refreshLogs}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  disabled={webhookLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${webhookLoading ? 'animate-spin' : ''}`} />
+                  Uppdatera Logs
+                </Button>
+              </div>
+            </Card>
+
+            {/* Information */}
+            <Card>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <Info className="w-5 h-5 text-blue-500" /> Information
+              </h2>
+              <div className="text-sm text-slate-300 space-y-3">
+                <div>
+                  <strong className="text-white">Webhook URL:</strong>
+                  <div className="font-mono text-xs text-slate-400 bg-slate-800/50 p-2 rounded mt-1">
+                    {window.location.origin}/api/oneflow/webhook
+                  </div>
+                </div>
+                
+                <div>
+                  <strong className="text-white">API Endpoints:</strong>
+                  <ul className="text-slate-400 text-xs mt-1 space-y-1">
+                    <li>• POST /api/oneflow/create-contract - Skapa kontrakt</li>
+                    <li>• POST /api/oneflow/webhook - Webhook mottagare</li>
+                    <li>• GET /api/oneflow/diagnostics - Diagnostik API</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <strong className="text-white">Miljövariabler som krävs:</strong>
+                  <ul className="text-slate-400 text-xs mt-1 space-y-1">
+                    <li>• ONEFLOW_API_TOKEN</li>
+                    <li>• ONEFLOW_USER_EMAIL</li>
+                    <li>• ONEFLOW_WORKSPACE_ID</li>
+                    <li>• ONEFLOW_WEBHOOK_SECRET (valfritt)</li>
+                  </ul>
+                </div>
+                
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3">
+                  <div className="text-blue-400 font-medium mb-1">💡 Tips</div>
+                  <div className="text-blue-300 text-xs">
+                    Använd "Health Check" för att verifiera att alla komponenter fungerar korrekt.
+                    Webhook logs uppdateras automatiskt när Oneflow skickar events.
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
