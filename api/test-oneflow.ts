@@ -36,24 +36,24 @@ export default function OneflowTest() {
   const [contractData, setContractData] = useState<ContractData>({
     // ✅ KORRIGERADE baserat på Oneflow-mallens externa nycklar
     anstalld: 'Christian Karlsson',
-    avtalslngd: '12',                              // ✅ UTAN 'a' enligt tabellen
-    avtalsobjekt: 'Komplett skadedjursbekämpning', // ✅ Mer realistisk beskrivning
-    begynnelsedag: new Date().toISOString().split('T')[0], // ✅ Dagens datum automatiskt
+    avtalslngd: '12',                              
+    avtalsobjekt: 'Komplett skadedjursbekämpning', 
+    begynnelsedag: new Date().toISOString().split('T')[0], 
     'dokument-skapat': new Date().toISOString().split('T')[0],
-    'e-post-anstlld': 'christian.karlsson@begone.se',    // ✅ UTAN 'a' enligt tabellen
-    'e-post-kontaktperson': 'christian.karlsson@hotmail.se', // ✅ Din privata mail för test
-    'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    // ✅ Samma mail för faktura
-    foretag: 'Test Företag AB',                        // ✅ Mer professionellt namn
-    kontaktperson: 'Anna Andersson',                   // ✅ Mer realistiskt namn
-    'org-nr': '556123-4567',                          // ✅ Mer realistiskt org.nr
+    'e-post-anstlld': 'christian.karlsson@begone.se',    
+    'e-post-kontaktperson': 'christian.karlsson@hotmail.se', 
+    'faktura-adress-pdf': 'christian.karlsson@hotmail.se',    
+    foretag: 'Test Företag AB',                        
+    Kontaktperson: 'Anna Andersson',  // <-- FIXAT: 'k' ändrat till 'K'
+    'org-nr': '556123-4567',                          
     'stycke-1': 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema',
-    'telefonnummer-kontaktperson': '08-123 45 67',    // ✅ Mer professionellt format
-    'utforande-adress': 'Storgatan 15, 111 22 Stockholm', // ✅ Mer central adress
+    'telefonnummer-kontaktperson': '08-123 45 67',    
+    'utforande-adress': 'Storgatan 15, 111 22 Stockholm', 
   })
   
   const [recipient, setRecipient] = useState<Recipient>({
     name: 'Anna Andersson',
-    email: 'christian.karlsson@hotmail.se', // ✅ Din privata mail för test
+    email: 'christian.karlsson@hotmail.se', 
     company_name: 'Test Företag AB',
     organization_number: '556123-4567',
   })
@@ -69,7 +69,7 @@ export default function OneflowTest() {
   const handleInputChange = (field: string, value: string) => {
     setContractData(prev => ({ ...prev, [field]: value }))
     // Synkronisera med recipient när relevanta fält ändras
-    if (field === 'kontaktperson') {
+    if (field === 'Kontaktperson') { // <-- FIXAT: 'k' ändrat till 'K'
       setRecipient(prev => ({ ...prev, name: value }))
     } else if (field === 'e-post-kontaktperson') {
       setRecipient(prev => ({ ...prev, email: value }))
@@ -151,7 +151,7 @@ export default function OneflowTest() {
       'e-post-kontaktperson': 'E-post kontaktperson',
       'faktura-adress-pdf': 'Faktura-adress (PDF)',
       'foretag': 'Företag',
-      'kontaktperson': 'Kontaktperson',
+      'Kontaktperson': 'Kontaktperson', // <-- FIXAT: 'k' ändrat till 'K'
       'org-nr': 'Organisationsnummer',
       'stycke-1': 'Avtalstext (stycke 1)',
       'telefonnummer-kontaktperson': 'Telefonnummer kontaktperson',
