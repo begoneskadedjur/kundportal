@@ -1,4 +1,4 @@
-// 📁 src/pages/admin/AdminDashboard.tsx - KOMPLETT MED ALLA FUNKTIONER
+// 📁 src/pages/admin/AdminDashboard.tsx - KOMPLETT MED ALLA FUNKTIONER + ONEFLOW SEKTION
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -327,6 +327,58 @@ const AdminDashboard: React.FC = () => {
                       <h3 className="font-medium text-white group-hover:text-yellow-300 transition-colors">Provisioner</h3>
                       <p className="text-xs text-slate-400">Beräkna & hantera</p>
                       <p className="text-xs text-slate-500 mt-1">Tekniker-commissionsystem</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+
+            {/* 🆕 ONEFLOW & AVTAL */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                Oneflow & Avtal
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                {/* Skapa Kontrakt */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/oneflow-contract-creator')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center group-hover:bg-indigo-500/30 transition-colors">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-indigo-300 transition-colors">Skapa Kontrakt</h3>
+                      <p className="text-xs text-slate-400">Oneflow-avtal för signering</p>
+                      <p className="text-xs text-slate-500 mt-1">6 tillgängliga mallar</p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Övervaka Avtal */}
+                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/oneflow-diagnostics')}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
+                      <BarChart3 className="w-6 h-6 text-cyan-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white group-hover:text-cyan-300 transition-colors">Övervaka Avtal</h3>
+                      <p className="text-xs text-slate-400">Status & diagnostik</p>
+                      <p className="text-xs text-slate-500 mt-1">Webhook logs & analys</p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Avtalsstatus (Kommande) */}
+                <Card className="p-4 bg-slate-800/30 border-dashed border-slate-600">
+                  <div className="flex items-center gap-3 opacity-50">
+                    <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                      <Target className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-slate-400">Avtalsstatus</h3>
+                      <p className="text-xs text-slate-500">Signering & uppföljning</p>
+                      <p className="text-xs text-slate-600 mt-1">Under utveckling</p>
                     </div>
                   </div>
                 </Card>

@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER + ONEFLOW TEST
+// src/App.tsx - UPPDATERAD MED NYA ONEFLOW ROUTES + TEKNIKER-MANAGEMENT + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -19,7 +19,10 @@ import Technicians from './pages/admin/Technicians'          // Tekniker Perform
 import TechnicianManagement from './pages/admin/TechnicianManagement'  // Tekniker CRUD
 import TechnicianCommissions from './pages/admin/TechnicianCommissions'  // 🆕 PROVISIONER
 import SalesOpportunities from './pages/admin/SalesOpportunities'  // 🆕 FÖRSÄLJNINGSMÖJLIGHETER
-import OneflowTest from './pages/admin/OneflowTest'  // 🆕 ONEFLOW TEST
+
+// 🆕 ONEFLOW ROUTES - UPPDATERADE NAMN
+import OneflowContractCreator from './pages/admin/OneflowContractCreator'  // Tidigare OneflowTest
+import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'  // Ny diagnostik dashboard
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -92,6 +95,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+
             {/* 🔧 TEKNIKER ROUTES - SEPARATA FUNKTIONER */}
             <Route 
               path="/admin/technicians" 
@@ -128,14 +132,29 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 🆕 NY ROUTE: Oneflow Test */}
+
+            {/* 🆕 ONEFLOW ROUTES - UPPDATERADE NAMN OCH STRUKTUR */}
             <Route 
-              path="/admin/oneflow-test" 
+              path="/admin/oneflow-contract-creator" 
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <OneflowTest />
+                  <OneflowContractCreator />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/admin/oneflow-diagnostics" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <OneflowDiagnostics />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* 🔄 LEGACY ONEFLOW REDIRECT - För bakåtkompatibilitet */}
+            <Route 
+              path="/admin/oneflow-test" 
+              element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
             {/* Customer routes */}
