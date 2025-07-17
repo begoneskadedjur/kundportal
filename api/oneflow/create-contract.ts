@@ -1,4 +1,4 @@
-// api/oneflow/create-contract.ts - UPPDATERAD FÖR ATT FIXA PRIVATPERSON-FELET
+// api/oneflow/create-contract.ts - KORREKT STRUKTUR ENLIGT ONEFLOW DOKUMENTATION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -47,35 +47,48 @@ export default async function handler(
     ([custom_id, value]) => ({ custom_id, value })
   )
 
-  // KORREKT STRUKTUR FÖR ONEFLOW API - FIX FÖR PRIVATPERSON
-  const counterParty: any = { 
-    type: partyType,
-    participants: [
-      {
-        name: recipient.name,
-        email: recipient.email,
-        _permissions: {
-          'contract:update': sendForSigning  // true om ska signera, false för viewer
-        },
-        signatory: sendForSigning,           // true om ska signera
-        delivery_channel: 'email'
+  // KORREKT STRUKTUR ENLIGT ONEFLOW DOKUMENTATION
+  // Skapa parties-array med korrekt struktur
+  const parties = []
+
+  if (partyType === 'individual') {
+    // För privatperson - använd korrekt struktur
+    parties.push({
+      type: 'individual',
+      name: recipient.name,
+      email: recipient.email,
+      _permissions: {
+        'contract:update': sendForSigning
       },
-    ]
+      signatory: sendForSigning,
+      delivery_channel: 'email'
+    })
+  } else {
+    // För företag - använd korrekt struktur
+    parties.push({
+      type: 'company',
+      name: recipient.company_name,
+      identification_number: recipient.organization_number,
+      // Lägg till kontaktperson som participant
+      participants: [
+        {
+          name: recipient.name,
+          email: recipient.email,
+          _permissions: {
+            'contract:update': sendForSigning
+          },
+          signatory: sendForSigning,
+          delivery_channel: 'email'
+        }
+      ]
+    })
   }
 
-  // ENDAST för företag - lägg till företagsspecifika fält
-  if (partyType === 'company') {
-    counterParty.name = recipient.company_name
-    counterParty.identification_number = recipient.organization_number
-  }
-  // FÖR PRIVATPERSON: Lägg INTE till name på rot-nivå - det orsakar felet!
-
-  // *** FIX: Skicka bara counterparty - Oneflow lägger automatiskt till owner ***
   const createPayload = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
     data_fields,
-    parties: [counterParty], // ✅ Bara counterparty, Oneflow adderar owner automatiskt
+    parties
   }
 
   console.log('Skickar följande create payload till Oneflow:', JSON.stringify(createPayload, null, 2))
