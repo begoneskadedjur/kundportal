@@ -1,4 +1,4 @@
-// api/oneflow/create-contract.ts - EXAKT SAMMA SOM DIN GAMLA FUNGERANDE FIL
+// api/oneflow/create-contract.ts - UPPDATERAD FÖR ATT FIXA PRIVATPERSON-FELET
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -47,26 +47,28 @@ export default async function handler(
     ([custom_id, value]) => ({ custom_id, value })
   )
 
-  // Skapa objekt för MOTPARTEN (kunden) - Oneflow lägger automatiskt till owner
-  const counterParty: any = { type: partyType }
+  // KORREKT STRUKTUR FÖR ONEFLOW API - FIX FÖR PRIVATPERSON
+  const counterParty: any = { 
+    type: partyType,
+    participants: [
+      {
+        name: recipient.name,
+        email: recipient.email,
+        _permissions: {
+          'contract:update': sendForSigning  // true om ska signera, false för viewer
+        },
+        signatory: sendForSigning,           // true om ska signera
+        delivery_channel: 'email'
+      },
+    ]
+  }
+
+  // ENDAST för företag - lägg till företagsspecifika fält
   if (partyType === 'company') {
     counterParty.name = recipient.company_name
     counterParty.identification_number = recipient.organization_number
-  } else {
-    counterParty.name = recipient.name
   }
-  counterParty.participants = [
-    {
-      name: recipient.name,
-      email: recipient.email,
-      // Korrekt struktur för motpart
-      _permissions: {
-        'contract:update': sendForSigning  // true om ska signera, false för viewer
-      },
-      signatory: sendForSigning,           // true om ska signera
-      delivery_channel: 'email'
-    },
-  ]
+  // FÖR PRIVATPERSON: Lägg INTE till name på rot-nivå - det orsakar felet!
 
   // *** FIX: Skicka bara counterparty - Oneflow lägger automatiskt till owner ***
   const createPayload = {
