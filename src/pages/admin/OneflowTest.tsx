@@ -31,14 +31,14 @@ interface Recipient {
 export default function OneflowTest() {
   const navigate = useNavigate()
   
-  const [selectedTemplate, setSelectedTemplate] = useState('8486368')
+  // ✅ FIX: Deklarera LIMIT här så att hela komponenten har tillgång till den.
+  const LIMIT = 1024;
 
-  // --- NYTT: En separat state för den långa texten ---
+  const [selectedTemplate, setSelectedTemplate] = useState('8486368')
   const [agreementObjectText, setAgreementObjectText] = useState(
     'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser, såsom utplacering av ytterligare fällor eller alternativa bekämpningsmetoder. Kunden förbinder sig att följa de rekommendationer som ges av BeGone Skadedjur & Sanering AB för att minimera risken för nya angrepp, vilket inkluderar sophantering och tätning av fastigheten. Avtalet omfattar även telefonrådgivning och en årlig genomgång av fastighetens skadedjursskydd. Detta är en extra lång text för att säkerställa att vi överstiger gränsen på 1024 tecken och kan testa uppdelningslogiken korrekt. Vi lägger till ännu mer utfyllnadstext här för att vara på den säkra sidan. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Vi behöver ännu lite mer text för att nå över 1500 tecken och verkligen stresstesta systemet. Detta bör räcka.'
   );
 
-  // --- ÄNDRAT: State för datafält utan de uppdelade styckena ---
   const [contractData, setContractData] = useState<ContractData>({
     anstalld: 'Christian Karlsson',
     avtalslngd: '12',                              
@@ -87,17 +87,14 @@ export default function OneflowTest() {
       return
     }
 
-    // --- NYTT: Uppdelningslogik ---
-    const LIMIT = 1024;
     const part1 = agreementObjectText.substring(0, LIMIT);
-    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2); // Säkerställ att stycke 2 inte heller är för långt
+    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2);
 
     const finalContractData = {
       ...contractData,
       'stycke-1': part1,
       'stycke-2': part2,
     };
-    // -----------------------------
 
     setIsCreating(true)
     try {
@@ -141,7 +138,6 @@ export default function OneflowTest() {
   }
 
   const handlePreview = () => {
-     const LIMIT = 1024;
      const part1 = agreementObjectText.substring(0, LIMIT);
      const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2);
 
@@ -243,7 +239,6 @@ export default function OneflowTest() {
                 />
               ))}
               
-              {/* --- NYTT: Textarea för avtalsobjektet --- */}
               <div className="flex flex-col">
                 <label htmlFor="agreement-object" className="mb-2 text-sm font-medium text-white">Avtalsobjekt (delas automatiskt)</label>
                 <textarea
