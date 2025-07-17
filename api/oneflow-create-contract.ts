@@ -64,7 +64,6 @@ export default async function handler(
           'contract:update': true
         },
         signatory: true,        // Ägaren ska signera
-        organizer: false,       // Explicit false för ägaren
         delivery_channel: 'email'
       },
     ],
@@ -87,7 +86,6 @@ export default async function handler(
         'contract:update': sendForSigning  // true om ska signera, false för viewer
       },
       signatory: sendForSigning,           // true om ska signera
-      organizer: false,                    // Alltid false för counterparty
       delivery_channel: 'email'
     },
   ];
