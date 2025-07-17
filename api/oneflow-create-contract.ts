@@ -1,8 +1,10 @@
-// api/oneflow-create-contract.ts - Skapa riktigt kontrakt i Oneflow
+// api/oneflow-create-contract.ts - KORRIGERAD VERSION
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
 const ONEFLOW_API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1'
+// Din e-post som är användare i Oneflow. Krävs i header för vissa anrop.
+const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL! 
 
 interface CreateContractRequest {
   templateId: string
@@ -16,8 +18,9 @@ interface CreateContractRequest {
   sendForSigning: boolean
 }
 
+// Denna funktion är nu korrekt deklarerad som `async`
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
+  // CORS-headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -25,7 +28,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -33,156 +35,128 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { templateId, contractData, recipient, sendForSigning }: CreateContractRequest = req.body
 
-    console.log('🔨 Creating contract from template:', templateId)
-    console.log('📨 Recipient:', recipient.email)
-
-    // 1. Skapa kontrakt från mall
-    const contract = await createContractFromTemplate(templateId, contractData, recipient)
-    console.log('✅ Contract created with ID:', contract.id)
-
-    // 2. Om vi ska skicka för signering
-    if (sendForSigning) {
-      await publishContract(contract.id)
-      console.log('📤 Contract sent for signing')
+    // Validera inkommande data
+    if (!templateId || !contractData || !recipient?.email) {
+      return res.status(400).json({ error: 'Bad Request: templateId, contractData, and recipient email are required.' })
+    }
+    if (!ONEFLOW_USER_EMAIL) {
+      return res.status(500).json({ error: 'Server Configuration Error: ONEFLOW_USER_EMAIL is not set.'})
     }
 
+    console.log(`🔨 Skapar kontrakt från mall: ${templateId}`)
+    
+    // 1. Förbered och skapa kontraktet
+    const contract = await createContract(templateId, contractData, recipient)
+    console.log(`✅ Kontrakt skapat som utkast med ID: ${contract.id}`)
+
+    let finalState = contract.state;
+
+    // 2. Publicera kontraktet om det ska skickas för signering
+    if (sendForSigning) {
+      console.log(`📤 Publicerar kontrakt ${contract.id} för signering...`)
+      const publishedContract = await publishContract(contract.id)
+      finalState = publishedContract.state; // Uppdatera status till 'pending'
+      console.log(`✅ Kontrakt publicerat.`)
+    }
+
+    // 3. Skicka tillbaka ett framgångsrikt svar
     return res.status(200).json({
       success: true,
       contract: {
         id: contract.id,
         name: contract.name,
-        state: contract.state,
-        url: `https://app.oneflow.com/contracts/${contract.id}`
-      },
-      message: sendForSigning 
-        ? `Kontrakt skapat och skickat till ${recipient.email}` 
-        : 'Kontrakt skapat som utkast'
+        state: finalState,
+        url: `https://app.oneflow.com/contracts/${contract.id}` // Direktlänk till kontraktet
+      }
     })
 
   } catch (error) {
-    console.error('❌ Error creating contract:', error)
+    console.error('❌ Ett fel inträffade vid skapande av kontrakt:', error)
     return res.status(500).json({
+      success: false,
       error: 'Failed to create contract',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'An unknown error occurred'
     })
   }
 }
 
-async function createContractFromTemplate(
+// --- HJÄLPFUNKTIONER ---
+
+// Denna funktion skapar kontraktet
+async function createContract(
   templateId: string, 
   contractData: { [key: string]: string },
-  recipient: any
+  recipient: CreateContractRequest['recipient']
 ) {
-  // Mappa dina field keys till faktiska Oneflow field IDs
-  const ONEFLOW_FIELD_IDS = {
-    'foretag': '15a28bab-5d17-4f3a-b021-fb9e4b5d6840',
-    'org-nr': '978226a1-6a53-4162-87b8-61e74ff10b61',
-    'kontaktperson': '0da9f741-02d1-4372-84ca-02f4a76c1dbb',
-    'e-post-kontaktperson': '8d8dac3a-18ab-4019-9ada-8c843e696ba2',
-    'telefonnummer-kontaktperson': 'cc29ae86-0a6c-4703-a45f-21a065e05a16',
-    'utforande-adress': '80ec7903-f636-43b0-bf7e-09c9888eb6b6',
-    'faktura-adress-pdf': '101d137e-236c-43c9-bf11-d14749ac8f4b',
-    'avtalslngd': 'cdaa9624-2b43-410a-a5e5-aec724d65bb0',
-    'begynnelsedag': 'f612ef4c-299f-4ce0-b5b3-d99fb30aea0e',
-    'avtalsobjekt': '288c2e67-c6a0-44e6-9fa8-d9742627f82e',
-    'anstlld': 'b0a5c543-f554-41b2-8401-e0dd272cffed',
-    'e-post-anstlld': 'c6941ca5-86d0-48f1-b903-7042e9e5a36e'
-  }
+    // Filtrera bort tomma värden och skapa data_fields-arrayen
+    // KORRIGERING: Använder "custom_id" som nyckel enligt dokumentationen
+    const dataFields = Object.entries(contractData)
+        .filter(([, value]) => value && value.trim() !== '')
+        .map(([key, value]) => ({
+            custom_id: key, // Använd nyckeln från frontend direkt som "custom_id"
+            value: value.trim()
+        }));
 
-  // Förbered data fields enligt Oneflow dokumentation - array av objekt med id/value
-  const dataFields = Object.entries(contractData)
-    .filter(([key, value]) => value && value.trim() && ONEFLOW_FIELD_IDS[key as keyof typeof ONEFLOW_FIELD_IDS])
-    .map(([key, value]) => ({
-      id: ONEFLOW_FIELD_IDS[key as keyof typeof ONEFLOW_FIELD_IDS],
-      value: value.trim()
-    }))
+    const contractPayload = {
+        template_id: parseInt(templateId),
+        name: `Skadedjursavtal - ${contractData['foretag'] || 'Ny Kund'}`,
+        parties: [
+            {
+                name: recipient.company_name || contractData['foretag'],
+                country_code: "SE", // Rekommenderas att inkludera
+                participants: [{
+                    name: recipient.name,
+                    email: recipient.email,
+                    delivery_channel: 'email',
+                    signatory: true // Personen som ska signera
+                }]
+            }
+        ],
+        data_fields: dataFields
+    };
 
-  // Skapa kontrakt-payload enligt Oneflow API dokumentation
-  const contractPayload = {
-    workspace_id: 485612,
-    template_id: parseInt(templateId),
-    name: `${contractData['foretag'] || 'Nytt företag'} - Skadedjursavtal`,
+    console.log('📋 Skickar följande payload till Oneflow:', JSON.stringify(contractPayload, null, 2));
     
-    // Lägg till parties (företag som ska signera)
-    parties: [
-      {
-        type: 'company',
-        name: recipient.company_name || contractData['foretag'],
-        organization_number: recipient.organization_number || contractData['org-nr'],
-        participants: [
-          {
-            delivery_channel: 'email',
-            email: recipient.email,
-            name: recipient.name,
-            is_signer: true,
-            sign_order: 1
-          }
-        ]
-      }
-    ],
-    
-    // Data fields som array av objekt med id/value
-    data_fields: dataFields
-  }
+    // KORRIGERING: Rätt endpoint är /contracts
+    const response = await fetch(`${ONEFLOW_API_URL}/contracts`, {
+        method: 'POST',
+        headers: {
+            'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+            'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(contractPayload)
+    });
 
-  console.log('📋 Contract payload:', JSON.stringify(contractPayload, null, 2))
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Oneflow API-fel vid createContract:', response.status, errorText);
+        throw new Error(`Oneflow API error (${response.status}): ${errorText}`);
+    }
 
-  const response = await fetch(`${ONEFLOW_API_URL}/contracts/create`, {
-    method: 'POST',
-    headers: {
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': 'christian.karlsson@begone.se',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(contractPayload)
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('❌ Oneflow API error:', response.status, errorText)
-    throw new Error(`Oneflow API error: ${response.status} ${errorText}`)
-  }
-
-  return await response.json()
-} dokumentation
-  const response = await fetch(`${ONEFLOW_API_URL}/contracts/create`, {
-    method: 'POST',
-    headers: {
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': 'christian.karlsson@begone.se', // Din email i Oneflow
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(contractPayload)
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('❌ Oneflow API error:', response.status, errorText)
-    throw new Error(`Oneflow API error: ${response.status} ${errorText}`)
-  }
-
-  return await response.json()
+    return await response.json();
 }
 
+// Denna funktion publicerar kontraktet
 async function publishContract(contractId: number) {
   const response = await fetch(`${ONEFLOW_API_URL}/contracts/${contractId}/publish`, {
     method: 'POST',
     headers: {
       'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': 'christian.karlsson@begone.se', // Din email
+      'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      subject: 'Ditt skadedjursavtal från BeGone',
-      message: 'Ditt skadedjursavtal är klart för signering. Vänligen granska och signera avtalet.'
+      subject: 'Ditt avtal från Begone Skadedjur & Sanering AB',
+      message: 'Vänligen granska och signera det bifogade avtalet.'
     })
-  })
+  });
 
   if (!response.ok) {
-    const errorText = await response.text()
-    console.error('❌ Failed to publish contract:', response.status, errorText)
-    throw new Error(`Failed to publish contract: ${response.status} ${errorText}`)
+    const errorText = await response.text();
+    console.error('❌ Oneflow API-fel vid publishContract:', response.status, errorText);
+    throw new Error(`Failed to publish contract (${response.status}): ${errorText}`);
   }
 
-  return await response.json()
+  return await response.json();
 }
