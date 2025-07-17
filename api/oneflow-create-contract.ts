@@ -81,20 +81,27 @@ async function createContractFromTemplate(
       value: value.trim()
     }))
 
-  // Skapa kontrakt-payload - UPPDATERAD för korrekt API
+  // Skapa kontrakt-payload enligt Oneflow API dokumentation
   const contractPayload = {
+    template_id: parseInt(templateId),
+    workspace_id: 1, // Default workspace - du kanske behöver ändra detta
     name: `${contractData['foretag'] || 'Nytt företag'} - Skadedjursavtal`,
     
-    // Lägg till mottagare som ska signera
-    participants: [
+    // Lägg till parties (företag som ska signera)
+    parties: [
       {
-        delivery_channel: 'email',
-        email: recipient.email,
-        name: recipient.name,
-        company_name: recipient.company_name || contractData['foretag'],
+        type: 'company',
+        name: recipient.company_name || contractData['foretag'],
         organization_number: recipient.organization_number || contractData['org-nr'],
-        is_signer: true,
-        sign_order: 1
+        participants: [
+          {
+            delivery_channel: 'email',
+            email: recipient.email,
+            name: recipient.name,
+            is_signer: true,
+            sign_order: 1
+          }
+        ]
       }
     ],
     
@@ -104,11 +111,12 @@ async function createContractFromTemplate(
 
   console.log('📋 Contract payload:', JSON.stringify(contractPayload, null, 2))
 
-  // RÄTTAD ENDPOINT: Skapa från mall
-  const response = await fetch(`${ONEFLOW_API_URL}/templates/${templateId}/contracts`, {
+  // KORREKT ENDPOINT enligt dokumentation
+  const response = await fetch(`${ONEFLOW_API_URL}/contracts/create`, {
     method: 'POST',
     headers: {
       'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+      'x-oneflow-user-email': 'christian.karlsson@begone.se', // Din email i Oneflow
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(contractPayload)
@@ -128,9 +136,11 @@ async function publishContract(contractId: number) {
     method: 'POST',
     headers: {
       'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+      'x-oneflow-user-email': 'christian.karlsson@begone.se', // Din email
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      subject: 'Ditt skadedjursavtal från BeGone',
       message: 'Ditt skadedjursavtal är klart för signering. Vänligen granska och signera avtalet.'
     })
   })
