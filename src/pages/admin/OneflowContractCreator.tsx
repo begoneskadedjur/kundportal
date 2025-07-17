@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, TestTube, Eye, FileText, Building2, Mail, Phone, MapPin, Calendar, Send, CheckCircle, ExternalLink } from 'lucide-react'
+import { ArrowLeft, TestTube, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Hash, Phone, MapPin, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -7,14 +7,46 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
-// Dina exakta Oneflow-mallar
+// Oneflow mallar med beskrivningar och ikoner
 const ONEFLOW_TEMPLATES = [
-  { id: '8486368', name: 'Skadedjursavtal' },
-  { id: '9324573', name: 'Avtal Betesstationer' },
-  { id: '8465556', name: 'Avtal Betongstationer' },
-  { id: '8462854', name: 'Avtal Mekaniska fällor' },
-  { id: '10102378', name: 'Komplett Skadedjursavtal' },
-  { id: '8732196', name: 'Skadedjursavtal indikationsfällor' }
+  { 
+    id: '8486368', 
+    name: 'Skadedjursavtal', 
+    description: 'Standard skadedjursavtal för företag',
+    icon: '🐛',
+    popular: true
+  },
+  { 
+    id: '10102378', 
+    name: 'Komplett Skadedjursavtal', 
+    description: 'Omfattande avtal med alla tjänster',
+    icon: '🏢',
+    popular: true
+  },
+  { 
+    id: '9324573', 
+    name: 'Avtal Betesstationer', 
+    description: 'Specialiserat för betesstationer',
+    icon: '🎯'
+  },
+  { 
+    id: '8465556', 
+    name: 'Avtal Betongstationer', 
+    description: 'För betongstationer och hård miljö',
+    icon: '🏗️'
+  },
+  { 
+    id: '8462854', 
+    name: 'Avtal Mekaniska fällor', 
+    description: 'Mekaniska lösningar och fällor',
+    icon: '⚙️'
+  },
+  { 
+    id: '8732196', 
+    name: 'Avtal Indikationsfällor', 
+    description: 'Monitoring och indikationsfällor',
+    icon: '📍'
+  }
 ]
 
 interface ContractData {
@@ -31,34 +63,39 @@ interface Recipient {
 export default function OneflowContractCreator() {
   const navigate = useNavigate()
   
-  // ✅ FIX: Deklarera LIMIT här så att hela komponenten har tillgång till den.
-  const LIMIT = 1024;
+  const LIMIT = 1024
 
   const [selectedTemplate, setSelectedTemplate] = useState('8486368')
   const [agreementObjectText, setAgreementObjectText] = useState(
-    'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser, såsom utplacering av ytterligare fällor eller alternativa bekämpningsmetoder. Kunden förbinder sig att följa de rekommendationer som ges av BeGone Skadedjur & Sanering AB för att minimera risken för nya angrepp, vilket inkluderar sophantering och tätning av fastigheten. Avtalet omfattar även telefonrådgivning och en årlig genomgång av fastighetens skadedjursskydd. Detta är en extra lång text för att säkerställa att vi överstiger gränsen på 1024 tecken och kan testa uppdelningslogiken korrekt. Vi lägger till ännu mer utfyllnadstext här för att vara på den säkra sidan. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Vi behöver ännu lite mer text för att nå över 1500 tecken och verkligen stresstesta systemet. Detta bör räcka.'
-  );
+    'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
+  )
 
+  // BeGone företagsinfo (leverantör)
   const [contractData, setContractData] = useState<ContractData>({
     anstalld: 'Christian Karlsson',
     avtalslngd: '12',                              
     begynnelsedag: new Date().toISOString().split('T')[0], 
     'dokument-skapat': new Date().toISOString().split('T')[0],
     'e-post-anstlld': 'christian.karlsson@begone.se',    
-    'e-post-kontaktperson': 'christian.karlsson@begone.se', 
-    'faktura-adress-pdf': 'christian.karlsson@begone.se',    
-    foretag: 'Test Företag AB',                        
-    Kontaktperson: 'Anna Andersson',
-    'org-nr': '556123-4567',                          
-    'telefonnummer-kontaktperson': '08-123 45 67',    
-    'utforande-adress': 'Storgatan 15, 111 22 Stockholm', 
   })
   
+  // Kundinfo (mottagare) - UPPDATERAD DUMMY DATA
   const [recipient, setRecipient] = useState<Recipient>({
-    name: 'Anna Andersson',
-    email: 'christian.karlsson@begone.se', 
-    company_name: 'Test Företag AB',
-    organization_number: '556123-4567',
+    name: 'Anna Svensson',
+    email: 'anna.svensson@example.com',
+    company_name: 'Svenssons Restaurang AB',
+    organization_number: '556789-1234',
+  })
+
+  // Kundspecifika fält
+  const [customerData, setCustomerData] = useState({
+    'e-post-kontaktperson': 'anna.svensson@example.com',
+    'faktura-adress-pdf': 'anna.svensson@example.com',
+    foretag: 'Svenssons Restaurang AB',
+    Kontaktperson: 'Anna Svensson',
+    'org-nr': '556789-1234',
+    'telefonnummer-kontaktperson': '08-555 0123',
+    'utforande-adress': 'Storgatan 15, 111 22 Stockholm',
   })
 
   const [partyType, setPartyType] = useState<'company' | 'individual'>('company')
@@ -68,8 +105,10 @@ export default function OneflowContractCreator() {
   const [showPreview, setShowPreview] = useState(false)
   const [createdContract, setCreatedContract] = useState<any>(null)
 
-  const handleInputChange = (field: string, value: string) => {
-    setContractData(prev => ({ ...prev, [field]: value }))
+  const handleCustomerDataChange = (field: string, value: string) => {
+    setCustomerData(prev => ({ ...prev, [field]: value }))
+    
+    // Synka med recipient
     if (field === 'Kontaktperson') {
       setRecipient(prev => ({ ...prev, name: value }))
     } else if (field === 'e-post-kontaktperson') {
@@ -81,24 +120,29 @@ export default function OneflowContractCreator() {
     }
   }
 
+  const handleBeGoneDataChange = (field: string, value: string) => {
+    setContractData(prev => ({ ...prev, [field]: value }))
+  }
+
   const handleCreateContract = async () => {
     if (!selectedTemplate || !recipient.email) {
-      toast.error('Välj mall och fyll i Mottagarens e-post.')
+      toast.error('Välj mall och fyll i kundens e-post.')
       return
     }
 
-    const part1 = agreementObjectText.substring(0, LIMIT);
-    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2);
+    const part1 = agreementObjectText.substring(0, LIMIT)
+    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
     const finalContractData = {
       ...contractData,
+      ...customerData,
       'stycke-1': part1,
       'stycke-2': part2,
-    };
+    }
 
     setIsCreating(true)
     try {
-      console.log('🚀 Skickar kontrakt-request med uppdelad data:', {
+      console.log('🚀 Skickar kontrakt-request:', {
         templateId: selectedTemplate,
         contractData: finalContractData,
         recipient,
@@ -138,14 +182,15 @@ export default function OneflowContractCreator() {
   }
 
   const handlePreview = () => {
-     const part1 = agreementObjectText.substring(0, LIMIT);
-     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2);
+    const part1 = agreementObjectText.substring(0, LIMIT)
+    const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
-     const finalContractData = {
-       ...contractData,
-       'stycke-1': part1,
-       'stycke-2': part2,
-     };
+    const finalContractData = {
+      ...contractData,
+      ...customerData,
+      'stycke-1': part1,
+      'stycke-2': part2,
+    }
 
     setPreviewData({
       template: ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate),
@@ -158,23 +203,7 @@ export default function OneflowContractCreator() {
     toast.success('📋 Förhandsgranskning genererad!')
   }
 
-  const formatFieldLabel = (key: string): string => {
-    const labelMap: { [key: string]: string } = {
-      'anstalld': 'Anställd hos BeGone',
-      'avtalslngd': 'Avtalslängd (månader)',
-      'begynnelsedag': 'Begynnelsedag',
-      'dokument-skapat': 'Dokument skapat',
-      'e-post-anstlld': 'E-post anställd',
-      'e-post-kontaktperson': 'E-post kontaktperson',
-      'faktura-adress-pdf': 'Faktura-adress (PDF)',
-      'foretag': 'Företag',
-      'Kontaktperson': 'Kontaktperson',
-      'org-nr': 'Organisationsnummer',
-      'telefonnummer-kontaktperson': 'Telefonnummer kontaktperson',
-      'utforande-adress': 'Utförande adress',
-    }
-    return labelMap[key] || key.replace(/-/g, ' ')
-  }
+  const selectedTemplateData = ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate)
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -189,185 +218,448 @@ export default function OneflowContractCreator() {
             >
               <ArrowLeft className="w-4 h-4" /> Tillbaka
             </Button>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <TestTube className="w-6 h-6" /> Oneflow Test
-            </h1>
-            <div className="ml-auto text-sm text-slate-400">
-              Template: {ONEFLOW_TEMPLATES.find(t => t.id === selectedTemplate)?.name || 'Ingen vald'}
+            <div className="flex items-center gap-3">
+              <div className="bg-green-500/10 p-2 rounded-lg">
+                <FileText className="w-6 h-6 text-green-500" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Skapa Oneflow Avtal</h1>
+                <p className="text-sm text-slate-400">Generera och skicka avtal för signering</p>
+              </div>
             </div>
+            {selectedTemplateData && (
+              <div className="ml-auto flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg">
+                <span className="text-2xl">{selectedTemplateData.icon}</span>
+                <span className="text-sm text-white">{selectedTemplateData.name}</span>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <Card>
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <FileText className="w-5 h-5 text-blue-500" /> Välj Mall
-            </h2>
-            <select 
-              value={selectedTemplate} 
-              onChange={e => setSelectedTemplate(e.target.value)} 
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">-- Välj mall --</option>
-              {ONEFLOW_TEMPLATES.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </Card>
-
-          <Card>
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <Building2 className="w-5 h-5 text-green-500" /> Avtalsdata
-            </h2>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {Object.entries(contractData).map(([key, value]) => (
-                <Input
-                  key={key}
-                  label={formatFieldLabel(key)}
-                  type={
-                    key.includes('e-post') ? 'email' : 
-                    key.includes('telefonnummer') ? 'tel' : 
-                    key.includes('dag') ? 'date' : 
-                    key === 'avtalslngd' ? 'number' :
-                    'text'
-                  }
-                  value={value}
-                  onChange={e => handleInputChange(key, e.target.value)}
-                  className="text-sm"
-                />
-              ))}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Vänster kolumn - Mallval */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-blue-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">1. Välj Avtalstyp</h2>
+              </div>
               
-              <div className="flex flex-col">
-                <label htmlFor="agreement-object" className="mb-2 text-sm font-medium text-white">Avtalsobjekt (delas automatiskt)</label>
+              <div className="space-y-3">
+                {ONEFLOW_TEMPLATES.map(template => (
+                  <div 
+                    key={template.id}
+                    onClick={() => setSelectedTemplate(template.id)}
+                    className={`relative p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:bg-slate-800/50 ${
+                      selectedTemplate === template.id 
+                        ? 'border-green-500 bg-green-500/10' 
+                        : 'border-slate-700 bg-slate-800/30'
+                    }`}
+                  >
+                    {template.popular && (
+                      <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                        Populär
+                      </div>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{template.icon}</span>
+                      <div className="flex-1">
+                        <h3 className={`font-medium ${selectedTemplate === template.id ? 'text-green-300' : 'text-white'}`}>
+                          {template.name}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">{template.description}</p>
+                      </div>
+                      {selectedTemplate === template.id && (
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Signeringsalternativ */}
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                  <Send className="w-4 h-4 text-yellow-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">Signering</h2>
+              </div>
+              
+              <label className="flex items-center space-x-3 text-white cursor-pointer p-3 rounded-lg hover:bg-slate-800/30 transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={sendForSigning} 
+                  onChange={() => setSendForSigning(prev => !prev)} 
+                  className="rounded border-slate-600 text-green-500 focus:ring-green-500 focus:ring-offset-slate-900" 
+                /> 
+                <div className="flex items-center gap-2">
+                  <Send className="w-4 h-4" />
+                  <span>Skicka för signering direkt</span>
+                </div>
+              </label>
+              <p className="text-sm text-slate-400 mt-3 px-3">
+                {sendForSigning 
+                  ? '📧 Kontraktet skickas omedelbart till kunden för signering' 
+                  : '📝 Kontraktet skapas som utkast och kan skickas senare'
+                }
+              </p>
+            </Card>
+          </div>
+
+          {/* Mitten kolumn - Avtalsdata */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* BeGone Info */}
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-green-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">2. BeGone Information</h2>
+              </div>
+              
+              <div className="space-y-4">
+                <Input
+                  label="Ansvarig från BeGone"
+                  value={contractData.anstalld}
+                  onChange={e => handleBeGoneDataChange('anstalld', e.target.value)}
+                  icon={<User className="w-4 h-4" />}
+                />
+                <Input
+                  label="E-post ansvarig"
+                  type="email"
+                  value={contractData['e-post-anstlld']}
+                  onChange={e => handleBeGoneDataChange('e-post-anstlld', e.target.value)}
+                  icon={<Mail className="w-4 h-4" />}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Avtalslängd (mån)"
+                    type="number"
+                    value={contractData.avtalslngd}
+                    onChange={e => handleBeGoneDataChange('avtalslngd', e.target.value)}
+                    icon={<Calendar className="w-4 h-4" />}
+                  />
+                  <Input
+                    label="Startdatum"
+                    type="date"
+                    value={contractData.begynnelsedag}
+                    onChange={e => handleBeGoneDataChange('begynnelsedag', e.target.value)}
+                    icon={<Calendar className="w-4 h-4" />}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Avtalsobjekt */}
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-purple-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">Avtalsobjekt</h2>
+              </div>
+              
+              <div className="space-y-3">
                 <textarea
-                  id="agreement-object"
                   value={agreementObjectText}
                   onChange={(e) => setAgreementObjectText(e.target.value)}
-                  rows={8}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                  placeholder="Beskriv avtalets omfattning här..."
+                  rows={6}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+                  placeholder="Beskriv avtalets omfattning och villkor..."
                 />
-                <p className={`mt-1 text-xs ${agreementObjectText.length > LIMIT * 2 ? 'text-red-500' : 'text-slate-400'}`}>
-                  Tecken: {agreementObjectText.length} / {LIMIT * 2}
-                </p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className={`${agreementObjectText.length > LIMIT * 2 ? 'text-red-500' : 'text-slate-400'}`}>
+                    {agreementObjectText.length} / {LIMIT * 2} tecken
+                  </span>
+                  {agreementObjectText.length > LIMIT && (
+                    <span className="text-yellow-500 flex items-center gap-1">
+                      <FileText className="w-3 h-3" />
+                      Delas automatiskt
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
 
-          <Card>
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <Mail className="w-5 h-5 text-red-500" /> Mottagare
-            </h2>
-            <div className="mb-4">
-              <label className="text-sm text-white mb-2 block">Typ av motpart</label>
-              <div className="flex gap-4">
-                <label className="flex items-center space-x-2 text-white cursor-pointer">
-                  <input type="radio" checked={partyType === 'company'} onChange={() => setPartyType('company')} className="text-blue-500" /> 
-                  <span>Företag</span>
-                </label>
-                <label className="flex items-center space-x-2 text-white cursor-pointer">
-                  <input type="radio" checked={partyType === 'individual'} onChange={() => setPartyType('individual')} className="text-blue-500" /> 
-                  <span>Privatperson</span>
-                </label>
+          {/* Höger kolumn - Kundinfo */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <User className="w-4 h-4 text-blue-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">3. Kundinformation</h2>
               </div>
-            </div>
-            <div className="space-y-4">
-              <Input label="Namn" type="text" value={recipient.name} onChange={e => setRecipient(prev => ({ ...prev, name: e.target.value }))} />
-              <Input label="E-post" type="email" value={recipient.email} onChange={e => setRecipient(prev => ({ ...prev, email: e.target.value }))} />
-              {partyType === 'company' && (
-                <>
-                  <Input label="Företag" type="text" value={recipient.company_name} onChange={e => setRecipient(prev => ({ ...prev, company_name: e.target.value }))} />
-                  <Input label="Organisationsnummer" type="text" value={recipient.organization_number} onChange={e => setRecipient(prev => ({ ...prev, organization_number: e.target.value }))} />
-                </>
-              )}
-            </div>
-          </Card>
 
-          <Card>
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <Send className="w-5 h-5 text-yellow-400" /> Signeringsalternativ
-            </h2>
-            <label className="flex items-center space-x-2 text-white cursor-pointer">
-              <input type="checkbox" checked={sendForSigning} onChange={() => setSendForSigning(prev => !prev)} className="text-blue-500" /> 
-              <span>Skicka för signering direkt</span>
-            </label>
-            <p className="text-sm text-slate-400 mt-2">
-              {sendForSigning ? 'Kontraktet kommer att skickas för signering omedelbart' : 'Kontraktet skapas som utkast och kan skickas senare'}
-            </p>
-          </Card>
+              {/* Företag/Privatperson */}
+              <div className="mb-6">
+                <label className="text-sm text-white mb-3 block">Avtalspart</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center space-x-2 text-white cursor-pointer flex-1 p-3 rounded-lg border border-slate-700 hover:bg-slate-800/30 transition-colors">
+                    <input 
+                      type="radio" 
+                      checked={partyType === 'company'} 
+                      onChange={() => setPartyType('company')} 
+                      className="text-green-500" 
+                    /> 
+                    <Building2 className="w-4 h-4" />
+                    <span>Företag</span>
+                  </label>
+                  <label className="flex items-center space-x-2 text-white cursor-pointer flex-1 p-3 rounded-lg border border-slate-700 hover:bg-slate-800/30 transition-colors">
+                    <input 
+                      type="radio" 
+                      checked={partyType === 'individual'} 
+                      onChange={() => setPartyType('individual')} 
+                      className="text-green-500" 
+                    /> 
+                    <User className="w-4 h-4" />
+                    <span>Privatperson</span>
+                  </label>
+                </div>
+              </div>
 
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={handlePreview} className="flex items-center gap-2">
-              <Eye className="w-4 h-4" /> Förhandsgranska
-            </Button>
-            <Button disabled={isCreating || !selectedTemplate} onClick={handleCreateContract} className="flex items-center gap-2 flex-1">
-              {isCreating ? <LoadingSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />} 
-              {sendForSigning ? 'Skapa & skicka' : 'Skapa utkast'}
-            </Button>
+              <div className="space-y-4">
+                {partyType === 'company' && (
+                  <>
+                    <Input 
+                      label="Företagsnamn" 
+                      value={customerData.foretag} 
+                      onChange={e => handleCustomerDataChange('foretag', e.target.value)}
+                      icon={<Building2 className="w-4 h-4" />}
+                      required
+                    />
+                    <Input 
+                      label="Organisationsnummer" 
+                      value={customerData['org-nr']} 
+                      onChange={e => handleCustomerDataChange('org-nr', e.target.value)}
+                      icon={<Hash className="w-4 h-4" />}
+                      placeholder="556123-4567"
+                    />
+                  </>
+                )}
+                
+                <Input 
+                  label="Kontaktperson" 
+                  value={customerData.Kontaktperson} 
+                  onChange={e => handleCustomerDataChange('Kontaktperson', e.target.value)}
+                  icon={<User className="w-4 h-4" />}
+                  required
+                />
+                
+                <Input 
+                  label="E-post" 
+                  type="email" 
+                  value={customerData['e-post-kontaktperson']} 
+                  onChange={e => handleCustomerDataChange('e-post-kontaktperson', e.target.value)}
+                  icon={<Mail className="w-4 h-4" />}
+                  required
+                />
+                
+                <Input 
+                  label="Telefon" 
+                  type="tel" 
+                  value={customerData['telefonnummer-kontaktperson']} 
+                  onChange={e => handleCustomerDataChange('telefonnummer-kontaktperson', e.target.value)}
+                  icon={<Phone className="w-4 h-4" />}
+                />
+                
+                <Input 
+                  label="Utförande adress" 
+                  value={customerData['utforande-adress']} 
+                  onChange={e => handleCustomerDataChange('utforande-adress', e.target.value)}
+                  icon={<MapPin className="w-4 h-4" />}
+                />
+              </div>
+            </Card>
+
+            {/* Åtgärdsknappar */}
+            <div className="space-y-3">
+              <Button 
+                disabled={isCreating || !selectedTemplate || !customerData['e-post-kontaktperson']} 
+                onClick={handleCreateContract} 
+                className="w-full flex items-center justify-center gap-2 h-12"
+              >
+                {isCreating ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <CheckCircle className="w-5 h-5" />
+                )} 
+                {sendForSigning ? 'Skapa & Skicka Avtal' : 'Skapa Utkast'}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={handlePreview} 
+                className="w-full flex items-center justify-center gap-2"
+                disabled={!selectedTemplate}
+              >
+                <Eye className="w-4 h-4" /> 
+                Förhandsgranska
+              </Button>
+            </div>
+
+            {/* Snabbfyll */}
+            <Card>
+              <h3 className="text-white font-medium mb-3">⚡ Snabbfyll Kunddata</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const restaurangData = {
+                      foretag: 'Bella Vista Ristorante AB',
+                      'org-nr': '556789-0123',
+                      Kontaktperson: 'Giuseppe Romano',
+                      'e-post-kontaktperson': 'giuseppe@bellavista.se',
+                      'telefonnummer-kontaktperson': '08-555 0123',
+                      'utforande-adress': 'Kungsgatan 25, 111 56 Stockholm'
+                    }
+                    setCustomerData(prev => ({ ...prev, ...restaurangData }))
+                    setRecipient(prev => ({ 
+                      ...prev, 
+                      name: restaurangData.Kontaktperson,
+                      email: restaurangData['e-post-kontaktperson'],
+                      company_name: restaurangData.foretag,
+                      organization_number: restaurangData['org-nr']
+                    }))
+                    toast.success('🍝 Restaurangdata ifylld!')
+                  }}
+                  className="text-xs"
+                >
+                  🍝 Restaurang
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const hotellData = {
+                      foretag: 'Grand Hotel Stockholm AB',
+                      'org-nr': '556456-1234',
+                      Kontaktperson: 'Elisabeth Andersson',
+                      'e-post-kontaktperson': 'elisabeth@grandhotel.se',
+                      'telefonnummer-kontaktperson': '08-679 3500',
+                      'utforande-adress': 'Södra Blasieholmshamnen 8, 103 27 Stockholm'
+                    }
+                    setCustomerData(prev => ({ ...prev, ...hotellData }))
+                    setRecipient(prev => ({ 
+                      ...prev, 
+                      name: hotellData.Kontaktperson,
+                      email: hotellData['e-post-kontaktperson'],
+                      company_name: hotellData.foretag,
+                      organization_number: hotellData['org-nr']
+                    }))
+                    toast.success('🏨 Hotelldata ifylld!')
+                  }}
+                  className="text-xs"
+                >
+                  🏨 Hotell
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {showPreview && (
-            <Card>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                <Eye className="w-5 h-5 text-cyan-400" /> Förhandsgranskning
-              </h2>
-              <div className="bg-slate-800/50 p-4 rounded-lg">
-                <div className="text-sm text-slate-300 space-y-2 mb-4">
-                  <div><strong>Mall:</strong> {previewData?.template?.name}</div>
-                  <div><strong>Motpart:</strong> {previewData?.recipient?.company_name} ({previewData?.recipient?.name})</div>
-                  <div><strong>Typ:</strong> {partyType === 'company' ? 'Företag' : 'Privatperson'}</div>
-                  <div><strong>Signering:</strong> {sendForSigning ? 'Ja' : 'Nej'}</div>
-                </div>
-                <details className="text-xs">
-                  <summary className="text-slate-400 cursor-pointer hover:text-white">Visa fullständig payload</summary>
-                  <pre className="text-slate-400 bg-slate-900/50 p-3 rounded mt-2 overflow-x-auto">
-                    {JSON.stringify(previewData, null, 2)}
-                  </pre>
-                </details>
-              </div>
-            </Card>
-          )}
-
-          {createdContract && (
-            <Card>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                <CheckCircle className="w-5 h-5 text-green-400" /> Kontrakt skapat!
-              </h3>
-              <div className="space-y-3">
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                  <div className="text-sm text-white space-y-2">
-                    <div><strong>ID:</strong> <span className="font-mono text-green-400">{createdContract.id}</span></div>
-                    <div><strong>Namn:</strong> {createdContract.name}</div>
-                    <div><strong>Status:</strong> 
-                      <span className={`ml-2 px-2 py-1 rounded text-xs ${createdContract.state === 'published' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                        {createdContract.state}
-                      </span>
+        {/* Resultat sektion */}
+        {(showPreview || createdContract) && (
+          <div className="mt-8 space-y-6">
+            {/* Förhandsgranskning */}
+            {showPreview && previewData && (
+              <Card>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                  <Eye className="w-5 h-5 text-cyan-400" /> Förhandsgranskning
+                </h2>
+                <div className="bg-slate-800/50 p-4 rounded-lg space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-400">Mall:</span>
+                      <div className="text-white font-medium">{previewData?.template?.name}</div>
                     </div>
-                    {createdContract.url && (
-                      <Button onClick={() => window.open(createdContract.url, '_blank')} className="w-full flex items-center justify-center gap-2 mt-3" size="sm">
-                        <ExternalLink className="w-4 h-4" /> Öppna i Oneflow
-                      </Button>
-                    )}
+                    <div>
+                      <span className="text-slate-400">Kund:</span>
+                      <div className="text-white">{previewData?.recipient?.company_name}</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Kontakt:</span>
+                      <div className="text-white">{previewData?.recipient?.name}</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Signering:</span>
+                      <div className={`text-sm px-2 py-1 rounded ${previewData.sendForSigning ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                        {previewData.sendForSigning ? 'Direkt' : 'Utkast'}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          <Card>
-            <h3 className="text-lg font-semibold text-white mb-3">💡 Tips</h3>
-            <div className="text-sm text-slate-300 space-y-2">
-              <div>• Alla fält är förifyllda med testdata</div>
-              <div>• Kontrollera att rätt mall är vald</div>
-              <div>• Använd "Förhandsgranska" för att se payload</div>
-              <div>• Utkast kan redigeras innan signering</div>
-            </div>
-          </Card>
-        </div>
+            {/* Skapat kontrakt */}
+            {createdContract && (
+              <Card>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                  <CheckCircle className="w-5 h-5 text-green-400" /> Kontrakt skapat!
+                </h3>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6">
+                  <div className="grid gap-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Kontrakt-ID:</span>
+                      <span className="font-mono text-green-400 bg-green-500/10 px-3 py-1 rounded">
+                        #{createdContract.id}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Avtalsnamn:</span>
+                      <span className="text-white font-medium">{createdContract.name}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Status:</span>
+                      <span className={`px-3 py-1 rounded text-sm font-medium ${
+                        createdContract.state === 'published' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3 mt-6">
+                    {createdContract.url && (
+                      <Button 
+                        onClick={() => window.open(createdContract.url, '_blank')} 
+                        className="flex-1 flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" /> 
+                        Öppna i Oneflow
+                      </Button>
+                    )}
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setCreatedContract(null)
+                        setShowPreview(false)
+                      }}
+                      className="px-6"
+                    >
+                      Skapa nytt avtal
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )
