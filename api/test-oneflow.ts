@@ -83,19 +83,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log('🔍 Skapar test-kontrakt för att identifiera obligatoriska data fields...');
             
             try {
-                // Minimal payload för att se vilka fält som förväntas
+                // Komplett payload med båda parter (baserat på miljövariabler)
                 const testPayload = {
                     workspace_id: parseInt(process.env.ONEFLOW_WORKSPACE_ID || '485612'),
                     template_id: parseInt(templateId as string),
                     parties: [
                         {
                             type: 'company',
-                            name: 'Begone Skadedjur & Sanering AB',
-                            identification_number: '559378-9208',
+                            name: process.env.ONEFLOW_OWNER_COMPANY_NAME || 'Begone Skadedjur & Sanering AB',
+                            identification_number: process.env.ONEFLOW_OWNER_ORGANIZATION_NUMBER || '559378-9208',
                             participants: [
                                 {
                                     name: 'Christian Karlsson',
-                                    email: 'christian.karlsson@begone.se', // ✅ BeGone skapar kontraktet
+                                    email: process.env.ONEFLOW_USER_EMAIL || 'christian.karlsson@begone.se',
                                     _permissions: { 'contract:update': true },
                                     signatory: true,
                                     delivery_channel: 'email'
@@ -109,7 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             participants: [
                                 {
                                     name: 'Christian Karlsson',
-                                    email: 'christian.karlsson@hotmail.se', // ✅ Skickas till din privata mail
+                                    email: 'christian.karlsson@hotmail.se', // ✅ Din privata testmail
                                     _permissions: { 'contract:update': true },
                                     signatory: true,
                                     delivery_channel: 'email'
