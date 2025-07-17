@@ -47,13 +47,28 @@ interface Recipient {
 
 export default function OneflowTest() {
   const navigate = useNavigate()
-  const [selectedTemplate, setSelectedTemplate] = useState('')
-  const [contractData, setContractData] = useState<ContractData>({})
+  
+  // Hårdkodade värden för snabb testning
+  const [selectedTemplate, setSelectedTemplate] = useState('8486368') // Skadedjursavtal
+  const [contractData, setContractData] = useState<ContractData>({
+    'foretag': 'Testkund',
+    'org-nr': '002233-4455',
+    'kontaktperson': 'Test kontaktperson',
+    'e-post-kontaktperson': 'christian.karlsson@hotmail.se',
+    'telefonnummer-kontaktperson': '0704466235',
+    'utforande-adress': 'Rankhusvägen 31, 196 31 Kungsängen',
+    'faktura-adress-pdf': 'test@faktura.se',
+    'begynnelsedag': '2025-07-17',
+    'avtalslngd': '3',
+    'avtalsobjekt': '9st mekaniska fällor',
+    'anstlld': 'Christian Karlsson',
+    'e-post-anstlld': 'christian.karlsson@begone.se'
+  })
   const [recipient, setRecipient] = useState<Recipient>({
-    name: '',
-    email: '',
-    company_name: '',
-    organization_number: ''
+    name: 'Test kontaktperson',
+    email: 'christian.karlsson@hotmail.se',
+    company_name: 'Testkund',
+    organization_number: '002233-4455'
   })
   const [sendForSigning, setSendForSigning] = useState(true)
   const [isCreating, setIsCreating] = useState(false)

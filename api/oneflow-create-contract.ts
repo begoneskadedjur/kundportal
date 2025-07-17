@@ -80,6 +80,7 @@ async function createContract(
         }));
 
     const contractPayload = {
+        template_id: parseInt(templateId),
         name: `Skadedjursavtal - ${contractData['foretag'] || 'Ny Kund'}`,
         parties: [
             {
@@ -100,9 +101,9 @@ async function createContract(
     
     // ==================================================================
     // HÄR ÄR DEN AVGÖRANDE KORRIGERINGEN
-    // URL:en inkluderar nu mallens ID och slutar på /create-contract
+    // Vi går tillbaka till den ursprungliga endpointen /contracts
     // ==================================================================
-    const response = await fetch(`${ONEFLOW_API_URL}/templates/${templateId}/create-contract`, {
+    const response = await fetch(`${ONEFLOW_API_URL}/contracts`, {
         method: 'POST',
         headers: {
             'x-oneflow-api-token': ONEFLOW_API_TOKEN,
