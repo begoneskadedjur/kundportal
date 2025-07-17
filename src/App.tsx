@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER
+// src/App.tsx - UPPDATERAD MED TEKNIKER-MANAGEMENT ROUTE + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER + ONEFLOW TEST
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -19,6 +19,7 @@ import Technicians from './pages/admin/Technicians'          // Tekniker Perform
 import TechnicianManagement from './pages/admin/TechnicianManagement'  // Tekniker CRUD
 import TechnicianCommissions from './pages/admin/TechnicianCommissions'  // 🆕 PROVISIONER
 import SalesOpportunities from './pages/admin/SalesOpportunities'  // 🆕 FÖRSÄLJNINGSMÖJLIGHETER
+import OneflowTest from './pages/admin/OneflowTest'  // 🆕 ONEFLOW TEST
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -124,6 +125,15 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <SalesOpportunities />
+                </ProtectedRoute>
+              } 
+            />
+            {/* 🆕 NY ROUTE: Oneflow Test */}
+            <Route 
+              path="/admin/oneflow-test" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <OneflowTest />
                 </ProtectedRoute>
               } 
             />
