@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, TestTube, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Hash, Phone, MapPin, Calendar } from 'lucide-react'
+import { ArrowLeft, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Hash, Phone, MapPin, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -12,11 +12,6 @@ const ONEFLOW_TEMPLATES = [
   { 
     id: '8486368', 
     name: 'Skadedjursavtal', 
-    popular: true
-  },
-  { 
-    id: '10102378', 
-    name: 'Komplett Skadedjursavtal', 
     popular: true
   },
   { 
@@ -48,6 +43,78 @@ interface Recipient {
   organization_number: string
 }
 
+interface CustomerData {
+  'e-post-kontaktperson': string
+  'faktura-adress-pdf': string
+  foretag: string
+  Kontaktperson: string
+  'org-nr': string
+  'telefonnummer-kontaktperson': string
+  'utforande-adress': string
+}
+
+// Komponenter för företag/privatperson
+const CompanyFields: React.FC<{
+  customerData: CustomerData
+  onDataChange: (field: string, value: string) => void
+}> = ({ customerData, onDataChange }) => (
+  <>
+    <Input 
+      label="Företagsnamn" 
+      value={customerData.foretag} 
+      onChange={e => onDataChange('foretag', e.target.value)}
+      icon={<Building2 className="w-4 h-4" />}
+      required
+    />
+    <Input 
+      label="Organisationsnummer" 
+      value={customerData['org-nr']} 
+      onChange={e => onDataChange('org-nr', e.target.value)}
+      icon={<Hash className="w-4 h-4" />}
+      placeholder="556123-4567"
+    />
+  </>
+)
+
+const CommonFields: React.FC<{
+  customerData: CustomerData
+  onDataChange: (field: string, value: string) => void
+}> = ({ customerData, onDataChange }) => (
+  <>
+    <Input 
+      label="Kontaktperson" 
+      value={customerData.Kontaktperson} 
+      onChange={e => onDataChange('Kontaktperson', e.target.value)}
+      icon={<User className="w-4 h-4" />}
+      required
+    />
+    
+    <Input 
+      label="E-post" 
+      type="email" 
+      value={customerData['e-post-kontaktperson']} 
+      onChange={e => onDataChange('e-post-kontaktperson', e.target.value)}
+      icon={<Mail className="w-4 h-4" />}
+      required
+    />
+    
+    <Input 
+      label="Telefon" 
+      type="tel" 
+      value={customerData['telefonnummer-kontaktperson']} 
+      onChange={e => onDataChange('telefonnummer-kontaktperson', e.target.value)}
+      icon={<Phone className="w-4 h-4" />}
+    />
+    
+    <Input 
+      label="Utförande adress" 
+      value={customerData['utforande-adress']} 
+      onChange={e => onDataChange('utforande-adress', e.target.value)}
+      icon={<MapPin className="w-4 h-4" />}
+    />
+  </>
+)
+
 export default function OneflowContractCreator() {
   const navigate = useNavigate()
   
@@ -76,7 +143,7 @@ export default function OneflowContractCreator() {
   })
 
   // Kundspecifika fält
-  const [customerData, setCustomerData] = useState({
+  const [customerData, setCustomerData] = useState<CustomerData>({
     'e-post-kontaktperson': 'anna.svensson@example.com',
     'faktura-adress-pdf': 'anna.svensson@example.com',
     foretag: 'Svenssons Restaurang AB',
@@ -121,13 +188,12 @@ export default function OneflowContractCreator() {
     const part1 = agreementObjectText.substring(0, LIMIT)
     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
-    // KONVERTERA ÅR TILL MÅNADER för Oneflow (backend förväntar månader)
-    const contractLengthInMonths = parseInt(contractData.avtalslngd) * 12
-
+    // SKICKA ÅR DIREKT - Ingen konvertering till månader
     const finalContractData = {
       ...contractData,
       ...customerData,
-      avtalslngd: contractLengthInMonths.toString(), // Skicka månader till backend
+      // Skicka år-värdet direkt utan konvertering
+      avtalslngd: contractData.avtalslngd,
       'stycke-1': part1,
       'stycke-2': part2,
     }
@@ -177,12 +243,11 @@ export default function OneflowContractCreator() {
     const part1 = agreementObjectText.substring(0, LIMIT)
     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
-    const contractLengthInMonths = parseInt(contractData.avtalslngd) * 12
-
+    // SKICKA ÅR DIREKT - Ingen konvertering
     const finalContractData = {
       ...contractData,
       ...customerData,
-      avtalslngd: contractLengthInMonths.toString(),
+      avtalslngd: contractData.avtalslngd,
       'stycke-1': part1,
       'stycke-2': part2,
     }
@@ -397,54 +462,15 @@ export default function OneflowContractCreator() {
 
               <div className="space-y-4">
                 {partyType === 'company' && (
-                  <>
-                    <Input 
-                      label="Företagsnamn" 
-                      value={customerData.foretag} 
-                      onChange={e => handleCustomerDataChange('foretag', e.target.value)}
-                      icon={<Building2 className="w-4 h-4" />}
-                      required
-                    />
-                    <Input 
-                      label="Organisationsnummer" 
-                      value={customerData['org-nr']} 
-                      onChange={e => handleCustomerDataChange('org-nr', e.target.value)}
-                      icon={<Hash className="w-4 h-4" />}
-                      placeholder="556123-4567"
-                    />
-                  </>
+                  <CompanyFields 
+                    customerData={customerData} 
+                    onDataChange={handleCustomerDataChange} 
+                  />
                 )}
                 
-                <Input 
-                  label="Kontaktperson" 
-                  value={customerData.Kontaktperson} 
-                  onChange={e => handleCustomerDataChange('Kontaktperson', e.target.value)}
-                  icon={<User className="w-4 h-4" />}
-                  required
-                />
-                
-                <Input 
-                  label="E-post" 
-                  type="email" 
-                  value={customerData['e-post-kontaktperson']} 
-                  onChange={e => handleCustomerDataChange('e-post-kontaktperson', e.target.value)}
-                  icon={<Mail className="w-4 h-4" />}
-                  required
-                />
-                
-                <Input 
-                  label="Telefon" 
-                  type="tel" 
-                  value={customerData['telefonnummer-kontaktperson']} 
-                  onChange={e => handleCustomerDataChange('telefonnummer-kontaktperson', e.target.value)}
-                  icon={<Phone className="w-4 h-4" />}
-                />
-                
-                <Input 
-                  label="Utförande adress" 
-                  value={customerData['utforande-adress']} 
-                  onChange={e => handleCustomerDataChange('utforande-adress', e.target.value)}
-                  icon={<MapPin className="w-4 h-4" />}
+                <CommonFields 
+                  customerData={customerData} 
+                  onDataChange={handleCustomerDataChange} 
                 />
               </div>
             </Card>
@@ -611,7 +637,7 @@ export default function OneflowContractCreator() {
                   <div className="mt-4 pt-4 border-t border-slate-700">
                     <span className="text-slate-400 text-sm">Avtalslängd:</span>
                     <div className="text-white font-medium">
-                      {contractData.avtalslngd} år ({parseInt(contractData.avtalslngd) * 12} månader)
+                      {contractData.avtalslngd} år
                     </div>
                   </div>
                 </div>
