@@ -30,42 +30,39 @@ export default async function handler(
     partyType,
   } = req.body as ContractRequestBody
 
-  // Hämta alla nödvändiga miljövariabler
   const token = process.env.ONEFLOW_API_TOKEN!
   const userEmail = process.env.ONEFLOW_USER_EMAIL!
   const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!
 
-  // Validera att nödvändiga variabler finns
   if (!token || !userEmail || !workspaceId) {
     console.error('Saknade miljövariabler för Oneflow-integrationen')
     return res.status(500).json({ message: 'Server configuration error.' })
   }
 
-  // Mappa datafält
   const data_fields = Object.entries(contractData).map(
     ([custom_id, value]) => ({ custom_id, value })
   )
 
-  // Skapa 'parties'-arrayen med korrekt struktur för både privatperson och företag
   const parties = []
 
   if (partyType === 'individual') {
-    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON:
-    // Egenskaperna (name, email etc.) ligger direkt i party-objektet.
-    // Ingen 'participants'-array används här.
+    // KORRIGERAD STRUKTUR FÖR PRIVATPERSON ENLIGT DOKUMENTATION
+    // Använder ett 'participant'-objekt (singular).
     parties.push({
       type: 'individual',
-      name: recipient.name,
-      email: recipient.email,
-      _permissions: {
-        'contract:update': sendForSigning
-      },
-      signatory: sendForSigning,
-      delivery_channel: 'email'
+      participant: {
+        name: recipient.name,
+        email: recipient.email,
+        _permissions: {
+          'contract:update': sendForSigning
+        },
+        signatory: sendForSigning,
+        delivery_channel: 'email'
+      }
     })
   } else {
-    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD):
-    // Ett företag har en 'participants'-array för sina kontaktpersoner.
+    // KORREKT STRUKTUR FÖR FÖRETAG (BEVARAD)
+    // Använder en 'participants'-array (plural).
     parties.push({
       type: 'company',
       name: recipient.company_name,
@@ -94,7 +91,6 @@ export default async function handler(
   console.log('Skickar följande create payload till Oneflow:', JSON.stringify(createPayload, null, 2))
 
   try {
-    // STEG 1: Skapa kontraktet
     const createResponse = await fetch(
       'https://api.oneflow.com/v1/contracts/create',
       {
@@ -118,7 +114,6 @@ export default async function handler(
 
     console.log('✅ Kontrakt skapat framgångsrikt:', createdContract.id)
 
-    // STEG 2: Publicera kontraktet (endast om sendForSigning är true)
     if (sendForSigning) {
       console.log('🚀 Publicerar kontrakt för signering...')
       
@@ -145,7 +140,6 @@ export default async function handler(
         const publishError = await publishResponse.json()
         console.error('⚠️ Kontrakt skapat men kunde inte publiceras:', JSON.stringify(publishError, null, 2))
         
-        // Returnera kontraktet ändå, men med en varning
         return res.status(200).json({ 
           contract: createdContract,
           warning: 'Kontrakt skapat men kunde inte skickas för signering automatiskt',
