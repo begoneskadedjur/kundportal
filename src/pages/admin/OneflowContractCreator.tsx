@@ -7,45 +7,33 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
-// Oneflow mallar med beskrivningar och ikoner
+// Oneflow mallar - FÖRENKLAD VERSION (inga ikoner/beskrivningar)
 const ONEFLOW_TEMPLATES = [
   { 
     id: '8486368', 
     name: 'Skadedjursavtal', 
-    description: 'Standard skadedjursavtal för företag',
-    icon: '🐛',
     popular: true
   },
   { 
     id: '10102378', 
     name: 'Komplett Skadedjursavtal', 
-    description: 'Omfattande avtal med alla tjänster',
-    icon: '🏢',
     popular: true
   },
   { 
     id: '9324573', 
-    name: 'Avtal Betesstationer', 
-    description: 'Specialiserat för betesstationer',
-    icon: '🎯'
+    name: 'Avtal Betesstationer'
   },
   { 
     id: '8465556', 
-    name: 'Avtal Betongstationer', 
-    description: 'För betongstationer och hård miljö',
-    icon: '🏗️'
+    name: 'Avtal Betongstationer'
   },
   { 
     id: '8462854', 
-    name: 'Avtal Mekaniska fällor', 
-    description: 'Mekaniska lösningar och fällor',
-    icon: '⚙️'
+    name: 'Avtal Mekaniska fällor'
   },
   { 
     id: '8732196', 
-    name: 'Avtal Indikationsfällor', 
-    description: 'Monitoring och indikationsfällor',
-    icon: '📍'
+    name: 'Avtal Indikationsfällor'
   }
 ]
 
@@ -70,10 +58,10 @@ export default function OneflowContractCreator() {
     'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
   )
 
-  // BeGone företagsinfo (leverantör)
+  // BeGone företagsinfo (leverantör) - ÄNDRAD TILL ÅR
   const [contractData, setContractData] = useState<ContractData>({
     anstalld: 'Christian Karlsson',
-    avtalslngd: '12',                              
+    avtalslngd: '1',                              // ÄNDRAT: Nu representerar år istället för månader
     begynnelsedag: new Date().toISOString().split('T')[0], 
     'dokument-skapat': new Date().toISOString().split('T')[0],
     'e-post-anstlld': 'christian.karlsson@begone.se',    
@@ -133,9 +121,13 @@ export default function OneflowContractCreator() {
     const part1 = agreementObjectText.substring(0, LIMIT)
     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
+    // KONVERTERA ÅR TILL MÅNADER för Oneflow (backend förväntar månader)
+    const contractLengthInMonths = parseInt(contractData.avtalslngd) * 12
+
     const finalContractData = {
       ...contractData,
       ...customerData,
+      avtalslngd: contractLengthInMonths.toString(), // Skicka månader till backend
       'stycke-1': part1,
       'stycke-2': part2,
     }
@@ -185,9 +177,12 @@ export default function OneflowContractCreator() {
     const part1 = agreementObjectText.substring(0, LIMIT)
     const part2 = agreementObjectText.substring(LIMIT, LIMIT * 2)
 
+    const contractLengthInMonths = parseInt(contractData.avtalslngd) * 12
+
     const finalContractData = {
       ...contractData,
       ...customerData,
+      avtalslngd: contractLengthInMonths.toString(),
       'stycke-1': part1,
       'stycke-2': part2,
     }
@@ -229,7 +224,6 @@ export default function OneflowContractCreator() {
             </div>
             {selectedTemplateData && (
               <div className="ml-auto flex items-center gap-2 bg-slate-800/50 px-3 py-2 rounded-lg">
-                <span className="text-2xl">{selectedTemplateData.icon}</span>
                 <span className="text-sm text-white">{selectedTemplateData.name}</span>
               </div>
             )}
@@ -238,7 +232,8 @@ export default function OneflowContractCreator() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+        {/* FÖRSTA RADEN: Mallval och Information */}
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {/* Vänster kolumn - Mallval */}
           <div className="lg:col-span-1 space-y-6">
             <Card>
@@ -249,35 +244,81 @@ export default function OneflowContractCreator() {
                 <h2 className="text-lg font-semibold text-white">1. Välj Avtalstyp</h2>
               </div>
               
-              <div className="space-y-3">
+              {/* FÖRENKLAD MALLVAL - Inga ikoner/beskrivningar */}
+              <div className="space-y-2">
                 {ONEFLOW_TEMPLATES.map(template => (
-                  <div 
+                  <label 
                     key={template.id}
-                    onClick={() => setSelectedTemplate(template.id)}
-                    className={`relative p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:bg-slate-800/50 ${
+                    className={`relative flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:bg-slate-800/50 ${
                       selectedTemplate === template.id 
                         ? 'border-green-500 bg-green-500/10' 
                         : 'border-slate-700 bg-slate-800/30'
                     }`}
                   >
+                    <input
+                      type="radio"
+                      name="template"
+                      value={template.id}
+                      checked={selectedTemplate === template.id}
+                      onChange={(e) => setSelectedTemplate(e.target.value)}
+                      className="sr-only"
+                    />
                     {template.popular && (
-                      <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                      <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Status:</span>
+                      <span className={`px-3 py-1 rounded text-sm font-medium ${
+                        createdContract.state === 'published' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3 mt-6">
+                    {createdContract.url && (
+                      <Button 
+                        onClick={() => window.open(createdContract.url, '_blank')} 
+                        className="flex-1 flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" /> 
+                        Öppna i Oneflow
+                      </Button>
+                    )}
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setCreatedContract(null)
+                        setShowPreview(false)
+                      }}
+                      className="px-6"
+                    >
+                      Skapa nytt avtal
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
                         Populär
                       </div>
                     )}
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{template.icon}</span>
-                      <div className="flex-1">
-                        <h3 className={`font-medium ${selectedTemplate === template.id ? 'text-green-300' : 'text-white'}`}>
-                          {template.name}
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-1">{template.description}</p>
-                      </div>
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`font-medium ${selectedTemplate === template.id ? 'text-green-300' : 'text-white'}`}>
+                        {template.name}
+                      </span>
                       {selectedTemplate === template.id && (
                         <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                       )}
                     </div>
-                  </div>
+                  </label>
                 ))}
               </div>
             </Card>
@@ -312,9 +353,8 @@ export default function OneflowContractCreator() {
             </Card>
           </div>
 
-          {/* Mitten kolumn - Avtalsdata */}
+          {/* Mitten kolumn - BeGone Info */}
           <div className="lg:col-span-1 space-y-6">
-            {/* BeGone Info */}
             <Card>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -338,9 +378,12 @@ export default function OneflowContractCreator() {
                   icon={<Mail className="w-4 h-4" />}
                 />
                 <div className="grid grid-cols-2 gap-3">
+                  {/* ÄNDRAT: Nu år istället för månader */}
                   <Input
-                    label="Avtalslängd (mån)"
+                    label="Avtalslängd (år)"
                     type="number"
+                    min="1"
+                    max="10"
                     value={contractData.avtalslngd}
                     onChange={e => handleBeGoneDataChange('avtalslngd', e.target.value)}
                     icon={<Calendar className="w-4 h-4" />}
@@ -352,37 +395,6 @@ export default function OneflowContractCreator() {
                     onChange={e => handleBeGoneDataChange('begynnelsedag', e.target.value)}
                     icon={<Calendar className="w-4 h-4" />}
                   />
-                </div>
-              </div>
-            </Card>
-
-            {/* Avtalsobjekt */}
-            <Card>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-purple-400" />
-                </div>
-                <h2 className="text-lg font-semibold text-white">Avtalsobjekt</h2>
-              </div>
-              
-              <div className="space-y-3">
-                <textarea
-                  value={agreementObjectText}
-                  onChange={(e) => setAgreementObjectText(e.target.value)}
-                  rows={6}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
-                  placeholder="Beskriv avtalets omfattning och villkor..."
-                />
-                <div className="flex items-center justify-between text-xs">
-                  <span className={`${agreementObjectText.length > LIMIT * 2 ? 'text-red-500' : 'text-slate-400'}`}>
-                    {agreementObjectText.length} / {LIMIT * 2} tecken
-                  </span>
-                  {agreementObjectText.length > LIMIT && (
-                    <span className="text-yellow-500 flex items-center gap-1">
-                      <FileText className="w-3 h-3" />
-                      Delas automatiskt
-                    </span>
-                  )}
                 </div>
               </div>
             </Card>
@@ -567,9 +579,50 @@ export default function OneflowContractCreator() {
           </div>
         </div>
 
+        {/* ANDRA RADEN: Avtalsobjekt - NU STÖRRE YTA */}
+        <div className="mb-8">
+          <Card>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <FileText className="w-4 h-4 text-purple-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">Avtalsobjekt</h2>
+              <div className="ml-auto text-sm text-slate-400">
+                Beskriv avtalets omfattning och villkor i detalj
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <textarea
+                value={agreementObjectText}
+                onChange={(e) => setAgreementObjectText(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm leading-relaxed"
+                placeholder="Beskriv avtalets omfattning och villkor i detalj. Inkludera vad som ingår i servicen, frekvens av besök, rapportering, och andra viktiga villkor..."
+              />
+              <div className="flex items-center justify-between text-sm">
+                <span className={`${agreementObjectText.length > LIMIT * 2 ? 'text-red-500' : 'text-slate-400'}`}>
+                  {agreementObjectText.length} / {LIMIT * 2} tecken
+                </span>
+                {agreementObjectText.length > LIMIT && (
+                  <span className="text-yellow-500 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    Texten delas automatiskt i stycken för Oneflow
+                  </span>
+                )}
+                {agreementObjectText.length > LIMIT * 2 && (
+                  <span className="text-red-500 flex items-center gap-1">
+                    ⚠️ För lång text kommer att trunkeras
+                  </span>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+
         {/* Resultat sektion */}
         {(showPreview || createdContract) && (
-          <div className="mt-8 space-y-6">
+          <div className="space-y-6">
             {/* Förhandsgranskning */}
             {showPreview && previewData && (
               <Card>
@@ -597,6 +650,12 @@ export default function OneflowContractCreator() {
                       </div>
                     </div>
                   </div>
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <span className="text-slate-400 text-sm">Avtalslängd:</span>
+                    <div className="text-white font-medium">
+                      {contractData.avtalslngd} år ({parseInt(contractData.avtalslngd) * 12} månader)
+                    </div>
+                  </div>
                 </div>
               </Card>
             )}
@@ -621,46 +680,4 @@ export default function OneflowContractCreator() {
                       <span className="text-white font-medium">{createdContract.name}</span>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Status:</span>
-                      <span className={`px-3 py-1 rounded text-sm font-medium ${
-                        createdContract.state === 'published' 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-3 mt-6">
-                    {createdContract.url && (
-                      <Button 
-                        onClick={() => window.open(createdContract.url, '_blank')} 
-                        className="flex-1 flex items-center justify-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" /> 
-                        Öppna i Oneflow
-                      </Button>
-                    )}
-                    
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        setCreatedContract(null)
-                        setShowPreview(false)
-                      }}
-                      className="px-6"
-                    >
-                      Skapa nytt avtal
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
-  )
-}
+                    <div className="
