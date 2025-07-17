@@ -35,7 +35,7 @@ export default async function handler(
   const userEmail = process.env.ONEFLOW_USER_EMAIL!;
   const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!;
   
-  // ---- NYTT: Hämta information om ägarparten från miljövariabler ----
+  // Hämta information om ägarparten från miljövariabler
   const ownerCompanyName = process.env.ONEFLOW_OWNER_COMPANY_NAME!;
   const ownerOrgNumber = process.env.ONEFLOW_OWNER_ORGANIZATION_NUMBER; // Kan vara valfri
 
@@ -45,14 +45,12 @@ export default async function handler(
     return res.status(500).json({ message: 'Server configuration error.' });
   }
 
-  // Mappa datafält, precis som tidigare
+  // Mappa datafält
   const data_fields = Object.entries(contractData).map(
     ([custom_id, value]) => ({ custom_id, value })
   );
 
-  // ---- UPPDATERING: Bygg en komplett lista med BÅDA parter ----
-
-  // 1. Skapa objekt för ÄGARPARTEN (ert företag)
+  // Skapa objekt för ÄGARPARTEN (ert företag)
   const ownerParty = {
     type: 'company',
     name: ownerCompanyName,
@@ -67,7 +65,7 @@ export default async function handler(
     ],
   };
 
-  // 2. Skapa objekt för MOTPARTEN (kunden), precis som tidigare
+  // Skapa objekt för MOTPARTEN (kunden)
   const counterParty: any = { type: partyType };
   if (partyType === 'company') {
     counterParty.name = recipient.company_name;
@@ -85,20 +83,20 @@ export default async function handler(
     },
   ];
 
-  // Förbered den slutgiltiga payloaden som ska skickas till Oneflow
-  const payload = {
+  // *** FIX: Ta bort "publish" parametern från payload ***
+  const createPayload = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
     data_fields,
-    // ---- FIX: Inkludera BÅDE ägaren och motparten ----
     parties: [ownerParty, counterParty],
-    publish: sendForSigning,
+    // publish: sendForSigning, // ❌ TA BORT DENNA RAD
   };
 
-  console.log('Skickar följande payload till Oneflow:', JSON.stringify(payload, null, 2));
+  console.log('Skickar följande create payload till Oneflow:', JSON.stringify(createPayload, null, 2));
 
   try {
-    const response = await fetch(
+    // STEG 1: Skapa kontraktet
+    const createResponse = await fetch(
       'https://api.oneflow.com/v1/contracts/create',
       {
         method: 'POST',
@@ -108,18 +106,58 @@ export default async function handler(
           'X-Oneflow-User-Email': userEmail,
           Accept: 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(createPayload),
       }
     );
 
-    const body = await response.json();
+    const createdContract = await createResponse.json();
     
-    if (!response.ok) {
-      console.error('Fel från Oneflows API:', JSON.stringify(body, null, 2));
-      return res.status(response.status).json(body);
+    if (!createResponse.ok) {
+      console.error('Fel vid skapande av kontrakt:', JSON.stringify(createdContract, null, 2));
+      return res.status(createResponse.status).json(createdContract);
     }
 
-    return res.status(200).json({ contract: body });
+    console.log('✅ Kontrakt skapat framgångsrikt:', createdContract.id);
+
+    // STEG 2: Publicera kontraktet (endast om sendForSigning är true)
+    if (sendForSigning) {
+      console.log('🚀 Publicerar kontrakt för signering...');
+      
+      const publishPayload = {
+        subject: `Avtal från ${ownerCompanyName}`,
+        message: `Hej ${recipient.name}!\n\nBifogat finner du vårt avtal för signering.\n\nVänliga hälsningar,\n${ownerCompanyName}`
+      };
+
+      const publishResponse = await fetch(
+        `https://api.oneflow.com/v1/contracts/${createdContract.id}/publish`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Oneflow-API-Token': token,
+            'X-Oneflow-User-Email': userEmail,
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(publishPayload),
+        }
+      );
+
+      if (!publishResponse.ok) {
+        const publishError = await publishResponse.json();
+        console.error('⚠️ Kontrakt skapat men kunde inte publiceras:', JSON.stringify(publishError, null, 2));
+        
+        // Returnera kontraktet ändå, men med en varning
+        return res.status(200).json({ 
+          contract: createdContract,
+          warning: 'Kontrakt skapat men kunde inte skickas för signering automatiskt',
+          publishError: publishError
+        });
+      }
+
+      console.log('✅ Kontrakt publicerat och skickat för signering');
+    }
+
+    return res.status(200).json({ contract: createdContract });
     
   } catch (error) {
     console.error('Internt serverfel vid anrop till Oneflow:', error);
