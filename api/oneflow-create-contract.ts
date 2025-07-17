@@ -1,4 +1,4 @@
-// api/oneflow-create-contract.ts - SLUTGILTIG KORRIGERAD VERSION
+// api/oneflow-create-contract.ts - SLUTGILTIG KORRIGERAD VERSION v3
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
@@ -101,9 +101,9 @@ async function createContract(
     
     // ==================================================================
     // HÄR ÄR DEN AVGÖRANDE KORRIGERINGEN
-    // Vi går tillbaka till den ursprungliga endpointen /contracts
+    // Den korrekta endpointen är /contracts/create-from-template
     // ==================================================================
-    const response = await fetch(`${ONEFLOW_API_URL}/contracts`, {
+    const response = await fetch(`${ONEFLOW_API_URL}/contracts/create-from-template`, {
         method: 'POST',
         headers: {
             'x-oneflow-api-token': ONEFLOW_API_TOKEN,
