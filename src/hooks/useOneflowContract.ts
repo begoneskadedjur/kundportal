@@ -1,5 +1,6 @@
-// src/hooks/useOneflowContract.ts - Custom hook för Oneflow kontrakt-hantering
+// src/hooks/useOneflowContract.ts - UPPDATERAD MED ANVÄNDARKONTEXT
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext' // 🆕 ANVÄND AUTH CONTEXT
 import toast from 'react-hot-toast'
 
 interface ContractRecipient {
@@ -19,6 +20,7 @@ interface CreateContractParams {
   recipient: ContractRecipient
   sendForSigning: boolean
   partyType: 'company' | 'individual'
+  senderName?: string // 🆕 VALFRITT: Överstyr standard namn
 }
 
 interface UseOneflowContractReturn {
@@ -31,15 +33,35 @@ interface UseOneflowContractReturn {
   createContract: (params: CreateContractParams) => Promise<any>
   clearError: () => void
   resetContract: () => void
+  
+  // 🆕 ANVÄNDARINFO
+  currentUser: any
+  senderEmail: string | null
+  senderName: string | null
 }
 
 export function useOneflowContract(): UseOneflowContractReturn {
+  const { user, profile } = useAuth() // 🆕 HÄMTA ANVÄNDARINFO
   const [isCreating, setIsCreating] = useState(false)
   const [createdContract, setCreatedContract] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // 🆕 BESTÄM AVSÄNDAREINFO
+  const senderEmail = user?.email || null
+  const senderName = profile?.display_name || 
+                    user?.user_metadata?.full_name || 
+                    'BeGone Medarbetare'
+
   const createContract = async (params: CreateContractParams) => {
-    const { templateId, contractData, recipient, sendForSigning, partyType } = params
+    const { templateId, contractData, recipient, sendForSigning, partyType, senderName: customSenderName } = params
+
+    // 🆕 VALIDERA ATT ANVÄNDAREN ÄR INLOGGAD
+    if (!user?.email) {
+      const errorMsg = 'Du måste vara inloggad för att skapa kontrakt'
+      setError(errorMsg)
+      toast.error(errorMsg)
+      throw new Error(errorMsg)
+    }
 
     // Validering
     if (!templateId || !recipient.email) {
@@ -53,12 +75,16 @@ export function useOneflowContract(): UseOneflowContractReturn {
     setError(null)
 
     try {
+      const finalSenderName = customSenderName || senderName
+
       console.log('🚀 Skapar Oneflow kontrakt med data:', {
         templateId,
         contractData,
         recipient,
         sendForSigning,
-        partyType
+        partyType,
+        senderEmail: user.email,
+        senderName: finalSenderName
       })
 
       const response = await fetch('/api/oneflow/create-contract', {
@@ -71,7 +97,10 @@ export function useOneflowContract(): UseOneflowContractReturn {
           contractData, 
           recipient, 
           sendForSigning, 
-          partyType 
+          partyType,
+          // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
+          senderEmail: user.email,
+          senderName: finalSenderName
         })
       })
       
@@ -86,20 +115,20 @@ export function useOneflowContract(): UseOneflowContractReturn {
       
       setCreatedContract(result.contract)
       
-      // Success meddelande
+      // 🆕 PERSONALISERAT SUCCESS MEDDELANDE
       const successMsg = sendForSigning 
-        ? '✅ Kontrakt skapat och skickat för signering!' 
-        : '✅ Kontrakt skapat som utkast!'
+        ? `✅ Kontrakt skapat och skickat från ${user.email} för signering!` 
+        : `✅ Kontrakt skapat som utkast av ${finalSenderName}!`
+      
       toast.success(successMsg)
       
       return result.contract
       
-    } catch (err: any) {
-      const errorMsg = `Fel vid skapande av kontrakt: ${err.message}`
-      console.error('❌', errorMsg, err)
-      setError(errorMsg)
-      toast.error(errorMsg)
-      throw err
+    } catch (error: any) {
+      console.error('❌ Fel vid skapande av kontrakt:', error)
+      setError(error.message)
+      toast.error(`❌ Fel: ${error.message}`)
+      throw error
     } finally {
       setIsCreating(false)
     }
@@ -123,6 +152,11 @@ export function useOneflowContract(): UseOneflowContractReturn {
     // Actions
     createContract,
     clearError,
-    resetContract
+    resetContract,
+    
+    // 🆕 ANVÄNDARINFO
+    currentUser: user,
+    senderEmail,
+    senderName
   }
 }

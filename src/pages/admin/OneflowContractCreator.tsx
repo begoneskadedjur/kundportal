@@ -1,9 +1,10 @@
 // 📁 src/components/admin/OneflowContractCreator.tsx
-// KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE
+// KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
 import React, { useState } from 'react'
 import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -74,15 +75,18 @@ const STEPS = [
 
 export default function OneflowContractCreator() {
   const navigate = useNavigate()
+  const { user, profile } = useAuth() // 🆕 HÄMTA ANVÄNDARINFO
   const [currentStep, setCurrentStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
   const [createdContract, setCreatedContract] = useState<any>(null)
   
+  // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
     selectedTemplate: '',
     partyType: 'company',
-    anstalld: 'Christian Karlsson',
-    'e-post-anstlld': 'christian.karlsson@begone.se',
+    // 🆕 ANVÄND INLOGGAD ANVÄNDARES INFO SOM DEFAULT
+    anstalld: user?.user_metadata?.full_name || profile?.display_name || 'BeGone Medarbetare',
+    'e-post-anstlld': user?.email || 'medarbetare@begone.se',
     avtalslngd: '1',
     begynnelsedag: new Date().toISOString().split('T')[0],
     Kontaktperson: '',
@@ -164,7 +168,10 @@ export default function OneflowContractCreator() {
           contractData, 
           recipient, 
           sendForSigning: wizardData.sendForSigning, 
-          partyType: wizardData.partyType
+          partyType: wizardData.partyType,
+          // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
+          senderEmail: user?.email,
+          senderName: wizardData.anstalld
         })
       })
       
@@ -307,6 +314,17 @@ export default function OneflowContractCreator() {
             
             <Card className="p-6">
               <div className="space-y-4">
+                {/* 🆕 VISA AKTUELL ANVÄNDARES INFO */}
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-blue-400 text-sm mb-2">
+                    <User className="w-4 h-4" />
+                    <span>Inloggad som: {user?.email}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Avtalet kommer att skapas i ditt namn och skickas från din e-post.
+                  </p>
+                </div>
+                
                 <Input
                   label="Ansvarig från BeGone *"
                   value={wizardData.anstalld}
@@ -485,6 +503,28 @@ export default function OneflowContractCreator() {
               <p className="text-slate-400">Kontrollera att allt ser korrekt ut innan du skapar avtalet</p>
             </div>
             
+            {/* 🆕 VISA AVSÄNDARINFO */}
+            <Card className="p-6 bg-green-500/10 border-green-500/20">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Avsändare
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Namn:</span>
+                  <span className="text-white">{wizardData.anstalld}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">E-post:</span>
+                  <span className="text-white">{user?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Oneflow-användare:</span>
+                  <span className="text-green-400">✓ Aktiv</span>
+                </div>
+              </div>
+            </Card>
+
             {/* Sammanfattning */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <Card className="p-6">
@@ -556,7 +596,7 @@ export default function OneflowContractCreator() {
               
               <p className="text-sm text-slate-400 mt-3 px-4">
                 {wizardData.sendForSigning 
-                  ? '📧 Kontraktet publiceras och skickas omedelbart till motparten för signering' 
+                  ? `📧 Kontraktet publiceras och skickas från ${user?.email} till motparten för signering` 
                   : '📝 Kontraktet skapas som utkast i Oneflow och kan skickas senare'
                 }
               </p>
@@ -630,8 +670,9 @@ export default function OneflowContractCreator() {
                       setWizardData({
                         selectedTemplate: '',
                         partyType: 'company',
-                        anstalld: 'Christian Karlsson',
-                        'e-post-anstlld': 'christian.karlsson@begone.se',
+                        // 🆕 ÅTERSTÄLL MED ANVÄNDARENS INFO
+                        anstalld: user?.user_metadata?.full_name || profile?.display_name || 'BeGone Medarbetare',
+                        'e-post-anstlld': user?.email || 'medarbetare@begone.se',
                         avtalslngd: '1',
                         begynnelsedag: new Date().toISOString().split('T')[0],
                         Kontaktperson: '',
