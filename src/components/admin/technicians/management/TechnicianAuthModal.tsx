@@ -1,4 +1,4 @@
-// src/components/admin/technicians/management/TechnicianAuthModal.tsx
+// src/components/admin/technicians/management/TechnicianAuthModal.tsx - UPPDATERAD
 import { useState } from 'react'
 import { Key, Eye, EyeOff, User, AlertCircle } from 'lucide-react'
 import Button from '../../../ui/Button'
@@ -50,44 +50,24 @@ export default function TechnicianAuthModal({
     setLoading(true)
 
     try {
-      // 1. Skapa auth user
-      const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
-        email: technician.email,
-        password: formData.password,
-        email_confirm: true,
-        user_metadata: {
-          display_name: formData.display_name,
-          role: 'technician',
+      // Använd API route istället för direkt supabase.auth.admin
+      const response = await fetch('/api/enable-technician-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           technician_id: technician.id,
-          technician_name: technician.name
-        }
-      })
-
-      if (authError) {
-        throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`)
-      }
-
-      // 2. Skapa tekniker-profil
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: newAuthUser.user.id,
-          user_id: newAuthUser.user.id,
           email: technician.email,
-          customer_id: null, // Tekniker har ingen customer_id
-          is_admin: false,    // Tekniker är inte admin
-          is_active: true,
-          // Tekniker-specifika fält
-          technician_id: technician.id,
-          role: 'technician',
+          password: formData.password,
           display_name: formData.display_name
         })
+      })
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError)
-        // Rensa upp auth user vid fel
-        await supabase.auth.admin.deleteUser(newAuthUser.user.id)
-        throw new Error(`Kunde inte skapa profil: ${profileError.message}`)
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte aktivera inloggning')
       }
 
       toast.success(`Inloggning aktiverat för ${technician.name}!`)
@@ -110,22 +90,21 @@ export default function TechnicianAuthModal({
     setLoading(true)
 
     try {
-      // Hitta profil
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('technician_id', technician.id)
-        .single()
+      // Använd API route för disable också
+      const response = await fetch('/api/disable-technician-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technician_id: technician.id
+        })
+      })
 
-      if (profile) {
-        // Ta bort profil
-        await supabase
-          .from('profiles')
-          .delete()
-          .eq('technician_id', technician.id)
+      const result = await response.json()
 
-        // Ta bort auth user
-        await supabase.auth.admin.deleteUser(profile.user_id)
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte inaktivera inloggning')
       }
 
       toast.success('Inloggning inaktiverat!')
