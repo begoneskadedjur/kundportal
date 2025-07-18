@@ -1,10 +1,11 @@
-// src/contexts/AuthContext.tsx - KOMPLETT FIXAD VERSION
+// src/contexts/AuthContext.tsx - KOMPLETT UPPDATERAD VERSION MED TEKNIKER-STÖD
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+// 🆕 UPPDATERAD PROFILE MED TEKNIKER-STÖD
 type Profile = {
   id: string;
   email: string;
@@ -12,6 +13,10 @@ type Profile = {
   is_active: boolean;
   customer_id: string | null;
   user_id: string;
+  // 🆕 TEKNIKER-FÄLT
+  technician_id?: string | null;
+  role?: 'admin' | 'customer' | 'technician';
+  display_name?: string | null;
 };
 
 type AuthContextType = {
@@ -22,7 +27,8 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isCustomer: boolean;
-  fetchProfile: (userId: string) => Promise<void>; // Exponera för extern användning
+  isTechnician: boolean; // 🆕 TEKNIKER-CHECK
+  fetchProfile: (userId: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,14 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Förbättrad fetchProfile med auto-acceptering
+  // 🆕 FÖRBÄTTRAD FETCHPROFILE MED TEKNIKER-STÖD
   const fetchProfile = async (userId: string, authUser?: User) => {
     try {
       console.log('📋 Fetching profile for user:', userId);
       
+      // 🆕 HÄMTA PROFIL MED TEKNIKER-KOPPLING
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          technicians(name, role, email)
+        `)
         .eq('user_id', userId)
         .single();
 
@@ -106,7 +116,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: profileData.id,
         email: profileData.email,
         is_admin: profileData.is_admin,
-        customer_id: profileData.customer_id
+        customer_id: profileData.customer_id,
+        technician_id: profileData.technician_id,
+        role: profileData.role,
+        display_name: profileData.display_name
       });
       
       setProfile(profileData);
@@ -119,13 +132,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // FIXED: Navigera enligt din faktiska routing struktur
+      // 🆕 FÖRBÄTTRAD NAVIGATION MED TEKNIKER-STÖD
       const currentPath = location.pathname;
       const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
       
       if (shouldNavigate) {
-        // FIX: Använd korrekt paths enligt din App.tsx
-        const targetPath = profileData.is_admin ? '/admin' : '/customer';
+        let targetPath = '/customer'; // Default för kunder
+        
+        if (profileData.is_admin) {
+          targetPath = '/admin';
+        } else if (profileData.role === 'technician') {
+          targetPath = '/technician'; // 🆕 TEKNIKER-PORTAL (FRAMTIDA)
+        }
+        
         console.log(`🧭 Navigating from ${currentPath} to ${targetPath}`);
         
         // Använd setTimeout för att undvika navigation under rendering
@@ -338,7 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('🐛 AuthContext State:', {
       user: user?.email || 'null',
-      profile: profile ? `${profile.email} (${profile.is_admin ? 'admin' : 'customer'})` : 'null',
+      profile: profile ? `${profile.email} (${profile.role || (profile.is_admin ? 'admin' : 'customer')})` : 'null',
       loading,
       initialized,
       currentPath: location.pathname
@@ -353,6 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     isAdmin: profile?.is_admin ?? false,
     isCustomer: !profile?.is_admin && !!profile?.customer_id,
+    isTechnician: profile?.role === 'technician', // 🆕 TEKNIKER-CHECK
     fetchProfile: (userId: string) => fetchProfile(userId)
   };
 

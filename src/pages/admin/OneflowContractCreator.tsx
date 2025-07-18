@@ -1,10 +1,10 @@
-// 📁 src/components/admin/OneflowContractCreator.tsx
+// 📁 src/pages/admin/oneflow/OneflowContractCreator.tsx
 // KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
 import React, { useState } from 'react'
 import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
+import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
