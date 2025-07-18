@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianCases.tsx - TEKNIKER ÄRENDEÖVERSIKT
+// src/pages/technician/TechnicianCases.tsx - FIXAD MED KORREKT AUTH
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -60,6 +60,7 @@ const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'completed':
     case 'avslutad':
+    case 'avslutat':
       return 'bg-green-500/20 text-green-400'
     case 'in progress':
     case 'pågående':
@@ -77,9 +78,11 @@ const getPriorityColor = (priority?: string) => {
   switch (priority?.toLowerCase()) {
     case 'high':
     case 'hög':
+    case 'urgent':
       return 'bg-red-500/20 text-red-400'
     case 'medium':
     case 'medel':
+    case 'normal':
       return 'bg-orange-500/20 text-orange-400'
     case 'low':
     case 'låg':
@@ -90,11 +93,12 @@ const getPriorityColor = (priority?: string) => {
 }
 
 export default function TechnicianCases() {
-  const { profile } = useAuth()
+  const { profile, technician, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [cases, setCases] = useState<TechnicianCase[]>([])
   const [filteredCases, setFilteredCases] = useState<TechnicianCase[]>([])
   const [stats, setStats] = useState<CaseStats>({
@@ -112,28 +116,57 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
+  // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
-    if (profile?.technician_id) {
+    if (!isTechnician || !technician?.id) {
+      console.log('❌ Inte en tekniker, omdirigerar från cases...', { isTechnician, technician })
+      navigate('/login', { replace: true })
+      return
+    }
+  }, [isTechnician, technician, navigate])
+
+  useEffect(() => {
+    if (isTechniker && technician?.id) {
       fetchCases()
     }
-  }, [profile?.technician_id])
+  }, [isTechniker, technician?.id])
 
   useEffect(() => {
     applyFilters()
   }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
   const fetchCases = async () => {
+    if (!technician?.id) {
+      setError('Ingen tekniker-ID tillgänglig')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
+      setError(null)
       
-      const response = await fetch(`/api/technician/cases?technician_id=${profile?.technician_id}`)
+      console.log('🔄 Fetching cases for technician:', technician.id)
+      
+      const response = await fetch(`/api/technician/cases?technician_id=${technician.id}`)
+      
       if (response.ok) {
         const data = await response.json()
         setCases(data.cases || [])
         setStats(data.stats || {})
+        
+        console.log('✅ Cases loaded:', {
+          total: data.cases?.length || 0,
+          stats: data.stats
+        })
+      } else {
+        const errorText = await response.text()
+        console.error('❌ Cases API error:', response.status, errorText)
+        setError(`Kunde inte hämta ärenden: ${response.status}`)
       }
     } catch (error) {
-      console.error('Error fetching cases:', error)
+      console.error('💥 Error fetching cases:', error)
+      setError('Ett oväntat fel uppstod vid hämtning av ärenden')
     } finally {
       setLoading(false)
     }
@@ -144,17 +177,32 @@ export default function TechnicianCases() {
 
     // Textsökning
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(case_ => 
-        case_.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        case_.kontaktperson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        case_.foretag?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        case_.case_number?.toLowerCase().includes(searchTerm.toLowerCase())
+        case_.title?.toLowerCase().includes(searchLower) ||
+        case_.kontaktperson?.toLowerCase().includes(searchLower) ||
+        case_.foretag?.toLowerCase().includes(searchLower) ||
+        case_.case_number?.toLowerCase().includes(searchLower) ||
+        case_.clickup_task_id?.toLowerCase().includes(searchLower)
       )
     }
 
     // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(case_ => case_.status?.toLowerCase() === statusFilter.toLowerCase())
+      if (statusFilter === 'completed') {
+        filtered = filtered.filter(case_ => 
+          case_.status?.toLowerCase() === 'completed' || 
+          case_.status?.toLowerCase() === 'avslutat' ||
+          case_.status?.toLowerCase() === 'avslutad'
+        )
+      } else if (statusFilter === 'in progress') {
+        filtered = filtered.filter(case_ => 
+          case_.status?.toLowerCase().includes('progress') || 
+          case_.status?.toLowerCase().includes('pågående')
+        )
+      } else {
+        filtered = filtered.filter(case_ => case_.status?.toLowerCase() === statusFilter.toLowerCase())
+      }
     }
 
     // Typ filter
@@ -188,6 +236,28 @@ export default function TechnicianCases() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8 max-w-md">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda ärenden</h2>
+            <p className="text-slate-400 mb-4">{error}</p>
+            <div className="space-y-2">
+              <Button onClick={fetchCases} className="w-full">
+                Försök igen
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
+                Tillbaka till dashboard
+              </Button>
+            </div>
+          </div>
+        </Card>
       </div>
     )
   }
@@ -356,6 +426,12 @@ export default function TechnicianCases() {
                         <Calendar className="w-3 h-3" />
                         {formatDate(case_.created_date)}
                       </span>
+                      {case_.completed_date && (
+                        <span className="flex items-center gap-1 text-green-400">
+                          <CheckCircle className="w-3 h-3" />
+                          {formatDate(case_.completed_date)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -386,20 +462,27 @@ export default function TechnicianCases() {
                     <p className="text-sm text-slate-300 flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-slate-400" />
                       {case_.foretag}
+                      {case_.org_nr && (
+                        <span className="text-slate-500 text-xs">({case_.org_nr})</span>
+                      )}
                     </p>
                   )}
 
                   {case_.telefon && (
                     <p className="text-sm text-slate-300 flex items-center gap-2">
                       <Phone className="w-4 h-4 text-slate-400" />
-                      {case_.telefon}
+                      <a href={`tel:${case_.telefon}`} className="hover:text-blue-400 transition-colors">
+                        {case_.telefon}
+                      </a>
                     </p>
                   )}
 
                   {case_.email && (
                     <p className="text-sm text-slate-300 flex items-center gap-2">
                       <Mail className="w-4 h-4 text-slate-400" />
-                      {case_.email}
+                      <a href={`mailto:${case_.email}`} className="hover:text-blue-400 transition-colors">
+                        {case_.email}
+                      </a>
                     </p>
                   )}
 
@@ -424,7 +507,7 @@ export default function TechnicianCases() {
                 {case_.beskrivning && (
                   <div className="mb-4">
                     <p className="text-xs text-slate-400 mb-1">Beskrivning:</p>
-                    <p className="text-sm text-slate-300 bg-slate-800/50 rounded px-2 py-1">
+                    <p className="text-sm text-slate-300 bg-slate-800/50 rounded px-2 py-1 line-clamp-3">
                       {case_.beskrivning}
                     </p>
                   </div>
@@ -433,8 +516,10 @@ export default function TechnicianCases() {
                 {/* Åtgärder */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-700">
                   <div className="text-xs text-slate-400">
-                    {case_.case_number && (
+                    {case_.case_number ? (
                       <span>Ärendenr: {case_.case_number}</span>
+                    ) : (
+                      <span>ClickUp: {case_.clickup_task_id}</span>
                     )}
                   </div>
                   
@@ -452,17 +537,15 @@ export default function TechnicianCases() {
                       </span>
                     )}
                     
-                    {case_.clickup_url && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.open(case_.clickup_url, '_blank')}
-                        className="flex items-center gap-2"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        ClickUp
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(case_.clickup_url || `https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      ClickUp
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -479,11 +562,33 @@ export default function TechnicianCases() {
                       : 'Du har inga tilldelade ärenden för tillfället.'
                     }
                   </p>
+                  {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearchTerm('')
+                        setStatusFilter('all')
+                        setTypeFilter('all')
+                      }}
+                    >
+                      Rensa filter
+                    </Button>
+                  )}
                 </div>
               </Card>
             </div>
           )}
         </div>
+
+        {/* Visningsinfo */}
+        {filteredCases.length > 0 && (
+          <div className="mt-6 text-center">
+            <p className="text-slate-400 text-sm">
+              Visar {filteredCases.length} av {cases.length} ärenden
+              {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && ' (filtrerade)'}
+            </p>
+          </div>
+        )}
       </main>
     </div>
   )

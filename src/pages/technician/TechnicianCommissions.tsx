@@ -1,10 +1,10 @@
-// src/pages/technician/TechnicianCommissions.tsx - TEKNIKER PROVISIONSÖVERSIKT
+// src/pages/technician/TechnicianCommissions.tsx - FIXAD MED KORREKT AUTH
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, DollarSign, Calendar, TrendingUp, Eye, FileText,
-  ChevronLeft, ChevronRight, Building2, User, CheckCircle
+  ChevronLeft, ChevronRight, Building2, User, CheckCircle, AlertCircle
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -45,11 +45,12 @@ interface CommissionStats {
 }
 
 export default function TechnicianCommissions() {
-  const { profile } = useAuth()
+  const { profile, technician, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
   const [monthlyData, setMonthlyData] = useState<MonthlyCommission[]>([])
   const [selectedMonthCases, setSelectedMonthCases] = useState<CommissionCase[]>([])
@@ -61,23 +62,42 @@ export default function TechnicianCommissions() {
     best_month_name: ''
   })
 
+  // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
-    if (profile?.technician_id) {
+    if (!isTechnician || !technician?.id) {
+      console.log('❌ Inte en tekniker, omdirigerar från commissions...', { isTechnician, technician })
+      navigate('/login', { replace: true })
+      return
+    }
+  }, [isTechnician, technician, navigate])
+
+  useEffect(() => {
+    if (isTechnician && technician?.id) {
       fetchCommissionData()
     }
-  }, [profile?.technician_id])
+  }, [isTechnician, technician?.id])
 
   useEffect(() => {
-    if (selectedMonth && profile?.technician_id) {
+    if (selectedMonth && isTechnician && technician?.id) {
       fetchMonthCases()
     }
-  }, [selectedMonth, profile?.technician_id])
+  }, [selectedMonth, isTechnician, technician?.id])
 
   const fetchCommissionData = async () => {
+    if (!technician?.id) {
+      setError('Ingen tekniker-ID tillgänglig')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
+      setError(null)
       
-      const response = await fetch(`/api/technician/commissions?technician_id=${profile?.technician_id}`)
+      console.log('🔄 Fetching commission data for technician:', technician.id)
+      
+      const response = await fetch(`/api/technician/commissions?technician_id=${technician.id}`)
+      
       if (response.ok) {
         const data = await response.json()
         setMonthlyData(data.monthly_data || [])
@@ -87,25 +107,43 @@ export default function TechnicianCommissions() {
         if (data.monthly_data?.length > 0) {
           setSelectedMonth(data.monthly_data[0].month)
         }
+        
+        console.log('✅ Commission data loaded:', {
+          months: data.monthly_data?.length || 0,
+          total_ytd: data.stats?.total_ytd || 0
+        })
+      } else {
+        const errorText = await response.text()
+        console.error('❌ Commission API error:', response.status, errorText)
+        setError(`Kunde inte hämta provisionsdata: ${response.status}`)
       }
     } catch (error) {
-      console.error('Error fetching commission data:', error)
+      console.error('💥 Error fetching commission data:', error)
+      setError('Ett oväntat fel uppstod vid hämtning av provisionsdata')
     } finally {
       setLoading(false)
     }
   }
 
   const fetchMonthCases = async () => {
+    if (!technician?.id || !selectedMonth) return
+
     try {
+      console.log('🔄 Fetching month cases for:', technician.id, selectedMonth)
+      
       const response = await fetch(
-        `/api/technician/commissions/cases?technician_id=${profile?.technician_id}&month=${selectedMonth}`
+        `/api/technician/commissions/cases?technician_id=${technician.id}&month=${selectedMonth}`
       )
+      
       if (response.ok) {
         const data = await response.json()
         setSelectedMonthCases(data.cases || [])
+        console.log('✅ Month cases loaded:', data.cases?.length || 0)
+      } else {
+        console.error('❌ Month cases API error:', response.status, await response.text())
       }
     } catch (error) {
-      console.error('Error fetching month cases:', error)
+      console.error('💥 Error fetching month cases:', error)
     }
   }
 
@@ -128,6 +166,28 @@ export default function TechnicianCommissions() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8 max-w-md">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda provisioner</h2>
+            <p className="text-slate-400 mb-4">{error}</p>
+            <div className="space-y-2">
+              <Button onClick={fetchCommissionData} className="w-full">
+                Försök igen
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
+                Tillbaka till dashboard
+              </Button>
+            </div>
+          </div>
+        </Card>
       </div>
     )
   }

@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianDashboard.tsx - TEKNIKER HUVUDDASHBOARD
+// src/pages/technician/TechnicianDashboard.tsx - FIXAD MED KORREKT AUTH
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -40,14 +40,17 @@ interface DashboardStats {
   current_month_commission: number
   pending_cases: number
   completed_cases_this_month: number
+  technician_name?: string
+  technician_email?: string
 }
 
 export default function TechnicianDashboard() {
-  const { user, profile } = useAuth()
+  const { user, profile, technician, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     total_commission_ytd: 0,
     total_cases_ytd: 0,
@@ -60,41 +63,74 @@ export default function TechnicianDashboard() {
   const [recentCases, setRecentCases] = useState<TechnicianCase[]>([])
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
 
+  // Säkerhetskontroll - omdirigera om inte tekniker
+  useEffect(() => {
+    if (!isTechnician || !technician?.id) {
+      console.log('❌ Inte en tekniker, omdirigerar...', { isTechnician, technician })
+      navigate('/login', { replace: true })
+      return
+    }
+  }, [isTechnician, technician, navigate])
+
   // Hämta tekniker-specifik data
   useEffect(() => {
-    if (profile?.technician_id) {
+    if (isTechnician && technician?.id) {
+      console.log('✅ Hämtar data för tekniker:', technician.id)
       fetchTechnicianData()
     }
-  }, [profile?.technician_id])
+  }, [isTechnician, technician?.id])
 
   const fetchTechnicianData = async () => {
+    if (!technician?.id) {
+      console.error('❌ Ingen tekniker-ID tillgänglig')
+      setError('Ingen tekniker-ID hittades')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
+      setError(null)
+      
+      console.log('🔄 Fetching data for technician:', technician.id)
       
       // Parallella API-anrop för att hämta all data
       const [statsResponse, commissionsResponse, casesResponse] = await Promise.all([
-        fetch(`/api/technician/stats?technician_id=${profile?.technician_id}`),
-        fetch(`/api/technician/commissions?technician_id=${profile?.technician_id}`),
-        fetch(`/api/technician/cases?technician_id=${profile?.technician_id}&limit=10`)
+        fetch(`/api/technician/stats?technician_id=${technician.id}`),
+        fetch(`/api/technician/commissions?technician_id=${technician.id}`),
+        fetch(`/api/technician/cases?technician_id=${technician.id}&limit=10`)
       ])
 
+      // Hantera stats
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         setStats(statsData)
+        console.log('✅ Stats loaded:', statsData)
+      } else {
+        console.error('❌ Stats API error:', await statsResponse.text())
       }
 
+      // Hantera commissionsData
       if (commissionsResponse.ok) {
         const commissionsData = await commissionsResponse.json()
         setMonthlyCommissions(commissionsData.monthly_data || [])
+        console.log('✅ Commissions loaded:', commissionsData.monthly_data?.length || 0, 'months')
+      } else {
+        console.error('❌ Commissions API error:', await commissionsResponse.text())
       }
 
+      // Hantera cases
       if (casesResponse.ok) {
         const casesData = await casesResponse.json()
         setRecentCases(casesData.cases || [])
+        console.log('✅ Cases loaded:', casesData.cases?.length || 0, 'cases')
+      } else {
+        console.error('❌ Cases API error:', await casesResponse.text())
       }
 
     } catch (error) {
-      console.error('Error fetching technician data:', error)
+      console.error('💥 Error fetching technician data:', error)
+      setError('Kunde inte hämta tekniker-data')
     } finally {
       setLoading(false)
     }
@@ -105,6 +141,7 @@ export default function TechnicianDashboard() {
   const goToCases = () => navigate('/technician/cases')  
   const goToOneflow = () => navigate('/admin/oneflow-contract-creator')
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -113,7 +150,26 @@ export default function TechnicianDashboard() {
     )
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8 max-w-md">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda data</h2>
+            <p className="text-slate-400 mb-4">{error}</p>
+            <Button onClick={fetchTechnicianData}>
+              Försök igen
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
   const currentMonthData = monthlyCommissions.find(m => m.month === selectedMonth)
+  const displayName = technician?.name || profile?.display_name || 'Tekniker'
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -123,10 +179,13 @@ export default function TechnicianDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-white">
-                Välkommen, {profile?.display_name || 'Tekniker'}! 👷‍♂️
+                Välkommen, {displayName}! 👷‍♂️
               </h1>
               <p className="text-slate-400 mt-1">
                 Din personliga översikt över provisioner, ärenden och verktyg
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Tekniker ID: {technician?.id} • Email: {technician?.email || profile?.email}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -239,19 +298,21 @@ export default function TechnicianDashboard() {
             </div>
 
             {/* Månadsväljare */}
-            <div className="mb-4">
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-              >
-                {monthlyCommissions.map(month => (
-                  <option key={month.month} value={month.month}>
-                    {month.month_display}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {monthlyCommissions.length > 0 && (
+              <div className="mb-4">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                >
+                  {monthlyCommissions.map(month => (
+                    <option key={month.month} value={month.month}>
+                      {month.month_display}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Månadsdata */}
             {currentMonthData ? (
@@ -280,7 +341,9 @@ export default function TechnicianDashboard() {
             ) : (
               <div className="text-center py-8">
                 <Clock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-400">Ingen data för vald månad</p>
+                <p className="text-slate-400">
+                  {monthlyCommissions.length === 0 ? 'Ingen provisionsdata ännu' : 'Ingen data för vald månad'}
+                </p>
               </div>
             )}
           </Card>
@@ -316,7 +379,7 @@ export default function TechnicianDashboard() {
                           {case_.title}
                         </p>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          case_.status === 'completed' 
+                          case_.status?.toLowerCase() === 'avslutat' || case_.status?.toLowerCase() === 'completed'
                             ? 'bg-green-500/20 text-green-400'
                             : 'bg-blue-500/20 text-blue-400'
                         }`}>
