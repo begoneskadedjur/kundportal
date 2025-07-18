@@ -1,4 +1,4 @@
-// src/components/shared/ProtectedRoute.tsx - FIXED VERSION
+// src/components/shared/ProtectedRoute.tsx - UPPDATERAD MED TEKNIKER-STÖD
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from './LoadingSpinner'
@@ -9,7 +9,7 @@ type ProtectedRouteProps = {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, profile, loading, isAdmin, isCustomer } = useAuth()
+  const { user, profile, loading, isAdmin, isCustomer, isTechnician } = useAuth()
 
   // Show loading while authentication state is being determined
   if (loading) {
@@ -30,11 +30,23 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // Check role-based access
   if (requiredRole === 'admin' && !isAdmin) {
+    // 🆕 TEKNIKER-STÖD: Tillåt tekniker att använda admin-portalen temporärt
+    if (isTechnician) {
+      console.log('🔧 Tekniker har tillgång till admin-portalen (temporärt)')
+      return <>{children}</>
+    }
+    
     // Admins only - redirect customers to their portal
     return <Navigate to="/customer" replace />
   }
 
   if (requiredRole === 'customer' && !isCustomer) {
+    // 🆕 TEKNIKER-STÖD: Omdirigera tekniker till admin istället för customer
+    if (isTechnician) {
+      console.log('🔧 Tekniker omdirigeras till admin-portalen')
+      return <Navigate to="/admin" replace />
+    }
+    
     // Customers only - redirect admins to admin dashboard  
     return <Navigate to="/admin" replace />
   }

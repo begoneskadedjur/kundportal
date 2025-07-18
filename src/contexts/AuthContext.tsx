@@ -142,7 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profileData.is_admin) {
           targetPath = '/admin';
         } else if (profileData.role === 'technician') {
-          targetPath = '/technician'; // 🆕 TEKNIKER-PORTAL (FRAMTIDA)
+          // 🔧 TEMPORÄR LÖSNING: Tekniker använder admin-portalen tills tekniker-portalen är klar
+          targetPath = '/admin';
+          console.log('🔧 Tekniker dirigeras till admin-portalen (temporärt)');
         }
         
         console.log(`🧭 Navigating from ${currentPath} to ${targetPath}`);
