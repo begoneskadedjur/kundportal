@@ -1,4 +1,4 @@
-// api/technician/stats.ts - API för tekniker-statistik
+// 📁 api/technician/stats.ts - UPPDATERAD MED UUID-BASERAD SÖKNING
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -18,39 +18,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Hämta tekniker info för att få namnet
-    const { data: technician } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
+    console.log('🔄 Fetching technician stats for UUID:', technician_id)
 
-    if (!technician) {
-      return res.status(404).json({ error: 'Tekniker hittades inte' })
-    }
-
-    // Nuvarande år
+    // Nuvarande år och månad
     const currentYear = new Date().getFullYear()
     const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-    // Beräkna provisioner från private_cases (namn-matchning)
-    const { data: privateCases } = await supabase
-      .from('private_cases')
-      .select('commission_amount, completed_date, case_price')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .gte('completed_date', `${currentYear}-01-01`)
+    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-MATCHNING
+    const [privateCases, businessCases, pendingPrivate, pendingBusiness] = await Promise.all([
+      // YTD Private cases med UUID
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date, pris')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', `${currentYear}-01-01`),
 
-    // Beräkna provisioner från business_cases (namn-matchning)
-    const { data: businessCases } = await supabase
-      .from('business_cases')
-      .select('commission_amount, completed_date, case_price')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .gte('completed_date', `${currentYear}-01-01`)
+      // YTD Business cases med UUID  
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date, pris')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', `${currentYear}-01-01`),
+
+      // Pågående private cases
+      supabase
+        .from('private_cases')
+        .select('id')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .is('completed_date', null),
+
+      // Pågående business cases
+      supabase
+        .from('business_cases')
+        .select('id')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .is('completed_date', null)
+    ])
 
     // Kombinera alla ärenden
-    const allCases = [...(privateCases || []), ...(businessCases || [])]
+    const allCases = [...(privateCases.data || []), ...(businessCases.data || [])]
 
     // Beräkna statistik
     const totalCommissionYtd = allCases.reduce((sum, case_) => sum + (case_.commission_amount || 0), 0)
@@ -62,23 +70,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
     const currentMonthCommission = currentMonthCases.reduce((sum, case_) => sum + (case_.commission_amount || 0), 0)
 
-    // Pågående ärenden (utan completed_date)
-    const { data: pendingPrivate } = await supabase
-      .from('private_cases')
-      .select('id')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .is('completed_date', null)
-
-    const { data: pendingBusiness } = await supabase
-      .from('business_cases')
-      .select('id')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .is('completed_date', null)
-
-    const pendingCases = (pendingPrivate?.length || 0) + (pendingBusiness?.length || 0)
+    // Pågående ärenden
+    const pendingCases = (pendingPrivate.data?.length || 0) + (pendingBusiness.data?.length || 0)
 
     // Genomsnittlig provision per ärende
     const avgCommissionPerCase = totalCasesYtd > 0 ? totalCommissionYtd / totalCasesYtd : 0
+
+    // Hämta tekniker-namn för display (efter all beräkning)
+    const { data: technician } = await supabase
+      .from('technicians')
+      .select('name, email')
+      .eq('id', technician_id)
+      .single()
 
     const stats = {
       total_commission_ytd: totalCommissionYtd,
@@ -87,9 +90,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       current_month_commission: currentMonthCommission,
       pending_cases: pendingCases,
       completed_cases_this_month: currentMonthCases.length,
-      technician_name: technician.name,
-      technician_email: technician.email
+      technician_name: technician?.name || 'Okänd tekniker',
+      technician_email: technician?.email || ''
     }
+
+    console.log(`✅ Stats calculated for UUID ${technician_id}:`, {
+      total_commission: totalCommissionYtd,
+      total_cases: totalCasesYtd,
+      pending: pendingCases
+    })
 
     res.status(200).json(stats)
 

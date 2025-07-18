@@ -1,4 +1,4 @@
-// api/technician/commissions/cases.ts - API för tekniker provisionsärenden per månad
+// 📁 api/technician/commissions/cases.ts - UPPDATERAD MED UUID-BASERAD SÖKNING
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -23,56 +23,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Hämta tekniker info
-    const { data: technician } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
-
-    if (!technician) {
-      return res.status(404).json({ error: 'Tekniker hittades inte' })
-    }
+    console.log(`🔄 Fetching month commission cases for UUID: ${technician_id}, month: ${month}`)
 
     const monthStr = month as string
     const startDate = `${monthStr}-01`
     const endDate = `${monthStr}-31`
 
-    // Hämta private cases för månaden
-    const { data: privateCases } = await supabase
-      .from('private_cases')
-      .select(`
-        id, clickup_task_id, title, commission_amount, case_price, completed_date,
-        kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
-      `)
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .gte('completed_date', startDate)
-      .lte('completed_date', endDate)
-      .order('completed_date', { ascending: false })
+    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-LOOKUP BEHÖVS
+    const [privateCases, businessCases] = await Promise.all([
+      // Private cases för månaden med UUID
+      supabase
+        .from('private_cases')
+        .select(`
+          id, clickup_task_id, title, commission_amount, pris as case_price, completed_date,
+          kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
+        `)
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', startDate)
+        .lte('completed_date', endDate)
+        .order('completed_date', { ascending: false }),
 
-    // Hämta business cases för månaden
-    const { data: businessCases } = await supabase
-      .from('business_cases')
-      .select(`
-        id, clickup_task_id, title, commission_amount, case_price, completed_date,
-        kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
-      `)
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .gte('completed_date', startDate)
-      .lte('completed_date', endDate)
-      .order('completed_date', { ascending: false })
+      // Business cases för månaden med UUID
+      supabase
+        .from('business_cases')
+        .select(`
+          id, clickup_task_id, title, commission_amount, pris as case_price, completed_date,
+          kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
+        `)
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', startDate)
+        .lte('completed_date', endDate)
+        .order('completed_date', { ascending: false })
+    ])
 
     // Kombinera och formatera
     const cases = [
-      ...(privateCases || []).map(c => ({
+      ...(privateCases.data || []).map(c => ({
         ...c,
         type: 'private' as const,
         case_number: `P-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
-      ...(businessCases || []).map(c => ({
+      ...(businessCases.data || []).map(c => ({
         ...c,
         type: 'business' as const,
         case_number: `B-${c.clickup_task_id}`,
@@ -104,11 +98,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       avg_commission_per_case: cases.length > 0 ? totalCommission / cases.length : 0
     }
 
+    // Hämta tekniker-namn för display (efter all beräkning)
+    const { data: technician } = await supabase
+      .from('technicians')
+      .select('name')
+      .eq('id', technician_id)
+      .single()
+
+    console.log(`✅ Month commission cases fetched for UUID ${technician_id}:`, {
+      month: monthStr,
+      cases: cases.length,
+      total_commission: totalCommission
+    })
+
     res.status(200).json({
       cases,
       summary,
       month: monthStr,
-      technician_name: technician.name
+      technician_name: technician?.name || 'Okänd tekniker'
     })
 
   } catch (error) {

@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - KOMPLETT UPPDATERAD VERSION MED TEKNIKER-STÖD
+// src/contexts/AuthContext.tsx - SÄKERT UPPDATERAD MED TEKNIKER-STÖD
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -17,6 +17,12 @@ type Profile = {
   technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician';
   display_name?: string | null;
+  // Tekniker-data från join (optional)
+  technicians?: {
+    name: string;
+    role: string; 
+    email: string;
+  } | null;
 };
 
 type AuthContextType = {
@@ -29,6 +35,12 @@ type AuthContextType = {
   isCustomer: boolean;
   isTechnician: boolean; // 🆕 TEKNIKER-CHECK
   fetchProfile: (userId: string) => Promise<void>;
+  // 🆕 TEKNIKER-SPECIFIK DATA
+  technician: {
+    id: string | null;
+    name: string | null;
+    email: string | null;
+  } | null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Auto-acceptering av inbjudan
+  // Auto-acceptering av inbjudan (oförändrad)
   const autoAcceptInvitation = async (customerId: string, email: string, userId: string) => {
     try {
       console.log('🎫 Auto-accepting invitation for customer:', customerId);
@@ -81,20 +93,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 🆕 FÖRBÄTTRAD FETCHPROFILE MED TEKNIKER-STÖD
+  // 🆕 SÄKER FETCHPROFILE MED GRACEFUL FALLBACK
   const fetchProfile = async (userId: string, authUser?: User) => {
     try {
       console.log('📋 Fetching profile for user:', userId);
       
-      // 🆕 HÄMTA PROFIL MED TEKNIKER-KOPPLING
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          technicians(name, role, email)
-        `)
-        .eq('user_id', userId)
-        .single();
+      // 🆕 FÖRSÖK FÖRST MED TEKNIKER-JOIN, FALLBACK VID FEL
+      let profileData = null;
+      let error = null;
+
+      try {
+        // Försök med tekniker-join
+        const result = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            technicians(name, role, email)
+          `)
+          .eq('user_id', userId)
+          .single();
+        
+        profileData = result.data;
+        error = result.error;
+        
+        console.log('✅ Profile with technician join successful');
+      } catch (joinError) {
+        console.log('⚠️ Technician join failed, falling back to basic profile fetch');
+        
+        // Fallback till basic profile fetch
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        
+        profileData = result.data;
+        error = result.error;
+        
+        console.log('✅ Basic profile fetch successful');
+      }
 
       if (error) {
         console.error('Profile fetch error:', error);
@@ -119,12 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         customer_id: profileData.customer_id,
         technician_id: profileData.technician_id,
         role: profileData.role,
-        display_name: profileData.display_name
+        display_name: profileData.display_name,
+        has_technician_data: !!profileData.technicians
       });
       
       setProfile(profileData);
 
-      // Auto-acceptera inbjudan för kunder
+      // Auto-acceptera inbjudan för kunder (oförändrat)
       if (!profileData.is_admin && profileData.customer_id) {
         const userEmail = authUser?.email || user?.email || profileData.email;
         if (userEmail) {
@@ -132,19 +170,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 🆕 FÖRBÄTTRAD NAVIGATION MED TEKNIKER-STÖD
+      // 🆕 SÄKER NAVIGATION MED FALLBACK
       const currentPath = location.pathname;
       const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
       
       if (shouldNavigate) {
-        let targetPath = '/customer'; // Default för kunder
+        let targetPath = '/customer'; // Säker default
         
         if (profileData.is_admin) {
           targetPath = '/admin';
-        } else if (profileData.role === 'technician') {
-          // 🆕 TEKNIKER-PORTAL NU TILLGÄNGLIG!
-          targetPath = '/technician';
+        } else if (profileData.role === 'technician' && profileData.technician_id) {
+          // 🆕 EXTRA SÄKERHETSKONTROLL FÖR TEKNIKER
+          targetPath = '/technician/dashboard';
           console.log('🔧 Tekniker dirigeras till tekniker-portalen');
+        } else if (profileData.customer_id) {
+          targetPath = '/customer';
         }
         
         console.log(`🧭 Navigating from ${currentPath} to ${targetPath}`);
@@ -159,7 +199,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('💥 Profile fetch error:', error);
       toast.error(error.message || 'Kunde inte hämta profilinformation');
       
-      // Logga ut vid kritiska fel
+      // 🚨 VID KRITISKA FEL - logga bara ut tekniker, inte alla
+      if (error.message.includes('relation') || error.message.includes('technician')) {
+        console.log('🔧 Tekniker-relaterat fel, men fortsätter med basic profil');
+        // Försök igen utan tekniker-join
+        try {
+          const { data: basicProfile, error: basicError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+          
+          if (!basicError && basicProfile && basicProfile.is_active) {
+            setProfile(basicProfile);
+            console.log('✅ Återhämtning med basic profil lyckades');
+            return;
+          }
+        } catch (fallbackError) {
+          console.error('💥 Även fallback misslyckades:', fallbackError);
+        }
+      }
+      
+      // Bara logga ut vid verkligt kritiska fel
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
@@ -168,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Auth initialization
+  // Auth initialization (oförändrad)
   useEffect(() => {
     let isMounted = true;
     let authSubscription: any = null;
@@ -278,7 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Förbättrad signIn funktion
+  // Förbättrad signIn funktion (oförändrad)
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
@@ -326,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Förbättrad signOut funktion
+  // Förbättrad signOut funktion (oförändrad)
   const signOut = async () => {
     try {
       console.log('👋 Signing out user...');
@@ -355,16 +416,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Debug information (ta bort i produktion)
+  // 🆕 BERÄKNA TEKNIKER-DATA SÄKERT
+  const technicianData = profile?.role === 'technician' && profile?.technician_id ? {
+    id: profile.technician_id,
+    name: profile.technicians?.name || profile.display_name || null,
+    email: profile.technicians?.email || profile.email || null
+  } : null;
+
+  // Debug information (uppdaterad)
   useEffect(() => {
     console.log('🐛 AuthContext State:', {
       user: user?.email || 'null',
       profile: profile ? `${profile.email} (${profile.role || (profile.is_admin ? 'admin' : 'customer')})` : 'null',
+      technician: technicianData ? `${technicianData.name} (${technicianData.id})` : 'null',
       loading,
       initialized,
       currentPath: location.pathname
     });
-  }, [user, profile, loading, initialized, location.pathname]);
+  }, [user, profile, technicianData, loading, initialized, location.pathname]);
 
   const value: AuthContextType = {
     user,
@@ -373,8 +442,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signOut,
     isAdmin: profile?.is_admin ?? false,
-    isCustomer: !profile?.is_admin && !!profile?.customer_id,
-    isTechnician: profile?.role === 'technician', // 🆕 TEKNIKER-CHECK
+    isCustomer: !profile?.is_admin && !!profile?.customer_id && profile?.role !== 'technician',
+    isTechnician: profile?.role === 'technician' && !!profile?.technician_id, // 🆕 SÄKER TEKNIKER-CHECK
+    technician: technicianData, // 🆕 TEKNIKER-DATA
     fetchProfile: (userId: string) => fetchProfile(userId)
   };
 

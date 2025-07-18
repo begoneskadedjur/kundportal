@@ -1,4 +1,4 @@
-// api/technician/cases.ts - API för tekniker-ärenden
+// 📁 api/technician/cases.ts - UPPDATERAD MED UUID-BASERAD SÖKNING  
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -18,52 +18,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Hämta tekniker info
-    const { data: technician } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
-
-    if (!technician) {
-      return res.status(404).json({ error: 'Tekniker hittades inte' })
-    }
+    console.log('🔄 Fetching technician cases for UUID:', technician_id)
 
     const limitNum = parseInt(limit as string) || 50
 
-    // Hämta private cases
-    const { data: privateCases } = await supabase
-      .from('private_cases')
-      .select(`
-        id, clickup_task_id, title, status, priority, created_date, completed_date,
-        commission_amount, case_price, kontaktperson, telefon, email, adress,
-        skadedjur, beskrivning, billing_status
-      `)
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .order('created_date', { ascending: false })
-      .limit(limitNum)
+    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-LOOKUP BEHÖVS
+    const [privateCases, businessCases] = await Promise.all([
+      // Private cases med UUID
+      supabase
+        .from('private_cases')
+        .select(`
+          id, clickup_task_id, title, status, priority, created_date, completed_date,
+          commission_amount, pris as case_price, kontaktperson, telefon, email, adress,
+          skadedjur, beskrivning, billing_status
+        `)
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .order('created_date', { ascending: false })
+        .limit(limitNum),
 
-    // Hämta business cases
-    const { data: businessCases } = await supabase
-      .from('business_cases')
-      .select(`
-        id, clickup_task_id, title, status, priority, created_date, completed_date,
-        commission_amount, case_price, kontaktperson, telefon, email, adress,
-        foretag, org_nr, skadedjur, beskrivning, billing_status
-      `)
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .order('created_date', { ascending: false })
-      .limit(limitNum)
+      // Business cases med UUID
+      supabase
+        .from('business_cases')
+        .select(`
+          id, clickup_task_id, title, status, priority, created_date, completed_date,
+          commission_amount, pris as case_price, kontaktperson, telefon, email, adress,
+          foretag, org_nr, skadedjur, beskrivning, billing_status
+        `)
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .order('created_date', { ascending: false })
+        .limit(limitNum)
+    ])
 
     // Kombinera och märk med typ
     const allCases = [
-      ...(privateCases || []).map(c => ({ 
+      ...(privateCases.data || []).map(c => ({ 
         ...c, 
         case_type: 'private' as const,
         case_number: `P-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
-      ...(businessCases || []).map(c => ({ 
+      ...(businessCases.data || []).map(c => ({ 
         ...c, 
         case_type: 'business' as const,
         case_number: `B-${c.clickup_task_id}`,
@@ -87,6 +81,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ).length
     const totalCommission = allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
 
+    // Hämta tekniker-namn för display (efter all beräkning)
+    const { data: technician } = await supabase
+      .from('technicians')
+      .select('name')
+      .eq('id', technician_id)
+      .single()
+
     const stats = {
       total_cases: totalCases,
       completed_cases: completedCases,
@@ -95,10 +96,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total_commission: totalCommission
     }
 
+    console.log(`✅ Cases fetched for UUID ${technician_id}:`, {
+      total: totalCases,
+      returned: limitedCases.length,
+      commission: totalCommission
+    })
+
     res.status(200).json({
       cases: limitedCases,
       stats,
-      technician_name: technician.name,
+      technician_name: technician?.name || 'Okänd tekniker',
       total_found: totalCases,
       returned: limitedCases.length
     })

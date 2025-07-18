@@ -1,4 +1,4 @@
-// api/technician/commissions.ts - API för tekniker-provisioner
+// 📁 api/technician/commissions.ts - UPPDATERAD MED UUID-BASERAD SÖKNING
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -25,46 +25,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Hämta tekniker info
-    const { data: technician } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
-
-    if (!technician) {
-      return res.status(404).json({ error: 'Tekniker hittades inte' })
-    }
+    console.log('🔄 Fetching technician commissions for UUID:', technician_id)
 
     // Hämta alla avslutade ärenden med provision för senaste 12 månaderna
     const oneYearAgo = new Date()
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
     const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10)
 
-    // Private cases
-    const { data: privateCases } = await supabase
-      .from('private_cases')
-      .select('commission_amount, completed_date, case_price, clickup_task_id, title, kontaktperson, adress, billing_status')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .not('completed_date', 'is', null)
-      .gte('completed_date', oneYearAgoStr)
-      .order('completed_date', { ascending: false })
+    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-LOOKUP
+    const [privateCases, businessCases] = await Promise.all([
+      // Private cases med UUID
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date, pris as case_price, clickup_task_id, title, kontaktperson, adress, billing_status')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .not('completed_date', 'is', null)
+        .gte('completed_date', oneYearAgoStr)
+        .order('completed_date', { ascending: false }),
 
-    // Business cases
-    const { data: businessCases } = await supabase
-      .from('business_cases')
-      .select('commission_amount, completed_date, case_price, clickup_task_id, title, kontaktperson, foretag, org_nr, adress, billing_status')
-      .ilike('primary_assignee_name', `%${technician.name}%`)
-      .not('commission_amount', 'is', null)
-      .not('completed_date', 'is', null)
-      .gte('completed_date', oneYearAgoStr)
-      .order('completed_date', { ascending: false })
+      // Business cases med UUID
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date, pris as case_price, clickup_task_id, title, kontaktperson, foretag, org_nr, adress, billing_status')
+        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .not('commission_amount', 'is', null)
+        .not('completed_date', 'is', null)
+        .gte('completed_date', oneYearAgoStr)
+        .order('completed_date', { ascending: false })
+    ])
 
     // Kombinera och märk med typ
     const allCases = [
-      ...(privateCases || []).map(c => ({ ...c, type: 'private' as const })),
-      ...(businessCases || []).map(c => ({ ...c, type: 'business' as const }))
+      ...(privateCases.data || []).map(c => ({ ...c, type: 'private' as const })),
+      ...(businessCases.data || []).map(c => ({ ...c, type: 'business' as const }))
     ]
 
     // Gruppera per månad
@@ -126,6 +120,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       monthlyArray[0] || { total_commission: 0, month_display: 'Ingen data' }
     )
 
+    // Hämta tekniker-namn för display (efter all beräkning)
+    const { data: technician } = await supabase
+      .from('technicians')
+      .select('name')
+      .eq('id', technician_id)
+      .single()
+
     const stats = {
       total_ytd: totalYtd,
       total_cases_ytd: totalCasesYtd,
@@ -134,10 +135,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       best_month_name: bestMonth.month_display
     }
 
+    console.log(`✅ Commissions calculated for UUID ${technician_id}:`, {
+      total_ytd: totalYtd,
+      cases: totalCasesYtd,
+      months: monthlyArray.length
+    })
+
     res.status(200).json({
       monthly_data: monthlyArray,
       stats,
-      technician_name: technician.name
+      technician_name: technician?.name || 'Okänd tekniker'
     })
 
   } catch (error) {
