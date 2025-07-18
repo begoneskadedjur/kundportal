@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianCases.tsx - FIXAD MED KORREKT AUTH
+// src/pages/technician/TechnicianCases.tsx - HELT FIXAD MED DEBUG & KORREKT AUTH
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -116,6 +116,17 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
+  // 🔍 DEBUG: Logga AuthContext state
+  useEffect(() => {
+    console.log('🔍 TechnicianCases AuthContext Debug:')
+    console.log('- isTechnician:', isTechnician)
+    console.log('- technician object:', technician)
+    console.log('- technician.id:', technician?.id)
+    console.log('- profile:', profile)
+    console.log('- profile.technician_id:', profile?.technician_id)
+    console.log('- profile.role:', profile?.role)
+  }, [isTechnician, technician, profile])
+
   // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
     if (!isTechnician || !technician?.id) {
@@ -125,11 +136,13 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, technician, navigate])
 
+  // ✅ FIXAD: Ändrat från isTechniker till isTechnician
   useEffect(() => {
-    if (isTechniker && technician?.id) {
+    if (isTechnician && technician?.id) {
+      console.log('✅ Tekniker verifierad, hämtar ärenden för:', technician.id)
       fetchCases()
     }
-  }, [isTechniker, technician?.id])
+  }, [isTechnician, technician?.id])
 
   useEffect(() => {
     applyFilters()
@@ -137,6 +150,7 @@ export default function TechnicianCases() {
 
   const fetchCases = async () => {
     if (!technician?.id) {
+      console.log('❌ No technician ID available')
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
       return
@@ -146,23 +160,31 @@ export default function TechnicianCases() {
       setLoading(true)
       setError(null)
       
+      const url = `/api/technician/cases?technician_id=${technician.id}`
       console.log('🔄 Fetching cases for technician:', technician.id)
+      console.log('📡 API URL:', url)
       
-      const response = await fetch(`/api/technician/cases?technician_id=${technician.id}`)
+      const response = await fetch(url)
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response ok:', response.ok)
       
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Raw API response:', data)
+        console.log('📊 Cases array length:', data.cases?.length || 0)
+        console.log('📊 Stats object:', data.stats)
+        
         setCases(data.cases || [])
         setStats(data.stats || {})
         
-        console.log('✅ Cases loaded:', {
+        console.log('✅ Cases loaded successfully:', {
           total: data.cases?.length || 0,
           stats: data.stats
         })
       } else {
         const errorText = await response.text()
         console.error('❌ Cases API error:', response.status, errorText)
-        setError(`Kunde inte hämta ärenden: ${response.status}`)
+        setError(`Kunde inte hämta ärenden: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error('💥 Error fetching cases:', error)
@@ -173,6 +195,7 @@ export default function TechnicianCases() {
   }
 
   const applyFilters = () => {
+    console.log('🔍 Applying filters to', cases.length, 'cases')
     let filtered = [...cases]
 
     // Textsökning
@@ -229,6 +252,7 @@ export default function TechnicianCases() {
       return sortOrder === 'desc' ? -comparison : comparison
     })
 
+    console.log('✅ Filtered cases:', filtered.length)
     setFilteredCases(filtered)
   }
 
@@ -255,6 +279,14 @@ export default function TechnicianCases() {
               <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
                 Tillbaka till dashboard
               </Button>
+            </div>
+            
+            {/* 🔍 DEBUG INFO */}
+            <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
+              <p className="text-slate-300 mb-1">Debug info:</p>
+              <p className="text-slate-400">Tekniker ID: {technician?.id || 'Saknas'}</p>
+              <p className="text-slate-400">isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
+              <p className="text-slate-400">Profile role: {profile?.role || 'Okänd'}</p>
             </div>
           </div>
         </Card>
@@ -283,6 +315,10 @@ export default function TechnicianCases() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Mina Ärenden</h1>
                 <p className="text-sm text-slate-400">Översikt över tilldelade ärenden från ClickUp</p>
+                {/* 🔍 DEBUG INFO I HEADER */}
+                <p className="text-xs text-slate-500">
+                  Debug: {technician?.id} • Cases: {cases.length} • Filtered: {filteredCases.length}
+                </p>
               </div>
             </div>
           </div>
@@ -391,6 +427,32 @@ export default function TechnicianCases() {
               <option value="commission-asc">Lägsta provision</option>
               <option value="status-asc">Status A-Z</option>
             </select>
+          </div>
+        </Card>
+
+        {/* 🔍 DEBUG-knapp för att testa API direkt */}
+        <Card className="p-4 mb-6 bg-red-500/10 border-red-500/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-red-400 text-sm font-medium">🔍 Debug Mode</p>
+              <p className="text-slate-400 text-xs">Tekniker ID: {technician?.id}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                console.log('🧪 Testing API directly...')
+                fetch(`/api/technician/cases?technician_id=${technician?.id}`)
+                  .then(r => {
+                    console.log('📡 Direct API Response:', r.status, r.ok)
+                    return r.json()
+                  })
+                  .then(data => console.log('📊 Direct API Data:', data))
+                  .catch(err => console.error('💥 Direct API Error:', err))
+              }}
+            >
+              🧪 Test API
+            </Button>
           </div>
         </Card>
 
@@ -574,6 +636,15 @@ export default function TechnicianCases() {
                       Rensa filter
                     </Button>
                   )}
+                  
+                  {/* 🔍 DEBUG INFO för tom lista */}
+                  <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
+                    <p className="text-slate-300 mb-1">Debug info:</p>
+                    <p className="text-slate-400">Total cases: {cases.length}</p>
+                    <p className="text-slate-400">Filtered cases: {filteredCases.length}</p>
+                    <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
+                    <p className="text-slate-400">API Stats: {JSON.stringify(stats)}</p>
+                  </div>
                 </div>
               </Card>
             </div>

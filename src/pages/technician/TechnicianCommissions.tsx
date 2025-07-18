@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianCommissions.tsx - FIXAD MED KORREKT AUTH
+// src/pages/technician/TechnicianCommissions.tsx - HELT FIXAD MED DEBUG & KORREKT AUTH
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -62,6 +62,17 @@ export default function TechnicianCommissions() {
     best_month_name: ''
   })
 
+  // 🔍 DEBUG: Logga AuthContext state
+  useEffect(() => {
+    console.log('🔍 TechnicianCommissions AuthContext Debug:')
+    console.log('- isTechnician:', isTechnician)
+    console.log('- technician object:', technician)
+    console.log('- technician.id:', technician?.id)
+    console.log('- profile:', profile)
+    console.log('- profile.technician_id:', profile?.technician_id)
+    console.log('- profile.role:', profile?.role)
+  }, [isTechnician, technician, profile])
+
   // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
     if (!isTechnician || !technician?.id) {
@@ -73,18 +84,21 @@ export default function TechnicianCommissions() {
 
   useEffect(() => {
     if (isTechnician && technician?.id) {
+      console.log('✅ Tekniker verifierad, hämtar provisionsdata för:', technician.id)
       fetchCommissionData()
     }
   }, [isTechnician, technician?.id])
 
   useEffect(() => {
     if (selectedMonth && isTechnician && technician?.id) {
+      console.log('✅ Hämtar månadsärenden för:', selectedMonth, technician.id)
       fetchMonthCases()
     }
   }, [selectedMonth, isTechnician, technician?.id])
 
   const fetchCommissionData = async () => {
     if (!technician?.id) {
+      console.log('❌ No technician ID available for commissions')
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
       return
@@ -94,28 +108,39 @@ export default function TechnicianCommissions() {
       setLoading(true)
       setError(null)
       
+      const url = `/api/technician/commissions?technician_id=${technician.id}`
       console.log('🔄 Fetching commission data for technician:', technician.id)
+      console.log('📡 API URL:', url)
       
-      const response = await fetch(`/api/technician/commissions?technician_id=${technician.id}`)
+      const response = await fetch(url)
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response ok:', response.ok)
       
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Raw commission API response:', data)
+        console.log('📊 Monthly data length:', data.monthly_data?.length || 0)
+        console.log('📊 Stats object:', data.stats)
+        
         setMonthlyData(data.monthly_data || [])
         setStats(data.stats || {})
         
         // Sätt senaste månaden som default
         if (data.monthly_data?.length > 0) {
+          console.log('📅 Setting selected month to:', data.monthly_data[0].month)
           setSelectedMonth(data.monthly_data[0].month)
+        } else {
+          console.log('⚠️ No monthly data available for commission')
         }
         
-        console.log('✅ Commission data loaded:', {
+        console.log('✅ Commission data loaded successfully:', {
           months: data.monthly_data?.length || 0,
           total_ytd: data.stats?.total_ytd || 0
         })
       } else {
         const errorText = await response.text()
         console.error('❌ Commission API error:', response.status, errorText)
-        setError(`Kunde inte hämta provisionsdata: ${response.status}`)
+        setError(`Kunde inte hämta provisionsdata: ${response.status} - ${errorText}`)
       }
     } catch (error) {
       console.error('💥 Error fetching commission data:', error)
@@ -126,21 +151,29 @@ export default function TechnicianCommissions() {
   }
 
   const fetchMonthCases = async () => {
-    if (!technician?.id || !selectedMonth) return
+    if (!technician?.id || !selectedMonth) {
+      console.log('❌ Missing technician ID or month for month cases')
+      return
+    }
 
     try {
+      const url = `/api/technician/commissions/cases?technician_id=${technician.id}&month=${selectedMonth}`
       console.log('🔄 Fetching month cases for:', technician.id, selectedMonth)
+      console.log('📡 Month cases URL:', url)
       
-      const response = await fetch(
-        `/api/technician/commissions/cases?technician_id=${technician.id}&month=${selectedMonth}`
-      )
+      const response = await fetch(url)
+      console.log('📡 Month cases response status:', response.status)
       
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Month cases data:', data)
+        console.log('📊 Cases for month:', data.cases?.length || 0)
+        
         setSelectedMonthCases(data.cases || [])
         console.log('✅ Month cases loaded:', data.cases?.length || 0)
       } else {
-        console.error('❌ Month cases API error:', response.status, await response.text())
+        const errorText = await response.text()
+        console.error('❌ Month cases API error:', response.status, errorText)
       }
     } catch (error) {
       console.error('💥 Error fetching month cases:', error)
@@ -152,13 +185,17 @@ export default function TechnicianCommissions() {
 
   const goToPreviousMonth = () => {
     if (currentMonthIndex < monthlyData.length - 1) {
-      setSelectedMonth(monthlyData[currentMonthIndex + 1].month)
+      const newMonth = monthlyData[currentMonthIndex + 1].month
+      console.log('⬅️ Going to previous month:', newMonth)
+      setSelectedMonth(newMonth)
     }
   }
 
   const goToNextMonth = () => {
     if (currentMonthIndex > 0) {
-      setSelectedMonth(monthlyData[currentMonthIndex - 1].month)
+      const newMonth = monthlyData[currentMonthIndex - 1].month
+      console.log('➡️ Going to next month:', newMonth)
+      setSelectedMonth(newMonth)
     }
   }
 
@@ -185,6 +222,14 @@ export default function TechnicianCommissions() {
               <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
                 Tillbaka till dashboard
               </Button>
+            </div>
+            
+            {/* 🔍 DEBUG INFO */}
+            <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
+              <p className="text-slate-300 mb-1">Debug info:</p>
+              <p className="text-slate-400">Tekniker ID: {technician?.id || 'Saknas'}</p>
+              <p className="text-slate-400">isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
+              <p className="text-slate-400">Profile role: {profile?.role || 'Okänd'}</p>
             </div>
           </div>
         </Card>
@@ -213,6 +258,10 @@ export default function TechnicianCommissions() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Mina Provisioner</h1>
                 <p className="text-sm text-slate-400">Översikt över intjänade provisioner</p>
+                {/* 🔍 DEBUG INFO I HEADER */}
+                <p className="text-xs text-slate-500">
+                  Debug: {technician?.id} • Månader: {monthlyData.length} • Vald: {selectedMonth}
+                </p>
               </div>
             </div>
           </div>
@@ -220,6 +269,32 @@ export default function TechnicianCommissions() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* 🔍 DEBUG-knapp för att testa API direkt */}
+        <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-400 text-sm font-medium">🔍 Debug Mode - Commissions</p>
+              <p className="text-slate-400 text-xs">Tekniker ID: {technician?.id}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                console.log('🧪 Testing commissions API directly...')
+                fetch(`/api/technician/commissions?technician_id=${technician?.id}`)
+                  .then(r => {
+                    console.log('📡 Direct Commission API Response:', r.status, r.ok)
+                    return r.json()
+                  })
+                  .then(data => console.log('📊 Direct Commission API Data:', data))
+                  .catch(err => console.error('💥 Direct Commission API Error:', err))
+              }}
+            >
+              🧪 Test Commissions API
+            </Button>
+          </div>
+        </Card>
+
         {/* Årsstatistik */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6 bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30">
@@ -266,7 +341,7 @@ export default function TechnicianCommissions() {
                   {formatCurrency(stats.highest_month)}
                 </p>
                 <p className="text-orange-300 text-xs">
-                  {stats.best_month_name}
+                  {stats.best_month_name || 'Ingen data'}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-orange-400" />
@@ -280,27 +355,31 @@ export default function TechnicianCommissions() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white">Månadsöversikt</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousMonth}
-                  disabled={currentMonthIndex >= monthlyData.length - 1}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-white font-medium px-4">
-                  {currentMonthData?.month_display || 'Ingen data'}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextMonth}
-                  disabled={currentMonthIndex <= 0}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+              {monthlyData.length > 0 ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToPreviousMonth}
+                    disabled={currentMonthIndex >= monthlyData.length - 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-white font-medium px-4">
+                    {currentMonthData?.month_display || 'Ingen data'}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToNextMonth}
+                    disabled={currentMonthIndex <= 0}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-slate-400 text-sm">Ingen data tillgänglig</span>
+              )}
             </div>
 
             {currentMonthData ? (
@@ -348,7 +427,18 @@ export default function TechnicianCommissions() {
             ) : (
               <div className="text-center py-8">
                 <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-400">Ingen data för vald månad</p>
+                <p className="text-slate-400">
+                  {monthlyData.length === 0 ? 'Ingen provisionsdata tillgänglig' : 'Ingen data för vald månad'}
+                </p>
+                
+                {/* 🔍 DEBUG INFO för tom månadsvy */}
+                <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
+                  <p className="text-slate-300 mb-1">Debug info:</p>
+                  <p className="text-slate-400">Månader tillgängliga: {monthlyData.length}</p>
+                  <p className="text-slate-400">Vald månad: {selectedMonth}</p>
+                  <p className="text-slate-400">Current month data: {currentMonthData ? 'Finns' : 'Saknas'}</p>
+                  <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
+                </div>
               </div>
             )}
           </Card>
@@ -430,6 +520,14 @@ export default function TechnicianCommissions() {
                 <div className="text-center py-8">
                   <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                   <p className="text-slate-400">Inga ärenden för denna månad</p>
+                  
+                  {/* 🔍 DEBUG INFO för tomma ärenden */}
+                  <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
+                    <p className="text-slate-300 mb-1">Debug info:</p>
+                    <p className="text-slate-400">Vald månad: {selectedMonth}</p>
+                    <p className="text-slate-400">Ärenden för månaden: {selectedMonthCases.length}</p>
+                    <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -441,52 +539,63 @@ export default function TechnicianCommissions() {
           <h2 className="text-xl font-semibold text-white mb-6">Månadshistorik</h2>
           
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left text-slate-400 text-sm font-medium pb-3">Månad</th>
-                  <th className="text-right text-slate-400 text-sm font-medium pb-3">Provision</th>
-                  <th className="text-right text-slate-400 text-sm font-medium pb-3">Ärenden</th>
-                  <th className="text-right text-slate-400 text-sm font-medium pb-3">Privat</th>
-                  <th className="text-right text-slate-400 text-sm font-medium pb-3">Företag</th>
-                  <th className="text-right text-slate-400 text-sm font-medium pb-3">Snitt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyData.map(month => (
-                  <tr 
-                    key={month.month}
-                    className={`border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer ${
-                      month.month === selectedMonth ? 'bg-blue-500/10' : ''
-                    }`}
-                    onClick={() => setSelectedMonth(month.month)}
-                  >
-                    <td className="py-3 text-white font-medium">{month.month_display}</td>
-                    <td className="py-3 text-right text-green-400 font-semibold">
-                      {formatCurrency(month.total_commission)}
-                    </td>
-                    <td className="py-3 text-right text-white">{month.case_count}</td>
-                    <td className="py-3 text-right text-blue-400">
-                      {formatCurrency(month.private_commission)}
-                    </td>
-                    <td className="py-3 text-right text-purple-400">
-                      {formatCurrency(month.business_commission)}
-                    </td>
-                    <td className="py-3 text-right text-slate-300">
-                      {formatCurrency(month.avg_commission_per_case)}
-                    </td>
+            {monthlyData.length > 0 ? (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    <th className="text-left text-slate-400 text-sm font-medium pb-3">Månad</th>
+                    <th className="text-right text-slate-400 text-sm font-medium pb-3">Provision</th>
+                    <th className="text-right text-slate-400 text-sm font-medium pb-3">Ärenden</th>
+                    <th className="text-right text-slate-400 text-sm font-medium pb-3">Privat</th>
+                    <th className="text-right text-slate-400 text-sm font-medium pb-3">Företag</th>
+                    <th className="text-right text-slate-400 text-sm font-medium pb-3">Snitt</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {monthlyData.map(month => (
+                    <tr 
+                      key={month.month}
+                      className={`border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer ${
+                        month.month === selectedMonth ? 'bg-blue-500/10' : ''
+                      }`}
+                      onClick={() => {
+                        console.log('📅 Selecting month from table:', month.month)
+                        setSelectedMonth(month.month)
+                      }}
+                    >
+                      <td className="py-3 text-white font-medium">{month.month_display}</td>
+                      <td className="py-3 text-right text-green-400 font-semibold">
+                        {formatCurrency(month.total_commission)}
+                      </td>
+                      <td className="py-3 text-right text-white">{month.case_count}</td>
+                      <td className="py-3 text-right text-blue-400">
+                        {formatCurrency(month.private_commission)}
+                      </td>
+                      <td className="py-3 text-right text-purple-400">
+                        {formatCurrency(month.business_commission)}
+                      </td>
+                      <td className="py-3 text-right text-slate-300">
+                        {formatCurrency(month.avg_commission_per_case)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-8">
+                <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-400">Ingen provisionsdata tillgänglig</p>
+                
+                {/* 🔍 DEBUG INFO för tom historik */}
+                <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
+                  <p className="text-slate-300 mb-1">Debug info:</p>
+                  <p className="text-slate-400">Monthly data length: {monthlyData.length}</p>
+                  <p className="text-slate-400">Stats object: {JSON.stringify(stats)}</p>
+                  <p className="text-slate-400">Tekniker ID: {techniker?.id}</p>
+                </div>
+              </div>
+            )}
           </div>
-
-          {monthlyData.length === 0 && (
-            <div className="text-center py-8">
-              <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-400">Ingen provisionsdata tillgänglig</p>
-            </div>
-          )}
         </Card>
       </main>
     </div>
