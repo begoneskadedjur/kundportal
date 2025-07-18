@@ -1,4 +1,4 @@
-// 📁 api/technician/commissions.ts - UPPDATERAD MED UUID-BASERAD SÖKNING
+// 📁 api/technician/commissions.ts - FIXAD MED ROBUST DATUM-HANTERING OCH DEBUG
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -32,7 +32,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
     const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10)
 
-    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-LOOKUP
+    console.log('📅 Looking for commissions from:', oneYearAgoStr, 'to now')
+
+    // ✅ DIREKT UUID-SÖKNING - ANVÄNDER completed_date (korrekt för provisioner)
     const [privateCases, businessCases] = await Promise.all([
       // Private cases med UUID
       supabase
@@ -55,11 +57,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .order('completed_date', { ascending: false })
     ])
 
+    // ✅ DEBUG: Logga vad vi faktiskt hittar
+    console.log('🔍 Private commission cases result:', {
+      data_length: privateCases.data?.length || 0,
+      error: privateCases.error?.message,
+      sample_case: privateCases.data?.[0] ? {
+        commission_amount: privateCases.data[0].commission_amount,
+        completed_date: privateCases.data[0].completed_date,
+        title: privateCases.data[0].title
+      } : null
+    })
+
+    console.log('🔍 Business commission cases result:', {
+      data_length: businessCases.data?.length || 0,
+      error: businessCases.error?.message,
+      sample_case: businessCases.data?.[0] ? {
+        commission_amount: businessCases.data[0].commission_amount,
+        completed_date: businessCases.data[0].completed_date,
+        title: businessCases.data[0].title
+      } : null
+    })
+
     // Kombinera och märk med typ
     const allCases = [
       ...(privateCases.data || []).map(c => ({ ...c, type: 'private' as const })),
       ...(businessCases.data || []).map(c => ({ ...c, type: 'business' as const }))
     ]
+
+    console.log(`🔍 Total commission cases found: ${allCases.length}`)
 
     // Gruppera per månad
     const monthlyData: Record<string, {
@@ -109,6 +134,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }))
       .sort((a, b) => b.month.localeCompare(a.month)) // Senaste månaden först
 
+    console.log(`🔍 Monthly data created: ${monthlyArray.length} months`)
+    if (monthlyArray.length > 0) {
+      console.log('📅 Sample months:', monthlyArray.slice(0, 3).map(m => ({
+        month: m.month_display,
+        commission: m.total_commission,
+        cases: m.case_count
+      })))
+    }
+
     // Beräkna årstatistik
     const totalYtd = monthlyArray.reduce((sum, month) => sum + month.total_commission, 0)
     const totalCasesYtd = monthlyArray.reduce((sum, month) => sum + month.case_count, 0)
@@ -138,17 +172,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`✅ Commissions calculated for UUID ${technician_id}:`, {
       total_ytd: totalYtd,
       cases: totalCasesYtd,
-      months: monthlyArray.length
+      months: monthlyArray.length,
+      best_month: bestMonth.month_display,
+      highest_commission: bestMonth.total_commission
     })
+
+    // ✅ EXTRA DEBUG om inga data hittas
+    if (allCases.length === 0) {
+      console.log('⚠️ NO COMMISSION DATA FOUND - checking for data without commission...')
+      
+      // Kolla om det finns completed cases utan commission_amount
+      const debugCheck = await supabase
+        .from('private_cases')
+        .select('id, title, completed_date, commission_amount, pris, primary_assignee_name')
+        .eq('primary_assignee_id', technician_id)
+        .not('completed_date', 'is', null)
+        .limit(5)
+      
+      console.log('🔍 Debug check - completed cases without commission filter:', debugCheck.data)
+    }
 
     res.status(200).json({
       monthly_data: monthlyArray,
       stats,
-      technician_name: technician?.name || 'Okänd tekniker'
+      technician_name: technician?.name || 'Okänd tekniker',
+      debug_info: {
+        total_cases_found: allCases.length,
+        private_cases_found: privateCases.data?.length || 0,
+        business_cases_found: businessCases.data?.length || 0,
+        months_with_data: monthlyArray.length,
+        date_range_from: oneYearAgoStr
+      }
     })
 
   } catch (error) {
-    console.error('Error fetching technician commissions:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('💥 Error fetching technician commissions:', error)
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
   }
 }
