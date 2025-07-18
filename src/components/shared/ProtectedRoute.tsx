@@ -41,14 +41,20 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   }
 
   if (requiredRole === 'customer' && !isCustomer) {
-    // 🆕 TEKNIKER-STÖD: Omdirigera tekniker till admin istället för customer
+    // 🆕 TEKNIKER-STÖD: Omdirigera tekniker till tekniker-dashboard
     if (isTechnician) {
-      console.log('🔧 Tekniker omdirigeras till admin-portalen')
-      return <Navigate to="/admin" replace />
+      console.log('🔧 Tekniker omdirigeras till tekniker-portalen')
+      return <Navigate to="/technician" replace />
     }
     
     // Customers only - redirect admins to admin dashboard  
     return <Navigate to="/admin" replace />
+  }
+
+  // 🆕 TEKNIKER-ROUTES: Om ingen required role är satt, tillåt alla autentiserade användare
+  // Detta gäller för tekniker-routes som ska vara tillgängliga för tekniker
+  if (!requiredRole) {
+    return <>{children}</>
   }
 
   // User is authenticated and has correct role

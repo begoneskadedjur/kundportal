@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED NYA ONEFLOW ROUTES + TEKNIKER-MANAGEMENT + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER
+// src/App.tsx - UPPDATERAD MED NYA ONEFLOW ROUTES + TEKNIKER-MANAGEMENT + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER + TEKNIKER-DASHBOARD
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -23,6 +23,11 @@ import SalesOpportunities from './pages/admin/SalesOpportunities'  // 🆕 FÖRS
 // 🆕 ONEFLOW ROUTES - UPPDATERADE NAMN
 import OneflowContractCreator from './pages/admin/OneflowContractCreator'  // Tidigare OneflowTest
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'  // Ny diagnostik dashboard
+
+// 🆕 TEKNIKER PAGES - NYA ROUTES
+import TechnicianDashboard from './pages/technician/TechnicianDashboard'  // Tekniker huvuddashboard
+import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'  // Tekniker provisioner
+import TechnicianCases from './pages/technician/TechnicianCases'  // Tekniker ärenden
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -157,6 +162,41 @@ function App() {
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
+            {/* 🆕 TEKNIKER ROUTES - EGEN PORTAL */}
+            <Route 
+              path="/technician/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <TechnicianDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/technician/commissions" 
+              element={
+                <ProtectedRoute>
+                  <TechnicianCommissionsPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/technician/cases" 
+              element={
+                <ProtectedRoute>
+                  <TechnicianCases />
+                </ProtectedRoute>
+              } 
+            />
+            {/* Tekniker har också tillgång till Oneflow */}
+            <Route 
+              path="/technician/oneflow" 
+              element={
+                <ProtectedRoute>
+                  <OneflowContractCreator />
+                </ProtectedRoute>
+              } 
+            />
+
             {/* Customer routes */}
             <Route 
               path="/customer" 
@@ -186,6 +226,7 @@ function App() {
             {/* Default redirects */}
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
             
             {/* Legacy portal redirects - FIX FOR THE BLACK SCREEN */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
