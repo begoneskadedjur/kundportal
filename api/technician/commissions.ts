@@ -1,4 +1,4 @@
-// 📁 api/technician/commissions.ts - FIXAD MED ROBUST DATUM-HANTERING OCH DEBUG
+// 📁 api/technician/commissions.ts - FÖRENKLAD VERSION BASERAT PÅ ADMIN-MÖNSTER
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -6,12 +6,10 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// Månadsnamn på svenska
-const MONTH_NAMES: Record<string, string> = {
-  '01': 'Januari', '02': 'Februari', '03': 'Mars', '04': 'April',
-  '05': 'Maj', '06': 'Juni', '07': 'Juli', '08': 'Augusti',
-  '09': 'September', '10': 'Oktober', '11': 'November', '12': 'December'
-}
+const monthNames = [
+  'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+  'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+]
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -21,193 +19,133 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { technician_id } = req.query
 
   if (!technician_id) {
-    return res.status(400).json({ error: 'technician_id is required' })
+    return res.status(400).json({ error: 'technician_id required' })
   }
 
   try {
-    console.log('🔄 Fetching technician commissions for UUID:', technician_id)
+    console.log('🔄 Fetching commission data for technician:', technician_id)
 
-    // Hämta alla avslutade ärenden med provision för senaste 12 månaderna
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-    const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10)
+    const currentYear = new Date().getFullYear()
+    const yearStart = `${currentYear}-01-01`
 
-    console.log('📅 Looking for commissions from:', oneYearAgoStr, 'to now')
-
-    // ✅ DIREKT UUID-SÖKNING - ANVÄNDER completed_date (korrekt för provisioner)
-    const [privateCases, businessCases] = await Promise.all([
-      // Private cases med UUID
+    // 🔥 SAMMA PARALLELLA QUERY-MÖNSTER SOM ADMIN ECONOMICS
+    const [privateResult, businessResult] = await Promise.all([
       supabase
         .from('private_cases')
-        .select('commission_amount, completed_date, pris as case_price, clickup_task_id, title, kontaktperson, adress, billing_status')
-        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .select('commission_amount, completed_date, pris')
+        .eq('primary_assignee_id', technician_id)
         .not('commission_amount', 'is', null)
-        .not('completed_date', 'is', null)
-        .gte('completed_date', oneYearAgoStr)
-        .order('completed_date', { ascending: false }),
+        .gte('completed_date', yearStart),
 
-      // Business cases med UUID
       supabase
         .from('business_cases')
-        .select('commission_amount, completed_date, pris as case_price, clickup_task_id, title, kontaktperson, foretag, org_nr, adress, billing_status')
-        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .select('commission_amount, completed_date, pris')
+        .eq('primary_assignee_id', technician_id)
         .not('commission_amount', 'is', null)
-        .not('completed_date', 'is', null)
-        .gte('completed_date', oneYearAgoStr)
-        .order('completed_date', { ascending: false })
+        .gte('completed_date', yearStart)
     ])
 
-    // ✅ DEBUG: Logga vad vi faktiskt hittar
-    console.log('🔍 Private commission cases result:', {
-      data_length: privateCases.data?.length || 0,
-      error: privateCases.error?.message,
-      sample_case: privateCases.data?.[0] ? {
-        commission_amount: privateCases.data[0].commission_amount,
-        completed_date: privateCases.data[0].completed_date,
-        title: privateCases.data[0].title
-      } : null
-    })
+    // 🔥 SAMMA ERROR HANDLING SOM ADMIN
+    if (privateResult.error) {
+      console.error('Private commission error:', privateResult.error)
+    }
+    if (businessResult.error) {
+      console.error('Business commission error:', businessResult.error)
+    }
 
-    console.log('🔍 Business commission cases result:', {
-      data_length: businessCases.data?.length || 0,
-      error: businessCases.error?.message,
-      sample_case: businessCases.data?.[0] ? {
-        commission_amount: businessCases.data[0].commission_amount,
-        completed_date: businessCases.data[0].completed_date,
-        title: businessCases.data[0].title
-      } : null
-    })
-
-    // Kombinera och märk med typ
+    // Kombinera alla cases
     const allCases = [
-      ...(privateCases.data || []).map(c => ({ ...c, type: 'private' as const })),
-      ...(businessCases.data || []).map(c => ({ ...c, type: 'business' as const }))
+      ...(privateResult.data || []).map(c => ({ ...c, source: 'private' })),
+      ...(businessResult.data || []).map(c => ({ ...c, source: 'business' }))
     ]
 
-    console.log(`🔍 Total commission cases found: ${allCases.length}`)
-
-    // Gruppera per månad
-    const monthlyData: Record<string, {
-      month: string
-      month_display: string
-      total_commission: number
-      case_count: number
-      private_commission: number
-      business_commission: number
-      cases: any[]
-    }> = {}
+    // Gruppera per månad - SAMMA LOGIK SOM ADMIN MONTHLY DATA
+    const monthlyMap = new Map()
 
     allCases.forEach(case_ => {
-      const monthKey = case_.completed_date!.slice(0, 7) // YYYY-MM
-      const [year, month] = monthKey.split('-')
-      const monthDisplay = `${MONTH_NAMES[month]} ${year}`
-
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = {
+      if (!case_.completed_date) return
+      
+      const monthKey = case_.completed_date.slice(0, 7) // YYYY-MM
+      
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, {
           month: monthKey,
-          month_display: monthDisplay,
           total_commission: 0,
           case_count: 0,
           private_commission: 0,
           business_commission: 0,
-          cases: []
-        }
+          private_count: 0,
+          business_count: 0
+        })
       }
 
+      const month = monthlyMap.get(monthKey)
       const commission = case_.commission_amount || 0
-      monthlyData[monthKey].total_commission += commission
-      monthlyData[monthKey].case_count += 1
-      monthlyData[monthKey].cases.push(case_)
-
-      if (case_.type === 'private') {
-        monthlyData[monthKey].private_commission += commission
+      
+      month.total_commission += commission
+      month.case_count += 1
+      
+      if (case_.source === 'private') {
+        month.private_commission += commission
+        month.private_count += 1
       } else {
-        monthlyData[monthKey].business_commission += commission
+        month.business_commission += commission
+        month.business_count += 1
       }
     })
 
-    // Konvertera till array och sortera
-    const monthlyArray = Object.values(monthlyData)
-      .map(month => ({
+    // Konvertera till array och lägg till display names - SAMMA FORMAT SOM ADMIN
+    const monthlyData = Array.from(monthlyMap.values())
+      .map((month: any) => ({
         ...month,
+        month_display: `${monthNames[parseInt(month.month.split('-')[1]) - 1]} ${month.month.split('-')[0]}`,
         avg_commission_per_case: month.case_count > 0 ? month.total_commission / month.case_count : 0
       }))
-      .sort((a, b) => b.month.localeCompare(a.month)) // Senaste månaden först
+      .sort((a, b) => b.month.localeCompare(a.month)) // Senaste först
 
-    console.log(`🔍 Monthly data created: ${monthlyArray.length} months`)
-    if (monthlyArray.length > 0) {
-      console.log('📅 Sample months:', monthlyArray.slice(0, 3).map(m => ({
-        month: m.month_display,
-        commission: m.total_commission,
-        cases: m.case_count
-      })))
+    // Beräkna årsstatistik - SAMMA MÖNSTER SOM ADMIN ECONOMICS
+    const stats = {
+      total_ytd: allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0),
+      total_cases_ytd: allCases.length,
+      avg_per_case: allCases.length > 0 ? 
+        allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0) / allCases.length : 0,
+      highest_month: Math.max(...monthlyData.map(m => m.total_commission), 0),
+      best_month_name: monthlyData.length > 0 ? 
+        monthlyData.find(m => m.total_commission === Math.max(...monthlyData.map(d => d.total_commission)))?.month_display || '' : ''
     }
 
-    // Beräkna årstatistik
-    const totalYtd = monthlyArray.reduce((sum, month) => sum + month.total_commission, 0)
-    const totalCasesYtd = monthlyArray.reduce((sum, month) => sum + month.case_count, 0)
-    const avgPerCase = totalCasesYtd > 0 ? totalYtd / totalCasesYtd : 0
-
-    // Hitta bästa månaden
-    const bestMonth = monthlyArray.reduce((best, current) => 
-      current.total_commission > best.total_commission ? current : best,
-      monthlyArray[0] || { total_commission: 0, month_display: 'Ingen data' }
-    )
-
-    // Hämta tekniker-namn för display (efter all beräkning)
+    // Hämta tekniker-info
     const { data: technician } = await supabase
       .from('technicians')
-      .select('name')
+      .select('name, email')
       .eq('id', technician_id)
       .single()
 
-    const stats = {
-      total_ytd: totalYtd,
-      total_cases_ytd: totalCasesYtd,
-      avg_per_case: avgPerCase,
-      highest_month: bestMonth.total_commission,
-      best_month_name: bestMonth.month_display
-    }
-
-    console.log(`✅ Commissions calculated for UUID ${technician_id}:`, {
-      total_ytd: totalYtd,
-      cases: totalCasesYtd,
-      months: monthlyArray.length,
-      best_month: bestMonth.month_display,
-      highest_commission: bestMonth.total_commission
+    console.log(`✅ Commission data loaded for technician ${technician_id}:`, {
+      technician_name: technician?.name,
+      months: monthlyData.length,
+      total_ytd: stats.total_ytd,
+      cases_ytd: stats.total_cases_ytd
     })
 
-    // ✅ EXTRA DEBUG om inga data hittas
-    if (allCases.length === 0) {
-      console.log('⚠️ NO COMMISSION DATA FOUND - checking for data without commission...')
-      
-      // Kolla om det finns completed cases utan commission_amount
-      const debugCheck = await supabase
-        .from('private_cases')
-        .select('id, title, completed_date, commission_amount, pris, primary_assignee_name')
-        .eq('primary_assignee_id', technician_id)
-        .not('completed_date', 'is', null)
-        .limit(5)
-      
-      console.log('🔍 Debug check - completed cases without commission filter:', debugCheck.data)
-    }
-
-    res.status(200).json({
-      monthly_data: monthlyArray,
+    // 🔥 SAMMA RESPONSE-FORMAT SOM ADMIN ECONOMICS
+    return res.status(200).json({
+      success: true,
+      monthly_data: monthlyData,
       stats,
-      technician_name: technician?.name || 'Okänd tekniker',
-      debug_info: {
-        total_cases_found: allCases.length,
-        private_cases_found: privateCases.data?.length || 0,
-        business_cases_found: businessCases.data?.length || 0,
-        months_with_data: monthlyArray.length,
-        date_range_from: oneYearAgoStr
+      meta: {
+        technician_id,
+        technician_name: technician?.name,
+        year: currentYear,
+        months_available: monthlyData.length,
+        timestamp: new Date().toISOString()
       }
     })
 
   } catch (error) {
-    console.error('💥 Error fetching technician commissions:', error)
-    res.status(500).json({ 
+    console.error('💥 Commission API error:', error)
+    return res.status(500).json({ 
+      success: false,
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     })

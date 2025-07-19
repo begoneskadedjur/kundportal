@@ -1,5 +1,4 @@
-
-// 📁 src/pages/technician/TechnicianCommissions.tsx - HELT FIXAD VERSION
+// 📁 src/pages/technician/TechnicianCommissions.tsx - FÖRENKLAD VERSION BASERAT PÅ ADMIN-MÖNSTER
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -23,20 +22,6 @@ interface MonthlyCommission {
   avg_commission_per_case: number
 }
 
-interface CommissionCase {
-  id: string
-  clickup_task_id: string
-  case_number?: string
-  title: string
-  type: 'private' | 'business'
-  case_price: number
-  commission_amount: number
-  completed_date: string
-  kontaktperson?: string
-  adress?: any
-  billing_status?: 'pending' | 'sent' | 'paid' | 'skip'
-}
-
 interface CommissionStats {
   total_ytd: number
   total_cases_ytd: number
@@ -45,50 +30,52 @@ interface CommissionStats {
   best_month_name: string
 }
 
+interface CommissionsData {
+  success: boolean
+  monthly_data: MonthlyCommission[]
+  stats: CommissionStats
+  meta: {
+    technician_id: string
+    technician_name?: string
+    year: number
+    months_available: number
+  }
+}
+
 export default function TechnicianCommissions() {
-  const { profile, technician, isTechnician } = useAuth() // ✅ FIXAD: isTechnician
+  const { profile, technician, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<CommissionsData | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
-  const [monthlyData, setMonthlyData] = useState<MonthlyCommission[]>([])
-  const [selectedMonthCases, setSelectedMonthCases] = useState<CommissionCase[]>([])
-  const [stats, setStats] = useState<CommissionStats>({
-    total_ytd: 0,
-    total_cases_ytd: 0,
-    avg_per_case: 0,
-    highest_month: 0,
-    best_month_name: ''
-  })
 
-  // Säkerhetskontroll - omdirigera om inte tekniker
+  // Säkerhetskontroll
   useEffect(() => {
     if (!isTechnician || !technician?.id) {
-      console.log('❌ Inte en tekniker, omdirigerar från commissions...', { isTechnician, technician })
+      console.log('❌ Inte en tekniker, omdirigerar från commissions...')
       navigate('/login', { replace: true })
       return
     }
   }, [isTechnician, technician, navigate])
 
+  // 🔥 SAMMA FETCH-MÖNSTER SOM ADMIN
   useEffect(() => {
     if (isTechnician && technician?.id) {
-      console.log('✅ Tekniker verifierad, hämtar provisionsdata för:', technician.id)
       fetchCommissionData()
     }
   }, [isTechnician, technician?.id])
 
   useEffect(() => {
-    if (selectedMonth && isTechnician && technician?.id) {
-      console.log('✅ Hämtar månadsärenden för:', selectedMonth, technician.id)
-      fetchMonthCases()
+    if (data?.monthly_data.length > 0 && !selectedMonth) {
+      setSelectedMonth(data.monthly_data[0].month)
     }
-  }, [selectedMonth, isTechnician, technician?.id])
+  }, [data?.monthly_data])
 
   const fetchCommissionData = async () => {
     if (!technician?.id) {
-      console.log('❌ No technician ID available for commissions')
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
       return
@@ -98,91 +85,47 @@ export default function TechnicianCommissions() {
       setLoading(true)
       setError(null)
       
-      const url = `/api/technician/commissions?technician_id=${technician.id}`
       console.log('🔄 Fetching commission data for technician:', technician.id)
       
-      const response = await fetch(url)
+      // 🔥 ENKEL API-ANROP LIKT ADMIN
+      const response = await fetch(`/api/technician/commissions?technician_id=${technician.id}`)
       
-      if (response.ok) {
-        const data = await response.json()
-        console.log('📊 Raw commission API response:', data)
-        
-        // ✅ FIXAD: API returnerar { monthly_data: [...], stats: {...} }
-        setMonthlyData(data.monthly_data || [])
-        setStats(data.stats || {
-          total_ytd: 0,
-          total_cases_ytd: 0,
-          avg_per_case: 0,
-          highest_month: 0,
-          best_month_name: ''
-        })
-        
-        // Sätt senaste månaden som default om det finns data
-        if (data.monthly_data?.length > 0) {
-          console.log('📅 Setting selected month to:', data.monthly_data[0].month)
-          setSelectedMonth(data.monthly_data[0].month)
-        }
-        
-        console.log('✅ Commission data loaded successfully:', {
-          months: data.monthly_data?.length || 0,
-          total_ytd: data.stats?.total_ytd || 0
-        })
-      } else {
+      if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ Commission API error:', response.status, errorText)
-        setError(`Kunde inte hämta provisionsdata: ${response.status} - ${errorText}`)
+        throw new Error(`API Error: ${response.status} - ${errorText}`)
       }
+
+      const commissionsData = await response.json()
+      
+      console.log('✅ Commission data loaded:', commissionsData)
+      setData(commissionsData)
+      
+      // Sätt senaste månaden som default om det finns data
+      if (commissionsData.monthly_data?.length > 0) {
+        setSelectedMonth(commissionsData.monthly_data[0].month)
+      }
+      
     } catch (error) {
       console.error('💥 Error fetching commission data:', error)
-      setError('Ett oväntat fel uppstod vid hämtning av provisionsdata')
+      setError(error instanceof Error ? error.message : 'Ett oväntat fel uppstod')
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchMonthCases = async () => {
-    if (!technician?.id || !selectedMonth) {
-      console.log('❌ Missing technician ID or month for month cases')
-      return
-    }
-
-    try {
-      const url = `/api/technician/commissions/cases?technician_id=${technician.id}&month=${selectedMonth}`
-      console.log('🔄 Fetching month cases for:', technician.id, selectedMonth)
-      
-      const response = await fetch(url)
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log('📊 Month cases data:', data)
-        
-        // ✅ FIXAD: API returnerar { cases: [...], summary: {...}, month: "...", technician_name: "..." }
-        setSelectedMonthCases(data.cases || [])
-        console.log('✅ Month cases loaded:', data.cases?.length || 0)
-      } else {
-        const errorText = await response.text()
-        console.error('❌ Month cases API error:', response.status, errorText)
-      }
-    } catch (error) {
-      console.error('💥 Error fetching month cases:', error)
-    }
-  }
-
-  const currentMonthData = monthlyData.find(m => m.month === selectedMonth)
-  const currentMonthIndex = monthlyData.findIndex(m => m.month === selectedMonth)
+  const currentMonthData = data?.monthly_data.find(m => m.month === selectedMonth)
+  const currentMonthIndex = data?.monthly_data.findIndex(m => m.month === selectedMonth) ?? -1
 
   const goToPreviousMonth = () => {
-    if (currentMonthIndex < monthlyData.length - 1) {
-      const newMonth = monthlyData[currentMonthIndex + 1].month
-      console.log('⬅️ Going to previous month:', newMonth)
+    if (data && currentMonthIndex < data.monthly_data.length - 1) {
+      const newMonth = data.monthly_data[currentMonthIndex + 1].month
       setSelectedMonth(newMonth)
     }
   }
 
   const goToNextMonth = () => {
-    if (currentMonthIndex > 0) {
-      const newMonth = monthlyData[currentMonthIndex - 1].month
-      console.log('➡️ Going to next month:', newMonth)
+    if (data && currentMonthIndex > 0) {
+      const newMonth = data.monthly_data[currentMonthIndex - 1].month
       setSelectedMonth(newMonth)
     }
   }
@@ -211,15 +154,17 @@ export default function TechnicianCommissions() {
                 Tillbaka till dashboard
               </Button>
             </div>
-            
-            {/* 🔍 DEBUG INFO */}
-            <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
-              <p className="text-slate-300 mb-1">Debug info:</p>
-              <p className="text-slate-400">Tekniker ID: {technician?.id || 'Saknas'}</p>
-              <p className="text-slate-400">isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
-              <p className="text-slate-400">Profile role: {profile?.role || 'Okänd'}</p>
-            </div>
           </div>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8">
+          <p className="text-slate-400">Ingen data tillgänglig</p>
         </Card>
       </div>
     )
@@ -253,26 +198,26 @@ export default function TechnicianCommissions() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Debug info */}
+        {/* 🔍 Success Debug Info */}
         <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
-          <div className="text-sm">
-            <p className="text-green-400 font-medium mb-2">🔍 Debug Info - Commissions</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-slate-300">
+          <div className="text-xs text-green-400">
+            <p className="font-medium mb-2">✅ Commission Data Successfully Loaded!</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-slate-400">Tekniker ID:</p>
-                <p className="text-xs">{technician?.id}</p>
+                <p className="text-slate-400">Tekniker:</p>
+                <p>{data.meta.technician_name || technician?.name}</p>
               </div>
               <div>
                 <p className="text-slate-400">Månader:</p>
-                <p>{monthlyData.length}</p>
+                <p>{data.monthly_data.length} tillgängliga</p>
+              </div>
+              <div>
+                <p className="text-slate-400">YTD Total:</p>
+                <p>{formatCurrency(data.stats.total_ytd)} ({data.stats.total_cases_ytd} cases)</p>
               </div>
               <div>
                 <p className="text-slate-400">Vald månad:</p>
-                <p>{selectedMonth}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">YTD:</p>
-                <p>{formatCurrency(stats.total_ytd)} ({stats.total_cases_ytd} cases)</p>
+                <p>{currentMonthData?.month_display || 'Ingen vald'}</p>
               </div>
             </div>
           </div>
@@ -285,7 +230,7 @@ export default function TechnicianCommissions() {
               <div>
                 <p className="text-green-400 text-sm font-medium">Total i år</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {formatCurrency(stats.total_ytd)}
+                  {formatCurrency(data.stats.total_ytd)}
                 </p>
               </div>
               <DollarSign className="w-8 h-8 text-green-400" />
@@ -297,7 +242,7 @@ export default function TechnicianCommissions() {
               <div>
                 <p className="text-blue-400 text-sm font-medium">Antal ärenden</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {stats.total_cases_ytd}
+                  {data.stats.total_cases_ytd}
                 </p>
               </div>
               <FileText className="w-8 h-8 text-blue-400" />
@@ -309,7 +254,7 @@ export default function TechnicianCommissions() {
               <div>
                 <p className="text-purple-400 text-sm font-medium">Snitt per ärende</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {formatCurrency(stats.avg_per_case)}
+                  {formatCurrency(data.stats.avg_per_case)}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-400" />
@@ -321,10 +266,10 @@ export default function TechnicianCommissions() {
               <div>
                 <p className="text-orange-400 text-sm font-medium">Bästa månaden</p>
                 <p className="text-lg font-bold text-white mt-1">
-                  {formatCurrency(stats.highest_month)}
+                  {formatCurrency(data.stats.highest_month)}
                 </p>
                 <p className="text-orange-300 text-xs">
-                  {stats.best_month_name || 'Ingen data'}
+                  {data.stats.best_month_name || 'Ingen data'}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-orange-400" />
@@ -338,13 +283,13 @@ export default function TechnicianCommissions() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white">Månadsöversikt</h2>
-              {monthlyData.length > 0 ? (
+              {data.monthly_data.length > 0 ? (
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={goToPreviousMonth}
-                    disabled={currentMonthIndex >= monthlyData.length - 1}
+                    disabled={currentMonthIndex >= data.monthly_data.length - 1}
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
@@ -411,101 +356,67 @@ export default function TechnicianCommissions() {
               <div className="text-center py-8">
                 <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <p className="text-slate-400">
-                  {monthlyData.length === 0 ? 'Ingen provisionsdata tillgänglig' : 'Ingen data för vald månad'}
+                  {data.monthly_data.length === 0 ? 'Ingen provisionsdata tillgänglig' : 'Ingen data för vald månad'}
                 </p>
               </div>
             )}
           </Card>
 
-          {/* Ärendedetaljer för månaden */}
+          {/* Månadshistorik */}
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Ärenden denna månad</h2>
-              <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">
-                {selectedMonthCases.length} ärenden
-              </span>
-            </div>
-
+            <h2 className="text-xl font-semibold text-white mb-6">Månadshistorik</h2>
+            
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {selectedMonthCases.length > 0 ? (
-                selectedMonthCases.map(case_ => (
+              {data.monthly_data.length > 0 ? (
+                data.monthly_data.map(month => (
                   <div 
-                    key={case_.id}
-                    className="bg-slate-800/50 rounded-lg p-4 hover:bg-slate-800/70 transition-colors"
+                    key={month.month}
+                    className={`p-4 rounded-lg cursor-pointer transition-colors ${
+                      month.month === selectedMonth 
+                        ? 'bg-blue-500/20 border border-blue-500/30' 
+                        : 'bg-slate-800/50 hover:bg-slate-800/70'
+                    }`}
+                    onClick={() => setSelectedMonth(month.month)}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-white text-sm">
-                            {case_.title}
-                          </p>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            case_.type === 'private' 
-                              ? 'bg-blue-500/20 text-blue-400'
-                              : 'bg-purple-500/20 text-purple-400'
-                          }`}>
-                            {case_.type === 'private' ? 'Privat' : 'Företag'}
-                          </span>
-                        </div>
-                        
-                        {case_.kontaktperson && (
-                          <p className="text-slate-400 text-xs mb-1">
-                            <User className="w-3 h-3 inline mr-1" />
-                            {case_.kontaktperson}
-                          </p>
-                        )}
-                        
-                        <p className="text-slate-400 text-xs">
-                          <Calendar className="w-3 h-3 inline mr-1" />
-                          {formatDate(case_.completed_date)}
-                        </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-white">{month.month_display}</h3>
+                      <span className="text-green-400 font-bold">
+                        {formatCurrency(month.total_commission)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 text-xs text-slate-400">
+                      <div>
+                        <span className="text-slate-400">Ärenden: </span>
+                        <span className="text-white">{month.case_count}</span>
                       </div>
-                      
-                      <div className="text-right">
-                        <p className="text-green-400 font-semibold">
-                          {formatCurrency(case_.commission_amount)}
-                        </p>
-                        <p className="text-slate-400 text-xs">
-                          av {formatCurrency(case_.case_price)}
-                        </p>
-                        {case_.billing_status && (
-                          <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs ${
-                            case_.billing_status === 'paid' 
-                              ? 'bg-green-500/20 text-green-400'
-                              : case_.billing_status === 'sent'
-                                ? 'bg-blue-500/20 text-blue-400' 
-                                : 'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {case_.billing_status === 'paid' ? 'Betald' : 
-                             case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}
-                          </span>
-                        )}
+                      <div>
+                        <span className="text-slate-400">Privat: </span>
+                        <span className="text-blue-400">{formatCurrency(month.private_commission)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Företag: </span>
+                        <span className="text-purple-400">{formatCurrency(month.business_commission)}</span>
                       </div>
                     </div>
-
-                    {case_.case_number && (
-                      <p className="text-slate-500 text-xs">
-                        Ärendenr: {case_.case_number}
-                      </p>
-                    )}
                   </div>
                 ))
               ) : (
                 <div className="text-center py-8">
-                  <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                  <p className="text-slate-400">Inga ärenden för denna månad</p>
+                  <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <p className="text-slate-400">Ingen månadshistorik tillgänglig</p>
                 </div>
               )}
             </div>
           </Card>
         </div>
 
-        {/* Månadshistorik */}
+        {/* Övergripande månadshistorik tabell */}
         <Card className="p-6 mt-8">
-          <h2 className="text-xl font-semibold text-white mb-6">Månadshistorik</h2>
+          <h2 className="text-xl font-semibold text-white mb-6">Komplett Månadsöversikt</h2>
           
           <div className="overflow-x-auto">
-            {monthlyData.length > 0 ? (
+            {data.monthly_data.length > 0 ? (
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-700">
@@ -518,16 +429,13 @@ export default function TechnicianCommissions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyData.map(month => (
+                  {data.monthly_data.map(month => (
                     <tr 
                       key={month.month}
                       className={`border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer ${
                         month.month === selectedMonth ? 'bg-blue-500/10' : ''
                       }`}
-                      onClick={() => {
-                        console.log('📅 Selecting month from table:', month.month)
-                        setSelectedMonth(month.month)
-                      }}
+                      onClick={() => setSelectedMonth(month.month)}
                     >
                       <td className="py-3 text-white font-medium">{month.month_display}</td>
                       <td className="py-3 text-right text-green-400 font-semibold">
@@ -550,9 +458,62 @@ export default function TechnicianCommissions() {
             ) : (
               <div className="text-center py-8">
                 <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-400">Ingen provisionsdata tillgänglig</p>
+                <p className="text-slate-400">Ingen månadsdata tillgänglig</p>
               </div>
             )}
+          </div>
+        </Card>
+
+        {/* Insights */}
+        <Card className="p-6 mt-8 bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-slate-400" />
+            Provisions Insights
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <div>
+              <h4 className="text-slate-300 font-medium mb-2">📈 Trend</h4>
+              <p className="text-slate-400">
+                {(() => {
+                  if (data.monthly_data.length < 2) return 'Behöver mer data'
+                  const firstMonth = data.monthly_data[data.monthly_data.length - 1]
+                  const lastMonth = data.monthly_data[0]
+                  const growth = firstMonth.total_commission > 0 ? 
+                    ((lastMonth.total_commission - firstMonth.total_commission) / firstMonth.total_commission * 100) : 0
+                  return `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}% sedan ${firstMonth.month_display}`
+                })()}
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="text-slate-300 font-medium mb-2">🎯 Konsistens</h4>
+              <p className="text-slate-400">
+                {(() => {
+                  if (data.monthly_data.length === 0) return 'Ingen data'
+                  const commissions = data.monthly_data.map(m => m.total_commission)
+                  const avg = commissions.reduce((sum, c) => sum + c, 0) / commissions.length
+                  const variance = commissions.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / commissions.length
+                  const stdDev = Math.sqrt(variance)
+                  const consistency = avg > 0 ? (1 - (stdDev / avg)) * 100 : 0
+                  return `${Math.max(0, consistency).toFixed(0)}% konsistens`
+                })()}
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="text-slate-300 font-medium mb-2">💡 Rekommendation</h4>
+              <p className="text-slate-400">
+                {(() => {
+                  if (data.monthly_data.length === 0) return 'Ingen data att analysera'
+                  const avgPrivate = data.monthly_data.reduce((sum, m) => sum + m.private_commission, 0) / data.monthly_data.length
+                  const avgBusiness = data.monthly_data.reduce((sum, m) => sum + m.business_commission, 0) / data.monthly_data.length
+                  return avgBusiness > avgPrivate ? 
+                    'Fokusera på företagsärenden för högre provision' : 
+                    'Bra balans mellan privat- och företagskunder'
+                })()}
+              </p>
+            </div>
           </div>
         </Card>
       </main>

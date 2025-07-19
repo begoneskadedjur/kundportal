@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - HELT FIXAD VERSION
+// 📁 src/pages/technician/TechnicianCases.tsx - FÖRENKLAD VERSION BASERAT PÅ ADMIN-MÖNSTER
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -55,6 +55,21 @@ interface CaseStats {
   total_commission: number
 }
 
+interface CasesData {
+  success: boolean
+  cases: TechnicianCase[]
+  stats: CaseStats
+  meta: {
+    technician_id: string
+    total_found: number
+    sources: {
+      private: number
+      business: number
+      contract: number
+    }
+  }
+}
+
 // Status färger
 const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -73,41 +88,15 @@ const getStatusColor = (status: string) => {
   }
 }
 
-// Prioritet färger
-const getPriorityColor = (priority?: string) => {
-  switch (priority?.toLowerCase()) {
-    case 'high':
-    case 'hög':
-    case 'urgent':
-      return 'bg-red-500/20 text-red-400'
-    case 'medium':
-    case 'medel':
-    case 'normal':
-      return 'bg-orange-500/20 text-orange-400'
-    case 'low':
-    case 'låg':
-      return 'bg-green-500/20 text-green-400'
-    default:
-      return 'bg-slate-500/20 text-slate-400'
-  }
-}
-
 export default function TechnicianCases() {
-  const { profile, technician, isTechnician } = useAuth() // ✅ FIXAD: isTechnician
+  const { profile, technician, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   // State
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cases, setCases] = useState<TechnicianCase[]>([])
+  const [data, setData] = useState<CasesData | null>(null)
   const [filteredCases, setFilteredCases] = useState<TechnicianCase[]>([])
-  const [stats, setStats] = useState<CaseStats>({
-    total_cases: 0,
-    completed_cases: 0,
-    pending_cases: 0,
-    in_progress_cases: 0,
-    total_commission: 0
-  })
   
   // Filter state
   const [searchTerm, setSearchTerm] = useState('')
@@ -116,29 +105,28 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // Säkerhetskontroll - omdirigera om inte tekniker
+  // Säkerhetskontroll
   useEffect(() => {
     if (!isTechnician || !technician?.id) {
-      console.log('❌ Inte en tekniker, omdirigerar från cases...', { isTechnician, technician })
+      console.log('❌ Inte en tekniker, omdirigerar från cases...')
       navigate('/login', { replace: true })
       return
     }
   }, [isTechnician, technician, navigate])
 
+  // 🔥 SAMMA FETCH-MÖNSTER SOM ADMIN
   useEffect(() => {
     if (isTechnician && technician?.id) {
-      console.log('✅ Tekniker verifierad, hämtar ärenden för:', technician.id)
       fetchCases()
     }
   }, [isTechnician, technician?.id])
 
   useEffect(() => {
     applyFilters()
-  }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
+  }, [data?.cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
   const fetchCases = async () => {
     if (!technician?.id) {
-      console.log('❌ No technician ID available')
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
       return
@@ -148,45 +136,36 @@ export default function TechnicianCases() {
       setLoading(true)
       setError(null)
       
-      const url = `/api/technician/cases?technician_id=${technician.id}`
       console.log('🔄 Fetching cases for technician:', technician.id)
       
-      const response = await fetch(url)
+      // 🔥 ENKEL API-ANROP LIKT ADMIN
+      const response = await fetch(`/api/technician/cases?technician_id=${technician.id}`)
       
-      if (response.ok) {
-        const data = await response.json()
-        console.log('📊 Raw API response:', data)
-        
-        // ✅ FIXAD: API returnerar { cases: [...], stats: {...} }
-        setCases(data.cases || [])
-        setStats(data.stats || {
-          total_cases: 0,
-          completed_cases: 0,
-          pending_cases: 0,
-          in_progress_cases: 0,
-          total_commission: 0
-        })
-        
-        console.log('✅ Cases loaded successfully:', {
-          total: data.cases?.length || 0,
-          stats: data.stats
-        })
-      } else {
+      if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ Cases API error:', response.status, errorText)
-        setError(`Kunde inte hämta ärenden: ${response.status} - ${errorText}`)
+        throw new Error(`API Error: ${response.status} - ${errorText}`)
       }
+
+      const casesData = await response.json()
+      
+      console.log('✅ Cases data loaded:', casesData)
+      setData(casesData)
+      
     } catch (error) {
       console.error('💥 Error fetching cases:', error)
-      setError('Ett oväntat fel uppstod vid hämtning av ärenden')
+      setError(error instanceof Error ? error.message : 'Ett oväntat fel uppstod')
     } finally {
       setLoading(false)
     }
   }
 
   const applyFilters = () => {
-    console.log('🔍 Applying filters to', cases.length, 'cases')
-    let filtered = [...cases]
+    if (!data?.cases) {
+      setFilteredCases([])
+      return
+    }
+
+    let filtered = [...data.cases]
 
     // Textsökning
     if (searchTerm) {
@@ -242,7 +221,6 @@ export default function TechnicianCases() {
       return sortOrder === 'desc' ? -comparison : comparison
     })
 
-    console.log('✅ Filtered cases:', filtered.length)
     setFilteredCases(filtered)
   }
 
@@ -270,15 +248,17 @@ export default function TechnicianCases() {
                 Tillbaka till dashboard
               </Button>
             </div>
-            
-            {/* 🔍 DEBUG INFO */}
-            <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
-              <p className="text-slate-300 mb-1">Debug info:</p>
-              <p className="text-slate-400">Tekniker ID: {technician?.id || 'Saknas'}</p>
-              <p className="text-slate-400">isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
-              <p className="text-slate-400">Profile role: {profile?.role || 'Okänd'}</p>
-            </div>
           </div>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Card className="p-8">
+          <p className="text-slate-400">Ingen data tillgänglig</p>
         </Card>
       </div>
     )
@@ -312,13 +292,38 @@ export default function TechnicianCases() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* 🔍 Success Debug Info */}
+        <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
+          <div className="text-xs text-green-400">
+            <p className="font-medium mb-2">✅ Cases Data Successfully Loaded!</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-slate-400">Total cases:</p>
+                <p>{data.cases.length}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Sources:</p>
+                <p>Private: {data.meta.sources.private}, Business: {data.meta.sources.business}, Contract: {data.meta.sources.contract}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Stats:</p>
+                <p>Total commission: {formatCurrency(data.stats.total_commission)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Filtered:</p>
+                <p>{filteredCases.length} cases showing</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
         {/* Statistik */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <Card className="p-4 bg-gradient-to-br from-slate-500/20 to-slate-600/20 border-slate-500/30">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Totalt</p>
-                <p className="text-xl font-bold text-white">{stats.total_cases}</p>
+                <p className="text-xl font-bold text-white">{data.stats.total_cases}</p>
               </div>
               <ClipboardList className="w-6 h-6 text-slate-400" />
             </div>
@@ -328,7 +333,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-400 text-sm">Avslutade</p>
-                <p className="text-xl font-bold text-white">{stats.completed_cases}</p>
+                <p className="text-xl font-bold text-white">{data.stats.completed_cases}</p>
               </div>
               <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
@@ -338,7 +343,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-400 text-sm">Pågående</p>
-                <p className="text-xl font-bold text-white">{stats.in_progress_cases}</p>
+                <p className="text-xl font-bold text-white">{data.stats.in_progress_cases}</p>
               </div>
               <Clock className="w-6 h-6 text-blue-400" />
             </div>
@@ -348,7 +353,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-yellow-400 text-sm">Väntande</p>
-                <p className="text-xl font-bold text-white">{stats.pending_cases}</p>
+                <p className="text-xl font-bold text-white">{data.stats.pending_cases}</p>
               </div>
               <AlertCircle className="w-6 h-6 text-yellow-400" />
             </div>
@@ -358,7 +363,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-400 text-sm">Provision</p>
-                <p className="text-lg font-bold text-white">{formatCurrency(stats.total_commission)}</p>
+                <p className="text-lg font-bold text-white">{formatCurrency(data.stats.total_commission)}</p>
               </div>
               <DollarSign className="w-6 h-6 text-purple-400" />
             </div>
@@ -417,31 +422,6 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* Debug info */}
-        <Card className="p-4 mb-6 bg-blue-500/10 border-blue-500/30">
-          <div className="text-sm">
-            <p className="text-blue-400 font-medium mb-2">🔍 Debug Info</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-slate-300">
-              <div>
-                <p className="text-slate-400">Total cases:</p>
-                <p>{cases.length}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Filtered cases:</p>
-                <p>{filteredCases.length}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Tekniker ID:</p>
-                <p className="text-xs">{technician?.id}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">API Stats:</p>
-                <p>Total: {stats.total_cases}, Commission: {formatCurrency(stats.total_commission)}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
         {/* Ärendelista */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredCases.length > 0 ? (
@@ -456,11 +436,6 @@ export default function TechnicianCases() {
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>
                         {case_.status}
                       </span>
-                      {case_.priority && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(case_.priority)}`}>
-                          {case_.priority}
-                        </span>
-                      )}
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
@@ -636,7 +611,7 @@ export default function TechnicianCases() {
         {filteredCases.length > 0 && (
           <div className="mt-6 text-center">
             <p className="text-slate-400 text-sm">
-              Visar {filteredCases.length} av {cases.length} ärenden
+              Visar {filteredCases.length} av {data.cases.length} ärenden
               {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && ' (filtrerade)'}
             </p>
           </div>
