@@ -119,7 +119,12 @@ async function getTechnicianMonthlyData(technicianId: string) {
   const privateData = privateMonthly.status === 'fulfilled' ? privateMonthly.value.data || [] : []
   const businessData = businessMonthly.status === 'fulfilled' ? businessMonthly.value.data || [] : []
   
+  console.log(`📊 Monthly commission data: Private: ${privateData.length}, Business: ${businessData.length}`)
+  
   const allCommissionCases = [...privateData, ...businessData]
+  
+  console.log(`📊 Total commission cases for monthly: ${allCommissionCases.length}`)
+  console.log('📊 Sample commission case:', allCommissionCases[0])
 
   // ✅ SAMMA GRUPPERING SOM ADMIN
   const monthlyMap = new Map()
@@ -154,31 +159,35 @@ async function getTechnicianMonthlyData(technicianId: string) {
   return monthlyData
 }
 
-// ✅ RECENT CASES SAMMA SOM ADMIN
+// ✅ RECENT CASES - VISA ALLA ÄRENDEN (INTE BARA AVSLUTADE)
 async function getRecentCases(technicianId: string) {
   const [recentPrivate, recentBusiness] = await Promise.allSettled([
+    // Private cases - ALLA STATUS (inte bara Avslutat)
     supabase
       .from('private_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at')
       .eq('primary_assignee_id', technicianId)
-      .order('created_date', { ascending: false })
-      .limit(10),
+      .order('created_at', { ascending: false })  // Sortera på created_at istället
+      .limit(15),
 
+    // Business cases - ALLA STATUS (inte bara Avslutat)
     supabase
       .from('business_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, foretag')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, foretag, created_at')
       .eq('primary_assignee_id', technicianId)
-      .order('created_date', { ascending: false })
-      .limit(10)
+      .order('created_at', { ascending: false })  // Sortera på created_at istället
+      .limit(15)
   ])
 
   const privateRecent = recentPrivate.status === 'fulfilled' ? recentPrivate.value.data || [] : []
   const businessRecent = recentBusiness.status === 'fulfilled' ? recentBusiness.value.data || [] : []
 
+  console.log(`📋 Recent cases found: Private: ${privateRecent.length}, Business: ${businessRecent.length}`)
+
   const allRecentCases = [
     ...privateRecent.map(c => ({ ...c, case_type: 'private' })),
     ...businessRecent.map(c => ({ ...c, case_type: 'business' }))
-  ].sort((a, b) => new Date(b.completed_date || 0).getTime() - new Date(a.completed_date || 0).getTime())
+  ].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
 
   return allRecentCases.slice(0, 10)
 }
