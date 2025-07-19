@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianCases.tsx - HELT FIXAD MED DEBUG & KORREKT AUTH
+// 📁 src/pages/technician/TechnicianCases.tsx - HELT FIXAD VERSION
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -21,7 +21,7 @@ interface TechnicianCase {
   title: string
   status: string
   priority?: string
-  case_type: 'private' | 'business'
+  case_type: 'private' | 'business' | 'contract'
   created_date: string
   completed_date?: string
   commission_amount?: number
@@ -93,7 +93,7 @@ const getPriorityColor = (priority?: string) => {
 }
 
 export default function TechnicianCases() {
-  const { profile, technician, isTechnician } = useAuth()
+  const { profile, technician, isTechnician } = useAuth() // ✅ FIXAD: isTechnician
   const navigate = useNavigate()
   
   // State
@@ -116,17 +116,6 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // 🔍 DEBUG: Logga AuthContext state
-  useEffect(() => {
-    console.log('🔍 TechnicianCases AuthContext Debug:')
-    console.log('- isTechnician:', isTechnician)
-    console.log('- technician object:', technician)
-    console.log('- technician.id:', technician?.id)
-    console.log('- profile:', profile)
-    console.log('- profile.technician_id:', profile?.technician_id)
-    console.log('- profile.role:', profile?.role)
-  }, [isTechnician, technician, profile])
-
   // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
     if (!isTechnician || !technician?.id) {
@@ -136,7 +125,6 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, technician, navigate])
 
-  // ✅ FIXAD: Ändrat från isTechniker till isTechnician
   useEffect(() => {
     if (isTechnician && technician?.id) {
       console.log('✅ Tekniker verifierad, hämtar ärenden för:', technician.id)
@@ -162,20 +150,22 @@ export default function TechnicianCases() {
       
       const url = `/api/technician/cases?technician_id=${technician.id}`
       console.log('🔄 Fetching cases for technician:', technician.id)
-      console.log('📡 API URL:', url)
       
       const response = await fetch(url)
-      console.log('📡 Response status:', response.status)
-      console.log('📡 Response ok:', response.ok)
       
       if (response.ok) {
         const data = await response.json()
         console.log('📊 Raw API response:', data)
-        console.log('📊 Cases array length:', data.cases?.length || 0)
-        console.log('📊 Stats object:', data.stats)
         
+        // ✅ FIXAD: API returnerar { cases: [...], stats: {...} }
         setCases(data.cases || [])
-        setStats(data.stats || {})
+        setStats(data.stats || {
+          total_cases: 0,
+          completed_cases: 0,
+          pending_cases: 0,
+          in_progress_cases: 0,
+          total_commission: 0
+        })
         
         console.log('✅ Cases loaded successfully:', {
           total: data.cases?.length || 0,
@@ -315,10 +305,6 @@ export default function TechnicianCases() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Mina Ärenden</h1>
                 <p className="text-sm text-slate-400">Översikt över tilldelade ärenden från ClickUp</p>
-                {/* 🔍 DEBUG INFO I HEADER */}
-                <p className="text-xs text-slate-500">
-                  Debug: {technician?.id} • Cases: {cases.length} • Filtered: {filteredCases.length}
-                </p>
               </div>
             </div>
           </div>
@@ -410,6 +396,7 @@ export default function TechnicianCases() {
               <option value="all">Alla typer</option>
               <option value="private">Privatpersoner</option>
               <option value="business">Företag</option>
+              <option value="contract">Avtalskunder</option>
             </select>
 
             <select
@@ -430,29 +417,28 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* 🔍 DEBUG-knapp för att testa API direkt */}
-        <Card className="p-4 mb-6 bg-red-500/10 border-red-500/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-red-400 text-sm font-medium">🔍 Debug Mode</p>
-              <p className="text-slate-400 text-xs">Tekniker ID: {technician?.id}</p>
+        {/* Debug info */}
+        <Card className="p-4 mb-6 bg-blue-500/10 border-blue-500/30">
+          <div className="text-sm">
+            <p className="text-blue-400 font-medium mb-2">🔍 Debug Info</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-slate-300">
+              <div>
+                <p className="text-slate-400">Total cases:</p>
+                <p>{cases.length}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Filtered cases:</p>
+                <p>{filteredCases.length}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Tekniker ID:</p>
+                <p className="text-xs">{technician?.id}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">API Stats:</p>
+                <p>Total: {stats.total_cases}, Commission: {formatCurrency(stats.total_commission)}</p>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                console.log('🧪 Testing API directly...')
-                fetch(`/api/technician/cases?technician_id=${technician?.id}`)
-                  .then(r => {
-                    console.log('📡 Direct API Response:', r.status, r.ok)
-                    return r.json()
-                  })
-                  .then(data => console.log('📊 Direct API Data:', data))
-                  .catch(err => console.error('💥 Direct API Error:', err))
-              }}
-            >
-              🧪 Test API
-            </Button>
           </div>
         </Card>
 
@@ -479,10 +465,14 @@ export default function TechnicianCases() {
                     
                     <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
                       <span className={`inline-flex items-center gap-1 ${
-                        case_.case_type === 'private' ? 'text-blue-400' : 'text-purple-400'
+                        case_.case_type === 'private' ? 'text-blue-400' : 
+                        case_.case_type === 'business' ? 'text-purple-400' : 'text-green-400'
                       }`}>
-                        {case_.case_type === 'private' ? <User className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
-                        {case_.case_type === 'private' ? 'Privatperson' : 'Företag'}
+                        {case_.case_type === 'private' ? <User className="w-3 h-3" /> : 
+                         case_.case_type === 'business' ? <Building2 className="w-3 h-3" /> : 
+                         <FileText className="w-3 h-3" />}
+                        {case_.case_type === 'private' ? 'Privatperson' : 
+                         case_.case_type === 'business' ? 'Företag' : 'Avtal'}
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
@@ -497,7 +487,7 @@ export default function TechnicianCases() {
                     </div>
                   </div>
 
-                  {case_.commission_amount && (
+                  {case_.commission_amount && case_.commission_amount > 0 && (
                     <div className="text-right">
                       <p className="text-green-400 font-semibold text-lg">
                         {formatCurrency(case_.commission_amount)}
@@ -636,15 +626,6 @@ export default function TechnicianCases() {
                       Rensa filter
                     </Button>
                   )}
-                  
-                  {/* 🔍 DEBUG INFO för tom lista */}
-                  <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
-                    <p className="text-slate-300 mb-1">Debug info:</p>
-                    <p className="text-slate-400">Total cases: {cases.length}</p>
-                    <p className="text-slate-400">Filtered cases: {filteredCases.length}</p>
-                    <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
-                    <p className="text-slate-400">API Stats: {JSON.stringify(stats)}</p>
-                  </div>
                 </div>
               </Card>
             </div>

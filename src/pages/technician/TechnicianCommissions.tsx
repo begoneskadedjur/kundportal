@@ -1,4 +1,5 @@
-// src/pages/technician/TechnicianCommissions.tsx - HELT FIXAD MED DEBUG & KORREKT AUTH
+
+// 📁 src/pages/technician/TechnicianCommissions.tsx - HELT FIXAD VERSION
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -45,7 +46,7 @@ interface CommissionStats {
 }
 
 export default function TechnicianCommissions() {
-  const { profile, technician, isTechnician } = useAuth()
+  const { profile, technician, isTechnician } = useAuth() // ✅ FIXAD: isTechnician
   const navigate = useNavigate()
   
   // State
@@ -61,17 +62,6 @@ export default function TechnicianCommissions() {
     highest_month: 0,
     best_month_name: ''
   })
-
-  // 🔍 DEBUG: Logga AuthContext state
-  useEffect(() => {
-    console.log('🔍 TechnicianCommissions AuthContext Debug:')
-    console.log('- isTechnician:', isTechnician)
-    console.log('- technician object:', technician)
-    console.log('- technician.id:', technician?.id)
-    console.log('- profile:', profile)
-    console.log('- profile.technician_id:', profile?.technician_id)
-    console.log('- profile.role:', profile?.role)
-  }, [isTechnician, technician, profile])
 
   // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
@@ -110,27 +100,27 @@ export default function TechnicianCommissions() {
       
       const url = `/api/technician/commissions?technician_id=${technician.id}`
       console.log('🔄 Fetching commission data for technician:', technician.id)
-      console.log('📡 API URL:', url)
       
       const response = await fetch(url)
-      console.log('📡 Response status:', response.status)
-      console.log('📡 Response ok:', response.ok)
       
       if (response.ok) {
         const data = await response.json()
         console.log('📊 Raw commission API response:', data)
-        console.log('📊 Monthly data length:', data.monthly_data?.length || 0)
-        console.log('📊 Stats object:', data.stats)
         
+        // ✅ FIXAD: API returnerar { monthly_data: [...], stats: {...} }
         setMonthlyData(data.monthly_data || [])
-        setStats(data.stats || {})
+        setStats(data.stats || {
+          total_ytd: 0,
+          total_cases_ytd: 0,
+          avg_per_case: 0,
+          highest_month: 0,
+          best_month_name: ''
+        })
         
-        // Sätt senaste månaden som default
+        // Sätt senaste månaden som default om det finns data
         if (data.monthly_data?.length > 0) {
           console.log('📅 Setting selected month to:', data.monthly_data[0].month)
           setSelectedMonth(data.monthly_data[0].month)
-        } else {
-          console.log('⚠️ No monthly data available for commission')
         }
         
         console.log('✅ Commission data loaded successfully:', {
@@ -159,16 +149,14 @@ export default function TechnicianCommissions() {
     try {
       const url = `/api/technician/commissions/cases?technician_id=${technician.id}&month=${selectedMonth}`
       console.log('🔄 Fetching month cases for:', technician.id, selectedMonth)
-      console.log('📡 Month cases URL:', url)
       
       const response = await fetch(url)
-      console.log('📡 Month cases response status:', response.status)
       
       if (response.ok) {
         const data = await response.json()
         console.log('📊 Month cases data:', data)
-        console.log('📊 Cases for month:', data.cases?.length || 0)
         
+        // ✅ FIXAD: API returnerar { cases: [...], summary: {...}, month: "...", technician_name: "..." }
         setSelectedMonthCases(data.cases || [])
         console.log('✅ Month cases loaded:', data.cases?.length || 0)
       } else {
@@ -258,10 +246,6 @@ export default function TechnicianCommissions() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Mina Provisioner</h1>
                 <p className="text-sm text-slate-400">Översikt över intjänade provisioner</p>
-                {/* 🔍 DEBUG INFO I HEADER */}
-                <p className="text-xs text-slate-500">
-                  Debug: {technician?.id} • Månader: {monthlyData.length} • Vald: {selectedMonth}
-                </p>
               </div>
             </div>
           </div>
@@ -269,29 +253,28 @@ export default function TechnicianCommissions() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* 🔍 DEBUG-knapp för att testa API direkt */}
+        {/* Debug info */}
         <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-400 text-sm font-medium">🔍 Debug Mode - Commissions</p>
-              <p className="text-slate-400 text-xs">Tekniker ID: {technician?.id}</p>
+          <div className="text-sm">
+            <p className="text-green-400 font-medium mb-2">🔍 Debug Info - Commissions</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-slate-300">
+              <div>
+                <p className="text-slate-400">Tekniker ID:</p>
+                <p className="text-xs">{technician?.id}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Månader:</p>
+                <p>{monthlyData.length}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Vald månad:</p>
+                <p>{selectedMonth}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">YTD:</p>
+                <p>{formatCurrency(stats.total_ytd)} ({stats.total_cases_ytd} cases)</p>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                console.log('🧪 Testing commissions API directly...')
-                fetch(`/api/technician/commissions?technician_id=${technician?.id}`)
-                  .then(r => {
-                    console.log('📡 Direct Commission API Response:', r.status, r.ok)
-                    return r.json()
-                  })
-                  .then(data => console.log('📊 Direct Commission API Data:', data))
-                  .catch(err => console.error('💥 Direct Commission API Error:', err))
-              }}
-            >
-              🧪 Test Commissions API
-            </Button>
           </div>
         </Card>
 
@@ -430,15 +413,6 @@ export default function TechnicianCommissions() {
                 <p className="text-slate-400">
                   {monthlyData.length === 0 ? 'Ingen provisionsdata tillgänglig' : 'Ingen data för vald månad'}
                 </p>
-                
-                {/* 🔍 DEBUG INFO för tom månadsvy */}
-                <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
-                  <p className="text-slate-300 mb-1">Debug info:</p>
-                  <p className="text-slate-400">Månader tillgängliga: {monthlyData.length}</p>
-                  <p className="text-slate-400">Vald månad: {selectedMonth}</p>
-                  <p className="text-slate-400">Current month data: {currentMonthData ? 'Finns' : 'Saknas'}</p>
-                  <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
-                </div>
               </div>
             )}
           </Card>
@@ -520,14 +494,6 @@ export default function TechnicianCommissions() {
                 <div className="text-center py-8">
                   <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                   <p className="text-slate-400">Inga ärenden för denna månad</p>
-                  
-                  {/* 🔍 DEBUG INFO för tomma ärenden */}
-                  <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
-                    <p className="text-slate-300 mb-1">Debug info:</p>
-                    <p className="text-slate-400">Vald månad: {selectedMonth}</p>
-                    <p className="text-slate-400">Ärenden för månaden: {selectedMonthCases.length}</p>
-                    <p className="text-slate-400">Tekniker ID: {technician?.id}</p>
-                  </div>
                 </div>
               )}
             </div>
@@ -585,14 +551,6 @@ export default function TechnicianCommissions() {
               <div className="text-center py-8">
                 <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <p className="text-slate-400">Ingen provisionsdata tillgänglig</p>
-                
-                {/* 🔍 DEBUG INFO för tom historik */}
-                <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs max-w-sm mx-auto">
-                  <p className="text-slate-300 mb-1">Debug info:</p>
-                  <p className="text-slate-400">Monthly data length: {monthlyData.length}</p>
-                  <p className="text-slate-400">Stats object: {JSON.stringify(stats)}</p>
-                  <p className="text-slate-400">Tekniker ID: {techniker?.id}</p>
-                </div>
               </div>
             )}
           </div>

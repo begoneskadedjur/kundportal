@@ -1,4 +1,4 @@
-// src/pages/technician/TechnicianDashboard.tsx - FIXAD MED KORREKT AUTH
+// 📁 src/pages/technician/TechnicianDashboard.tsx - FULLSTÄNDIGT FIXAD
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -26,7 +26,7 @@ interface TechnicianCase {
   clickup_task_id: string
   title: string
   status: string
-  case_type: 'private' | 'business'
+  case_type: 'private' | 'business' | 'contract'
   completed_date?: string
   commission_amount?: number
   priority?: string
@@ -45,7 +45,7 @@ interface DashboardStats {
 }
 
 export default function TechnicianDashboard() {
-  const { user, profile, technician, isTechnician } = useAuth()
+  const { user, profile, technician, isTechnician } = useAuth() // ✅ FIXAD: isTechnician (inte isTechniker)
   const navigate = useNavigate()
   
   // State
@@ -61,7 +61,18 @@ export default function TechnicianDashboard() {
   })
   const [monthlyCommissions, setMonthlyCommissions] = useState<TechnicianCommission[]>([])
   const [recentCases, setRecentCases] = useState<TechnicianCase[]>([])
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+
+  // 🔍 DEBUG: Logga AuthContext state
+  useEffect(() => {
+    console.log('🔍 TechnicianDashboard AuthContext Debug:')
+    console.log('- isTechnician:', isTechnician)
+    console.log('- technician object:', technician)
+    console.log('- technician.id:', technician?.id)
+    console.log('- profile:', profile)
+    console.log('- profile.technician_id:', profile?.technician_id)
+    console.log('- profile.role:', profile?.role)
+  }, [isTechnician, technician, profile])
 
   // Säkerhetskontroll - omdirigera om inte tekniker
   useEffect(() => {
@@ -94,7 +105,7 @@ export default function TechnicianDashboard() {
       
       console.log('🔄 Fetching data for technician:', technician.id)
       
-      // Parallella API-anrop för att hämta all data
+      // ✅ KORRIGERADE API-ANROP med rätt error handling
       const [statsResponse, commissionsResponse, casesResponse] = await Promise.all([
         fetch(`/api/technician/stats?technician_id=${technician.id}`),
         fetch(`/api/technician/commissions?technician_id=${technician.id}`),
@@ -107,25 +118,49 @@ export default function TechnicianDashboard() {
         setStats(statsData)
         console.log('✅ Stats loaded:', statsData)
       } else {
-        console.error('❌ Stats API error:', await statsResponse.text())
+        const errorText = await statsResponse.text()
+        console.error('❌ Stats API error:', statsResponse.status, errorText)
       }
 
-      // Hantera commissionsData
+      // ✅ FIXAD: Hantera commissions API response structure
       if (commissionsResponse.ok) {
         const commissionsData = await commissionsResponse.json()
+        // API returnerar { monthly_data: [...], stats: {...} }
         setMonthlyCommissions(commissionsData.monthly_data || [])
         console.log('✅ Commissions loaded:', commissionsData.monthly_data?.length || 0, 'months')
+        
+        // Uppdatera även stats om det finns i commission response
+        if (commissionsData.stats) {
+          setStats(prev => ({
+            ...prev,
+            total_commission_ytd: commissionsData.stats.total_ytd || prev.total_commission_ytd,
+            total_cases_ytd: commissionsData.stats.total_cases_ytd || prev.total_cases_ytd,
+            avg_commission_per_case: commissionsData.stats.avg_per_case || prev.avg_commission_per_case
+          }))
+        }
       } else {
-        console.error('❌ Commissions API error:', await commissionsResponse.text())
+        const errorText = await commissionsResponse.text()
+        console.error('❌ Commissions API error:', commissionsResponse.status, errorText)
       }
 
-      // Hantera cases
+      // ✅ FIXAD: Hantera cases API response structure
       if (casesResponse.ok) {
         const casesData = await casesResponse.json()
+        // API returnerar { cases: [...], stats: {...} }
         setRecentCases(casesData.cases || [])
         console.log('✅ Cases loaded:', casesData.cases?.length || 0, 'cases')
+        
+        // Uppdatera stats från cases om tillgängligt
+        if (casesData.stats) {
+          setStats(prev => ({
+            ...prev,
+            pending_cases: casesData.stats.pending_cases || prev.pending_cases,
+            completed_cases_this_month: casesData.stats.completed_cases || prev.completed_cases_this_month
+          }))
+        }
       } else {
-        console.error('❌ Cases API error:', await casesResponse.text())
+        const errorText = await casesResponse.text()
+        console.error('❌ Cases API error:', casesResponse.status, errorText)
       }
 
     } catch (error) {
@@ -159,15 +194,26 @@ export default function TechnicianDashboard() {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda data</h2>
             <p className="text-slate-400 mb-4">{error}</p>
-            <Button onClick={fetchTechnicianData}>
-              Försök igen
-            </Button>
+            <div className="space-y-2">
+              <Button onClick={fetchTechnicianData} className="w-full">
+                Försök igen
+              </Button>
+              
+              {/* 🔍 DEBUG INFO */}
+              <div className="mt-4 p-3 bg-slate-800 rounded text-left text-xs">
+                <p className="text-slate-300 mb-1">Debug info:</p>
+                <p className="text-slate-400">Tekniker ID: {technician?.id || 'Saknas'}</p>
+                <p className="text-slate-400">isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
+                <p className="text-slate-400">Profile role: {profile?.role || 'Okänd'}</p>
+              </div>
+            </div>
           </div>
         </Card>
       </div>
     )
   }
 
+  // ✅ FIXAD: Säker currentMonthData access
   const currentMonthData = monthlyCommissions.find(m => m.month === selectedMonth)
   const displayName = technician?.name || profile?.display_name || 'Tekniker'
 
@@ -202,6 +248,33 @@ export default function TechnicianDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* 🔍 DEBUG-sektion för att visa rådata */}
+        <Card className="p-4 mb-6 bg-blue-500/10 border-blue-500/30">
+          <div className="text-xs">
+            <p className="text-blue-400 font-medium mb-2">🔍 Debug Info</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-slate-300">
+              <div>
+                <p className="text-slate-400">Stats:</p>
+                <p>YTD Commission: {formatCurrency(stats.total_commission_ytd)}</p>
+                <p>YTD Cases: {stats.total_cases_ytd}</p>
+                <p>Pending: {stats.pending_cases}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Monthly Data:</p>
+                <p>Antal månader: {monthlyCommissions.length}</p>
+                <p>Current month: {selectedMonth}</p>
+                <p>Current data: {currentMonthData ? 'Finns' : 'Saknas'}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Recent Cases:</p>
+                <p>Antal cases: {recentCases.length}</p>
+                <p>Tekniker ID: {technician?.id}</p>
+                <p>isTechnician: {isTechnician ? 'Ja' : 'Nej'}</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Provision i år */}
@@ -228,10 +301,10 @@ export default function TechnicianDashboard() {
               <div>
                 <p className="text-blue-400 text-sm font-medium">Denna månad</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {formatCurrency(stats.current_month_commission)}
+                  {formatCurrency(currentMonthData?.total_commission || stats.current_month_commission)}
                 </p>
                 <p className="text-blue-300 text-xs mt-1">
-                  {stats.completed_cases_this_month} avslutade
+                  {currentMonthData?.case_count || stats.completed_cases_this_month} avslutade
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
@@ -344,6 +417,9 @@ export default function TechnicianDashboard() {
                 <p className="text-slate-400">
                   {monthlyCommissions.length === 0 ? 'Ingen provisionsdata ännu' : 'Ingen data för vald månad'}
                 </p>
+                <div className="mt-2 text-xs text-slate-500">
+                  Månader tillgängliga: {monthlyCommissions.length}
+                </div>
               </div>
             )}
           </Card>
@@ -387,11 +463,11 @@ export default function TechnicianDashboard() {
                         </span>
                       </div>
                       <p className="text-slate-400 text-xs">
-                        {case_.case_type === 'private' ? 'Privat' : 'Företag'}
+                        {case_.case_type === 'private' ? 'Privat' : case_.case_type === 'business' ? 'Företag' : 'Avtal'}
                         {case_.completed_date && ` • ${formatDate(case_.completed_date)}`}
                       </p>
                     </div>
-                    {case_.commission_amount && (
+                    {case_.commission_amount && case_.commission_amount > 0 && (
                       <div className="text-right">
                         <p className="text-green-400 font-medium text-sm">
                           {formatCurrency(case_.commission_amount)}
@@ -404,6 +480,9 @@ export default function TechnicianDashboard() {
                 <div className="text-center py-8">
                   <ClipboardList className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                   <p className="text-slate-400">Inga ärenden att visa</p>
+                  <div className="mt-2 text-xs text-slate-500">
+                    Cases hämtade: {recentCases.length}
+                  </div>
                 </div>
               )}
             </div>
