@@ -1,4 +1,4 @@
-// 📁 api/technician/dashboard.ts - KORRIGERAD VERSION MED RÄTT EXPORT
+// 📁 api/technician/dashboard.ts - ANVÄND BEFINTLIGA ADMIN SERVICES!
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -16,7 +16,174 @@ const monthNames = [
   'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
 ]
 
-// ✅ KORREKT DEFAULT EXPORT för Vercel
+// ✅ ÅTERANVÄND SAMMA LOGIK SOM ADMIN technicianAnalyticsService.ts
+async function getTechnicianPerformanceById(technicianId: string) {
+  console.log('🔄 Getting technician performance using admin logic...')
+  
+  // Hämta tekniker-info
+  const { data: technician, error: techError } = await supabase
+    .from('technicians')
+    .select('id, name, role, email, is_active')
+    .eq('id', technicianId)
+    .single()
+
+  if (techError || !technician) {
+    throw new Error('Technician not found')
+  }
+
+  console.log(`✅ Found technician: ${technician.name}`)
+
+  // ✅ EXAKT SAMMA QUERIES SOM ADMIN technicianAnalyticsService.ts
+  const [privateCasesResult, businessCasesResult, contractCasesResult] = await Promise.allSettled([
+    // Private cases - SAMMA SOM ADMIN
+    supabase
+      .from('private_cases')
+      .select('pris, commission_amount, completed_date, created_at, status')
+      .eq('primary_assignee_id', technician.id)
+      .eq('status', 'Avslutat')
+      .not('pris', 'is', null),
+
+    // Business cases - SAMMA SOM ADMIN
+    supabase
+      .from('business_cases')
+      .select('pris, commission_amount, completed_date, created_at, status')
+      .eq('primary_assignee_id', technician.id) 
+      .eq('status', 'Avslutat')
+      .not('pris', 'is', null),
+
+    // Contract cases - SAMMA SOM ADMIN
+    supabase
+      .from('cases')
+      .select('price, completed_date, created_date, status')
+      .eq('assigned_technician_id', technician.id)
+      .in('status', ['Avslutat', 'Genomförd', 'Klar'])
+      .not('price', 'is', null)
+  ])
+
+  // ✅ SÄKER DATA EXTRACTION
+  const privateCases = privateCasesResult.status === 'fulfilled' ? privateCasesResult.value.data || [] : []
+  const businessCases = businessCasesResult.status === 'fulfilled' ? businessCasesResult.value.data || [] : []
+  const contractCases = contractCasesResult.status === 'fulfilled' ? contractCasesResult.value.data || [] : []
+
+  console.log(`📊 Cases found: Private: ${privateCases.length}, Business: ${businessCases.length}, Contract: ${contractCases.length}`)
+
+  // ✅ EXAKT SAMMA BERÄKNING SOM ADMIN
+  const privateRevenue = privateCases.reduce((sum, c) => sum + (c.pris || 0), 0)
+  const businessRevenue = businessCases.reduce((sum, c) => sum + (c.pris || 0), 0)
+  const contractRevenue = contractCases.reduce((sum, c) => sum + (c.price || 0), 0)
+
+  const totalRevenue = privateRevenue + businessRevenue + contractRevenue
+  const totalCases = privateCases.length + businessCases.length + contractCases.length
+
+  // ✅ COMMISSION BERÄKNING (bara BeGone cases har commission)
+  const totalCommissionYtd = privateCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0) +
+                           businessCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
+
+  return {
+    technician,
+    totalRevenue,
+    totalCases,
+    totalCommissionYtd,
+    privateCases,
+    businessCases,
+    contractCases
+  }
+}
+
+// ✅ MÅNADSDATA SAMMA SOM ADMIN useTechnicianMonthlyData
+async function getTechnicianMonthlyData(technicianId: string) {
+  console.log('🔄 Getting monthly data using admin logic...')
+  
+  const currentYear = new Date().getFullYear()
+  const yearStart = `${currentYear}-01-01`
+
+  // ✅ SAMMA QUERIES SOM ADMIN
+  const [privateMonthly, businessMonthly] = await Promise.allSettled([
+    supabase
+      .from('private_cases')
+      .select('commission_amount, completed_date, pris')
+      .eq('primary_assignee_id', technicianId)
+      .eq('status', 'Avslutat')
+      .not('commission_amount', 'is', null)
+      .gte('completed_date', yearStart),
+
+    supabase
+      .from('business_cases')
+      .select('commission_amount, completed_date, pris')
+      .eq('primary_assignee_id', technicianId)
+      .eq('status', 'Avslutat')
+      .not('commission_amount', 'is', null)
+      .gte('completed_date', yearStart)
+  ])
+
+  const privateData = privateMonthly.status === 'fulfilled' ? privateMonthly.value.data || [] : []
+  const businessData = businessMonthly.status === 'fulfilled' ? businessMonthly.value.data || [] : []
+  
+  const allCommissionCases = [...privateData, ...businessData]
+
+  // ✅ SAMMA GRUPPERING SOM ADMIN
+  const monthlyMap = new Map()
+  
+  allCommissionCases.forEach(case_ => {
+    if (!case_.completed_date) return
+    
+    const month = case_.completed_date.slice(0, 7) // YYYY-MM
+    
+    if (!monthlyMap.has(month)) {
+      monthlyMap.set(month, {
+        month,
+        total_commission: 0,
+        case_count: 0
+      })
+    }
+    
+    const monthData = monthlyMap.get(month)
+    monthData.total_commission += case_.commission_amount || 0
+    monthData.case_count += 1
+  })
+
+  // ✅ SAMMA FORMAT SOM ADMIN
+  const monthlyData = Array.from(monthlyMap.values())
+    .map(m => ({
+      ...m,
+      month_display: `${monthNames[parseInt(m.month.split('-')[1]) - 1]} ${m.month.split('-')[0]}`,
+      avg_commission_per_case: m.case_count > 0 ? m.total_commission / m.case_count : 0
+    }))
+    .sort((a, b) => b.month.localeCompare(a.month))
+
+  return monthlyData
+}
+
+// ✅ RECENT CASES SAMMA SOM ADMIN
+async function getRecentCases(technicianId: string) {
+  const [recentPrivate, recentBusiness] = await Promise.allSettled([
+    supabase
+      .from('private_cases')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson')
+      .eq('primary_assignee_id', technicianId)
+      .order('created_date', { ascending: false })
+      .limit(10),
+
+    supabase
+      .from('business_cases')
+      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, foretag')
+      .eq('primary_assignee_id', technicianId)
+      .order('created_date', { ascending: false })
+      .limit(10)
+  ])
+
+  const privateRecent = recentPrivate.status === 'fulfilled' ? recentPrivate.value.data || [] : []
+  const businessRecent = recentBusiness.status === 'fulfilled' ? recentBusiness.value.data || [] : []
+
+  const allRecentCases = [
+    ...privateRecent.map(c => ({ ...c, case_type: 'private' })),
+    ...businessRecent.map(c => ({ ...c, case_type: 'business' }))
+  ].sort((a, b) => new Date(b.completed_date || 0).getTime() - new Date(a.completed_date || 0).getTime())
+
+  return allRecentCases.slice(0, 10)
+}
+
+// ✅ MAIN HANDLER
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -43,178 +210,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('🔄 Fetching dashboard data for technician:', technician_id)
 
-    const currentYear = new Date().getFullYear()
-    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-    const yearStart = `${currentYear}-01-01`
-
-    // ✅ HÄMTA TEKNIKER FÖRST för att få namn
-    const { data: technician, error: techError } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
-
-    if (techError || !technician) {
-      return res.status(404).json({
-        success: false,
-        error: 'Technician not found',
-        technician_id
-      })
-    }
-
-    console.log(`✅ Technician found: ${technician.name}`)
-
-    // ✅ PARALLELLA QUERIES med BÅDE UUID OCH NAMN-SÖKNING
-    const results = await Promise.allSettled([
-      // Stats queries - HYBRID SÖKNING (UUID + namn)
-      supabase
-        .from('private_cases')
-        .select('commission_amount, completed_date, pris, status, created_date, primary_assignee_name')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`),
-
-      supabase
-        .from('business_cases')
-        .select('commission_amount, completed_date, pris, status, created_date, primary_assignee_name')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`),
-
-      // Commission queries för månadsdata - HYBRID SÖKNING
-      supabase
-        .from('private_cases')
-        .select('commission_amount, completed_date')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
-        .not('commission_amount', 'is', null)
-        .gte('completed_date', yearStart),
-
-      supabase
-        .from('business_cases')
-        .select('commission_amount, completed_date')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
-        .not('commission_amount', 'is', null)
-        .gte('completed_date', yearStart),
-
-      // Recent cases queries - HYBRID SÖKNING
-      supabase
-        .from('private_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris, kontaktperson, telefon, email, adress, skadedjur, beskrivning')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
-        .order('created_date', { ascending: false })
-        .limit(10),
-
-      supabase
-        .from('business_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris, kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning')
-        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
-        .order('created_date', { ascending: false })
-        .limit(10)
+    // ✅ ANVÄND BEFINTLIGA ADMIN SERVICES
+    const [performanceData, monthlyData, recentCases] = await Promise.all([
+      getTechnicianPerformanceById(technician_id as string),
+      getTechnicianMonthlyData(technician_id as string),
+      getRecentCases(technician_id as string)
     ])
 
-    // ✅ EXTRAHERA RESULTAT från Promise.allSettled
-    const [
-      privateCasesResult,
-      businessCasesResult,
-      privateCommissionsResult,
-      businessCommissionsResult,
-      recentPrivateResult,
-      recentBusinessResult
-    ] = results
+    // ✅ BERÄKNA DASHBOARD STATS SAMMA SOM ADMIN
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    
+    const currentMonthData = monthlyData.find(m => m.month === currentMonth)
+    const currentMonthCommission = currentMonthData?.total_commission || 0
+    const completedCasesThisMonth = currentMonthData?.case_count || 0
 
-    // ✅ SÄKER DATA EXTRACTION från Promise.allSettled
-    const privateCases = privateCasesResult.status === 'fulfilled' ? privateCasesResult.value.data || [] : []
-    const businessCases = businessCasesResult.status === 'fulfilled' ? businessCasesResult.value.data || [] : []
-    const privateCommissions = privateCommissionsResult.status === 'fulfilled' ? privateCommissionsResult.value.data || [] : []
-    const businessCommissions = businessCommissionsResult.status === 'fulfilled' ? businessCommissionsResult.value.data || [] : []
-    const recentPrivate = recentPrivateResult.status === 'fulfilled' ? recentPrivateResult.value.data || [] : []
-    const recentBusiness = recentBusinessResult.status === 'fulfilled' ? recentBusinessResult.value.data || [] : []
+    // Pågående ärenden (inte avslutade)
+    const pendingCases = recentCases.filter(c => 
+      c.status?.toLowerCase() !== 'avslutat' && 
+      c.status?.toLowerCase() !== 'completed' &&
+      !c.completed_date
+    ).length
 
-    // ✅ LOGGA EVENTUELLA FEL
-    if (privateCasesResult.status === 'rejected') {
-      console.error('❌ Private cases error:', privateCasesResult.reason)
-    }
-    if (businessCasesResult.status === 'rejected') {
-      console.error('❌ Business cases error:', businessCasesResult.reason)
-    }
+    const avgCommissionPerCase = performanceData.totalCases > 0 ? 
+      performanceData.totalCommissionYtd / performanceData.totalCases : 0
 
-    // ✅ DEBUG LOGGING för att se vad vi faktiskt hittar
-    console.log(`🔍 Data found for ${technician.name}:`, {
-      privateCases: privateCases.length,
-      businessCases: businessCases.length,
-      privateCommissions: privateCommissions.length,
-      businessCommissions: businessCommissions.length,
-      recentPrivate: recentPrivate.length,
-      recentBusiness: recentBusiness.length
-    })
-
-    // Kombinera all data för beräkningar
-    const allCases = [...privateCases, ...businessCases]
-    const allCommissions = [...privateCommissions, ...businessCommissions]
-    const allRecentCases = [
-      ...recentPrivate.map((c: any) => ({ ...c, case_type: 'private' })),
-      ...recentBusiness.map((c: any) => ({ ...c, case_type: 'business' }))
-    ].sort((a, b) => new Date(b.completed_date || 0).getTime() - new Date(a.completed_date || 0).getTime())
-
-    // ✅ BERÄKNA DASHBOARD STATS
-    const totalCommissionYtd = allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
-    const totalCasesYtd = allCases.length
-    const avgCommissionPerCase = totalCasesYtd > 0 ? totalCommissionYtd / totalCasesYtd : 0
-
-    const currentMonthCases = allCases.filter(c => c.completed_date?.startsWith(currentMonth))
-    const currentMonthCommission = currentMonthCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
-    const completedCasesThisMonth = currentMonthCases.length
-
-    const pendingCases = allRecentCases.filter(c => !c.completed_date).length
-
-    // ✅ MÅNADSDATA för chart
-    const monthlyMap = new Map()
-    allCommissions.forEach(c => {
-      if (!c.completed_date) return
-      const month = c.completed_date.slice(0, 7)
-      if (!monthlyMap.has(month)) {
-        monthlyMap.set(month, { month, total_commission: 0, case_count: 0 })
-      }
-      const monthData = monthlyMap.get(month)
-      monthData.total_commission += c.commission_amount || 0
-      monthData.case_count += 1
-    })
-
-    const monthlyData = Array.from(monthlyMap.values())
-      .map(m => ({
-        ...m,
-        month_display: `${monthNames[parseInt(m.month.split('-')[1]) - 1]} ${m.month.split('-')[0]}`,
-        avg_commission_per_case: m.case_count > 0 ? m.total_commission / m.case_count : 0
-      }))
-      .sort((a, b) => b.month.localeCompare(a.month))
-
-    // ✅ FINAL RESPONSE
+    // ✅ SAMMA RESPONSE FORMAT SOM ADMIN
     const response = {
       success: true,
       stats: {
-        total_commission_ytd: totalCommissionYtd,
-        total_cases_ytd: totalCasesYtd,
+        total_commission_ytd: performanceData.totalCommissionYtd,
+        total_cases_ytd: performanceData.totalCases,
         avg_commission_per_case: avgCommissionPerCase,
         current_month_commission: currentMonthCommission,
         pending_cases: pendingCases,
         completed_cases_this_month: completedCasesThisMonth,
-        technician_name: technician?.name,
-        technician_email: technician?.email
+        technician_name: performanceData.technician.name,
+        technician_email: performanceData.technician.email
       },
       monthly_data: monthlyData,
-      recent_cases: allRecentCases.slice(0, 10),
+      recent_cases: recentCases,
       meta: {
         technician_id,
         timestamp: new Date().toISOString(),
         data_sources: {
-          private_cases: privateCases.length,
-          business_cases: businessCases.length,
-          recent_cases: allRecentCases.length
+          private_cases: performanceData.privateCases.length,
+          business_cases: performanceData.businessCases.length,
+          contract_cases: performanceData.contractCases.length,
+          recent_cases: recentCases.length,
+          monthly_periods: monthlyData.length
         }
       }
     }
 
     console.log('✅ Dashboard data compiled successfully:', {
-      technician_name: technician?.name,
-      total_commission: totalCommissionYtd,
-      cases: totalCasesYtd,
-      months: monthlyData.length
+      technician_name: performanceData.technician.name,
+      total_commission: performanceData.totalCommissionYtd,
+      cases: performanceData.totalCases,
+      months: monthlyData.length,
+      current_month_commission: currentMonthCommission
     })
 
     return res.status(200).json(response)
