@@ -47,16 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
     const yearStart = `${currentYear}-01-01`
 
-    // ✅ PARALLELLA QUERIES med robust error handling
-    const [
-      privateCasesResult,
-      businessCasesResult,
-      privateCommissionsResult,
-      businessCommissionsResult,
-      recentPrivateResult,
-      recentBusinessResult,
-      technicianResult
-    ] = await Promise.allSettled([
+    // ✅ PARALLELLA QUERIES med Promise.allSettled
+    const results = await Promise.allSettled([
       // Stats queries
       supabase
         .from('private_cases')
@@ -108,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .single()
     ])
 
-    // ✅ ROBUST ERROR HANDLING för Promise.allSettled
+    // ✅ EXTRAHERA RESULTAT från Promise.allSettled
     const [
       privateCasesResult,
       businessCasesResult,
@@ -117,54 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       recentPrivateResult,
       recentBusinessResult,
       technicianResult
-    ] = await Promise.allSettled([
-      // Duplicate queries för Promise.allSettled
-      supabase
-        .from('private_cases')
-        .select('commission_amount, completed_date, pris, status, created_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null),
-
-      supabase
-        .from('business_cases')
-        .select('commission_amount, completed_date, pris, status, created_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null),
-
-      supabase
-        .from('private_cases')
-        .select('commission_amount, completed_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null)
-        .gte('completed_date', yearStart),
-
-      supabase
-        .from('business_cases')
-        .select('commission_amount, completed_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null)
-        .gte('completed_date', yearStart),
-
-      supabase
-        .from('private_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-        .eq('primary_assignee_id', technician_id)
-        .order('created_date', { ascending: false })
-        .limit(10),
-
-      supabase
-        .from('business_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-        .eq('primary_assignee_id', technician_id)
-        .order('created_date', { ascending: false })
-        .limit(10),
-
-      supabase
-        .from('technicians')
-        .select('name, email')
-        .eq('id', technician_id)
-        .single()
-    ])
+    ] = results
 
     // ✅ SÄKER DATA EXTRACTION från Promise.allSettled
     const privateCases = privateCasesResult.status === 'fulfilled' ? privateCasesResult.value.data || [] : []
