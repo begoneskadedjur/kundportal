@@ -47,57 +47,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
     const yearStart = `${currentYear}-01-01`
 
-    // ✅ PARALLELLA QUERIES med Promise.allSettled
+    // ✅ HÄMTA TEKNIKER FÖRST för att få namn
+    const { data: technician, error: techError } = await supabase
+      .from('technicians')
+      .select('name, email')
+      .eq('id', technician_id)
+      .single()
+
+    if (techError || !technician) {
+      return res.status(404).json({
+        success: false,
+        error: 'Technician not found',
+        technician_id
+      })
+    }
+
+    console.log(`✅ Technician found: ${technician.name}`)
+
+    // ✅ PARALLELLA QUERIES med BÅDE UUID OCH NAMN-SÖKNING
     const results = await Promise.allSettled([
-      // Stats queries
+      // Stats queries - HYBRID SÖKNING (UUID + namn)
       supabase
         .from('private_cases')
-        .select('commission_amount, completed_date, pris, status, created_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null),
+        .select('commission_amount, completed_date, pris, status, created_date, primary_assignee_name')
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`),
 
       supabase
         .from('business_cases')
-        .select('commission_amount, completed_date, pris, status, created_date')
-        .eq('primary_assignee_id', technician_id)
-        .not('commission_amount', 'is', null),
+        .select('commission_amount, completed_date, pris, status, created_date, primary_assignee_name')
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`),
 
-      // Commission queries för månadsdata
+      // Commission queries för månadsdata - HYBRID SÖKNING
       supabase
         .from('private_cases')
         .select('commission_amount, completed_date')
-        .eq('primary_assignee_id', technician_id)
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
         .not('commission_amount', 'is', null)
         .gte('completed_date', yearStart),
 
       supabase
         .from('business_cases')
         .select('commission_amount, completed_date')
-        .eq('primary_assignee_id', technician_id)
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
         .not('commission_amount', 'is', null)
         .gte('completed_date', yearStart),
 
-      // Recent cases queries
+      // Recent cases queries - HYBRID SÖKNING
       supabase
         .from('private_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-        .eq('primary_assignee_id', technician_id)
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris, kontaktperson, telefon, email, adress, skadedjur, beskrivning')
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
         .order('created_date', { ascending: false })
         .limit(10),
 
       supabase
         .from('business_cases')
-        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-        .eq('primary_assignee_id', technician_id)
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris, kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning')
+        .or(`primary_assignee_id.eq.${technician_id},primary_assignee_name.eq.${technician.name}`)
         .order('created_date', { ascending: false })
-        .limit(10),
-
-      // Technician info
-      supabase
-        .from('technicians')
-        .select('name, email')
-        .eq('id', technician_id)
-        .single()
+        .limit(10)
     ])
 
     // ✅ EXTRAHERA RESULTAT från Promise.allSettled
@@ -107,8 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       privateCommissionsResult,
       businessCommissionsResult,
       recentPrivateResult,
-      recentBusinessResult,
-      technicianResult
+      recentBusinessResult
     ] = results
 
     // ✅ SÄKER DATA EXTRACTION från Promise.allSettled
@@ -118,7 +125,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const businessCommissions = businessCommissionsResult.status === 'fulfilled' ? businessCommissionsResult.value.data || [] : []
     const recentPrivate = recentPrivateResult.status === 'fulfilled' ? recentPrivateResult.value.data || [] : []
     const recentBusiness = recentBusinessResult.status === 'fulfilled' ? recentBusinessResult.value.data || [] : []
-    const technician = technicianResult.status === 'fulfilled' ? technicianResult.value.data : null
 
     // ✅ LOGGA EVENTUELLA FEL
     if (privateCasesResult.status === 'rejected') {
@@ -127,6 +133,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (businessCasesResult.status === 'rejected') {
       console.error('❌ Business cases error:', businessCasesResult.reason)
     }
+
+    // ✅ DEBUG LOGGING för att se vad vi faktiskt hittar
+    console.log(`🔍 Data found for ${technician.name}:`, {
+      privateCases: privateCases.length,
+      businessCases: businessCases.length,
+      privateCommissions: privateCommissions.length,
+      businessCommissions: businessCommissions.length,
+      recentPrivate: recentPrivate.length,
+      recentBusiness: recentBusiness.length
+    })
 
     // Kombinera all data för beräkningar
     const allCases = [...privateCases, ...businessCases]
