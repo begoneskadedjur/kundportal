@@ -1,52 +1,69 @@
-// 📁 api/technician/cases.ts - FÖRENKLAD VERSION BASERAT PÅ ADMIN-MÖNSTER
+// 📁 api/technician/cases.ts - ANVÄND SAMMA LOGIK SOM ADMIN
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('Missing Supabase environment variables')
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { technician_id, limit = '50' } = req.query
+  const { technician_id, limit = '100' } = req.query
 
   if (!technician_id) {
-    return res.status(400).json({ error: 'technician_id required' })
+    return res.status(400).json({ 
+      success: false,
+      error: 'technician_id required' 
+    })
   }
 
   try {
     console.log('🔄 Fetching cases for technician:', technician_id)
 
-    // 🔥 SAMMA PARALLELLA QUERY-MÖNSTER SOM ADMIN ECONOMICS
-    const [privateResult, businessResult, contractResult] = await Promise.all([
-      // Private cases
+    // ✅ SAMMA PARALLELLA QUERIES SOM ADMIN
+    const [privateResult, businessResult, contractResult] = await Promise.allSettled([
+      // Private cases - ALLA STATUS (inte bara avslutade)
       supabase
         .from('private_cases')
         .select(`
-          id, clickup_task_id, title, status, priority, created_date, completed_date,
+          id, clickup_task_id, title, status, priority, start_date as created_date, completed_date,
           commission_amount, pris as case_price, primary_assignee_name as assignee_name,
           kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
         `)
         .eq('primary_assignee_id', technician_id)
-        .order('created_date', { ascending: false })
+        .order('start_date', { ascending: false })
         .limit(parseInt(limit as string)),
 
-      // Business cases  
+      // Business cases - ALLA STATUS (inte bara avslutade)
       supabase
         .from('business_cases')
         .select(`
-          id, clickup_task_id, title, status, priority, created_date, completed_date,
+          id, clickup_task_id, title, status, priority, start_date as created_date, completed_date,
           commission_amount, pris as case_price, primary_assignee_name as assignee_name,
           kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
         `)
         .eq('primary_assignee_id', technician_id)
-        .order('created_date', { ascending: false })
+        .order('start_date', { ascending: false })
         .limit(parseInt(limit as string)),
 
-      // Contract cases (avtalskunder) - använder assigned_technician_id
+      // Contract cases - använder assigned_technician_id
       supabase
         .from('cases')
         .select(`
@@ -59,26 +76,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .limit(parseInt(limit as string))
     ])
 
-    // 🔥 SAMMA ERROR HANDLING SOM ADMIN
-    if (privateResult.error) console.error('Private cases error:', privateResult.error)
-    if (businessResult.error) console.error('Business cases error:', businessResult.error)
-    if (contractResult.error) console.error('Contract cases error:', contractResult.error)
+    // ✅ SÄKER ERROR HANDLING
+    if (privateResult.status === 'rejected') {
+      console.error('Private cases error:', privateResult.reason)
+    }
+    if (businessResult.status === 'rejected') {
+      console.error('Business cases error:', businessResult.reason)
+    }
+    if (contractResult.status === 'rejected') {
+      console.error('Contract cases error:', contractResult.reason)
+    }
 
-    // Kombinera och formattera alla cases
+    // ✅ KOMBINERA OCH FORMATTERA ALLA CASES
+    const privateCases = privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []
+    const businessCases = businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []
+    const contractCases = contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []
+
     const allCases = [
-      ...(privateResult.data || []).map(c => ({
+      ...privateCases.map(c => ({
         ...c,
         case_type: 'private' as const,
         case_number: `P-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
-      ...(businessResult.data || []).map(c => ({
+      ...businessCases.map(c => ({
         ...c,
         case_type: 'business' as const,
         case_number: `B-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
-      ...(contractResult.data || []).map(c => ({
+      ...contractCases.map(c => ({
         ...c,
         case_type: 'contract' as const,
         case_number: `C-${c.clickup_task_id}`,
@@ -87,10 +114,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }))
     ]
 
-    // Sortera efter datum (senaste först)
+    // ✅ SORTERA EFTER DATUM (senaste först)
     allCases.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())
 
-    // Beräkna stats - SAMMA MÖNSTER SOM ADMIN
+    // ✅ BERÄKNA STATS
     const stats = {
       total_cases: allCases.length,
       completed_cases: allCases.filter(c => 
@@ -112,13 +139,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`✅ Cases loaded for technician ${technician_id}:`, {
       total: allCases.length,
-      private: privateResult.data?.length || 0,
-      business: businessResult.data?.length || 0,
-      contract: contractResult.data?.length || 0,
+      private: privateCases.length,
+      business: businessCases.length,
+      contract: contractCases.length,
       stats
     })
 
-    // 🔥 SAMMA RESPONSE-FORMAT SOM ADMIN
+    // ✅ SAMMA RESPONSE-FORMAT SOM ADMIN
     return res.status(200).json({
       success: true,
       cases: allCases,
@@ -127,9 +154,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         technician_id,
         total_found: allCases.length,
         sources: {
-          private: privateResult.data?.length || 0,
-          business: businessResult.data?.length || 0,
-          contract: contractResult.data?.length || 0
+          private: privateCases.length,
+          business: businessCases.length,
+          contract: contractCases.length
         },
         timestamp: new Date().toISOString()
       }
