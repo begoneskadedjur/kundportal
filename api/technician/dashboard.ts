@@ -1,12 +1,32 @@
-// 📁 api/technician/dashboard.ts - FUNGERANDE VERSION BASERAT PÅ ADMIN-MÖNSTER
+// 📁 api/technician/dashboard.ts - KORRIGERAD VERSION MED RÄTT EXPORT
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('Missing Supabase environment variables')
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+const monthNames = [
+  'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
+  'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
+]
+
+// ✅ KORREKT DEFAULT EXPORT för Vercel
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -14,89 +34,164 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { technician_id } = req.query
 
   if (!technician_id) {
-    return res.status(400).json({ error: 'technician_id required' })
+    return res.status(400).json({ 
+      success: false,
+      error: 'technician_id is required' 
+    })
   }
 
   try {
     console.log('🔄 Fetching dashboard data for technician:', technician_id)
 
-    // 🔥 SAMMA MÖNSTER SOM ADMIN ECONOMICS - PARALLELLA QUERIES
-    const [statsResult, commissionsResult, casesResult] = await Promise.all([
-      // Stats från alla case-tabeller
-      Promise.all([
-        supabase
-          .from('private_cases')
-          .select('commission_amount, completed_date, pris, status')
-          .eq('primary_assignee_id', technician_id)
-          .not('commission_amount', 'is', null),
-        
-        supabase
-          .from('business_cases')
-          .select('commission_amount, completed_date, pris, status')
-          .eq('primary_assignee_id', technician_id)
-          .not('commission_amount', 'is', null)
-      ]),
+    const currentYear = new Date().getFullYear()
+    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+    const yearStart = `${currentYear}-01-01`
 
-      // Commissions data - månadsvis
-      Promise.all([
-        supabase
-          .from('private_cases')
-          .select('commission_amount, completed_date')
-          .eq('primary_assignee_id', technician_id)
-          .not('commission_amount', 'is', null)
-          .gte('completed_date', '2025-01-01'),
-        
-        supabase
-          .from('business_cases')
-          .select('commission_amount, completed_date')
-          .eq('primary_assignee_id', technician_id)
-          .not('commission_amount', 'is', null)
-          .gte('completed_date', '2025-01-01')
-      ]),
+    // ✅ PARALLELLA QUERIES med robust error handling
+    const [
+      privateCasesResult,
+      businessCasesResult,
+      privateCommissionsResult,
+      businessCommissionsResult,
+      recentPrivateResult,
+      recentBusinessResult,
+      technicianResult
+    ] = await Promise.allSettled([
+      // Stats queries
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date, pris, status, created_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null),
 
-      // Recent cases
-      Promise.all([
-        supabase
-          .from('private_cases')
-          .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-          .eq('primary_assignee_id', technician_id)
-          .order('created_date', { ascending: false })
-          .limit(5),
-        
-        supabase
-          .from('business_cases')
-          .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
-          .eq('primary_assignee_id', technician_id)
-          .order('created_date', { ascending: false })
-          .limit(5)
-      ])
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date, pris, status, created_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null),
+
+      // Commission queries för månadsdata
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', yearStart),
+
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', yearStart),
+
+      // Recent cases queries
+      supabase
+        .from('private_cases')
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
+        .eq('primary_assignee_id', technician_id)
+        .order('created_date', { ascending: false })
+        .limit(10),
+
+      supabase
+        .from('business_cases')
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
+        .eq('primary_assignee_id', technician_id)
+        .order('created_date', { ascending: false })
+        .limit(10),
+
+      // Technician info
+      supabase
+        .from('technicians')
+        .select('name, email')
+        .eq('id', technician_id)
+        .single()
     ])
 
-    // 🔥 ROBUST ERROR HANDLING LIKT ADMIN
-    const [privateCases, businessCases] = statsResult
-    const [privateCommissions, businessCommissions] = commissionsResult
-    const [privateRecentCases, businessRecentCases] = casesResult
+    // ✅ ROBUST ERROR HANDLING för Promise.allSettled
+    const [
+      privateCasesResult,
+      businessCasesResult,
+      privateCommissionsResult,
+      businessCommissionsResult,
+      recentPrivateResult,
+      recentBusinessResult,
+      technicianResult
+    ] = await Promise.allSettled([
+      // Duplicate queries för Promise.allSettled
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date, pris, status, created_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null),
 
-    // Kombinera all data
-    const allCases = [
-      ...(privateCases.data || []),
-      ...(businessCases.data || [])
-    ]
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date, pris, status, created_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null),
 
-    const allCommissions = [
-      ...(privateCommissions.data || []),
-      ...(businessCommissions.data || [])
-    ]
+      supabase
+        .from('private_cases')
+        .select('commission_amount, completed_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', yearStart),
 
+      supabase
+        .from('business_cases')
+        .select('commission_amount, completed_date')
+        .eq('primary_assignee_id', technician_id)
+        .not('commission_amount', 'is', null)
+        .gte('completed_date', yearStart),
+
+      supabase
+        .from('private_cases')
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
+        .eq('primary_assignee_id', technician_id)
+        .order('created_date', { ascending: false })
+        .limit(10),
+
+      supabase
+        .from('business_cases')
+        .select('id, clickup_task_id, title, status, completed_date, commission_amount, pris')
+        .eq('primary_assignee_id', technician_id)
+        .order('created_date', { ascending: false })
+        .limit(10),
+
+      supabase
+        .from('technicians')
+        .select('name, email')
+        .eq('id', technician_id)
+        .single()
+    ])
+
+    // ✅ SÄKER DATA EXTRACTION från Promise.allSettled
+    const privateCases = privateCasesResult.status === 'fulfilled' ? privateCasesResult.value.data || [] : []
+    const businessCases = businessCasesResult.status === 'fulfilled' ? businessCasesResult.value.data || [] : []
+    const privateCommissions = privateCommissionsResult.status === 'fulfilled' ? privateCommissionsResult.value.data || [] : []
+    const businessCommissions = businessCommissionsResult.status === 'fulfilled' ? businessCommissionsResult.value.data || [] : []
+    const recentPrivate = recentPrivateResult.status === 'fulfilled' ? recentPrivateResult.value.data || [] : []
+    const recentBusiness = recentBusinessResult.status === 'fulfilled' ? recentBusinessResult.value.data || [] : []
+    const technician = technicianResult.status === 'fulfilled' ? technicianResult.value.data : null
+
+    // ✅ LOGGA EVENTUELLA FEL
+    if (privateCasesResult.status === 'rejected') {
+      console.error('❌ Private cases error:', privateCasesResult.reason)
+    }
+    if (businessCasesResult.status === 'rejected') {
+      console.error('❌ Business cases error:', businessCasesResult.reason)
+    }
+
+    // Kombinera all data för beräkningar
+    const allCases = [...privateCases, ...businessCases]
+    const allCommissions = [...privateCommissions, ...businessCommissions]
     const allRecentCases = [
-      ...(privateRecentCases.data || []).map(c => ({ ...c, case_type: 'private' })),
-      ...(businessRecentCases.data || []).map(c => ({ ...c, case_type: 'business' }))
+      ...recentPrivate.map((c: any) => ({ ...c, case_type: 'private' })),
+      ...recentBusiness.map((c: any) => ({ ...c, case_type: 'business' }))
     ].sort((a, b) => new Date(b.completed_date || 0).getTime() - new Date(a.completed_date || 0).getTime())
 
-    // Beräkna stats
-    const currentYear = new Date().getFullYear()
-    const currentMonth = new Date().toISOString().slice(0, 7)
-
+    // ✅ BERÄKNA DASHBOARD STATS
     const totalCommissionYtd = allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
     const totalCasesYtd = allCases.length
     const avgCommissionPerCase = totalCasesYtd > 0 ? totalCommissionYtd / totalCasesYtd : 0
@@ -107,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const pendingCases = allRecentCases.filter(c => !c.completed_date).length
 
-    // Månadsdata för chart
+    // ✅ MÅNADSDATA för chart
     const monthlyMap = new Map()
     allCommissions.forEach(c => {
       if (!c.completed_date) return
@@ -123,21 +218,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const monthlyData = Array.from(monthlyMap.values())
       .map(m => ({
         ...m,
-        month_display: `${getMonthName(parseInt(m.month.split('-')[1]))} ${m.month.split('-')[0]}`,
+        month_display: `${monthNames[parseInt(m.month.split('-')[1]) - 1]} ${m.month.split('-')[0]}`,
         avg_commission_per_case: m.case_count > 0 ? m.total_commission / m.case_count : 0
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
 
-    // Tekniker-info
-    const { data: technician } = await supabase
-      .from('technicians')
-      .select('name, email')
-      .eq('id', technician_id)
-      .single()
-
-    // 🔥 SAMMA RESPONSE-FORMAT SOM ADMIN
+    // ✅ FINAL RESPONSE
     const response = {
-      // Stats för KPI-kort
+      success: true,
       stats: {
         total_commission_ytd: totalCommissionYtd,
         total_cases_ytd: totalCasesYtd,
@@ -148,19 +236,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         technician_name: technician?.name,
         technician_email: technician?.email
       },
-
-      // Månadsdata för chart
       monthly_data: monthlyData,
-
-      // Senaste ärenden
       recent_cases: allRecentCases.slice(0, 10),
-
-      // Meta
-      success: true,
-      timestamp: new Date().toISOString()
+      meta: {
+        technician_id,
+        timestamp: new Date().toISOString(),
+        data_sources: {
+          private_cases: privateCases.length,
+          business_cases: businessCases.length,
+          recent_cases: allRecentCases.length
+        }
+      }
     }
 
-    console.log('✅ Dashboard data loaded successfully:', {
+    console.log('✅ Dashboard data compiled successfully:', {
       technician_name: technician?.name,
       total_commission: totalCommissionYtd,
       cases: totalCasesYtd,
@@ -172,61 +261,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('💥 Dashboard API error:', error)
     return res.status(500).json({ 
+      success: false,
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     })
-  }
-}
-
-// Helper function
-function getMonthName(month: number): string {
-  const months = [
-    'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
-    'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
-  ]
-  return months[month - 1] || 'Okänd'
-}
-
-// 📁 api/technician/stats.ts - FÖRENKLAD VERSION SOM FUNGERAR
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
-  const { technician_id } = req.query
-
-  if (!technician_id) {
-    return res.status(400).json({ error: 'technician_id required' })
-  }
-
-  try {
-    // 🔥 ENKEL QUERY SOM FUNGERAR
-    const { data: cases, error } = await supabase
-      .from('private_cases')
-      .select('commission_amount, completed_date, pris, status')
-      .eq('primary_assignee_id', technician_id)
-
-    if (error) throw error
-
-    const stats = {
-      total_commission_ytd: cases?.reduce((sum, c) => sum + (c.commission_amount || 0), 0) || 0,
-      total_cases_ytd: cases?.length || 0,
-      avg_commission_per_case: cases?.length > 0 ? 
-        (cases.reduce((sum, c) => sum + (c.commission_amount || 0), 0) / cases.length) : 0,
-      pending_cases: cases?.filter(c => !c.completed_date).length || 0
-    }
-
-    return res.status(200).json(stats)
-
-  } catch (error) {
-    console.error('Stats API error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
   }
 }
