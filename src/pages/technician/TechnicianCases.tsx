@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FIXAD MED RÄTT TEKNIKER-ID
+// 📁 src/pages/technician/TechnicianCases.tsx - FIXAD MED RÄTTA KOLUMNNAMN
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -28,10 +28,10 @@ interface TechnicianCase {
   commission_amount?: number
   case_price?: number
   
-  // Kontaktuppgifter
+  // Kontaktuppgifter - KORRIGERADE FÄLTNAMN
   kontaktperson?: string
-  telefon?: string
-  email?: string
+  telefon_kontaktperson?: string  // 🔥 ÄNDRAT från telefon
+  e_post_kontaktperson?: string   // 🔥 ÄNDRAT från email
   adress?: any
   
   // Företagsuppgifter (för business cases)
@@ -172,20 +172,30 @@ export default function TechnicianCases() {
       
       console.log('🔄 Fetching cases for technician ID:', technicianId)
       
-      // 🔥 HUVUDQUERIES - använd det korrekta technician ID:t
+      // 🔥 HUVUDQUERIES - FIX: Använd korrekta kolumnnamn
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        // Private cases - ALLA STATUS
+        // Private cases - KORRIGERADE KOLUMNNAMN
         supabase
           .from('private_cases')
-          .select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status')
+          .select(`
+            id, clickup_task_id, title, status, priority, created_at, start_date, 
+            completed_date, commission_amount, pris, primary_assignee_name, 
+            kontaktperson, telefon_kontaktperson, e_post_kontaktperson, 
+            adress, skadedjur, beskrivning, billing_status
+          `)
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
 
-        // Business cases - ALLA STATUS
+        // Business cases - KORRIGERADE KOLUMNNAMN  
         supabase
           .from('business_cases')
-          .select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status')
+          .select(`
+            id, clickup_task_id, title, status, priority, created_at, start_date, 
+            completed_date, commission_amount, pris, primary_assignee_name, 
+            kontaktperson, telefon_kontaktperson, e_post_kontaktperson, 
+            adress, org_nr, skadedjur, beskrivning, billing_status
+          `)
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -241,8 +251,8 @@ export default function TechnicianCases() {
           commission_amount: c.commission_amount,
           case_price: c.pris,
           kontaktperson: c.kontaktperson,
-          telefon: c.telefon,
-          email: c.email,
+          telefon_kontaktperson: c.telefon_kontaktperson,  // 🔥 KORRIGERAT
+          e_post_kontaktperson: c.e_post_kontaktperson,    // 🔥 KORRIGERAT
           adress: c.adress,
           skadedjur: c.skadedjur,
           beskrivning: c.beskrivning,
@@ -263,10 +273,9 @@ export default function TechnicianCases() {
           commission_amount: c.commission_amount,
           case_price: c.pris,
           kontaktperson: c.kontaktperson,
-          telefon: c.telefon,
-          email: c.email,
+          telefon_kontaktperson: c.telefon_kontaktperson,  // 🔥 KORRIGERAT
+          e_post_kontaktperson: c.e_post_kontaktperson,    // 🔥 KORRIGERAT
           adress: c.adress,
-          foretag: c.foretag,
           org_nr: c.org_nr,
           skadedjur: c.skadedjur,
           beskrivning: c.beskrivning,
@@ -686,7 +695,7 @@ export default function TechnicianCases() {
                     )}
                   </div>
 
-                  {/* Kontaktinformation */}
+                  {/* Kontaktinformation - KORRIGERADE FÄLTNAMN */}
                   <div className="space-y-2 mb-4">
                     {case_.kontaktperson && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
@@ -695,30 +704,27 @@ export default function TechnicianCases() {
                       </p>
                     )}
                     
-                    {case_.foretag && (
+                    {case_.org_nr && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-slate-400" />
-                        {case_.foretag}
-                        {case_.org_nr && (
-                          <span className="text-slate-500 text-xs">({case_.org_nr})</span>
-                        )}
+                        Org.nr: {case_.org_nr}
                       </p>
                     )}
 
-                    {case_.telefon && (
+                    {case_.telefon_kontaktperson && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
                         <Phone className="w-4 h-4 text-slate-400" />
-                        <a href={`tel:${case_.telefon}`} className="hover:text-blue-400 transition-colors">
-                          {case_.telefon}
+                        <a href={`tel:${case_.telefon_kontaktperson}`} className="hover:text-blue-400 transition-colors">
+                          {case_.telefon_kontaktperson}
                         </a>
                       </p>
                     )}
 
-                    {case_.email && (
+                    {case_.e_post_kontaktperson && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
                         <Mail className="w-4 h-4 text-slate-400" />
-                        <a href={`mailto:${case_.email}`} className="hover:text-blue-400 transition-colors">
-                          {case_.email}
+                        <a href={`mailto:${case_.e_post_kontaktperson}`} className="hover:text-blue-400 transition-colors">
+                          {case_.e_post_kontaktperson}
                         </a>
                       </p>
                     )}
