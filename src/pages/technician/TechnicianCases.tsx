@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - HELT NY LISTVY MED PAGINERING OCH SORTERING
+// 📁 src/pages/technician/TechnicianCases.tsx - FÖRFINAD LISTVY MED MER DATA OCH INTERAKTION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -44,11 +44,14 @@ const getStatusColor = (status: string) => {
   return 'bg-slate-500/20 text-slate-400';
 };
 
-const statusOrder = [
-  'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
-  'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
-  'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'
-];
+const formatAddress = (address: any): string => {
+  if (!address) return 'Saknas';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } }
+  return 'Okänt format';
+};
+
+const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
 
 export default function TechnicianCases() {
   const { profile, isTechnician } = useAuth()
@@ -63,8 +66,8 @@ export default function TechnicianCases() {
   const [statusFilter, setStatusFilter] = useState<string>('Öppen')
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
-  // ✅ State för sortering och paginering
-  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'due_date', direction: 'asc' });
+  // ✅ Standardsortering ändrad till start_date
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'start_date', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
@@ -113,11 +116,8 @@ export default function TechnicianCases() {
     }
   }
 
-  // ✅ LOGIK FÖR FILTRERING OCH SORTERING (useMemo för prestanda)
   const filteredAndSortedCases = useMemo(() => {
     let sortableItems = [...cases];
-
-    // Filtrering
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       sortableItems = sortableItems.filter(c => Object.values(c).some(val => String(val).toLowerCase().includes(searchLower)));
@@ -129,41 +129,29 @@ export default function TechnicianCases() {
     if (typeFilter !== 'all') {
       sortableItems = sortableItems.filter(c => c.case_type === typeFilter);
     }
-
-    // Sortering
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
-
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
-        
         let comparison = 0;
-        if (sortConfig.key === 'status') {
-          comparison = (statusOrder.indexOf(aValue) ?? 99) - (statusOrder.indexOf(bValue) ?? 99);
-        } else {
-          if (aValue < bValue) comparison = -1;
-          if (aValue > bValue) comparison = 1;
-        }
+        if (sortConfig.key === 'status') { comparison = (statusOrder.indexOf(aValue) ?? 99) - (statusOrder.indexOf(bValue) ?? 99); } 
+        else { if (aValue < bValue) comparison = -1; if (aValue > bValue) comparison = 1; }
         return sortConfig.direction === 'asc' ? comparison : -comparison;
       });
     }
     return sortableItems;
   }, [cases, searchTerm, statusFilter, typeFilter, sortConfig]);
 
-  // ✅ LOGIK FÖR PAGINERING
   const currentTableData = useMemo(() => {
     const firstPageIndex = (currentPage - 1) * itemsPerPage;
-    const lastPageIndex = firstPageIndex + itemsPerPage;
-    return filteredAndSortedCases.slice(firstPageIndex, lastPageIndex);
+    return filteredAndSortedCases.slice(firstPageIndex, firstPageIndex + itemsPerPage);
   }, [currentPage, itemsPerPage, filteredAndSortedCases]);
 
   const requestSort = (key: keyof TechnicianCase) => {
     let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+    if (sortConfig.key === key && sortConfig.direction === 'asc') { direction = 'desc'; }
     setSortConfig({ key, direction });
   };
   
@@ -184,7 +172,6 @@ export default function TechnicianCases() {
               <div className="bg-blue-500/10 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-blue-500" /></div>
               <div><h1 className="text-2xl font-bold text-white">Mina Ärenden</h1><p className="text-sm text-slate-400">Översikt över tilldelade ärenden - {technicianName}</p></div>
             </div>
-            {/* ✅ TILLBAKA-KNAPP */}
             <Button variant="secondary" onClick={() => navigate('/technician/dashboard')}><ArrowLeft className="w-4 h-4 mr-2"/>Tillbaka</Button>
         </div>
       </header>
@@ -210,32 +197,51 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* ✅ NY TABELL-VY */}
+        {/* ✅ FÖRFINAD TABELL-VY */}
         <div className="bg-slate-900/50 rounded-lg overflow-hidden border border-slate-800">
             <table className="w-full text-sm text-left">
                 <thead className="bg-slate-800/50 text-xs text-slate-400 uppercase">
                     <tr>
-                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('title')}>Ärende</th>
-                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('status')}>
-                            <div className="flex items-center">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                        <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('title')}>Ärende</th>
+                        <th scope="col" className="px-4 py-3">Kund</th>
+                        <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
+                        <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('start_date')}>
+                           <div className="flex items-center">Startdatum {sortConfig.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                         </th>
-                        <th scope="col" className="px-6 py-3">Kund</th>
-                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('due_date')}>
-                            <div className="flex items-center">Förfallodatum {sortConfig.key === 'due_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-right">Åtgärder</th>
+                        <th scope="col" className="px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('case_price')}>Pris</th>
+                        <th scope="col" className="px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('commission_amount')}>Provision</th>
+                        <th scope="col" className="px-4 py-3">Fakturastatus</th>
+                        <th scope="col" className="px-4 py-3 text-right">Åtgärder</th>
                     </tr>
                 </thead>
                 <tbody>
                     {currentTableData.map(case_ => (
                         <tr key={case_.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                            <td className="px-6 py-4 font-medium text-white">{case_.title}</td>
-                            <td className="px-6 py-4">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span>
+                            <td className="px-4 py-4">
+                                <div className="font-medium text-white">{case_.title}</div>
+                                <div className="text-xs text-slate-400">{formatAddress(case_.adress)}</div>
                             </td>
-                            <td className="px-6 py-4 text-slate-300">{case_.kontaktperson || 'Okänd'}</td>
-                            <td className="px-6 py-4 text-slate-300">{case_.due_date ? formatDate(case_.due_date) : 'Inget'}</td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-slate-300">{case_.kontaktperson || 'Okänd'}</span>
+                                    <div className="flex items-center gap-3">
+                                      {case_.telefon_kontaktperson && <a href={`tel:${case_.telefon_kontaktperson}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Phone className="w-4 h-4"/></a>}
+                                      {case_.e_post_kontaktperson && <a href={`mailto:${case_.e_post_kontaktperson}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Mail className="w-4 h-4"/></a>}
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="px-4 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span></td>
+                            <td className="px-4 py-4 text-slate-300">{case_.start_date ? formatDate(case_.start_date) : '-'}</td>
+                            <td className="px-4 py-4 text-right text-slate-300">{formatCurrency(case_.case_price)}</td>
+                            <td className="px-4 py-4 text-right font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</td>
+                            <td className="px-4 py-4">
+                                {case_.billing_status && case_.billing_status !== 'skip' && (
+                                    <span className={`px-2 py-1 rounded text-xs ${case_.billing_status === 'paid' ? 'bg-green-500/20 text-green-400' : case_.billing_status === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                        {case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}
+                                    </span>
+                                )}
+                            </td>
+                            <td className="px-4 py-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                     <Button size="sm" onClick={() => handleOpenEditModal(case_)}><Edit className="w-4 h-4 mr-2" />Öppna</Button>
                                     <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url, '_blank')}><ExternalLink className="w-4 h-4" /></Button>
@@ -245,7 +251,6 @@ export default function TechnicianCases() {
                     ))}
                 </tbody>
             </table>
-            {/* ✅ PAGINERINGS-KONTROLLER */}
             <div className="flex items-center justify-between p-4 text-sm text-slate-400">
                 <div className="flex items-center gap-2">
                     <span>Visa</span>
