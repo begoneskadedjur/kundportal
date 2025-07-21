@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - KORRIGERAD MED SMARTARE UPPDATERING
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - KOMPLETT VERSION MED FÖRBÄTTRAD TIDRAPPORTERING
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
@@ -38,10 +38,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentCase, setCurrentCase] = useState<TechnicianCase | null>(null)
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
 
   useEffect(() => {
     if (caseData) {
+      setCurrentCase(caseData);
       setFormData({
         title: caseData.title || '', status: caseData.status || '', description: caseData.description || '',
         kontaktperson: caseData.kontaktperson || '', telefon_kontaktperson: caseData.telefon_kontaktperson || '',
@@ -53,50 +55,35 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   }, [caseData])
 
   const getTableName = () => {
-    if (!caseData) return null;
-    return caseData.case_type === 'private' ? 'private_cases' 
-         : caseData.case_type === 'business' ? 'business_cases' 
+    if (!currentCase) return null;
+    return currentCase.case_type === 'private' ? 'private_cases' 
+         : currentCase.case_type === 'business' ? 'business_cases' 
          : 'cases';
   }
 
-  // ✅ KORRIGERAD: Skickar bara relevanta fält för varje ärendetyp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
-    if (!tableName || !caseData) return;
+    if (!tableName || !currentCase) return;
     setLoading(true);
     setError(null);
     try {
-      // Bygg uppdateringsobjektet baserat på gemensamma fält
       const updateData: { [key: string]: any } = {
-        title: formData.title,
-        status: formData.status,
-        description: formData.description,
-        kontaktperson: formData.kontaktperson,
-        telefon_kontaktperson: formData.telefon_kontaktperson,
-        e_post_kontaktperson: formData.e_post_kontaktperson,
-        skadedjur: formData.skadedjur,
-        pris: formData.case_price,
-        material_cost: formData.material_cost,
+        title: formData.title, status: formData.status, description: formData.description,
+        kontaktperson: formData.kontaktperson, telefon_kontaktperson: formData.telefon_kontaktperson,
+        e_post_kontaktperson: formData.e_post_kontaktperson, skadedjur: formData.skadedjur,
+        pris: formData.case_price, material_cost: formData.material_cost,
       };
+      if (currentCase.case_type === 'private') { updateData.personnummer = formData.personnummer; } 
+      else if (currentCase.case_type === 'business') { updateData.org_nr = formData.org_nr; }
 
-      // Lägg till typspecifika fält
-      if (caseData.case_type === 'private') {
-        updateData.personnummer = formData.personnummer;
-      } else if (caseData.case_type === 'business') {
-        updateData.org_nr = formData.org_nr;
-      }
-
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update(updateData)
-        .eq('id', caseData.id)
-
+      const { error: updateError } = await supabase.from(tableName).update(updateData).eq('id', currentCase.id)
       if (updateError) throw updateError;
+      
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
-        onSuccess({ ...caseData, ...formData });
+        onSuccess({ ...currentCase, ...formData });
         onClose();
       }, 1500);
     } catch (error: any) {
@@ -108,32 +95,31 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const handleTimeTracking = async (action: 'start' | 'pause' | 'reset') => {
     const tableName = getTableName();
-    if (!tableName || !caseData) return;
+    if (!tableName || !currentCase) return;
     setLoading(true);
     
     let updatePayload = {};
 
     if (action === 'start') {
         updatePayload = { work_started_at: new Date().toISOString() };
-    } else if (action === 'pause' && caseData.work_started_at) {
+    } else if (action === 'pause' && currentCase.work_started_at) {
         const stopTime = new Date();
-        const startTime = new Date(caseData.work_started_at);
+        const startTime = new Date(currentCase.work_started_at);
         const minutesWorked = (stopTime.getTime() - startTime.getTime()) / 1000 / 60;
-        const newTotalMinutes = (caseData.time_spent_minutes || 0) + minutesWorked;
+        const newTotalMinutes = (currentCase.time_spent_minutes || 0) + minutesWorked;
         updatePayload = { work_started_at: null, time_spent_minutes: newTotalMinutes };
     } else if (action === 'reset') {
         updatePayload = { work_started_at: null, time_spent_minutes: 0 };
     }
 
-    const { data, error } = await supabase
-        .from(tableName)
-        .update(updatePayload)
-        .eq('id', caseData.id)
-        .select()
-        .single();
+    const { data, error } = await supabase.from(tableName).update(updatePayload).eq('id', currentCase.id).select().single();
         
-    if (error) { setError(error.message); } 
-    else { onSuccess(data as Partial<TechnicianCase>); }
+    if (error) { 
+      setError(error.message); 
+    } else { 
+      setCurrentCase(data as TechnicianCase); 
+      onSuccess(data as Partial<TechnicianCase>);
+    }
     setLoading(false);
   }
 
@@ -143,13 +129,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   }
 
-  if (!caseData) return null;
+  if (!currentCase) return null;
   if (submitted) return <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true}><div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /><h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3></div></Modal>
 
-  const footer = ( <div className="flex gap-3 p-6 bg-slate-800/50"><Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button><Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button></div> )
+  const footer = ( 
+    <div className="flex gap-3 p-6 bg-slate-800/50">
+      <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button>
+      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button>
+    </div> 
+  );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${caseData.title}`} size="xl" footer={footer} preventClose={loading}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading}>
       <div className="p-6 max-h-[70vh] overflow-y-auto">
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
           {error && <div className="bg-red-500/20 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400" /><p className="text-red-400">{error}</p></div>}
@@ -176,8 +167,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
-                {caseData.case_type === 'business' && <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />}
-                {caseData.case_type === 'private' && <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />}
+                {currentCase.case_type === 'business' && <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />}
+                {currentCase.case_type === 'private' && <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
@@ -194,17 +185,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             <div className="p-4 bg-slate-800/50 rounded-lg">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Arbetstid</label>
                 <div className="flex items-center justify-between">
-                    <div className="text-white">
-                        <p className="text-2xl font-bold">{formatMinutes(caseData.time_spent_minutes)}</p>
-                        {caseData.work_started_at && <p className="text-xs text-green-400 animate-pulse">Tidtagning pågår...</p>}
+                    <div>
+                        <p className="text-2xl font-bold text-white">{formatMinutes(currentCase.time_spent_minutes)}</p>
+                        {currentCase.work_started_at ? (
+                           <p className="text-xs text-green-400 animate-pulse">
+                                Påbörjades kl. {new Date(currentCase.work_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                           </p>
+                        ) : (
+                           <p className="text-xs text-slate-400">Tidtagning pausad</p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {caseData.work_started_at ? (
+                        {currentCase.work_started_at ? (
                             <Button type="button" variant="warning" onClick={() => handleTimeTracking('pause')} disabled={loading} className="flex items-center gap-2"><Pause className="w-4 h-4" /> Pausa</Button>
                         ) : (
-                            <Button type="button" variant="secondary" onClick={() => handleTimeTracking('start')} disabled={loading} className="flex items-center gap-2"><Play className="w-4 h-4" /> {caseData.time_spent_minutes && caseData.time_spent_minutes > 0 ? 'Återuppta' : 'Påbörja arbete'}</Button>
+                            <Button type="button" variant="secondary" onClick={() => handleTimeTracking('start')} disabled={loading} className="flex items-center gap-2"><Play className="w-4 h-4" /> {currentCase.time_spent_minutes && currentCase.time_spent_minutes > 0 ? 'Återuppta' : 'Påbörja arbete'}</Button>
                         )}
-                        <Button type="button" variant="danger" onClick={() => handleTimeTracking('reset')} disabled={loading || (!caseData.time_spent_minutes && !caseData.work_started_at)} className="flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Nollställ</Button>
+                        <Button type="button" variant="danger" onClick={() => handleTimeTracking('reset')} disabled={loading || (!currentCase.time_spent_minutes && !currentCase.work_started_at)} className="flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Nollställ</Button>
                     </div>
                 </div>
             </div>
