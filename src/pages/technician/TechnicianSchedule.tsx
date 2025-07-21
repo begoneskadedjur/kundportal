@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG OCH FULLT FUNGERANDE VERSION
+// 📁 src/pages/technician/TechnicianSchedule.tsx - KOMPLETT OCH KORREKT VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,7 +10,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { ArrowLeft, User, Building2, Calendar, FileText } from 'lucide-react'
+import { ArrowLeft, User, Building2, Calendar, FileText, Phone, MapPin } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import '../../styles/FullCalendar.css'
@@ -19,8 +19,24 @@ interface ScheduledCase {
   id: string; title: string; case_type: 'private' | 'business' | 'contract';
   kontaktperson?: string; start_date: string; description?: string; status: string;
   case_price?: number; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
-  skadedjur?: string; org_nr?: string;
+  skadedjur?: string; org_nr?: string; adress?: any;
 }
+
+const getStatusColor = (status: string) => {
+  const lowerStatus = status?.toLowerCase() || '';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-500/20 text-green-400 border-green-500/50';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50';
+  if (lowerStatus.includes('bokad')) return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
+  if (lowerStatus.includes('öppen')) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50';
+  return 'bg-slate-600/20 text-slate-400 border-slate-500/50';
+};
+
+const formatAddress = (address: any): string => {
+  if (!address) return '';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } }
+  return '';
+};
 
 export default function TechnicianSchedule() {
   const { profile, isTechnician } = useAuth()
@@ -40,58 +56,23 @@ export default function TechnicianSchedule() {
   }, [isTechnician, profile?.technician_id])
 
   const fetchScheduledCases = async (technicianId: string) => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const commonFields = 'id, title, kontaktperson, start_date, created_at, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
-      
+      const commonFields = 'id, title, kontaktperson, start_date, created_at, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur, adress'
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
         supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
-        // ✅ KORRIGERAD: 'kontaktperson' är borttagen härifrån eftersom den inte finns i 'cases'-tabellen.
-        supabase.from('cases').select('id, title, created_date, description, status, case_type').eq('assigned_technician_id', technicianId)
+        supabase.from('cases').select('id, title, created_date, description, status, case_type, adress').eq('assigned_technician_id', technicianId)
       ]);
       
       const allCases: Partial<ScheduledCase>[] = [];
+      if (privateResult.status === 'fulfilled' && privateResult.value.data) { allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, start_date: c.start_date || c.created_at, case_price: c.pris, case_type: 'private' }))); }
+      if (businessResult.status === 'fulfilled' && businessResult.value.data) { allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, start_date: c.start_date || c.created_at, case_price: c.pris, case_type: 'business' }))); }
+      if (contractResult.status === 'fulfilled' && contractResult.value.data) { allCases.push(...contractResult.value.data.map((c: any) => ({ ...c, start_date: c.created_date, case_type: c.case_type || 'contract' }))); }
 
-      // Hantera resultat och kasta fel om något misslyckas, för tydligare felsökning.
-      if (privateResult.status === 'fulfilled' && privateResult.value.data) {
-        allCases.push(...privateResult.value.data.map((c: any) => ({ 
-          ...c, 
-          start_date: c.start_date || c.created_at,
-          case_price: c.pris, 
-          case_type: 'private' 
-        })));
-      } else if (privateResult.status === 'rejected' || (privateResult.status === 'fulfilled' && privateResult.value.error)) {
-        throw new Error(`Kunde inte hämta privatärenden: ${privateResult.reason?.message || privateResult.value.error.message}`);
-      }
-
-      if (businessResult.status === 'fulfilled' && businessResult.value.data) {
-        allCases.push(...businessResult.value.data.map((c: any) => ({ 
-          ...c, 
-          start_date: c.start_date || c.created_at,
-          case_price: c.pris, 
-          case_type: 'business' 
-        })));
-      } else if (businessResult.status === 'rejected' || (businessResult.status === 'fulfilled' && businessResult.value.error)) {
-        throw new Error(`Kunde inte hämta företagsärenden: ${businessResult.reason?.message || businessResult.value.error.message}`);
-      }
-
-      if (contractResult.status === 'fulfilled' && contractResult.value.data) {
-        allCases.push(...contractResult.value.data.map((c: any) => ({ 
-          ...c, 
-          start_date: c.created_date,
-          case_type: c.case_type || 'contract' 
-        })));
-      } else if (contractResult.status === 'rejected' || (contractResult.status === 'fulfilled' && contractResult.value.error)) {
-        throw new Error(`Kunde inte hämta avtalsärenden: ${contractResult.reason?.message || contractResult.value.error.message}`);
-      }
-      
       const casesWithDates = allCases.filter(c => c.start_date);
-      
-      console.log(`Hämtade ${allCases.length} ärenden, ${casesWithDates.length} har ett datum och kommer visas.`, casesWithDates);
       setCases(casesWithDates as ScheduledCase[])
-
     } catch (err: any) {
       setError(err.message || 'Kunde inte hämta schemalagda ärenden')
     } finally {
@@ -105,20 +86,56 @@ export default function TechnicianSchedule() {
       title: case_.title,
       start: case_.start_date,
       extendedProps: { ...case_ },
-      backgroundColor: case_.case_type === 'private' ? '#3b82f6' : case_.case_type === 'business' ? '#8b5cf6' : '#10b981',
-      borderColor: case_.case_type === 'private' ? '#3b82f6' : case_.case_type === 'business' ? '#8b5cf6' : '#10b981',
+      backgroundColor: getStatusColor(case_.status).split(' ')[0],
+      borderColor: getStatusColor(case_.status).split(' ')[2]
     }));
   }, [cases]);
   
   const renderEventContent = (eventInfo: any) => {
-    const { case_type, kontaktperson } = eventInfo.event.extendedProps;
+    const { case_type, kontaktperson, status, adress, telefon_kontaktperson } = eventInfo.event.extendedProps;
+    const isMonthView = eventInfo.view.type === 'dayGridMonth';
+
+    if (isMonthView) {
+      return (
+        <div className="p-1 text-xs overflow-hidden h-full">
+          <b className="text-white">{eventInfo.timeText}</b>
+          <p className="whitespace-nowrap overflow-hidden text-ellipsis text-white">{eventInfo.event.title}</p>
+          <div className="flex items-center gap-1 mt-1 opacity-80 text-slate-200">
+            {case_type === 'private' ? <User className="w-3 h-3"/> : <Building2 className="w-3 h-3"/>}
+            <span>{kontaktperson || 'Okänd'}</span>
+          </div>
+        </div>
+      )
+    }
+
     return (
-      <div className="p-1 text-xs overflow-hidden h-full">
-        <b className="text-white">{eventInfo.timeText}</b>
-        <p className="whitespace-nowrap overflow-hidden text-ellipsis text-white">{eventInfo.event.title}</p>
-        <div className="flex items-center gap-1 mt-1 opacity-80 text-slate-200">
-          {case_type === 'private' ? <User className="w-3 h-3"/> : case_type === 'business' ? <Building2 className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
-          <span>{kontaktperson || 'Okänd'}</span>
+      <div className="p-2 text-xs overflow-hidden h-full flex flex-col justify-between">
+        <div>
+          <div className="flex justify-between items-center">
+            <b className="text-white text-sm">{eventInfo.timeText}</b>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>{status}</span>
+          </div>
+          <p className="font-semibold text-md whitespace-nowrap overflow-hidden text-ellipsis text-white my-1">{eventInfo.event.title}</p>
+          <p className="flex items-center gap-1.5 mt-1 text-slate-300">
+            {case_type === 'private' ? <User className="w-3 h-3"/> : <Building2 className="w-3 h-3"/>}
+            <span>{kontaktperson || 'Okänd'}</span>
+          </p>
+          <p className="flex items-center gap-1.5 mt-1 text-slate-300">
+            <MapPin className="w-3 h-3"/>
+            <span>{formatAddress(adress) || 'Adress saknas'}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+            {telefon_kontaktperson && (
+                <a href={`tel:${telefon_kontaktperson}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors" title="Ring kund">
+                    <Phone className="w-4 h-4" /> Ring
+                </a>
+            )}
+            {adress && (
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors" title="Navigera till adress">
+                    <MapPin className="w-4 h-4" /> Navigera
+                </a>
+            )}
         </div>
       </div>
     )
@@ -167,6 +184,7 @@ export default function TechnicianSchedule() {
             slotMinTime="07:00:00"
             slotMaxTime="19:00:00"
             height="auto"
+            eventMinHeight={90} 
           />
         </div>
       </main>
