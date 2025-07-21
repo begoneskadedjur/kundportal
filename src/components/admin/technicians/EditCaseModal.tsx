@@ -1,19 +1,18 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - UPPGRADERAD MED TID & KOSTNAD
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - UPPGRADERAD MED PAUS/ÅTERUPPTA OCH BUGFIX
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Square } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Square, Pause, RotateCcw } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 
-// ✅ UTÖKAT INTERFACE MED NYA FÄLT
 interface TechnicianCase {
   id: string; case_type: 'private' | 'business' | 'contract'; title: string;
   description?: string; status: string; case_price?: number;
   kontaktperson?: string; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
   skadedjur?: string; org_nr?: string; personnummer?: string;
-  material_cost?: number; time_spent_minutes?: number; work_started_at?: string;
+  material_cost?: number; time_spent_minutes?: number; work_started_at?: string | null;
 }
 
 interface EditCaseModalProps {
@@ -25,9 +24,8 @@ interface EditCaseModalProps {
 
 const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
 
-// ✅ HJÄLPFUNKTION FÖR ATT FORMATERA MINUTER TILL LÄSBAR TID
 const formatMinutes = (minutes: number | null | undefined): string => {
-  if (minutes === null || minutes === undefined) return '0 min';
+  if (minutes === null || minutes === undefined || minutes < 1) return '0 min';
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = Math.round(minutes % 60);
   let result = '';
@@ -61,23 +59,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
          : 'cases';
   }
 
+  // ✅ KORRIGERAD: Skickar inte längre 'case_price'
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
     if (!tableName || !caseData) return;
-
     setLoading(true);
     setError(null);
     try {
+      const updateData = { ...formData };
+      delete updateData.case_price; // Ta bort fältet som inte finns i DB
+
       const { error: updateError } = await supabase
         .from(tableName)
-        .update({ ...formData, pris: formData.case_price })
+        .update({ ...updateData, pris: formData.case_price })
         .eq('id', caseData.id)
       if (updateError) throw updateError;
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
-        onSuccess(formData);
+        onSuccess({ ...caseData, ...formData });
         onClose();
       }, 1500);
     } catch (error: any) {
@@ -87,39 +88,33 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }
 
-  // ✅ NY FUNKTION: PÅBÖRJA ARBETE
-  const handleStartTimeTracking = async () => {
+  // ✅ HELT NY TIDRAPPORTERINGS-LOGIK
+  const handleTimeTracking = async (action: 'start' | 'pause' | 'reset') => {
     const tableName = getTableName();
     if (!tableName || !caseData) return;
     setLoading(true);
-    const startTime = new Date().toISOString();
-    const { data, error } = await supabase
-        .from(tableName)
-        .update({ work_started_at: startTime })
-        .eq('id', caseData.id)
-        .select()
-        .single();
-    if (error) { setError(error.message); } 
-    else { onSuccess(data as Partial<TechnicianCase>); }
-    setLoading(false);
-  }
+    
+    let updatePayload = {};
 
-  // ✅ NY FUNKTION: AVSLUTA ARBETE
-  const handleStopTimeTracking = async () => {
-    const tableName = getTableName();
-    if (!tableName || !caseData || !caseData.work_started_at) return;
-    setLoading(true);
-    const stopTime = new Date();
-    const startTime = new Date(caseData.work_started_at);
-    const minutesWorked = (stopTime.getTime() - startTime.getTime()) / 1000 / 60;
-    const newTotalMinutes = (caseData.time_spent_minutes || 0) + minutesWorked;
+    if (action === 'start') {
+        updatePayload = { work_started_at: new Date().toISOString() };
+    } else if (action === 'pause' && caseData.work_started_at) {
+        const stopTime = new Date();
+        const startTime = new Date(caseData.work_started_at);
+        const minutesWorked = (stopTime.getTime() - startTime.getTime()) / 1000 / 60;
+        const newTotalMinutes = (caseData.time_spent_minutes || 0) + minutesWorked;
+        updatePayload = { work_started_at: null, time_spent_minutes: newTotalMinutes };
+    } else if (action === 'reset') {
+        updatePayload = { work_started_at: null, time_spent_minutes: 0 };
+    }
 
     const { data, error } = await supabase
         .from(tableName)
-        .update({ work_started_at: null, time_spent_minutes: newTotalMinutes })
+        .update(updatePayload)
         .eq('id', caseData.id)
         .select()
         .single();
+        
     if (error) { setError(error.message); } 
     else { onSuccess(data as Partial<TechnicianCase>); }
     setLoading(false);
@@ -134,12 +129,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   if (!caseData) return null;
   if (submitted) return <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true}><div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /><h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3></div></Modal>
 
-  const footer = (
-    <div className="flex gap-3 p-6 bg-slate-800/50">
-      <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button>
-      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button>
-    </div>
-  )
+  const footer = ( <div className="flex gap-3 p-6 bg-slate-800/50"><Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button><Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button></div> )
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${caseData.title}`} size="xl" footer={footer} preventClose={loading}>
@@ -169,7 +159,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
-                {/* ✅ VISAR ANTINGEN ORG.NR ELLER PERSONNUMMER */}
                 {caseData.case_type === 'business' && <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />}
                 {caseData.case_type === 'private' && <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />}
             </div>
@@ -179,13 +168,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           </div>
           
-          {/* ✅ NY SEKTION FÖR KOSTNADER OCH TID */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Kostnader & Tid</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
               <Input label="Materialkostnad" name="material_cost" type="number" value={formData.material_cost === null ? '' : formData.material_cost} onChange={handleChange} />
             </div>
+            {/* ✅ NYA KNAPPAR FÖR TIDRAPPORTERING */}
             <div className="p-4 bg-slate-800/50 rounded-lg">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Arbetstid</label>
                 <div className="flex items-center justify-between">
@@ -193,16 +182,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         <p className="text-2xl font-bold">{formatMinutes(caseData.time_spent_minutes)}</p>
                         {caseData.work_started_at && <p className="text-xs text-green-400 animate-pulse">Tidtagning pågår...</p>}
                     </div>
-                    <div>
-                        {!caseData.work_started_at ? (
-                            <Button type="button" variant="secondary" onClick={handleStartTimeTracking} disabled={loading} className="flex items-center gap-2">
-                                <Play className="w-4 h-4" /> Påbörja arbete
-                            </Button>
+                    <div className="flex items-center gap-2">
+                        {caseData.work_started_at ? (
+                            <Button type="button" variant="warning" onClick={() => handleTimeTracking('pause')} disabled={loading} className="flex items-center gap-2"><Pause className="w-4 h-4" /> Pausa</Button>
                         ) : (
-                            <Button type="button" variant="danger" onClick={handleStopTimeTracking} disabled={loading} className="flex items-center gap-2">
-                                <Square className="w-4 h-4" /> Avsluta arbete
-                            </Button>
+                            <Button type="button" variant="secondary" onClick={() => handleTimeTracking('start')} disabled={loading} className="flex items-center gap-2"><Play className="w-4 h-4" /> {caseData.time_spent_minutes && caseData.time_spent_minutes > 0 ? 'Återuppta' : 'Påbörja arbete'}</Button>
                         )}
+                        <Button type="button" variant="danger" onClick={() => handleTimeTracking('reset')} disabled={loading || (!caseData.time_spent_minutes && !caseData.work_started_at)} className="flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Nollställ</Button>
                     </div>
                 </div>
             </div>
