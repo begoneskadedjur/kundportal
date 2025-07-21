@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - KORRIGERAD MED RÄTTA SELECT-FRÅGOR
+// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG OCH KORRIGERAD VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,7 +10,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { ArrowLeft, User, Building2, Calendar } from 'lucide-react'
+import { ArrowLeft, User, Building2, Calendar, FileText } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import '../../styles/FullCalendar.css'
@@ -39,34 +39,36 @@ export default function TechnicianSchedule() {
     }
   }, [isTechnician, profile?.technician_id])
 
-  // ✅ KORRIGERAD FUNKTION MED SEPARATA QUERIES
   const fetchScheduledCases = async (technicianId: string) => {
     setLoading(true)
     setError(null)
     try {
+      // ✅ KORRIGERADE SELECT-FRÅGOR
       const commonFields = 'id, title, kontaktperson, start_date, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
       
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        // Privat-ärenden har inte org_nr men har case_type i sig
-        supabase.from('private_cases').select(`${commonFields}, pris, case_type`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        // Företags-ärenden har org_nr och pris
-        supabase.from('business_cases').select(`${commonFields}, pris, org_nr, case_type`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        // Avtals-ärenden har en enklare struktur
-        supabase.from('cases').select('id, title, case_type, kontaktperson, created_date as start_date, description, status').eq('assigned_technician_id', technicianId).not('created_date', 'is', null)
+        // Tar bort "case_type" från select, eftersom den inte finns i tabellen
+        supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
+        // Tar bort "case_type" från select, men behåller org_nr
+        supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
+        // Denna tabell har case_type, men vi hämtar den för konsekvensens skull
+        supabase.from('cases').select('id, title, kontaktperson, created_date as start_date, description, status, case_type').eq('assigned_technician_id', technicianId).not('created_date', 'is', null)
       ]);
-
+      
       const allCases: ScheduledCase[] = [];
 
+      // ✅ LÄGGER TILL `case_type` MANUELLT I JAVASCRIPT
       if (privateResult.status === 'fulfilled' && privateResult.value.data) {
-        allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, case_price: c.pris })));
+        allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, case_price: c.pris, case_type: 'private' })));
       }
       if (businessResult.status === 'fulfilled' && businessResult.value.data) {
-        allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, case_price: c.pris })));
+        allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, case_price: c.pris, case_type: 'business' })));
       }
       if (contractResult.status === 'fulfilled' && contractResult.value.data) {
-        allCases.push(...contractResult.value.data);
+        // Om case_type är null/undefined, sätt den till 'contract' som fallback
+        allCases.push(...contractResult.value.data.map((c: any) => ({ ...c, case_type: c.case_type || 'contract' })));
       }
-
+      
       console.log('Hämtade ärenden för kalender:', allCases);
       setCases(allCases as ScheduledCase[])
 
