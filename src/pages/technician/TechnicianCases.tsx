@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FÖRENKLAD VERSION BASERAT PÅ ADMIN-MÖNSTER
+// 📁 src/pages/technician/TechnicianCases.tsx - ANVÄND BEFINTLIGA SERVICES
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -12,6 +12,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { supabase } from '../../lib/supabase'
 
 // Interfaces
 interface TechnicianCase {
@@ -55,21 +56,6 @@ interface CaseStats {
   total_commission: number
 }
 
-interface CasesData {
-  success: boolean
-  cases: TechnicianCase[]
-  stats: CaseStats
-  meta: {
-    technician_id: string
-    total_found: number
-    sources: {
-      private: number
-      business: number
-      contract: number
-    }
-  }
-}
-
 // Status färger
 const getStatusColor = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -95,7 +81,14 @@ export default function TechnicianCases() {
   // State
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<CasesData | null>(null)
+  const [cases, setCases] = useState<TechnicianCase[]>([])
+  const [stats, setStats] = useState<CaseStats>({
+    total_cases: 0,
+    completed_cases: 0,
+    pending_cases: 0,
+    in_progress_cases: 0,
+    total_commission: 0
+  })
   const [filteredCases, setFilteredCases] = useState<TechnicianCase[]>([])
   
   // Filter state
@@ -114,18 +107,18 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, technician, navigate])
 
-  // 🔥 SAMMA FETCH-MÖNSTER SOM ADMIN
+  // 🔥 ANVÄND SUPABASE DIREKT ISTÄLLET FÖR API
   useEffect(() => {
     if (isTechnician && technician?.id) {
-      fetchCases()
+      fetchCasesDirectly()
     }
   }, [isTechnician, technician?.id])
 
   useEffect(() => {
     applyFilters()
-  }, [data?.cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
+  }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
-  const fetchCases = async () => {
+  const fetchCasesDirectly = async () => {
     if (!technician?.id) {
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
@@ -136,23 +129,163 @@ export default function TechnicianCases() {
       setLoading(true)
       setError(null)
       
-      console.log('🔄 Fetching cases for technician:', technician.id)
+      console.log('🔄 Fetching cases directly from database for technician:', technician.id)
       
-      // 🔥 ENKEL API-ANROP LIKT ADMIN
-      const response = await fetch(`/api/technician/cases?technician_id=${technician.id}`)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`API Error: ${response.status} - ${errorText}`)
+      // 🔥 ANVÄND SAMMA LOGIK SOM technicianAnalyticsService.ts
+      const [privateResult, businessResult, contractResult] = await Promise.allSettled([
+        // Private cases - ALLA STATUS (inte bara avslutade)
+        supabase
+          .from('private_cases')
+          .select(`
+            id, clickup_task_id, title, status, priority, start_date, completed_date,
+            commission_amount, pris, primary_assignee_name,
+            kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
+          `)
+          .eq('primary_assignee_id', technician.id)
+          .order('start_date', { ascending: false })
+          .limit(100),
+
+        // Business cases - ALLA STATUS (inte bara avslutade)
+        supabase
+          .from('business_cases')
+          .select(`
+            id, clickup_task_id, title, status, priority, start_date, completed_date,
+            commission_amount, pris, primary_assignee_name,
+            kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
+          `)
+          .eq('primary_assignee_id', technician.id)
+          .order('start_date', { ascending: false })
+          .limit(100),
+
+        // Contract cases - använder assigned_technician_id
+        supabase
+          .from('cases')
+          .select(`
+            id, clickup_task_id, title, status, priority, created_date, completed_date,
+            price, assigned_technician_name, billing_status
+          `)
+          .eq('assigned_technician_id', technician.id)
+          .order('created_date', { ascending: false })
+          .limit(100)
+      ])
+
+      // ✅ SÄKER ERROR HANDLING
+      if (privateResult.status === 'rejected') {
+        console.error('Private cases error:', privateResult.reason)
+      }
+      if (businessResult.status === 'rejected') {
+        console.error('Business cases error:', businessResult.reason)
+      }
+      if (contractResult.status === 'rejected') {
+        console.error('Contract cases error:', contractResult.reason)
       }
 
-      const casesData = await response.json()
-      
-      console.log('✅ Cases data loaded:', casesData)
-      setData(casesData)
+      // ✅ KOMBINERA OCH FORMATTERA ALLA CASES
+      const privateCases = privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []
+      const businessCases = businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []
+      const contractCases = contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []
+
+      const allCases: TechnicianCase[] = [
+        ...privateCases.map(c => ({
+          id: c.id,
+          clickup_task_id: c.clickup_task_id,
+          case_number: `P-${c.clickup_task_id}`,
+          title: c.title,
+          status: c.status,
+          priority: c.priority,
+          case_type: 'private' as const,
+          created_date: c.start_date,
+          completed_date: c.completed_date,
+          commission_amount: c.commission_amount,
+          case_price: c.pris,
+          kontaktperson: c.kontaktperson,
+          telefon: c.telefon,
+          email: c.email,
+          adress: c.adress,
+          skadedjur: c.skadedjur,
+          beskrivning: c.beskrivning,
+          assignee_name: c.primary_assignee_name,
+          billing_status: c.billing_status,
+          clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
+        })),
+        ...businessCases.map(c => ({
+          id: c.id,
+          clickup_task_id: c.clickup_task_id,
+          case_number: `B-${c.clickup_task_id}`,
+          title: c.title,
+          status: c.status,
+          priority: c.priority,
+          case_type: 'business' as const,
+          created_date: c.start_date,
+          completed_date: c.completed_date,
+          commission_amount: c.commission_amount,
+          case_price: c.pris,
+          kontaktperson: c.kontaktperson,
+          telefon: c.telefon,
+          email: c.email,
+          adress: c.adress,
+          foretag: c.foretag,
+          org_nr: c.org_nr,
+          skadedjur: c.skadedjur,
+          beskrivning: c.beskrivning,
+          assignee_name: c.primary_assignee_name,
+          billing_status: c.billing_status,
+          clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
+        })),
+        ...contractCases.map(c => ({
+          id: c.id,
+          clickup_task_id: c.clickup_task_id,
+          case_number: `C-${c.clickup_task_id}`,
+          title: c.title,
+          status: c.status,
+          priority: c.priority,
+          case_type: 'contract' as const,
+          created_date: c.created_date,
+          completed_date: c.completed_date,
+          commission_amount: 0, // Avtalskunder har ingen provision
+          case_price: c.price,
+          assignee_name: c.assigned_technician_name,
+          billing_status: c.billing_status,
+          clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
+        }))
+      ]
+
+      // ✅ SORTERA EFTER DATUM (senaste först)
+      allCases.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())
+
+      // ✅ BERÄKNA STATS
+      const newStats: CaseStats = {
+        total_cases: allCases.length,
+        completed_cases: allCases.filter(c => 
+          c.status?.toLowerCase() === 'avslutat' || 
+          c.status?.toLowerCase() === 'completed' ||
+          c.completed_date
+        ).length,
+        pending_cases: allCases.filter(c => 
+          !c.completed_date && 
+          c.status?.toLowerCase() !== 'avslutat' && 
+          c.status?.toLowerCase() !== 'completed'
+        ).length,
+        in_progress_cases: allCases.filter(c => 
+          c.status?.toLowerCase().includes('pågående') ||
+          c.status?.toLowerCase().includes('progress')
+        ).length,
+        total_commission: allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
+      }
+
+      console.log(`✅ Cases loaded directly from database:`, {
+        total: allCases.length,
+        private: privateCases.length,
+        business: businessCases.length,
+        contract: contractCases.length,
+        stats: newStats
+      })
+
+      setCases(allCases)
+      setStats(newStats)
       
     } catch (error) {
-      console.error('💥 Error fetching cases:', error)
+      console.error('💥 Error fetching cases directly:', error)
       setError(error instanceof Error ? error.message : 'Ett oväntat fel uppstod')
     } finally {
       setLoading(false)
@@ -160,12 +293,12 @@ export default function TechnicianCases() {
   }
 
   const applyFilters = () => {
-    if (!data?.cases) {
+    if (!cases) {
       setFilteredCases([])
       return
     }
 
-    let filtered = [...data.cases]
+    let filtered = [...cases]
 
     // Textsökning
     if (searchTerm) {
@@ -241,7 +374,7 @@ export default function TechnicianCases() {
             <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda ärenden</h2>
             <p className="text-slate-400 mb-4">{error}</p>
             <div className="space-y-2">
-              <Button onClick={fetchCases} className="w-full">
+              <Button onClick={fetchCasesDirectly} className="w-full">
                 Försök igen
               </Button>
               <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
@@ -249,16 +382,6 @@ export default function TechnicianCases() {
               </Button>
             </div>
           </div>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Card className="p-8">
-          <p className="text-slate-400">Ingen data tillgänglig</p>
         </Card>
       </div>
     )
@@ -295,19 +418,19 @@ export default function TechnicianCases() {
         {/* 🔍 Success Debug Info */}
         <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
           <div className="text-xs text-green-400">
-            <p className="font-medium mb-2">✅ Cases Data Successfully Loaded!</p>
+            <p className="font-medium mb-2">✅ Cases Data Successfully Loaded Directly from Database!</p>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-slate-400">Total cases:</p>
-                <p>{data.cases.length}</p>
+                <p>{cases.length}</p>
               </div>
               <div>
                 <p className="text-slate-400">Sources:</p>
-                <p>Private: {data.meta.sources.private}, Business: {data.meta.sources.business}, Contract: {data.meta.sources.contract}</p>
+                <p>Private: {cases.filter(c => c.case_type === 'private').length}, Business: {cases.filter(c => c.case_type === 'business').length}, Contract: {cases.filter(c => c.case_type === 'contract').length}</p>
               </div>
               <div>
                 <p className="text-slate-400">Stats:</p>
-                <p>Total commission: {formatCurrency(data.stats.total_commission)}</p>
+                <p>Total commission: {formatCurrency(stats.total_commission)}</p>
               </div>
               <div>
                 <p className="text-slate-400">Filtered:</p>
@@ -323,7 +446,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Totalt</p>
-                <p className="text-xl font-bold text-white">{data.stats.total_cases}</p>
+                <p className="text-xl font-bold text-white">{stats.total_cases}</p>
               </div>
               <ClipboardList className="w-6 h-6 text-slate-400" />
             </div>
@@ -333,7 +456,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-400 text-sm">Avslutade</p>
-                <p className="text-xl font-bold text-white">{data.stats.completed_cases}</p>
+                <p className="text-xl font-bold text-white">{stats.completed_cases}</p>
               </div>
               <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
@@ -343,7 +466,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-400 text-sm">Pågående</p>
-                <p className="text-xl font-bold text-white">{data.stats.in_progress_cases}</p>
+                <p className="text-xl font-bold text-white">{stats.in_progress_cases}</p>
               </div>
               <Clock className="w-6 h-6 text-blue-400" />
             </div>
@@ -353,7 +476,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-yellow-400 text-sm">Väntande</p>
-                <p className="text-xl font-bold text-white">{data.stats.pending_cases}</p>
+                <p className="text-xl font-bold text-white">{stats.pending_cases}</p>
               </div>
               <AlertCircle className="w-6 h-6 text-yellow-400" />
             </div>
@@ -363,7 +486,7 @@ export default function TechnicianCases() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-400 text-sm">Provision</p>
-                <p className="text-lg font-bold text-white">{formatCurrency(data.stats.total_commission)}</p>
+                <p className="text-lg font-bold text-white">{formatCurrency(stats.total_commission)}</p>
               </div>
               <DollarSign className="w-6 h-6 text-purple-400" />
             </div>
@@ -611,7 +734,7 @@ export default function TechnicianCases() {
         {filteredCases.length > 0 && (
           <div className="mt-6 text-center">
             <p className="text-slate-400 text-sm">
-              Visar {filteredCases.length} av {data.cases.length} ärenden
+              Visar {filteredCases.length} av {cases.length} ärenden
               {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && ' (filtrerade)'}
             </p>
           </div>
