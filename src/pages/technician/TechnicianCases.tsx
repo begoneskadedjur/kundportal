@@ -1,11 +1,12 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - KORRIGERAD MED NY STATUSLOGIK OCH ADRESSFORMATERING
+// 📁 src/pages/technician/TechnicianCases.tsx - FULLT INTEGRERAD MED EDITCASEMODAL
+
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, ClipboardList, Filter, Search, Eye, ExternalLink,
   Clock, CheckCircle, AlertCircle, User, Building2, Calendar,
-  MapPin, Phone, Mail, DollarSign, FileText
+  MapPin, Phone, Mail, DollarSign, FileText, Edit
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -13,6 +14,8 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
+// ✅ 1. Importera den nya modal-komponenten
+import EditCaseModal from '../../components/technicians/EditCaseModal'
 
 // Interfaces
 interface TechnicianCase {
@@ -48,68 +51,35 @@ interface CaseStats {
   total_commission: number
 }
 
-// ✅ NY, MER DETALJERAD STATUSFÄRG-FUNKTION
 const getStatusColor = (status: string) => {
   const lowerStatus = status?.toLowerCase() || '';
-  
-  if (lowerStatus.includes('avslutat') || lowerStatus.includes('completed')) {
-    return 'bg-green-500/20 text-green-400';
-  }
-  if (lowerStatus.startsWith('återbesök')) {
-    return 'bg-cyan-500/20 text-cyan-400';
-  }
-  if (lowerStatus.includes('bokad') || lowerStatus.includes('offert signerad')) {
-    return 'bg-blue-500/20 text-blue-400';
-  }
-  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) {
-     return 'bg-yellow-500/20 text-yellow-400';
-  }
-  if (lowerStatus.includes('review')) {
-     return 'bg-purple-500/20 text-purple-400';
-  }
-  if (lowerStatus.includes('stängt')) {
-     return 'bg-slate-600/50 text-slate-400';
-  }
+  if (lowerStatus.includes('avslutat') || lowerStatus.includes('completed')) return 'bg-green-500/20 text-green-400';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('offert signerad')) return 'bg-blue-500/20 text-blue-400';
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-500/20 text-yellow-400';
+  if (lowerStatus.includes('review')) return 'bg-purple-500/20 text-purple-400';
+  if (lowerStatus.includes('stängt')) return 'bg-slate-600/50 text-slate-400';
   return 'bg-slate-500/20 text-slate-400';
 };
 
-
-// ✅ NY FUNKTION FÖR ATT FORMATERA ADRESSOBJEKT
 const formatAddress = (address: any): string => {
   if (!address) return 'Adress saknas';
-
-  // Om det redan är ett korrekt objekt
-  if (typeof address === 'object' && address.formatted_address) {
-    return address.formatted_address;
-  }
-  
-  // Om det är en JSON-sträng som behöver parsas
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
   if (typeof address === 'string') {
     try {
       const parsed = JSON.parse(address);
-      return parsed.formatted_address || address; // Fallback till originalsträngen
+      return parsed.formatted_address || address;
     } catch (e) {
-      return address; // Det var bara en vanlig sträng
+      return address;
     }
   }
-
   return 'Adressinformation ej tillgänglig';
 };
 
-// ✅ DEFINIERAR DEN KORREKTA SORTERINGSORDNINGEN FÖR STATUS
 const statusOrder = [
-  'öppen',
-  'bokad',
-  'offert skickad',
-  'offert signerad - boka in',
-  'återbesök 1',
-  'återbesök 2',
-  'återbesök 3',
-  'återbesök 4',
-  'återbesök 5',
-  'privatperson - review',
-  'stängt - slasklogg',
-  'avslutat'
+  'öppen', 'bokad', 'offert skickad', 'offert signerad - boka in',
+  'återbesök 1', 'återbesök 2', 'återbesök 3', 'återbesök 4', 'återbesök 5',
+  'privatperson - review', 'stängt - slasklogg', 'avslutat'
 ];
 
 export default function TechnicianCases() {
@@ -134,6 +104,10 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
+  // ✅ 2. State för att hantera modalen
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null);
+
   const getTechnicianId = () => {
     return profile?.technician_id || technician?.id
   }
@@ -154,7 +128,8 @@ export default function TechnicianCases() {
     applyFilters()
   }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
-  const fetchCasesDirectly = async (technicianId: string) => {
+  // ... (fetchCasesDirectly och applyFilters är oförändrade) ...
+    const fetchCasesDirectly = async (technicianId: string) => {
     if (!technicianId) {
       setError('Ingen tekniker-ID tillgänglig')
       setLoading(false)
@@ -305,6 +280,24 @@ export default function TechnicianCases() {
 
     setFilteredCases(filtered)
   }
+  
+  // ✅ 3. Funktioner för att hantera modalen
+  const handleOpenEditModal = (caseToEdit: TechnicianCase) => {
+    setSelectedCase(caseToEdit);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedCase(null);
+  };
+
+  const handleUpdateSuccess = (updatedCase: TechnicianCase) => {
+    setCases(currentCases =>
+      currentCases.map(c => (c.id === updatedCase.id ? { ...c, ...updatedCase } : c))
+    );
+  };
+
 
   const technicianId = getTechnicianId()
   const technicianName = technician?.name || profile?.display_name || 'Tekniker'
@@ -352,6 +345,7 @@ export default function TechnicianCases() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* ... (Statistik-kort och filter-kort är oförändrade) ... */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">Totalt</p><p className="text-xl font-bold text-white">{stats.total_cases}</p></div><ClipboardList className="w-6 h-6 text-slate-400" /></div></Card>
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-green-400 text-sm">Avslutade</p><p className="text-xl font-bold text-white">{stats.completed_cases}</p></div><CheckCircle className="w-6 h-6 text-green-400" /></div></Card>
@@ -366,7 +360,6 @@ export default function TechnicianCases() {
               <Input placeholder="Sök ärenden, kunder..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} icon={<Search className="w-4 h-4" />} />
             </div>
             
-            {/* ✅ UPPDATERAD FILTER-MENY */}
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
               <option value="all">Alla statusar</option>
               <option value="Öppen">Öppen</option>
@@ -404,7 +397,8 @@ export default function TechnicianCases() {
             {filteredCases.length > 0 ? (
               filteredCases.map(case_ => (
                 <Card key={case_.id} className="p-6 hover:bg-slate-800/50 transition-colors">
-                  <div className="flex items-start justify-between mb-4">
+                  {/* ... (Kortets innehåll är oförändrat fram till knapparna) ... */}
+                    <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-semibold text-white text-lg truncate">{case_.title}</h3>
@@ -427,7 +421,6 @@ export default function TechnicianCases() {
                     {case_.telefon_kontaktperson && (<p className="text-sm text-slate-300 flex items-center gap-2"><Phone className="w-4 h-4 text-slate-400" /><a href={`tel:${case_.telefon_kontaktperson}`} className="hover:text-blue-400 transition-colors">{case_.telefon_kontaktperson}</a></p>)}
                     {case_.e_post_kontaktperson && (<p className="text-sm text-slate-300 flex items-center gap-2"><Mail className="w-4 h-4 text-slate-400" /><a href={`mailto:${case_.e_post_kontaktperson}`} className="hover:text-blue-400 transition-colors">{case_.e_post_kontaktperson}</a></p>)}
                     
-                    {/* ✅ ANVÄNDER DEN NYA ADRESS-FUNKTIONEN */}
                     {case_.adress && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-slate-400" />
@@ -441,8 +434,21 @@ export default function TechnicianCases() {
 
                   <div className="flex items-center justify-between pt-4 border-t border-slate-700">
                     <div className="text-xs text-slate-400">{case_.case_number ? (<span>Ärendenr: {case_.case_number}</span>) : (<span>ClickUp: {case_.clickup_task_id}</span>)}</div>
+                    
                     <div className="flex items-center gap-2">
                       {case_.billing_status && (<span className={`px-2 py-1 rounded text-xs ${ case_.billing_status === 'paid' ? 'bg-green-500/20 text-green-400' : case_.billing_status === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}</span>)}
+                      
+                      {/* ✅ 4. Knapp för att öppna redigeringsmodalen */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleOpenEditModal(case_)}
+                        className="flex items-center gap-2"
+                      >
+                          <Edit className="w-3 h-3" />
+                          Redigera
+                      </Button>
+
                       <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url || `https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')} className="flex items-center gap-2"><ExternalLink className="w-3 h-3" />ClickUp</Button>
                     </div>
                   </div>
@@ -462,6 +468,14 @@ export default function TechnicianCases() {
           </div>
         )}
       </main>
+
+      {/* ✅ 5. Rendera modalen och skicka med nödvändiga props */}
+      <EditCaseModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase}
+      />
     </div>
   )
 }
