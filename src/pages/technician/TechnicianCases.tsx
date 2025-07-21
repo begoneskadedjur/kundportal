@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FULLT INTEGRERAD MED EDITCASEMODAL
+// 📁 src/pages/technician/TechnicianCases.tsx - KORRIGERAD MED RÄTT SÖKVÄG
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,8 +14,8 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
-// ✅ 1. Importera den nya modal-komponenten
-import EditCaseModal from '../../components/technicians/EditCaseModal'
+// ✅ KORRIGERAD SÖKVÄG TILL KOMPONENTEN
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 
 // Interfaces
 interface TechnicianCase {
@@ -104,7 +104,6 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // ✅ 2. State för att hantera modalen
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null);
 
@@ -128,7 +127,6 @@ export default function TechnicianCases() {
     applyFilters()
   }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
-  // ... (fetchCasesDirectly och applyFilters är oförändrade) ...
     const fetchCasesDirectly = async (technicianId: string) => {
     if (!technicianId) {
       setError('Ingen tekniker-ID tillgänglig')
@@ -237,7 +235,6 @@ export default function TechnicianCases() {
       )
     }
     
-    // ✅ UPPDATERAD FILTERLOGIK FÖR NYA STATUSAR
     if (statusFilter !== 'all') {
       const filterLower = statusFilter.toLowerCase();
       if (filterLower === 'återbesök') {
@@ -253,7 +250,6 @@ export default function TechnicianCases() {
       filtered = filtered.filter(case_ => case_.case_type === typeFilter)
     }
 
-    // ✅ UPPDATERAD SORTERINGSLOGIK
     filtered.sort((a, b) => {
       let comparison = 0
       
@@ -281,7 +277,6 @@ export default function TechnicianCases() {
     setFilteredCases(filtered)
   }
   
-  // ✅ 3. Funktioner för att hantera modalen
   const handleOpenEditModal = (caseToEdit: TechnicianCase) => {
     setSelectedCase(caseToEdit);
     setIsEditModalOpen(true);
@@ -345,7 +340,6 @@ export default function TechnicianCases() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* ... (Statistik-kort och filter-kort är oförändrade) ... */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">Totalt</p><p className="text-xl font-bold text-white">{stats.total_cases}</p></div><ClipboardList className="w-6 h-6 text-slate-400" /></div></Card>
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-green-400 text-sm">Avslutade</p><p className="text-xl font-bold text-white">{stats.completed_cases}</p></div><CheckCircle className="w-6 h-6 text-green-400" /></div></Card>
@@ -397,7 +391,6 @@ export default function TechnicianCases() {
             {filteredCases.length > 0 ? (
               filteredCases.map(case_ => (
                 <Card key={case_.id} className="p-6 hover:bg-slate-800/50 transition-colors">
-                  {/* ... (Kortets innehåll är oförändrat fram till knapparna) ... */}
                     <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -438,7 +431,6 @@ export default function TechnicianCases() {
                     <div className="flex items-center gap-2">
                       {case_.billing_status && (<span className={`px-2 py-1 rounded text-xs ${ case_.billing_status === 'paid' ? 'bg-green-500/20 text-green-400' : case_.billing_status === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}</span>)}
                       
-                      {/* ✅ 4. Knapp för att öppna redigeringsmodalen */}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -469,7 +461,6 @@ export default function TechnicianCases() {
         )}
       </main>
 
-      {/* ✅ 5. Rendera modalen och skicka med nödvändiga props */}
       <EditCaseModal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
