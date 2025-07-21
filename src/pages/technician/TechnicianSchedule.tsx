@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED ALLA FIXAR
+// 📁 src/pages/technician/TechnicianSchedule.tsx - KOMPLETT OCH KORREKT VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,25 +10,25 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { ArrowLeft, User, Building2, Calendar, FileText, Phone, MapPin } from 'lucide-react'
+import { ArrowLeft, User, Building2, Calendar, FileText, Phone, MapPin, Clock } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import '../../styles/FullCalendar.css'
 
 interface ScheduledCase {
   id: string; title: string; case_type: 'private' | 'business' | 'contract';
-  kontaktperson?: string; start_date: string; description?: string; status: string;
+  kontaktperson?: string; start_date: string; end_date?: string; description?: string; status: string;
   case_price?: number; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
   skadedjur?: string; org_nr?: string; adress?: any;
 }
 
 const getStatusColorClasses = (status: string) => {
   const lowerStatus = status?.toLowerCase() || '';
-  if (lowerStatus.includes('avslutat')) return 'bg-green-500/10 text-green-400 border-green-500/50';
-  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/50';
-  if (lowerStatus.includes('bokad')) return 'bg-blue-500/10 text-blue-400 border-blue-500/50';
-  if (lowerStatus.includes('öppen')) return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50';
-  return 'bg-slate-700/20 text-slate-400 border-slate-600/50';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-900/50 text-green-300 border-green-700';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-900/50 text-cyan-300 border-cyan-700';
+  if (lowerStatus.includes('bokad')) return 'bg-blue-900/50 text-blue-300 border-blue-700';
+  if (lowerStatus.includes('öppen')) return 'bg-yellow-900/50 text-yellow-300 border-yellow-700';
+  return 'bg-slate-800/50 text-slate-400 border-slate-700';
 };
 
 const formatAddress = (address: any): string => {
@@ -63,7 +63,6 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
         supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
-        // ✅ KORRIGERAD SYNTAX FÖR ALIAS: `adress:address_formatted`
         supabase.from('cases').select('id, title, created_date, description, status, case_type, adress:address_formatted').eq('assigned_technician_id', technicianId)
       ]);
       
@@ -82,54 +81,53 @@ export default function TechnicianSchedule() {
   }
 
   const calendarEvents = useMemo(() => {
-    return cases.map(case_ => ({
-      id: case_.id,
-      title: case_.title,
-      start: case_.start_date,
-      extendedProps: { ...case_ },
-      className: getStatusColorClasses(case_.status).split(' ')[2]
-    }));
+    return cases.map(case_ => {
+      const startDate = new Date(case_.start_date);
+      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+      return {
+        id: case_.id,
+        title: case_.title,
+        start: startDate,
+        end: endDate,
+        extendedProps: { ...case_ },
+        className: `!border ${getStatusColorClasses(case_.status)}`
+      }
+    });
   }, [cases]);
   
   const renderEventContent = (eventInfo: any) => {
-    const { case_type, kontaktperson, status, adress, telefon_kontaktperson } = eventInfo.event.extendedProps;
-    const isMonthView = eventInfo.view.type === 'dayGridMonth';
-
-    if (isMonthView) {
-      return (
-        <div className="p-1 text-xs overflow-hidden h-full fc-event-main-monthly">
-          <b className="fc-event-time">{eventInfo.timeText}</b>
-          <span className="fc-event-title">{eventInfo.event.title}</span>
-        </div>
-      )
-    }
-
+    const { case_type, kontaktperson, adress, telefon_kontaktperson, skadedjur } = eventInfo.event.extendedProps;
+    
+    // Samma detaljerade vy används nu i alla lägen (månad, vecka, dag)
     return (
-      <div className="p-2 text-xs overflow-hidden h-full flex flex-col justify-between fc-event-main-detailed">
-        <div>
-          <div className="flex justify-between items-center">
-            <b className="text-white text-sm">{eventInfo.timeText}</b>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColorClasses(status)}`}>{status}</span>
-          </div>
-          <p className="font-semibold text-md text-white my-1">{eventInfo.event.title}</p>
-          <p className="flex items-center gap-1.5 mt-2 text-slate-300">
-            {case_type === 'private' ? <User className="w-4 h-4"/> : <Building2 className="w-4 h-4"/>}
-            <span>{kontaktperson || 'Okänd'}</span>
+      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between ${getStatusColorClasses(eventInfo.event.extendedProps.status).split(' ')[0]}`}>
+        <div className="flex-grow">
+          <p className="text-xs opacity-80">{case_type === 'private' ? 'Privatperson' : 'Företag'}</p>
+          <p className="font-bold text-md text-white -mt-1">{eventInfo.event.title}</p>
+          
+          <p className="flex items-center gap-1.5 text-xs mt-2 opacity-90">
+            <Clock className="w-3 h-3"/>
+            <span>{eventInfo.timeText}</span>
           </p>
-          <p className="flex items-center gap-1.5 mt-1 text-slate-300">
-            <MapPin className="w-4 h-4"/>
-            <span>{formatAddress(adress) || 'Adress saknas'}</span>
+          <p className="text-xs mt-1 opacity-90">
+            <span className="font-semibold">Adress:</span> {formatAddress(adress) || 'Saknas'}
+          </p>
+          <p className="flex items-center gap-1.5 text-xs mt-1 opacity-90">
+            <span className="font-semibold">Skadedjur:</span>
+            <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{skadedjur || 'Okänt'}</span>
           </p>
         </div>
-        <div className="flex items-center gap-4 mt-3">
+
+        <div className="flex items-center gap-4 mt-2 self-end">
             {telefon_kontaktperson && (
-                <a href={`tel:${telefon_kontaktperson}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors" title="Ring kund">
-                    <Phone className="w-4 h-4" /> Ring
+                <a href={`tel:${telefon_kontaktperson}`} onClick={(e) => e.stopPropagation()} className="hover:text-white transition-colors" title={`Ring ${kontaktperson}`}>
+                    <Phone className="w-5 h-5" />
                 </a>
             )}
             {adress && (
-                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors" title="Navigera till adress">
-                    <MapPin className="w-4 h-4" /> Navigera
+                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="hover:text-white transition-colors" title="Navigera till adress">
+                    <MapPin className="w-5 h-5" />
                 </a>
             )}
         </div>
@@ -154,9 +152,14 @@ export default function TechnicianSchedule() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-purple-500/10 p-2 rounded-lg"><Calendar className="w-6 h-6 text-purple-500" /></div>
-              <div><h1 className="text-2xl font-bold text-white">Mitt Schema</h1><p className="text-sm text-slate-400">Kalenderöversikt över bokade ärenden</p></div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Mitt Schema</h1>
+                <p className="text-sm text-slate-400">Kalenderöversikt över bokade ärenden</p>
+              </div>
             </div>
-            <Button variant="secondary" onClick={() => navigate('/technician/dashboard')}><ArrowLeft className="w-4 h-4 mr-2"/>Tillbaka</Button>
+            <Button variant="secondary" onClick={() => navigate('/technician/dashboard')}>
+              <ArrowLeft className="w-4 h-4 mr-2"/>Tillbaka
+            </Button>
         </div>
       </header>
       
@@ -180,7 +183,8 @@ export default function TechnicianSchedule() {
             slotMinTime="07:00:00"
             slotMaxTime="19:00:00"
             height="auto"
-            eventMinHeight={75} 
+            eventMinHeight={120} // Ökat för att rymma mer information
+            dayMaxEvents={true} // Förhindrar att månadsvyn blir för hög
           />
         </div>
       </main>
