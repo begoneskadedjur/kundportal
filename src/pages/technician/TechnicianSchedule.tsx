@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED NY DESIGN & BUGFIX
+// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED ALLA FIXAR
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -63,8 +63,8 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
         supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
-        // ✅ KORRIGERAD: 'adress' heter 'address_formatted' i databasen. Vi ger den ett alias 'adress' för konsekvens.
-        supabase.from('cases').select('id, title, created_date, description, status, case_type, address_formatted as adress').eq('assigned_technician_id', technicianId)
+        // ✅ KORRIGERAD SYNTAX FÖR ALIAS: `adress:address_formatted`
+        supabase.from('cases').select('id, title, created_date, description, status, case_type, adress:address_formatted').eq('assigned_technician_id', technicianId)
       ]);
       
       const allCases: Partial<ScheduledCase>[] = [];
@@ -87,7 +87,7 @@ export default function TechnicianSchedule() {
       title: case_.title,
       start: case_.start_date,
       extendedProps: { ...case_ },
-      className: getStatusColorClasses(case_.status).split(' ')[2] // Använd border-färg för status
+      className: getStatusColorClasses(case_.status).split(' ')[2]
     }));
   }, [cases]);
   
