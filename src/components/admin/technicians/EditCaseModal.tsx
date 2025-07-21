@@ -1,8 +1,8 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - UPPGRADERAD MED PAUS/ÅTERUPPTA OCH BUGFIX
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - KORRIGERAD MED SMARTARE UPPDATERING
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Square, Pause, RotateCcw } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -59,7 +59,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
          : 'cases';
   }
 
-  // ✅ KORRIGERAD: Skickar inte längre 'case_price'
+  // ✅ KORRIGERAD: Skickar bara relevanta fält för varje ärendetyp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
@@ -67,13 +67,31 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     setLoading(true);
     setError(null);
     try {
-      const updateData = { ...formData };
-      delete updateData.case_price; // Ta bort fältet som inte finns i DB
+      // Bygg uppdateringsobjektet baserat på gemensamma fält
+      const updateData: { [key: string]: any } = {
+        title: formData.title,
+        status: formData.status,
+        description: formData.description,
+        kontaktperson: formData.kontaktperson,
+        telefon_kontaktperson: formData.telefon_kontaktperson,
+        e_post_kontaktperson: formData.e_post_kontaktperson,
+        skadedjur: formData.skadedjur,
+        pris: formData.case_price,
+        material_cost: formData.material_cost,
+      };
+
+      // Lägg till typspecifika fält
+      if (caseData.case_type === 'private') {
+        updateData.personnummer = formData.personnummer;
+      } else if (caseData.case_type === 'business') {
+        updateData.org_nr = formData.org_nr;
+      }
 
       const { error: updateError } = await supabase
         .from(tableName)
-        .update({ ...updateData, pris: formData.case_price })
+        .update(updateData)
         .eq('id', caseData.id)
+
       if (updateError) throw updateError;
       setSubmitted(true);
       setTimeout(() => {
@@ -88,7 +106,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }
 
-  // ✅ HELT NY TIDRAPPORTERINGS-LOGIK
   const handleTimeTracking = async (action: 'start' | 'pause' | 'reset') => {
     const tableName = getTableName();
     if (!tableName || !caseData) return;
@@ -174,7 +191,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
               <Input label="Materialkostnad" name="material_cost" type="number" value={formData.material_cost === null ? '' : formData.material_cost} onChange={handleChange} />
             </div>
-            {/* ✅ NYA KNAPPAR FÖR TIDRAPPORTERING */}
             <div className="p-4 bg-slate-800/50 rounded-lg">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Arbetstid</label>
                 <div className="flex items-center justify-between">
