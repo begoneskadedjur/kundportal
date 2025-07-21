@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - SLUTGILTIG VERSION
+// 📁 src/pages/technician/TechnicianCases.tsx - UPPDATERAD MED NYA FÄLT
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,7 +16,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 
-// Interfaces
+// ✅ INTERFACE UTÖKAT MED NYA FÄLT FRÅN DATABASEN
 interface TechnicianCase {
   id: string; clickup_task_id: string; case_number?: string; title: string;
   status: string; priority?: string; case_type: 'private' | 'business' | 'contract';
@@ -26,6 +26,10 @@ interface TechnicianCase {
   foretag?: string; org_nr?: string; skadedjur?: string; description?: string; 
   clickup_url?: string; assignee_name?: string; 
   billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
+  personnummer?: string;
+  material_cost?: number;
+  time_spent_minutes?: number;
+  work_started_at?: string;
 }
 
 interface CaseStats {
@@ -66,7 +70,6 @@ export default function TechnicianCases() {
   const [statusFilter, setStatusFilter] = useState<string>('Öppen')
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
-  // ✅ Standardsortering ändrad till senaste startdatum först (desc)
   const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'start_date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -84,21 +87,22 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, profile?.technician_id])
 
+  // ✅ UPPDATERAD SELECT-FRÅGA FÖR ATT INKLUDERA ALLA FÄLT
   const fetchCasesDirectly = async (technicianId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const selectQuery = 'id, clickup_task_id, title, status, priority, created_at, start_date, due_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon_kontaktperson, e_post_kontaktperson, adress, skadedjur, description, billing_status';
+      const selectQuery = '*, pris'; // Hämta allt + pris för enkelhetens skull
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId),
-        supabase.from('business_cases').select(`${selectQuery}, org_nr`).eq('primary_assignee_id', technicianId),
-        supabase.from('cases').select('id, clickup_task_id, title, status, priority, created_date, completed_date, assigned_technician_name').eq('assigned_technician_id', technicianId)
+        supabase.from('business_cases').select(selectQuery).eq('primary_assignee_id', technicianId),
+        supabase.from('cases').select('*').eq('assigned_technician_id', technicianId)
       ]);
       
       const allCases = [
         ...(privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'private' as const, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
         ...(businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'business' as const, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
-        ...(contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'contract' as const, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
+        ...(contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'contract' as const, created_date: c.created_date, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
       ];
 
       setCases(allCases);
@@ -224,7 +228,6 @@ export default function TechnicianCases() {
                                 <div className="flex items-center gap-3">
                                     <span className="text-slate-300">{case_.kontaktperson || 'Okänd'}</span>
                                     <div className="flex items-center gap-3">
-                                      {/* ✅ HOVER-TOOLTIP TILLAGD */}
                                       {case_.telefon_kontaktperson && <a href={`tel:${case_.telefon_kontaktperson}`} title={case_.telefon_kontaktperson} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Phone className="w-4 h-4"/></a>}
                                       {case_.e_post_kontaktperson && <a href={`mailto:${case_.e_post_kontaktperson}`} title={case_.e_post_kontaktperson} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Mail className="w-4 h-4"/></a>}
                                     </div>
