@@ -1,10 +1,10 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - KORREKT VERSION MED ALL FUNKTIONALITET OCH NY DESIGN
+// 📁 src/pages/technician/TechnicianCases.tsx - FÖRBÄTTRAD KORTDESIGN MED EKONOMI & FAKTURADETALJER
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ClipboardList, Filter, Search, ExternalLink,
+  ClipboardList, Search, ExternalLink,
   Clock, CheckCircle, AlertCircle, User, Building2, Calendar,
   MapPin, Phone, Mail, DollarSign, FileText, Edit
 } from 'lucide-react'
@@ -94,13 +94,7 @@ export default function TechnicianCases() {
     applyFilters()
   }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
-  // ✅ ÅTERSTÄLLD, KORREKT FUNKTION
   const fetchCasesDirectly = async (technicianId: string) => {
-    if (!technicianId) {
-      setError('Ingen tekniker-ID tillgänglig');
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -119,15 +113,13 @@ export default function TechnicianCases() {
       const contractCasesData = contractResult.status === 'fulfilled' ? contractResult.value.data || [] : [];
 
       const allCases: TechnicianCase[] = [
-        ...privateCasesData.map((c: any) => ({ ...c, case_type: 'private', case_number: `P-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
-        ...businessCasesData.map((c: any) => ({ ...c, case_type: 'business', case_number: `B-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
-        ...contractCasesData.map((c: any) => ({ ...c, case_type: 'contract', case_number: `C-${c.clickup_task_id}`, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
+        ...privateCasesData.map((c: any) => ({ ...c, case_type: 'private' as const, case_number: `P-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
+        ...businessCasesData.map((c: any) => ({ ...c, case_type: 'business' as const, case_number: `B-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
+        ...contractCasesData.map((c: any) => ({ ...c, case_type: 'contract' as const, case_number: `C-${c.clickup_task_id}`, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
       ];
 
       allCases.sort((a, b) => new Date(b.created_date || 0).getTime() - new Date(a.created_date || 0).getTime());
-      
       setCases(allCases);
-      
       setStats({
           total_cases: allCases.length,
           completed_cases: allCases.filter(c => c.status?.toLowerCase() === 'avslutat').length,
@@ -135,7 +127,6 @@ export default function TechnicianCases() {
           in_progress_cases: allCases.filter(c => c.status?.toLowerCase().includes('bokad') || c.status?.toLowerCase().includes('återbesök')).length,
           total_commission: allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
       });
-
     } catch (error: any) {
       console.error('💥 DETAILED ERROR:', error);
       setError(error.message || 'Ett oväntat fel uppstod');
@@ -144,17 +135,12 @@ export default function TechnicianCases() {
     }
   }
 
-  // ✅ ÅTERSTÄLLD, KORREKT FUNKTION
   const applyFilters = () => {
     let filtered = [...cases];
-    
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(c => 
-        Object.values(c).some(val => String(val).toLowerCase().includes(searchLower))
-      );
+      filtered = filtered.filter(c => Object.values(c).some(val => String(val).toLowerCase().includes(searchLower)));
     }
-    
     if (statusFilter !== 'all') {
       const filterLower = statusFilter.toLowerCase();
       if (filterLower === 'återbesök') {
@@ -163,47 +149,28 @@ export default function TechnicianCases() {
         filtered = filtered.filter(c => c.status?.toLowerCase() === filterLower);
       }
     }
-    
     if (typeFilter !== 'all') {
       filtered = filtered.filter(c => c.case_type === typeFilter);
     }
-
     filtered.sort((a, b) => {
       let comparison = 0;
-      switch (sortBy) {
-        case 'status':
-          const statusA = statusOrder.findIndex(s => s.toLowerCase() === a.status?.toLowerCase());
-          const statusB = statusOrder.findIndex(s => s.toLowerCase() === b.status?.toLowerCase());
-          comparison = (statusA === -1 ? 99 : statusA) - (statusB === -1 ? 99 : statusB);
-          break;
-        case 'date':
-          comparison = new Date(a.created_date || 0).getTime() - new Date(b.created_date || 0).getTime();
-          break;
-        case 'commission':
-          comparison = (a.commission_amount || 0) - (b.commission_amount || 0);
-          break;
+      if (sortBy === 'status') {
+        const statusA = statusOrder.findIndex(s => s.toLowerCase() === a.status?.toLowerCase());
+        const statusB = statusOrder.findIndex(s => s.toLowerCase() === b.status?.toLowerCase());
+        comparison = (statusA === -1 ? 99 : statusA) - (statusB === -1 ? 99 : statusB);
+      } else if (sortBy === 'date') {
+        comparison = new Date(a.created_date || 0).getTime() - new Date(b.created_date || 0).getTime();
+      } else if (sortBy === 'commission') {
+        comparison = (a.commission_amount || 0) - (b.commission_amount || 0);
       }
       return sortOrder === 'desc' ? -comparison : comparison;
     });
-
     setFilteredCases(filtered);
   }
 
-  const handleOpenEditModal = (caseToEdit: TechnicianCase) => {
-    setSelectedCase(caseToEdit);
-    setIsEditModalOpen(true);
-  };
-
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false);
-    setSelectedCase(null);
-  };
-
-  const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => {
-    setCases(currentCases =>
-      currentCases.map(c => (c.id === selectedCase?.id ? { ...c, ...updatedCase } : c))
-    );
-  };
+  const handleOpenEditModal = (caseToEdit: TechnicianCase) => { setSelectedCase(caseToEdit); setIsEditModalOpen(true); };
+  const handleCloseEditModal = () => { setIsEditModalOpen(false); setSelectedCase(null); };
+  const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => { setCases(currentCases => currentCases.map(c => (c.id === selectedCase?.id ? { ...c, ...updatedCase } : c))); };
 
   const technicianName = profile?.display_name || 'Tekniker';
 
@@ -239,64 +206,74 @@ export default function TechnicianCases() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filteredCases.length > 0 ? (
               filteredCases.map(case_ => (
-                <Card key={case_.id} className="p-4 hover:bg-slate-800/50 transition-colors flex flex-col">
-                  <div className="flex-grow">
+                <Card key={case_.id} className="p-4 hover:bg-slate-800/50 transition-colors flex flex-col justify-between">
+                  <div>
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="font-semibold text-white text-md pr-2 flex-1">{case_.title}</h3>
                         <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
+                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-4">
                         <span className={`inline-flex items-center gap-1.5 ${case_.case_type === 'private' ? 'text-blue-400' : case_.case_type === 'business' ? 'text-purple-400' : 'text-green-400'}`}><User className="w-3 h-3" />{case_.case_type === 'private' ? 'Privat' : case_.case_type === 'business' ? 'Företag' : 'Avtal'}</span>
                         <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />{formatDate(case_.created_date)}</span>
-                        {case_.commission_amount && case_.commission_amount > 0 && <span className="text-green-400 flex items-center gap-1.5"><DollarSign className="w-3 h-3"/>{formatCurrency(case_.commission_amount)}</span>}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4 border-t border-slate-700/50 pt-3">
-                        <div>
-                            <p className="font-medium text-slate-300 flex items-center gap-2"><User className="w-4 h-4 text-slate-500"/> {case_.kontaktperson || 'Kontakt saknas'}</p>
-                            <p className="text-slate-400 flex items-center gap-2"><Phone className="w-4 h-4 text-slate-500"/> {case_.telefon_kontaktperson || 'Telefon saknas'}</p>
+                    
+                    <div className="space-y-3 text-sm border-t border-slate-700/50 pt-3">
+                        <div className="flex justify-between">
+                            <span className="font-medium text-slate-300 flex items-center gap-2"><User className="w-4 h-4 text-slate-500"/> {case_.kontaktperson || 'Kontakt saknas'}</span>
+                            <span className="text-slate-400 flex items-center gap-2">{case_.telefon_kontaktperson || 'Telefon saknas'} <Phone className="w-4 h-4 text-slate-500"/></span>
                         </div>
-                        <div>
-                            <p className="font-medium text-slate-300 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-500"/> Adress</p>
-                            <p className="text-slate-400">{formatAddress(case_.adress)}</p>
+                        <div className="flex justify-between">
+                            <span className="font-medium text-slate-300 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-500"/> Adress</span>
+                            <span className="text-slate-400 text-right">{formatAddress(case_.adress)}</span>
                         </div>
+                        {/* ✅ EKONOMISK INFORMATION TILLBAKA */}
+                        {(case_.case_price || (case_.commission_amount && case_.commission_amount > 0)) && (
+                            <div className="flex justify-between border-t border-slate-700/50 pt-3">
+                                <span className="font-medium text-slate-300 flex items-center gap-2"><DollarSign className="w-4 h-4 text-slate-500"/>Ekonomi</span>
+                                <div className="text-right">
+                                    {case_.case_price && <p className="text-slate-300">Pris: <span className="font-semibold text-white">{formatCurrency(case_.case_price)}</span></p>}
+                                    {case_.commission_amount && case_.commission_amount > 0 && <p className="text-slate-300">Provision: <span className="font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</span></p>}
+                                </div>
+                            </div>
+                        )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-700">
-                    <Button size="sm" onClick={() => handleOpenEditModal(case_)} className="flex items-center gap-2">
-                        <Edit className="w-4 h-4" /> Öppna ärende
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url, '_blank')} className="flex items-center gap-2">
-                        <ExternalLink className="w-4 h-4" /> Visa i ClickUp
-                    </Button>
+                  <div className="flex items-center justify-between pt-3 mt-4 border-t border-slate-700">
+                    {/* ✅ FAKTURAINFORMATION FÖRTYDLIGAD */}
+                    <div className="flex items-center gap-2 text-xs">
+                        {case_.billing_status && case_.billing_status !== 'skip' && (
+                            <>
+                                <span className="text-slate-400">Fakturastatus:</span>
+                                <span className={`px-2 py-1 rounded ${
+                                    case_.billing_status === 'paid' ? 'bg-green-500/20 text-green-400'
+                                    : case_.billing_status === 'sent' ? 'bg-blue-500/20 text-blue-400'
+                                    : 'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                    {case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={() => handleOpenEditModal(case_)} className="flex items-center gap-2"><Edit className="w-4 h-4" /> Öppna ärende</Button>
+                        <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url, '_blank')} className="flex items-center gap-2"><ExternalLink className="w-4 h-4" /> Visa i ClickUp</Button>
+                    </div>
                   </div>
                 </Card>
               ))
             ) : (
-              <div className="col-span-1 lg:col-span-2">
-                <Card className="p-12"><div className="text-center"><ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" /><h3 className="text-lg font-semibold text-white mb-2">Inga ärenden matchar filtret</h3><p className="text-slate-400">Prova att ändra dina filter eller sökord.</p></div></Card>
-              </div>
+              <div className="col-span-1 lg:col-span-2"><Card className="p-12"><div className="text-center"><ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" /><h3 className="text-lg font-semibold text-white mb-2">Inga ärenden matchar filtret</h3><p className="text-slate-400">Prova att ändra dina filter eller sökord.</p></div></Card></div>
             )}
         </div>
         
-        {filteredCases.length > 0 && (
-            <p className="mt-6 text-center text-slate-400 text-sm">Visar {filteredCases.length} av {cases.length} ärenden.</p>
-        )}
+        {filteredCases.length > 0 && (<p className="mt-6 text-center text-slate-400 text-sm">Visar {filteredCases.length} av {cases.length} ärenden.</p>)}
 
         <div className="mt-10 max-w-2xl mx-auto p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
             <h4 className="text-md font-semibold text-slate-200 mb-2">Information om fakturastatus</h4>
             <dl className="text-sm text-slate-400 space-y-2">
-                <div>
-                    <dt className="font-medium text-slate-300">Väntande (Pending)</dt>
-                    <dd>Fakturan är skapad i systemet men har ännu inte skickats till kunden.</dd>
-                </div>
-                <div>
-                    <dt className="font-medium text-slate-300">Skickad (Sent)</dt>
-                    <dd>Fakturan är skickad till kunden och vi inväntar betalning.</dd>
-                </div>
-                <div>
-                    <dt className="font-medium text-slate-300">Betald (Paid)</dt>
-                    <dd>Kunden har betalat fakturan och ärendet är ekonomiskt avslutat.</dd>
-                </div>
+                <div><dt className="font-medium text-slate-300">Väntande (Pending)</dt><dd>Fakturan är skapad i systemet men har ännu inte skickats till kunden.</dd></div>
+                <div><dt className="font-medium text-slate-300">Skickad (Sent)</dt><dd>Fakturan är skickad till kunden och vi inväntar betalning.</dd></div>
+                <div><dt className="font-medium text-slate-300">Betald (Paid)</dt><dd>Kunden har betalat fakturan och ärendet är ekonomiskt avslutat.</dd></div>
             </dl>
         </div>
       </main>
