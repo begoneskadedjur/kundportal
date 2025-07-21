@@ -13,6 +13,10 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.18",
+    "@fullcalendar/list": "^6.1.18",
+    "@fullcalendar/react": "^6.1.18",
+    "@fullcalendar/timegrid": "^6.1.18",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/cli": "^4.1.10",
     "@vercel/node": "^5.2.2",

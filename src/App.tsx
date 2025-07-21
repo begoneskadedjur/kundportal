@@ -1,4 +1,5 @@
-// src/App.tsx - UPPDATERAD MED NYA ONEFLOW ROUTES + TEKNIKER-MANAGEMENT + PROVISIONER + FÖRSÄLJNINGSMÖJLIGHETER + TEKNIKER-DASHBOARD
+// src/App.tsx - UPPDATERAD MED DEN NYA SCHEMAVYN FÖR TEKNIKER
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
@@ -15,19 +16,21 @@ import CustomerDetails from './pages/admin/CustomerDetails'
 import NewCustomer from './pages/admin/NewCustomer'
 import Economics from './pages/admin/Economics'
 import BillingManagement from './pages/admin/BillingManagement'
-import Technicians from './pages/admin/Technicians'          // Tekniker Performance/Statistik
-import TechnicianManagement from './pages/admin/TechnicianManagement'  // Tekniker CRUD
-import TechnicianCommissions from './pages/admin/TechnicianCommissions'  // 🆕 PROVISIONER
-import SalesOpportunities from './pages/admin/SalesOpportunities'  // 🆕 FÖRSÄLJNINGSMÖJLIGHETER
+import Technicians from './pages/admin/Technicians'
+import TechnicianManagement from './pages/admin/TechnicianManagement'
+import TechnicianCommissions from './pages/admin/TechnicianCommissions'
+import SalesOpportunities from './pages/admin/SalesOpportunities'
 
-// 🆕 ONEFLOW ROUTES - UPPDATERADE NAMN
-import OneflowContractCreator from './pages/admin/OneflowContractCreator'  // Tidigare OneflowTest
-import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'  // Ny diagnostik dashboard
+// ONEFLOW ROUTES
+import OneflowContractCreator from './pages/admin/OneflowContractCreator'
+import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'
 
-// 🆕 TEKNIKER PAGES - NYA ROUTES
-import TechnicianDashboard from './pages/technician/TechnicianDashboard'  // Tekniker huvuddashboard
-import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'  // Tekniker provisioner
-import TechnicianCases from './pages/technician/TechnicianCases'  // Tekniker ärenden
+// TEKNIKER PAGES
+import TechnicianDashboard from './pages/technician/TechnicianDashboard'
+import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'
+import TechnicianCases from './pages/technician/TechnicianCases'
+// ✅ NY IMPORT FÖR SCHEMAVYN
+import TechnicianSchedule from './pages/technician/TechnicianSchedule' 
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal'
@@ -100,8 +103,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-
-            {/* 🔧 TEKNIKER ROUTES - SEPARATA FUNKTIONER */}
             <Route 
               path="/admin/technicians" 
               element={
@@ -110,7 +111,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 🆕 NY ROUTE: Tekniker Management (CRUD) */}
             <Route 
               path="/admin/technician-management" 
               element={
@@ -119,7 +119,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 🆕 NY ROUTE: Provisioner */}
             <Route 
               path="/admin/commissions" 
               element={
@@ -128,7 +127,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* 🆕 NY ROUTE: Försäljningsmöjligheter */}
             <Route 
               path="/admin/sales-opportunities" 
               element={
@@ -137,8 +135,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-
-            {/* 🆕 ONEFLOW ROUTES - UPPDATERADE NAMN OCH STRUKTUR */}
             <Route 
               path="/admin/oneflow-contract-creator" 
               element={
@@ -155,14 +151,12 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* 🔄 LEGACY ONEFLOW REDIRECT - För bakåtkompatibilitet */}
             <Route 
               path="/admin/oneflow-test" 
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
-            {/* 🆕 TEKNIKER ROUTES - EGEN PORTAL */}
+            {/* TEKNIKER ROUTES - EGEN PORTAL */}
             <Route 
               path="/technician/dashboard" 
               element={
@@ -187,7 +181,15 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* Tekniker har också tillgång till Oneflow */}
+            {/* ✅ NY ROUTE FÖR SCHEMAVYN */}
+            <Route 
+              path="/technician/schedule" 
+              element={
+                <ProtectedRoute>
+                  <TechnicianSchedule />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/technician/oneflow" 
               element={
@@ -228,7 +230,7 @@ function App() {
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
             
-            {/* Legacy portal redirects - FIX FOR THE BLACK SCREEN */}
+            {/* Legacy portal redirects */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
 
@@ -236,26 +238,25 @@ function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
 
-          {/* Toast notifications */}
           <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#1e293b', // slate-800
-                color: '#f8fafc', // slate-50
-                border: '1px solid #475569', // slate-600
+                background: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #475569',
               },
               success: {
                 iconTheme: {
-                  primary: '#22c55e', // green-500
-                  secondary: '#f8fafc', // slate-50
+                  primary: '#22c55e',
+                  secondary: '#f8fafc',
                 },
               },
               error: {
                 iconTheme: {
-                  primary: '#ef4444', // red-500
-                  secondary: '#f8fafc', // slate-50
+                  primary: '#ef4444',
+                  secondary: '#f8fafc',
                 },
               },
             }}
