@@ -1,12 +1,12 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - LADE TILL KLICKBARA KONTAKT-IKONER
+// 📁 src/pages/technician/TechnicianCases.tsx - HELT NY LISTVY MED PAGINERING OCH SORTERING
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ClipboardList, Search, ExternalLink,
+  ClipboardList, Search, ExternalLink, ArrowLeft,
   Clock, CheckCircle, AlertCircle, User, Building2, Calendar,
-  MapPin, Phone, Mail, DollarSign, FileText, Edit, PlayCircle, Flag, ThumbsUp
+  MapPin, Phone, Mail, DollarSign, FileText, Edit, ChevronUp, ChevronDown
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -44,18 +44,6 @@ const getStatusColor = (status: string) => {
   return 'bg-slate-500/20 text-slate-400';
 };
 
-const formatAddress = (address: any): string => {
-  if (!address) return 'Adress saknas';
-  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
-  if (typeof address === 'string') {
-    try {
-      const parsed = JSON.parse(address);
-      return parsed.formatted_address || address;
-    } catch (e) { return address; }
-  }
-  return 'Adressinformation ej tillgänglig';
-};
-
 const statusOrder = [
   'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
   'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
@@ -70,14 +58,16 @@ export default function TechnicianCases() {
   const [error, setError] = useState<string | null>(null)
   const [cases, setCases] = useState<TechnicianCase[]>([])
   const [stats, setStats] = useState<CaseStats>({ total_cases: 0, completed_cases: 0, pending_cases: 0, in_progress_cases: 0, total_commission: 0 })
-  const [filteredCases, setFilteredCases] = useState<TechnicianCase[]>([])
   
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('Öppen')
   const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
+  // ✅ State för sortering och paginering
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'due_date', direction: 'asc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null);
 
@@ -91,37 +81,23 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, profile?.technician_id])
 
-  useEffect(() => {
-    applyFilters()
-  }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
-
   const fetchCasesDirectly = async (technicianId: string) => {
     setLoading(true);
     setError(null);
     try {
       const selectQuery = 'id, clickup_task_id, title, status, priority, created_at, start_date, due_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon_kontaktperson, e_post_kontaktperson, adress, skadedjur, description, billing_status';
-      
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
-        supabase.from('business_cases').select(`${selectQuery}, org_nr`).eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
-        supabase.from('cases').select('id, clickup_task_id, title, status, priority, created_date, completed_date, assigned_technician_name').eq('assigned_technician_id', technicianId).order('created_date', { ascending: false })
+        supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId),
+        supabase.from('business_cases').select(`${selectQuery}, org_nr`).eq('primary_assignee_id', technicianId),
+        supabase.from('cases').select('id, clickup_task_id, title, status, priority, created_date, completed_date, assigned_technician_name').eq('assigned_technician_id', technicianId)
       ]);
       
-      if (privateResult.status === 'fulfilled' && privateResult.value.error) throw privateResult.value.error;
-      if (businessResult.status === 'fulfilled' && businessResult.value.error) throw businessResult.value.error;
-      if (contractResult.status === 'fulfilled' && contractResult.value.error) throw contractResult.value.error;
-
-      const privateCasesData = privateResult.status === 'fulfilled' ? privateResult.value.data || [] : [];
-      const businessCasesData = businessResult.status === 'fulfilled' ? businessResult.value.data || [] : [];
-      const contractCasesData = contractResult.status === 'fulfilled' ? contractResult.value.data || [] : [];
-
-      const allCases: TechnicianCase[] = [
-        ...privateCasesData.map((c: any) => ({ ...c, case_type: 'private' as const, case_number: `P-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
-        ...businessCasesData.map((c: any) => ({ ...c, case_type: 'business' as const, case_number: `B-${c.clickup_task_id}`, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
-        ...contractCasesData.map((c: any) => ({ ...c, case_type: 'contract' as const, case_number: `C-${c.clickup_task_id}`, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
+      const allCases = [
+        ...(privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'private' as const, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
+        ...(businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'business' as const, created_date: c.start_date || c.created_at, case_price: c.pris, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` })),
+        ...(contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []).map((c: any) => ({ ...c, case_type: 'contract' as const, clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}` }))
       ];
 
-      allCases.sort((a, b) => new Date(b.created_date || 0).getTime() - new Date(a.created_date || 0).getTime());
       setCases(allCases);
       setStats({
           total_cases: allCases.length,
@@ -131,46 +107,66 @@ export default function TechnicianCases() {
           total_commission: allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
       });
     } catch (error: any) {
-      console.error('💥 DETAILED ERROR:', error);
       setError(error.message || 'Ett oväntat fel uppstod');
     } finally {
       setLoading(false);
     }
   }
 
-  const applyFilters = () => {
-    let filtered = [...cases];
+  // ✅ LOGIK FÖR FILTRERING OCH SORTERING (useMemo för prestanda)
+  const filteredAndSortedCases = useMemo(() => {
+    let sortableItems = [...cases];
+
+    // Filtrering
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(c => Object.values(c).some(val => String(val).toLowerCase().includes(searchLower)));
+      sortableItems = sortableItems.filter(c => Object.values(c).some(val => String(val).toLowerCase().includes(searchLower)));
     }
     if (statusFilter !== 'all') {
       const filterLower = statusFilter.toLowerCase();
-      if (filterLower === 'återbesök') {
-        filtered = filtered.filter(c => c.status?.toLowerCase().startsWith('återbesök'));
-      } else {
-        filtered = filtered.filter(c => c.status?.toLowerCase() === filterLower);
-      }
+      sortableItems = sortableItems.filter(c => (filterLower === 'återbesök') ? c.status?.toLowerCase().startsWith('återbesök') : c.status?.toLowerCase() === filterLower);
     }
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(c => c.case_type === typeFilter);
+      sortableItems = sortableItems.filter(c => c.case_type === typeFilter);
     }
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'status') {
-        const statusA = statusOrder.findIndex(s => s.toLowerCase() === a.status?.toLowerCase());
-        const statusB = statusOrder.findIndex(s => s.toLowerCase() === b.status?.toLowerCase());
-        comparison = (statusA === -1 ? 99 : statusA) - (statusB === -1 ? 99 : statusB);
-      } else if (sortBy === 'date') {
-        comparison = new Date(a.created_date || 0).getTime() - new Date(b.created_date || 0).getTime();
-      } else if (sortBy === 'commission') {
-        comparison = (a.commission_amount || 0) - (b.commission_amount || 0);
-      }
-      return sortOrder === 'desc' ? -comparison : comparison;
-    });
-    setFilteredCases(filtered);
-  }
 
+    // Sortering
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        
+        let comparison = 0;
+        if (sortConfig.key === 'status') {
+          comparison = (statusOrder.indexOf(aValue) ?? 99) - (statusOrder.indexOf(bValue) ?? 99);
+        } else {
+          if (aValue < bValue) comparison = -1;
+          if (aValue > bValue) comparison = 1;
+        }
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+      });
+    }
+    return sortableItems;
+  }, [cases, searchTerm, statusFilter, typeFilter, sortConfig]);
+
+  // ✅ LOGIK FÖR PAGINERING
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * itemsPerPage;
+    const lastPageIndex = firstPageIndex + itemsPerPage;
+    return filteredAndSortedCases.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, itemsPerPage, filteredAndSortedCases]);
+
+  const requestSort = (key: keyof TechnicianCase) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
   const handleOpenEditModal = (caseToEdit: TechnicianCase) => { setSelectedCase(caseToEdit); setIsEditModalOpen(true); };
   const handleCloseEditModal = () => { setIsEditModalOpen(false); setSelectedCase(null); };
   const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => { setCases(currentCases => currentCases.map(c => (c.id === selectedCase?.id ? { ...c, ...updatedCase } : c))); };
@@ -182,7 +178,16 @@ export default function TechnicianCases() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="bg-slate-900/50 border-b border-slate-800"><div className="max-w-7xl mx-auto px-4 py-4"><div className="flex items-center gap-3"><div className="bg-blue-500/10 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-blue-500" /></div><div><h1 className="text-2xl font-bold text-white">Mina Ärenden</h1><p className="text-sm text-slate-400">Översikt över tilldelade ärenden - {technicianName}</p></div></div></div></header>
+      <header className="bg-slate-900/50 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/10 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-blue-500" /></div>
+              <div><h1 className="text-2xl font-bold text-white">Mina Ärenden</h1><p className="text-sm text-slate-400">Översikt över tilldelade ärenden - {technicianName}</p></div>
+            </div>
+            {/* ✅ TILLBAKA-KNAPP */}
+            <Button variant="secondary" onClick={() => navigate('/technician/dashboard')}><ArrowLeft className="w-4 h-4 mr-2"/>Tillbaka</Button>
+        </div>
+      </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -202,99 +207,59 @@ export default function TechnicianCases() {
                 <option value="återbesök">Återbesök (Alla)</option>
             </select>
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"><option value="all">Alla typer</option><option value="private">Privat</option><option value="business">Företag</option><option value="contract">Avtal</option></select>
-            <select value={`${sortBy}-${sortOrder}`} onChange={(e) => { const [f, o] = e.target.value.split('-'); setSortBy(f as any); setSortOrder(o as any); }} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"><option value="date-desc">Senaste</option><option value="date-asc">Äldsta</option><option value="status-asc">Status</option></select>
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredCases.length > 0 ? (
-              filteredCases.map(case_ => (
-                <Card key={case_.id} className="p-4 hover:bg-slate-800/50 transition-colors flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-white text-md pr-2 flex-1">{case_.title}</h3>
-                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-4">
-                        <span className={`inline-flex items-center gap-1.5 ${case_.case_type === 'private' ? 'text-blue-400' : case_.case_type === 'business' ? 'text-purple-400' : 'text-green-400'}`}><User className="w-3 h-3" />{case_.case_type === 'private' ? 'Privat' : case_.case_type === 'business' ? 'Företag' : 'Avtal'}</span>
-                        <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />{formatDate(case_.created_date)}</span>
-                    </div>
-                    
-                    <div className="space-y-3 text-sm border-t border-slate-700/50 pt-3">
-                        {/* ✅ UPPDATERAD KONTAKTRAD MED KLICKBARA IKONER */}
-                        <div className="flex justify-between items-center">
-                            <span className="font-medium text-slate-300 flex items-center gap-2"><User className="w-4 h-4 text-slate-500"/> {case_.kontaktperson || 'Kontakt saknas'}</span>
-                            <div className="flex items-center gap-4">
-                                {case_.telefon_kontaktperson && (
-                                    <a href={`tel:${case_.telefon_kontaktperson}`} title={case_.telefon_kontaktperson} className="text-slate-400 hover:text-white transition-colors">
-                                        <Phone className="w-4 h-4" />
-                                    </a>
-                                )}
-                                {case_.e_post_kontaktperson && (
-                                    <a href={`mailto:${case_.e_post_kontaktperson}`} title={case_.e_post_kontaktperson} className="text-slate-400 hover:text-white transition-colors">
-                                        <Mail className="w-4 h-4" />
-                                    </a>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="font-medium text-slate-300 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-500"/> Adress</span>
-                            <span className="text-slate-400 text-right">{formatAddress(case_.adress)}</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center border-y border-slate-700/50 py-3 my-3">
-                        <div><p className="text-xs text-slate-400 flex items-center justify-center gap-1"><PlayCircle className="w-3 h-3"/>Startdatum</p><p className="font-semibold text-white mt-1">{case_.start_date ? formatDate(case_.start_date) : <span className="text-slate-500">Ej satt</span>}</p></div>
-                        <div><p className="text-xs text-slate-400 flex items-center justify-center gap-1"><Flag className="w-3 h-3"/>Förfallodatum</p><p className="font-semibold text-white mt-1">{case_.due_date ? formatDate(case_.due_date) : <span className="text-slate-500">Ej satt</span>}</p></div>
-                        <div><p className="text-xs text-slate-400 flex items-center justify-center gap-1"><ThumbsUp className="w-3 h-3"/>Avslutad</p><p className="font-semibold mt-1">{case_.completed_date ? <span className="text-green-400">{formatDate(case_.completed_date)}</span> : <span className="text-slate-500">Pågående</span>}</p></div>
-                    </div>
-                    
-                    {(case_.case_price || (case_.commission_amount && case_.commission_amount > 0)) && (
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="font-medium text-slate-300 flex items-center gap-2"><DollarSign className="w-4 h-4 text-slate-500"/>Ekonomi</span>
-                            <div className="text-right">
-                                {case_.case_price && <p className="text-slate-400">Pris: <span className="font-semibold text-white">{formatCurrency(case_.case_price)}</span></p>}
-                                {case_.commission_amount && case_.commission_amount > 0 && <p className="text-slate-400">Provision: <span className="font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</span></p>}
-                            </div>
-                        </div>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between pt-3 mt-4 border-t border-slate-700">
-                    <div className="flex items-center gap-2 text-xs">
-                        {case_.billing_status && case_.billing_status !== 'skip' && (
-                            <>
-                                <span className="text-slate-400">Fakturastatus:</span>
-                                <span className={`px-2 py-1 rounded ${
-                                    case_.billing_status === 'paid' ? 'bg-green-500/20 text-green-400'
-                                    : case_.billing_status === 'sent' ? 'bg-blue-500/20 text-blue-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                    {case_.billing_status === 'paid' ? 'Betald' : case_.billing_status === 'sent' ? 'Skickad' : 'Väntande'}
-                                </span>
-                            </>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => handleOpenEditModal(case_)} className="flex items-center gap-2"><Edit className="w-4 h-4" /> Öppna ärende</Button>
-                        <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url, '_blank')} className="flex items-center gap-2"><ExternalLink className="w-4 h-4" /> Visa i ClickUp</Button>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <div className="col-span-1 lg:col-span-2"><Card className="p-12"><div className="text-center"><ClipboardList className="w-12 h-12 text-slate-400 mx-auto mb-4" /><h3 className="text-lg font-semibold text-white mb-2">Inga ärenden matchar filtret</h3><p className="text-slate-400">Prova att ändra dina filter eller sökord.</p></div></Card></div>
-            )}
-        </div>
-        
-        {filteredCases.length > 0 && (<p className="mt-6 text-center text-slate-400 text-sm">Visar {filteredCases.length} av {cases.length} ärenden.</p>)}
-
-        <div className="mt-10 max-w-2xl mx-auto p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
-            <h4 className="text-md font-semibold text-slate-200 mb-2">Information om fakturastatus</h4>
-            <dl className="text-sm text-slate-400 space-y-2">
-                <div><dt className="font-medium text-slate-300">Väntande (Pending)</dt><dd>Fakturan är skapad i systemet men har ännu inte skickats till kunden.</dd></div>
-                <div><dt className="font-medium text-slate-300">Skickad (Sent)</dt><dd>Fakturan är skickad till kunden och vi inväntar betalning.</dd></div>
-                <div><dt className="font-medium text-slate-300">Betald (Paid)</dt><dd>Kunden har betalat fakturan och ärendet är ekonomiskt avslutat.</dd></div>
-            </dl>
+        {/* ✅ NY TABELL-VY */}
+        <div className="bg-slate-900/50 rounded-lg overflow-hidden border border-slate-800">
+            <table className="w-full text-sm text-left">
+                <thead className="bg-slate-800/50 text-xs text-slate-400 uppercase">
+                    <tr>
+                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('title')}>Ärende</th>
+                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('status')}>
+                            <div className="flex items-center">Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                        </th>
+                        <th scope="col" className="px-6 py-3">Kund</th>
+                        <th scope="col" className="px-6 py-3 cursor-pointer" onClick={() => requestSort('due_date')}>
+                            <div className="flex items-center">Förfallodatum {sortConfig.key === 'due_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-right">Åtgärder</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {currentTableData.map(case_ => (
+                        <tr key={case_.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                            <td className="px-6 py-4 font-medium text-white">{case_.title}</td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300">{case_.kontaktperson || 'Okänd'}</td>
+                            <td className="px-6 py-4 text-slate-300">{case_.due_date ? formatDate(case_.due_date) : 'Inget'}</td>
+                            <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                    <Button size="sm" onClick={() => handleOpenEditModal(case_)}><Edit className="w-4 h-4 mr-2" />Öppna</Button>
+                                    <Button size="sm" variant="outline" onClick={() => window.open(case_.clickup_url, '_blank')}><ExternalLink className="w-4 h-4" /></Button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {/* ✅ PAGINERINGS-KONTROLLER */}
+            <div className="flex items-center justify-between p-4 text-sm text-slate-400">
+                <div className="flex items-center gap-2">
+                    <span>Visa</span>
+                    <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white">
+                        {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+                    </select>
+                    <span>per sida</span>
+                </div>
+                <span>Visar {Math.min(filteredAndSortedCases.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(currentPage * itemsPerPage, filteredAndSortedCases.length)} av {filteredAndSortedCases.length} ärenden</span>
+                <div className="flex gap-2">
+                    <Button onClick={() => setCurrentPage(prev => prev - 1)} disabled={currentPage === 1}>Föregående</Button>
+                    <Button onClick={() => setCurrentPage(prev => prev + 1)} disabled={currentPage * itemsPerPage >= filteredAndSortedCases.length}>Nästa</Button>
+                </div>
+            </div>
         </div>
       </main>
 
