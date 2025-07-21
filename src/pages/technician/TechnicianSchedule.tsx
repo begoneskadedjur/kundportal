@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - KOMPLETT OCH KORREKT VERSION
+// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED NY DESIGN & BUGFIX
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -22,13 +22,13 @@ interface ScheduledCase {
   skadedjur?: string; org_nr?: string; adress?: any;
 }
 
-const getStatusColor = (status: string) => {
+const getStatusColorClasses = (status: string) => {
   const lowerStatus = status?.toLowerCase() || '';
-  if (lowerStatus.includes('avslutat')) return 'bg-green-500/20 text-green-400 border-green-500/50';
-  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50';
-  if (lowerStatus.includes('bokad')) return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
-  if (lowerStatus.includes('öppen')) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50';
-  return 'bg-slate-600/20 text-slate-400 border-slate-500/50';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-500/10 text-green-400 border-green-500/50';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/50';
+  if (lowerStatus.includes('bokad')) return 'bg-blue-500/10 text-blue-400 border-blue-500/50';
+  if (lowerStatus.includes('öppen')) return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50';
+  return 'bg-slate-700/20 text-slate-400 border-slate-600/50';
 };
 
 const formatAddress = (address: any): string => {
@@ -63,14 +63,15 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
         supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
-        supabase.from('cases').select('id, title, created_date, description, status, case_type, adress').eq('assigned_technician_id', technicianId)
+        // ✅ KORRIGERAD: 'adress' heter 'address_formatted' i databasen. Vi ger den ett alias 'adress' för konsekvens.
+        supabase.from('cases').select('id, title, created_date, description, status, case_type, address_formatted as adress').eq('assigned_technician_id', technicianId)
       ]);
       
       const allCases: Partial<ScheduledCase>[] = [];
       if (privateResult.status === 'fulfilled' && privateResult.value.data) { allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, start_date: c.start_date || c.created_at, case_price: c.pris, case_type: 'private' }))); }
       if (businessResult.status === 'fulfilled' && businessResult.value.data) { allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, start_date: c.start_date || c.created_at, case_price: c.pris, case_type: 'business' }))); }
       if (contractResult.status === 'fulfilled' && contractResult.value.data) { allCases.push(...contractResult.value.data.map((c: any) => ({ ...c, start_date: c.created_date, case_type: c.case_type || 'contract' }))); }
-
+      
       const casesWithDates = allCases.filter(c => c.start_date);
       setCases(casesWithDates as ScheduledCase[])
     } catch (err: any) {
@@ -86,8 +87,7 @@ export default function TechnicianSchedule() {
       title: case_.title,
       start: case_.start_date,
       extendedProps: { ...case_ },
-      backgroundColor: getStatusColor(case_.status).split(' ')[0],
-      borderColor: getStatusColor(case_.status).split(' ')[2]
+      className: getStatusColorClasses(case_.status).split(' ')[2] // Använd border-färg för status
     }));
   }, [cases]);
   
@@ -97,35 +97,31 @@ export default function TechnicianSchedule() {
 
     if (isMonthView) {
       return (
-        <div className="p-1 text-xs overflow-hidden h-full">
-          <b className="text-white">{eventInfo.timeText}</b>
-          <p className="whitespace-nowrap overflow-hidden text-ellipsis text-white">{eventInfo.event.title}</p>
-          <div className="flex items-center gap-1 mt-1 opacity-80 text-slate-200">
-            {case_type === 'private' ? <User className="w-3 h-3"/> : <Building2 className="w-3 h-3"/>}
-            <span>{kontaktperson || 'Okänd'}</span>
-          </div>
+        <div className="p-1 text-xs overflow-hidden h-full fc-event-main-monthly">
+          <b className="fc-event-time">{eventInfo.timeText}</b>
+          <span className="fc-event-title">{eventInfo.event.title}</span>
         </div>
       )
     }
 
     return (
-      <div className="p-2 text-xs overflow-hidden h-full flex flex-col justify-between">
+      <div className="p-2 text-xs overflow-hidden h-full flex flex-col justify-between fc-event-main-detailed">
         <div>
           <div className="flex justify-between items-center">
             <b className="text-white text-sm">{eventInfo.timeText}</b>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>{status}</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColorClasses(status)}`}>{status}</span>
           </div>
-          <p className="font-semibold text-md whitespace-nowrap overflow-hidden text-ellipsis text-white my-1">{eventInfo.event.title}</p>
-          <p className="flex items-center gap-1.5 mt-1 text-slate-300">
-            {case_type === 'private' ? <User className="w-3 h-3"/> : <Building2 className="w-3 h-3"/>}
+          <p className="font-semibold text-md text-white my-1">{eventInfo.event.title}</p>
+          <p className="flex items-center gap-1.5 mt-2 text-slate-300">
+            {case_type === 'private' ? <User className="w-4 h-4"/> : <Building2 className="w-4 h-4"/>}
             <span>{kontaktperson || 'Okänd'}</span>
           </p>
           <p className="flex items-center gap-1.5 mt-1 text-slate-300">
-            <MapPin className="w-3 h-3"/>
+            <MapPin className="w-4 h-4"/>
             <span>{formatAddress(adress) || 'Adress saknas'}</span>
           </p>
         </div>
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-4 mt-3">
             {telefon_kontaktperson && (
                 <a href={`tel:${telefon_kontaktperson}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors" title="Ring kund">
                     <Phone className="w-4 h-4" /> Ring
@@ -184,7 +180,7 @@ export default function TechnicianSchedule() {
             slotMinTime="07:00:00"
             slotMaxTime="19:00:00"
             height="auto"
-            eventMinHeight={90} 
+            eventMinHeight={75} 
           />
         </div>
       </main>

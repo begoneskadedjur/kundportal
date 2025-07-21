@@ -1,56 +1,80 @@
-/* 📁 src/styles/FullCalendar.css */
+/* 📁 src/styles/FullCalendar.css - UPPDATERAD FÖR NY DESIGN */
 
 /* Generell container och tema */
 .fc {
   --fc-border-color: #334155; /* slate-700 */
-  --fc-today-bg-color: rgba(71, 85, 105, 0.3); /* slate-600 med transparens */
-  --fc-bg-event-color: #3b82f6; /* blue-500 för default event */
-  --fc-event-border-color: #3b82f6;
-  --fc-event-text-color: #ffffff;
+  --fc-today-bg-color: rgba(71, 85, 105, 0.3);
+  --fc-event-text-color: #f1f5f9; /* slate-100 */
   color: #cbd5e1; /* slate-300 för generell text */
 }
-
+    
 /* Toolbar (header med knappar) */
 .fc .fc-toolbar.fc-header-toolbar {
   margin-bottom: 1.5em;
   color: #f1f5f9; /* slate-100 */
 }
-
+    
 .fc .fc-button {
   background-color: #334155; /* slate-700 */
   border: 1px solid #475569; /* slate-600 */
   color: #f1f5f9; /* slate-100 */
+  text-transform: capitalize;
 }
 
 .fc .fc-button:hover {
-    background-color: #475569; /* slate-600 */
+  background-color: #475569; /* slate-600 */
 }
 
 .fc .fc-button-primary:not(:disabled).fc-button-active,
 .fc .fc-button-primary:not(:disabled):active {
-    background-color: #4f46e5; /* indigo-600 */
-    border-color: #4f46e5;
+  background-color: #4f46e5; /* indigo-600 */
+  border-color: #4f46e5;
 }
-
+    
 /* Tabell-utseende (dagar, rutor) */
 .fc .fc-daygrid-day.fc-day-today {
-    background-color: rgba(51, 65, 85, 0.5);
+  background-color: rgba(51, 65, 85, 0.5);
 }
-
+    
 .fc .fc-col-header-cell {
-    background-color: #1e293b; /* slate-800 */
+  background-color: #1e293b; /* slate-800 */
+  border-bottom: 1px solid #334155; /* slate-700 */
 }
 
 .fc-theme-standard .fc-list-day-cushion {
-    background-color: #1e293b; /* slate-800 */
+  background-color: #1e293b; /* slate-800 */
 }
 
 /* Event-utseende */
 .fc-event {
-    cursor: pointer;
-    transition: opacity 0.2s;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  border-radius: 6px;
+  padding: 0 !important;
+  background-color: var(--fc-event-bg-color, #1e293b) !important;
+  border-width: 1px !important;
+  border-left-width: 4px !important; /* För färg-accent */
 }
 
 .fc-event:hover {
-    opacity: 0.8;
+  opacity: 0.85;
+}
+
+.fc-v-event .fc-event-main {
+  padding: 0;
+  height: 100%;
+}
+
+.fc-daygrid-event .fc-event-main {
+  padding: 0;
+}
+
+.fc-event-time {
+  font-weight: 600;
+}
+
+.fc-event-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
