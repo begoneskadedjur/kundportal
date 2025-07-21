@@ -1,11 +1,12 @@
-// 📁 src/components/technicians/EditCaseModal.tsx
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - KORRIGERAD SÖKVÄG
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+// ✅ KORRIGERAD SÖKVÄG FÖR DENNA FIL
+import { supabase } from '../../../lib/supabase' 
 import { AlertCircle, CheckCircle, FileText, User, DollarSign } from 'lucide-react'
-import Button from '../ui/Button'
-import Input from '../ui/Input'
-import Modal from '../ui/Modal'
+import Button from '../../ui/Button'
+import Input from '../../ui/Input'
+import Modal from '../../ui/Modal'
 
 // Återanvänd samma interface från TechnicianCases-sidan
 interface TechnicianCase {
@@ -28,7 +29,7 @@ interface TechnicianCase {
 interface EditCaseModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (updatedCase: TechnicianCase) => void
+  onSuccess: (updatedCase: Partial<TechnicianCase>) => void
   caseData: TechnicianCase | null
 }
 
@@ -44,10 +45,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // Detta state håller all formulärdata
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
 
-  // Denna useEffect-hook fyller formuläret med data när modalen öppnas
   useEffect(() => {
     if (caseData) {
       setFormData({
@@ -63,7 +62,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         org_nr: caseData.org_nr || '',
       })
     }
-  }, [caseData]) // Körs varje gång caseData ändras
+  }, [caseData])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,20 +71,21 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     setLoading(true)
     setError(null)
 
-    // Bestäm tabellnamn baserat på ärendetyp
     const tableName = 
         caseData.case_type === 'private' ? 'private_cases' 
       : caseData.case_type === 'business' ? 'business_cases' 
       : 'cases';
 
+    const updatedFields: { [key: string]: any } = { ...formData };
+    if (updatedFields.case_price !== undefined) {
+        updatedFields.pris = updatedFields.case_price;
+        delete updatedFields.case_price;
+    }
+
     try {
-      // Använd Supabase .update() för att spara ändringarna
       const { error: updateError } = await supabase
         .from(tableName)
-        .update({
-            ...formData,
-            pris: formData.case_price // Mappa om till databasens kolumnnamn
-        })
+        .update(updatedFields)
         .eq('id', caseData.id)
         .single()
 
@@ -95,10 +95,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
       setSubmitted(true)
       
-      // Stäng modal och kör onSuccess-callback efter en kort fördröjning
       setTimeout(() => {
         setSubmitted(false)
-        onSuccess({ ...caseData, ...formData })
+        onSuccess(formData)
         onClose()
       }, 1500)
 
@@ -112,7 +111,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    // Hantera nummer-fält korrekt
     const finalValue = type === 'number' ? (value === '' ? null : parseFloat(value)) : value;
     
     setFormData(prev => ({
@@ -121,10 +119,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }))
   }
 
-  // Om modalen inte har någon data, rendera ingenting
   if (!caseData) return null;
 
-  // Success-vyn
   if (submitted) {
     return (
       <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true}>
@@ -166,7 +162,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           )}
 
-          {/* Ärendeinformation */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-400" />Ärendeinformation</h3>
             <Input label="Titel *" name="title" value={formData.title || ''} onChange={handleChange} required />
@@ -178,14 +173,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
                 <select name="status" value={formData.status || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white">
-                  {statusOrder.map(s => <option key={s} value={s}>{s}</option>)}
+                  {statusOrder.map(s => <option key={s} value={s.charAt(0).toUpperCase() + s.slice(1)}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                 </select>
               </div>
               <Input label="Skadedjur" name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} />
             </div>
           </div>
 
-          {/* Kontaktinformation */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -198,12 +192,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           </div>
 
-          {/* Ekonomi */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Ekonomi</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Ärendepris (Pris)" name="case_price" type="number" value={formData.case_price || ''} onChange={handleChange} />
-              <Input label="Provision" name="commission_amount" type="number" value={formData.commission_amount || ''} onChange={handleChange} />
+              <Input label="Ärendepris (Pris)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
+              <Input label="Provision" name="commission_amount" type="number" value={formData.commission_amount === null ? '' : formData.commission_amount} onChange={handleChange} />
             </div>
           </div>
 
