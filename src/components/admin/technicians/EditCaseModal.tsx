@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - KOMPLETT VERSION MED ALLA FUNKTIONER
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - SLUTGILTIG VERSION MED KORREKT TIDRAPPORTERING
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
@@ -67,14 +67,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     if (!tableName || !currentCase) return;
     setLoading(true);
     setError(null);
-
     try {
       const updateData: { [key: string]: any } = {
-        title: formData.title,
-        status: formData.status,
-        description: formData.description,
+        title: formData.title, status: formData.status, description: formData.description,
       };
-
       if (tableName === 'private_cases' || tableName === 'business_cases') {
         updateData.kontaktperson = formData.kontaktperson;
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
@@ -83,18 +79,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.pris = formData.case_price;
         updateData.material_cost = formData.material_cost;
       }
-
-      if (tableName === 'private_cases') {
-        updateData.personnummer = formData.personnummer;
-      } else if (tableName === 'business_cases') {
-        updateData.org_nr = formData.org_nr;
-      } else if (tableName === 'cases') {
-        updateData.price = formData.case_price;
-      }
+      if (tableName === 'private_cases') { updateData.personnummer = formData.personnummer; } 
+      else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
+      else if (tableName === 'cases') { updateData.price = formData.case_price; }
 
       const { error: updateError } = await supabase.from(tableName).update(updateData).eq('id', currentCase.id)
       if (updateError) throw updateError;
-      
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
@@ -102,7 +92,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         onClose();
       }, 1500);
     } catch (error: any) {
-      console.error('Update Error:', error);
       setError(`Fel vid uppdatering: ${error.message}`);
     } finally {
       setLoading(false);
@@ -111,7 +100,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const handleTimeTracking = async (action: 'start' | 'pause' | 'reset') => {
     const tableName = getTableName();
-    if (!tableName || !currentCase) return;
+    // ✅ KONTROLL: Avbryt om det är ett avtalsärende
+    if (!tableName || !currentCase || tableName === 'cases') {
+      setError("Tidrapportering är inte tillgängligt för avtalsärenden.");
+      return;
+    }
     setLoading(true);
     
     let updatePayload = {};
@@ -145,24 +138,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   }
 
   if (!currentCase) return null;
+  if (submitted) return <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true}><div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /><h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3></div></Modal>
 
-  if (submitted) {
-    return (
-        <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true}>
-            <div className="p-8 text-center">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3>
-            </div>
-        </Modal>
-    );
-  }
-
-  const footer = ( 
-    <div className="flex gap-3 p-6 bg-slate-800/50">
-      <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button>
-      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button>
-    </div> 
-  );
+  const footer = ( <div className="flex gap-3 p-6 bg-slate-800/50"><Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="flex-1">Avbryt</Button><Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">Spara ändringar</Button></div> )
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading}>
@@ -209,7 +187,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
               {currentCase.case_type !== 'contract' && <Input label="Materialkostnad" name="material_cost" type="number" value={formData.material_cost === null ? '' : formData.material_cost} onChange={handleChange} />}
             </div>
-            {currentCase.case_type !== 'contract' && (
+            {/* ✅ KONTROLL: Visa bara tidrapportering för privat/företag */}
+            {(currentCase.case_type === 'private' || currentCase.case_type === 'business') && (
               <div className="p-4 bg-slate-800/50 rounded-lg">
                   <label className="block text-sm font-medium text-slate-300 mb-2">Arbetstid</label>
                   <div className="flex items-center justify-between">
