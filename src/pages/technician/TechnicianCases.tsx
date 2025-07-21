@@ -1,12 +1,12 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FÖRFINAD LISTVY MED MER DATA OCH INTERAKTION
+// 📁 src/pages/technician/TechnicianCases.tsx - SLUTGILTIG VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { 
   ClipboardList, Search, ExternalLink, ArrowLeft,
-  Clock, CheckCircle, AlertCircle, User, Building2, Calendar,
-  MapPin, Phone, Mail, DollarSign, FileText, Edit, ChevronUp, ChevronDown
+  Clock, CheckCircle, AlertCircle, User, Building2,
+  MapPin, Phone, Mail, DollarSign, Edit, ChevronUp, ChevronDown
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -66,8 +66,8 @@ export default function TechnicianCases() {
   const [statusFilter, setStatusFilter] = useState<string>('Öppen')
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
-  // ✅ Standardsortering ändrad till start_date
-  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'start_date', direction: 'asc' });
+  // ✅ Standardsortering ändrad till senaste startdatum först (desc)
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'start_date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
@@ -197,7 +197,6 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* ✅ FÖRFINAD TABELL-VY */}
         <div className="bg-slate-900/50 rounded-lg overflow-hidden border border-slate-800">
             <table className="w-full text-sm text-left">
                 <thead className="bg-slate-800/50 text-xs text-slate-400 uppercase">
@@ -219,14 +218,15 @@ export default function TechnicianCases() {
                         <tr key={case_.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                             <td className="px-4 py-4">
                                 <div className="font-medium text-white">{case_.title}</div>
-                                <div className="text-xs text-slate-400">{formatAddress(case_.adress)}</div>
+                                <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1"><MapPin className="w-3 h-3" /> {formatAddress(case_.adress)}</div>
                             </td>
                             <td className="px-4 py-4">
                                 <div className="flex items-center gap-3">
                                     <span className="text-slate-300">{case_.kontaktperson || 'Okänd'}</span>
                                     <div className="flex items-center gap-3">
-                                      {case_.telefon_kontaktperson && <a href={`tel:${case_.telefon_kontaktperson}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Phone className="w-4 h-4"/></a>}
-                                      {case_.e_post_kontaktperson && <a href={`mailto:${case_.e_post_kontaktperson}`} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Mail className="w-4 h-4"/></a>}
+                                      {/* ✅ HOVER-TOOLTIP TILLAGD */}
+                                      {case_.telefon_kontaktperson && <a href={`tel:${case_.telefon_kontaktperson}`} title={case_.telefon_kontaktperson} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Phone className="w-4 h-4"/></a>}
+                                      {case_.e_post_kontaktperson && <a href={`mailto:${case_.e_post_kontaktperson}`} title={case_.e_post_kontaktperson} onClick={e => e.stopPropagation()} className="text-slate-400 hover:text-white"><Mail className="w-4 h-4"/></a>}
                                     </div>
                                 </div>
                             </td>
