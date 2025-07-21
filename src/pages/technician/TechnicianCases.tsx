@@ -98,39 +98,53 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // 🔥 FIX: Hämta rätt tekniker-ID från profile istället för technician
+  // 🔥 FIX: Hämta rätt tekniker-ID från profile direkt
   const getTechnicianId = () => {
-    console.log('🔍 GETTING TECHNICIAN ID:', {
+    console.log('🔍 GETTING TECHNIKER ID:', {
       profileTechnicianId: profile?.technician_id,
       technicianId: technician?.id,
       userUID: user?.id,
-      profileRole: profile?.role
+      profileRole: profile?.role,
+      fullProfile: profile,
+      fullTechnician: technician
     })
     
-    // Använd profile.technician_id först, sedan fallback till technician.id
+    // ✅ ANVÄND ALLTID profile.technician_id FÖRST - det är den säkra källan
     return profile?.technician_id || technician?.id
   }
 
-  // Säkerhetskontroll
+  // 🔥 SÄKERHETSKONTROLL - vänta tills profile laddas
   useEffect(() => {
-    if (!isTechnician) {
-      console.log('❌ Inte en tekniker, omdirigerar från cases...', { 
+    if (!isTechnician || !profile?.technician_id) {
+      console.log('❌ Inte en tekniker eller tekniker-ID saknas:', { 
         isTechnician, 
         profileRole: profile?.role,
-        technicianId: getTechnicianId()
+        technicianId: profile?.technician_id,
+        loading: loading
       })
-      navigate('/login', { replace: true })
+      
+      // Om vi inte är en tekniker, omdirigera
+      if (profile && profile.role !== 'technician') {
+        navigate('/login', { replace: true })
+      }
       return
     }
   }, [isTechnician, profile, navigate])
 
-  // 🔥 ANVÄND SUPABASE DIREKT ISTÄLLET FÖR API
+  // 🔥 KÖRT FETCHCASES NÄR VI HAR RÄTT DATA
   useEffect(() => {
-    const technicianId = getTechnicianId()
-    if (isTechnician && technicianId) {
-      fetchCasesDirectly(technicianId)
+    // Vänta tills vi har profile.technician_id
+    if (isTechnician && profile?.technician_id) {
+      console.log('🚀 Starting fetch with technician ID:', profile.technician_id)
+      fetchCasesDirectly(profile.technician_id)
+    } else {
+      console.log('⏳ Waiting for technician data...', {
+        isTechnician,
+        profileTechnicianId: profile?.technician_id,
+        profileLoaded: !!profile
+      })
     }
-  }, [isTechnician, profile?.technician_id, technician?.id])
+  }, [isTechnician, profile?.technician_id]) // Endast lyssna på profile.technician_id
 
   useEffect(() => {
     applyFilters()
