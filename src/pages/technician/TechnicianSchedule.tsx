@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - UPPDATERAD MED STYLING OCH FUNKTIONALITET
+// 📁 src/pages/technician/TechnicianSchedule.tsx - KORRIGERAD MED RÄTTA SELECT-FRÅGOR
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -13,8 +13,6 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { ArrowLeft, User, Building2, Calendar } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
-
-// ✅ Importera den nya CSS-filen för att styla kalendern
 import '../../styles/FullCalendar.css'
 
 interface ScheduledCase {
@@ -41,28 +39,37 @@ export default function TechnicianSchedule() {
     }
   }, [isTechnician, profile?.technician_id])
 
+  // ✅ KORRIGERAD FUNKTION MED SEPARATA QUERIES
   const fetchScheduledCases = async (technicianId: string) => {
     setLoading(true)
     setError(null)
     try {
-      const selectQuery = 'id, title, case_type, kontaktperson, start_date, description, status, pris, telefon_kontaktperson, e_post_kontaktperson, skadedjur, org_nr'
+      const commonFields = 'id, title, kontaktperson, start_date, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
       
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        supabase.from('business_cases').select(selectQuery).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
+        // Privat-ärenden har inte org_nr men har case_type i sig
+        supabase.from('private_cases').select(`${commonFields}, pris, case_type`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
+        // Företags-ärenden har org_nr och pris
+        supabase.from('business_cases').select(`${commonFields}, pris, org_nr, case_type`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
+        // Avtals-ärenden har en enklare struktur
         supabase.from('cases').select('id, title, case_type, kontaktperson, created_date as start_date, description, status').eq('assigned_technician_id', technicianId).not('created_date', 'is', null)
       ]);
 
-      const allCases = [
-        ...(privateResult.status === 'fulfilled' ? privateResult.value.data?.map(c => ({...c, case_price: (c as any).pris})) || [] : []),
-        ...(businessResult.status === 'fulfilled' ? businessResult.value.data?.map(c => ({...c, case_price: (c as any).pris})) || [] : []),
-        ...(contractResult.status === 'fulfilled' ? contractResult.value.data || [] : [])
-      ];
-      
-      // ✅ FELSÖKNING: Logga datan som hämtats
+      const allCases: ScheduledCase[] = [];
+
+      if (privateResult.status === 'fulfilled' && privateResult.value.data) {
+        allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, case_price: c.pris })));
+      }
+      if (businessResult.status === 'fulfilled' && businessResult.value.data) {
+        allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, case_price: c.pris })));
+      }
+      if (contractResult.status === 'fulfilled' && contractResult.value.data) {
+        allCases.push(...contractResult.value.data);
+      }
+
       console.log('Hämtade ärenden för kalender:', allCases);
-      
       setCases(allCases as ScheduledCase[])
+
     } catch (err: any) {
       setError(err.message || 'Kunde inte hämta schemalagda ärenden')
     } finally {
@@ -76,8 +83,8 @@ export default function TechnicianSchedule() {
       title: case_.title,
       start: case_.start_date,
       extendedProps: { ...case_ },
-      backgroundColor: case_.case_type === 'private' ? '#3b82f6' : '#8b5cf6',
-      borderColor: case_.case_type === 'private' ? '#3b82f6' : '#8b5cf6',
+      backgroundColor: case_.case_type === 'private' ? '#3b82f6' : case_.case_type === 'business' ? '#8b5cf6' : '#10b981',
+      borderColor: case_.case_type === 'private' ? '#3b82f6' : case_.case_type === 'business' ? '#8b5cf6' : '#10b981',
     }));
   }, [cases]);
   
@@ -88,7 +95,7 @@ export default function TechnicianSchedule() {
         <b className="text-white">{eventInfo.timeText}</b>
         <p className="whitespace-nowrap overflow-hidden text-ellipsis text-white">{eventInfo.event.title}</p>
         <div className="flex items-center gap-1 mt-1 opacity-80 text-slate-200">
-          {case_type === 'private' ? <User className="w-3 h-3"/> : <Building2 className="w-3 h-3"/>}
+          {case_type === 'private' ? <User className="w-3 h-3"/> : case_type === 'business' ? <Building2 className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
           <span>{kontaktperson || 'Okänd'}</span>
         </div>
       </div>
@@ -131,7 +138,7 @@ export default function TechnicianSchedule() {
             }}
             events={calendarEvents}
             eventContent={renderEventContent}
-            eventClick={handleEventClick} // ✅ Öppna modal vid klick
+            eventClick={handleEventClick}
             locale={svLocale}
             buttonText={{ today: 'idag', month: 'månad', week: 'vecka', day: 'dag', list: 'lista' }}
             allDaySlot={false}
