@@ -177,11 +177,7 @@ export default function TechnicianCases() {
         // Private cases - ALLA STATUS
         supabase
           .from('private_cases')
-          .select(`
-            id, clickup_task_id, title, status, priority, created_at, start_date, completed_date,
-            commission_amount, pris, primary_assignee_name,
-            kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
-          `)
+          .select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status')
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -189,11 +185,7 @@ export default function TechnicianCases() {
         // Business cases - ALLA STATUS
         supabase
           .from('business_cases')
-          .select(`
-            id, clickup_task_id, title, status, priority, created_at, start_date, completed_date,
-            commission_amount, pris, primary_assignee_name,
-            kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
-          `)
+          .select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status')
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -201,10 +193,7 @@ export default function TechnicianCases() {
         // Contract cases - använder assigned_technician_id
         supabase
           .from('cases')
-          .select(`
-            id, clickup_task_id, title, status, priority, created_date, completed_date,
-            price, assigned_technician_name, billing_status
-          `)
+          .select('id, clickup_task_id, title, status, priority, created_date, completed_date, price, assigned_technician_name, billing_status')
           .eq('assigned_technician_id', technicianId)
           .order('created_date', { ascending: false })
           .limit(100)
