@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED FALLBACK-DATUM
+// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG OCH FULLT FUNGERANDE VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -39,47 +39,54 @@ export default function TechnicianSchedule() {
     }
   }, [isTechnician, profile?.technician_id])
 
-  // ✅ UPPDATERAD FUNKTION MED FALLBACK-LOGIK
   const fetchScheduledCases = async (technicianId: string) => {
     setLoading(true)
     setError(null)
     try {
-      // Hämta created_at för att använda som fallback
       const commonFields = 'id, title, kontaktperson, start_date, created_at, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
       
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
         supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
-        supabase.from('cases').select('id, title, kontaktperson, created_date, description, status, case_type').eq('assigned_technician_id', technicianId)
+        // ✅ KORRIGERAD: 'kontaktperson' är borttagen härifrån eftersom den inte finns i 'cases'-tabellen.
+        supabase.from('cases').select('id, title, created_date, description, status, case_type').eq('assigned_technician_id', technicianId)
       ]);
       
       const allCases: Partial<ScheduledCase>[] = [];
 
+      // Hantera resultat och kasta fel om något misslyckas, för tydligare felsökning.
       if (privateResult.status === 'fulfilled' && privateResult.value.data) {
         allCases.push(...privateResult.value.data.map((c: any) => ({ 
           ...c, 
-          start_date: c.start_date || c.created_at, // Använd created_at om start_date är null
+          start_date: c.start_date || c.created_at,
           case_price: c.pris, 
           case_type: 'private' 
         })));
+      } else if (privateResult.status === 'rejected' || (privateResult.status === 'fulfilled' && privateResult.value.error)) {
+        throw new Error(`Kunde inte hämta privatärenden: ${privateResult.reason?.message || privateResult.value.error.message}`);
       }
+
       if (businessResult.status === 'fulfilled' && businessResult.value.data) {
         allCases.push(...businessResult.value.data.map((c: any) => ({ 
           ...c, 
-          start_date: c.start_date || c.created_at, // Använd created_at om start_date är null
+          start_date: c.start_date || c.created_at,
           case_price: c.pris, 
           case_type: 'business' 
         })));
+      } else if (businessResult.status === 'rejected' || (businessResult.status === 'fulfilled' && businessResult.value.error)) {
+        throw new Error(`Kunde inte hämta företagsärenden: ${businessResult.reason?.message || businessResult.value.error.message}`);
       }
+
       if (contractResult.status === 'fulfilled' && contractResult.value.data) {
         allCases.push(...contractResult.value.data.map((c: any) => ({ 
           ...c, 
-          start_date: c.created_date, // Denna tabell använder created_date som start
+          start_date: c.created_date,
           case_type: c.case_type || 'contract' 
         })));
+      } else if (contractResult.status === 'rejected' || (contractResult.status === 'fulfilled' && contractResult.value.error)) {
+        throw new Error(`Kunde inte hämta avtalsärenden: ${contractResult.reason?.message || contractResult.value.error.message}`);
       }
       
-      // Säkerställ att vi bara försöker rendera ärenden som faktiskt har ett datum
       const casesWithDates = allCases.filter(c => c.start_date);
       
       console.log(`Hämtade ${allCases.length} ärenden, ${casesWithDates.length} har ett datum och kommer visas.`, casesWithDates);
