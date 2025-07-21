@@ -1,5 +1,4 @@
 // src/lib/supabase.ts - FÖRBÄTTRAD VERSION med auth optimering
-
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database'
 
@@ -55,3 +54,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     },
   },
 })
+
+// 🔧 GÖR SUPABASE TILLGÄNGLIGT GLOBALT FÖR DEBUGGING
+if (typeof window !== 'undefined') {
+  (window as any).supabase = supabase
+  console.log('🔧 Supabase client made available globally for debugging')
+}
