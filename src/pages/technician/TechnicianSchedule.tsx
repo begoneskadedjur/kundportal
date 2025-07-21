@@ -1,27 +1,27 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx
+// 📁 src/pages/technician/TechnicianSchedule.tsx - UPPDATERAD MED STYLING OCH FUNKTIONALITET
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
-import svLocale from '@fullcalendar/core/locales/sv'; // Importera svenska språket
-
+import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { ArrowLeft, User, Building2, Calendar } from 'lucide-react'
 import Button from '../../components/ui/Button'
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 
-// Samma interface som tidigare men med start_date som potentiell timestamp
+// ✅ Importera den nya CSS-filen för att styla kalendern
+import '../../styles/FullCalendar.css'
+
 interface ScheduledCase {
-  id: string;
-  title: string;
-  case_type: 'private' | 'business' | 'contract';
-  kontaktperson?: string;
-  start_date: string; // Detta kommer nu vara en fullständig timestamp-sträng
+  id: string; title: string; case_type: 'private' | 'business' | 'contract';
+  kontaktperson?: string; start_date: string; description?: string; status: string;
+  case_price?: number; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
+  skadedjur?: string; org_nr?: string;
 }
 
 export default function TechnicianSchedule() {
@@ -31,6 +31,9 @@ export default function TechnicianSchedule() {
   const [loading, setLoading] = useState(true)
   const [cases, setCases] = useState<ScheduledCase[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedCase, setSelectedCase] = useState<ScheduledCase | null>(null)
 
   useEffect(() => {
     if (isTechnician && profile?.technician_id) {
@@ -42,19 +45,22 @@ export default function TechnicianSchedule() {
     setLoading(true)
     setError(null)
     try {
-      const selectQuery = 'id, title, case_type, kontaktperson, start_date'
+      const selectQuery = 'id, title, case_type, kontaktperson, start_date, description, status, pris, telefon_kontaktperson, e_post_kontaktperson, skadedjur, org_nr'
       
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
         supabase.from('business_cases').select(selectQuery).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        supabase.from('cases').select('id, title, case_type, kontaktperson, created_date as start_date').eq('assigned_technician_id', technicianId).not('created_date', 'is', null) // Antagande för avtalskunder
+        supabase.from('cases').select('id, title, case_type, kontaktperson, created_date as start_date, description, status').eq('assigned_technician_id', technicianId).not('created_date', 'is', null)
       ]);
 
       const allCases = [
-        ...(privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []),
-        ...(businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []),
+        ...(privateResult.status === 'fulfilled' ? privateResult.value.data?.map(c => ({...c, case_price: (c as any).pris})) || [] : []),
+        ...(businessResult.status === 'fulfilled' ? businessResult.value.data?.map(c => ({...c, case_price: (c as any).pris})) || [] : []),
         ...(contractResult.status === 'fulfilled' ? contractResult.value.data || [] : [])
       ];
+      
+      // ✅ FELSÖKNING: Logga datan som hämtats
+      console.log('Hämtade ärenden för kalender:', allCases);
       
       setCases(allCases as ScheduledCase[])
     } catch (err: any) {
@@ -68,11 +74,8 @@ export default function TechnicianSchedule() {
     return cases.map(case_ => ({
       id: case_.id,
       title: case_.title,
-      start: case_.start_date, // FullCalendar förstår "2024-12-04T09:00:00.000Z"
-      extendedProps: {
-        case_type: case_.case_type,
-        kontaktperson: case_.kontaktperson,
-      },
+      start: case_.start_date,
+      extendedProps: { ...case_ },
       backgroundColor: case_.case_type === 'private' ? '#3b82f6' : '#8b5cf6',
       borderColor: case_.case_type === 'private' ? '#3b82f6' : '#8b5cf6',
     }));
@@ -92,6 +95,15 @@ export default function TechnicianSchedule() {
     )
   }
 
+  const handleEventClick = (clickInfo: any) => {
+    setSelectedCase(clickInfo.event.extendedProps as ScheduledCase);
+    setIsEditModalOpen(true);
+  }
+  
+  const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => {
+    setCases(currentCases => currentCases.map(c => c.id === selectedCase?.id ? { ...c, ...updatedCase } : c));
+  }
+
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>
 
   return (
@@ -107,7 +119,7 @@ export default function TechnicianSchedule() {
       </header>
       
       <main className="max-w-7xl mx-auto p-4">
-        {error && <p className="text-red-400">{error}</p>}
+        {error && <p className="text-red-400 p-4 bg-red-500/10 rounded-lg">{error}</p>}
         <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800">
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
@@ -119,15 +131,23 @@ export default function TechnicianSchedule() {
             }}
             events={calendarEvents}
             eventContent={renderEventContent}
-            locale={svLocale} // Använd svenska
+            eventClick={handleEventClick} // ✅ Öppna modal vid klick
+            locale={svLocale}
             buttonText={{ today: 'idag', month: 'månad', week: 'vecka', day: 'dag', list: 'lista' }}
             allDaySlot={false}
             slotMinTime="07:00:00"
             slotMaxTime="19:00:00"
-            height="auto" // Låt kalendern anpassa sin höjd
+            height="auto"
           />
         </div>
       </main>
+
+      <EditCaseModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase as any} 
+      />
     </div>
   )
 }
