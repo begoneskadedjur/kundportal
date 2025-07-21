@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG OCH KORRIGERAD VERSION
+// 📁 src/pages/technician/TechnicianSchedule.tsx - SLUTGILTIG VERSION MED FALLBACK-DATUM
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -39,38 +39,51 @@ export default function TechnicianSchedule() {
     }
   }, [isTechnician, profile?.technician_id])
 
+  // ✅ UPPDATERAD FUNKTION MED FALLBACK-LOGIK
   const fetchScheduledCases = async (technicianId: string) => {
     setLoading(true)
     setError(null)
     try {
-      // ✅ KORRIGERADE SELECT-FRÅGOR
-      const commonFields = 'id, title, kontaktperson, start_date, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
+      // Hämta created_at för att använda som fallback
+      const commonFields = 'id, title, kontaktperson, start_date, created_at, description, status, telefon_kontaktperson, e_post_kontaktperson, skadedjur'
       
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        // Tar bort "case_type" från select, eftersom den inte finns i tabellen
-        supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        // Tar bort "case_type" från select, men behåller org_nr
-        supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId).not('start_date', 'is', null),
-        // Denna tabell har case_type, men vi hämtar den för konsekvensens skull
-        supabase.from('cases').select('id, title, kontaktperson, created_date as start_date, description, status, case_type').eq('assigned_technician_id', technicianId).not('created_date', 'is', null)
+        supabase.from('private_cases').select(`${commonFields}, pris`).eq('primary_assignee_id', technicianId),
+        supabase.from('business_cases').select(`${commonFields}, pris, org_nr`).eq('primary_assignee_id', technicianId),
+        supabase.from('cases').select('id, title, kontaktperson, created_date, description, status, case_type').eq('assigned_technician_id', technicianId)
       ]);
       
-      const allCases: ScheduledCase[] = [];
+      const allCases: Partial<ScheduledCase>[] = [];
 
-      // ✅ LÄGGER TILL `case_type` MANUELLT I JAVASCRIPT
       if (privateResult.status === 'fulfilled' && privateResult.value.data) {
-        allCases.push(...privateResult.value.data.map((c: any) => ({ ...c, case_price: c.pris, case_type: 'private' })));
+        allCases.push(...privateResult.value.data.map((c: any) => ({ 
+          ...c, 
+          start_date: c.start_date || c.created_at, // Använd created_at om start_date är null
+          case_price: c.pris, 
+          case_type: 'private' 
+        })));
       }
       if (businessResult.status === 'fulfilled' && businessResult.value.data) {
-        allCases.push(...businessResult.value.data.map((c: any) => ({ ...c, case_price: c.pris, case_type: 'business' })));
+        allCases.push(...businessResult.value.data.map((c: any) => ({ 
+          ...c, 
+          start_date: c.start_date || c.created_at, // Använd created_at om start_date är null
+          case_price: c.pris, 
+          case_type: 'business' 
+        })));
       }
       if (contractResult.status === 'fulfilled' && contractResult.value.data) {
-        // Om case_type är null/undefined, sätt den till 'contract' som fallback
-        allCases.push(...contractResult.value.data.map((c: any) => ({ ...c, case_type: c.case_type || 'contract' })));
+        allCases.push(...contractResult.value.data.map((c: any) => ({ 
+          ...c, 
+          start_date: c.created_date, // Denna tabell använder created_date som start
+          case_type: c.case_type || 'contract' 
+        })));
       }
       
-      console.log('Hämtade ärenden för kalender:', allCases);
-      setCases(allCases as ScheduledCase[])
+      // Säkerställ att vi bara försöker rendera ärenden som faktiskt har ett datum
+      const casesWithDates = allCases.filter(c => c.start_date);
+      
+      console.log(`Hämtade ${allCases.length} ärenden, ${casesWithDates.length} har ett datum och kommer visas.`, casesWithDates);
+      setCases(casesWithDates as ScheduledCase[])
 
     } catch (err: any) {
       setError(err.message || 'Kunde inte hämta schemalagda ärenden')
