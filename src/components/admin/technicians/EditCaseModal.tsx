@@ -1,14 +1,13 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - KORRIGERAD SÖKVÄG
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - UPPDATERAD UTAN PROVISION
 
 import { useState, useEffect } from 'react'
-// ✅ KORRIGERAD SÖKVÄG FÖR DENNA FIL
 import { supabase } from '../../../lib/supabase' 
 import { AlertCircle, CheckCircle, FileText, User, DollarSign } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 
-// Återanvänd samma interface från TechnicianCases-sidan
+// Interface
 interface TechnicianCase {
   id: string
   case_type: 'private' | 'business' | 'contract'
@@ -17,13 +16,12 @@ interface TechnicianCase {
   status: string
   priority?: string
   case_price?: number
-  commission_amount?: number
+  commission_amount?: number // Finns kvar i interfacet för att ta emot data
   kontaktperson?: string
   telefon_kontaktperson?: string
   e_post_kontaktperson?: string
   skadedjur?: string
   org_nr?: string
-  // Lägg till fler fält här vid behov
 }
 
 interface EditCaseModalProps {
@@ -33,7 +31,6 @@ interface EditCaseModalProps {
   caseData: TechnicianCase | null
 }
 
-// Återanvänd statuslistan för konsekvens
 const statusOrder = [
   'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
   'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
@@ -57,7 +54,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         telefon_kontaktperson: caseData.telefon_kontaktperson || '',
         e_post_kontaktperson: caseData.e_post_kontaktperson || '',
         case_price: caseData.case_price || 0,
-        commission_amount: caseData.commission_amount || 0,
+        // Vi läser inte in provisionen i formulärets state alls
         skadedjur: caseData.skadedjur || '',
         org_nr: caseData.org_nr || '',
       })
@@ -77,6 +74,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       : 'cases';
 
     const updatedFields: { [key: string]: any } = { ...formData };
+
+    // ✅ SÄKERHETSÅTGÄRD: Se till att provision ALDRIG kan uppdateras härifrån
+    delete updatedFields.commission_amount; 
+
     if (updatedFields.case_price !== undefined) {
         updatedFields.pris = updatedFields.case_price;
         delete updatedFields.case_price;
@@ -173,7 +174,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
                 <select name="status" value={formData.status || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white">
-                  {statusOrder.map(s => <option key={s} value={s.charAt(0).toUpperCase() + s.slice(1)}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  {statusOrder.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <Input label="Skadedjur" name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} />
@@ -196,7 +197,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Ekonomi</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Ärendepris (Pris)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
-              <Input label="Provision" name="commission_amount" type="number" value={formData.commission_amount === null ? '' : formData.commission_amount} onChange={handleChange} />
+              {/* ✅ FÄLTET FÖR PROVISION ÄR NU BORTTAGET */}
             </div>
           </div>
 
