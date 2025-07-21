@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FÖRBÄTTRAD KORTDESIGN MED EKONOMI & FAKTURADETALJER
+// 📁 src/pages/technician/TechnicianCases.tsx - NY DESIGN MED TYDLIG DATUMVISNING
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   ClipboardList, Search, ExternalLink,
   Clock, CheckCircle, AlertCircle, User, Building2, Calendar,
-  MapPin, Phone, Mail, DollarSign, FileText, Edit
+  MapPin, Phone, Mail, DollarSign, FileText, Edit, PlayCircle, Flag, ThumbsUp
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -20,11 +20,16 @@ import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 interface TechnicianCase {
   id: string; clickup_task_id: string; case_number?: string; title: string;
   status: string; priority?: string; case_type: 'private' | 'business' | 'contract';
-  created_date: string; completed_date?: string; commission_amount?: number;
-  case_price?: number; kontaktperson?: string; telefon_kontaktperson?: string;
-  e_post_kontaktperson?: string; adress?: any; foretag?: string; org_nr?: string;
-  skadedjur?: string; description?: string; clickup_url?: string;
-  assignee_name?: string; billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
+  created_date: string; 
+  // ✅ DATUM-FÄLT TILLAGDA
+  start_date?: string;
+  due_date?: string;
+  completed_date?: string; 
+  commission_amount?: number; case_price?: number; kontaktperson?: string; 
+  telefon_kontaktperson?: string; e_post_kontaktperson?: string; adress?: any; 
+  foretag?: string; org_nr?: string; skadedjur?: string; description?: string; 
+  clickup_url?: string; assignee_name?: string; 
+  billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
 }
 
 interface CaseStats {
@@ -98,9 +103,12 @@ export default function TechnicianCases() {
     setLoading(true);
     setError(null);
     try {
+      // ✅ HÄMTAR NU ÄVEN due_date
+      const selectQuery = 'id, clickup_task_id, title, status, priority, created_at, start_date, due_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon_kontaktperson, e_post_kontaktperson, adress, skadedjur, description, billing_status';
+      
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon_kontaktperson, e_post_kontaktperson, adress, skadedjur, description, billing_status').eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
-        supabase.from('business_cases').select('id, clickup_task_id, title, status, priority, created_at, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon_kontaktperson, e_post_kontaktperson, adress, org_nr, skadedjur, description, billing_status').eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
+        supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
+        supabase.from('business_cases').select(`${selectQuery}, org_nr`).eq('primary_assignee_id', technicianId).order('created_at', { ascending: false }),
         supabase.from('cases').select('id, clickup_task_id, title, status, priority, created_date, completed_date, assigned_technician_name').eq('assigned_technician_id', technicianId).order('created_date', { ascending: false })
       ]);
       
@@ -212,7 +220,7 @@ export default function TechnicianCases() {
                         <h3 className="font-semibold text-white text-md pr-2 flex-1">{case_.title}</h3>
                         <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-4">
+                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
                         <span className={`inline-flex items-center gap-1.5 ${case_.case_type === 'private' ? 'text-blue-400' : case_.case_type === 'business' ? 'text-purple-400' : 'text-green-400'}`}><User className="w-3 h-3" />{case_.case_type === 'private' ? 'Privat' : case_.case_type === 'business' ? 'Företag' : 'Avtal'}</span>
                         <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />{formatDate(case_.created_date)}</span>
                     </div>
@@ -226,20 +234,35 @@ export default function TechnicianCases() {
                             <span className="font-medium text-slate-300 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-500"/> Adress</span>
                             <span className="text-slate-400 text-right">{formatAddress(case_.adress)}</span>
                         </div>
-                        {/* ✅ EKONOMISK INFORMATION TILLBAKA */}
-                        {(case_.case_price || (case_.commission_amount && case_.commission_amount > 0)) && (
-                            <div className="flex justify-between border-t border-slate-700/50 pt-3">
-                                <span className="font-medium text-slate-300 flex items-center gap-2"><DollarSign className="w-4 h-4 text-slate-500"/>Ekonomi</span>
-                                <div className="text-right">
-                                    {case_.case_price && <p className="text-slate-300">Pris: <span className="font-semibold text-white">{formatCurrency(case_.case_price)}</span></p>}
-                                    {case_.commission_amount && case_.commission_amount > 0 && <p className="text-slate-300">Provision: <span className="font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</span></p>}
-                                </div>
-                            </div>
-                        )}
                     </div>
+
+                    {/* ✅ NY, FÖRBÄTTRAD DATUM-SEKTION */}
+                    <div className="grid grid-cols-3 gap-2 text-center border-y border-slate-700/50 py-3 my-3">
+                        <div>
+                            <p className="text-xs text-slate-400 flex items-center justify-center gap-1"><PlayCircle className="w-3 h-3"/>Startdatum</p>
+                            <p className="font-semibold text-white mt-1">{case_.start_date ? formatDate(case_.start_date) : <span className="text-slate-500">Ej satt</span>}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-400 flex items-center justify-center gap-1"><Flag className="w-3 h-3"/>Förfallodatum</p>
+                            <p className="font-semibold text-white mt-1">{case_.due_date ? formatDate(case_.due_date) : <span className="text-slate-500">Ej satt</span>}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-400 flex items-center justify-center gap-1"><ThumbsUp className="w-3 h-3"/>Avslutad</p>
+                            <p className="font-semibold mt-1">{case_.completed_date ? <span className="text-green-400">{formatDate(case_.completed_date)}</span> : <span className="text-slate-500">Pågående</span>}</p>
+                        </div>
+                    </div>
+                    
+                    {(case_.case_price || (case_.commission_amount && case_.commission_amount > 0)) && (
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-slate-300 flex items-center gap-2"><DollarSign className="w-4 h-4 text-slate-500"/>Ekonomi</span>
+                            <div className="text-right">
+                                {case_.case_price && <p className="text-slate-400">Pris: <span className="font-semibold text-white">{formatCurrency(case_.case_price)}</span></p>}
+                                {case_.commission_amount && case_.commission_amount > 0 && <p className="text-slate-400">Provision: <span className="font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</span></p>}
+                            </div>
+                        </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between pt-3 mt-4 border-t border-slate-700">
-                    {/* ✅ FAKTURAINFORMATION FÖRTYDLIGAD */}
                     <div className="flex items-center gap-2 text-xs">
                         {case_.billing_status && case_.billing_status !== 'skip' && (
                             <>
