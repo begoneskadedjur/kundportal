@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - FIXAD MED RÄTTA KOLUMNNAMN
+// 📁 src/pages/technician/TechnicianCases.tsx - KORRIGERAD OCH KOMPLETT VERSION
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -28,10 +28,10 @@ interface TechnicianCase {
   commission_amount?: number
   case_price?: number
   
-  // Kontaktuppgifter - KORRIGERADE FÄLTNAMN
+  // Kontaktuppgifter
   kontaktperson?: string
-  telefon_kontaktperson?: string  // 🔥 ÄNDRAT från telefon
-  e_post_kontaktperson?: string   // 🔥 ÄNDRAT från email
+  telefon_kontaktperson?: string
+  e_post_kontaktperson?: string
   adress?: any
   
   // Företagsuppgifter (för business cases)
@@ -40,7 +40,7 @@ interface TechnicianCase {
   
   // Ärendespecifika fält
   skadedjur?: string
-  beskrivning?: string
+  description?: string // 🔥 KORRIGERAT från "beskrivning"
   
   // ClickUp specifikt
   clickup_url?: string
@@ -98,7 +98,6 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // 🔥 FIX: Hämta rätt tekniker-ID från profile direkt
   const getTechnicianId = () => {
     console.log('🔍 GETTING TECHNIKER ID:', {
       profileTechnicianId: profile?.technician_id,
@@ -109,11 +108,9 @@ export default function TechnicianCases() {
       fullTechnician: technician
     })
     
-    // ✅ ANVÄND ALLTID profile.technician_id FÖRST - det är den säkra källan
     return profile?.technician_id || technician?.id
   }
 
-  // 🔥 SÄKERHETSKONTROLL - vänta tills profile laddas
   useEffect(() => {
     if (!isTechnician || !profile?.technician_id) {
       console.log('❌ Inte en tekniker eller tekniker-ID saknas:', { 
@@ -123,7 +120,6 @@ export default function TechnicianCases() {
         loading: loading
       })
       
-      // Om vi inte är en tekniker, omdirigera
       if (profile && profile.role !== 'technician') {
         navigate('/login', { replace: true })
       }
@@ -131,9 +127,7 @@ export default function TechnicianCases() {
     }
   }, [isTechnician, profile, navigate])
 
-  // 🔥 KÖRT FETCHCASES NÄR VI HAR RÄTT DATA
   useEffect(() => {
-    // Vänta tills vi har profile.technician_id
     if (isTechnician && profile?.technician_id) {
       console.log('🚀 Starting fetch with technician ID:', profile.technician_id)
       fetchCasesDirectly(profile.technician_id)
@@ -144,7 +138,7 @@ export default function TechnicianCases() {
         profileLoaded: !!profile
       })
     }
-  }, [isTechnician, profile?.technician_id]) // Endast lyssna på profile.technician_id
+  }, [isTechnician, profile?.technician_id])
 
   useEffect(() => {
     applyFilters()
@@ -155,7 +149,6 @@ export default function TechnicianCases() {
       usedTechnicianId: technicianId,
       profileTechnicianId: profile?.technician_id,
       technicianObjId: technician?.id,
-      expectedId: 'ecaf151a-44b2-4220-b105-998aa0f82d6e'
     })
 
     if (!technicianId) {
@@ -172,59 +165,65 @@ export default function TechnicianCases() {
       
       console.log('🔄 Fetching cases for technician ID:', technicianId)
       
-      // 🔥 HUVUDQUERIES - FIX: Använd korrekta kolumnnamn
+      // ✅ HUVUDQUERIES - KORRIGERADE MED RÄTT KOLUMNNAMN FRÅN JSON-SCHEMAT
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        // Private cases - KORRIGERADE KOLUMNNAMN
+        // Private cases
         supabase
           .from('private_cases')
           .select(`
             id, clickup_task_id, title, status, priority, created_at, start_date, 
             completed_date, commission_amount, pris, primary_assignee_name, 
             kontaktperson, telefon_kontaktperson, e_post_kontaktperson, 
-            adress, skadedjur, beskrivning, billing_status
+            adress, skadedjur, description, billing_status 
           `)
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
 
-        // Business cases - KORRIGERADE KOLUMNNAMN  
+        // Business cases
         supabase
           .from('business_cases')
           .select(`
             id, clickup_task_id, title, status, priority, created_at, start_date, 
             completed_date, commission_amount, pris, primary_assignee_name, 
             kontaktperson, telefon_kontaktperson, e_post_kontaktperson, 
-            adress, org_nr, skadedjur, beskrivning, billing_status
+            adress, org_nr, skadedjur, description, billing_status
           `)
           .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
 
-        // Contract cases - använder assigned_technician_id
+        // Contract cases - KORRIGERADE KOLUMNER
         supabase
           .from('cases')
-          .select('id, clickup_task_id, title, status, priority, created_date, completed_date, price, assigned_technician_name, billing_status')
+          .select(`
+            id, clickup_task_id, title, status, priority, created_date, completed_date, 
+            assigned_technician_name
+          `)
           .eq('assigned_technician_id', technicianId)
           .order('created_date', { ascending: false })
           .limit(100)
       ])
 
-      // ✅ LOGGA RESULTAT
       console.log('🔍 QUERY RESULTS:', {
         privateStatus: privateResult.status,
-        privateCount: privateResult.status === 'fulfilled' ? privateResult.value.data?.length : 0,
+        privateCount: privateResult.status === 'fulfilled' ? privateResult.value.data?.length : undefined,
         privateError: privateResult.status === 'fulfilled' ? privateResult.value.error : privateResult.reason,
         
         businessStatus: businessResult.status,
-        businessCount: businessResult.status === 'fulfilled' ? businessResult.value.data?.length : 0,
+        businessCount: businessResult.status === 'fulfilled' ? businessResult.value.data?.length : undefined,
         businessError: businessResult.status === 'fulfilled' ? businessResult.value.error : businessResult.reason,
         
         contractStatus: contractResult.status,
-        contractCount: contractResult.status === 'fulfilled' ? contractResult.value.data?.length : 0,
+        contractCount: contractResult.status === 'fulfilled' ? contractResult.value.data?.length : undefined,
         contractError: contractResult.status === 'fulfilled' ? contractResult.value.error : contractResult.reason
       })
+      
+      // Handle potential errors from fulfilled promises
+      if (privateResult.status === 'fulfilled' && privateResult.value.error) throw privateResult.value.error;
+      if (businessResult.status === 'fulfilled' && businessResult.value.error) throw businessResult.value.error;
+      if (contractResult.status === 'fulfilled' && contractResult.value.error) throw contractResult.value.error;
 
-      // ✅ KOMBINERA OCH FORMATTERA ALLA CASES
       const privateCases = privateResult.status === 'fulfilled' && privateResult.value.data ? privateResult.value.data : []
       const businessCases = businessResult.status === 'fulfilled' && businessResult.value.data ? businessResult.value.data : []
       const contractCases = contractResult.status === 'fulfilled' && contractResult.value.data ? contractResult.value.data : []
@@ -233,8 +232,6 @@ export default function TechnicianCases() {
         privateCases: privateCases.length,
         businessCases: businessCases.length,
         contractCases: contractCases.length,
-        expectedPrivate: 142,
-        expectedBusiness: 85
       })
 
       const allCases: TechnicianCase[] = [
@@ -251,11 +248,11 @@ export default function TechnicianCases() {
           commission_amount: c.commission_amount,
           case_price: c.pris,
           kontaktperson: c.kontaktperson,
-          telefon_kontaktperson: c.telefon_kontaktperson,  // 🔥 KORRIGERAT
-          e_post_kontaktperson: c.e_post_kontaktperson,    // 🔥 KORRIGERAT
+          telefon_kontaktperson: c.telefon_kontaktperson,
+          e_post_kontaktperson: c.e_post_kontaktperson,
           adress: c.adress,
           skadedjur: c.skadedjur,
-          beskrivning: c.beskrivning,
+          description: c.description, // <-- Använd rätt fält
           assignee_name: c.primary_assignee_name,
           billing_status: c.billing_status,
           clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
@@ -273,12 +270,12 @@ export default function TechnicianCases() {
           commission_amount: c.commission_amount,
           case_price: c.pris,
           kontaktperson: c.kontaktperson,
-          telefon_kontaktperson: c.telefon_kontaktperson,  // 🔥 KORRIGERAT
-          e_post_kontaktperson: c.e_post_kontaktperson,    // 🔥 KORRIGERAT
+          telefon_kontaktperson: c.telefon_kontaktperson,
+          e_post_kontaktperson: c.e_post_kontaktperson,
           adress: c.adress,
           org_nr: c.org_nr,
           skadedjur: c.skadedjur,
-          beskrivning: c.beskrivning,
+          description: c.description, // <-- Använd rätt fält
           assignee_name: c.primary_assignee_name,
           billing_status: c.billing_status,
           clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
@@ -293,22 +290,20 @@ export default function TechnicianCases() {
           case_type: 'contract' as const,
           created_date: c.created_date,
           completed_date: c.completed_date,
-          commission_amount: 0,
-          case_price: c.price,
+          commission_amount: 0, // Saknas i 'cases'-tabellen
+          case_price: undefined, // Saknas i 'cases'-tabellen
           assignee_name: c.assigned_technician_name,
-          billing_status: c.billing_status,
+          billing_status: undefined, // Saknas i 'cases'-tabellen
           clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
         }))
       ]
 
-      // ✅ SORTERA EFTER DATUM (senaste först)
       allCases.sort((a, b) => {
         const dateA = new Date(a.created_date || 0).getTime()
         const dateB = new Date(b.created_date || 0).getTime()
         return dateB - dateA
       })
 
-      // ✅ BERÄKNA STATS
       const newStats: CaseStats = {
         total_cases: allCases.length,
         completed_cases: allCases.filter(c => 
@@ -330,7 +325,6 @@ export default function TechnicianCases() {
 
       console.log('✅ FINAL RESULTS:', {
         totalCases: allCases.length,
-        expectedTotal: 227, // 142 + 85
         stats: newStats,
         firstCase: allCases[0]
       })
@@ -344,7 +338,7 @@ export default function TechnicianCases() {
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
         technicianId: technicianId
       })
-      setError(error instanceof Error ? error.message : 'Ett oväntat fel uppstod')
+      setError(error instanceof Error ? `Fel från databasen: ${error.message}` : 'Ett oväntat fel uppstod')
     } finally {
       setLoading(false)
     }
@@ -358,7 +352,6 @@ export default function TechnicianCases() {
 
     let filtered = [...cases]
 
-    // Textsökning
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(case_ => 
@@ -370,7 +363,6 @@ export default function TechnicianCases() {
       )
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
       if (statusFilter === 'completed') {
         filtered = filtered.filter(case_ => 
@@ -388,12 +380,10 @@ export default function TechnicianCases() {
       }
     }
 
-    // Typ filter
     if (typeFilter !== 'all') {
       filtered = filtered.filter(case_ => case_.case_type === typeFilter)
     }
 
-    // Sortering
     filtered.sort((a, b) => {
       let comparison = 0
       
@@ -459,7 +449,6 @@ export default function TechnicianCases() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
       <header className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -487,35 +476,6 @@ export default function TechnicianCases() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* 🔍 Success Info */}
-        <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
-          <div className="text-xs text-green-400">
-            <p className="font-medium mb-2">✅ Cases Successfully Loaded!</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-slate-400">Tekniker:</p>
-                <p>{technicianName}</p>
-                <p className="text-slate-500">ID: {technicianId}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Total cases:</p>
-                <p>{cases.length} (Expected: 227)</p>
-                <p className="text-slate-500">Private: {cases.filter(c => c.case_type === 'private').length}/142, Business: {cases.filter(c => c.case_type === 'business').length}/85</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Stats:</p>
-                <p>Commission: {formatCurrency(stats.total_commission)}</p>
-                <p className="text-slate-500">Completed: {stats.completed_cases}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Filtered:</p>
-                <p>{filteredCases.length} showing</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Statistik */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <Card className="p-4 bg-gradient-to-br from-slate-500/20 to-slate-600/20 border-slate-500/30">
             <div className="flex items-center justify-between">
@@ -568,7 +528,6 @@ export default function TechnicianCases() {
           </Card>
         </div>
 
-        {/* Filter och sök */}
         <Card className="p-4 mb-6">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-64">
@@ -620,7 +579,6 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* Ärendelista */}
         {cases.length === 0 ? (
           <Card className="p-12">
             <div className="text-center">
@@ -695,7 +653,6 @@ export default function TechnicianCases() {
                     )}
                   </div>
 
-                  {/* Kontaktinformation - KORRIGERADE FÄLTNAMN */}
                   <div className="space-y-2 mb-4">
                     {case_.kontaktperson && (
                       <p className="text-sm text-slate-300 flex items-center gap-2">
@@ -737,7 +694,6 @@ export default function TechnicianCases() {
                     )}
                   </div>
 
-                  {/* Ärendespecifik information */}
                   {case_.skadedjur && (
                     <div className="mb-4">
                       <p className="text-xs text-slate-400 mb-1">Skadedjur:</p>
@@ -747,16 +703,15 @@ export default function TechnicianCases() {
                     </div>
                   )}
 
-                  {case_.beskrivning && (
+                  {case_.description && ( // <-- Ändrad till description
                     <div className="mb-4">
                       <p className="text-xs text-slate-400 mb-1">Beskrivning:</p>
                       <p className="text-sm text-slate-300 bg-slate-800/50 rounded px-2 py-1 line-clamp-3">
-                        {case_.beskrivning}
+                        {case_.description}
                       </p>
                     </div>
                   )}
 
-                  {/* Åtgärder */}
                   <div className="flex items-center justify-between pt-4 border-t border-slate-700">
                     <div className="text-xs text-slate-400">
                       {case_.case_number ? (
@@ -827,7 +782,6 @@ export default function TechnicianCases() {
           </div>
         )}
 
-        {/* Visningsinfo */}
         {filteredCases.length > 0 && (
           <div className="mt-6 text-center">
             <p className="text-slate-400 text-sm">
