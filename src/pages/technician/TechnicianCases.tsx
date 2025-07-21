@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianCases.tsx - MED FULL DEBUG
+// 📁 src/pages/technician/TechnicianCases.tsx - FIXAD MED RÄTT TEKNIKER-ID
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -98,52 +98,55 @@ export default function TechnicianCases() {
   const [sortBy, setSortBy] = useState<'date' | 'commission' | 'status'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // 🔍 DEBUG: Logga alla auth-värden
-  useEffect(() => {
-    console.log('🔍 FULL AUTH DEBUG:', {
-      user: user,
-      profile: profile,
-      technician: technician,
-      isTechnician: isTechnician,
-      userMetadata: user?.user_metadata,
+  // 🔥 FIX: Hämta rätt tekniker-ID från profile istället för technician
+  const getTechnicianId = () => {
+    console.log('🔍 GETTING TECHNICIAN ID:', {
+      profileTechnicianId: profile?.technician_id,
+      technicianId: technician?.id,
+      userUID: user?.id,
       profileRole: profile?.role
     })
-  }, [user, profile, technician, isTechnician])
+    
+    // Använd profile.technician_id först, sedan fallback till technician.id
+    return profile?.technician_id || technician?.id
+  }
 
   // Säkerhetskontroll
   useEffect(() => {
-    if (!isTechnician || !technician?.id) {
-      console.log('❌ Inte en tekniker, omdirigerar från cases...', { isTechnician, technician })
+    if (!isTechnician) {
+      console.log('❌ Inte en tekniker, omdirigerar från cases...', { 
+        isTechnician, 
+        profileRole: profile?.role,
+        technicianId: getTechnicianId()
+      })
       navigate('/login', { replace: true })
       return
     }
-  }, [isTechnician, technician, navigate])
+  }, [isTechnician, profile, navigate])
 
   // 🔥 ANVÄND SUPABASE DIREKT ISTÄLLET FÖR API
   useEffect(() => {
-    if (isTechnician && technician?.id) {
-      fetchCasesDirectly()
+    const technicianId = getTechnicianId()
+    if (isTechnician && technicianId) {
+      fetchCasesDirectly(technicianId)
     }
-  }, [isTechnician, technician?.id])
+  }, [isTechnician, profile?.technician_id, technician?.id])
 
   useEffect(() => {
     applyFilters()
   }, [cases, searchTerm, statusFilter, typeFilter, sortBy, sortOrder])
 
-  const fetchCasesDirectly = async () => {
-    // 🔍 EXTRA DEBUG före allt
-    console.log('🔍 TECHNICIAN DEBUG BEFORE FETCH:', {
-      technician: technician,
-      technicianId: technician?.id,
-      technicianName: technician?.name,
-      isTechnician: isTechnician,
-      profile: profile,
-      profileRole: profile?.role
+  const fetchCasesDirectly = async (technicianId: string) => {
+    console.log('🔍 FINAL TECHNICIAN ID DEBUG:', {
+      usedTechnicianId: technicianId,
+      profileTechnicianId: profile?.technician_id,
+      technicianObjId: technician?.id,
+      expectedId: 'ecaf151a-44b2-4220-b105-998aa0f82d6e'
     })
 
-    if (!technician?.id) {
+    if (!technicianId) {
       const errorMsg = 'Ingen tekniker-ID tillgänglig'
-      console.error('❌', errorMsg, { technician })
+      console.error('❌', errorMsg)
       setError(errorMsg)
       setLoading(false)
       return
@@ -153,63 +156,11 @@ export default function TechnicianCases() {
       setLoading(true)
       setError(null)
       
-      console.log('🔄 Fetching cases directly from database for technician:', technician.id)
-      console.log('🔄 Technician name:', technician.name)
+      console.log('🔄 Fetching cases for technician ID:', technicianId)
       
-      // 🔍 FÖRST: Testa en enkel query för att se om tekniker finns i tabellerna
-      console.log('🔍 Testing if technician exists in tables...')
-      
-      const [testPrivate, testBusiness, testContract] = await Promise.allSettled([
-        supabase
-          .from('private_cases')
-          .select('id, primary_assignee_id, primary_assignee_name')
-          .eq('primary_assignee_id', technician.id)
-          .limit(1),
-        
-        supabase
-          .from('business_cases')
-          .select('id, primary_assignee_id, primary_assignee_name')
-          .eq('primary_assignee_id', technician.id)
-          .limit(1),
-        
-        supabase
-          .from('cases')
-          .select('id, assigned_technician_id, assigned_technician_name')
-          .eq('assigned_technician_id', technician.id)
-          .limit(1)
-      ])
-
-      console.log('🔍 TEST RESULTS:', {
-        privateTest: testPrivate.status === 'fulfilled' ? testPrivate.value : testPrivate.reason,
-        businessTest: testBusiness.status === 'fulfilled' ? testBusiness.value : testBusiness.reason,
-        contractTest: testContract.status === 'fulfilled' ? testContract.value : testContract.reason
-      })
-
-      // 🔍 Testa även namn-baserad sökning
-      console.log('🔍 Testing name-based search for:', technician.name)
-      
-      const [nameTestPrivate, nameTestBusiness] = await Promise.allSettled([
-        supabase
-          .from('private_cases')
-          .select('id, primary_assignee_name')
-          .eq('primary_assignee_name', technician.name)
-          .limit(1),
-        
-        supabase
-          .from('business_cases')
-          .select('id, primary_assignee_name')
-          .eq('primary_assignee_name', technician.name)
-          .limit(1)
-      ])
-
-      console.log('🔍 NAME-BASED TEST RESULTS:', {
-        privateNameTest: nameTestPrivate.status === 'fulfilled' ? nameTestPrivate.value : nameTestPrivate.reason,
-        businessNameTest: nameTestBusiness.status === 'fulfilled' ? nameTestBusiness.value : nameTestBusiness.reason
-      })
-      
-      // 🔥 HUVUDQUERIES - använd både created_at och start_date för säkerhet
+      // 🔥 HUVUDQUERIES - använd det korrekta technician ID:t
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        // Private cases - ALLA STATUS (inte bara avslutade)
+        // Private cases - ALLA STATUS
         supabase
           .from('private_cases')
           .select(`
@@ -217,11 +168,11 @@ export default function TechnicianCases() {
             commission_amount, pris, primary_assignee_name,
             kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
           `)
-          .eq('primary_assignee_id', technician.id)
+          .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
 
-        // Business cases - ALLA STATUS (inte bara avslutade)
+        // Business cases - ALLA STATUS
         supabase
           .from('business_cases')
           .select(`
@@ -229,7 +180,7 @@ export default function TechnicianCases() {
             commission_amount, pris, primary_assignee_name,
             kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
           `)
-          .eq('primary_assignee_id', technician.id)
+          .eq('primary_assignee_id', technicianId)
           .order('created_at', { ascending: false })
           .limit(100),
 
@@ -240,58 +191,37 @@ export default function TechnicianCases() {
             id, clickup_task_id, title, status, priority, created_date, completed_date,
             price, assigned_technician_name, billing_status
           `)
-          .eq('assigned_technician_id', technician.id)
+          .eq('assigned_technician_id', technicianId)
           .order('created_date', { ascending: false })
           .limit(100)
       ])
 
-      // ✅ DETALJERAD ERROR HANDLING MED LOGGING
+      // ✅ LOGGA RESULTAT
       console.log('🔍 QUERY RESULTS:', {
-        privateResult: {
-          status: privateResult.status,
-          data: privateResult.status === 'fulfilled' ? privateResult.value.data : null,
-          error: privateResult.status === 'rejected' ? privateResult.reason : 
-                 privateResult.status === 'fulfilled' ? privateResult.value.error : null,
-          count: privateResult.status === 'fulfilled' ? privateResult.value.data?.length : 0
-        },
-        businessResult: {
-          status: businessResult.status,
-          data: businessResult.status === 'fulfilled' ? businessResult.value.data : null,
-          error: businessResult.status === 'rejected' ? businessResult.reason : 
-                 businessResult.status === 'fulfilled' ? businessResult.value.error : null,
-          count: businessResult.status === 'fulfilled' ? businessResult.value.data?.length : 0
-        },
-        contractResult: {
-          status: contractResult.status,
-          data: contractResult.status === 'fulfilled' ? contractResult.value.data : null,
-          error: contractResult.status === 'rejected' ? contractResult.reason : 
-                 contractResult.status === 'fulfilled' ? contractResult.value.error : null,
-          count: contractResult.status === 'fulfilled' ? contractResult.value.data?.length : 0
-        }
+        privateStatus: privateResult.status,
+        privateCount: privateResult.status === 'fulfilled' ? privateResult.value.data?.length : 0,
+        privateError: privateResult.status === 'fulfilled' ? privateResult.value.error : privateResult.reason,
+        
+        businessStatus: businessResult.status,
+        businessCount: businessResult.status === 'fulfilled' ? businessResult.value.data?.length : 0,
+        businessError: businessResult.status === 'fulfilled' ? businessResult.value.error : businessResult.reason,
+        
+        contractStatus: contractResult.status,
+        contractCount: contractResult.status === 'fulfilled' ? contractResult.value.data?.length : 0,
+        contractError: contractResult.status === 'fulfilled' ? contractResult.value.error : contractResult.reason
       })
 
-      if (privateResult.status === 'rejected') {
-        console.error('❌ Private cases error:', privateResult.reason)
-      }
-      if (businessResult.status === 'rejected') {
-        console.error('❌ Business cases error:', businessResult.reason)
-      }
-      if (contractResult.status === 'rejected') {
-        console.error('❌ Contract cases error:', contractResult.reason)
-      }
-
       // ✅ KOMBINERA OCH FORMATTERA ALLA CASES
-      const privateCases = privateResult.status === 'fulfilled' ? privateResult.value.data || [] : []
-      const businessCases = businessResult.status === 'fulfilled' ? businessResult.value.data || [] : []
-      const contractCases = contractResult.status === 'fulfilled' ? contractResult.value.data || [] : []
+      const privateCases = privateResult.status === 'fulfilled' && privateResult.value.data ? privateResult.value.data : []
+      const businessCases = businessResult.status === 'fulfilled' && businessResult.value.data ? businessResult.value.data : []
+      const contractCases = contractResult.status === 'fulfilled' && contractResult.value.data ? contractResult.value.data : []
 
       console.log('🔍 RAW CASE COUNTS:', {
         privateCases: privateCases.length,
         businessCases: businessCases.length,
         contractCases: contractCases.length,
-        samplePrivateCase: privateCases[0],
-        sampleBusinessCase: businessCases[0],
-        sampleContractCase: contractCases[0]
+        expectedPrivate: 142,
+        expectedBusiness: 85
       })
 
       const allCases: TechnicianCase[] = [
@@ -303,7 +233,7 @@ export default function TechnicianCases() {
           status: c.status,
           priority: c.priority,
           case_type: 'private' as const,
-          created_date: c.start_date || c.created_at, // Använd start_date först, sedan created_at
+          created_date: c.start_date || c.created_at,
           completed_date: c.completed_date,
           commission_amount: c.commission_amount,
           case_price: c.pris,
@@ -325,7 +255,7 @@ export default function TechnicianCases() {
           status: c.status,
           priority: c.priority,
           case_type: 'business' as const,
-          created_date: c.start_date || c.created_at, // Använd start_date först, sedan created_at
+          created_date: c.start_date || c.created_at,
           completed_date: c.completed_date,
           commission_amount: c.commission_amount,
           case_price: c.pris,
@@ -351,7 +281,7 @@ export default function TechnicianCases() {
           case_type: 'contract' as const,
           created_date: c.created_date,
           completed_date: c.completed_date,
-          commission_amount: 0, // Avtalskunder har ingen provision
+          commission_amount: 0,
           case_price: c.price,
           assignee_name: c.assigned_technician_name,
           billing_status: c.billing_status,
@@ -388,11 +318,9 @@ export default function TechnicianCases() {
 
       console.log('✅ FINAL RESULTS:', {
         totalCases: allCases.length,
-        privateCasesProcessed: privateCases.length,
-        businessCasesProcessed: businessCases.length,
-        contractCasesProcessed: contractCases.length,
+        expectedTotal: 227, // 142 + 85
         stats: newStats,
-        sampleProcessedCase: allCases[0]
+        firstCase: allCases[0]
       })
 
       setCases(allCases)
@@ -402,10 +330,7 @@ export default function TechnicianCases() {
       console.error('💥 DETAILED ERROR:', {
         error: error,
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        errorStack: error instanceof Error ? error.stack : null,
-        technician: technician,
-        technicianId: technician?.id,
-        isTechnician: isTechnician
+        technicianId: technicianId
       })
       setError(error instanceof Error ? error.message : 'Ett oväntat fel uppstod')
     } finally {
@@ -478,13 +403,16 @@ export default function TechnicianCases() {
     setFilteredCases(filtered)
   }
 
+  const technicianId = getTechnicianId()
+  const technicianName = technician?.name || profile?.display_name || 'Tekniker'
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="text-slate-400 mt-4">Laddar ärenden för {technician?.name}...</p>
-          <p className="text-slate-500 text-sm mt-2">Tekniker-ID: {technician?.id}</p>
+          <p className="text-slate-400 mt-4">Laddar ärenden för {technicianName}...</p>
+          <p className="text-slate-500 text-sm mt-2">Tekniker-ID: {technicianId}</p>
         </div>
       </div>
     )
@@ -499,12 +427,12 @@ export default function TechnicianCases() {
             <h2 className="text-xl font-semibold text-white mb-2">Problem med att ladda ärenden</h2>
             <p className="text-slate-400 mb-4">{error}</p>
             <div className="text-xs text-slate-500 mb-4">
-              <p>Tekniker: {technician?.name}</p>
-              <p>ID: {technician?.id}</p>
+              <p>Tekniker: {technicianName}</p>
+              <p>ID: {technicianId}</p>
               <p>Roll: {profile?.role}</p>
             </div>
             <div className="space-y-2">
-              <Button onClick={fetchCasesDirectly} className="w-full">
+              <Button onClick={() => technicianId && fetchCasesDirectly(technicianId)} className="w-full">
                 Försök igen
               </Button>
               <Button variant="outline" onClick={() => navigate('/technician/dashboard')} className="w-full">
@@ -538,7 +466,7 @@ export default function TechnicianCases() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Mina Ärenden</h1>
                 <p className="text-sm text-slate-400">
-                  Översikt över tilldelade ärenden från ClickUp - {technician?.name}
+                  Översikt över tilldelade ärenden från ClickUp - {technicianName}
                 </p>
               </div>
             </div>
@@ -547,30 +475,29 @@ export default function TechnicianCases() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* 🔍 UTÖKAD Debug Info */}
+        {/* 🔍 Success Info */}
         <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
           <div className="text-xs text-green-400">
-            <p className="font-medium mb-2">✅ Cases Data Successfully Loaded Directly from Database!</p>
+            <p className="font-medium mb-2">✅ Cases Successfully Loaded!</p>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-slate-400">Tekniker:</p>
-                <p>{technician?.name} ({technician?.id})</p>
-                <p className="text-slate-500">Roll: {profile?.role}</p>
+                <p>{technicianName}</p>
+                <p className="text-slate-500">ID: {technicianId}</p>
               </div>
               <div>
                 <p className="text-slate-400">Total cases:</p>
-                <p>{cases.length}</p>
-                <p className="text-slate-500">Private: {cases.filter(c => c.case_type === 'private').length}, Business: {cases.filter(c => c.case_type === 'business').length}, Contract: {cases.filter(c => c.case_type === 'contract').length}</p>
+                <p>{cases.length} (Expected: 227)</p>
+                <p className="text-slate-500">Private: {cases.filter(c => c.case_type === 'private').length}/142, Business: {cases.filter(c => c.case_type === 'business').length}/85</p>
               </div>
               <div>
                 <p className="text-slate-400">Stats:</p>
                 <p>Commission: {formatCurrency(stats.total_commission)}</p>
-                <p className="text-slate-500">Completed: {stats.completed_cases}, Pending: {stats.pending_cases}</p>
+                <p className="text-slate-500">Completed: {stats.completed_cases}</p>
               </div>
               <div>
                 <p className="text-slate-400">Filtered:</p>
-                <p>{filteredCases.length} cases showing</p>
-                <p className="text-slate-500">Filters active: {searchTerm ? 'Search' : ''} {statusFilter !== 'all' ? 'Status' : ''} {typeFilter !== 'all' ? 'Type' : ''}</p>
+                <p>{filteredCases.length} showing</p>
               </div>
             </div>
           </div>
@@ -681,31 +608,25 @@ export default function TechnicianCases() {
           </div>
         </Card>
 
-        {/* Ärendelista eller no-data meddelande */}
+        {/* Ärendelista */}
         {cases.length === 0 ? (
           <Card className="p-12">
             <div className="text-center">
               <ClipboardList className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Inga ärenden hittades i databasen</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">Inga ärenden hittades</h3>
               <p className="text-slate-400 mb-4">
-                Det finns inga ärenden tilldelade till dig ({technician?.name}) i systemet.
+                Det finns inga ärenden tilldelade till dig i systemet.
               </p>
               <div className="text-xs text-slate-500 bg-slate-800/50 rounded p-4 mb-4">
                 <p className="font-medium mb-2">Debug Information:</p>
-                <p>• Tekniker-ID: {technician?.id}</p>
-                <p>• Tekniker-namn: {technician?.name}</p>
+                <p>• Tekniker-ID: {technicianId}</p>
+                <p>• Tekniker-namn: {technicianName}</p>
                 <p>• Profil-roll: {profile?.role}</p>
-                <p>• Sökta tabeller: private_cases, business_cases, cases</p>
-                <p>• Sökfält: primary_assignee_id, assigned_technician_id</p>
+                <p>• Auth UID: {user?.id}</p>
               </div>
-              <div className="space-y-2">
-                <Button onClick={fetchCasesDirectly}>
-                  Uppdatera och försök igen
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/technician/dashboard')}>
-                  Tillbaka till dashboard
-                </Button>
-              </div>
+              <Button onClick={() => technicianId && fetchCasesDirectly(technicianId)}>
+                Uppdatera och försök igen
+              </Button>
             </div>
           </Card>
         ) : (
