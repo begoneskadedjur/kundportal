@@ -1,5 +1,9 @@
 // 📁 src/pages/coordinator/CoordinatorDashboard.tsx
-// Helt ny sida för en koordinator att planera rutter för tekniker.
+// ⭐ VERSION 1.1 - FIX FÖR "formatAddress is not defined" ⭐
+// Denna version åtgärdar kraschen som inträffade vid val av tekniker.
+// 1. FLYTTAD FUNKTION: `formatAddress` har flyttats ut till komponentens
+//    toppnivå så att den är tillgänglig för både optimeringslogiken
+//    och renderingen av ärendelistan.
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase'; // Antar att du har en supabase-klient här
@@ -19,6 +23,13 @@ interface Case {
 
 // Liten laddningsspinner-komponent
 const SmallSpinner = () => <div style={{ border: '2px solid #374151', borderTopColor: '#3b82f6', borderRadius: '50%', width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />;
+
+// ✅ UTFLYTTAD HIT: Nu är funktionen tillgänglig för hela komponenten
+const formatAddress = (address: any): string => {
+    if (!address) return '';
+    if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+    if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } } return '';
+};
 
 export default function CoordinatorDashboard() {
     // State-hantering
@@ -109,13 +120,6 @@ export default function CoordinatorDashboard() {
         }
         setIsOptimizing(true);
         setError(null);
-
-        // Formattera adresser på ett säkert sätt
-        const formatAddress = (address: any): string => {
-            if (!address) return '';
-            if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
-            if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } } return '';
-        };
 
         try {
             const addresses = cases.map(c => formatAddress(c.adress)).filter(Boolean);
