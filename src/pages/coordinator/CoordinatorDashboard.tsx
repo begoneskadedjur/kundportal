@@ -1,9 +1,7 @@
 // 📁 src/pages/coordinator/CoordinatorDashboard.tsx
-// ⭐ VERSION 1.1 - FIX FÖR "formatAddress is not defined" ⭐
-// Denna version åtgärdar kraschen som inträffade vid val av tekniker.
-// 1. FLYTTAD FUNKTION: `formatAddress` har flyttats ut till komponentens
-//    toppnivå så att den är tillgänglig för både optimeringslogiken
-//    och renderingen av ärendelistan.
+// ⭐ VERSION 1.2 - KORRIGERAD API-SÖKVÄG ⭐
+// Denna version uppdaterar fetch-anropet för att matcha den exakta
+// filstrukturen på Vercel (`api/ruttplanerare/optimize-route`).
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase'; // Antar att du har en supabase-klient här
@@ -24,7 +22,6 @@ interface Case {
 // Liten laddningsspinner-komponent
 const SmallSpinner = () => <div style={{ border: '2px solid #374151', borderTopColor: '#3b82f6', borderRadius: '50%', width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />;
 
-// ✅ UTFLYTTAD HIT: Nu är funktionen tillgänglig för hela komponenten
 const formatAddress = (address: any): string => {
     if (!address) return '';
     if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
@@ -71,12 +68,10 @@ export default function CoordinatorDashboard() {
         setCases([]);
         setOptimizedRoute(null);
 
-        // Skapa start- och slutdatum för hela den valda dagen
         const startDate = `${date}T00:00:00`;
         const endDate = `${date}T23:59:59`;
 
         try {
-            // Vi måste söka i både privat- och företagsärenden
             const { data: privateCases, error: privateError } = await supabase
                 .from('private_cases')
                 .select('id, title, adress')
@@ -95,7 +90,6 @@ export default function CoordinatorDashboard() {
             
             if (businessError) throw businessError;
 
-            // Kombinera resultaten och sortera efter titel (eller starttid om du har det)
             const combinedCases = [...(privateCases || []), ...(businessCases || [])];
             setCases(combinedCases);
 
@@ -107,7 +101,6 @@ export default function CoordinatorDashboard() {
         }
     }, []);
     
-    // Anropa 'fetchCasesForTechnician' när tekniker eller datum ändras
     useEffect(() => {
         fetchCasesForTechnician(selectedTechnicianId, selectedDate);
     }, [selectedTechnicianId, selectedDate, fetchCasesForTechnician]);
@@ -127,8 +120,8 @@ export default function CoordinatorDashboard() {
                 console.warn("Vissa ärenden saknar giltiga adresser och kommer ignoreras.");
             }
 
-            // Anropa vår backend-funktion. Notera den nya sökvägen!
-            const response = await fetch('/api/ruttplanerare', {
+            // ✅ UPPDATERAD SÖKVÄG HÄR
+            const response = await fetch('/api/ruttplanerare/optimize-route', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -150,7 +143,6 @@ export default function CoordinatorDashboard() {
         }
     };
 
-    // Visa ärenden i antingen original- eller optimerad ordning
     const displayCases = useMemo(() => {
         if (!optimizedRoute) return cases;
         return optimizedRoute.order.map(index => cases[index]);
@@ -161,7 +153,6 @@ export default function CoordinatorDashboard() {
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}>Ruttplanerare för Koordinator</h1>
                 
-                {/* Kontroller för att välja tekniker och datum */}
                 <div style={{ display: 'flex', gap: '1rem', background: '#1f2937', padding: '1rem', borderRadius: '0.5rem', marginBottom: '2rem' }}>
                     <div style={{ flex: 1 }}>
                         <label htmlFor="technician-select" style={{ display: 'block', marginBottom: '0.5rem', color: '#9ca3af' }}>Välj Tekniker</label>
@@ -189,7 +180,6 @@ export default function CoordinatorDashboard() {
                     </div>
                 </div>
 
-                {/* Sektion för ärenden och optimering */}
                 <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Ärenden</h2>
