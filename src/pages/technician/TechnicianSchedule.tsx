@@ -327,6 +327,7 @@ export default function TechnicianSchedule() {
       filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
     }
     
+    // ✅ ENDAST LISTDAY FILTRERAR PÅ DAGENS DATUM
     if (calendarView === 'listDay') {
       const today = new Date().toISOString().split('T')[0];
       filteredCases = filteredCases.filter(case_ => {
@@ -361,118 +362,147 @@ export default function TechnicianSchedule() {
     const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
     const isList = eventInfo.view.type.includes('list');
     
+    // ✅ FÖRBÄTTRAD LISTVY
     if (isList) {
       return (
-        <div className={`w-full ${isMobile ? 'p-3' : isTablet ? 'p-4' : 'p-6'} bg-slate-800/30 hover:bg-slate-800/50 transition-colors duration-200 rounded-lg border border-slate-700/50 relative z-10`}>
+        <div className="w-full p-4 bg-slate-800/50 hover:bg-slate-700/50 transition-all duration-200 rounded-xl border border-slate-600/50 shadow-lg relative z-10">
+          {/* Header med case type och status */}
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className={`${isMobile ? 'text-sm' : 'text-base'} font-medium flex items-center gap-2`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-purple-600/20 rounded-full flex items-center justify-center">
                 <span className="text-lg">
                   {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
                 </span>
-                {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
-              </span>
-              {technician_role && technician_role !== 'primary' && (
-                <div className="flex items-center gap-1">
-                  {getTechnicianRoleIcon(technician_role)}
-                  <span className="text-xs bg-slate-700 px-2 py-1 rounded">
-                    {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
-                  </span>
-                </div>
-              )}
+              </div>
+              <div>
+                <span className="text-sm font-medium text-slate-300">
+                  {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
+                </span>
+                {technician_role && technician_role !== 'primary' && (
+                  <div className="flex items-center gap-1 mt-1">
+                    {getTechnicianRoleIcon(technician_role)}
+                    <span className="text-xs bg-slate-700 px-2 py-1 rounded-full">
+                      {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusBadgeColor(status)}`}>
+            <span className={`px-3 py-1.5 rounded-full text-sm font-medium shadow-sm ${getStatusBadgeColor(status)}`}>
               {status}
             </span>
           </div>
           
-          <div className="mb-3">
-            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white mb-1`}>
+          {/* Ärendetitel och tid */}
+          <div className="mb-4">
+            <h3 className="text-xl font-bold text-white mb-2 leading-tight">
               {eventInfo.event.title}
             </h3>
-            <div className="flex items-center gap-2 text-slate-400">
-              <Clock className="w-4 h-4" />
-              <span>{new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="flex items-center gap-3 text-slate-400">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                <span className="font-medium">{new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
               <span>•</span>
               <span>{new Date(eventInfo.event.start).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
           </div>
           
-          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mb-4`}>
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-300">
-                <span className="font-medium">Kund:</span> {kontaktperson || 'Okänd'}
-              </span>
+          {/* Kundinfo och intäkt */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <User className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Kund</p>
+                <p className="text-white font-medium">{kontaktperson || 'Okänd'}</p>
+              </div>
             </div>
             {case_price && (
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-green-400 font-medium">
-                  {case_price.toLocaleString()} kr
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Värde</p>
+                  <p className="text-green-400 font-bold">{case_price.toLocaleString()} kr</p>
+                </div>
               </div>
             )}
           </div>
           
-          <div className="space-y-2 mb-4">
+          {/* Adress och skadedjur */}
+          <div className="space-y-3 mb-4">
             {adress && (
-              <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-slate-400 mt-1" />
-                <span className="text-slate-300 leading-relaxed">
-                  <span className="font-medium">Adress:</span> {formatAddress(adress)}
-                </span>
+              <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
+                <MapPin className="w-4 h-4 text-slate-400 mt-1 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Adress</p>
+                  <p className="text-slate-200">{formatAddress(adress)}</p>
+                </div>
               </div>
             )}
             {skadedjur && (
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-orange-400" />
-                <span className="text-slate-300">
-                  <span className="font-medium">Skadedjur:</span>
-                  <span className="ml-2 bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
+              <div className="flex items-start gap-3 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                <Target className="w-4 h-4 text-orange-400 mt-1" />
+                <div>
+                  <p className="text-xs text-orange-300 uppercase tracking-wide mb-1">Skadedjur</p>
+                  <span className="bg-orange-500/20 text-orange-300 px-3 py-1 rounded-full text-sm font-medium">
                     {skadedjur}
                   </span>
-                </span>
+                </div>
               </div>
             )}
           </div>
           
+          {/* Team info för multi-tekniker */}
           {(secondary_assignee_name || tertiary_assignee_name) && (
-            <div className="mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <p className="text-sm font-medium text-blue-300 mb-2">Team:</p>
-              <div className="text-sm space-y-1">
+            <div className="mb-4 p-4 bg-slate-800/60 rounded-lg border border-slate-600/50">
+              <p className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Team
+              </p>
+              <div className="space-y-2">
                 {primary_assignee_name && (
-                  <p className="flex items-center gap-2">
-                    <User className="w-3 h-3 text-blue-400" />
-                    <span>1. {primary_assignee_name}</span>
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center">
+                      <User className="w-3 h-3 text-blue-400" />
+                    </div>
+                    <span className="text-slate-300">1. {primary_assignee_name}</span>
+                  </div>
                 )}
                 {secondary_assignee_name && (
-                  <p className="flex items-center gap-2">
-                    <Users className="w-3 h-3 text-green-400" />
-                    <span>2. {secondary_assignee_name}</span>
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <Users className="w-3 h-3 text-green-400" />
+                    </div>
+                    <span className="text-slate-300">2. {secondary_assignee_name}</span>
+                  </div>
                 )}
                 {tertiary_assignee_name && (
-                  <p className="flex items-center gap-2">
-                    <Users className="w-3 h-3 text-purple-400" />
-                    <span>3. {tertiary_assignee_name}</span>
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center">
+                      <Users className="w-3 h-3 text-purple-400" />
+                    </div>
+                    <span className="text-slate-300">3. {tertiary_assignee_name}</span>
+                  </div>
                 )}
               </div>
             </div>
           )}
           
-          <div className="flex items-center justify-between">
+          {/* Åtgärdsknappar */}
+          <div className="flex items-center justify-between pt-4 border-t border-slate-600/50">
             <div className="flex items-center gap-3">
               {telefon_kontaktperson && (
                 <a 
                   href={`tel:${telefon_kontaktperson}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200 shadow-sm"
                 >
                   <Phone className="w-4 h-4" />
-                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Ring</span>
+                  <span>Ring</span>
                 </a>
               )}
               {adress && (
@@ -481,10 +511,10 @@ export default function TechnicianSchedule() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-all duration-200 shadow-sm"
                 >
                   <MapPin className="w-4 h-4" />
-                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Navigera</span>
+                  <span>Navigera</span>
                 </a>
               )}
             </div>
@@ -496,7 +526,7 @@ export default function TechnicianSchedule() {
                 setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
                 setIsEditModalOpen(true);
               }}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 shadow-lg"
             >
               <span>Öppna ärende</span>
               <ChevronRight className="w-4 h-4" />
@@ -506,13 +536,14 @@ export default function TechnicianSchedule() {
       );
     }
     
+    // ✅ FÖRBÄTTRADE STANDARD CALENDAR EVENTS (VECKA/DAG/MÅNAD)
     return (
-      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
+      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between rounded-md ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
         <div className="flex-grow">
           <div className="flex items-center justify-between mb-1">
-            <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80`}>
+            <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80 font-medium`}>
               {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
-              {!isMobile && (case_type === 'private' ? ' Privatperson' : case_type === 'business' ? ' Företag' : ' Avtal')}
+              {!isMobile && (case_type === 'private' ? ' Privat' : case_type === 'business' ? ' Företag' : ' Avtal')}
             </p>
             {technician_role && !isMobile && (
               <div className="flex items-center gap-1">
@@ -524,7 +555,7 @@ export default function TechnicianSchedule() {
             )}
           </div>
           
-          <p className={`font-bold ${isMobile ? 'text-xs' : 'text-sm'} text-white mb-1 ${isMobile ? 'truncate' : ''}`}>
+          <p className={`font-bold ${isMobile ? 'text-xs' : 'text-sm'} text-white mb-1 leading-tight ${isMobile ? 'truncate' : ''}`}>
             {eventInfo.event.title}
           </p>
           
@@ -541,20 +572,21 @@ export default function TechnicianSchedule() {
               
               {skadedjur && (
                 <p className="flex items-center gap-1.5">
-                  <span className="font-semibold">Skadedjur:</span>
-                  <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{skadedjur}</span>
+                  <span className="font-semibold">Problem:</span>
+                  <span className="bg-slate-700/50 px-1.5 py-0.5 rounded text-xs">{skadedjur}</span>
                 </p>
               )}
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-1">
+        {/* ✅ FÖRBÄTTRADE ACTION BUTTONS */}
+        <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-1">
             {telefon_kontaktperson && (
               <a href={`tel:${telefon_kontaktperson}`} 
                  onClick={(e) => e.stopPropagation()} 
-                 className="text-blue-400 hover:text-blue-300 transition-colors" 
+                 className="p-1 bg-blue-500/20 text-blue-400 hover:text-blue-300 hover:bg-blue-500/30 transition-all rounded" 
                  title={`Ring ${kontaktperson}`}>
                 <Phone className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
               </a>
@@ -564,7 +596,7 @@ export default function TechnicianSchedule() {
                  target="_blank" 
                  rel="noopener noreferrer" 
                  onClick={(e) => e.stopPropagation()} 
-                 className="text-green-400 hover:text-green-300 transition-colors" 
+                 className="p-1 bg-green-500/20 text-green-400 hover:text-green-300 hover:bg-green-500/30 transition-all rounded" 
                  title="Navigera till adress">
                 <MapPin className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
               </a>
@@ -572,7 +604,7 @@ export default function TechnicianSchedule() {
           </div>
           
           {!isMobile && (
-            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColorClasses(status)}`}>
+            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColorClasses(status)} opacity-90`}>
               {status}
             </span>
           )}
