@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - OPTIMERAD SCHEMA-VISNING
+// 📁 src/pages/technician/TechnicianSchedule.tsx - CLEAN MODERN DESIGN
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,8 +12,7 @@ import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { 
   ArrowLeft, Calendar, Phone, MapPin, Clock, Filter, X, User, Users,
-  TrendingUp, Target, Search, ChevronRight, AlertCircle, Navigation,
-  DollarSign, Zap, Star, Circle
+  Search, ChevronRight, AlertCircle, Navigation
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -77,44 +76,36 @@ const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status =>
   !status.includes('Avslutat') && !status.includes('Stängt')
 );
 
-// ✅ FÖRBÄTTRADE FÄRGER OCH PRIORITERINGAR
+// ✅ CLEAN STATUS COLORS - Mjukare, mer moderna
+const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
+  const lowerStatus = status?.toLowerCase() || '';
+  
+  if (lowerStatus.includes('avslutat')) 
+    return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+  if (lowerStatus.startsWith('återbesök')) 
+    return { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' };
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) 
+    return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) 
+    return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+  if (lowerStatus.includes('review')) 
+    return { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' };
+  if (lowerStatus.includes('stängt')) 
+    return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
+  
+  return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' };
+};
+
+// ✅ DARK THEME STATUS COLORS för FullCalendar events
 const getStatusColorClasses = (status: string) => {
   const lowerStatus = status?.toLowerCase() || '';
-  if (lowerStatus.includes('avslutat')) return 'bg-green-900/70 text-green-200 border-l-green-400 shadow-green-900/20';
-  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-900/70 text-cyan-200 border-l-cyan-400 shadow-cyan-900/20';
-  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-900/70 text-blue-200 border-l-blue-400 shadow-blue-900/20';
-  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-900/70 text-yellow-200 border-l-yellow-400 shadow-yellow-900/20';
-  if (lowerStatus.includes('review')) return 'bg-purple-900/70 text-purple-200 border-l-purple-400 shadow-purple-900/20';
-  if (lowerStatus.includes('stängt')) return 'bg-slate-700/70 text-slate-300 border-l-slate-500 shadow-slate-700/20';
-  return 'bg-slate-800/70 text-slate-300 border-l-slate-600 shadow-slate-800/20';
-};
-
-const getStatusBadgeColor = (status: string) => {
-  const lowerStatus = status?.toLowerCase() || '';
-  if (lowerStatus.includes('avslutat')) return 'bg-green-500/90 text-white shadow-lg shadow-green-500/25';
-  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/90 text-white shadow-lg shadow-cyan-500/25';
-  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-500/90 text-white shadow-lg shadow-blue-500/25';
-  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-500/90 text-black shadow-lg shadow-yellow-500/25';
-  if (lowerStatus.includes('review')) return 'bg-purple-500/90 text-white shadow-lg shadow-purple-500/25';
-  if (lowerStatus.includes('stängt')) return 'bg-slate-500/90 text-white shadow-lg shadow-slate-500/25';
-  return 'bg-slate-600/90 text-white shadow-lg shadow-slate-600/25';
-};
-
-// ✅ PRIORITETSLOGIK BASERAT PÅ STATUS + TID
-const getCasePriority = (case_: ScheduledCase): 'high' | 'medium' | 'low' => {
-  const status = case_.status?.toLowerCase() || '';
-  const now = new Date();
-  const caseTime = new Date(case_.start_date);
-  const hoursDiff = (caseTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-  
-  // Hög prioritet: Bokade inom 2 timmar eller kritiska status
-  if (status.includes('bokad') && hoursDiff <= 2) return 'high';
-  if (status.includes('signerad') || status.startsWith('återbesök')) return 'high';
-  
-  // Medel prioritet: Öppna eller skickade offerter
-  if (status.includes('öppen') || status.includes('offert skickad')) return 'medium';
-  
-  return 'low';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-900/50 text-green-300 border-green-700';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-900/50 text-cyan-300 border-cyan-700';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-900/50 text-blue-300 border-blue-700';
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-900/50 text-yellow-300 border-yellow-700';
+  if (lowerStatus.includes('review')) return 'bg-purple-900/50 text-purple-300 border-purple-700';
+  if (lowerStatus.includes('stängt')) return 'bg-slate-700/50 text-slate-400 border-slate-600';
+  return 'bg-slate-800/50 text-slate-400 border-slate-700';
 };
 
 const formatAddress = (address: any): string => {
@@ -131,32 +122,18 @@ const formatAddress = (address: any): string => {
   return '';
 };
 
-// ✅ SMART ADRESSFÖRKORTNING
-const formatAddressShort = (address: any): string => {
-  const fullAddress = formatAddress(address);
-  if (!fullAddress) return '';
-  
-  // Ta första delen före komma (gatunamn + nummer)
-  const parts = fullAddress.split(',');
-  if (parts.length > 0) {
-    return parts[0].trim();
-  }
-  return fullAddress;
+// ✅ EXAKT PRISVISNING - Visar precis som det står i databasen
+const formatPriceExact = (price: number | null | undefined): string => {
+  if (!price || price === 0) return '';
+  return `${price}kr`;
 };
 
 const getTechnicianRoleIcon = (role: 'primary' | 'secondary' | 'tertiary') => {
   switch (role) {
-    case 'primary': return <User className="w-3 h-3 text-blue-400" title="Primär tekniker" />;
-    case 'secondary': return <Users className="w-3 h-3 text-green-400" title="Sekundär tekniker" />;
-    case 'tertiary': return <Users className="w-3 h-3 text-purple-400" title="Tertiär tekniker" />;
+    case 'primary': return <User className="w-3 h-3 text-blue-500" title="Primär tekniker" />;
+    case 'secondary': return <Users className="w-3 h-3 text-green-500" title="Sekundär tekniker" />;
+    case 'tertiary': return <Users className="w-3 h-3 text-purple-500" title="Tertiär tekniker" />;
   }
-};
-
-// ✅ SMART PRISFORMATERING
-const formatPrice = (price: number | null | undefined): string => {
-  if (!price || price === 0) return '';
-  if (price >= 1000) return `${Math.round(price/1000)}k kr`;
-  return `${price} kr`;
 };
 
 const findNextCase = (cases: ScheduledCase[], activeStatuses: Set<string>) => {
@@ -369,15 +346,14 @@ export default function TechnicianSchedule() {
     return filteredCases.map(case_ => {
       const startDate = new Date(case_.start_date);
       const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-      const priority = getCasePriority(case_);
 
       return {
         id: case_.id,
         title: case_.title,
         start: startDate,
         end: endDate,
-        extendedProps: { ...case_, priority },
-        className: `!border-l-4 ${getStatusColorClasses(case_.status)} ${priority === 'high' ? '!shadow-lg !shadow-red-500/20 !ring-1 !ring-red-500/30' : ''}`
+        extendedProps: { ...case_ },
+        className: `!border ${getStatusColorClasses(case_.status)}`
       }
     });
   }, [cases, activeStatuses, caseTypeFilter, searchQuery]);
@@ -386,127 +362,157 @@ export default function TechnicianSchedule() {
     const { 
       case_type, kontaktperson, adress, telefon_kontaktperson, skadedjur, 
       technician_role, primary_assignee_name, secondary_assignee_name, tertiary_assignee_name,
-      case_price, status, priority
+      case_price, status
     } = eventInfo.event.extendedProps;
     
     const isMobile = window.innerWidth < 640;
     const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
     const isList = eventInfo.view.type.includes('list');
     
-    // ✅ OPTIMERAD KOMPAKT LISTVY MED ALLA FÖRBÄTTRINGAR
+    // ✅ HELT NY CLEAN MODERN LISTVY
     if (isList) {
-      const shortAddress = formatAddressShort(adress);
       const fullAddress = formatAddress(adress);
-      const shortTime = new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { 
+      const timeStr = new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { 
         hour: '2-digit', 
         minute: '2-digit' 
       });
-      const formattedPrice = formatPrice(case_price);
+      const exactPrice = formatPriceExact(case_price);
+      const statusColors = getStatusColor(status);
       
       return (
-        <div className={`w-full p-4 ${getStatusColorClasses(status)} hover:bg-opacity-80 transition-all duration-200 rounded-xl border-l-4 shadow-lg mb-3 relative z-10 ${priority === 'high' ? 'ring-2 ring-red-400/50' : ''}`}>
-          {/* ✅ PRIORITETSINDIKATOR */}
-          {priority === 'high' && (
-            <div className="absolute top-2 right-2">
-              <Star className="w-4 h-4 text-red-400 fill-current animate-pulse" />
-            </div>
-          )}
-          
-          {/* ✅ FÖRBÄTTRAD HEADER */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">
-                  {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(status)}`}>
-                  {status.length > 15 ? status.substring(0, 15) + '...' : status}
-                </span>
-              </div>
-              {technician_role && technician_role !== 'primary' && (
-                <div className="flex items-center gap-1">
-                  {getTechnicianRoleIcon(technician_role)}
-                  <span className="text-xs bg-slate-700/80 px-2 py-1 rounded-full backdrop-blur">
-                    {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
+        <div className="w-full bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4 hover:shadow-md transition-shadow duration-200">
+          {/* ✅ HEADER MED TID OCH STATUS */}
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center justify-between mb-3">
+              {/* Tid och ärendetyp */}
+              <div className="flex items-center gap-3">
+                <div className="text-2xl font-bold text-gray-900 font-mono">
+                  {timeStr}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">
+                    {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+                  </span>
+                  <span className="text-sm font-medium text-gray-600">
+                    {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
                   </span>
                 </div>
-              )}
+              </div>
+              
+              {/* Status badge */}
+              <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusColors.bg} ${statusColors.text} ${statusColors.border} border`}>
+                {status}
+              </span>
             </div>
             
-            <div className="text-right">
-              <div className="text-sm font-bold text-white mb-1">{shortTime}</div>
-              {formattedPrice && (
-                <div className="text-green-400 font-bold text-sm">
-                  {formattedPrice}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* ✅ HUVUDINNEHÅLL - TITEL OCH KUND */}
-          <div className="mb-3">
-            <h3 className="text-lg font-bold text-white mb-2 leading-tight">
-              {eventInfo.event.title.length > 50 
-                ? eventInfo.event.title.substring(0, 50) + '...' 
-                : eventInfo.event.title
-              }
+            {/* ✅ ÄRENDETITEL */}
+            <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight">
+              {eventInfo.event.title}
             </h3>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-200">
+            {/* ✅ GRUNDINFO RAD */}
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 <span className="font-medium">
                   {kontaktperson || 'Okänd kund'}
                 </span>
               </div>
               
-              {shortAddress && (
-                <div className="flex items-center gap-2 text-slate-300 text-sm">
-                  <MapPin className="w-4 h-4" />
-                  <span className="truncate max-w-[140px]" title={fullAddress}>
-                    {shortAddress}
+              {exactPrice && (
+                <div className="font-bold text-lg text-emerald-600">
+                  {exactPrice}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* ✅ DETALJER SEKTION */}
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+            <div className="grid grid-cols-1 gap-3">
+              {/* Adress */}
+              {fullAddress && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 leading-relaxed">
+                    {fullAddress}
+                  </span>
+                </div>
+              )}
+              
+              {/* Skadedjur */}
+              {skadedjur && (
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 flex-shrink-0 text-center">🐛</div>
+                  <span className="text-sm text-gray-700">
+                    <span className="font-medium">Skadedjur:</span> {skadedjur}
+                  </span>
+                </div>
+              )}
+              
+              {/* Team info - endast om flera tekniker */}
+              {(secondary_assignee_name || tertiary_assignee_name) && (
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-600">Team:</span>
+                    {secondary_assignee_name && (
+                      <span className="text-emerald-600 font-medium">
+                        {secondary_assignee_name.split(' ')[0]}
+                      </span>
+                    )}
+                    {tertiary_assignee_name && (
+                      <>
+                        {secondary_assignee_name && <span className="text-gray-400">•</span>}
+                        <span className="text-purple-600 font-medium">
+                          {tertiary_assignee_name.split(' ')[0]}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Tekniker-roll indikator */}
+              {technician_role && technician_role !== 'primary' && (
+                <div className="flex items-center gap-3">
+                  {getTechnicianRoleIcon(technician_role)}
+                  <span className="text-sm text-gray-600">
+                    {technician_role === 'secondary' ? 'Sekundär tekniker på detta ärende' : 'Tredje tekniker på detta ärende'}
                   </span>
                 </div>
               )}
             </div>
           </div>
           
-          {/* ✅ SKADEDJUR OCH ACTIONS */}
-          <div className="flex items-center justify-between">
-            <div className="flex-grow">
-              {skadedjur && (
-                <div className="inline-flex items-center gap-2">
-                  <Target className="w-4 h-4 text-orange-400" />
-                  <span className="bg-orange-500/20 text-orange-200 px-3 py-1 rounded-full text-sm font-medium">
-                    {skadedjur}
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2 ml-3">
-              {telefon_kontaktperson && (
-                <a 
-                  href={`tel:${telefon_kontaktperson}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-2 bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 rounded-lg transition-all duration-200 backdrop-blur"
-                  title={`Ring ${kontaktperson}`}
-                >
-                  <Phone className="w-4 h-4" />
-                </a>
-              )}
-              {fullAddress && (
-                <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-2 bg-green-500/20 text-green-300 hover:bg-green-500/40 rounded-lg transition-all duration-200 backdrop-blur"
-                  title="Navigera"
-                >
-                  <Navigation className="w-4 h-4" />
-                </a>
-              )}
+          {/* ✅ ACTION BUTTONS */}
+          <div className="px-4 py-3 border-t border-gray-100 bg-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {telefon_kontaktperson && (
+                  <a 
+                    href={`tel:${telefon_kontaktperson}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors duration-200 text-sm font-medium"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Ring
+                  </a>
+                )}
+                {fullAddress && (
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors duration-200 text-sm font-medium"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Navigera
+                  </a>
+                )}
+              </div>
+              
               <Button 
                 size="sm" 
                 variant="primary"
@@ -515,48 +521,26 @@ export default function TechnicianSchedule() {
                   setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
                   setIsEditModalOpen(true);
                 }}
-                className="px-3 py-2 text-sm flex items-center gap-2 font-semibold shadow-lg"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
               >
-                <span>Öppna</span>
+                <span>Öppna ärende</span>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
-          
-          {/* ✅ TEAM INFO - ENDAST OM FLERA TEKNIKER */}
-          {(secondary_assignee_name || tertiary_assignee_name) && (
-            <div className="mt-3 pt-3 border-t border-slate-600/40">
-              <div className="flex items-center gap-3 text-sm">
-                <Users className="w-4 h-4 text-slate-400" />
-                <div className="flex items-center gap-3">
-                  {secondary_assignee_name && (
-                    <span className="text-green-400 font-medium">
-                      +{secondary_assignee_name.split(' ')[0]}
-                    </span>
-                  )}
-                  {tertiary_assignee_name && (
-                    <span className="text-purple-400 font-medium">
-                      +{tertiary_assignee_name.split(' ')[0]}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       );
     }
     
-    // ✅ FÖRBÄTTRADE STANDARD CALENDAR EVENTS
-    const formattedPrice = formatPrice(case_price);
+    // ✅ STANDARD CALENDAR EVENTS - Behåller mörkt tema för kalender-vyerna
+    const exactPrice = formatPriceExact(case_price);
     
     return (
-      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between rounded-md ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''} ${priority === 'high' ? 'ring-2 ring-red-400/50' : ''}`}>
+      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between rounded-md ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
         <div className="flex-grow">
           <div className="flex items-center justify-between mb-1">
             <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80 font-medium flex items-center gap-1`}>
               {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
-              {priority === 'high' && <Star className="w-3 h-3 text-red-400 fill-current" />}
               {!isMobile && (case_type === 'private' ? ' Privat' : case_type === 'business' ? ' Företag' : ' Avtal')}
             </p>
             {technician_role && !isMobile && (
@@ -594,16 +578,15 @@ export default function TechnicianSchedule() {
                 </p>
               )}
               
-              {formattedPrice && (
-                <p className="flex items-center gap-1.5">
-                  <span className="text-green-400 font-bold">{formattedPrice}</span>
+              {exactPrice && (
+                <p className="text-green-400 font-bold">
+                  {exactPrice}
                 </p>
               )}
             </div>
           )}
         </div>
 
-        {/* ✅ FÖRBÄTTRADE ACTION BUTTONS */}
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-1">
             {telefon_kontaktperson && (
@@ -742,7 +725,7 @@ export default function TechnicianSchedule() {
                     {quickStats.nextCase.case_price && (
                       <>
                         <span>•</span>
-                        <span className="text-green-400 font-semibold">{formatPrice(quickStats.nextCase.case_price)}</span>
+                        <span className="text-green-400 font-semibold">{formatPriceExact(quickStats.nextCase.case_price)}</span>
                       </>
                     )}
                   </div>
