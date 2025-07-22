@@ -1,5 +1,5 @@
 // 📁 src/components/admin/technicians/ReportModal.tsx
-// ⭐ SLUTGILTIG KORRIGERING: Rättar databasfrågan för 'case_type'. ⭐
+// ⭐ KORRIGERING: Hämtar nu ALLA fält för varje ärende med select('*'). ⭐
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -7,15 +7,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Search, X } from 'lucide-react';
 import Button from '../../ui/Button';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+import { BeGoneCaseRow } from '../../../types/database'; // Importera din typ för flexibilitet
 
-// Interface
-interface ScheduledCase { id: string; title: string; case_type: 'private' | 'business' | 'contract'; kontaktperson?: string; start_date: string; status: string; case_price?: number; skadedjur?: string; }
+// Använd den importerade typen, men lägg till case_price eftersom vi mappar det manuellt
+type ReportCase = BeGoneCaseRow & { case_price?: number; };
 
 interface ReportModalProps {
     isOpen: boolean;
     onClose: () => void;
     technicianId: string;
-    onOpenCase: (caseData: ScheduledCase) => void;
+    onOpenCase: (caseData: ReportCase) => void;
 }
 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
@@ -24,7 +25,7 @@ const toDateString = (date: Date): string => date.toISOString().split('T')[0];
 
 export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase }: ReportModalProps) {
     const [loading, setLoading] = useState(false);
-    const [reportCases, setReportCases] = useState<ScheduledCase[]>([]);
+    const [reportCases, setReportCases] = useState<ReportCase[]>([]);
     
     // Filter-state
     const [startDate, setStartDate] = useState(() => {
@@ -41,32 +42,30 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
         setLoading(true);
 
         try {
-            // KORRIGERING: 'case_type' borttagen från commonFields.
-            const commonFields = `id, title, kontaktperson, start_date, status, skadedjur, pris`;
-
+            // KORRIGERING: Använder select('*') för att hämta ALLA kolumner.
             const [privateResult, businessResult] = await Promise.all([
-                supabase.from('private_cases').select(commonFields).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
-                supabase.from('business_cases').select(commonFields).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
+                supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
+                supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
             ]);
 
             if (privateResult.error) throw privateResult.error;
             if (businessResult.error) throw businessResult.error;
 
-            // KORRIGERING: Mappar 'pris' till 'case_price' OCH lägger manuellt till 'case_type'.
+            // Logiken för att mappa 'pris' och lägga till 'case_type' är densamma.
             const privateCases = (privateResult.data || []).map(c => ({
                 ...c,
                 case_price: c.pris,
-                case_type: 'private' as const // Lägg till typen manuellt
+                case_type: 'private' as const
             }));
             const businessCases = (businessResult.data || []).map(c => ({
                 ...c,
                 case_price: c.pris,
-                case_type: 'business' as const // Lägg till typen manuellt
+                case_type: 'business' as const
             }));
 
             const allCases = [...privateCases, ...businessCases];
 
-            setReportCases(allCases as ScheduledCase[]);
+            setReportCases(allCases as ReportCase[]);
 
         } catch (error) {
             console.error("Fel vid hämtning av rapportdata:", error);
@@ -81,10 +80,10 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
             .filter(c => {
                 const matchesStatus = selectedStatuses.has(c.status);
                 const query = searchQuery.toLowerCase();
-                const matchesSearch = !query || c.title.toLowerCase().includes(query) || c.kontaktperson?.toLowerCase().includes(query) || c.skadedjur?.toLowerCase().includes(query);
+                const matchesSearch = !query || c.title.toLowerCase().includes(query) || (c.kontaktperson && c.kontaktperson.toLowerCase().includes(query)) || (c.skadedjur && c.skadedjur.toLowerCase().includes(query));
                 return matchesStatus && matchesSearch;
             })
-            .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+            .sort((a, b) => new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime());
     }, [reportCases, selectedStatuses, searchQuery]);
     
     const stats = useMemo(() => {
@@ -137,7 +136,7 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                                 {!loading && filteredReportCases.map(caseData => (
                                     <div key={caseData.id} onClick={() => onOpenCase(caseData)} className="p-4 border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer transition-colors">
                                         <div className="flex justify-between items-center mb-1"><span className="font-bold text-white">{caseData.title}</span><span className="text-sm font-semibold text-blue-300">{caseData.case_price?.toLocaleString('sv-SE')} kr</span></div>
-                                        <div className="flex justify-between items-center text-sm text-slate-400"><span>{new Date(caseData.start_date).toLocaleDateString('sv-SE')} - {caseData.kontaktperson}</span><span>{caseData.status}</span></div>
+                                        <div className="flex justify-between items-center text-sm text-slate-400"><span>{caseData.start_date ? new Date(caseData.start_date).toLocaleDateString('sv-SE') : 'Inget datum'} - {caseData.kontaktperson}</span><span>{caseData.status}</span></div>
                                     </div>
                                 ))}
                                 </div>
