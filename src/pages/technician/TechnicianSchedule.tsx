@@ -1,12 +1,10 @@
 // 📁 src/pages/technician/TechnicianSchedule.tsx
-// ⭐ VERSION 7.1 - KORRIGERAD OCH ROBUST KLICK-LOGIK ⭐
-// Denna version säkerställer att datumhanteringen är robust och fri från tidszonsfel.
-// 1. Omskriven Interaktion: Använder `dayCellDidMount` för att fästa en egen,
-//    tillförlitlig klickhanterare på varje dag-cell.
-// 2. Garanterat Korrekt Datum: Läser datumet från `data-date-str` och skapar
-//    ett nytt Date-objekt i lokal tidszon för att förhindra "off-by-one"-buggen.
-// 3. Stabilitet: Ersätter den potentiellt osäkra `new Date('YYYY-MM-DD')` med en
-//    stabilare metod som fungerar konsekvent över alla webbläsare och tidszoner.
+// ⭐ VERSION 8.0 - STABILISERAD KLICK-LOGIK MED NATIVE HANDLER ⭐
+// Denna version återgår till FullCalendars inbyggda `dateClick`-hanterare,
+// vilket är den mest robusta och rekommenderade metoden.
+// 1. Borttagen `dayCellDidMount`: Den anpassade och buggiga event-hanteraren är borttagen.
+// 2. Återinförd `dateClick`: Använder `dateClick`-propen för att pålitligt fånga datumval.
+// 3. Stabilitet: Eliminerar felet med felaktig kolumn genom att lita på bibliotekets interna logik.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin from '@fullcalendar/interaction'
+import interactionPlugin from '@fullcalendar/interaction' // Krävs för dateClick
 import svLocale from '@fullcalendar/core/locales/sv'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X } from 'lucide-react'
@@ -205,69 +203,45 @@ export default function TechnicianSchedule() {
   const handleOpenModal = (caseData: ScheduledCase) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
   const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
   
-  const dayCellDidMount = (arg: any) => {
-    const dateStr = arg.date.toISOString().split('T')[0];
-    arg.el.setAttribute('data-date-str', dateStr);
-    
-    // Tar bort eventuella gamla lyssnare för att undvika dubbla anrop
-    const existingListener = (arg.el as any)._clickListener;
-    if (existingListener) {
-        arg.el.removeEventListener('click', existingListener);
-    }
-
-    const newListener = (e: MouseEvent) => {
-        // Förhindra FullCalendars standardbeteende för att undvika konflikter
-        e.preventDefault();
-        e.stopPropagation();
-
-        const targetDateStr = (e.currentTarget as HTMLElement).getAttribute('data-date-str');
-        if (targetDateStr) {
-            // **KORRIGERING FÖR TIDSZON:**
-            // Att använda `new Date('2023-10-25')` kan tolkas som midnatt UTC, vilket
-            // kan bli föregående dag i tidszoner som ligger före UTC (t.ex. i Sverige).
-            // Genom att dela upp strängen och skicka delarna separat till `new Date()`
-            // säkerställer vi att datumet skapas i användarens lokala tidszon.
-            const [year, month, day] = targetDateStr.split('-').map(Number);
-            const clickedDate = new Date(year, month - 1, day);
-            
-            setSelectedDate(clickedDate);
-            
-            // Växla till agendavy på mobil efter datumval
-            if (window.innerWidth < 1024) {
-                setMobileView('agenda');
-            }
-        }
-    };
-    
-    arg.el.addEventListener('click', newListener);
-    // Spara en referens till lyssnaren för att kunna ta bort den senare
-    (arg.el as any)._clickListener = newListener;
-  }
+  // Använd FullCalendars inbyggda klick-hanterare
+  const handleDateClick = (clickInfo: { date: Date }) => {
+      setSelectedDate(clickInfo.date);
+      if (window.innerWidth < 1024) {
+          setMobileView('agenda');
+      }
+  };
 
   const renderDayCellContent = (dayRenderInfo: any) => {
     const dayString = dayRenderInfo.date.toDateString();
     const count = eventsByDay[dayString];
     const heatmapClass = getHeatmapClass(count);
     return (
-        <div className={`heatmap-cell ${heatmapClass}`}>
-            {dayRenderInfo.dayNumberText}
+        <div className={`relative w-full h-full flex items-center justify-center`}>
+          <span>{dayRenderInfo.dayNumberText}</span>
+          {count > 0 && 
+            <div className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${heatmapClass}`}></div>
+          }
         </div>
     );
   };
   
-
   useEffect(() => {
-    // Synkronisera kalendervyerna när `selectedDate` ändras
-    calendarRef.current?.getApi().gotoDate(selectedDate);
-    mobileCalendarRef.current?.getApi().gotoDate(selectedDate);
+    // Synkronisera kalendervyerna när selectedDate ändras
+    const calendarApi = calendarRef.current?.getApi();
+    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
+    if (calendarApi && calendarApi.getDate().toDateString() !== selectedDate.toDateString()) {
+        calendarApi.gotoDate(selectedDate);
+    }
+    if (mobileCalendarApi && mobileCalendarApi.getDate().toDateString() !== selectedDate.toDateString()) {
+        mobileCalendarApi.gotoDate(selectedDate);
+    }
     
-    // Markera den valda dagen visuellt i kalendern
-    // Ta först bort markering från eventuellt tidigare vald dag
+    // Rensa tidigare visuella markeringar
     document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
-    
-    // Hitta och markera den nya dagen
+
+    // Hitta och markera den nya valda dagen. FullCalendar placerar `data-date` på `<td>`-elementet.
     const dateString = selectedDate.toISOString().split('T')[0];
-    const dayElement = document.querySelector(`.fc-day[data-date="${dateString}"]`);
+    const dayElement = document.querySelector(`td[data-date="${dateString}"]`);
     if (dayElement) {
         dayElement.classList.add('day-selected');
     }
@@ -301,7 +275,7 @@ export default function TechnicianSchedule() {
                 locale={svLocale}
                 headerToolbar={{left: 'title', center: '', right: 'prev,next'}}
                 height="auto"
-                dayCellDidMount={dayCellDidMount}
+                dateClick={handleDateClick} // ANVÄND INBYGGD HANTERARE
                 dayCellContent={renderDayCellContent}
               />
             </Card>
@@ -356,7 +330,7 @@ export default function TechnicianSchedule() {
                       locale={svLocale}
                       headerToolbar={{ left: 'title', center: '', right: 'prev,next' }}
                       height="auto"
-                      dayCellDidMount={dayCellDidMount}
+                      dateClick={handleDateClick} // ANVÄND INBYGGD HANTERARE
                       dayCellContent={renderDayCellContent}
                     />
                   </Card>
