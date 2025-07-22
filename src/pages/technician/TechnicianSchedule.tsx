@@ -1,4 +1,910 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD MED SÖKNING OCH NÄSTA ÄRENDE
+// 📁 src/pages/technician/TechnicianSchedule.tsx - MED DAGENS ÄRENDEN OCH EXTERN CSS
+
+import React, { useState, useEffect, useMemo } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import listPlugin from '@fullcalendar/list'
+import svLocale from '@fullcalendar/core/locales/sv'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import { 
+  ArrowLeft, Calendar, Phone, MapPin, Clock, Filter, X, User, Users,
+  TrendingUp, Zap, Target, Search, ChevronRight, AlertCircle
+} from 'lucide-react'
+import Button from '../../components/ui/Button'
+import Card from '../../components/ui/Card'
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
+import '../../styles/FullCalendar.css'
+
+interface ScheduledCase {
+  id: string; title: string; case_type: 'private' | 'business' | 'contract';
+  kontaktperson?: string; start_date: string; end_date?: string; description?: string; status: string;
+  case_price?: number; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
+  skadedjur?: string; org_nr?: string; adress?: any;
+  primary_assignee_id?: string; secondary_assignee_id?: string; tertiary_assignee_id?: string;
+  primary_assignee_name?: string; secondary_assignee_name?: string; tertiary_assignee_name?: string;
+  technician_role?: 'primary' | 'secondary' | 'tertiary';
+}
+
+// ✅ RESPONSIVA CALENDAR VIEWS INKLUDERAR VECKA PÅ MOBIL
+const getResponsiveInitialView = () => {
+  if (typeof window === 'undefined') return 'timeGridWeek';
+  
+  const width = window.innerWidth;
+  if (width < 640) return 'listDay'; // Mobil: dagens lista som default
+  if (width < 1024) return 'timeGridDay'; // Tablet: dagens timmar
+  return 'timeGridWeek'; // Desktop: vecka
+};
+
+// ✅ RESPONSIVA HEADER TOOLBAR MED "DAGENS ÄRENDEN"
+const getResponsiveHeaderToolbar = () => {
+  if (typeof window === 'undefined') return {
+    left: 'prev,next today',
+    center: 'title',
+    right: 'dayGridMonth,timeGridWeek,timeGridDay,listDay'
+  };
+  
+  const width = window.innerWidth;
+  if (width < 640) {
+    // Mobil: Dagens ärenden, dag, vecka och månad
+    return {
+      left: 'prev,next',
+      center: 'title',
+      right: 'listDay,timeGridDay,timeGridWeek,dayGridMonth'
+    };
+  }
+  if (width < 1024) {
+    // Tablet: Dag, vecka, dagens ärenden och månad
+    return {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'timeGridDay,timeGridWeek,listDay,dayGridMonth'
+    };
+  }
+  // Desktop: Alla vyer
+  return {
+    left: 'prev,next today',
+    center: 'title',
+    right: 'dayGridMonth,timeGridWeek,timeGridDay,listDay'
+  };
+};
+
+const ALL_STATUSES = [
+  'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
+  'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5',
+  'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'
+];
+
+const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => 
+  !status.includes('Avslutat') && !status.includes('Stängt')
+);
+
+const getStatusColorClasses = (status: string) => {
+  const lowerStatus = status?.toLowerCase() || '';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-900/50 text-green-300 border-green-700';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-900/50 text-cyan-300 border-cyan-700';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-900/50 text-blue-300 border-blue-700';
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-900/50 text-yellow-300 border-yellow-700';
+  if (lowerStatus.includes('review')) return 'bg-purple-900/50 text-purple-300 border-purple-700';
+  if (lowerStatus.includes('stängt')) return 'bg-slate-700/50 text-slate-400 border-slate-600';
+  return 'bg-slate-800/50 text-slate-400 border-slate-700';
+};
+
+const getStatusBadgeColor = (status: string) => {
+  const lowerStatus = status?.toLowerCase() || '';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-500 text-white';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500 text-white';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-500 text-white';
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-500 text-black';
+  if (lowerStatus.includes('review')) return 'bg-purple-500 text-white';
+  if (lowerStatus.includes('stängt')) return 'bg-slate-500 text-white';
+  return 'bg-slate-600 text-white';
+};
+
+const formatAddress = (address: any): string => {
+  if (!address) return '';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  if (typeof address === 'string') { 
+    try { 
+      const p = JSON.parse(address); 
+      return p.formatted_address || address; 
+    } catch (e) { 
+      return address; 
+    } 
+  }
+  return '';
+};
+
+const getTechnicianRoleIcon = (role: 'primary' | 'secondary' | 'tertiary') => {
+  switch (role) {
+    case 'primary': return <User className="w-3 h-3 text-blue-400" title="Primär tekniker" />;
+    case 'secondary': return <Users className="w-3 h-3 text-green-400" title="Sekundär tekniker" />;
+    case 'tertiary': return <Users className="w-3 h-3 text-purple-400" title="Tertiär tekniker" />;
+  }
+};
+
+// ✅ HJÄLPFUNKTION FÖR ATT HITTA NÄSTA ÄRENDE
+const findNextCase = (cases: ScheduledCase[], activeStatuses: Set<string>) => {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  
+  // Filtrera ärenden för idag som inte är avslutade
+  const todaysCases = cases.filter(case_ => {
+    const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
+    const isToday = caseDate === todayStr;
+    const isActive = activeStatuses.has(case_.status);
+    const isNotCompleted = !case_.status?.toLowerCase().includes('avslutat');
+    
+    return isToday && isActive && isNotCompleted;
+  });
+  
+  // Sortera efter tid
+  todaysCases.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  
+  // Hitta nästa ärende (första som är efter nu eller det första ärende om inget är efter nu)
+  const nextCase = todaysCases.find(case_ => new Date(case_.start_date) > now) || todaysCases[0];
+  
+  return nextCase;
+};
+
+export default function TechnicianSchedule() {
+  const { profile, isTechnician } = useAuth()
+  const navigate = useNavigate()
+
+  const [loading, setLoading] = useState(true)
+  const [cases, setCases] = useState<ScheduledCase[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const [calendarView, setCalendarView] = useState(getResponsiveInitialView())
+
+  // Filter states
+  const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES))
+  const [showFilters, setShowFilters] = useState(false)
+  const [caseTypeFilter, setCaseTypeFilter] = useState<'all' | 'private' | 'business' | 'contract'>('all')
+
+  // ✅ SÖKNING
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedCase, setSelectedCase] = useState<ScheduledCase | null>(null)
+
+  // ✅ RESPONSIVE WINDOW RESIZE HANDLER
+  useEffect(() => {
+    const handleResize = () => {
+      const newView = getResponsiveInitialView();
+      if (newView !== calendarView) {
+        setCalendarView(newView);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calendarView]);
+
+  useEffect(() => {
+    if (isTechnician && profile?.technician_id) {
+      fetchScheduledCases(profile.technician_id)
+    }
+  }, [isTechnician, profile?.technician_id])
+
+  const fetchScheduledCases = async (technicianId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('🔍 Fetching cases for technician:', technicianId);
+      
+      const commonFields = `
+        id, title, kontaktperson, start_date, created_at, description, status, 
+        telefon_kontaktperson, e_post_kontaktperson, skadedjur, adress,
+        primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
+        primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
+      `;
+      
+      const [privateResult, businessResult, contractResult] = await Promise.allSettled([
+        supabase
+          .from('private_cases')
+          .select(`${commonFields}, pris`)
+          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        
+        supabase
+          .from('business_cases')
+          .select(`${commonFields}, pris, org_nr`)
+          .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        
+        supabase
+          .from('cases')
+          .select('id, title, created_date, description, status, case_type, adress:address_formatted')
+          .eq('assigned_technician_id', technicianId)
+      ]);
+      
+      const allCases: Partial<ScheduledCase>[] = [];
+      
+      // Process private cases
+      if (privateResult.status === 'fulfilled' && privateResult.value.data) {
+        allCases.push(...privateResult.value.data.map((c: any) => {
+          let technicianRole: 'primary' | 'secondary' | 'tertiary' = 'primary';
+          if (c.secondary_assignee_id === technicianId) technicianRole = 'secondary';
+          else if (c.tertiary_assignee_id === technicianId) technicianRole = 'tertiary';
+          
+          return {
+            ...c,
+            start_date: c.start_date || c.created_at,
+            case_price: c.pris,
+            case_type: 'private' as const,
+            technician_role: technicianRole
+          };
+        }));
+      }
+      
+      // Process business cases
+      if (businessResult.status === 'fulfilled' && businessResult.value.data) {
+        allCases.push(...businessResult.value.data.map((c: any) => {
+          let technicianRole: 'primary' | 'secondary' | 'tertiary' = 'primary';
+          if (c.secondary_assignee_id === technicianId) technicianRole = 'secondary';
+          else if (c.tertiary_assignee_id === technicianId) technicianRole = 'tertiary';
+          
+          return {
+            ...c,
+            start_date: c.start_date || c.created_at,
+            case_price: c.pris,
+            case_type: 'business' as const,
+            technician_role: technicianRole
+          };
+        }));
+      }
+      
+      // Process contract cases
+      if (contractResult.status === 'fulfilled' && contractResult.value.data) {
+        allCases.push(...contractResult.value.data.map((c: any) => ({
+          ...c,
+          start_date: c.created_date,
+          case_type: c.case_type || 'contract',
+          technician_role: 'primary' as const
+        })));
+      }
+      
+      const casesWithDates = allCases.filter(c => c.start_date);
+      
+      console.log('📊 Fetched cases:', {
+        total: casesWithDates.length,
+        private: casesWithDates.filter(c => c.case_type === 'private').length,
+        business: casesWithDates.filter(c => c.case_type === 'business').length,
+        contract: casesWithDates.filter(c => c.case_type === 'contract').length
+      });
+      
+      setCases(casesWithDates as ScheduledCase[]);
+    } catch (err: any) {
+      console.error('❌ Error fetching cases:', err);
+      setError(err.message || 'Kunde inte hämta schemalagda ärenden')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ✅ STATISTIK FÖR HEADER MED NÄSTA ÄRENDE
+  const quickStats = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    let filteredCases = cases;
+    
+    // Applicera textfilter först
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredCases = filteredCases.filter(case_ => 
+        case_.title.toLowerCase().includes(query) ||
+        case_.kontaktperson?.toLowerCase().includes(query) ||
+        case_.skadedjur?.toLowerCase().includes(query) ||
+        case_.status.toLowerCase().includes(query) ||
+        formatAddress(case_.adress).toLowerCase().includes(query)
+      );
+    }
+    
+    // Applicera statusfilter
+    if (activeStatuses.size < ALL_STATUSES.length) {
+      filteredCases = filteredCases.filter(case_ => activeStatuses.has(case_.status));
+    }
+    
+    // Applicera ärendetypfilter
+    if (caseTypeFilter !== 'all') {
+      filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
+    }
+    
+    const todaysCases = filteredCases.filter(case_ => {
+      const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
+      return caseDate === today;
+    });
+    
+    const completedToday = todaysCases.filter(c => 
+      c.status?.toLowerCase().includes('avslutat')
+    ).length;
+    
+    const todaysRevenue = todaysCases
+      .filter(c => c.status?.toLowerCase().includes('avslutat'))
+      .reduce((sum, c) => sum + (c.case_price || 0), 0);
+    
+    // Hitta nästa ärende
+    const nextCase = findNextCase(filteredCases, activeStatuses);
+    
+    return {
+      todayTotal: todaysCases.length,
+      todayCompleted: completedToday,
+      todaysRevenue: todaysRevenue,
+      totalFiltered: filteredCases.length,
+      nextCase: nextCase
+    };
+  }, [cases, activeStatuses, caseTypeFilter, searchQuery]);
+
+  // ✅ CALENDAR EVENTS - FILTRERAR BARA DAGENS FÖR LISTVY
+  const calendarEvents = useMemo(() => {
+    let filteredCases = cases;
+    
+    // Textfilter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredCases = filteredCases.filter(case_ => 
+        case_.title.toLowerCase().includes(query) ||
+        case_.kontaktperson?.toLowerCase().includes(query) ||
+        case_.skadedjur?.toLowerCase().includes(query) ||
+        case_.status.toLowerCase().includes(query) ||
+        formatAddress(case_.adress).toLowerCase().includes(query)
+      );
+    }
+    
+    // Statusfilter
+    if (activeStatuses.size < ALL_STATUSES.length) {
+      filteredCases = filteredCases.filter(case_ => activeStatuses.has(case_.status));
+    }
+    
+    // Ärendetypfilter
+    if (caseTypeFilter !== 'all') {
+      filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
+    }
+    
+    // ✅ FÖR LISTVY: VISA BARA DAGENS ÄRENDEN
+    if (calendarView === 'listDay') {
+      const today = new Date().toISOString().split('T')[0];
+      filteredCases = filteredCases.filter(case_ => {
+        const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
+        return caseDate === today;
+      });
+    }
+    
+    return filteredCases.map(case_ => {
+      const startDate = new Date(case_.start_date);
+      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+      return {
+        id: case_.id,
+        title: case_.title,
+        start: startDate,
+        end: endDate,
+        extendedProps: { ...case_ },
+        className: `!border ${getStatusColorClasses(case_.status)}`
+      }
+    });
+  }, [cases, activeStatuses, caseTypeFilter, searchQuery, calendarView]);
+  
+  // ✅ FÖRBÄTTRAD EVENT RENDERING MED DESKTOP LISTVY-FIX
+  const renderEventContent = (eventInfo: any) => {
+    const { 
+      case_type, kontaktperson, adress, telefon_kontaktperson, skadedjur, 
+      technician_role, primary_assignee_name, secondary_assignee_name, tertiary_assignee_name,
+      case_price, status
+    } = eventInfo.event.extendedProps;
+    
+    const isMobile = window.innerWidth < 640;
+    const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
+    const isList = eventInfo.view.type.includes('list');
+    
+    // ✅ FÖRBÄTTRAD LISTVY FÖR ALLA SKÄRMSTORLEKAR
+    if (isList) {
+      return (
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center gap-1">
+            {telefon_kontaktperson && (
+              <a href={`tel:${telefon_kontaktperson}`} 
+                 onClick={(e) => e.stopPropagation()} 
+                 className="text-blue-400 hover:text-blue-300 transition-colors" 
+                 title={`Ring ${kontaktperson}`}>
+                <Phone className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+              </a>
+            )}
+            {adress && (
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`} 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 onClick={(e) => e.stopPropagation()} 
+                 className="text-green-400 hover:text-green-300 transition-colors" 
+                 title="Navigera till adress">
+                <MapPin className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+              </a>
+            )}
+          </div>
+          
+          {!isMobile && (
+            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColorClasses(status)}`}>
+              {status}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const handleEventClick = (clickInfo: any) => {
+    setSelectedCase(clickInfo.event.extendedProps as ScheduledCase);
+    setIsEditModalOpen(true);
+  }
+  
+  const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => {
+    setCases(currentCases => currentCases.map(c => c.id === selectedCase?.id ? { ...c, ...updatedCase } : c));
+  }
+
+  // Filter handlers
+  const toggleStatus = (status: string) => {
+    const newActiveStatuses = new Set(activeStatuses);
+    if (newActiveStatuses.has(status)) {
+      newActiveStatuses.delete(status);
+    } else {
+      newActiveStatuses.add(status);
+    }
+    setActiveStatuses(newActiveStatuses);
+  };
+
+  const resetFilters = () => {
+    setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES));
+    setCaseTypeFilter('all');
+    setSearchQuery('');
+  };
+
+  const selectAllStatuses = () => {
+    setActiveStatuses(new Set(ALL_STATUSES));
+  };
+
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white">
+      {/* ✅ FÖRBÄTTRAD HEADER MED NÄSTA ÄRENDE OCH SÖKNING */}
+      <header className="bg-slate-900/50 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="bg-purple-500/10 p-1.5 sm:p-2 rounded-lg">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Mitt Schema</h1>
+                <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
+                  <span>{quickStats.totalFiltered} ärenden</span>
+                  {quickStats.todayTotal > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="text-blue-400">{quickStats.todayCompleted}/{quickStats.todayTotal} idag</span>
+                    </>
+                  )}
+                  {quickStats.todaysRevenue > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="text-green-400">{quickStats.todaysRevenue.toLocaleString()}kr</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant={showSearch ? "primary" : "secondary"} 
+                onClick={() => setShowSearch(!showSearch)}
+                size="sm"
+              >
+                <Search className="w-4 h-4" />
+                <span className="hidden sm:inline ml-2">Sök</span>
+              </Button>
+              <Button 
+                variant={showFilters ? "primary" : "secondary"} 
+                onClick={() => setShowFilters(!showFilters)}
+                size="sm"
+              >
+                <Filter className="w-4 h-4 sm:mr-2"/>
+                <span className="hidden sm:inline">Filter</span>
+                {quickStats.totalFiltered < cases.length && (
+                  <span className="ml-1 sm:ml-2 bg-blue-500 text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                    {quickStats.totalFiltered}
+                  </span>
+                )}
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm">
+                <ArrowLeft className="w-4 h-4 sm:mr-2"/>
+                <span className="hidden sm:inline">Tillbaka</span>
+              </Button>
+            </div>
+          </div>
+          
+          {/* ✅ NÄSTA ÄRENDE INDIKATOR */}
+          {quickStats.nextCase && (
+            <div className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 border border-blue-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-blue-400" />
+                  </div>
+                </div>
+                <div className="flex-grow min-w-0">
+                  <p className="text-sm font-medium text-blue-300">Nästa ärende</p>
+                  <p className="text-white font-semibold truncate">{quickStats.nextCase.title}</p>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span>{new Date(quickStats.nextCase.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>•</span>
+                    <span>{quickStats.nextCase.kontaktperson || 'Okänd kund'}</span>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="primary"
+                  onClick={() => {
+                    setSelectedCase(quickStats.nextCase!);
+                    setIsEditModalOpen(true);
+                  }}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+      
+      <main className="max-w-7xl mx-auto p-3 sm:p-4">
+        {error && (
+          <div className="mb-4 p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+        
+        {/* ✅ SÖKNING */}
+        {showSearch && (
+          <Card className="p-3 sm:p-4 mb-4 bg-slate-800/30">
+            <div className="flex items-center gap-3">
+              <div className="flex-grow relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Sök efter ärende, kund, skadedjur, adress..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowSearch(false);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            {searchQuery && (
+              <p className="mt-2 text-sm text-slate-400">
+                Visar {quickStats.totalFiltered} resultat för "{searchQuery}"
+              </p>
+            )}
+          </Card>
+        )}
+        
+        {/* ✅ RESPONSIV FILTER PANEL */}
+        {showFilters && (
+          <Card className="p-3 sm:p-4 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Filter</h3>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={selectAllStatuses}>
+                  <span className="hidden sm:inline">Visa alla</span>
+                  <span className="sm:hidden">Alla</span>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={resetFilters}>
+                  <span className="hidden sm:inline">Återställ</span>
+                  <span className="sm:hidden">Reset</span>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowFilters(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Case Type Filter */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Ärendetyp</label>
+              <div className="flex gap-1 sm:gap-2">
+                {[
+                  { value: 'all', label: 'Alla' },
+                  { value: 'private', label: 'Privat' },
+                  { value: 'business', label: 'Företag' },
+                  { value: 'contract', label: 'Avtal' }
+                ].map(type => (
+                  <Button
+                    key={type.value}
+                    size="sm"
+                    variant={caseTypeFilter === type.value ? "primary" : "secondary"}
+                    onClick={() => setCaseTypeFilter(type.value as any)}
+                    className="text-xs sm:text-sm"
+                  >
+                    {type.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Status ({activeStatuses.size}/{ALL_STATUSES.length})
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {ALL_STATUSES.map(status => (
+                  <label key={status} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={activeStatuses.has(status)}
+                      onChange={() => toggleStatus(status)}
+                      className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500"
+                    />
+                    <span className={`text-xs sm:text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>
+                      {status}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* ✅ FÖRBÄTTRAD RESPONSIV CALENDAR MED EXTERN CSS */}
+        <div className="calendar-container bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
+            initialView={calendarView}
+            headerToolbar={getResponsiveHeaderToolbar()}
+            events={calendarEvents}
+            eventContent={renderEventContent}
+            eventClick={handleEventClick}
+            locale={svLocale}
+            buttonText={{ 
+              today: 'idag', 
+              month: window.innerWidth < 640 ? 'mån' : 'månad', 
+              week: window.innerWidth < 640 ? 'vecka' : 'vecka', 
+              day: window.innerWidth < 640 ? 'dag' : 'dag', 
+              list: 'Dagens ärenden' // ✅ ÄNDRAT NAMN HÄR
+            }}
+            allDaySlot={false}
+            slotMinTime="07:00:00"
+            slotMaxTime="19:00:00"
+            height="auto"
+            eventMinHeight={window.innerWidth < 640 ? 60 : 140}
+            dayMaxEvents={window.innerWidth < 640 ? 2 : true}
+            moreLinkClick="popover"
+            aspectRatio={window.innerWidth < 640 ? 1.2 : 1.35}
+            handleWindowResize={true}
+            stickyHeaderDates={true}
+            initialDate={new Date()}
+            navLinks={true}
+            selectable={false}
+            selectMirror={false}
+            listDayFormat={{ weekday: 'long', day: 'numeric', month: 'long' }}
+            listDaySideFormat={false}
+          />
+        </div>
+      </main>
+
+      <EditCaseModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase as any} 
+      />
+    </div>
+  )
+} className={`w-full ${isMobile ? 'p-3' : isTablet ? 'p-4' : 'p-6'} bg-slate-800/30 hover:bg-slate-800/50 transition-colors duration-200 rounded-lg border border-slate-700/50 relative z-10`}>
+          {/* Header med case type och status */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className={`${isMobile ? 'text-sm' : 'text-base'} font-medium flex items-center gap-2`}>
+                <span className="text-lg">
+                  {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+                </span>
+                {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
+              </span>
+              {technician_role && technician_role !== 'primary' && (
+                <div className="flex items-center gap-1">
+                  {getTechnicianRoleIcon(technician_role)}
+                  <span className="text-xs bg-slate-700 px-2 py-1 rounded">
+                    {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusBadgeColor(status)}`}>
+              {status}
+            </span>
+          </div>
+          
+          {/* Ärendetitel och tid */}
+          <div className="mb-3">
+            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white mb-1`}>
+              {eventInfo.event.title}
+            </h3>
+            <div className="flex items-center gap-2 text-slate-400">
+              <Clock className="w-4 h-4" />
+              <span>{new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>•</span>
+              <span>{new Date(eventInfo.event.start).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </div>
+          </div>
+          
+          {/* Kundinfo och intäkt */}
+          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mb-4`}>
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-300">
+                <span className="font-medium">Kund:</span> {kontaktperson || 'Okänd'}
+              </span>
+            </div>
+            {case_price && (
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-400" />
+                <span className="text-green-400 font-medium">
+                  {case_price.toLocaleString()} kr
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Adress och skadedjur */}
+          <div className="space-y-2 mb-4">
+            {adress && (
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-slate-400 mt-1" />
+                <span className="text-slate-300 leading-relaxed">
+                  <span className="font-medium">Adress:</span> {formatAddress(adress)}
+                </span>
+              </div>
+            )}
+            {skadedjur && (
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-orange-400" />
+                <span className="text-slate-300">
+                  <span className="font-medium">Skadedjur:</span>
+                  <span className="ml-2 bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
+                    {skadedjur}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Team info för multi-tekniker */}
+          {(secondary_assignee_name || tertiary_assignee_name) && (
+            <div className="mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <p className="text-sm font-medium text-blue-300 mb-2">Team:</p>
+              <div className="text-sm space-y-1">
+                {primary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-blue-400" />
+                    <span>1. {primary_assignee_name}</span>
+                  </p>
+                )}
+                {secondary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-green-400" />
+                    <span>2. {secondary_assignee_name}</span>
+                  </p>
+                )}
+                {tertiary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-purple-400" />
+                    <span>3. {tertiary_assignee_name}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Åtgärdsknappar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {telefon_kontaktperson && (
+                <a 
+                  href={`tel:${telefon_kontaktperson}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Ring</span>
+                </a>
+              )}
+              {adress && (
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Navigera</span>
+                </a>
+              )}
+            </div>
+            <Button 
+              size="sm" 
+              variant="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
+                setIsEditModalOpen(true);
+              }}
+              className="flex items-center gap-2"
+            >
+              <span>Öppna ärende</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    // ✅ STANDARD CALENDAR EVENT (VECKA/DAG/MÅNAD)
+    return (
+      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
+        <div className="flex-grow">
+          <div className="flex items-center justify-between mb-1">
+            <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80`}>
+              {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+              {!isMobile && (case_type === 'private' ? ' Privatperson' : case_type === 'business' ? ' Företag' : ' Avtal')}
+            </p>
+            {technician_role && !isMobile && (
+              <div className="flex items-center gap-1">
+                {getTechnicianRoleIcon(technician_role)}
+                <span className="text-xs opacity-70">
+                  {technician_role === 'primary' ? '1:a' : technician_role === 'secondary' ? '2:a' : '3:e'}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          <p className={`font-bold ${isMobile ? 'text-xs' : 'text-sm'} text-white mb-1 ${isMobile ? 'truncate' : ''}`}>
+            {eventInfo.event.title}
+          </p>
+          
+          {!isMobile && (
+            <div className="space-y-1 text-xs opacity-90">
+              <p className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3"/>
+                <span>{eventInfo.timeText}</span>
+              </p>
+              
+              <p className="truncate">
+                <span className="font-semibold">Kund:</span> {kontaktperson || 'Okänd'}
+              </p>
+              
+              {skadedjur && (
+                <p className="flex items-center gap-1.5">
+                  <span className="font-semibold">Skadedjur:</span>
+                  <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{skadedjur}</span>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD MED SÖKNING OCH NÄSTA ÄRENDE
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -893,163 +1799,6 @@ export default function TechnicianSchedule() {
         onSuccess={handleUpdateSuccess}
         caseData={selectedCase as any} 
       />
-      
-      {/* ✅ FIXAD CSS FÖR VIT BAKGRUND OCH FÖRBÄTTRAD STYLING */}
-      <style jsx global>{`
-        /* ✅ FIX FÖR VIT BAKGRUND - VIKTIGT! */
-        .calendar-container .fc {
-          background: transparent !important;
-        }
-        
-        .calendar-container .fc-theme-standard td,
-        .calendar-container .fc-theme-standard th {
-          background: transparent !important;
-          border-color: rgb(51, 65, 85) !important;
-        }
-        
-        .calendar-container .fc-scrollgrid {
-          background: transparent !important;
-        }
-        
-        .calendar-container .fc-col-header-cell {
-          background: rgba(30, 41, 59, 0.8) !important;
-        }
-        
-        .calendar-container .fc-daygrid-day {
-          background: transparent !important;
-        }
-        
-        .calendar-container .fc-list {
-          background: transparent !important;
-          border: none !important;
-        }
-        
-        .calendar-container .fc-list-table {
-          background: transparent !important;
-        }
-        
-        .calendar-container .fc-list-day-cushion {
-          background: rgba(30, 41, 59, 0.8) !important;
-          color: white !important;
-          padding: 0.75rem 1rem !important;
-          border-radius: 0.5rem !important;
-          margin: 0.5rem 0 !important;
-        }
-        
-        .calendar-container .fc-list-event {
-          background: transparent !important;
-          border: none !important;
-          padding: 0.5rem 0 !important;
-        }
-        
-        .calendar-container .fc-list-event:hover {
-          background: rgba(51, 65, 85, 0.3) !important;
-        }
-        
-        .calendar-container .fc-list-event-dot {
-          display: none !important;
-        }
-        
-        .calendar-container .fc-list-event-time {
-          display: none !important;
-        }
-        
-        .calendar-container .fc-list-event-title {
-          padding: 0 !important;
-        }
-        
-        .calendar-container .fc-toolbar {
-          padding: 1rem !important;
-          background: rgba(30, 41, 59, 0.5) !important;
-          border-radius: 0.5rem 0.5rem 0 0 !important;
-        }
-        
-        .calendar-container .fc-toolbar-title {
-          color: white !important;
-          font-weight: 600 !important;
-        }
-        
-        .calendar-container .fc-button {
-          background: rgba(59, 130, 246, 0.2) !important;
-          border: 1px solid rgba(59, 130, 246, 0.3) !important;
-          color: rgb(147, 197, 253) !important;
-          font-size: 0.875rem !important;
-          padding: 0.375rem 0.75rem !important;
-          border-radius: 0.375rem !important;
-        }
-        
-        .calendar-container .fc-button:hover {
-          background: rgba(59, 130, 246, 0.3) !important;
-          border-color: rgba(59, 130, 246, 0.5) !important;
-        }
-        
-        .calendar-container .fc-button-active {
-          background: rgba(59, 130, 246, 0.5) !important;
-          color: white !important;
-        }
-        
-        .calendar-container .fc-button:disabled {
-          background: rgba(71, 85, 105, 0.3) !important;
-          border-color: rgba(71, 85, 105, 0.3) !important;
-          color: rgb(148, 163, 184) !important;
-        }
-        
-        /* ✅ MOBILSPECIFIKA FÖRBÄTTRINGAR */
-        @media (max-width: 640px) {
-          .calendar-container .fc-toolbar {
-            flex-direction: column !important;
-            gap: 0.75rem !important;
-            padding: 0.75rem !important;
-          }
-          
-          .calendar-container .fc-toolbar-chunk {
-            display: flex !important;
-            justify-content: center !important;
-          }
-          
-          .calendar-container .fc-button {
-            padding: 0.25rem 0.5rem !important;
-            font-size: 0.75rem !important;
-            margin: 0 0.125rem !important;
-          }
-          
-          .calendar-container .fc-list-day-cushion {
-            padding: 0.5rem 0.75rem !important;
-            margin: 0.25rem 0 !important;
-          }
-          
-          .calendar-container .fc-toolbar-title {
-            font-size: 1.125rem !important;
-          }
-        }
-        
-        @media (max-width: 1024px) {
-          .calendar-container .fc-toolbar-title {
-            font-size: 1.25rem !important;
-          }
-        }
-        
-        /* ✅ CALENDAR EVENT HOVER EFFEKTER */
-        .calendar-container .fc-event:hover {
-          transform: scale(1.02) !important;
-          transition: transform 0.2s ease !important;
-          z-index: 10 !important;
-        }
-        
-        /* ✅ BÄTTRE SCROLLING FÖR LISTVY */
-        .calendar-container .fc-scroller {
-          overflow-y: auto !important;
-          max-height: 70vh !important;
-        }
-        
-        /* ✅ FIX FÖR EMPTY LIST */
-        .calendar-container .fc-list-empty {
-          padding: 2rem !important;
-          text-align: center !important;
-          color: rgb(148, 163, 184) !important;
-          background: transparent !important;
-        }
-      `}</style>
     </div>
   )
 }
