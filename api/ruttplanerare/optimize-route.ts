@@ -1,14 +1,16 @@
-// 📁 src/api/ruttplanerare/optimize-route.ts
+// 📁 api/ruttplanerare/optimize-route.ts
+// ⭐ VERSION 2.1 - KORREKT MILJÖVARIABEL-NAMN ⭐
+// Denna version löser 500-felet genom att använda exakt samma
+// namn på miljövariablerna som de andra fungerande API-filerna.
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
-// Skapa en Supabase-klient för att prata med din databas
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ KORRIGERAD: Använder VITE_SUPABASE_URL och SUPABASE_SERVICE_KEY
+const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // --- HJÄLPFUNKTIONER FÖR ABAX API ---
 async function getAbaxToken() {
