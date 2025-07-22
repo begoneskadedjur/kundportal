@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD MED DAGENS ÄRENDEN
+// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD UTAN DAGENS ÄRENDEN-KORT
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -11,8 +11,8 @@ import listPlugin from '@fullcalendar/list'
 import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { 
-  ArrowLeft, Calendar, Phone, MapPin, Clock, Filter, X, User, Users, 
-  CheckCircle, Circle, Target, TrendingUp, Zap 
+  ArrowLeft, Calendar, Phone, MapPin, Clock, Filter, X, User, Users,
+  TrendingUp, Zap, Target
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -27,15 +27,6 @@ interface ScheduledCase {
   primary_assignee_id?: string; secondary_assignee_id?: string; tertiary_assignee_id?: string;
   primary_assignee_name?: string; secondary_assignee_name?: string; tertiary_assignee_name?: string;
   technician_role?: 'primary' | 'secondary' | 'tertiary';
-  completed?: boolean; // För progress tracking
-}
-
-interface DayProgress {
-  totalCases: number;
-  completedCases: number;
-  percentage: number;
-  estimatedRevenue: number;
-  completedRevenue: number;
 }
 
 // ✅ RESPONSIVA CALENDAR VIEWS BASERAT PÅ SKÄRMSTORLEK
@@ -58,19 +49,19 @@ const getResponsiveHeaderToolbar = () => {
   
   const width = window.innerWidth;
   if (width < 640) {
-    // Mobil: Enklare knappar
+    // Mobil: Lista som standard + månadsvy för planering
     return {
       left: 'prev,next',
       center: 'title',
-      right: 'today,listDay'
+      right: 'today,listDay,dayGridMonth'
     };
   }
   if (width < 1024) {
-    // Tablet: Mellanstorlek
+    // Tablet: Dag och lista + månadsvy
     return {
       left: 'prev,next today',
       center: 'title',
-      right: 'timeGridDay,listDay'
+      right: 'timeGridDay,listDay,dayGridMonth'
     };
   }
   // Desktop: Alla vyer
@@ -100,6 +91,17 @@ const getStatusColorClasses = (status: string) => {
   if (lowerStatus.includes('review')) return 'bg-purple-900/50 text-purple-300 border-purple-700';
   if (lowerStatus.includes('stängt')) return 'bg-slate-700/50 text-slate-400 border-slate-600';
   return 'bg-slate-800/50 text-slate-400 border-slate-700';
+};
+
+const getStatusBadgeColor = (status: string) => {
+  const lowerStatus = status?.toLowerCase() || '';
+  if (lowerStatus.includes('avslutat')) return 'bg-green-500 text-white';
+  if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500 text-white';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) return 'bg-blue-500 text-white';
+  if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-500 text-black';
+  if (lowerStatus.includes('review')) return 'bg-purple-500 text-white';
+  if (lowerStatus.includes('stängt')) return 'bg-slate-500 text-white';
+  return 'bg-slate-600 text-white';
 };
 
 const formatAddress = (address: any): string => {
@@ -132,8 +134,6 @@ export default function TechnicianSchedule() {
   const [cases, setCases] = useState<ScheduledCase[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // ✅ SMART AUTO-DETECTION AV DAGENS DATUM
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [calendarView, setCalendarView] = useState(getResponsiveInitialView())
 
   // Filter states
@@ -207,8 +207,7 @@ export default function TechnicianSchedule() {
             start_date: c.start_date || c.created_at,
             case_price: c.pris,
             case_type: 'private' as const,
-            technician_role: technicianRole,
-            completed: c.status?.toLowerCase().includes('avslutat') || false
+            technician_role: technicianRole
           };
         }));
       }
@@ -225,8 +224,7 @@ export default function TechnicianSchedule() {
             start_date: c.start_date || c.created_at,
             case_price: c.pris,
             case_type: 'business' as const,
-            technician_role: technicianRole,
-            completed: c.status?.toLowerCase().includes('avslutat') || false
+            technician_role: technicianRole
           };
         }));
       }
@@ -237,8 +235,7 @@ export default function TechnicianSchedule() {
           ...c,
           start_date: c.created_date,
           case_type: c.case_type || 'contract',
-          technician_role: 'primary' as const,
-          completed: c.status?.toLowerCase().includes('avslutat') || false
+          technician_role: 'primary' as const
         })));
       }
       
@@ -260,46 +257,38 @@ export default function TechnicianSchedule() {
     }
   }
 
-  // ✅ DAGENS ÄRENDEN BERÄKNING
-  const todaysCases = useMemo(() => {
+  // ✅ STATISTIK FÖR HEADER (KOMPAKT)
+  const quickStats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     
-    let filteredCases = cases.filter(case_ => {
-      const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
-      return caseDate === today;
-    });
-    
-    // Applicera filter
+    let filteredCases = cases;
     if (activeStatuses.size < ALL_STATUSES.length) {
       filteredCases = filteredCases.filter(case_ => activeStatuses.has(case_.status));
     }
-    
     if (caseTypeFilter !== 'all') {
       filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
     }
     
-    return filteredCases.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
-  }, [cases, activeStatuses, caseTypeFilter]);
-
-  // ✅ DAGENS PROGRESS BERÄKNING
-  const todaysProgress = useMemo((): DayProgress => {
-    const totalCases = todaysCases.length;
-    const completedCases = todaysCases.filter(c => c.completed).length;
-    const percentage = totalCases > 0 ? Math.round((completedCases / totalCases) * 100) : 0;
+    const todaysCases = filteredCases.filter(case_ => {
+      const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
+      return caseDate === today;
+    });
     
-    const estimatedRevenue = todaysCases.reduce((sum, c) => sum + (c.case_price || 0), 0);
-    const completedRevenue = todaysCases
-      .filter(c => c.completed)
+    const completedToday = todaysCases.filter(c => 
+      c.status?.toLowerCase().includes('avslutat')
+    ).length;
+    
+    const todaysRevenue = todaysCases
+      .filter(c => c.status?.toLowerCase().includes('avslutat'))
       .reduce((sum, c) => sum + (c.case_price || 0), 0);
     
     return {
-      totalCases,
-      completedCases,
-      percentage,
-      estimatedRevenue,
-      completedRevenue
+      todayTotal: todaysCases.length,
+      todayCompleted: completedToday,
+      todayRevenue: todaysRevenue,
+      totalFiltered: filteredCases.length
     };
-  }, [todaysCases]);
+  }, [cases, activeStatuses, caseTypeFilter]);
 
   // Filtrerade calendar events
   const calendarEvents = useMemo(() => {
@@ -328,18 +317,157 @@ export default function TechnicianSchedule() {
     });
   }, [cases, activeStatuses, caseTypeFilter]);
   
-  // ✅ RESPONSIV EVENT RENDERING
+  // ✅ MOBILOPTIMERAD EVENT RENDERING MED FÖRBÄTTRAD LISTVY
   const renderEventContent = (eventInfo: any) => {
     const { 
       case_type, kontaktperson, adress, telefon_kontaktperson, skadedjur, 
       technician_role, primary_assignee_name, secondary_assignee_name, tertiary_assignee_name,
-      completed
+      case_price, status
     } = eventInfo.event.extendedProps;
     
     const isMobile = window.innerWidth < 640;
+    const isList = eventInfo.view.type.includes('list');
     
+    // ✅ FÖRBÄTTRAD LISTVY FÖR MOBIL
+    if (isList) {
+      return (
+        <div className="w-full p-3 sm:p-4">
+          {/* Header med case type och status */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                {case_type === 'private' ? '👤 Privatperson' : case_type === 'business' ? '🏢 Företag' : '📄 Avtal'}
+              </span>
+              {technician_role && technician_role !== 'primary' && (
+                <div className="flex items-center gap-1">
+                  {getTechnicianRoleIcon(technician_role)}
+                  <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded">
+                    {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(status)}`}>
+              {status}
+            </span>
+          </div>
+          
+          {/* Ärendetitel */}
+          <h3 className="text-lg font-bold text-white mb-2">{eventInfo.event.title}</h3>
+          
+          {/* Kundinfo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 text-sm">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-300">
+                <span className="font-medium">Kund:</span> {kontaktperson || 'Okänd'}
+              </span>
+            </div>
+            {case_price && (
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-400" />
+                <span className="text-green-400 font-medium">
+                  {case_price.toLocaleString()} kr
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Adress och skadedjur */}
+          <div className="space-y-2 mb-3 text-sm">
+            {adress && (
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
+                <span className="text-slate-300">
+                  <span className="font-medium">Adress:</span> {formatAddress(adress)}
+                </span>
+              </div>
+            )}
+            {skadedjur && (
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-orange-400" />
+                <span className="text-slate-300">
+                  <span className="font-medium">Skadedjur:</span>
+                  <span className="ml-1 bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded">
+                    {skadedjur}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Team info för multi-tekniker */}
+          {(secondary_assignee_name || tertiary_assignee_name) && (
+            <div className="mb-3 p-2 bg-slate-800/50 rounded border border-slate-700">
+              <p className="text-sm font-medium text-blue-300 mb-1">Team:</p>
+              <div className="text-sm space-y-1">
+                {primary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-blue-400" />
+                    <span>1. {primary_assignee_name}</span>
+                  </p>
+                )}
+                {secondary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-green-400" />
+                    <span>2. {secondary_assignee_name}</span>
+                  </p>
+                )}
+                {tertiary_assignee_name && (
+                  <p className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-purple-400" />
+                    <span>3. {tertiary_assignee_name}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Åtgärdsknappar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {telefon_kontaktperson && (
+                <a 
+                  href={`tel:${telefon_kontaktperson}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="hidden sm:inline">Ring</span>
+                </a>
+              )}
+              {adress && (
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(adress))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">Navigera</span>
+                </a>
+              )}
+            </div>
+            <Button 
+              size="sm" 
+              variant="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
+                setIsEditModalOpen(true);
+              }}
+            >
+              Öppna ärende
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    // ✅ STANDARD CALENDAR EVENT (VECKA/DAG/MÅNAD)
     return (
-      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between ${getStatusColorClasses(eventInfo.event.extendedProps.status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
+      <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''}`}>
         <div className="flex-grow">
           <div className="flex items-center justify-between mb-1">
             <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80`}>
@@ -353,9 +481,6 @@ export default function TechnicianSchedule() {
                   {technician_role === 'primary' ? '1:a' : technician_role === 'secondary' ? '2:a' : '3:e'}
                 </span>
               </div>
-            )}
-            {completed && (
-              <CheckCircle className="w-4 h-4 text-green-400" />
             )}
           </div>
           
@@ -374,23 +499,12 @@ export default function TechnicianSchedule() {
                 <span className="font-semibold">Kund:</span> {kontaktperson || 'Okänd'}
               </p>
               
-              <p className="truncate">
-                <span className="font-semibold">Adress:</span> {formatAddress(adress) || 'Saknas'}
-              </p>
-              
-              <p className="flex items-center gap-1.5">
-                <span className="font-semibold">Skadedjur:</span>
-                <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{skadedjur || 'Okänt'}</span>
-              </p>
-            </div>
-          )}
-          
-          {!isMobile && (secondary_assignee_name || tertiary_assignee_name) && (
-            <div className="mt-2 p-1 bg-slate-800/50 rounded text-xs">
-              <p className="font-semibold text-blue-300">Team:</p>
-              {primary_assignee_name && <p>1. {primary_assignee_name}</p>}
-              {secondary_assignee_name && <p>2. {secondary_assignee_name}</p>}
-              {tertiary_assignee_name && <p>3. {tertiary_assignee_name}</p>}
+              {skadedjur && (
+                <p className="flex items-center gap-1.5">
+                  <span className="font-semibold">Skadedjur:</span>
+                  <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{skadedjur}</span>
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -418,8 +532,8 @@ export default function TechnicianSchedule() {
           </div>
           
           {!isMobile && (
-            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColorClasses(eventInfo.event.extendedProps.status)}`}>
-              {eventInfo.event.extendedProps.status}
+            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColorClasses(status)}`}>
+              {status}
             </span>
           )}
         </div>
@@ -456,38 +570,11 @@ export default function TechnicianSchedule() {
     setActiveStatuses(new Set(ALL_STATUSES));
   };
 
-  // ✅ KOMPLETT CASE HANDLER
-  const handleCompleteCase = async (caseId: string, completed: boolean) => {
-    try {
-      // Uppdatera lokalt state omedelbart för bättre UX
-      setCases(currentCases => 
-        currentCases.map(c => 
-          c.id === caseId ? { ...c, completed } : c
-        )
-      );
-      
-      // TODO: Här skulle man uppdatera databasen
-      console.log(`📝 Marking case ${caseId} as ${completed ? 'completed' : 'not completed'}`);
-      
-    } catch (error) {
-      console.error('Error updating case completion:', error);
-      // Revert lokala ändringar vid fel
-      setCases(currentCases => 
-        currentCases.map(c => 
-          c.id === caseId ? { ...c, completed: !completed } : c
-        )
-      );
-    }
-  };
-
-  const filteredCasesCount = calendarEvents.length;
-  const totalCasesCount = cases.length;
-
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* ✅ RESPONSIV HEADER */}
+      {/* ✅ KOMPAKT HEADER MED SMART STATISTIK */}
       <header className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
@@ -497,12 +584,21 @@ export default function TechnicianSchedule() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white">Mitt Schema</h1>
-                <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">
-                  Kalenderöversikt över bokade ärenden ({filteredCasesCount}/{totalCasesCount})
-                </p>
-                <p className="text-xs text-slate-400 sm:hidden">
-                  {filteredCasesCount}/{totalCasesCount} ärenden
-                </p>
+                <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
+                  <span>{quickStats.totalFiltered} ärenden</span>
+                  {quickStats.todayTotal > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="text-blue-400">{quickStats.todayCompleted}/{quickStats.todayTotal} idag</span>
+                    </>
+                  )}
+                  {quickStats.todayRevenue > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="text-green-400">{quickStats.todayRevenue.toLocaleString()}kr</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -513,9 +609,9 @@ export default function TechnicianSchedule() {
               >
                 <Filter className="w-4 h-4 sm:mr-2"/>
                 <span className="hidden sm:inline">Filter</span>
-                {filteredCasesCount < totalCasesCount && (
+                {quickStats.totalFiltered < cases.length && (
                   <span className="ml-1 sm:ml-2 bg-blue-500 text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
-                    {filteredCasesCount}
+                    {quickStats.totalFiltered}
                   </span>
                 )}
               </Button>
@@ -535,160 +631,7 @@ export default function TechnicianSchedule() {
           </div>
         )}
         
-        {/* ✅ DAGENS ÄRENDEN CARD - ALLTID SYNLIG PÅ MOBIL */}
-        <Card className="p-4 mb-4 bg-gradient-to-br from-blue-500/10 to-purple-600/10 border-blue-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-400" />
-              Dagens Ärenden
-            </h3>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-white">{todaysProgress.completedCases}/{todaysProgress.totalCases}</p>
-              <p className="text-xs text-slate-400">avklarade</p>
-            </div>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-300">Framsteg idag</span>
-              <span className="text-sm font-medium text-blue-400">{todaysProgress.percentage}%</span>
-            </div>
-            <div className="w-full bg-slate-800 rounded-full h-2">
-              <div 
-                className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${todaysProgress.percentage}%` }}
-              />
-            </div>
-          </div>
-          
-          {/* Dagens Stats */}
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-xs text-slate-400">Intäkt</span>
-              </div>
-              <p className="text-lg font-bold text-green-400">
-                {todaysProgress.completedRevenue.toLocaleString()} kr
-              </p>
-              <p className="text-xs text-slate-500">
-                av {todaysProgress.estimatedRevenue.toLocaleString()} kr
-              </p>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <Zap className="w-4 h-4 text-yellow-400" />
-                <span className="text-xs text-slate-400">Effektivitet</span>
-              </div>
-              <p className="text-lg font-bold text-yellow-400">
-                {todaysProgress.totalCases > 0 ? Math.round(todaysProgress.completedRevenue / todaysProgress.totalCases) : 0} kr
-              </p>
-              <p className="text-xs text-slate-500">per ärende</p>
-            </div>
-          </div>
-          
-          {/* Dagens Lista - KOMPAKT FÖR MOBIL */}
-          {todaysCases.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Ärenden idag:</h4>
-              <div className="space-y-2 max-h-32 sm:max-h-48 overflow-y-auto">
-                {todaysCases.slice(0, 5).map((case_) => (
-                  <div 
-                    key={case_.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] ${
-                      case_.completed 
-                        ? 'bg-green-900/20 border-green-700/30 opacity-75' 
-                        : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600'
-                    }`}
-                    onClick={() => {
-                      setSelectedCase(case_);
-                      setIsEditModalOpen(true);
-                    }}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCompleteCase(case_.id, !case_.completed);
-                      }}
-                      className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                        case_.completed
-                          ? 'bg-green-500 border-green-500 text-white'
-                          : 'border-slate-500 hover:border-green-400'
-                      }`}
-                    >
-                      {case_.completed && <CheckCircle className="w-4 h-4" />}
-                    </button>
-                    
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-slate-400">
-                          {case_.case_type === 'private' ? '👤' : case_.case_type === 'business' ? '🏢' : '📄'}
-                        </span>
-                        <span className="text-sm font-medium text-white truncate">
-                          {case_.title}
-                        </span>
-                        {case_.technician_role && case_.technician_role !== 'primary' && (
-                          <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded">
-                            {case_.technician_role === 'secondary' ? '2:a' : '3:e'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <Clock className="w-3 h-3" />
-                        <span>{new Date(case_.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {case_.kontaktperson && (
-                          <>
-                            <span>•</span>
-                            <span className="truncate">{case_.kontaktperson}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
-                      {case_.telefon_kontaktperson && (
-                        <a 
-                          href={`tel:${case_.telefon_kontaktperson}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1 text-blue-400 hover:text-blue-300"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </a>
-                      )}
-                      {case_.adress && (
-                        <a 
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(case_.adress))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1 text-green-400 hover:text-green-300"
-                        >
-                          <MapPin className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {todaysCases.length > 5 && (
-                  <p className="text-xs text-slate-400 text-center py-1">
-                    +{todaysCases.length - 5} fler ärenden idag
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {todaysCases.length === 0 && (
-            <div className="mt-4 text-center py-4">
-              <Circle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-slate-400">Inga ärenden idag</p>
-              <p className="text-xs text-slate-500">Tid för planering eller vilodag! 🌟</p>
-            </div>
-          )}
-        </Card>
-        
-        {/* ✅ FILTER PANEL - RESPONSIV */}
+        {/* ✅ RESPONSIV FILTER PANEL */}
         {showFilters && (
           <Card className="p-3 sm:p-4 mb-4">
             <div className="flex items-center justify-between mb-4">
@@ -755,7 +698,7 @@ export default function TechnicianSchedule() {
           </Card>
         )}
 
-        {/* ✅ RESPONSIV CALENDAR */}
+        {/* ✅ FÖRBÄTTRAD RESPONSIV CALENDAR */}
         <div className="p-2 sm:p-4 bg-slate-900/50 rounded-lg border border-slate-800">
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
@@ -770,7 +713,7 @@ export default function TechnicianSchedule() {
               month: window.innerWidth < 640 ? 'mån' : 'månad', 
               week: window.innerWidth < 640 ? 'v' : 'vecka', 
               day: window.innerWidth < 640 ? 'd' : 'dag', 
-              list: window.innerWidth < 640 ? 'l' : 'lista' 
+              list: window.innerWidth < 640 ? 'lista' : 'lista' 
             }}
             allDaySlot={false}
             slotMinTime="07:00:00"
@@ -797,6 +740,9 @@ export default function TechnicianSchedule() {
               }
               return baseClasses;
             }}
+            // ✅ FÖRBÄTTRAR LISTVY SPACING
+            listDayFormat={{ weekday: 'long', day: 'numeric', month: 'long' }}
+            listDaySideFormat={false}
           />
         </div>
       </main>
@@ -808,7 +754,7 @@ export default function TechnicianSchedule() {
         caseData={selectedCase as any} 
       />
       
-      {/* ✅ CUSTOM CSS FÖR MOBIL CALENDAR */}
+      {/* ✅ FÖRBÄTTRAD CUSTOM CSS FÖR MOBIL CALENDAR */}
       <style jsx>{`
         @media (max-width: 640px) {
           .fc-toolbar {
@@ -824,14 +770,33 @@ export default function TechnicianSchedule() {
           .fc-button {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
+            border-radius: 0.375rem;
+          }
+          
+          .fc-button-group .fc-button {
+            border-radius: 0;
+          }
+          
+          .fc-button-group .fc-button:first-child {
+            border-radius: 0.375rem 0 0 0.375rem;
+          }
+          
+          .fc-button-group .fc-button:last-child {
+            border-radius: 0 0.375rem 0.375rem 0;
           }
           
           .fc-list-event {
-            padding: 0.5rem;
+            padding: 0;
+            border: none !important;
+            background: transparent !important;
           }
           
-          .fc-list-event-title {
-            font-size: 0.875rem;
+          .fc-list-event-dot {
+            display: none;
+          }
+          
+          .fc-list-event:hover {
+            background: rgba(51, 65, 85, 0.3) !important;
           }
           
           .fc-daygrid-event {
@@ -846,12 +811,59 @@ export default function TechnicianSchedule() {
           .fc-event-main {
             padding: 2px;
           }
+          
+          .fc-list-day-cushion {
+            padding: 0.5rem 1rem;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+          }
+          
+          .fc-list-empty {
+            padding: 2rem;
+            text-align: center;
+            color: rgb(148, 163, 184);
+          }
         }
         
         @media (max-width: 1024px) {
           .fc-toolbar-title {
             font-size: 1.25rem;
           }
+        }
+        
+        /* ✅ FÖRBÄTTRAD LISTVY STYLING */
+        .fc-list-event-title {
+          padding: 0 !important;
+        }
+        
+        .fc-list-event-time {
+          display: none; /* Dölj standard tid eftersom vi visar den i custom content */
+        }
+        
+        .fc-list-day {
+          background: rgba(30, 41, 59, 0.5);
+        }
+        
+        .fc-list-day-text {
+          font-weight: 600;
+          color: white;
+        }
+        
+        .fc-list-day-side-text {
+          color: rgb(148, 163, 184);
+        }
+        
+        /* ✅ CALENDAR EVENT HOVER EFFEKTER */
+        .fc-event:hover {
+          transform: scale(1.02);
+          transition: transform 0.2s ease;
+          z-index: 10;
+        }
+        
+        .fc-list-event:hover .fc-list-event-title {
+          background: rgba(59, 130, 246, 0.1) !important;
+          border-radius: 0.5rem;
         }
       `}</style>
     </div>
