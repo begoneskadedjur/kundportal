@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD UTAN DAGENS ÄRENDEN-KORT
+// 📁 src/pages/technician/TechnicianSchedule.tsx - MOBILOPTIMERAD MED SÖKNING OCH NÄSTA ÄRENDE
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,7 +12,7 @@ import svLocale from '@fullcalendar/core/locales/sv'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { 
   ArrowLeft, Calendar, Phone, MapPin, Clock, Filter, X, User, Users,
-  TrendingUp, Zap, Target
+  TrendingUp, Zap, Target, Search, ChevronRight, AlertCircle
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -29,17 +29,17 @@ interface ScheduledCase {
   technician_role?: 'primary' | 'secondary' | 'tertiary';
 }
 
-// ✅ RESPONSIVA CALENDAR VIEWS BASERAT PÅ SKÄRMSTORLEK
+// ✅ RESPONSIVA CALENDAR VIEWS INKLUDERAR VECKA PÅ MOBIL
 const getResponsiveInitialView = () => {
   if (typeof window === 'undefined') return 'timeGridWeek';
   
   const width = window.innerWidth;
-  if (width < 640) return 'listDay'; // Mobil: dagens lista
+  if (width < 640) return 'listDay'; // Mobil: dagens lista som default
   if (width < 1024) return 'timeGridDay'; // Tablet: dagens timmar
   return 'timeGridWeek'; // Desktop: vecka
 };
 
-// ✅ RESPONSIVA HEADER TOOLBAR
+// ✅ RESPONSIVA HEADER TOOLBAR MED VECKA PÅ MOBIL
 const getResponsiveHeaderToolbar = () => {
   if (typeof window === 'undefined') return {
     left: 'prev,next today',
@@ -49,19 +49,19 @@ const getResponsiveHeaderToolbar = () => {
   
   const width = window.innerWidth;
   if (width < 640) {
-    // Mobil: Lista som standard + månadsvy för planering
+    // Mobil: Lista, dag, vecka och månad
     return {
       left: 'prev,next',
       center: 'title',
-      right: 'today,listDay,dayGridMonth'
+      right: 'listDay,timeGridDay,timeGridWeek,dayGridMonth'
     };
   }
   if (width < 1024) {
-    // Tablet: Dag och lista + månadsvy
+    // Tablet: Dag, vecka, lista och månad
     return {
       left: 'prev,next today',
       center: 'title',
-      right: 'timeGridDay,listDay,dayGridMonth'
+      right: 'timeGridDay,timeGridWeek,listDay,dayGridMonth'
     };
   }
   // Desktop: Alla vyer
@@ -126,6 +126,30 @@ const getTechnicianRoleIcon = (role: 'primary' | 'secondary' | 'tertiary') => {
   }
 };
 
+// ✅ HJÄLPFUNKTION FÖR ATT HITTA NÄSTA ÄRENDE
+const findNextCase = (cases: ScheduledCase[], activeStatuses: Set<string>) => {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  
+  // Filtrera ärenden för idag som inte är avslutade
+  const todaysCases = cases.filter(case_ => {
+    const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
+    const isToday = caseDate === todayStr;
+    const isActive = activeStatuses.has(case_.status);
+    const isNotCompleted = !case_.status?.toLowerCase().includes('avslutat');
+    
+    return isToday && isActive && isNotCompleted;
+  });
+  
+  // Sortera efter tid
+  todaysCases.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  
+  // Hitta nästa ärende (första som är efter nu eller det första ärende om inget är efter nu)
+  const nextCase = todaysCases.find(case_ => new Date(case_.start_date) > now) || todaysCases[0];
+  
+  return nextCase;
+};
+
 export default function TechnicianSchedule() {
   const { profile, isTechnician } = useAuth()
   const navigate = useNavigate()
@@ -140,6 +164,10 @@ export default function TechnicianSchedule() {
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES))
   const [showFilters, setShowFilters] = useState(false)
   const [caseTypeFilter, setCaseTypeFilter] = useState<'all' | 'private' | 'business' | 'contract'>('all')
+
+  // ✅ SÖKNING
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<ScheduledCase | null>(null)
@@ -257,14 +285,30 @@ export default function TechnicianSchedule() {
     }
   }
 
-  // ✅ STATISTIK FÖR HEADER (KOMPAKT)
+  // ✅ STATISTIK FÖR HEADER MED NÄSTA ÄRENDE
   const quickStats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     
     let filteredCases = cases;
+    
+    // Applicera textfilter först
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredCases = filteredCases.filter(case_ => 
+        case_.title.toLowerCase().includes(query) ||
+        case_.kontaktperson?.toLowerCase().includes(query) ||
+        case_.skadedjur?.toLowerCase().includes(query) ||
+        case_.status.toLowerCase().includes(query) ||
+        formatAddress(case_.adress).toLowerCase().includes(query)
+      );
+    }
+    
+    // Applicera statusfilter
     if (activeStatuses.size < ALL_STATUSES.length) {
       filteredCases = filteredCases.filter(case_ => activeStatuses.has(case_.status));
     }
+    
+    // Applicera ärendetypfilter
     if (caseTypeFilter !== 'all') {
       filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
     }
@@ -282,22 +326,40 @@ export default function TechnicianSchedule() {
       .filter(c => c.status?.toLowerCase().includes('avslutat'))
       .reduce((sum, c) => sum + (c.case_price || 0), 0);
     
+    // Hitta nästa ärende
+    const nextCase = findNextCase(filteredCases, activeStatuses);
+    
     return {
       todayTotal: todaysCases.length,
       todayCompleted: completedToday,
-      todayRevenue: todaysRevenue,
-      totalFiltered: filteredCases.length
+      todaysRevenue: todaysRevenue,
+      totalFiltered: filteredCases.length,
+      nextCase: nextCase
     };
-  }, [cases, activeStatuses, caseTypeFilter]);
+  }, [cases, activeStatuses, caseTypeFilter, searchQuery]);
 
   // Filtrerade calendar events
   const calendarEvents = useMemo(() => {
     let filteredCases = cases;
     
+    // Textfilter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredCases = filteredCases.filter(case_ => 
+        case_.title.toLowerCase().includes(query) ||
+        case_.kontaktperson?.toLowerCase().includes(query) ||
+        case_.skadedjur?.toLowerCase().includes(query) ||
+        case_.status.toLowerCase().includes(query) ||
+        formatAddress(case_.adress).toLowerCase().includes(query)
+      );
+    }
+    
+    // Statusfilter
     if (activeStatuses.size < ALL_STATUSES.length) {
       filteredCases = filteredCases.filter(case_ => activeStatuses.has(case_.status));
     }
     
+    // Ärendetypfilter
     if (caseTypeFilter !== 'all') {
       filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
     }
@@ -315,9 +377,9 @@ export default function TechnicianSchedule() {
         className: `!border ${getStatusColorClasses(case_.status)}`
       }
     });
-  }, [cases, activeStatuses, caseTypeFilter]);
+  }, [cases, activeStatuses, caseTypeFilter, searchQuery]);
   
-  // ✅ MOBILOPTIMERAD EVENT RENDERING MED FÖRBÄTTRAD LISTVY
+  // ✅ FÖRBÄTTRAD EVENT RENDERING MED DESKTOP LISTVY-FIX
   const renderEventContent = (eventInfo: any) => {
     const { 
       case_type, kontaktperson, adress, telefon_kontaktperson, skadedjur, 
@@ -326,37 +388,51 @@ export default function TechnicianSchedule() {
     } = eventInfo.event.extendedProps;
     
     const isMobile = window.innerWidth < 640;
+    const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
     const isList = eventInfo.view.type.includes('list');
     
-    // ✅ FÖRBÄTTRAD LISTVY FÖR MOBIL
+    // ✅ FÖRBÄTTRAD LISTVY FÖR ALLA SKÄRMSTORLEKAR
     if (isList) {
       return (
-        <div className="w-full p-3 sm:p-4">
+        <div className={`w-full ${isMobile ? 'p-3' : isTablet ? 'p-4' : 'p-6'} bg-slate-800/30 hover:bg-slate-800/50 transition-colors duration-200 rounded-lg border border-slate-700/50`}>
           {/* Header med case type och status */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {case_type === 'private' ? '👤 Privatperson' : case_type === 'business' ? '🏢 Företag' : '📄 Avtal'}
+              <span className={`${isMobile ? 'text-sm' : 'text-base'} font-medium flex items-center gap-2`}>
+                <span className="text-lg">
+                  {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+                </span>
+                {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
               </span>
               {technician_role && technician_role !== 'primary' && (
                 <div className="flex items-center gap-1">
                   {getTechnicianRoleIcon(technician_role)}
-                  <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-slate-700 px-2 py-1 rounded">
                     {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
                   </span>
                 </div>
               )}
             </div>
-            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(status)}`}>
+            <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusBadgeColor(status)}`}>
               {status}
             </span>
           </div>
           
-          {/* Ärendetitel */}
-          <h3 className="text-lg font-bold text-white mb-2">{eventInfo.event.title}</h3>
+          {/* Ärendetitel och tid */}
+          <div className="mb-3">
+            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white mb-1`}>
+              {eventInfo.event.title}
+            </h3>
+            <div className="flex items-center gap-2 text-slate-400">
+              <Clock className="w-4 h-4" />
+              <span>{new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>•</span>
+              <span>{new Date(eventInfo.event.start).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </div>
+          </div>
           
-          {/* Kundinfo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 text-sm">
+          {/* Kundinfo och intäkt */}
+          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mb-4`}>
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-slate-400" />
               <span className="text-slate-300">
@@ -374,11 +450,11 @@ export default function TechnicianSchedule() {
           </div>
           
           {/* Adress och skadedjur */}
-          <div className="space-y-2 mb-3 text-sm">
+          <div className="space-y-2 mb-4">
             {adress && (
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                <span className="text-slate-300">
+                <MapPin className="w-4 h-4 text-slate-400 mt-1" />
+                <span className="text-slate-300 leading-relaxed">
                   <span className="font-medium">Adress:</span> {formatAddress(adress)}
                 </span>
               </div>
@@ -388,7 +464,7 @@ export default function TechnicianSchedule() {
                 <Target className="w-4 h-4 text-orange-400" />
                 <span className="text-slate-300">
                   <span className="font-medium">Skadedjur:</span>
-                  <span className="ml-1 bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded">
+                  <span className="ml-2 bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
                     {skadedjur}
                   </span>
                 </span>
@@ -398,8 +474,8 @@ export default function TechnicianSchedule() {
           
           {/* Team info för multi-tekniker */}
           {(secondary_assignee_name || tertiary_assignee_name) && (
-            <div className="mb-3 p-2 bg-slate-800/50 rounded border border-slate-700">
-              <p className="text-sm font-medium text-blue-300 mb-1">Team:</p>
+            <div className="mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <p className="text-sm font-medium text-blue-300 mb-2">Team:</p>
               <div className="text-sm space-y-1">
                 {primary_assignee_name && (
                   <p className="flex items-center gap-2">
@@ -430,10 +506,10 @@ export default function TechnicianSchedule() {
                 <a 
                   href={`tel:${telefon_kontaktperson}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
                 >
                   <Phone className="w-4 h-4" />
-                  <span className="hidden sm:inline">Ring</span>
+                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Ring</span>
                 </a>
               )}
               {adress && (
@@ -442,10 +518,10 @@ export default function TechnicianSchedule() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
                 >
                   <MapPin className="w-4 h-4" />
-                  <span className="hidden sm:inline">Navigera</span>
+                  <span className={`${isMobile ? 'hidden' : 'inline'}`}>Navigera</span>
                 </a>
               )}
             </div>
@@ -457,8 +533,10 @@ export default function TechnicianSchedule() {
                 setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
                 setIsEditModalOpen(true);
               }}
+              className="flex items-center gap-2"
             >
-              Öppna ärende
+              <span>Öppna ärende</span>
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -564,6 +642,7 @@ export default function TechnicianSchedule() {
   const resetFilters = () => {
     setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES));
     setCaseTypeFilter('all');
+    setSearchQuery('');
   };
 
   const selectAllStatuses = () => {
@@ -574,10 +653,10 @@ export default function TechnicianSchedule() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* ✅ KOMPAKT HEADER MED SMART STATISTIK */}
+      {/* ✅ FÖRBÄTTRAD HEADER MED NÄSTA ÄRENDE OCH SÖKNING */}
       <header className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="bg-purple-500/10 p-1.5 sm:p-2 rounded-lg">
                 <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
@@ -592,16 +671,24 @@ export default function TechnicianSchedule() {
                       <span className="text-blue-400">{quickStats.todayCompleted}/{quickStats.todayTotal} idag</span>
                     </>
                   )}
-                  {quickStats.todayRevenue > 0 && (
+                  {quickStats.todaysRevenue > 0 && (
                     <>
                       <span>•</span>
-                      <span className="text-green-400">{quickStats.todayRevenue.toLocaleString()}kr</span>
+                      <span className="text-green-400">{quickStats.todaysRevenue.toLocaleString()}kr</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                variant={showSearch ? "primary" : "secondary"} 
+                onClick={() => setShowSearch(!showSearch)}
+                size="sm"
+              >
+                <Search className="w-4 h-4" />
+                <span className="hidden sm:inline ml-2">Sök</span>
+              </Button>
               <Button 
                 variant={showFilters ? "primary" : "secondary"} 
                 onClick={() => setShowFilters(!showFilters)}
@@ -621,6 +708,38 @@ export default function TechnicianSchedule() {
               </Button>
             </div>
           </div>
+          
+          {/* ✅ NÄSTA ÄRENDE INDIKATOR */}
+          {quickStats.nextCase && (
+            <div className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 border border-blue-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-blue-400" />
+                  </div>
+                </div>
+                <div className="flex-grow min-w-0">
+                  <p className="text-sm font-medium text-blue-300">Nästa ärende</p>
+                  <p className="text-white font-semibold truncate">{quickStats.nextCase.title}</p>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span>{new Date(quickStats.nextCase.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>•</span>
+                    <span>{quickStats.nextCase.kontaktperson || 'Okänd kund'}</span>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="primary"
+                  onClick={() => {
+                    setSelectedCase(quickStats.nextCase!);
+                    setIsEditModalOpen(true);
+                  }}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
       
@@ -629,6 +748,39 @@ export default function TechnicianSchedule() {
           <div className="mb-4 p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
             <p className="text-red-400 text-sm">{error}</p>
           </div>
+        )}
+        
+        {/* ✅ SÖKNING */}
+        {showSearch && (
+          <Card className="p-3 sm:p-4 mb-4 bg-slate-800/30">
+            <div className="flex items-center gap-3">
+              <div className="flex-grow relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Sök efter ärende, kund, skadedjur, adress..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowSearch(false);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            {searchQuery && (
+              <p className="mt-2 text-sm text-slate-400">
+                Visar {quickStats.totalFiltered} resultat för "{searchQuery}"
+              </p>
+            )}
+          </Card>
         )}
         
         {/* ✅ RESPONSIV FILTER PANEL */}
@@ -698,8 +850,8 @@ export default function TechnicianSchedule() {
           </Card>
         )}
 
-        {/* ✅ FÖRBÄTTRAD RESPONSIV CALENDAR */}
-        <div className="p-2 sm:p-4 bg-slate-900/50 rounded-lg border border-slate-800">
+        {/* ✅ FÖRBÄTTRAD RESPONSIV CALENDAR MED FIXED CSS */}
+        <div className="calendar-container bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
             initialView={calendarView}
@@ -711,9 +863,9 @@ export default function TechnicianSchedule() {
             buttonText={{ 
               today: 'idag', 
               month: window.innerWidth < 640 ? 'mån' : 'månad', 
-              week: window.innerWidth < 640 ? 'v' : 'vecka', 
-              day: window.innerWidth < 640 ? 'd' : 'dag', 
-              list: window.innerWidth < 640 ? 'lista' : 'lista' 
+              week: window.innerWidth < 640 ? 'vecka' : 'vecka', 
+              day: window.innerWidth < 640 ? 'dag' : 'dag', 
+              list: 'lista'
             }}
             allDaySlot={false}
             slotMinTime="07:00:00"
@@ -722,25 +874,13 @@ export default function TechnicianSchedule() {
             eventMinHeight={window.innerWidth < 640 ? 60 : 140}
             dayMaxEvents={window.innerWidth < 640 ? 2 : true}
             moreLinkClick="popover"
-            // ✅ MOBILSPECIFIKA INSTÄLLNINGAR
             aspectRatio={window.innerWidth < 640 ? 1.2 : 1.35}
             handleWindowResize={true}
             stickyHeaderDates={true}
-            // ✅ AUTOMATISKT FOKUS PÅ IDAG
             initialDate={new Date()}
-            // ✅ FÖRBÄTTRAD NAVIGATION
             navLinks={true}
             selectable={false}
             selectMirror={false}
-            // ✅ RESPONSIVA EVENT STYLING
-            eventClassNames={(arg) => {
-              const baseClasses = ['calendar-event'];
-              if (window.innerWidth < 640) {
-                baseClasses.push('mobile-event');
-              }
-              return baseClasses;
-            }}
-            // ✅ FÖRBÄTTRAR LISTVY SPACING
             listDayFormat={{ weekday: 'long', day: 'numeric', month: 'long' }}
             listDaySideFormat={false}
           />
@@ -754,116 +894,160 @@ export default function TechnicianSchedule() {
         caseData={selectedCase as any} 
       />
       
-      {/* ✅ FÖRBÄTTRAD CUSTOM CSS FÖR MOBIL CALENDAR */}
-      <style jsx>{`
+      {/* ✅ FIXAD CSS FÖR VIT BAKGRUND OCH FÖRBÄTTRAD STYLING */}
+      <style jsx global>{`
+        /* ✅ FIX FÖR VIT BAKGRUND - VIKTIGT! */
+        .calendar-container .fc {
+          background: transparent !important;
+        }
+        
+        .calendar-container .fc-theme-standard td,
+        .calendar-container .fc-theme-standard th {
+          background: transparent !important;
+          border-color: rgb(51, 65, 85) !important;
+        }
+        
+        .calendar-container .fc-scrollgrid {
+          background: transparent !important;
+        }
+        
+        .calendar-container .fc-col-header-cell {
+          background: rgba(30, 41, 59, 0.8) !important;
+        }
+        
+        .calendar-container .fc-daygrid-day {
+          background: transparent !important;
+        }
+        
+        .calendar-container .fc-list {
+          background: transparent !important;
+          border: none !important;
+        }
+        
+        .calendar-container .fc-list-table {
+          background: transparent !important;
+        }
+        
+        .calendar-container .fc-list-day-cushion {
+          background: rgba(30, 41, 59, 0.8) !important;
+          color: white !important;
+          padding: 0.75rem 1rem !important;
+          border-radius: 0.5rem !important;
+          margin: 0.5rem 0 !important;
+        }
+        
+        .calendar-container .fc-list-event {
+          background: transparent !important;
+          border: none !important;
+          padding: 0.5rem 0 !important;
+        }
+        
+        .calendar-container .fc-list-event:hover {
+          background: rgba(51, 65, 85, 0.3) !important;
+        }
+        
+        .calendar-container .fc-list-event-dot {
+          display: none !important;
+        }
+        
+        .calendar-container .fc-list-event-time {
+          display: none !important;
+        }
+        
+        .calendar-container .fc-list-event-title {
+          padding: 0 !important;
+        }
+        
+        .calendar-container .fc-toolbar {
+          padding: 1rem !important;
+          background: rgba(30, 41, 59, 0.5) !important;
+          border-radius: 0.5rem 0.5rem 0 0 !important;
+        }
+        
+        .calendar-container .fc-toolbar-title {
+          color: white !important;
+          font-weight: 600 !important;
+        }
+        
+        .calendar-container .fc-button {
+          background: rgba(59, 130, 246, 0.2) !important;
+          border: 1px solid rgba(59, 130, 246, 0.3) !important;
+          color: rgb(147, 197, 253) !important;
+          font-size: 0.875rem !important;
+          padding: 0.375rem 0.75rem !important;
+          border-radius: 0.375rem !important;
+        }
+        
+        .calendar-container .fc-button:hover {
+          background: rgba(59, 130, 246, 0.3) !important;
+          border-color: rgba(59, 130, 246, 0.5) !important;
+        }
+        
+        .calendar-container .fc-button-active {
+          background: rgba(59, 130, 246, 0.5) !important;
+          color: white !important;
+        }
+        
+        .calendar-container .fc-button:disabled {
+          background: rgba(71, 85, 105, 0.3) !important;
+          border-color: rgba(71, 85, 105, 0.3) !important;
+          color: rgb(148, 163, 184) !important;
+        }
+        
+        /* ✅ MOBILSPECIFIKA FÖRBÄTTRINGAR */
         @media (max-width: 640px) {
-          .fc-toolbar {
-            flex-direction: column;
-            gap: 0.5rem;
+          .calendar-container .fc-toolbar {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+            padding: 0.75rem !important;
           }
           
-          .fc-toolbar-chunk {
-            display: flex;
-            justify-content: center;
+          .calendar-container .fc-toolbar-chunk {
+            display: flex !important;
+            justify-content: center !important;
           }
           
-          .fc-button {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            border-radius: 0.375rem;
+          .calendar-container .fc-button {
+            padding: 0.25rem 0.5rem !important;
+            font-size: 0.75rem !important;
+            margin: 0 0.125rem !important;
           }
           
-          .fc-button-group .fc-button {
-            border-radius: 0;
+          .calendar-container .fc-list-day-cushion {
+            padding: 0.5rem 0.75rem !important;
+            margin: 0.25rem 0 !important;
           }
           
-          .fc-button-group .fc-button:first-child {
-            border-radius: 0.375rem 0 0 0.375rem;
-          }
-          
-          .fc-button-group .fc-button:last-child {
-            border-radius: 0 0.375rem 0.375rem 0;
-          }
-          
-          .fc-list-event {
-            padding: 0;
-            border: none !important;
-            background: transparent !important;
-          }
-          
-          .fc-list-event-dot {
-            display: none;
-          }
-          
-          .fc-list-event:hover {
-            background: rgba(51, 65, 85, 0.3) !important;
-          }
-          
-          .fc-daygrid-event {
-            font-size: 0.75rem;
-            padding: 1px 2px;
-          }
-          
-          .mobile-event {
-            min-height: 40px !important;
-          }
-          
-          .fc-event-main {
-            padding: 2px;
-          }
-          
-          .fc-list-day-cushion {
-            padding: 0.5rem 1rem;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 0.5rem;
-            margin: 0.5rem 0;
-          }
-          
-          .fc-list-empty {
-            padding: 2rem;
-            text-align: center;
-            color: rgb(148, 163, 184);
+          .calendar-container .fc-toolbar-title {
+            font-size: 1.125rem !important;
           }
         }
         
         @media (max-width: 1024px) {
-          .fc-toolbar-title {
-            font-size: 1.25rem;
+          .calendar-container .fc-toolbar-title {
+            font-size: 1.25rem !important;
           }
         }
         
-        /* ✅ FÖRBÄTTRAD LISTVY STYLING */
-        .fc-list-event-title {
-          padding: 0 !important;
-        }
-        
-        .fc-list-event-time {
-          display: none; /* Dölj standard tid eftersom vi visar den i custom content */
-        }
-        
-        .fc-list-day {
-          background: rgba(30, 41, 59, 0.5);
-        }
-        
-        .fc-list-day-text {
-          font-weight: 600;
-          color: white;
-        }
-        
-        .fc-list-day-side-text {
-          color: rgb(148, 163, 184);
-        }
-        
         /* ✅ CALENDAR EVENT HOVER EFFEKTER */
-        .fc-event:hover {
-          transform: scale(1.02);
-          transition: transform 0.2s ease;
-          z-index: 10;
+        .calendar-container .fc-event:hover {
+          transform: scale(1.02) !important;
+          transition: transform 0.2s ease !important;
+          z-index: 10 !important;
         }
         
-        .fc-list-event:hover .fc-list-event-title {
-          background: rgba(59, 130, 246, 0.1) !important;
-          border-radius: 0.5rem;
+        /* ✅ BÄTTRE SCROLLING FÖR LISTVY */
+        .calendar-container .fc-scroller {
+          overflow-y: auto !important;
+          max-height: 70vh !important;
+        }
+        
+        /* ✅ FIX FÖR EMPTY LIST */
+        .calendar-container .fc-list-empty {
+          padding: 2rem !important;
+          text-align: center !important;
+          color: rgb(148, 163, 184) !important;
+          background: transparent !important;
         }
       `}</style>
     </div>
