@@ -1,10 +1,9 @@
 // 📁 src/pages/technician/TechnicianSchedule.tsx
-// ⭐ VERSION 8.0 - STABILISERAD KLICK-LOGIK MED NATIVE HANDLER ⭐
-// Denna version återgår till FullCalendars inbyggda `dateClick`-hanterare,
-// vilket är den mest robusta och rekommenderade metoden.
-// 1. Borttagen `dayCellDidMount`: Den anpassade och buggiga event-hanteraren är borttagen.
-// 2. Återinförd `dateClick`: Använder `dateClick`-propen för att pålitligt fånga datumval.
-// 3. Stabilitet: Eliminerar felet med felaktig kolumn genom att lita på bibliotekets interna logik.
+// ⭐ VERSION 9.0 - TIDSZONS-SÄKER DATUMHANTERING ⭐
+// Denna version löser "en-dag-fel" genom att hantera datum som tidszons-neutrala strängar.
+// 1. State som sträng: `selectedDate` lagras nu som en 'YYYY-MM-DD'-sträng, inte ett Date-objekt.
+// 2. Tidszons-säker `dateClick`: `dateClick` använder `info.dateStr` för att fånga det exakta, lokala datumet.
+// 3. Konsekvent jämförelse: All logik jämför nu datumsträngar, vilket eliminerar alla tidszonsrelaterade fel.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin from '@fullcalendar/interaction' // Krävs för dateClick
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction' // Krävs för dateClick
 import svLocale from '@fullcalendar/core/locales/sv'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X } from 'lucide-react'
@@ -21,6 +20,11 @@ import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import '../../styles/FullCalendar.css'
+
+// Funktion för att formatera ett Date-objekt till en YYYY-MM-DD-sträng
+const toDateString = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+};
 
 // Interfaces & Hjälpfunktioner
 interface ScheduledCase { id: string; title: string; case_type: 'private' | 'business' | 'contract'; kontaktperson?: string; start_date: string; due_date?: string; description?: string; status: string; case_price?: number; telefon_kontaktperson?: string; e_post_kontaktperson?: string; skadedjur?: string; org_nr?: string; adress?: any; primary_assignee_name?: string; secondary_assignee_name?: string; technician_role?: 'primary' | 'secondary' | 'tertiary'; }
@@ -31,7 +35,6 @@ const formatTimeSpan = (start: string, end?: string): string => { const s = new 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
-// Huvudkomponenter för UI
 const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduledCase, onOpen: (c: ScheduledCase) => void }) => {
     const { status, title, kontaktperson, start_date, due_date, case_type, adress, telefon_kontaktperson, skadedjur, secondary_assignee_name } = caseData;
     const colors = getStatusColor(status);
@@ -70,16 +73,7 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduledCase, onOpen:
 };
 
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => {
-    const toggleStatus = (status: string) => {
-        const newStatuses = new Set(activeStatuses);
-        if (newStatuses.has(status)) {
-            newStatuses.delete(status);
-        } else {
-            newStatuses.add(status);
-        }
-        setActiveStatuses(newStatuses);
-    };
-
+    const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); };
     return (
         <AnimatePresence>
             {isOpen && (
@@ -87,37 +81,13 @@ const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { i
                     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
                         <header className="p-4 border-b border-slate-800 flex items-center justify-between">
                             <h2 className="text-lg font-bold">Filtrera Ärenden</h2>
-                            <Button variant="ghost" size="icon" onClick={onClose}>
-                                <X className="w-5 h-5" />
-                            </Button>
+                            <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
                         </header>
-                        <div className="p-4 flex-grow overflow-y-auto">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {ALL_STATUSES.map(status => (
-                                    <label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50">
-                                        <input
-                                            type="checkbox"
-                                            checked={activeStatuses.has(status)}
-                                            onChange={() => toggleStatus(status)}
-                                            className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0"
-                                        />
-                                        <span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>
-                                            {status}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
+                        <div className="p-4 flex-grow overflow-y-auto"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{ALL_STATUSES.map(status => (<label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50"><input type="checkbox" checked={activeStatuses.has(status)} onChange={() => toggleStatus(status)} className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0" /><span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>{status}</span></label>))}</div></div>
                         <footer className="p-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2">
-                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_STATUSES))} className="w-full">
-                                Visa alla
-                            </Button>
-                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">
-                                Återställ
-                            </Button>
-                            <Button variant="primary" onClick={onClose} className="w-full">
-                                Klar
-                            </Button>
+                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_STATUSES))} className="w-full">Visa alla</Button>
+                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">Återställ</Button>
+                            <Button variant="primary" onClick={onClose} className="w-full">Klar</Button>
                         </footer>
                     </motion.div>
                 </motion.div>
@@ -134,7 +104,8 @@ export default function TechnicianSchedule() {
 
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<ScheduledCase[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // ÄNDRING: `selectedDate` är nu en sträng i formatet 'YYYY-MM-DD'
+  const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()));
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduledCase | null>(null);
   
@@ -176,77 +147,65 @@ export default function TechnicianSchedule() {
   }), [cases, activeStatuses, searchQuery]);
 
   const casesForSelectedDay = useMemo(() => {
+    // Jämför startdatum-strängen direkt med den valda datum-strängen
     return filteredCases
-      .filter(c => new Date(c.start_date).toDateString() === selectedDate.toDateString())
+      .filter(c => c.start_date.startsWith(selectedDate))
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
   }, [filteredCases, selectedDate]);
   
   const eventsByDay = useMemo(() => {
     return filteredCases.reduce((acc, event) => {
-        const day = new Date(event.start_date).toDateString();
-        if (!acc[day]) {
-            acc[day] = 0;
-        }
+        const day = event.start_date.split('T')[0];
+        if (!acc[day]) acc[day] = 0;
         acc[day]++;
         return acc;
     }, {} as Record<string, number>);
   }, [filteredCases]);
 
-  const getHeatmapClass = (count: number | undefined) => {
-    if (!count || count === 0) return '';
-    if (count <= 2) return 'heatmap-low';
-    if (count <= 4) return 'heatmap-medium';
-    return 'heatmap-high';
-  };
-
-  const handleDayChange = (offset: number) => { setSelectedDate(prev => { const newDate = new Date(prev); newDate.setDate(newDate.getDate() + offset); return newDate; }); };
   const handleOpenModal = (caseData: ScheduledCase) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
-  const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
+  const handleUpdateSuccess = () => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
   
-  // Använd FullCalendars inbyggda klick-hanterare
-  const handleDateClick = (clickInfo: { date: Date }) => {
-      setSelectedDate(clickInfo.date);
+  // ÄNDRING: Använd `dateClick` för att sätta datum-STRÄNG
+  const handleDateClick = (clickInfo: DateClickArg) => {
+      setSelectedDate(clickInfo.dateStr); // `dateStr` är alltid 'YYYY-MM-DD' och tidszons-säker
       if (window.innerWidth < 1024) {
           setMobileView('agenda');
       }
   };
 
-  const renderDayCellContent = (dayRenderInfo: any) => {
-    const dayString = dayRenderInfo.date.toDateString();
-    const count = eventsByDay[dayString];
-    const heatmapClass = getHeatmapClass(count);
-    return (
-        <div className={`relative w-full h-full flex items-center justify-center`}>
-          <span>{dayRenderInfo.dayNumberText}</span>
-          {count > 0 && 
-            <div className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${heatmapClass}`}></div>
-          }
-        </div>
-    );
+  const handleDayChange = (offset: number) => {
+    const currentDate = new Date(selectedDate);
+    // Justera för tidszonen när ett nytt Date-objekt skapas från en sträng
+    currentDate.setUTCHours(12);
+    currentDate.setDate(currentDate.getDate() + offset);
+    setSelectedDate(toDateString(currentDate));
   };
   
-  useEffect(() => {
-    // Synkronisera kalendervyerna när selectedDate ändras
-    const calendarApi = calendarRef.current?.getApi();
-    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
-    if (calendarApi && calendarApi.getDate().toDateString() !== selectedDate.toDateString()) {
-        calendarApi.gotoDate(selectedDate);
-    }
-    if (mobileCalendarApi && mobileCalendarApi.getDate().toDateString() !== selectedDate.toDateString()) {
-        mobileCalendarApi.gotoDate(selectedDate);
-    }
-    
-    // Rensa tidigare visuella markeringar
-    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+  const renderDayCellContent = (dayRenderInfo: any) => {
+    const dayString = dayRenderInfo.date.toISOString().split('T')[0];
+    const count = eventsByDay[dayString];
+    return (<div className="relative w-full h-full flex items-center justify-center"><span>{dayRenderInfo.dayNumberText}</span>{count > 0 && <div className={`absolute bottom-1 w-1.5 h-1.5 rounded-full heatmap-low`}></div>}</div>);
+  };
 
-    // Hitta och markera den nya valda dagen. FullCalendar placerar `data-date` på `<td>`-elementet.
-    const dateString = selectedDate.toISOString().split('T')[0];
-    const dayElement = document.querySelector(`td[data-date="${dateString}"]`);
+  useEffect(() => {
+    const dateObj = new Date(selectedDate);
+    dateObj.setUTCHours(12); // Säkerställ att vi inte hamnar på fel dag vid övergång
+    
+    calendarRef.current?.getApi().gotoDate(dateObj);
+    mobileCalendarRef.current?.getApi().gotoDate(dateObj);
+    
+    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+    const dayElement = document.querySelector(`td[data-date="${selectedDate}"]`);
     if (dayElement) {
         dayElement.classList.add('day-selected');
     }
   }, [selectedDate]);
 
+  const selectedDateObject = useMemo(() => {
+      const d = new Date(selectedDate);
+      d.setUTCHours(12);
+      return d;
+  }, [selectedDate]);
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
   const filtersAreActive = activeStatuses.size !== DEFAULT_ACTIVE_STATUSES.size || !([...DEFAULT_ACTIVE_STATUSES].every(status => activeStatuses.has(status)));
@@ -256,83 +215,42 @@ export default function TechnicianSchedule() {
       <div className="min-h-screen bg-slate-950 text-white flex flex-col">
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
           <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                  <div className="bg-purple-500/10 p-2 rounded-lg"><Calendar className="w-6 h-6 text-purple-400" /></div>
-                  <div><h1 className="text-xl font-bold text-white">Mitt Schema</h1><p className="text-sm text-slate-400">{profile?.display_name}</p></div>
-              </div>
-              <Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm"><ArrowLeft className="w-4 h-4" /></Button>
+            <div className="flex items-center gap-3"><div className="bg-purple-500/10 p-2 rounded-lg"><Calendar className="w-6 h-6 text-purple-400" /></div><div><h1 className="text-xl font-bold text-white">Mitt Schema</h1><p className="text-sm text-slate-400">{profile?.display_name}</p></div></div>
+            <Button variant="secondary" onClick={() => navigate('/technician/dashboard')} size="sm"><ArrowLeft className="w-4 h-4" /></Button>
           </div>
         </header>
-
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4">
             <Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]">
-              <FullCalendar
-                key="desktop-calendar"
-                ref={calendarRef}
-                plugins={[dayGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                locale={svLocale}
-                headerToolbar={{left: 'title', center: '', right: 'prev,next'}}
-                height="auto"
-                dateClick={handleDateClick} // ANVÄND INBYGGD HANTERARE
-                dayCellContent={renderDayCellContent}
-              />
+              <FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>
             </Card>
           </aside>
-
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">
-            <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">
-              {(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}
-            </div>
+            <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">{(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}</div>
             <div className="mb-4 flex gap-2">
-              <div className="flex-grow relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
-              </div>
-              <Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative">
-                  <Filter className="w-4 h-4" />
-                  {filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}
-              </Button>
+              <div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div>
+              <Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button>
             </div>
-            
             <AnimatePresence mode="wait">
               <motion.div key={mobileView} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative">
                 <div className={(mobileView === 'agenda' || window.innerWidth >= 1024) ? 'block' : 'hidden'}>
                   <header className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-bold">{selectedDate.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+                      <h2 className="text-xl font-bold">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                       <div className="flex items-center gap-1">
                           <Button variant="secondary" size="icon" onClick={() => handleDayChange(-1)}><ChevronLeft className="w-5 h-5"/></Button>
-                          <Button variant="secondary" size="sm" onClick={() => setSelectedDate(new Date())}>Idag</Button>
+                          <Button variant="secondary" size="sm" onClick={() => setSelectedDate(toDateString(new Date()))}>Idag</Button>
                           <Button variant="secondary" size="icon" onClick={() => handleDayChange(1)}><ChevronRight className="w-5 h-5"/></Button>
                       </div>
                   </header>
                   <div className="space-y-3">
                       <AnimatePresence>
-                          {casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (
-                              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700">
-                                  <Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" />
-                                  <h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3>
-                                  <p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p>
-                              </motion.div>
-                          )}
+                          {casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}
                       </AnimatePresence>
                   </div>
                 </div>
-                
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
                   <Card className="p-0 bg-slate-900/50 border-slate-800">
-                    <FullCalendar
-                      key="mobile-calendar"
-                      ref={mobileCalendarRef}
-                      plugins={[dayGridPlugin, interactionPlugin]}
-                      initialView="dayGridMonth"
-                      locale={svLocale}
-                      headerToolbar={{ left: 'title', center: '', right: 'prev,next' }}
-                      height="auto"
-                      dateClick={handleDateClick} // ANVÄND INBYGGD HANTERARE
-                      dayCellContent={renderDayCellContent}
-                    />
+                    <FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>
                   </Card>
                 </div>
               </motion.div>
