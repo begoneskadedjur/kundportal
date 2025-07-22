@@ -76,24 +76,24 @@ const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status =>
   !status.includes('Avslutat') && !status.includes('Stängt')
 );
 
-// ✅ CLEAN STATUS COLORS - Mjukare, mer moderna
+// ✅ CLEAN STATUS COLORS - Mörkt tema för professionellt utseende
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
   const lowerStatus = status?.toLowerCase() || '';
   
   if (lowerStatus.includes('avslutat')) 
-    return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+    return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700' };
   if (lowerStatus.startsWith('återbesök')) 
-    return { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' };
+    return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700' };
   if (lowerStatus.includes('bokad') || lowerStatus.includes('signerad')) 
-    return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
+    return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700' };
   if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) 
-    return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+    return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700' };
   if (lowerStatus.includes('review')) 
-    return { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' };
+    return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700' };
   if (lowerStatus.includes('stängt')) 
-    return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
+    return { bg: 'bg-slate-700/50', text: 'text-slate-400', border: 'border-slate-600' };
   
-  return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' };
+  return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700' };
 };
 
 // ✅ DARK THEME STATUS COLORS för FullCalendar events
@@ -130,9 +130,26 @@ const formatPriceExact = (price: number | null | undefined): string => {
 
 const getTechnicianRoleIcon = (role: 'primary' | 'secondary' | 'tertiary') => {
   switch (role) {
-    case 'primary': return <User className="w-3 h-3 text-blue-500" title="Primär tekniker" />;
-    case 'secondary': return <Users className="w-3 h-3 text-green-500" title="Sekundär tekniker" />;
-    case 'tertiary': return <Users className="w-3 h-3 text-purple-500" title="Tertiär tekniker" />;
+    case 'primary': return <User className="w-3 h-3 text-blue-400" title="Primär tekniker" />;
+    case 'secondary': return <Users className="w-3 h-3 text-green-400" title="Sekundär tekniker" />;
+    case 'tertiary': return <Users className="w-3 h-3 text-purple-400" title="Tertiär tekniker" />;
+  }
+};
+
+// ✅ PROFESSIONELLA CASE TYPE IKONER
+const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract') => {
+  switch (caseType) {
+    case 'private': return <User className="w-5 h-5 text-blue-400" />;
+    case 'business': return <Users className="w-5 h-5 text-green-400" />;
+    case 'contract': return <Clock className="w-5 h-5 text-purple-400" />;
+  }
+};
+
+const getCaseTypeText = (caseType: 'private' | 'business' | 'contract') => {
+  switch (caseType) {
+    case 'private': return 'Privatperson';
+    case 'business': return 'Företag';
+    case 'contract': return 'Avtal';
   }
 };
 
@@ -369,7 +386,7 @@ export default function TechnicianSchedule() {
     const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
     const isList = eventInfo.view.type.includes('list');
     
-    // ✅ HELT NY CLEAN MODERN LISTVY
+    // ✅ PROFESSIONELL LISTVY - MÖRKT TEMA
     if (isList) {
       const fullAddress = formatAddress(adress);
       const timeStr = new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { 
@@ -380,47 +397,45 @@ export default function TechnicianSchedule() {
       const statusColors = getStatusColor(status);
       
       return (
-        <div className="w-full bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4 hover:shadow-md transition-shadow duration-200">
+        <div className="w-full bg-slate-800/60 rounded-xl shadow-lg border border-slate-700/50 overflow-hidden mb-4 hover:bg-slate-800/80 transition-all duration-200 backdrop-blur-sm">
           {/* ✅ HEADER MED TID OCH STATUS */}
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-center justify-between mb-3">
               {/* Tid och ärendetyp */}
               <div className="flex items-center gap-3">
-                <div className="text-2xl font-bold text-gray-900 font-mono">
+                <div className="text-2xl font-bold text-white font-mono">
                   {timeStr}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">
-                    {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
-                  </span>
-                  <span className="text-sm font-medium text-gray-600">
-                    {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
+                  {getCaseTypeIcon(case_type)}
+                  <span className="text-sm font-medium text-slate-300">
+                    {getCaseTypeText(case_type)}
                   </span>
                 </div>
               </div>
               
               {/* Status badge */}
-              <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusColors.bg} ${statusColors.text} ${statusColors.border} border`}>
+              <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${statusColors.bg} ${statusColors.text} ${statusColors.border} border shadow-sm`}>
                 {status}
               </span>
             </div>
             
             {/* ✅ ÄRENDETITEL */}
-            <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight">
+            <h3 className="text-xl font-bold text-white mb-2 leading-tight">
               {eventInfo.event.title}
             </h3>
             
             {/* ✅ GRUNDINFO RAD */}
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center justify-between text-sm text-slate-300">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4" />
+                <User className="w-4 h-4 text-slate-400" />
                 <span className="font-medium">
                   {kontaktperson || 'Okänd kund'}
                 </span>
               </div>
               
               {exactPrice && (
-                <div className="font-bold text-lg text-emerald-600">
+                <div className="font-bold text-lg text-green-400">
                   {exactPrice}
                 </div>
               )}
@@ -428,13 +443,13 @@ export default function TechnicianSchedule() {
           </div>
           
           {/* ✅ DETALJER SEKTION */}
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+          <div className="px-4 py-3 bg-slate-900/50 border-t border-slate-700/50">
             <div className="grid grid-cols-1 gap-3">
               {/* Adress */}
               {fullAddress && (
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-gray-700 leading-relaxed">
+                  <MapPin className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-slate-300 leading-relaxed">
                     {fullAddress}
                   </span>
                 </div>
@@ -443,9 +458,9 @@ export default function TechnicianSchedule() {
               {/* Skadedjur */}
               {skadedjur && (
                 <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 flex-shrink-0 text-center">🐛</div>
-                  <span className="text-sm text-gray-700">
-                    <span className="font-medium">Skadedjur:</span> {skadedjur}
+                  <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-sm text-slate-300">
+                    <span className="font-medium text-slate-200">Ärende:</span> {skadedjur}
                   </span>
                 </div>
               )}
@@ -453,18 +468,18 @@ export default function TechnicianSchedule() {
               {/* Team info - endast om flera tekniker */}
               {(secondary_assignee_name || tertiary_assignee_name) && (
                 <div className="flex items-center gap-3">
-                  <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <Users className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-600">Team:</span>
+                    <span className="font-medium text-slate-300">Team:</span>
                     {secondary_assignee_name && (
-                      <span className="text-emerald-600 font-medium">
+                      <span className="text-green-400 font-medium">
                         {secondary_assignee_name.split(' ')[0]}
                       </span>
                     )}
                     {tertiary_assignee_name && (
                       <>
-                        {secondary_assignee_name && <span className="text-gray-400">•</span>}
-                        <span className="text-purple-600 font-medium">
+                        {secondary_assignee_name && <span className="text-slate-500">•</span>}
+                        <span className="text-purple-400 font-medium">
                           {tertiary_assignee_name.split(' ')[0]}
                         </span>
                       </>
@@ -477,7 +492,7 @@ export default function TechnicianSchedule() {
               {technician_role && technician_role !== 'primary' && (
                 <div className="flex items-center gap-3">
                   {getTechnicianRoleIcon(technician_role)}
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-slate-400">
                     {technician_role === 'secondary' ? 'Sekundär tekniker på detta ärende' : 'Tredje tekniker på detta ärende'}
                   </span>
                 </div>
@@ -486,14 +501,14 @@ export default function TechnicianSchedule() {
           </div>
           
           {/* ✅ ACTION BUTTONS */}
-          <div className="px-4 py-3 border-t border-gray-100 bg-white">
+          <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-800/30">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {telefon_kontaktperson && (
                   <a 
                     href={`tel:${telefon_kontaktperson}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors duration-200 text-sm font-medium"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors duration-200 text-sm font-medium border border-blue-500/30"
                   >
                     <Phone className="w-4 h-4" />
                     Ring
@@ -505,7 +520,7 @@ export default function TechnicianSchedule() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors duration-200 text-sm font-medium"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors duration-200 text-sm font-medium border border-green-500/30"
                   >
                     <Navigation className="w-4 h-4" />
                     Navigera
@@ -540,8 +555,8 @@ export default function TechnicianSchedule() {
         <div className="flex-grow">
           <div className="flex items-center justify-between mb-1">
             <p className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-80 font-medium flex items-center gap-1`}>
-              {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
-              {!isMobile && (case_type === 'private' ? ' Privat' : case_type === 'business' ? ' Företag' : ' Avtal')}
+              {getCaseTypeIcon(case_type)}
+              {!isMobile && getCaseTypeText(case_type)}
             </p>
             {technician_role && !isMobile && (
               <div className="flex items-center gap-1">
@@ -573,7 +588,7 @@ export default function TechnicianSchedule() {
               
               {skadedjur && (
                 <p className="flex items-center gap-1.5">
-                  <span className="font-semibold">Problem:</span>
+                  <span className="font-semibold">Ärende:</span>
                   <span className="bg-slate-700/50 px-1.5 py-0.5 rounded text-xs">{skadedjur}</span>
                 </p>
               )}
