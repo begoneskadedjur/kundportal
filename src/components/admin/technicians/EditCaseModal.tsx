@@ -313,8 +313,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }
 
-  // ✅ FIX: Denna funktion uppdaterar nu både föräldern (onSuccess) OCH sig själv (setCurrentCase)
-  // för att ge omedelbar visuell feedback i UI.
   const handleTimeTracking = async (action: 'start' | 'pause' | 'complete' | 'reset') => {
     const tableName = getTableName();
     if (!tableName || !currentCase || tableName === 'cases') return;
@@ -355,10 +353,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
       const updatedCase = { ...currentCase, ...data };
       
-      // Informera föräldern om ändringen
       onSuccess(updatedCase as TechnicianCase);
-      
-      // Informera sig själv om ändringen för omedelbar UI-uppdatering
       setCurrentCase(updatedCase as TechnicianCase);
       
       if (action !== 'start') {
