@@ -1,5 +1,5 @@
 // 📁 src/components/admin/technicians/ReportModal.tsx
-// ⭐ KORRIGERING: Rättar databasfrågan för att hämta 'pris' istället för 'case_price'. ⭐
+// ⭐ SLUTGILTIG KORRIGERING: Rättar databasfrågan för 'case_type'. ⭐
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -41,29 +41,35 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
         setLoading(true);
 
         try {
-            // KORRIGERING: 'case_price' är borttaget från commonFields eftersom den kolumnen inte finns i databasen.
-            const commonFields = `id, title, kontaktperson, start_date, status, skadedjur, case_type`;
+            // KORRIGERING: 'case_type' borttagen från commonFields.
+            const commonFields = `id, title, kontaktperson, start_date, status, skadedjur, pris`;
 
-            // KORRIGERING: Vi hämtar 'pris' separat från båda tabellerna.
             const [privateResult, businessResult] = await Promise.all([
-                supabase.from('private_cases').select(`${commonFields}, pris`).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
-                supabase.from('business_cases').select(`${commonFields}, pris`).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
+                supabase.from('private_cases').select(commonFields).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
+                supabase.from('business_cases').select(commonFields).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
             ]);
 
             if (privateResult.error) throw privateResult.error;
             if (businessResult.error) throw businessResult.error;
 
-            // KORRIGERING: Mappar 'pris' till 'case_price' för att skapa ett enhetligt objekt.
-            const allCases = [
-                ...(privateResult.data || []).map(c => ({ ...c, case_price: c.pris })),
-                ...(businessResult.data || []).map(c => ({ ...c, case_price: c.pris })),
-            ];
+            // KORRIGERING: Mappar 'pris' till 'case_price' OCH lägger manuellt till 'case_type'.
+            const privateCases = (privateResult.data || []).map(c => ({
+                ...c,
+                case_price: c.pris,
+                case_type: 'private' as const // Lägg till typen manuellt
+            }));
+            const businessCases = (businessResult.data || []).map(c => ({
+                ...c,
+                case_price: c.pris,
+                case_type: 'business' as const // Lägg till typen manuellt
+            }));
+
+            const allCases = [...privateCases, ...businessCases];
 
             setReportCases(allCases as ScheduledCase[]);
 
         } catch (error) {
             console.error("Fel vid hämtning av rapportdata:", error);
-            // Nollställ ärenden vid fel för att undvika att visa gammal data
             setReportCases([]);
         } finally {
             setLoading(false);
