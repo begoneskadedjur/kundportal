@@ -1,13 +1,13 @@
-// 📁 src\components\admin\technicians
-// ⭐ NY KOMPONENT - RAPPORT & ANALYS ⭐
-// Denna modal ger tekniker ett kraftfullt verktyg för att analysera sitt arbete.
+// 📁 src/components/admin/technicians/ReportModal.tsx
+// ⭐ KORRIGERING: Justerad importsökväg för Supabase ⭐
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+// KORRIGERING: Sökvägen har justerats från ../../ till ../../../ för att korrekt hitta lib-mappen
+import { supabase } from '../../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Calendar, ChevronDown, Filter, Search, X } from 'lucide-react';
-import Button from '../ui/Button';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import Button from '../../ui/Button';
+import LoadingSpinner from '../../shared/LoadingSpinner';
 
 // Anta att ScheduledCase-interfacet finns tillgängligt (importeras eller definieras)
 interface ScheduledCase { id: string; title: string; case_type: 'private' | 'business' | 'contract'; kontaktperson?: string; start_date: string; status: string; case_price?: number; skadedjur?: string; }
@@ -135,7 +135,6 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                             <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
                         </header>
 
-                        {/* --- KONTROLLPANEL --- */}
                         <div className="p-4 bg-slate-950/50 border-b border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div className="md:col-span-2 grid grid-cols-2 gap-4">
                                 <div><label className="text-xs font-semibold text-slate-400 block mb-1">Startdatum</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm"/></div>
@@ -148,9 +147,7 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                             </div>
                         </div>
 
-                        {/* --- RESULTATVY --- */}
                         <div className="flex-grow flex overflow-hidden">
-                            {/* --- SIDOPANEL MED STATISTIK OCH FILTER --- */}
                             <aside className="w-1/3 xl:w-1/4 p-4 border-r border-slate-800 overflow-y-auto shrink-0">
                                 <h3 className="text-lg font-bold mb-4">Statistik</h3>
                                 <div className="space-y-3 text-sm mb-6">
@@ -168,7 +165,6 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                                 </div>
                             </aside>
 
-                            {/* --- HUVUDLISTA MED ÄRENDEN --- */}
                             <main className="flex-grow flex flex-col overflow-y-auto">
                                 <div className="p-4 border-b border-slate-800 shrink-0"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök i resultat..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500"/></div></div>
                                 <div className="flex-grow overflow-y-auto">
