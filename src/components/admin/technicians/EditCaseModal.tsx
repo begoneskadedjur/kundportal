@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - KOMPLETT OCH FIXAD VERSION
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - SLUTGILTIG VERSION MED ALLA FIXAR
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
@@ -19,7 +19,7 @@ interface TechnicianCase {
 interface EditCaseModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (updatedCase: Partial<TechnicianCase>) => void
+  onSuccess: (updatedCase: TechnicianCase) => void
   caseData: TechnicianCase | null
 }
 
@@ -262,6 +262,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
          : 'cases';
   }
 
+  // ✅ FIX: Denna funktion använder nu datan som returneras från databasen som sanning.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
@@ -293,12 +294,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         
       if (updateError) throw updateError;
       
+      const updatedCaseFromDb = data as TechnicianCase;
+      
+      // Använd alltid det kompletta, returnerade objektet för att uppdatera allt.
+      onSuccess(updatedCaseFromDb);
+      setCurrentCase(updatedCaseFromDb);
+
       setSubmitted(true);
       toast.success('Ärendet har uppdaterats!');
       
       setTimeout(() => {
         setSubmitted(false);
-        onSuccess({ ...currentCase, ...formData });
         onClose();
       }, 1500);
       
@@ -332,14 +338,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             const minutesWorked = (Date.now() - new Date(currentCase.work_started_at).getTime()) / 1000 / 60;
             const safeMinutesWorked = safeRoundMinutes(minutesWorked);
             const safeTotalMinutes = safeRoundMinutes((currentCase.time_spent_minutes || 0) + minutesWorked);
-            
             updatePayload = { work_started_at: null, time_spent_minutes: safeTotalMinutes };
-            
             if (action === 'pause') successMessage = `⏸️ Arbete pausat! Loggade ${formatMinutes(safeMinutesWorked)}`;
             else successMessage = `✅ Arbete slutfört! Total tid: ${formatMinutes(safeTotalMinutes)}`;
-          } else {
-            return; // Ingen aktiv tid att pausa
-          }
+          } else { return; }
           break;
         case 'reset':
           updatePayload = { work_started_at: null, time_spent_minutes: 0 };
@@ -352,12 +354,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
       if (error) throw error;
 
-      // ✅ FIX: Slå ihop state istället för att ersätta det.
-      // Detta garanterar att 'case_type' och andra fält som inte returneras av databasen finns kvar.
       const mergedCase = { ...currentCase, ...data };
-
       setCurrentCase(mergedCase as TechnicianCase);
-      onSuccess(mergedCase);
+      onSuccess(mergedCase as TechnicianCase);
       
       if (action !== 'start') {
         localStorage.removeItem(`time_backup_${currentCase.id}`);
@@ -382,10 +381,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const handleSuccessfulRestore = async () => {
     const result = await restoreFromBackup();
     if (result && typeof result === 'object' && currentCase) {
-      // Använd samma säkra merge-logik här
       const mergedCase = { ...currentCase, ...result };
       setCurrentCase(mergedCase as TechnicianCase);
-      onSuccess(mergedCase);
+      onSuccess(mergedCase as TechnicianCase);
     }
   };
 
@@ -408,7 +406,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading || timeTrackingLoading} className="flex-1">
         Avbryt
       </Button>
-      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading} className="flex-1">
+      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading || timeTrackingLoading} className="flex-1">
         Spara ändringar
       </Button>
     </div>
