@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - FIXAD VERSION MED KORREKTA DATATYPER
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - KOMPLETT SLUTGILTIG VERSION
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
@@ -33,7 +33,7 @@ interface BackupData {
 
 const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
 
-// ✅ FIX 1: SÄKER AVRUNDNING AV MINUTER TILL INTEGER
+// ✅ SÄKER AVRUNDNING AV MINUTER TILL INTEGER
 const safeRoundMinutes = (minutes: number): number => {
   return Math.round(Math.max(0, minutes));
 };
@@ -70,7 +70,11 @@ const useRealTimeTimer = (case_: TechnicianCase | null) => {
   const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
-    if (!case_) return;
+    if (!case_) {
+      setDisplayTime(0);
+      setIsRunning(false);
+      return;
+    }
 
     const baseTime = case_.time_spent_minutes || 0;
     const isActive = Boolean(case_.work_started_at);
@@ -99,7 +103,7 @@ const useRealTimeTimer = (case_: TechnicianCase | null) => {
   return { displayTime, isRunning };
 };
 
-// ✅ FIX 2: FÖRBÄTTRAD BACKUP MED SÄKER DATAHANTERING
+// ✅ CUSTOM HOOK FÖR AUTO-BACKUP SYSTEM
 const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
   const [lastBackup, setLastBackup] = useState<Date | null>(null);
   const [pendingRestore, setPendingRestore] = useState<BackupData | null>(null);
@@ -117,7 +121,6 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         const backupTime = new Date(data.timestamp);
         const now = new Date();
         
-        // ✅ FIX: Säker hantering av backup-data med avrundning
         const backupMinutes = safeRoundMinutes(data.totalMinutes);
         const currentMinutes = currentCase.time_spent_minutes || 0;
         
@@ -125,13 +128,11 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         const hoursSinceBackup = (now.getTime() - backupTime.getTime()) / (1000 * 60 * 60);
         
         if (backupMinutes > currentMinutes && hoursSinceBackup < 8) {
-          // Uppdatera backup-data med säkra värden
           setPendingRestore({
             ...data,
             totalMinutes: backupMinutes
           });
         } else {
-          // Rensa gammal backup
           localStorage.removeItem(backupKey);
         }
       } catch (e) {
@@ -151,7 +152,6 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
       const sessionMinutes = (now.getTime() - startTime.getTime()) / 1000 / 60;
       const totalMinutes = (currentCase.time_spent_minutes || 0) + sessionMinutes;
 
-      // ✅ FIX: Spara säkra, avrundade värden i backup
       const backup: BackupData = {
         caseId: currentCase.id,
         totalMinutes: safeRoundMinutes(totalMinutes),
@@ -169,7 +169,7 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
     return () => clearInterval(backupInterval);
   }, [currentCase?.work_started_at, currentCase?.time_spent_minutes, currentCase?.id]);
 
-  const restoreFromBackup = useCallback(async (): Promise<boolean> => {
+  const restoreFromBackup = useCallback(async (): Promise<TechnicianCase | false> => {
     if (!pendingRestore || !currentCase) return false;
 
     try {
@@ -177,7 +177,6 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
                      : currentCase.case_type === 'business' ? 'business_cases' 
                      : 'cases';
       
-      // ✅ FIX: Använd säkert avrundade värden
       const safeMinutes = safeRoundMinutes(pendingRestore.totalMinutes);
       
       const { data, error } = await supabase
@@ -195,12 +194,11 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         throw error;
       }
 
-      // Clear backup and pending restore
       localStorage.removeItem(`time_backup_${currentCase.id}`);
       setPendingRestore(null);
       
       toast.success(`Återställde ${formatMinutes(safeMinutes)} arbetstid!`);
-      return data;
+      return data as TechnicianCase;
     } catch (error) {
       console.error('Restore failed:', error);
       toast.error('Kunde inte återställa arbetstid');
@@ -221,7 +219,7 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
 // ✅ BACKUP RESTORE PROMPT COMPONENT
 const BackupRestorePrompt: React.FC<{
   pendingRestore: BackupData | null;
-  onRestore: () => Promise<any>;
+  onRestore: () => Promise<TechnicianCase | false>;
   onDismiss: () => void;
 }> = ({ pendingRestore, onRestore, onDismiss }) => {
   const [restoring, setRestoring] = useState(false);
@@ -231,10 +229,7 @@ const BackupRestorePrompt: React.FC<{
   const handleRestore = async () => {
     setRestoring(true);
     try {
-      const result = await onRestore();
-      if (result) {
-        // Success - component will unmount since pendingRestore becomes null
-      }
+      await onRestore();
     } catch (error) {
       console.error('Restore failed:', error);
     } finally {
@@ -283,31 +278,40 @@ const BackupRestorePrompt: React.FC<{
 
 export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
   const [loading, setLoading] = useState(false)
-  const [timeTrackingLoading, setTimeTrackingLoading] = useState(false) // ✅ FIX 3: Separat loading för tidsspårning
+  const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentCase, setCurrentCase] = useState<TechnicianCase | null>(null)
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
 
-  // ✅ NYA HOOKS FÖR FÖRBÄTTRAD FUNKTIONALITET
+  // ✅ HOOKS FÖR FÖRBÄTTRAD FUNKTIONALITET
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
 
+  // ✅ FIX 1: BÄTTRE STATE INITIALIZATION
   useEffect(() => {
     if (caseData) {
+      console.log('Setting currentCase:', caseData);
       setCurrentCase(caseData);
       setFormData({
-        title: caseData.title || '', status: caseData.status || '', description: caseData.description || '',
-        kontaktperson: caseData.kontaktperson || '', telefon_kontaktperson: caseData.telefon_kontaktperson || '',
-        e_post_kontaktperson: caseData.e_post_kontaktperson || '', case_price: caseData.case_price || 0,
-        skadedjur: caseData.skadedjur || '', org_nr: caseData.org_nr || '', personnummer: caseData.personnummer || '',
+        title: caseData.title || '', 
+        status: caseData.status || '', 
+        description: caseData.description || '',
+        kontaktperson: caseData.kontaktperson || '', 
+        telefon_kontaktperson: caseData.telefon_kontaktperson || '',
+        e_post_kontaktperson: caseData.e_post_kontaktperson || '', 
+        case_price: caseData.case_price || 0,
+        skadedjur: caseData.skadedjur || '', 
+        org_nr: caseData.org_nr || '', 
+        personnummer: caseData.personnummer || '',
         material_cost: caseData.material_cost || 0
-      })
-      // ✅ FIX: Rensa errors när ny data laddas
+      });
+      // Reset alla states vid ny data
       setError(null);
       setTimeTrackingLoading(false);
+      setLoading(false);
     }
-  }, [caseData])
+  }, [caseData?.id]); // ✅ FIX: Använd case ID som dependency
 
   const getTableName = () => {
     if (!currentCase) return null;
@@ -316,7 +320,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
          : 'cases';
   }
 
-  // ✅ FIX 4: Förbättrad form submission som inte påverkas av time tracking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
@@ -376,17 +379,22 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }
 
-  // ✅ FIX 5: SÄKER TIDSSPÅRNING MED KORREKT AVRUNDNING
+  // ✅ FIX 2: FÖRBÄTTRAD TIDSSPÅRNING MED KORREKT STATE UPDATES
   const handleTimeTracking = async (action: 'start' | 'pause' | 'complete' | 'reset') => {
     const tableName = getTableName();
     
-    // Kontroll: Avbryt om det är ett avtalsärende
     if (!tableName || !currentCase || tableName === 'cases') {
       setError("Tidrapportering är inte tillgängligt för avtalsärenden.");
       return;
     }
     
-    setTimeTrackingLoading(true); // ✅ FIX: Använd separat loading state
+    console.log(`⏱️ Time tracking action: ${action}`, {
+      currentCase: currentCase.id,
+      work_started_at: currentCase.work_started_at,
+      time_spent_minutes: currentCase.time_spent_minutes
+    });
+    
+    setTimeTrackingLoading(true);
     setError(null);
 
     try {
@@ -406,7 +414,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             const startTime = new Date(currentCase.work_started_at);
             const minutesWorked = (stopTime.getTime() - startTime.getTime()) / 1000 / 60;
             
-            // ✅ FIX: Säker avrundning till integer
             const safeMinutesWorked = safeRoundMinutes(minutesWorked);
             const safeTotalMinutes = safeRoundMinutes((currentCase.time_spent_minutes || 0) + minutesWorked);
             
@@ -420,6 +427,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             } else {
               successMessage = `✅ Arbete slutfört! Total tid: ${formatMinutes(safeTotalMinutes)}`;
             }
+          } else {
+            console.warn('No work_started_at found for pause/complete');
+            setError('Ingen pågående arbetstid att pausa/slutföra');
+            return;
           }
           break;
           
@@ -432,11 +443,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
           break;
       }
 
-      // Optimistic update
-      const optimisticState = { ...currentCase, ...updatePayload };
-      setCurrentCase(optimisticState);
+      console.log('📤 Sending update payload:', updatePayload);
 
-      // Database update
+      // Database update FÖRST - ingen optimistic update
       const { data, error } = await supabase
         .from(tableName)
         .update(updatePayload)
@@ -445,46 +454,41 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         .single();
 
       if (error) {
-        // Rollback optimistic update
-        setCurrentCase(currentCase);
+        console.error('Database update error:', error);
         throw error;
       }
 
-      // Success - update state and clear backups
-      setCurrentCase(data as TechnicianCase);
-      onSuccess(data as Partial<TechnicianCase>);
+      console.log('✅ Database update successful:', data);
+
+      // ✅ FIX 3: UPPDATERA STATE EFTER FRAMGÅNGSRIK DATABAS-UPDATE
+      const updatedCase = data as TechnicianCase;
+      setCurrentCase(updatedCase);
+      onSuccess(updatedCase); // Informera parent component
       
       // Clear backup on successful save (except for start)
       if (action !== 'start') {
         localStorage.removeItem(`time_backup_${currentCase.id}`);
       }
       
-      // Success toast
       toast.success(successMessage, { duration: 3000 });
 
     } catch (error: any) {
-      console.error('Time tracking error:', error);
+      console.error('⚠️ Time tracking error:', error);
       
       // Specific error messages
-      if (error.message.includes('network') || error.message.includes('fetch')) {
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
         setError('🌐 Nätverksfel - kontrollera internetanslutningen');
-        
-        // Auto-retry för nätverksfel
-        setTimeout(() => {
-          console.log('🔄 Auto-retrying time tracking...');
-          handleTimeTracking(action);
-        }, 3000);
-      } else if (error.message.includes('permission') || error.code === '42501') {
+      } else if (error.message?.includes('permission') || error.code === '42501') {
         setError('🔒 Behörighet saknas - kontakta administratör');  
       } else if (error.code === '22P02') {
         setError('🔢 Datafel - tidsvärdet kunde inte sparas korrekt');
       } else {
-        setError(`⚠️ Tidsspårning misslyckades: ${error.message}`);
+        setError(`⚠️ Tidsspårning misslyckades: ${error.message || 'Okänt fel'}`);
       }
       
       toast.error('Tidsspårning misslyckades');
     } finally {
-      setTimeTrackingLoading(false); // ✅ FIX: Sätt rätt loading state
+      setTimeTrackingLoading(false);
     }
   }
 
@@ -494,22 +498,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   }
 
-  // ✅ FIX 6: FÖRBÄTTRAT BACKUP RESTORE MED KORREKT STATE UPDATE
+  // ✅ FIX 4: FÖRBÄTTRAT BACKUP RESTORE
   const handleSuccessfulRestore = async () => {
     const result = await restoreFromBackup();
-    if (result && currentCase) {
-      // Uppdatera current case med restored data
-      const updatedCase = { 
-        ...currentCase, 
-        time_spent_minutes: safeRoundMinutes(pendingRestore?.totalMinutes || 0),
-        work_started_at: null 
-      };
-      setCurrentCase(updatedCase);
-      onSuccess(updatedCase);
+    if (result && typeof result === 'object') {
+      console.log('✅ Restore successful, updating state:', result);
+      setCurrentCase(result);
+      onSuccess(result);
     }
     return result;
   };
 
+  // ✅ FIX 5: BÄTTRE LOADING STATES OCH UI FEEDBACK
   if (!currentCase) return null;
   
   if (submitted) {
@@ -530,7 +530,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         type="button" 
         variant="secondary" 
         onClick={onClose} 
-        disabled={loading || timeTrackingLoading} // ✅ FIX: Check both loading states
+        disabled={loading || timeTrackingLoading}
         className="flex-1"
       >
         Avbryt
@@ -539,7 +539,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         type="submit" 
         form="edit-case-form" 
         loading={loading} 
-        disabled={loading || timeTrackingLoading} // ✅ FIX: Disable only if form is loading
+        disabled={loading}  // ✅ FIX: Bara disable vid form loading
         className="flex-1"
       >
         Spara ändringar
@@ -547,10 +547,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     </div>
   );
 
+  // ✅ FIX 6: ENDAST VISA TIDSSPÅRNING FÖR RÄTT CASE TYPES
+  const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading}>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title={`Redigera ärende: ${currentCase.title}`} 
+      size="xl" 
+      footer={footer} 
+      preventClose={loading || timeTrackingLoading}
+    >
       <div className="p-6 max-h-[70vh] overflow-y-auto">
-        {/* ✅ BACKUP RESTORE PROMPT */}
         <BackupRestorePrompt 
           pendingRestore={pendingRestore}
           onRestore={handleSuccessfulRestore}
@@ -565,6 +574,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           )}
           
+          {/* Ärendeinformation */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-400" />
@@ -594,7 +604,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   {statusOrder.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              {currentCase.case_type !== 'contract' && (
+              {showTimeTracking && (
                 <Input 
                   label="Skadedjur" 
                   name="skadedjur" 
@@ -606,7 +616,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           </div>
 
-          {currentCase.case_type !== 'contract' && (
+          {/* Kontaktinformation */}
+          {showTimeTracking && (
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-white flex items-center gap-2">
                 <User className="w-5 h-5 text-green-400" />
@@ -628,6 +639,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           )}
           
+          {/* Kostnader & Tid */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-white flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-yellow-400" />
@@ -641,7 +653,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 value={formData.case_price === null ? '' : formData.case_price} 
                 onChange={handleChange} 
               />
-              {currentCase.case_type !== 'contract' && (
+              {showTimeTracking && (
                 <Input 
                   label="Materialkostnad" 
                   name="material_cost" 
@@ -652,13 +664,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               )}
             </div>
             
-            {/* ✅ FÖRBÄTTRAT TIDRAPPORTERINGSGRÄNSSNITT */}
-            {(currentCase.case_type === 'private' || currentCase.case_type === 'business') && (
+            {/* ✅ FÖRBÄTTRAT TIDRAPPORTERINGSGRÄNSSNITT - KOMPLETT VERSION */}
+            {showTimeTracking && (
               <div className="p-4 bg-slate-800/50 rounded-lg border-2 border-slate-700">
+                {/* Header med status info */}
                 <div className="flex items-center justify-between mb-4">
                   <label className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     Arbetstid
+                    <span className="text-xs text-slate-500">
+                      ({currentCase.case_type} - {currentCase.id.slice(0, 8)})
+                    </span>
                   </label>
                   <div className="flex items-center gap-2 text-xs">
                     {isRunning && (
@@ -724,7 +740,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         className="flex items-center justify-center gap-2"
                       >
                         <Pause className="w-4 h-4" />
-                        Pausa
+                        {timeTrackingLoading ? 'Pausar...' : 'Pausa'}
                       </Button>
                       <Button 
                         type="button" 
@@ -735,7 +751,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         className="flex items-center justify-center gap-2"
                       >
                         <Save className="w-4 h-4" />
-                        Slutför
+                        {timeTrackingLoading ? 'Slutför...' : 'Slutför'}
                       </Button>
                     </div>
                   ) : (
@@ -748,7 +764,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                       className="w-full flex items-center justify-center gap-2 py-3"
                     >
                       <Play className="w-5 h-5" />
-                      {displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid'}
+                      {timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
                     </Button>
                   )}
 
@@ -764,10 +780,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                       className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 transition-colors"
                     >
                       <RotateCcw className="w-4 h-4" />
-                      Nollställ arbetstid
+                      {timeTrackingLoading ? 'Återställer...' : 'Nollställ arbetstid'}
                     </Button>
                   )}
                 </div>
+
+                {/* Debug info (remove in production) */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-4 p-2 bg-slate-900/50 rounded text-xs text-slate-500">
+                    <strong>Debug:</strong> work_started_at: {currentCase.work_started_at || 'null'}, 
+                    time_spent: {currentCase.time_spent_minutes || 0}min, 
+                    display: {Math.round(displayTime)}min, 
+                    running: {isRunning ? 'yes' : 'no'}
+                  </div>
+                )}
 
                 {/* Progress indicator för långa arbeten */}
                 {displayTime > 120 && (
