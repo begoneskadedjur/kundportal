@@ -4,6 +4,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/ruttplanerare",
+      "destination": "/api/optimize-route"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
