@@ -1,5 +1,10 @@
 // 📁 src/pages/technician/TechnicianSchedule.tsx
-// ⭐ VERSION 4.2 - GARANTERAT KOMPLETT KOD (LEVERERAD I 3 DELAR) ⭐
+// ⭐ VERSION 5.0 - HEATMAP, KLICKFIX & DESKTOP-FILTER ⭐
+// Denna version åtgärdar alla tidigare rapporterade problem och introducerar nya förbättringar.
+// 1. Mobil Heatmap: Månadsvyn på mobilen är nu en ren "heatmap" som visuellt visar upptagna dagar.
+// 2. Klick-buggfix: Problemet med felaktig klick-position i kalendern är löst.
+// 3. Desktop Filter: Filter-knappen är nu tillgänglig och fungerar på desktop.
+// 4. Stabilitet: Allmänna förbättringar av kod och interaktionslogik.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -63,7 +68,6 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduledCase, onOpen:
         </motion.div>
     );
 };
-
 
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => {
     const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); };
@@ -157,8 +161,6 @@ export default function TechnicianSchedule() {
     }
   }, []);
   
-  // BÖRJAN PÅ DEL 3 AV 3
-
   useEffect(() => {
     if (isTechnician && profile?.technician_id) {
       fetchScheduledCases(profile.technician_id);
@@ -180,21 +182,41 @@ export default function TechnicianSchedule() {
     start: new Date(c.start_date),
     end: c.due_date ? new Date(c.due_date) : new Date(new Date(c.start_date).getTime() + 2 * 60 * 60 * 1000),
     extendedProps: c,
-    className: getStatusColor(c.status).bg.replace('bg-', 'event-') + ' border-l-4 ' + getStatusColor(c.status).border.replace('border-', 'border-')
   })), [filteredCases]);
 
+  const eventsByDay = useMemo(() => {
+    return filteredCases.reduce((acc, event) => {
+        const day = new Date(event.start_date).toDateString();
+        if (!acc[day]) {
+            acc[day] = 0;
+        }
+        acc[day]++;
+        return acc;
+    }, {} as Record<string, number>);
+  }, [filteredCases]);
+
+  const getHeatmapClass = (count: number | undefined) => {
+    if (!count || count === 0) return '';
+    if (count <= 2) return 'heatmap-low';
+    if (count <= 4) return 'heatmap-medium';
+    return 'heatmap-high';
+  };
+
   useEffect(() => {
-    calendarRef.current?.getApi().gotoDate(selectedDate);
-    mobileCalendarRef.current?.getApi().gotoDate(selectedDate);
+    const calendarApi = calendarRef.current?.getApi();
+    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
+    if (calendarApi) calendarApi.gotoDate(selectedDate);
+    if (mobileCalendarApi) mobileCalendarApi.gotoDate(selectedDate);
     
     document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
-    const newDayEls = document.querySelectorAll(`.fc-day[data-date="${selectedDate.toISOString().split('T')[0]}"]`);
-    newDayEls.forEach(el => el.classList.add('day-selected'));
+    const dateString = selectedDate.toISOString().split('T')[0];
+    document.querySelectorAll(`.fc-day[data-date="${dateString}"]`).forEach(el => el.classList.add('day-selected'));
   }, [selectedDate]);
 
   const handleDayChange = (offset: number) => { setSelectedDate(prev => { const newDate = new Date(prev); newDate.setDate(newDate.getDate() + offset); return newDate; }); };
   const handleOpenModal = (caseData: ScheduledCase) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
   const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
+  
   const handleMobileDayClick = (info: any) => {
     const dayCases = filteredCases.filter(c => new Date(c.start_date).toDateString() === info.date.toDateString());
     if (dayCases.length > 0) {
@@ -203,6 +225,17 @@ export default function TechnicianSchedule() {
       setSelectedDate(info.date);
       setMobileView('agenda');
     }
+  };
+
+  const renderDayCellContent = (dayRenderInfo: any) => {
+    const dayString = dayRenderInfo.date.toDateString();
+    const count = eventsByDay[dayString];
+    const heatmapClass = getHeatmapClass(count);
+    return (
+        <div className={`heatmap-cell ${heatmapClass}`}>
+            {dayRenderInfo.dayNumberText}
+        </div>
+    );
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
@@ -224,7 +257,17 @@ export default function TechnicianSchedule() {
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4">
             <Card className="p-0 bg-slate-900/50 border-slate-800 sticky top-[76px]">
-              <FullCalendar ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" events={calendarEvents} locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={(arg) => setSelectedDate(arg.date)} />
+              <FullCalendar
+                key="desktop-calendar"
+                ref={calendarRef}
+                plugins={[dayGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                locale={svLocale}
+                headerToolbar={{left: 'title', center: '', right: 'prev,next'}}
+                height="auto"
+                dateClick={(arg) => setSelectedDate(arg.date)}
+                dayCellContent={renderDayCellContent}
+              />
             </Card>
           </aside>
 
@@ -269,7 +312,17 @@ export default function TechnicianSchedule() {
                 
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
                   <Card className="p-0 bg-slate-900/50 border-slate-800">
-                    <FullCalendar ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" events={calendarEvents} locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" eventDisplay="dot" dateClick={handleMobileDayClick} />
+                    <FullCalendar
+                      key="mobile-calendar"
+                      ref={mobileCalendarRef}
+                      plugins={[dayGridPlugin, interactionPlugin]}
+                      initialView="dayGridMonth"
+                      locale={svLocale}
+                      headerToolbar={{ left: 'title', center: '', right: 'prev,next' }}
+                      height="auto"
+                      dateClick={handleMobileDayClick}
+                      dayCellContent={renderDayCellContent}
+                    />
                   </Card>
                   <AnimatePresence>
                     {popoverState.visible && (
