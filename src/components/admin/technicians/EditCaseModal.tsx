@@ -239,22 +239,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
 
-  // ✅ FIX: Depend on the entire caseData object. This ensures the form
-  // re-initializes with fresh data whenever the parent component sends updated props.
   useEffect(() => {
     if (caseData) {
       setCurrentCase(caseData);
       setFormData({
-        title: caseData.title || '',
-        status: caseData.status || '',
-        description: caseData.description || '',
-        kontaktperson: caseData.kontaktperson || '',
-        telefon_kontaktperson: caseData.telefon_kontaktperson || '',
-        e_post_kontaktperson: caseData.e_post_kontaktperson || '',
-        case_price: caseData.case_price || 0,
-        skadedjur: caseData.skadedjur || '',
-        org_nr: caseData.org_nr || '',
-        personnummer: caseData.personnummer || '',
+        title: caseData.title || '', status: caseData.status || '', description: caseData.description || '',
+        kontaktperson: caseData.kontaktperson || '', telefon_kontaktperson: caseData.telefon_kontaktperson || '',
+        e_post_kontaktperson: caseData.e_post_kontaktperson || '', case_price: caseData.case_price || 0,
+        skadedjur: caseData.skadedjur || '', org_nr: caseData.org_nr || '', personnummer: caseData.personnummer || '',
         material_cost: caseData.material_cost || 0
       });
       setError(null);
@@ -321,6 +313,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }
 
+  // ✅ FIX: Denna funktion uppdaterar nu både föräldern (onSuccess) OCH sig själv (setCurrentCase)
+  // för att ge omedelbar visuell feedback i UI.
   const handleTimeTracking = async (action: 'start' | 'pause' | 'complete' | 'reset') => {
     const tableName = getTableName();
     if (!tableName || !currentCase || tableName === 'cases') return;
@@ -360,7 +354,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       if (error) throw error;
 
       const updatedCase = { ...currentCase, ...data };
+      
+      // Informera föräldern om ändringen
       onSuccess(updatedCase as TechnicianCase);
+      
+      // Informera sig själv om ändringen för omedelbar UI-uppdatering
+      setCurrentCase(updatedCase as TechnicianCase);
       
       if (action !== 'start') {
         localStorage.removeItem(`time_backup_${currentCase.id}`);
@@ -387,6 +386,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     if (result && typeof result === 'object' && currentCase) {
       const updatedCase = { ...currentCase, ...result };
       onSuccess(updatedCase as TechnicianCase);
+      setCurrentCase(updatedCase as TechnicianCase);
     }
   };
 
@@ -528,7 +528,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                       <Play className="w-5 h-5" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
                     </Button>
                   )}
-                  {displayTime > 0 && (
+                  {displayTime > 0 && !isRunning && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => handleTimeTracking('reset')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 transition-colors">
                       <RotateCcw className="w-4 h-4" />{timeTrackingLoading ? 'Återställer...' : 'Nollställ arbetstid'}
                     </Button>
