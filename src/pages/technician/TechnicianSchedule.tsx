@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianSchedule.tsx - KORREKT KOMPAKT VERSION
+// 📁 src/pages/technician/TechnicianSchedule.tsx - FIXAD MOBILOPTIMERAD VERSION
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -327,14 +327,8 @@ export default function TechnicianSchedule() {
       filteredCases = filteredCases.filter(case_ => case_.case_type === caseTypeFilter);
     }
     
-    // ✅ ENDAST LISTDAY FILTRERAR PÅ DAGENS DATUM
-    if (calendarView === 'listDay') {
-      const today = new Date().toISOString().split('T')[0];
-      filteredCases = filteredCases.filter(case_ => {
-        const caseDate = new Date(case_.start_date).toISOString().split('T')[0];
-        return caseDate === today;
-      });
-    }
+    // ✅ FIXAD: Ta bort listDay-filtrering så alla ärenden visas
+    // Kalender-vyn hanterar själv vilka event den visar baserat på den valda vyn
     
     return filteredCases.map(case_ => {
       const startDate = new Date(case_.start_date);
@@ -349,7 +343,7 @@ export default function TechnicianSchedule() {
         className: `!border ${getStatusColorClasses(case_.status)}`
       }
     });
-  }, [cases, activeStatuses, caseTypeFilter, searchQuery, calendarView]);
+  }, [cases, activeStatuses, caseTypeFilter, searchQuery]); // ✅ Borttaget calendarView från dependencies
   
   const renderEventContent = (eventInfo: any) => {
     const { 
@@ -362,147 +356,92 @@ export default function TechnicianSchedule() {
     const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
     const isList = eventInfo.view.type.includes('list');
     
-    // ✅ FÖRBÄTTRAD LISTVY
+    // ✅ HELT NY KOMPAKT LISTVY FÖR MOBIL
     if (isList) {
+      const shortAddress = formatAddress(adress).split(',')[0] || ''; // Bara första delen av adressen
+      const shortTime = new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
       return (
-        <div className="w-full p-4 bg-slate-800/50 hover:bg-slate-700/50 transition-all duration-200 rounded-xl border border-slate-600/50 shadow-lg relative z-10">
-          {/* Header med case type och status */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-purple-600/20 rounded-full flex items-center justify-center">
-                <span className="text-lg">
-                  {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+        <div className="w-full p-3 bg-slate-800/50 hover:bg-slate-700/50 transition-all duration-200 rounded-lg border border-slate-600/50 shadow-sm relative z-10">
+          {/* ✅ KOMPAKT HEADER - En rad */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">
+                {case_type === 'private' ? '👤' : case_type === 'business' ? '🏢' : '📄'}
+              </span>
+              <div className="text-xs">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(status)}`}>
+                  {status.length > 12 ? status.substring(0, 12) + '...' : status}
                 </span>
               </div>
-              <div>
-                <span className="text-sm font-medium text-slate-300">
-                  {case_type === 'private' ? 'Privatperson' : case_type === 'business' ? 'Företag' : 'Avtal'}
-                </span>
-                {technician_role && technician_role !== 'primary' && (
-                  <div className="flex items-center gap-1 mt-1">
-                    {getTechnicianRoleIcon(technician_role)}
-                    <span className="text-xs bg-slate-700 px-2 py-1 rounded-full">
-                      {technician_role === 'secondary' ? '2:a tekniker' : '3:e tekniker'}
-                    </span>
-                  </div>
-                )}
-              </div>
+              {technician_role && technician_role !== 'primary' && (
+                <div className="flex items-center gap-1">
+                  {getTechnicianRoleIcon(technician_role)}
+                  <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded text-xs">
+                    {technician_role === 'secondary' ? '2:a' : '3:e'}
+                  </span>
+                </div>
+              )}
             </div>
-            <span className={`px-3 py-1.5 rounded-full text-sm font-medium shadow-sm ${getStatusBadgeColor(status)}`}>
-              {status}
-            </span>
+            <div className="text-right text-xs text-slate-400">
+              <div className="font-mono">{shortTime}</div>
+              {case_price && (
+                <div className="text-green-400 font-semibold">
+                  {case_price >= 1000 ? `${Math.round(case_price/1000)}k` : `${case_price}`}kr
+                </div>
+              )}
+            </div>
           </div>
           
-          {/* Ärendetitel och tid */}
-          <div className="mb-4">
-            <h3 className="text-xl font-bold text-white mb-2 leading-tight">
-              {eventInfo.event.title}
+          {/* ✅ KOMPAKT INNEHÅLL - Titel och kund i samma rad */}
+          <div className="mb-2">
+            <h3 className="text-base font-bold text-white mb-1 leading-tight">
+              {eventInfo.event.title.length > 40 
+                ? eventInfo.event.title.substring(0, 40) + '...' 
+                : eventInfo.event.title
+              }
             </h3>
-            <div className="flex items-center gap-3 text-slate-400">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                <span className="font-medium">{new Date(eventInfo.event.start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-1.5 text-slate-300">
+                <User className="w-3 h-3" />
+                <span className="truncate max-w-[120px]">
+                  {kontaktperson || 'Okänd'}
+                </span>
               </div>
-              <span>•</span>
-              <span>{new Date(eventInfo.event.start).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+              {shortAddress && (
+                <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+                  <MapPin className="w-3 h-3" />
+                  <span className="truncate max-w-[100px]">{shortAddress}</span>
+                </div>
+              )}
             </div>
           </div>
           
-          {/* Kundinfo och intäkt */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <User className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Kund</p>
-                <p className="text-white font-medium">{kontaktperson || 'Okänd'}</p>
-              </div>
-            </div>
-            {case_price && (
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide">Värde</p>
-                  <p className="text-green-400 font-bold">{case_price.toLocaleString()} kr</p>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Adress och skadedjur */}
-          <div className="space-y-3 mb-4">
-            {adress && (
-              <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
-                <MapPin className="w-4 h-4 text-slate-400 mt-1 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Adress</p>
-                  <p className="text-slate-200">{formatAddress(adress)}</p>
-                </div>
-              </div>
-            )}
-            {skadedjur && (
-              <div className="flex items-start gap-3 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                <Target className="w-4 h-4 text-orange-400 mt-1" />
-                <div>
-                  <p className="text-xs text-orange-300 uppercase tracking-wide mb-1">Skadedjur</p>
-                  <span className="bg-orange-500/20 text-orange-300 px-3 py-1 rounded-full text-sm font-medium">
+          {/* ✅ SKADEDJUR OCH ACTIONS - Kompakt rad */}
+          <div className="flex items-center justify-between">
+            <div className="flex-grow min-w-0">
+              {skadedjur && (
+                <div className="inline-flex items-center gap-1.5 text-xs">
+                  <Target className="w-3 h-3 text-orange-400" />
+                  <span className="bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full text-xs font-medium max-w-[100px] truncate">
                     {skadedjur}
                   </span>
                 </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Team info för multi-tekniker */}
-          {(secondary_assignee_name || tertiary_assignee_name) && (
-            <div className="mb-4 p-4 bg-slate-800/60 rounded-lg border border-slate-600/50">
-              <p className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Team
-              </p>
-              <div className="space-y-2">
-                {primary_assignee_name && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center">
-                      <User className="w-3 h-3 text-blue-400" />
-                    </div>
-                    <span className="text-slate-300">1. {primary_assignee_name}</span>
-                  </div>
-                )}
-                {secondary_assignee_name && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
-                      <Users className="w-3 h-3 text-green-400" />
-                    </div>
-                    <span className="text-slate-300">2. {secondary_assignee_name}</span>
-                  </div>
-                )}
-                {tertiary_assignee_name && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center">
-                      <Users className="w-3 h-3 text-purple-400" />
-                    </div>
-                    <span className="text-slate-300">3. {tertiary_assignee_name}</span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          )}
-          
-          {/* Åtgärdsknappar */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-600/50">
-            <div className="flex items-center gap-3">
+            
+            <div className="flex items-center gap-1.5 ml-2">
               {telefon_kontaktperson && (
                 <a 
                   href={`tel:${telefon_kontaktperson}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200 shadow-sm"
+                  className="p-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded-md transition-all duration-200"
+                  title={`Ring ${kontaktperson}`}
                 >
-                  <Phone className="w-4 h-4" />
-                  <span>Ring</span>
+                  <Phone className="w-3.5 h-3.5" />
                 </a>
               )}
               {adress && (
@@ -511,27 +450,48 @@ export default function TechnicianSchedule() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-all duration-200 shadow-sm"
+                  className="p-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-md transition-all duration-200"
+                  title="Navigera"
                 >
-                  <MapPin className="w-4 h-4" />
-                  <span>Navigera</span>
+                  <MapPin className="w-3.5 h-3.5" />
                 </a>
               )}
+              <Button 
+                size="sm" 
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
+                  setIsEditModalOpen(true);
+                }}
+                className="px-2 py-1 text-xs flex items-center gap-1"
+              >
+                <span>Öppna</span>
+                <ChevronRight className="w-3 h-3" />
+              </Button>
             </div>
-            <Button 
-              size="sm" 
-              variant="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedCase(eventInfo.event.extendedProps as ScheduledCase);
-                setIsEditModalOpen(true);
-              }}
-              className="flex items-center gap-2 shadow-lg"
-            >
-              <span>Öppna ärende</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
           </div>
+          
+          {/* ✅ TEAM INFO - Bara om flera tekniker, mycket kompakt */}
+          {(secondary_assignee_name || tertiary_assignee_name) && (
+            <div className="mt-2 pt-2 border-t border-slate-600/30">
+              <div className="flex items-center gap-2 text-xs">
+                <Users className="w-3 h-3 text-slate-400" />
+                <div className="flex items-center gap-2">
+                  {secondary_assignee_name && (
+                    <span className="text-green-400 text-xs">
+                      +{secondary_assignee_name.split(' ')[0]}
+                    </span>
+                  )}
+                  {tertiary_assignee_name && (
+                    <span className="text-purple-400 text-xs">
+                      +{tertiary_assignee_name.split(' ')[0]}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
