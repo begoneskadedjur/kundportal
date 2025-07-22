@@ -437,7 +437,6 @@ export default function TechnicianSchedule() {
               <div className="text-sm font-bold text-white mb-1">{shortTime}</div>
               {formattedPrice && (
                 <div className="text-green-400 font-bold text-sm">
-                  <DollarSign className="w-3 h-3 inline mr-1" />
                   {formattedPrice}
                 </div>
               )}
@@ -549,6 +548,8 @@ export default function TechnicianSchedule() {
     }
     
     // ✅ FÖRBÄTTRADE STANDARD CALENDAR EVENTS
+    const formattedPrice = formatPrice(case_price);
+    
     return (
       <div className={`p-2 text-sm overflow-hidden h-full flex flex-col justify-between rounded-md ${getStatusColorClasses(status).split(' ')[0]} ${isMobile ? 'text-xs' : ''} ${priority === 'high' ? 'ring-2 ring-red-400/50' : ''}`}>
         <div className="flex-grow">
@@ -595,7 +596,6 @@ export default function TechnicianSchedule() {
               
               {formattedPrice && (
                 <p className="flex items-center gap-1.5">
-                  <DollarSign className="w-3 h-3 text-green-400"/>
                   <span className="text-green-400 font-bold">{formattedPrice}</span>
                 </p>
               )}
