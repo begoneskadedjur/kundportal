@@ -25,6 +25,9 @@ import SalesOpportunities from './pages/admin/SalesOpportunities'
 import OneflowContractCreator from './pages/admin/OneflowContractCreator'
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'
 
+// ✅ NY IMPORT FÖR KOORDINATOR-DASHBOARD
+import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard'
+
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard'
 import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'
@@ -154,6 +157,16 @@ function App() {
             <Route 
               path="/admin/oneflow-test" 
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
+            />
+
+            {/* ✅ NY ROUTE FÖR RUTTPLANERAREN */}
+            <Route 
+              path="/coordinator/ruttplanerare" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CoordinatorDashboard />
+                </ProtectedRoute>
+              } 
             />
 
             {/* TEKNIKER ROUTES - EGEN PORTAL */}

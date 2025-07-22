@@ -50,22 +50,23 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contract_types']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contract_types']['Insert']>
       }
-      technicians: {
-        Row: {
-          id: string
-          name: string
-          role: string
-          email: string
-          direct_phone: string | null
-          office_phone: string | null
-          address: string | null
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['technicians']['Insert']>
-      }
+     technicians: {
+  Row: {
+    id: string
+    name: string
+    role: string
+    email: string
+    direct_phone: string | null
+    office_phone: string | null
+    address: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+    abax_vehicle_id: string | null // ✅ NY, VIKTIG RAD
+  }
+  Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
+  Update: Partial<Database['public']['Tables']['technicians']['Insert']>
+}
       cases: {
         Row: {
           id: string
