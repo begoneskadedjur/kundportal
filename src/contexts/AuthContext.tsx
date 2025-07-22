@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - SÄKERT UPPDATERAD MED TEKNIKER-STÖD
+// src/contexts/AuthContext.tsx - SÄKERT UPPDATERAD MED TEKNIKER-STÖD OCH FIX FÖR LADDNING
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -93,47 +93,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 🆕 SÄKER FETCHPROFILE MED GRACEFUL FALLBACK
+  // ✅ UPPDATERAD FETCHPROFILE-FUNKTION FÖR ATT LÖSA LADDNINGSPROBLEMET
   const fetchProfile = async (userId: string, authUser?: User) => {
+    // Sätt loading till true i början av funktionen
+    setLoading(true);
     try {
       console.log('📋 Fetching profile for user:', userId);
       
-      // 🆕 FÖRSÖK FÖRST MED TEKNIKER-JOIN, FALLBACK VID FEL
-      let profileData = null;
-      let error = null;
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select(`*, technicians(name, role, email)`)
+        .eq('user_id', userId)
+        .single();
 
-      try {
-        // Försök med tekniker-join
-        const result = await supabase
-          .from('profiles')
-          .select(`
-            *,
-            technicians(name, role, email)
-          `)
-          .eq('user_id', userId)
-          .single();
-        
-        profileData = result.data;
-        error = result.error;
-        
-        console.log('✅ Profile with technician join successful');
-      } catch (joinError) {
-        console.log('⚠️ Technician join failed, falling back to basic profile fetch');
-        
-        // Fallback till basic profile fetch
-        const result = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-        
-        profileData = result.data;
-        error = result.error;
-        
-        console.log('✅ Basic profile fetch successful');
-      }
-
-      if (error) {
+      // Supabase returnerar ett fel (PGRST116) om en join (som på technicians)
+      // inte hittar några rader. Detta är förväntat för admin/kunder och inget riktigt fel.
+      if (error && error.code !== 'PGRST116') {
         console.error('Profile fetch error:', error);
         throw new Error(`Kunde inte hämta profil: ${error.message}`);
       }
@@ -143,10 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!profileData.is_active) {
-        console.log('Profile is inactive:', profileData);
         toast.error('Ditt konto är inaktiverat. Kontakta support.');
         await signOut();
-        return;
+        return; // 'finally' kommer fortfarande att köras
       }
       
       console.log('✅ Profile loaded:', {
@@ -156,13 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         customer_id: profileData.customer_id,
         technician_id: profileData.technician_id,
         role: profileData.role,
-        display_name: profileData.display_name,
-        has_technician_data: !!profileData.technicians
       });
       
       setProfile(profileData);
 
-      // Auto-acceptera inbjudan för kunder (oförändrat)
       if (!profileData.is_admin && profileData.customer_id) {
         const userEmail = authUser?.email || user?.email || profileData.email;
         if (userEmail) {
@@ -170,26 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 🆕 SÄKER NAVIGATION MED FALLBACK
       const currentPath = location.pathname;
       const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
       
       if (shouldNavigate) {
         let targetPath = '/customer'; // Säker default
-        
         if (profileData.is_admin) {
           targetPath = '/admin';
         } else if (profileData.role === 'technician' && profileData.technician_id) {
-          // 🆕 EXTRA SÄKERHETSKONTROLL FÖR TEKNIKER
           targetPath = '/technician/dashboard';
-          console.log('🔧 Tekniker dirigeras till tekniker-portalen');
-        } else if (profileData.customer_id) {
-          targetPath = '/customer';
         }
         
-        console.log(`🧭 Navigating from ${currentPath} to ${targetPath}`);
-        
-        // Använd setTimeout för att undvika navigation under rendering
         setTimeout(() => {
           navigate(targetPath, { replace: true });
         }, 100);
@@ -198,33 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       console.error('💥 Profile fetch error:', error);
       toast.error(error.message || 'Kunde inte hämta profilinformation');
-      
-      // 🚨 VID KRITISKA FEL - logga bara ut tekniker, inte alla
-      if (error.message.includes('relation') || error.message.includes('technician')) {
-        console.log('🔧 Tekniker-relaterat fel, men fortsätter med basic profil');
-        // Försök igen utan tekniker-join
-        try {
-          const { data: basicProfile, error: basicError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', userId)
-            .single();
-          
-          if (!basicError && basicProfile && basicProfile.is_active) {
-            setProfile(basicProfile);
-            console.log('✅ Återhämtning med basic profil lyckades');
-            return;
-          }
-        } catch (fallbackError) {
-          console.error('💥 Även fallback misslyckades:', fallbackError);
-        }
-      }
-      
-      // Bara logga ut vid verkligt kritiska fel
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
     } finally {
+      // ✅ DEN KRITISKA ÄNDRINGEN: Säkerställer att 'loading' ALLTID sätts till false.
       setLoading(false);
     }
   };
@@ -240,7 +180,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔧 Initializing AuthContext...');
       
       try {
-        // Hämta befintlig session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -257,11 +196,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
-        // Sätt upp auth state listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
             if (!isMounted) return;
-            
             console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
             
             try {
@@ -273,35 +210,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     await fetchProfile(session.user.id, session.user);
                   }
                   break;
-                  
                 case 'SIGNED_OUT':
                   console.log('👋 User signed out');
                   setUser(null);
                   setProfile(null);
                   setLoading(false);
                   
-                  // Navigera till login om inte redan där
                   const currentPath = location.pathname;
                   if (!currentPath.includes('/login') && currentPath !== '/') {
                     navigate('/login', { replace: true });
                   }
                   break;
-                  
                 case 'TOKEN_REFRESHED':
                   console.log('🔄 Token refreshed for:', session?.user?.email);
-                  // Session är redan uppdaterad, inget mer behövs
                   break;
-                  
                 case 'USER_UPDATED':
                   console.log('👤 User updated:', session?.user?.email);
                   if (session?.user) {
                     setUser(session.user);
                   }
                   break;
-                  
                 default:
                   console.log('ℹ️ Unhandled auth event:', event);
-                  // För okända events, kontrollera session status
                   if (!session && isMounted) {
                     setUser(null);
                     setProfile(null);
@@ -329,7 +259,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeAuth();
 
-    // Cleanup
     return () => {
       console.log('🧹 AuthContext cleanup');
       isMounted = false;
@@ -339,10 +268,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Förbättrad signIn funktion (oförändrad)
+  // signIn funktion (oförändrad)
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    setLoading(true);
     try {
-      setLoading(true);
       console.log('🔐 Attempting sign in for:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -351,16 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error('Sign in error:', error);
-        
-        // Översätt vanliga felmeddelanden
         let errorMessage = error.message;
         if (error.message === 'Invalid login credentials') {
           errorMessage = 'Felaktiga inloggningsuppgifter';
         } else if (error.message === 'Email not confirmed') {
           errorMessage = 'E-postadressen är inte bekräftad';
         }
-        
         toast.error(errorMessage);
         return { success: false, error: errorMessage };
       }
@@ -373,12 +298,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('✅ Sign in successful for:', data.user.email);
       toast.success('Inloggning lyckades!');
-      
-      // Auth state change listener kommer hantera fetchProfile och navigation
       return { success: true };
       
     } catch (error: any) {
-      console.error('💥 Unexpected sign in error:', error);
       const errorMessage = error.message || 'Ett oväntat fel uppstod';
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
@@ -387,43 +309,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Förbättrad signOut funktion (oförändrad)
+  // signOut funktion (oförändrad)
   const signOut = async () => {
     try {
       console.log('👋 Signing out user...');
-      
-      // Rensa state först
       setUser(null);
       setProfile(null);
       setLoading(false);
       
-      // Logga ut från Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign out error:', error);
-        // Fortsätt ändå - local state är redan rensat
       }
       
-      // Navigera till login
       navigate('/login', { replace: true });
       toast.success('Du har loggats ut');
       
     } catch (error) {
       console.error('💥 Sign out error:', error);
-      // Även vid fel, försäkra att vi navigerar till login
       navigate('/login', { replace: true });
       toast.error('Problem vid utloggning, men du har loggats ut');
     }
   };
 
-  // 🆕 BERÄKNA TEKNIKER-DATA SÄKERT
+  // Beräkna tekniker-data (oförändrad)
   const technicianData = profile?.role === 'technician' && profile?.technician_id ? {
     id: profile.technician_id,
     name: profile.technicians?.name || profile.display_name || null,
     email: profile.technicians?.email || profile.email || null
   } : null;
 
-  // Debug information (uppdaterad)
+  // Debug information (oförändrad)
   useEffect(() => {
     console.log('🐛 AuthContext State:', {
       user: user?.email || 'null',
@@ -443,8 +359,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     isAdmin: profile?.is_admin ?? false,
     isCustomer: !profile?.is_admin && !!profile?.customer_id && profile?.role !== 'technician',
-    isTechnician: profile?.role === 'technician' && !!profile?.technician_id, // 🆕 SÄKER TEKNIKER-CHECK
-    technician: technicianData, // 🆕 TEKNIKER-DATA
+    isTechnician: profile?.role === 'technician' && !!profile?.technician_id,
+    technician: technicianData,
     fetchProfile: (userId: string) => fetchProfile(userId)
   };
 
