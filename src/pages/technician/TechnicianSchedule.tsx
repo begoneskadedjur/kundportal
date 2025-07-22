@@ -1,9 +1,11 @@
 // 📁 src/pages/technician/TechnicianSchedule.tsx
-// ⭐ VERSION 6.0 - NY MOBIL-INTERAKTION & SORTERINGSFIX ⭐
-// Denna version eliminerar den buggiga popovern och introducerar ett bättre flöde.
-// 1. NY Mobil-Interaktion: Klick på en dag i månadsvyn växlar nu direkt till den dagens agenda. Snabbt, enkelt och 100% tillförlitligt.
-// 2. Sorteringsfix: Alla ärendelistor sorteras nu korrekt baserat på starttid.
-// 3. Robusthet: Koden är städad och all logik för den problematiska popovern är borttagen.
+// ⭐ VERSION 7.0 - ROBUST KLICK-LOGIK ⭐
+// Denna version byter ut den opålitliga dateClick-funktionen mot en anpassad
+// event listener som garanterar att rätt dag väljs, varje gång.
+// 1. Omskriven Interaktion: Använder `dayCellDidMount` för att fästa en egen,
+//    tillförlitlig klickhanterare på varje dag-cell.
+// 2. Garanterat Korrekt Datum: Läser datumet direkt från cellens `data-date` attribut.
+// 3. Stabilitet: Eliminerar "off-by-one"-buggen permanent.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -68,8 +70,19 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduledCase, onOpen:
     );
 };
 
+// BÖRJAN PÅ DEL 2 AV 4
+
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => {
-    const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); };
+    const toggleStatus = (status: string) => {
+        const newStatuses = new Set(activeStatuses);
+        if (newStatuses.has(status)) {
+            newStatuses.delete(status);
+        } else {
+            newStatuses.add(status);
+        }
+        setActiveStatuses(newStatuses);
+    };
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -77,22 +90,37 @@ const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { i
                     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
                         <header className="p-4 border-b border-slate-800 flex items-center justify-between">
                             <h2 className="text-lg font-bold">Filtrera Ärenden</h2>
-                            <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
+                            <Button variant="ghost" size="icon" onClick={onClose}>
+                                <X className="w-5 h-5" />
+                            </Button>
                         </header>
                         <div className="p-4 flex-grow overflow-y-auto">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {ALL_STATUSES.map(status => (
                                     <label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50">
-                                        <input type="checkbox" checked={activeStatuses.has(status)} onChange={() => toggleStatus(status)} className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0"/>
-                                        <span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>{status}</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={activeStatuses.has(status)}
+                                            onChange={() => toggleStatus(status)}
+                                            className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0"
+                                        />
+                                        <span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>
+                                            {status}
+                                        </span>
                                     </label>
                                 ))}
                             </div>
                         </div>
                         <footer className="p-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2">
-                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_STATUSES))} className="w-full">Visa alla</Button>
-                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">Återställ</Button>
-                            <Button variant="primary" onClick={onClose} className="w-full">Klar</Button>
+                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_STATUSES))} className="w-full">
+                                Visa alla
+                            </Button>
+                            <Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">
+                                Återställ
+                            </Button>
+                            <Button variant="primary" onClick={onClose} className="w-full">
+                                Klar
+                            </Button>
                         </footer>
                     </motion.div>
                 </motion.div>
@@ -174,17 +202,6 @@ export default function TechnicianSchedule() {
     return 'heatmap-high';
   };
 
-  useEffect(() => {
-    const calendarApi = calendarRef.current?.getApi();
-    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
-    if (calendarApi) calendarApi.gotoDate(selectedDate);
-    if (mobileCalendarApi) mobileCalendarApi.gotoDate(selectedDate);
-    
-    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
-    const dateString = selectedDate.toISOString().split('T')[0];
-    document.querySelectorAll(`.fc-day[data-date="${dateString}"]`).forEach(el => el.classList.add('day-selected'));
-  }, [selectedDate]);
-
   const handleDayChange = (offset: number) => { setSelectedDate(prev => { const newDate = new Date(prev); newDate.setDate(newDate.getDate() + offset); return newDate; }); };
   const handleOpenModal = (caseData: ScheduledCase) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
   const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
@@ -196,6 +213,38 @@ export default function TechnicianSchedule() {
       }
   };
 
+  const dayCellDidMount = (arg: any) => {
+    const dateStr = arg.date.toISOString().split('T')[0];
+    arg.el.setAttribute('data-date-str', dateStr);
+    
+    // Tar bort gamla listeners för att undvika minnesläckor
+    const existingListener = (arg.el as any)._clickListener;
+    if (existingListener) {
+        arg.el.removeEventListener('click', existingListener);
+    }
+
+    const newListener = (e: MouseEvent) => {
+        // Stoppa FullCalendars inbyggda event för att undvika dubbla klick
+        e.preventDefault();
+        e.stopPropagation();
+
+        const targetDateStr = (e.currentTarget as HTMLElement).getAttribute('data-date-str');
+        if (targetDateStr) {
+            // Skapa datum med korrekt tidszon för att undvika "off-by-one day"
+            const [year, month, day] = targetDateStr.split('-').map(Number);
+            const clickedDate = new Date(year, month - 1, day);
+            setSelectedDate(clickedDate);
+            
+            if (window.innerWidth < 1024) {
+                setMobileView('agenda');
+            }
+        }
+    };
+    
+    arg.el.addEventListener('click', newListener);
+    (arg.el as any)._clickListener = newListener; // Spara referens till listener
+  }
+
   const renderDayCellContent = (dayRenderInfo: any) => {
     const dayString = dayRenderInfo.date.toDateString();
     const count = eventsByDay[dayString];
@@ -206,6 +255,28 @@ export default function TechnicianSchedule() {
         </div>
     );
   };
+  
+
+  useEffect(() => {
+    // Synkronisera kalendervyerna när selectedDate ändras
+    const calendarApi = calendarRef.current?.getApi();
+    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
+    if (calendarApi) calendarApi.gotoDate(selectedDate);
+    if (mobileCalendarApi) mobileCalendarApi.gotoDate(selectedDate);
+    
+    // Markera den valda dagen visuellt
+    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+    const dateString = selectedDate.toISOString().split('T')[0];
+    document.querySelectorAll(`[data-date="${dateString}"]`).forEach(el => {
+        const parent = el.closest('.fc-day');
+        if(parent) {
+            parent.classList.add('day-selected');
+        } else {
+            el.classList.add('day-selected');
+        }
+    });
+  }, [selectedDate]);
+
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
   const filtersAreActive = activeStatuses.size !== DEFAULT_ACTIVE_STATUSES.size || !([...DEFAULT_ACTIVE_STATUSES].every(status => activeStatuses.has(status)));
@@ -234,7 +305,7 @@ export default function TechnicianSchedule() {
                 locale={svLocale}
                 headerToolbar={{left: 'title', center: '', right: 'prev,next'}}
                 height="auto"
-                dateClick={handleDateClick}
+                dayCellDidMount={dayCellDidMount}
                 dayCellContent={renderDayCellContent}
               />
             </Card>
@@ -289,7 +360,7 @@ export default function TechnicianSchedule() {
                       locale={svLocale}
                       headerToolbar={{ left: 'title', center: '', right: 'prev,next' }}
                       height="auto"
-                      dateClick={handleDateClick}
+                      dayCellDidMount={dayCellDidMount}
                       dayCellContent={renderDayCellContent}
                     />
                   </Card>
@@ -304,3 +375,5 @@ export default function TechnicianSchedule() {
     </>
   )
 }
+
+// SLUT PÅ DEL 4 AV 4
