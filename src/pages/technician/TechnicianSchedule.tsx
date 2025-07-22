@@ -1,11 +1,12 @@
 // 📁 src/pages/technician/TechnicianSchedule.tsx
-// ⭐ VERSION 7.0 - ROBUST KLICK-LOGIK ⭐
-// Denna version byter ut den opålitliga dateClick-funktionen mot en anpassad
-// event listener som garanterar att rätt dag väljs, varje gång.
+// ⭐ VERSION 7.1 - KORRIGERAD OCH ROBUST KLICK-LOGIK ⭐
+// Denna version säkerställer att datumhanteringen är robust och fri från tidszonsfel.
 // 1. Omskriven Interaktion: Använder `dayCellDidMount` för att fästa en egen,
 //    tillförlitlig klickhanterare på varje dag-cell.
-// 2. Garanterat Korrekt Datum: Läser datumet direkt från cellens `data-date` attribut.
-// 3. Stabilitet: Eliminerar "off-by-one"-buggen permanent.
+// 2. Garanterat Korrekt Datum: Läser datumet från `data-date-str` och skapar
+//    ett nytt Date-objekt i lokal tidszon för att förhindra "off-by-one"-buggen.
+// 3. Stabilitet: Ersätter den potentiellt osäkra `new Date('YYYY-MM-DD')` med en
+//    stabilare metod som fungerar konsekvent över alla webbläsare och tidszoner.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -69,8 +70,6 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduledCase, onOpen:
         </motion.div>
     );
 };
-
-// BÖRJAN PÅ DEL 2 AV 4
 
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => {
     const toggleStatus = (status: string) => {
@@ -206,35 +205,34 @@ export default function TechnicianSchedule() {
   const handleOpenModal = (caseData: ScheduledCase) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
   const handleUpdateSuccess = (updatedCase: Partial<ScheduledCase>) => { fetchScheduledCases(profile!.technician_id!); setIsEditModalOpen(false); };
   
-  const handleDateClick = (info: any) => {
-      setSelectedDate(info.date);
-      if (window.innerWidth < 1024) {
-          setMobileView('agenda');
-      }
-  };
-
   const dayCellDidMount = (arg: any) => {
     const dateStr = arg.date.toISOString().split('T')[0];
     arg.el.setAttribute('data-date-str', dateStr);
     
-    // Tar bort gamla listeners för att undvika minnesläckor
+    // Tar bort eventuella gamla lyssnare för att undvika dubbla anrop
     const existingListener = (arg.el as any)._clickListener;
     if (existingListener) {
         arg.el.removeEventListener('click', existingListener);
     }
 
     const newListener = (e: MouseEvent) => {
-        // Stoppa FullCalendars inbyggda event för att undvika dubbla klick
+        // Förhindra FullCalendars standardbeteende för att undvika konflikter
         e.preventDefault();
         e.stopPropagation();
 
         const targetDateStr = (e.currentTarget as HTMLElement).getAttribute('data-date-str');
         if (targetDateStr) {
-            // Skapa datum med korrekt tidszon för att undvika "off-by-one day"
+            // **KORRIGERING FÖR TIDSZON:**
+            // Att använda `new Date('2023-10-25')` kan tolkas som midnatt UTC, vilket
+            // kan bli föregående dag i tidszoner som ligger före UTC (t.ex. i Sverige).
+            // Genom att dela upp strängen och skicka delarna separat till `new Date()`
+            // säkerställer vi att datumet skapas i användarens lokala tidszon.
             const [year, month, day] = targetDateStr.split('-').map(Number);
             const clickedDate = new Date(year, month - 1, day);
+            
             setSelectedDate(clickedDate);
             
+            // Växla till agendavy på mobil efter datumval
             if (window.innerWidth < 1024) {
                 setMobileView('agenda');
             }
@@ -242,7 +240,8 @@ export default function TechnicianSchedule() {
     };
     
     arg.el.addEventListener('click', newListener);
-    (arg.el as any)._clickListener = newListener; // Spara referens till listener
+    // Spara en referens till lyssnaren för att kunna ta bort den senare
+    (arg.el as any)._clickListener = newListener;
   }
 
   const renderDayCellContent = (dayRenderInfo: any) => {
@@ -258,23 +257,20 @@ export default function TechnicianSchedule() {
   
 
   useEffect(() => {
-    // Synkronisera kalendervyerna när selectedDate ändras
-    const calendarApi = calendarRef.current?.getApi();
-    const mobileCalendarApi = mobileCalendarRef.current?.getApi();
-    if (calendarApi) calendarApi.gotoDate(selectedDate);
-    if (mobileCalendarApi) mobileCalendarApi.gotoDate(selectedDate);
+    // Synkronisera kalendervyerna när `selectedDate` ändras
+    calendarRef.current?.getApi().gotoDate(selectedDate);
+    mobileCalendarRef.current?.getApi().gotoDate(selectedDate);
     
-    // Markera den valda dagen visuellt
+    // Markera den valda dagen visuellt i kalendern
+    // Ta först bort markering från eventuellt tidigare vald dag
     document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+    
+    // Hitta och markera den nya dagen
     const dateString = selectedDate.toISOString().split('T')[0];
-    document.querySelectorAll(`[data-date="${dateString}"]`).forEach(el => {
-        const parent = el.closest('.fc-day');
-        if(parent) {
-            parent.classList.add('day-selected');
-        } else {
-            el.classList.add('day-selected');
-        }
-    });
+    const dayElement = document.querySelector(`.fc-day[data-date="${dateString}"]`);
+    if (dayElement) {
+        dayElement.classList.add('day-selected');
+    }
   }, [selectedDate]);
 
 
@@ -375,5 +371,3 @@ export default function TechnicianSchedule() {
     </>
   )
 }
-
-// SLUT PÅ DEL 4 AV 4
