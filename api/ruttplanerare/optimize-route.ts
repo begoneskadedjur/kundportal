@@ -1,13 +1,13 @@
 // 📁 api/ruttplanerare/optimize-route.ts
-// ⭐ VERSION 2.1 - KORREKT MILJÖVARIABEL-NAMN ⭐
-// Denna version löser 500-felet genom att använda exakt samma
-// namn på miljövariablerna som de andra fungerande API-filerna.
+// ⭐ VERSION 2.2 - ROBUST DATAPARSNING ENLIGT NY DOKUMENTATION ⭐
+// Denna version är uppdaterad för att hantera den exakta datastrukturen
+// från ABAX API, vilket förhindrar framtida fel.
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
-// ✅ KORRIGERAD: Använder VITE_SUPABASE_URL och SUPABASE_SERVICE_KEY
+// Använder de korrekta miljövariabel-namnen för ditt projekt
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -32,21 +32,29 @@ async function getAbaxToken() {
     return data.access_token;
 }
 
+// ✅ UPPDATERAD FUNKTION: Hanterar nu det fullständiga Vehicle-objektet
 async function getVehicleLocation(token: string, vehicleId: string) {
-    // ABAX API förväntar sig ID utan "abax-vehicle-" prefixet
-    const numericVehicleId = vehicleId.replace('abax-vehicle-', '');
-    const response = await fetch(`https://api.abax.cloud/v1/vehicles/${numericVehicleId}/locations`, {
+    const response = await fetch(`https://api.abax.cloud/v1/vehicles/${vehicleId}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
         console.error("ABAX Location Error:", await response.text());
         throw new Error('Kunde inte hämta fordonsposition');
     }
-    const data = await response.json() as { lat: number, lng: number }[];
-    if (data.length === 0) throw new Error('Fordon hittades inte eller saknar positionsdata');
-    return `${data[0].lat},${data[0].lng}`;
-}
 
+    // Tolkar svaret som ett fullständigt Vehicle-objekt
+    const vehicleData = await response.json() as { location?: { latitude?: number, longitude?: number } };
+    
+    // Plockar ut latitud och longitud från det nästlade location-objektet
+    const lat = vehicleData?.location?.latitude;
+    const lng = vehicleData?.location?.longitude;
+
+    if (lat === undefined || lng === undefined) {
+        throw new Error('Fordon hittades, men saknar giltig positionsdata (lat/lng)');
+    }
+
+    return `${lat},${lng}`;
+}
 
 // --- HUVUDFUNKTION ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -85,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const directionsResponse = await fetch(googleApiUrl);
         if (!directionsResponse.ok) throw new Error('Kunde inte hämta rutt från Google Maps');
         
-        const directionsData = await directionsResponse.json() as any;
+        const directionsData = await response.json() as any;
         if (directionsData.status !== 'OK') throw new Error(`Google Maps fel: ${directionsData.status}`);
 
         // 4. Skicka tillbaka den optimerade ordningen och en navigeringslänk
