@@ -239,21 +239,29 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
 
+  // ✅ FIX: Depend on the entire caseData object. This ensures the form
+  // re-initializes with fresh data whenever the parent component sends updated props.
   useEffect(() => {
     if (caseData) {
       setCurrentCase(caseData);
       setFormData({
-        title: caseData.title || '', status: caseData.status || '', description: caseData.description || '',
-        kontaktperson: caseData.kontaktperson || '', telefon_kontaktperson: caseData.telefon_kontaktperson || '',
-        e_post_kontaktperson: caseData.e_post_kontaktperson || '', case_price: caseData.case_price || 0,
-        skadedjur: caseData.skadedjur || '', org_nr: caseData.org_nr || '', personnummer: caseData.personnummer || '',
+        title: caseData.title || '',
+        status: caseData.status || '',
+        description: caseData.description || '',
+        kontaktperson: caseData.kontaktperson || '',
+        telefon_kontaktperson: caseData.telefon_kontaktperson || '',
+        e_post_kontaktperson: caseData.e_post_kontaktperson || '',
+        case_price: caseData.case_price || 0,
+        skadedjur: caseData.skadedjur || '',
+        org_nr: caseData.org_nr || '',
+        personnummer: caseData.personnummer || '',
         material_cost: caseData.material_cost || 0
       });
       setError(null);
       setTimeTrackingLoading(false);
       setLoading(false);
     }
-  }, [caseData?.id]);
+  }, [caseData]);
 
   const getTableName = () => {
     if (!currentCase) return null;
@@ -262,7 +270,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
          : 'cases';
   }
 
-  // ✅ FIX: Denna funktion använder nu datan som returneras från databasen som sanning.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tableName = getTableName();
@@ -296,10 +303,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       
       const updatedCaseFromDb = data as TechnicianCase;
       
-      // Använd alltid det kompletta, returnerade objektet för att uppdatera allt.
       onSuccess(updatedCaseFromDb);
-      setCurrentCase(updatedCaseFromDb);
-
+      
       setSubmitted(true);
       toast.success('Ärendet har uppdaterats!');
       
@@ -354,9 +359,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
       if (error) throw error;
 
-      const mergedCase = { ...currentCase, ...data };
-      setCurrentCase(mergedCase as TechnicianCase);
-      onSuccess(mergedCase as TechnicianCase);
+      const updatedCase = { ...currentCase, ...data };
+      onSuccess(updatedCase as TechnicianCase);
       
       if (action !== 'start') {
         localStorage.removeItem(`time_backup_${currentCase.id}`);
@@ -381,9 +385,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const handleSuccessfulRestore = async () => {
     const result = await restoreFromBackup();
     if (result && typeof result === 'object' && currentCase) {
-      const mergedCase = { ...currentCase, ...result };
-      setCurrentCase(mergedCase as TechnicianCase);
-      onSuccess(mergedCase as TechnicianCase);
+      const updatedCase = { ...currentCase, ...result };
+      onSuccess(updatedCase as TechnicianCase);
     }
   };
 
