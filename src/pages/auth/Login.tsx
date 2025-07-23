@@ -1,59 +1,49 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/auth/Login.tsx - SLUTGILTIG OCH STABIL VERSION
+
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-import LoadingSpinner from '../../components/shared/LoadingSpinner'; // Antagande om sökväg till din spinner
-import { Bug } from 'lucide-react'; // Importerar din befintliga ikon
-import Button from '../../components/ui/Button'; // Importerar din befintliga Button
-import Input from '../../components/ui/Input'; // Importerar din befintliga Input
+import { useNavigate, Link, Navigate } from 'react-router-dom';
+import LoadingSpinner from '../../components/shared/LoadingSpinner';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import { Bug } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const navigate = useNavigate();
-  const { signIn, user, profile, loading: authLoading } = useAuth();
-
-  // Omdirigera om användaren redan är inloggad och har en profil
-  useEffect(() => {
-    // Om auth inte längre laddar och vi har en giltig användare/profil...
-    if (!authLoading && user && profile) {
-      console.log(`User already logged in. Redirecting to role-based dashboard.`);
-      // ...omdirigera baserat på roll
-      if (profile.is_admin || profile.role === 'admin') {
-        navigate('/koordinator/dashboard', { replace: true });
-      } else if (profile.role === 'technician') {
-        navigate('/technician/dashboard', { replace: true });
-      } else {
-        navigate('/customer', { replace: true });
-      }
-    }
-  }, [user, profile, authLoading, navigate]);
+  const { signIn, profile, loading: authLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || isSubmitting) return;
 
     setIsSubmitting(true);
-    
-    // Anropa signIn. AuthContext hanterar nu omdirigering
-    // via onAuthStateChange, så vi behöver ingen logik här.
     await signIn(email, password);
-
-    // Vi sätter inte isSubmitting till false direkt,
-    // eftersom sidan kommer att omdirigeras om inloggningen lyckas.
-    // Om den misslyckas, kommer användaren att kunna försöka igen.
-    // Vi lägger en timeout som en fallback om något skulle hänga sig.
-    setTimeout(() => {
-        setIsSubmitting(false)
-    }, 3000);
+    
+    // Om inloggningen misslyckas, tillåt ett nytt försök.
+    // Vid lyckad inloggning tar AuthContext över omdirigeringen.
+    setIsSubmitting(false); 
   };
 
-  // Om den initiala autentiseringen pågår, visa en helsides-laddare.
-  if (authLoading && !isSubmitting) {
+  // ✅ KÄRNAN I FIXEN: Detta är den nya, stabila logiken.
+  // Om autentiseringen INTE laddar och en profil redan finns, betyder det
+  // att en inloggad användare felaktigt har hamnat på loginsidan.
+  if (!authLoading && profile) {
+    let targetPath = '/customer'; // Fallback
+    if (profile.role === 'admin') targetPath = '/koordinator/dashboard';
+    else if (profile.role === 'technician') targetPath = '/technician/dashboard';
+    
+    // Omdirigera omedelbart för att bryta loopen.
+    return <Navigate to={targetPath} replace />;
+  }
+  
+  // Visa laddningsskärm endast under den allra första sidladdningen
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <LoadingSpinner text="Laddar session..." />
+        <LoadingSpinner text="Laddar..." />
       </div>
     );
   }
@@ -64,7 +54,7 @@ export default function Login() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-3">
-             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center relative">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center relative">
               <Bug className="w-10 h-10 text-slate-950" />
               <div className="absolute inset-0 rounded-full border-2 border-red-500 transform rotate-45"></div>
               <div className="absolute w-full h-0.5 bg-red-500 top-1/2 transform -translate-y-1/2 rotate-45"></div>
