@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.5 - KORRIGERADE TYP-IMPORTER + DATUM-HANTERING FÖR TIMESTAMPTZ ⭐
+// ⭐ VERSION 2.6 - FIXADE HEADERS FÖR ALLA DAGAR ⭐
 
 import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -8,10 +8,8 @@ import interactionPlugin from '@fullcalendar/interaction';
 import svLocale from '@fullcalendar/core/locales/sv';
 import { BeGoneCaseRow, Technician, toFullCalendarDate } from '../../../types/database';
 
-// ✅ FIX: Korrigerade importer för FullCalendar typer (6.1.18)
 import type { EventContentArg, EventClickArg } from '@fullcalendar/core';
-
-import '../../../styles/FullCalendar.css'; // Säkerställ att denna fil finns
+import '../../../styles/FullCalendar.css';
 
 interface ScheduleTimelineProps {
   technicians: Technician[];
@@ -19,7 +17,6 @@ interface ScheduleTimelineProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void;
 }
 
-// Hjälpfunktion för att färglägga ärenden baserat på status
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
     const ls = status?.toLowerCase() || '';
     if (ls.includes('avslutat')) return { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' };
@@ -30,12 +27,10 @@ const getStatusColor = (status: string): { bg: string; text: string; border: str
     return { bg: 'bg-slate-800', text: 'text-slate-300', border: 'border-slate-600' };
 };
 
-// Anpassad funktion för att rendera innehållet i varje ärende-kort
 const renderEventContent = (eventInfo: EventContentArg) => {
     const caseData = eventInfo.event.extendedProps as BeGoneCaseRow;
     const colors = getStatusColor(caseData.status);
 
-    // Formatera tid för visning
     const startTime = eventInfo.event.start ? 
       eventInfo.event.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
 
@@ -62,17 +57,14 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
 
   const calendarEvents = useMemo(() => {
     return cases
-      .filter(c => c.primary_assignee_id && (c.start_date || c.due_date)) // Endast schemalagda ärenden
+      .filter(c => c.primary_assignee_id && (c.start_date || c.due_date))
       .map(c => {
-        // ✅ Använd hjälpfunktionen för att konvertera timestamptz till ISO-format
         const startDate = toFullCalendarDate(c.start_date);
         const endDate = toFullCalendarDate(c.due_date);
         
-        // Om inget startdatum, använd due_date som start
         const eventStart = startDate || endDate;
-        
-        // Om bara startdatum finns, sätt slutdatum 2 timmar senare
         let eventEnd = endDate;
+        
         if (startDate && !endDate) {
           const start = new Date(c.start_date!);
           start.setHours(start.getHours() + 2);
@@ -86,12 +78,12 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
           start: eventStart,
           end: eventEnd,
           extendedProps: c,
-          backgroundColor: 'transparent', // Låt vår custom styling hantera färger
+          backgroundColor: 'transparent',
           borderColor: 'transparent',
           textColor: 'inherit'
         };
       })
-      .filter(event => event.start); // Filtrera bort events utan startdatum
+      .filter(event => event.start);
   }, [cases]);
 
   const handleEventClick = (clickInfo: EventClickArg) => {
@@ -101,13 +93,11 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
   return (
     <div className="p-4 h-full w-full bg-slate-900">
       <FullCalendar
-        // Licensnyckel för utvecklingsmiljö
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
         
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         locale={svLocale}
 
-        // Korrekt header med alla knappar
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -123,44 +113,86 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
         height="100%"
         resourceAreaHeaderContent="Tekniker"
         resourceAreaWidth="20%"
-        slotMinWidth={120} // Lite bredare för bättre läsbarhet
-        eventContent={renderEventContent}
         
-        noEventsContent="Inga bokade ärenden att visa"
-        defaultTimedEventDuration="02:00" // Standard 2 timmar
+        // ✅ KRITISKA INSTÄLLNINGAR FÖR ATT VISA ALLA DAGAR
+        slotMinWidth={100}           // Bredare slots
+        slotDuration="1:00:00"       // 1-timmes intervall
+        slotLabelInterval="1:00:00"  // Visa varje timme
         
-        // ✅ Bättre tidsformat för svenska användare
+        // ✅ TVINGA VISA ALLA DAGAR I VECKAN
+        dayMinWidth={80}             // Minsta bredd per dag
+        expandRows={true}            // Expandera rader
+        nowIndicator={true}          // Visa nuvarande tid
+        
+        // ✅ BÄTTRE TIDSFORMAT OCH INTERVALL
         views={{
-            resourceTimelineWeek: {
-                slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' }
+          resourceTimelineWeek: {
+            type: 'resourceTimelineWeek',
+            slotDuration: '01:00:00',        // 1 timme per slot
+            slotLabelFormat: {               // Format för tid-labels
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
             },
-            resourceTimelineDay: {
-                slotLabelFormat: { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false }
-            },
-            resourceTimelineMonth: {
-                slotLabelFormat: { day: 'numeric' }
+            slotLabelInterval: '02:00:00',   // Visa label varannan timme
+            dayHeaderFormat: {               // Format för dag-headers
+              weekday: 'short',
+              day: 'numeric',
+              month: 'numeric'
             }
+          },
+          resourceTimelineDay: {
+            type: 'resourceTimelineDay',
+            slotDuration: '00:30:00',        // 30 min per slot
+            slotLabelFormat: {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            },
+            slotLabelInterval: '01:00:00'    // Visa label varje timme
+          },
+          resourceTimelineMonth: {
+            type: 'resourceTimelineMonth',
+            slotDuration: '1.00:00:00',      // 1 dag per slot
+            slotLabelFormat: {
+              day: 'numeric'
+            }
+          }
         }}
         
-        // Starta scrollning vid 08:00
-        scrollTime={'08:00:00'}
+        eventContent={renderEventContent}
         
-        // Begränsa arbetstid
-        slotMinTime={'06:00:00'}
-        slotMaxTime={'20:00:00'}
+        // ✅ ARBETSTIDER - VISA HELA ARBETSDAGEN
+        slotMinTime="07:00:00"       // Börja 07:00
+        slotMaxTime="19:00:00"       // Sluta 19:00
+        scrollTime="08:00:00"        // Scrolla till 08:00
         
-        // Bättre responsivitet
-        dayMinWidth={150}
-        expandRows={true}
+        // ✅ VISA HELGER OCH ALLA DAGAR
+        weekends={true}              // Visa helger
+        hiddenDays={[]}              // Dölj inga dagar
         
-        // Tillåt event-interaktion
-        editable={false} // Vi hanterar redigering via modal
-        selectable={false}
+        // ✅ GRUNDLÄGGANDE INSTÄLLNINGAR
+        noEventsContent="Inga bokade ärenden att visa"
+        defaultTimedEventDuration="02:00"
+        editable={false}
+        selectable={true}            // Tillåt markering av tidsslots
+        selectMirror={true}          // Visa selection feedback
         
-        // Bättre UX
+        // ✅ EVENT-INSTÄLLNINGAR
         eventInteractionEnabled={true}
         displayEventTime={true}
-        displayEventEnd={false} // Visa bara starttid för att spara plats
+        displayEventEnd={false}
+        eventMinHeight={40}          // Minsta höjd för events
+        
+        // ✅ TVINGA KOMPAKT LAYOUT
+        resourceOrder="title"        // Sortera tekniker alfabetiskt
+        resourceAreaColumns={[       // Endast namn-kolumn
+          {
+            headerContent: 'Tekniker',
+            field: 'title',
+            width: '100%'
+          }
+        ]}
       />
     </div>
   );
