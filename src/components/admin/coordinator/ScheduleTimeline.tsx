@@ -102,7 +102,7 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
     <div className="p-4 h-full w-full bg-slate-900">
       <FullCalendar
         // Licensnyckel för utvecklingsmiljö
-        schedulerLicenseKey="GPL-MY-PROJECT-IS-OPEN-SOURCE"
+        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
         
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         locale={svLocale}
