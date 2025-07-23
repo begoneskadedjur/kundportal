@@ -1,6 +1,6 @@
 // 📁 src/components/ui/ModernCard.tsx - Återanvändbar Modern Kortkomponent
 import React from 'react'
-import { LucideIcon } from 'lucide-react'
+import type { Icon as LucideIcon } from 'lucide-react';
 
 interface ModernCardProps {
   children: React.ReactNode

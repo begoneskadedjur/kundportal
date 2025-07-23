@@ -1,6 +1,6 @@
 // 📁 src/components/ui/ModernViewSelector.tsx - Växla mellan olika vyer
 import React from 'react'
-import { LucideIcon } from 'lucide-react'
+import type { Icon as LucideIcon } from 'lucide-react';
 
 interface ViewOption {
   key: string
