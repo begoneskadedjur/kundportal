@@ -27,7 +27,6 @@ import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 
 // KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
-import RoutePlanner from './pages/coordinator/CoordinatorDashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import BookingAssistant from './pages/coordinator/BookingAssistant';
 
@@ -167,14 +166,6 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <CoordinatorMainDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/koordinator/ruttplanerare" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <RoutePlanner />
                 </ProtectedRoute>
               } 
             />
