@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.5 - UPPDATERAD MED VY-VÄXLING OCH FÖRBÄTTRAD HEADER ⭐
+// ⭐ VERSION 2.6 - TIDSSPANN OCH NY FÄRGKODNING ENLIGT STATUSAR ⭐
 
 import React, { useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -20,29 +20,94 @@ interface ScheduleTimelineProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void;
 }
 
+// ✅ NY FÄRGKODNING ENLIGT STATUSAR
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
     const ls = status?.toLowerCase() || '';
-    if (ls.includes('avslutat')) return { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' };
-    if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/60', text: 'text-cyan-300', border: 'border-cyan-600' };
-    if (ls.includes('bokad') || ls.includes('signerad')) return { bg: 'bg-blue-900/60', text: 'text-blue-300', border: 'border-blue-600' };
-    if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/60', text: 'text-yellow-300', border: 'border-yellow-600' };
-    if (ls.includes('review')) return { bg: 'bg-purple-900/60', text: 'text-purple-300', border: 'border-purple-600' };
-    return { bg: 'bg-slate-800', text: 'text-slate-300', border: 'border-slate-600' };
+    
+    // Avslutat = Grön
+    if (ls.includes('avslutat')) {
+        return { bg: 'bg-green-600', text: 'text-white', border: 'border-green-700' };
+    }
+    
+    // Alla återbesök = Blå
+    if (ls.startsWith('återbesök')) {
+        return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' };
+    }
+    
+    // Offert signerad - boka in = Ljusgrön
+    if (ls.includes('signerad') && ls.includes('boka')) {
+        return { bg: 'bg-emerald-500', text: 'text-white', border: 'border-emerald-600' };
+    }
+    
+    // Offert skickad = Orange
+    if (ls.includes('offert') && ls.includes('skickad')) {
+        return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' };
+    }
+    
+    // Bokad = Gul
+    if (ls.includes('bokad')) {
+        return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
+    }
+    
+    // Privatperson - review = Lila
+    if (ls.includes('review')) {
+        return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
+    }
+    
+    // Stängt - slasklogg = Röd
+    if (ls.includes('stängt') || ls.includes('slasklogg')) {
+        return { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' };
+    }
+    
+    // Öppen = Grå (default)
+    return { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' };
 };
 
 const renderEventContent = (eventInfo: EventContentArg) => {
     const caseData = eventInfo.event.extendedProps as BeGoneCaseRow;
     const colors = getStatusColor(caseData.status);
-    const startTime = eventInfo.event.start ? eventInfo.event.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+    
+    // ✅ VISA TIDSSPANN: START - SLUT
+    const formatTime = (date: Date | null) => {
+        if (!date) return '';
+        return date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    };
+    
+    const startTime = formatTime(eventInfo.event.start);
+    const endTime = formatTime(eventInfo.event.end);
+    const timeSpan = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || '');
 
     return (
-        <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:brightness-125 transition-all`}>
+        <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm`}>
             <div className="flex items-center justify-between mb-1">
-                <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
-                {startTime && <span className="text-xs text-slate-400 font-mono">{startTime}</span>}
+                <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>
+                    {eventInfo.event.title}
+                </p>
+                {timeSpan && (
+                    <span className={`text-xs font-mono ${colors.text} opacity-90`}>
+                        {timeSpan}
+                    </span>
+                )}
             </div>
-            {caseData.kontaktperson && <p className="text-xs text-slate-400 truncate">{caseData.kontaktperson}</p>}
-            {caseData.skadedjur && <p className="text-xs text-slate-500 truncate">{caseData.skadedjur}</p>}
+            
+            {caseData.kontaktperson && (
+                <p className={`text-xs ${colors.text} opacity-80 truncate`}>
+                    {caseData.kontaktperson}
+                </p>
+            )}
+            
+            {caseData.skadedjur && (
+                <p className={`text-xs ${colors.text} opacity-70 truncate`}>
+                    {caseData.skadedjur}
+                </p>
+            )}
+            
+            {/* Status-badge */}
+            <div className="mt-1">
+                <span className={`inline-block px-1.5 py-0.5 text-xs rounded ${colors.text} opacity-60 bg-black bg-opacity-20`}>
+                    {caseData.status}
+                </span>
+            </div>
         </div>
     );
 };
@@ -60,16 +125,35 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
   }, [technicians]);
 
   const calendarEvents = useMemo(() => {
-    return cases.map(c => {
-        // Säkerställer att det finns ett giltigt startdatum att rendera
-        const eventStart = c.start_date ? new Date(c.start_date).toISOString() : new Date().toISOString();
-        let eventEnd = c.due_date ? new Date(c.due_date).toISOString() : undefined;
-
-        // Om det bara finns ett startdatum, ge det en standardlängd på 2 timmar
-        if (c.start_date && !c.due_date) {
-            const start = new Date(c.start_date);
-            start.setHours(start.getHours() + 2);
-            eventEnd = start.toISOString();
+    return cases
+      .filter(c => c.primary_assignee_id && (c.start_date || c.due_date)) // Endast schemalagda ärenden
+      .map(c => {
+        // ✅ HANTERA TIDSSPANN KORREKT
+        let eventStart: string;
+        let eventEnd: string;
+        
+        if (c.start_date && c.due_date) {
+          // Båda datum finns - använd som tidsspann
+          eventStart = new Date(c.start_date).toISOString();
+          eventEnd = new Date(c.due_date).toISOString();
+        } else if (c.start_date) {
+          // Endast startdatum - ge 2 timmars default
+          const start = new Date(c.start_date);
+          eventStart = start.toISOString();
+          start.setHours(start.getHours() + 2);
+          eventEnd = start.toISOString();
+        } else if (c.due_date) {
+          // Endast slutdatum - ge 2 timmar bakåt
+          const end = new Date(c.due_date);
+          eventEnd = end.toISOString();
+          end.setHours(end.getHours() - 2);
+          eventStart = end.toISOString();
+        } else {
+          // Inget datum - använd nu + 2 timmar
+          const now = new Date();
+          eventStart = now.toISOString();
+          now.setHours(now.getHours() + 2);
+          eventEnd = now.toISOString();
         }
 
         return {
@@ -79,11 +163,13 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
           start: eventStart,
           end: eventEnd,
           extendedProps: c,
-          // Vi sätter färg via eventContent istället för dessa
+          // Låt vår renderEventContent hantera färger
           backgroundColor: 'transparent',
           borderColor: 'transparent',
+          textColor: 'inherit'
         };
-    });
+      })
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()); // ✅ Sortera efter starttid
   }, [cases]);
 
   const handleEventClick = (clickInfo: EventClickArg) => {
@@ -114,7 +200,37 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
       {/* ✅ ANPASSAD HEADER MED VY-KNAPPAR */}
       <div className="p-4 bg-slate-800/50 border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
+            
+            {/* ✅ STATUS-FÄRGGUIDE */}
+            <div className="hidden xl:flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-gray-500 rounded"></div>
+                <span className="text-slate-300">Öppen</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                <span className="text-slate-300">Bokad</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                <span className="text-slate-300">Offert</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-emerald-500 rounded"></div>
+                <span className="text-slate-300">Signerad</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-600 rounded"></div>
+                <span className="text-slate-300">Återbesök</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-600 rounded"></div>
+                <span className="text-slate-300">Avslutat</span>
+              </div>
+            </div>
+          </div>
           
           <div className="flex items-center gap-4">
             {/* Vy-väljare */}
@@ -242,8 +358,9 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
           selectable={true}
           selectMirror={true}
           eventInteractionEnabled={true}
-          displayEventTime={true}
+          displayEventTime={false}     // Vi visar tid i vår egen renderEventContent
           displayEventEnd={false}
+          eventMinHeight={80}          // Lite högre för att få plats med all info
         />
       </div>
     </div>
