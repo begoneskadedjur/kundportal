@@ -834,18 +834,6 @@ export const isScheduledToday = (start_date?: string, due_date?: string): boolea
   return false
 }
 
-// Helper för att konvertera datum till FullCalendar-format
-export const toFullCalendarDate = (timestampStr?: string): string | undefined => {
-  if (!timestampStr) return undefined
-  
-  try {
-    const date = new Date(timestampStr)
-    return date.toISOString()
-  } catch {
-    return undefined
-  }
-}
-
 // Helper för att filtrera ärenden som inte har någon schemalagd tid (oplanerade)
 export const isUnplannedCase = (caseData: BeGoneCaseRow): boolean => {
   return !caseData.start_date && !caseData.due_date
