@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED DEN NYA SCHEMAVYN FÖR TEKNIKER
+// src/App.tsx - UPPDATERAD MED DEN NYA SCHEMAVYN FÖR KOORDINATOR
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
@@ -25,14 +25,14 @@ import SalesOpportunities from './pages/admin/SalesOpportunities'
 import OneflowContractCreator from './pages/admin/OneflowContractCreator'
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'
 
-// ✅ NY IMPORT FÖR KOORDINATOR-DASHBOARD
+// ✅ KOORDINATOR IMPORTS
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard'
+import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule' // ✅ NY IMPORT FÖR SCHEMAVYN
 
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard'
 import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'
 import TechnicianCases from './pages/technician/TechnicianCases'
-// ✅ NY IMPORT FÖR SCHEMAVYN
 import TechnicianSchedule from './pages/technician/TechnicianSchedule' 
 
 // Customer pages
@@ -159,12 +159,21 @@ function App() {
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
-            {/* ✅ NY ROUTE FÖR RUTTPLANERAREN */}
+            {/* KOORDINATOR ROUTES */}
             <Route 
-              path="/coordinator/ruttplanerare" 
+              path="/koordinator/ruttplanerare" 
               element={
                 <ProtectedRoute requiredRole="admin">
                   <CoordinatorDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            {/* ✅ NY ROUTE FÖR SCHEMAÖVERSIKTEN */}
+            <Route 
+              path="/koordinator/schema" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CoordinatorSchedule />
                 </ProtectedRoute>
               } 
             />
@@ -194,7 +203,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* ✅ NY ROUTE FÖR SCHEMAVYN */}
             <Route 
               path="/technician/schedule" 
               element={
