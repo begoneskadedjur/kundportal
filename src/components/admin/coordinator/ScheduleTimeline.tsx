@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.1 - ROBUST OCH ANVÄNDARVÄNLIG TIDSLINJE ⭐
+// ⭐ VERSION 2.2 - DEFINITIV LÖSNING MED FULL NAVIGATION ⭐
 
 import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -8,7 +8,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import svLocale from '@fullcalendar/core/locales/sv';
 import { BeGoneCaseRow, Technician } from '../../../types/database';
 import { EventClickArg, EventContentArg } from '@fullcalendar/core';
-import '../../../styles/FullCalendar.css'; // Återanvänder er befintliga FullCalendar-styling
+import '../../../styles/FullCalendar.css'; // Säkerställ att denna fil finns och är korrekt
 
 interface ScheduleTimelineProps {
   technicians: Technician[];
@@ -16,7 +16,7 @@ interface ScheduleTimelineProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void;
 }
 
-// HJÄLPFUNKTION: Förfinad färgkodning av status
+// Hjälpfunktion för att färglägga ärenden baserat på status
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
     const ls = status?.toLowerCase() || '';
     if (ls.includes('avslutat')) return { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' };
@@ -27,7 +27,7 @@ const getStatusColor = (status: string): { bg: string; text: string; border: str
     return { bg: 'bg-slate-800', text: 'text-slate-300', border: 'border-slate-600' };
 };
 
-// Anpassad rendering för varje ärende-kort i kalendern
+// Anpassad funktion för att rendera innehållet i varje ärende-kort
 const renderEventContent = (eventInfo: EventContentArg) => {
     const caseData = eventInfo.event.extendedProps as BeGoneCaseRow;
     const colors = getStatusColor(caseData.status);
@@ -42,7 +42,7 @@ const renderEventContent = (eventInfo: EventContentArg) => {
 
 
 export default function ScheduleTimeline({ technicians, cases, onCaseClick }: ScheduleTimelineProps) {
-  // Omvandla tekniker till FullCalendars "Resource"-format
+  
   const calendarResources = useMemo(() => {
     return technicians.map(tech => ({
       id: tech.id,
@@ -50,19 +50,17 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
     }));
   }, [technicians]);
 
-  // Omvandla ärenden till FullCalendars "Event"-format
   const calendarEvents = useMemo(() => {
     return cases.map(c => ({
       id: c.id,
       resourceId: c.primary_assignee_id,
       title: c.title,
       start: c.start_date!,
-      end: c.due_date, // Om due_date är null, hanterar FullCalendar det korrekt med defaultEventMinutes
+      end: c.due_date,
       extendedProps: c,
     }));
   }, [cases]);
 
-  // Hantera klick på ett ärende
   const handleEventClick = (clickInfo: EventClickArg) => {
     onCaseClick(clickInfo.event.extendedProps as BeGoneCaseRow);
   };
@@ -70,41 +68,34 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
   return (
     <div className="p-4 h-full w-full bg-slate-900">
       <FullCalendar
-        // Licensnyckel för att ta bort varningsmeddelandet under utveckling
+        // Licensnyckel för utvecklingsmiljö
         schedulerLicenseKey="GPL-TO-REMOVE-THE-WARNING"
         
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         locale={svLocale}
 
-        // Standardvy är nu "resourceTimelineWeek"
-        initialView="resourceTimelineWeek"
-
-        // Komplett header med navigeringsknappar och vy-bytare
+        // ✅ KORREKT HEADER MED ALLA KNAPPAR
+        // Detta är den viktigaste ändringen som löser ditt problem.
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
           right: 'resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth',
         }}
         
-        // Data
+        initialView="resourceTimelineWeek"
+        
         resources={calendarResources}
         events={calendarEvents}
-
-        // Interaktion
         eventClick={handleEventClick}
         
-        // Utseende & Layout
         height="100%"
         resourceAreaHeaderContent="Tekniker"
         resourceAreaWidth="20%"
         slotMinWidth={100}
-        eventContent={renderEventContent} // Använder vår anpassade render-funktion
-
-        // ✅ NYTT: Visar ett meddelande om inga ärenden finns för den valda perioden
-        noEventsContent="Inga bokade ärenden att visa"
+        eventContent={renderEventContent}
         
-        // ✅ NYTT: Ger endags-ärenden (utan slutdatum) en standardlängd så de syns tydligt
-        defaultTimedEventDuration="02:00" // 2 timmar
+        noEventsContent="Inga bokade ärenden att visa"
+        defaultTimedEventDuration="02:00"
 
         views={{
             resourceTimelineWeek: {
