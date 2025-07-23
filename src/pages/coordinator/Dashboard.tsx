@@ -145,20 +145,20 @@ export default function CoordinatorDashboard() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             <CoordinatorDashboardCard
-              href="/coordinator/CoordinatorSchedule"
+              href="/koordinator/schema"
               icon={CalendarDays}
               title="Schema & Planering"
               description="Visuell översikt av alla teknikers scheman. Dra och släpp oplanerade ärenden för att boka."
               tag="Kärnfunktion"
             />
             <CoordinatorDashboardCard
-              href="/coordinator/RoutePlanner"
+              href="/koordinator/ruttplanerare"
               icon={Map}
               title="Ruttplanerare"
               description="Välj en tekniker och ett datum för att se och optimera dagens körrutt med ett klick."
             />
             <CoordinatorDashboardCard
-              href="/coordinator/BookingAssistant"
+              href="/koordinator/booking-assistant"
               icon={Wand2}
               title="Intelligent Bokningsassistent"
               description="Ange en ny adress och få AI-förslag på den mest effektiva teknikern och tiden att boka."
