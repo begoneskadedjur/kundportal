@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.2 - DEFINITIV LÖSNING MED FULL NAVIGATION ⭐
+// ⭐ VERSION 2.3 - KORRIGERADE TYP-IMPORTER FÖR ATT LÖSA BUILD-FEL ⭐
 
 import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -7,7 +7,11 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import svLocale from '@fullcalendar/core/locales/sv';
 import { BeGoneCaseRow, Technician } from '../../../types/database';
-import { EventClickArg, EventContentArg } from '@fullcalendar/core';
+
+// ✅ FIX: Importerar typer från rätt paket för att lösa build-fel.
+import type { EventContentArg } from '@fullcalendar/core';
+import type { EventClickArg } from '@fullcalendar/interaction';
+
 import '../../../styles/FullCalendar.css'; // Säkerställ att denna fil finns och är korrekt
 
 interface ScheduleTimelineProps {
@@ -74,8 +78,7 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         locale={svLocale}
 
-        // ✅ KORREKT HEADER MED ALLA KNAPPAR
-        // Detta är den viktigaste ändringen som löser ditt problem.
+        // Korrekt header med alla knappar
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
