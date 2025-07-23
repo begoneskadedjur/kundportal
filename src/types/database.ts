@@ -50,23 +50,24 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contract_types']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contract_types']['Insert']>
       }
-     technicians: {
-      Row: {
-        id: string
-        name: string
-        role: string
-        email: string
-        direct_phone: string | null
-        office_phone: string | null
-        address: string | null
-        is_active: boolean
-        created_at: string
-        updated_at: string
-        abax_vehicle_id: string | null // ✅ NY, VIKTIG RAD
+      // ✅ KORRIGERAD TEKNIKER-TABELL MED ABAX_VEHICLE_ID
+      technicians: {
+        Row: {
+          id: string
+          name: string
+          role: string
+          email: string
+          direct_phone: string | null
+          office_phone: string | null
+          address: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          abax_vehicle_id: string | null // ✅ DENNA RAD VAR SAKNAD - NU TILLAGD
+        }
+        Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['technicians']['Insert']>
       }
-      Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
-      Update: Partial<Database['public']['Tables']['technicians']['Insert']>
-    }
       cases: {
         Row: {
           id: string
@@ -125,9 +126,9 @@ export type Database = {
           tertiary_assignee_name: string | null
           tertiary_assignee_email: string | null
           
-          // Svenska datum (YYYY-MM-DD)
-          start_date: string | null
-          due_date: string | null
+          // Svenska datum med tid (YYYY-MM-DD HH:MM:SS)
+          start_date: string | null // timestamptz med tid
+          due_date: string | null   // timestamptz med tid
           completed_date: string | null  // 🆕 När ärendet stängdes/avslutades
           
           // 20 Custom fields från ClickUp (privatpersoner)
@@ -151,6 +152,11 @@ export type Database = {
           filer: any | null // JSONB
           r_servicebil: number | null
           annat_skadedjur: string | null
+          
+          // ✅ PROVISIONSKOLUMNER TILLAGDA
+          commission_amount: number | null
+          commission_calculated_at: string | null
+          billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
         }
         Insert: Omit<Database['public']['Tables']['private_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['private_cases']['Insert']>
@@ -179,9 +185,9 @@ export type Database = {
           tertiary_assignee_name: string | null
           tertiary_assignee_email: string | null
           
-          // Svenska datum (YYYY-MM-DD)
-          start_date: string | null
-          due_date: string | null
+          // Svenska datum med tid (YYYY-MM-DD HH:MM:SS)
+          start_date: string | null // timestamptz med tid
+          due_date: string | null   // timestamptz med tid
           completed_date: string | null  // 🆕 När ärendet stängdes/avslutades
           
           // 19 Custom fields från ClickUp (företag)
@@ -204,10 +210,16 @@ export type Database = {
           pris: number | null
           filer: any | null // JSONB
           annat_skadedjur: string | null
+          
+          // ✅ PROVISIONSKOLUMNER TILLAGDA
+          commission_amount: number | null
+          commission_calculated_at: string | null
+          billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
         }
         Insert: Omit<Database['public']['Tables']['business_cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['business_cases']['Insert']>
       }
+      // ✅ KORRIGERAD PROFILES-TABELL MED TEKNIKER-INTEGRATION
       profiles: {
         Row: {
           id: string
@@ -219,9 +231,30 @@ export type Database = {
           last_login: string | null
           created_at: string
           updated_at: string
+          // ✅ TEKNIKER-INTEGRATION TILLAGD
+          technician_id: string | null // FK till technicians
+          role: string | null // 'admin' | 'customer' | 'technician'
+          display_name: string | null // Visningsnamn för tekniker
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+      }
+      // ✅ BILLING_AUDIT_LOG TABELL TILLAGD
+      billing_audit_log: {
+        Row: {
+          id: string
+          case_id: string
+          case_type: 'private' | 'business'
+          clickup_task_id: string
+          old_status: string | null
+          new_status: string
+          changed_by: string
+          changed_at: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['billing_audit_log']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['billing_audit_log']['Insert']>
       }
       visits: {
         Row: {
@@ -382,13 +415,13 @@ export interface CaseAssignee {
 }
 
 export interface CaseDateInfo {
-  start_date?: string        // YYYY-MM-DD
-  due_date?: string         // YYYY-MM-DD  
-  completed_date?: string   // YYYY-MM-DD - 🆕 När ärendet stängdes
+  start_date?: string        // YYYY-MM-DD HH:MM:SS (timestamptz)
+  due_date?: string         // YYYY-MM-DD HH:MM:SS (timestamptz)
+  completed_date?: string   // YYYY-MM-DD HH:MM:SS - 🆕 När ärendet stängdes
   // Hjälpfunktioner för svenska format
-  start_date_swedish?: string    // DD/MM YYYY
-  due_date_swedish?: string      // DD/MM YYYY  
-  completed_date_swedish?: string // DD/MM YYYY
+  start_date_swedish?: string    // DD/MM YYYY HH:MM
+  due_date_swedish?: string      // DD/MM YYYY HH:MM
+  completed_date_swedish?: string // DD/MM YYYY HH:MM
 }
 
 // Helper för att identifiera case-typ
@@ -428,6 +461,11 @@ export type CaseUpdate = Database['public']['Tables']['cases']['Update']
 export type MonthlyMarketingSpend = Database['public']['Tables']['monthly_marketing_spend']['Row']
 export type MonthlyMarketingSpendInsert = Database['public']['Tables']['monthly_marketing_spend']['Insert']
 export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_marketing_spend']['Update']
+
+// ✅ BILLING AUDIT LOG TYPE
+export type BillingAuditLog = Database['public']['Tables']['billing_audit_log']['Row']
+export type BillingAuditLogInsert = Database['public']['Tables']['billing_audit_log']['Insert']
+export type BillingAuditLogUpdate = Database['public']['Tables']['billing_audit_log']['Update']
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [
@@ -722,4 +760,86 @@ export const isValidMonthFormat = (monthStr: string): boolean => {
   
   const date = new Date(monthStr)
   return !isNaN(date.getTime())
+}
+
+// 🆕 HJÄLPFUNKTIONER FÖR KOORDINATOR SCHEMA - MED TIDSSTÄMPLAR
+export const formatScheduleDateTime = (timestampStr?: string): string => {
+  if (!timestampStr) return '-'
+  
+  try {
+    const date = new Date(timestampStr)
+    return date.toLocaleDateString('sv-SE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return 'Ogiltigt datum'
+  }
+}
+
+export const formatScheduleTime = (timestampStr?: string): string => {
+  if (!timestampStr) return '-'
+  
+  try {
+    const date = new Date(timestampStr)
+    return date.toLocaleDateString('sv-SE', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return '-'
+  }
+}
+
+export const parseScheduleTimestamp = (timestampStr: string): Date | null => {
+  try {
+    return new Date(timestampStr)
+  } catch {
+    return null
+  }
+}
+
+// Helper för att konvertera datum till FullCalendar-format
+export const toFullCalendarDate = (timestampStr?: string): string | undefined => {
+  if (!timestampStr) return undefined
+  
+  try {
+    const date = new Date(timestampStr)
+    return date.toISOString()
+  } catch {
+    return undefined
+  }
+}
+
+// Helper för att avgöra om ett ärende är schemalagt idag
+export const isScheduledToday = (start_date?: string, due_date?: string): boolean => {
+  const today = new Date()
+  const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD
+  
+  if (start_date) {
+    const startDate = new Date(start_date)
+    const startDateStr = startDate.toISOString().split('T')[0]
+    if (startDateStr === todayStr) return true
+  }
+  
+  if (due_date) {
+    const dueDate = new Date(due_date)
+    const dueDateStr = dueDate.toISOString().split('T')[0]
+    if (dueDateStr === todayStr) return true
+  }
+  
+  return false
+}
+
+// Helper för att filtrera ärenden som inte har någon schemalagd tid (oplanerade)
+export const isUnplannedCase = (caseData: BeGoneCaseRow): boolean => {
+  return !caseData.start_date && !caseData.due_date
+}
+
+// Helper för att filtrera schemalagda ärenden
+export const isScheduledCase = (caseData: BeGoneCaseRow): boolean => {
+  return !!(caseData.start_date || caseData.due_date)
 }
