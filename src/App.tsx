@@ -1,4 +1,4 @@
-// src/App.tsx - UPPDATERAD MED DEN NYA SCHEMAVYN FÖR KOORDINATOR
+      // src/App.tsx - UPPDATERAD MED RUTT FÖR BOOKING ASSISTANT
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
@@ -27,7 +27,8 @@ import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'
 
 // ✅ KOORDINATOR IMPORTS
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard'
-import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule' // ✅ NY IMPORT FÖR SCHEMAVYN
+import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule'
+import BookingAssistant from './pages/coordinator/BookingAssistant' // ✅ NY IMPORT
 
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard'
@@ -168,12 +169,20 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* ✅ NY ROUTE FÖR SCHEMAÖVERSIKTEN */}
             <Route 
               path="/koordinator/schema" 
               element={
                 <ProtectedRoute requiredRole="admin">
                   <CoordinatorSchedule />
+                </ProtectedRoute>
+              } 
+            />
+            {/* ✅ NY ROUTE FÖR BOKNINGSASSISTENTEN */}
+            <Route 
+              path="/koordinator/booking-assistant" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <BookingAssistant />
                 </ProtectedRoute>
               } 
             />
