@@ -1,32 +1,61 @@
-// src/pages/auth/Login.tsx - UPPDATERAD
-
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import { Bug } from 'lucide-react'
-import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
+import LoadingSpinner from '../../components/shared/LoadingSpinner'; // Antagande om sökväg till din spinner
+import { Bug } from 'lucide-react'; // Importerar din befintliga ikon
+import Button from '../../components/ui/Button'; // Importerar din befintliga Button
+import Input from '../../components/ui/Input'; // Importerar din befintliga Input
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // FIX: Hämta 'loading' direkt från AuthContext.
-  // Det lokala loading-tillståndet är borttaget.
-  const { signIn, loading } = useAuth()
+  const navigate = useNavigate();
+  const { signIn, user, profile, loading: authLoading } = useAuth();
+
+  // Omdirigera om användaren redan är inloggad och har en profil
+  useEffect(() => {
+    // Om auth inte längre laddar och vi har en giltig användare/profil...
+    if (!authLoading && user && profile) {
+      console.log(`User already logged in. Redirecting to role-based dashboard.`);
+      // ...omdirigera baserat på roll
+      if (profile.is_admin || profile.role === 'admin') {
+        navigate('/koordinator/dashboard', { replace: true });
+      } else if (profile.role === 'technician') {
+        navigate('/technician/dashboard', { replace: true });
+      } else {
+        navigate('/customer', { replace: true });
+      }
+    }
+  }, [user, profile, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+    if (!email || !password || isSubmitting) return;
 
-    // FIX: Förenklad hantering. AuthContext sköter nu hela
-    // loading-tillståndet och felmeddelanden.
-    try {
-      await signIn(email, password)
-    } catch (error) {
-      // Tomt catch-block eftersom AuthContext redan visar ett toast-fel.
-      // Detta förhindrar bara att en okänd "unhandled rejection" loggas i konsolen.
-      console.error("Login component caught error, but AuthContext handles UI.")
-    }
+    setIsSubmitting(true);
+    
+    // Anropa signIn. AuthContext hanterar nu omdirigering
+    // via onAuthStateChange, så vi behöver ingen logik här.
+    await signIn(email, password);
+
+    // Vi sätter inte isSubmitting till false direkt,
+    // eftersom sidan kommer att omdirigeras om inloggningen lyckas.
+    // Om den misslyckas, kommer användaren att kunna försöka igen.
+    // Vi lägger en timeout som en fallback om något skulle hänga sig.
+    setTimeout(() => {
+        setIsSubmitting(false)
+    }, 3000);
+  };
+
+  // Om den initiala autentiseringen pågår, visa en helsides-laddare.
+  if (authLoading && !isSubmitting) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <LoadingSpinner text="Laddar session..." />
+      </div>
+    );
   }
 
   return (
@@ -35,7 +64,7 @@ export default function Login() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-3">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center relative">
+             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center relative">
               <Bug className="w-10 h-10 text-slate-950" />
               <div className="absolute inset-0 rounded-full border-2 border-red-500 transform rotate-45"></div>
               <div className="absolute w-full h-0.5 bg-red-500 top-1/2 transform -translate-y-1/2 rotate-45"></div>
@@ -51,7 +80,6 @@ export default function Login() {
           <h2 className="text-2xl font-semibold text-center mb-6">
             Logga in
           </h2>
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
               type="email"
@@ -60,8 +88,8 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              disabled={isSubmitting}
             />
-
             <Input
               type="password"
               label="Lösenord"
@@ -69,20 +97,17 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              disabled={isSubmitting}
             />
-
             <Button
               type="submit"
-              // FIX: Denna 'loading' kommer nu från AuthContext och speglar
-              // hela inloggningsprocessen.
-              loading={loading}
+              loading={isSubmitting}
               fullWidth
               size="lg"
             >
-              Logga in
+              {isSubmitting ? 'Loggar in...' : 'Logga in'}
             </Button>
           </form>
-
           <div className="mt-6 text-center">
             <Link 
               to="/forgot-password"
@@ -94,7 +119,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-sm text-slate-400 mt-8">
-          Har du fått en inbjudan? 
+          Har du fått en inbjudan?{' '}
           <Link 
             to="/set-password" 
             className="text-green-400 hover:text-green-300 ml-1 transition-colors"
@@ -104,5 +129,5 @@ export default function Login() {
         </p>
       </div>
     </div>
-  )
+  );
 }

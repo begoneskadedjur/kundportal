@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - KORRIGERAD VERSION
+// src/contexts/AuthContext.tsx - SLUTGILTIG VERSION FÖR STRIKT BEHÖRIGHETSSTYRNING
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -6,41 +6,24 @@ import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-// Typer (oförändrade)
 type Profile = {
-  id: string;
-  email: string;
-  is_admin: boolean;
-  is_active: boolean;
-  customer_id: string | null;
-  user_id: string;
-  technician_id?: string | null;
-  role?: 'admin' | 'customer' | 'technician';
-  display_name?: string | null;
-  technicians?: {
-    name: string;
-    role: string; 
-    email: string;
-  } | null;
+  id: string; email: string; is_admin: boolean; is_active: boolean;
+  customer_id: string | null; user_id: string; technician_id?: string | null;
+  role?: 'admin' | 'customer' | 'technician'; display_name?: string | null;
+  technicians?: { name: string; role: string; email: string; } | null;
 };
 
 type AuthContextType = {
-  user: User | null;
-  profile: Profile | null;
-  loading: boolean;
+  user: User | null; profile: Profile | null; loading: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  // ✅ STRIKT DEFINIERADE ROLLER
   isAdmin: boolean;
   isCustomer: boolean;
   isTechnician: boolean;
-  fetchProfile: (userId: string) => Promise<void>;
-  technician: {
-    id: string | null;
-    name: string | null;
-    email: string | null;
-  } | null;
 };
 
+// Skapar kontexten
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -48,308 +31,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-
   const navigate = useNavigate();
   const location = useLocation();
 
-  const autoAcceptInvitation = async (customerId: string, email: string, userId: string) => {
+  const fetchProfile = async (userId: string) => {
     try {
-      console.log('🎫 Auto-accepting invitation for customer:', customerId);
-      const response = await fetch('/api/accept-invitation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId, email, userId })
-      });
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Invitation auto-accepted:', result.message);
-        if (result.message !== 'Inbjudan redan accepterad') {
-          toast.success('Välkommen! Ditt konto är nu aktiverat.', { duration: 4000, icon: '🎉' });
-        }
-        return true;
-      } else {
-        const error = await response.json();
-        console.log('ℹ️ Auto-accept info:', error.error);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Auto-accept failed (non-critical):', error);
-      return false;
-    }
-  };
-
-  const fetchProfile = async (userId: string, authUser?: User) => {
-    // ✅ DEN KRITISKA ÄNDRINGEN: Denna rad är borttagen!
-    // Vi sätter inte längre loading till true här, eftersom detta skapar en race condition.
-    // setLoading(true); 
-
-    try {
-      console.log('📋 Fetching profile for user:', userId);
-      
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select(`*, technicians(name, role, email)`)
-        .eq('user_id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Profile fetch error:', error);
-        throw new Error(`Kunde inte hämta profil: ${error.message}`);
-      }
-      
-      if (!profileData) {
-        throw new Error('Ingen profil hittades för användaren');
-      }
-
+      const { data: profileData, error } = await supabase.from('profiles').select(`*, technicians(*)`).eq('user_id', userId).single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (!profileData) throw new Error('Ingen profil hittades.');
       if (!profileData.is_active) {
-        toast.error('Ditt konto är inaktiverat. Kontakta support.');
-        await signOut();
-        return;
+        toast.error('Ditt konto är inaktiverat.', { id: 'inactive-account' });
+        return supabase.auth.signOut();
       }
-      
-      console.log('✅ Profile loaded:', {
-        id: profileData.id,
-        email: profileData.email,
-        is_admin: profileData.is_admin,
-        customer_id: profileData.customer_id,
-        technician_id: profileData.technician_id,
-        role: profileData.role,
-      });
-      
+
       setProfile(profileData);
 
-      if (!profileData.is_admin && profileData.customer_id) {
-        const userEmail = authUser?.email || user?.email || profileData.email;
-        if (userEmail) {
-          await autoAcceptInvitation(profileData.customer_id, userEmail, userId);
+      // Omdirigering efter lyckad inloggning
+      const onAuthPage = ['/', '/login', '/set-password', '/forgot-password'].includes(location.pathname);
+      if (onAuthPage) {
+        let targetPath = '/login'; // Fallback
+        switch (profileData.role) {
+          case 'admin':
+            targetPath = '/koordinator/dashboard'; // Admins/Koordinatorer startar här
+            break;
+          case 'technician':
+            targetPath = '/technician/dashboard';
+            break;
+          case 'customer':
+            targetPath = '/customer';
+            break;
         }
+        console.log(`User role is '${profileData.role}'. Navigating to ${targetPath}`);
+        navigate(targetPath, { replace: true });
       }
-
-      const currentPath = location.pathname;
-      const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
-      
-      if (shouldNavigate) {
-        let targetPath = '/customer';
-        if (profileData.is_admin) {
-          targetPath = '/admin';
-        } else if (profileData.role === 'technician' && profileData.technician_id) {
-          targetPath = '/technician/dashboard';
-        }
-        
-        setTimeout(() => {
-          navigate(targetPath, { replace: true });
-        }, 100);
-      }
-
     } catch (error: any) {
-      console.error('💥 Profile fetch error:', error);
-      toast.error(error.message || 'Kunde inte hämta profilinformation');
+      console.error('💥 Profile fetch error:', error.message);
+      toast.error('Kunde inte hämta profil.', { id: 'profile-fetch-error' });
       await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
     } finally {
-      // Vi sätter fortfarande loading till false för att säkerställa att appen blir interaktiv
-      // efter den allra första laddningen.
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
-    let authSubscription: any = null;
+    if (initialized) return;
+    setInitialized(true);
 
-    const initializeAuth = async () => {
-      if (initialized) return;
-      
-      console.log('🔧 Initializing AuthContext...');
-      
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          throw sessionError;
-        }
-        
-        if (session?.user && isMounted) {
-          console.log('👤 Found existing session for:', session.user.email);
-          setUser(session.user);
-          await fetchProfile(session.user.id, session.user);
-        } else if (isMounted) {
-          console.log('🚫 No existing session found');
-          setLoading(false);
-        }
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            if (!isMounted) return;
-            console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
-            
-            try {
-              switch (event) {
-                case 'SIGNED_IN':
-                  if (session?.user) {
-                    console.log('✅ User signed in:', session.user.email);
-                    setUser(session.user);
-                    await fetchProfile(session.user.id, session.user);
-                  }
-                  break;
-                case 'SIGNED_OUT':
-                  console.log('👋 User signed out');
-                  setUser(null);
-                  setProfile(null);
-                  setLoading(false);
-                  
-                  const currentPath = location.pathname;
-                  if (!currentPath.includes('/login') && currentPath !== '/') {
-                    navigate('/login', { replace: true });
-                  }
-                  break;
-                case 'TOKEN_REFRESHED':
-                  console.log('🔄 Token refreshed for:', session?.user?.email);
-                  break;
-                case 'USER_UPDATED':
-                  console.log('👤 User updated:', session?.user?.email);
-                  if (session?.user) {
-                    setUser(session.user);
-                  }
-                  break;
-                default:
-                  console.log('ℹ️ Unhandled auth event:', event);
-                  if (!session && isMounted) {
-                    setUser(null);
-                    setProfile(null);
-                    setLoading(false);
-                  }
-              }
-            } catch (error) {
-              console.error('Error handling auth state change:', error);
-              setLoading(false);
-            }
-          }
-        );
-
-        authSubscription = subscription;
-        setInitialized(true);
-        
-      } catch (error) {
-        console.error('💥 Auth initialization error:', error);
-        if (isMounted) {
-          setLoading(false);
-          toast.error('Problem med autentisering. Försök ladda om sidan.');
-        }
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
-    };
+    });
 
-    initializeAuth();
-
-    return () => {
-      console.log('🧹 AuthContext cleanup');
-      isMounted = false;
-      if (authSubscription) {
-        authSubscription.unsubscribe();
+    // Auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        navigate('/login', { replace: true });
       }
-    };
-  }, []);
+    });
 
-  const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setLoading(true);
+    return () => subscription.unsubscribe();
+  }, [initialized, navigate]);
+
+  const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Attempting sign in for:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password
-      });
-
-      if (error) {
-        let errorMessage = error.message;
-        if (error.message === 'Invalid login credentials') {
-          errorMessage = 'Felaktiga inloggningsuppgifter';
-        } else if (error.message === 'Email not confirmed') {
-          errorMessage = 'E-postadressen är inte bekräftad';
-        }
-        toast.error(errorMessage);
-        return { success: false, error: errorMessage };
-      }
-      
-      if (!data.user) {
-        const errorMessage = 'Ingen användare returnerades';
-        toast.error(errorMessage);
-        return { success: false, error: errorMessage };
-      }
-
-      console.log('✅ Sign in successful for:', data.user.email);
-      toast.success('Inloggning lyckades!');
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      if (error) throw error;
+      if (!data.user) throw new Error('Ingen användare returnerades efter inloggning.');
+      toast.success('Inloggning lyckades!', { id: 'login-success' });
       return { success: true };
-      
     } catch (error: any) {
-      const errorMessage = error.message || 'Ett oväntat fel uppstod';
-      toast.error(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
+      const message = error.message === 'Invalid login credentials' ? 'Felaktiga inloggningsuppgifter' : 'Ett fel uppstod.';
+      toast.error(message, { id: 'login-error' });
+      return { success: false, error: message };
     }
   };
 
   const signOut = async () => {
-    try {
-      console.log('👋 Signing out user...');
-      setUser(null);
-      setProfile(null);
-      setLoading(false);
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
-      }
-      
-      navigate('/login', { replace: true });
-      toast.success('Du har loggats ut');
-      
-    } catch (error) {
-      console.error('💥 Sign out error:', error);
-      navigate('/login', { replace: true });
-      toast.error('Problem vid utloggning, men du har loggats ut');
-    }
+    await supabase.auth.signOut();
+    toast.success('Du har loggats ut.', { id: 'logout-success' });
   };
+  
+  // ✅ ENKEL OCH TYDLIG ROLDEFINITION
+  const isAdmin = profile?.role === 'admin';
+  const isTechnician = profile?.role === 'technician';
+  const isCustomer = profile?.role === 'customer';
 
-  const technicianData = profile?.role === 'technician' && profile?.technician_id ? {
-    id: profile.technician_id,
-    name: profile.technicians?.name || profile.display_name || null,
-    email: profile.technicians?.email || profile.email || null
-  } : null;
-
-  useEffect(() => {
-    console.log('🐛 AuthContext State:', {
-      user: user?.email || 'null',
-      profile: profile ? `${profile.email} (${profile.role || (profile.is_admin ? 'admin' : 'customer')})` : 'null',
-      technician: technicianData ? `${technicianData.name} (${technicianData.id})` : 'null',
-      loading,
-      initialized,
-      currentPath: location.pathname
-    });
-  }, [user, profile, technicianData, loading, initialized, location.pathname]);
-
-  const value: AuthContextType = {
+  const value = {
     user,
     profile,
     loading,
     signIn,
     signOut,
-    isAdmin: profile?.is_admin ?? false,
-    isCustomer: !profile?.is_admin && !!profile?.customer_id && profile?.role !== 'technician',
-    isTechnician: profile?.role === 'technician' && !!profile?.technician_id,
-    technician: technicianData,
-    fetchProfile: (userId: string) => fetchProfile(userId)
+    isAdmin,
+    isCustomer,
+    isTechnician,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// Hook för att använda kontexten
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

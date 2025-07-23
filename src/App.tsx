@@ -1,4 +1,4 @@
-// src/App.tsx - KOMPLETT VERSION MED NY KOORDINATOR-DASHBOARD
+// src/App.tsx - SLUTGILTIG VERSION MED KORREKT FORMATERING OCH STRIKT BEHÖRIGHET
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -25,12 +25,9 @@ import SalesOpportunities from './pages/admin/SalesOpportunities';
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 
-// --- KOORDINATOR IMPORTS (MED NYA DASHBOARDEN) ---
-// ✅ NY: Importerar den nya huvudsidan för koordinatorn.
+// KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
-
-// Befintliga sidor. Notera att "CoordinatorDashboard" är er specifika ruttplanerare.
-import RoutePlanner from './pages/coordinator/CoordinatorDashboard'; // Omdöpt för tydlighet, pekar på samma fil.
+import RoutePlanner from './pages/coordinator/CoordinatorDashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import BookingAssistant from './pages/coordinator/BookingAssistant';
 
@@ -164,9 +161,7 @@ function App() {
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
-            {/* --- KOORDINATOR ROUTES (UPPDATERADE) --- */}
-            
-            {/* ✅ NY ROUTE: Detta är den nya huvudsidan som länkar till de andra verktygen. */}
+            {/* Koordinator-rutter (skyddas också av 'admin'-rollen) */}
             <Route 
               path="/koordinator/dashboard" 
               element={
@@ -175,8 +170,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* Befintlig rutt för den specifika ruttplaneraren */}
             <Route 
               path="/koordinator/ruttplanerare" 
               element={
@@ -185,8 +178,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* Befintlig rutt för schema-vyn */}
             <Route 
               path="/koordinator/schema" 
               element={
@@ -195,8 +186,6 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* Befintlig rutt för bokningsassistenten */}
             <Route 
               path="/koordinator/booking-assistant" 
               element={
@@ -206,11 +195,11 @@ function App() {
               } 
             />
 
-            {/* TEKNIKER ROUTES - EGEN PORTAL */}
+            {/* --- TEKNIKER ROUTES (UPPDATERADE MED STRIKT BEHÖRIGHET) --- */}
             <Route 
               path="/technician/dashboard" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="technician">
                   <TechnicianDashboard />
                 </ProtectedRoute>
               } 
@@ -218,7 +207,7 @@ function App() {
             <Route 
               path="/technician/commissions" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="technician">
                   <TechnicianCommissionsPage />
                 </ProtectedRoute>
               } 
@@ -226,7 +215,7 @@ function App() {
             <Route 
               path="/technician/cases" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="technician">
                   <TechnicianCases />
                 </ProtectedRoute>
               } 
@@ -234,7 +223,7 @@ function App() {
             <Route 
               path="/technician/schedule" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="technician">
                   <TechnicianSchedule />
                 </ProtectedRoute>
               } 
@@ -242,7 +231,7 @@ function App() {
             <Route 
               path="/technician/oneflow" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
                 </ProtectedRoute>
               } 
@@ -278,10 +267,8 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
-            
-            {/* ✅ NY REDIRECT: Om någon går till /koordinator, skicka dem till den nya dashboarden. */}
             <Route path="/koordinator" element={<Navigate to="/koordinator/dashboard" replace />} />
-
+            
             {/* Legacy portal redirects */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
@@ -316,7 +303,7 @@ function App() {
         </div>
       </AuthProvider>
     </Router>
-  )
+  );
 }
 
 export default App;
