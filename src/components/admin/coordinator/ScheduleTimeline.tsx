@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 1.0 - INTERAKTIV TIDSLINJE MED FULLCALENDAR ⭐
+// ⭐ VERSION 2.1 - ROBUST OCH ANVÄNDARVÄNLIG TIDSLINJE ⭐
 
 import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -16,25 +16,24 @@ interface ScheduleTimelineProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void;
 }
 
-// HJÄLPFUNKTION: Kopierad från TechnicianSchedule för att kunna färglägga events.
-// Notera att Tailwind's JIT-compiler måste kunna "se" dessa klassnamn för att de ska fungera.
+// HJÄLPFUNKTION: Förfinad färgkodning av status
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
     const ls = status?.toLowerCase() || '';
-    if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700' };
-    if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700' };
-    if (ls.includes('bokad') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700' };
-    if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700' };
-    if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700' };
+    if (ls.includes('avslutat')) return { bg: 'bg-green-900/60', text: 'text-green-300', border: 'border-green-600' };
+    if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/60', text: 'text-cyan-300', border: 'border-cyan-600' };
+    if (ls.includes('bokad') || ls.includes('signerad')) return { bg: 'bg-blue-900/60', text: 'text-blue-300', border: 'border-blue-600' };
+    if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/60', text: 'text-yellow-300', border: 'border-yellow-600' };
+    if (ls.includes('review')) return { bg: 'bg-purple-900/60', text: 'text-purple-300', border: 'border-purple-600' };
     return { bg: 'bg-slate-800', text: 'text-slate-300', border: 'border-slate-600' };
 };
 
-// Komponent för att rendera innehållet i varje ärende-event
+// Anpassad rendering för varje ärende-kort i kalendern
 const renderEventContent = (eventInfo: EventContentArg) => {
     const caseData = eventInfo.event.extendedProps as BeGoneCaseRow;
     const colors = getStatusColor(caseData.status);
 
     return (
-        <div className={`w-full h-full p-1.5 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm`}>
+        <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:brightness-125 transition-all`}>
             <p className={`font-bold text-sm leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
             {caseData.kontaktperson && <p className="text-xs text-slate-400 truncate">{caseData.kontaktperson}</p>}
         </div>
@@ -43,8 +42,7 @@ const renderEventContent = (eventInfo: EventContentArg) => {
 
 
 export default function ScheduleTimeline({ technicians, cases, onCaseClick }: ScheduleTimelineProps) {
-  // Omvandla våra tekniker till FullCalendars "Resource"-format.
-  // useMemo används för prestanda, så att detta inte räknas om vid varje render.
+  // Omvandla tekniker till FullCalendars "Resource"-format
   const calendarResources = useMemo(() => {
     return technicians.map(tech => ({
       id: tech.id,
@@ -52,35 +50,36 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
     }));
   }, [technicians]);
 
-  // Omvandla våra ärenden till FullCalendars "Event"-format.
+  // Omvandla ärenden till FullCalendars "Event"-format
   const calendarEvents = useMemo(() => {
     return cases.map(c => ({
       id: c.id,
-      resourceId: c.primary_assignee_id, // Detta kopplar ärendet till en tekniker!
+      resourceId: c.primary_assignee_id,
       title: c.title,
       start: c.start_date!,
-      end: c.due_date || c.start_date!, // Säkerställ att det alltid finns ett slutdatum
-      extendedProps: c, // Här sparar vi all originaldata från ärendet
+      end: c.due_date, // Om due_date är null, hanterar FullCalendar det korrekt med defaultEventMinutes
+      extendedProps: c,
     }));
   }, [cases]);
 
-  // Hanterar klick på ett ärende i kalendern.
+  // Hantera klick på ett ärende
   const handleEventClick = (clickInfo: EventClickArg) => {
     onCaseClick(clickInfo.event.extendedProps as BeGoneCaseRow);
   };
 
   return (
     <div className="p-4 h-full w-full bg-slate-900">
-      {/* 
-        FullCalendar kräver en licensnyckel för resourceTimeline-vyn. 
-        "GPL-TO-REMOVE-THE-WARNING" kan användas under utveckling.
-        För kommersiellt bruk, besök https://fullcalendar.io/license
-      */}
       <FullCalendar
+        // Licensnyckel för att ta bort varningsmeddelandet under utveckling
         schedulerLicenseKey="GPL-TO-REMOVE-THE-WARNING"
+        
         plugins={[resourceTimelinePlugin, interactionPlugin]}
-        initialView="resourceTimelineWeek"
         locale={svLocale}
+
+        // Standardvy är nu "resourceTimelineWeek"
+        initialView="resourceTimelineWeek"
+
+        // Komplett header med navigeringsknappar och vy-bytare
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -98,8 +97,15 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
         height="100%"
         resourceAreaHeaderContent="Tekniker"
         resourceAreaWidth="20%"
-        slotMinWidth={120} // Minsta bredd för en dagskolumn
+        slotMinWidth={100}
         eventContent={renderEventContent} // Använder vår anpassade render-funktion
+
+        // ✅ NYTT: Visar ett meddelande om inga ärenden finns för den valda perioden
+        noEventsContent="Inga bokade ärenden att visa"
+        
+        // ✅ NYTT: Ger endags-ärenden (utan slutdatum) en standardlängd så de syns tydligt
+        defaultTimedEventDuration="02:00" // 2 timmar
+
         views={{
             resourceTimelineWeek: {
                 slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' }
@@ -108,7 +114,7 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
                 slotLabelFormat: { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false }
             }
         }}
-        scrollTime={'08:00:00'} // Centrerar vyn kring arbetstidens början
+        scrollTime={'08:00:00'}
       />
     </div>
   );
