@@ -1,7 +1,7 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.4 - DEFINITIV LÖSNING & UI-FÖRBÄTTRINGAR ⭐
+// ⭐ VERSION 2.5 - UPPDATERAD MED VY-VÄXLING OCH FÖRBÄTTRAD HEADER ⭐
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -49,6 +49,9 @@ const renderEventContent = (eventInfo: EventContentArg) => {
 
 export default function ScheduleTimeline({ technicians, cases, onCaseClick }: ScheduleTimelineProps) {
   
+  // ✅ USEREF FÖR SÄKER KALENDER-KONTROLL
+  const calendarRef = useRef<FullCalendar>(null);
+  
   const calendarResources = useMemo(() => {
     return technicians.map(tech => ({
       id: tech.id,
@@ -87,55 +90,162 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
     onCaseClick(clickInfo.event.extendedProps as BeGoneCaseRow);
   };
 
-  return (
-    <div className="p-4 h-full w-full bg-slate-900">
-      <FullCalendar
-        schedulerLicenseKey="GPL-TO-REMOVE-THE-WARNING"
-        plugins={[resourceTimelinePlugin, interactionPlugin]}
-        locale={svLocale}
+  // ✅ VY-VÄXLINGSFUNKTIONER
+  const changeView = (viewName: string) => {
+    const calendarApi = calendarRef.current?.getApi();
+    if (calendarApi) {
+      calendarApi.changeView(viewName);
+    }
+  };
 
-        // ✅ KORREKT HEADER MED ALLA KNAPPAR OCH VY-VÄLJARE
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth',
-        }}
-        
-        initialView="resourceTimelineDay" // Starta med dagsvyn för bäst detaljnivå
-        
-        resources={calendarResources}
-        events={calendarEvents}
-        eventClick={handleEventClick}
-        
-        height="100%"
-        resourceAreaHeaderContent="Tekniker"
-        resourceAreaWidth="15%" // Lite mindre för mer schemayta
-        
-        // ✅ FÖRBÄTTRADE INSTÄLLNINGAR FÖR TIDSVISNING
-        slotMinWidth={60}            // Bredd på tids-slots
-        nowIndicator={true}          // Röd linje för nuvarande tid
-        
-        // ✅ FÖRBÄTTRADE VY-INSTÄLLNINGAR
-        views={{
-          resourceTimelineDay: {
-            slotDuration: '01:00:00',
-            slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
-          },
-          resourceTimelineWeek: {
-            slotDuration: { days: 1 },
-            slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' }
-          },
-        }}
-        
-        eventContent={renderEventContent}
-        
-        // ✅ VISA ARBETSTIDER
-        slotMinTime="06:00:00"
-        slotMaxTime="19:00:00"
-        scrollTime="07:00:00" // Scrolla till arbetsdagens början
-        
-        noEventsContent="Inga bokade ärenden att visa"
-      />
+  const navigateCalendar = (direction: 'prev' | 'next' | 'today') => {
+    const calendarApi = calendarRef.current?.getApi();
+    if (calendarApi) {
+      if (direction === 'today') {
+        calendarApi.today();
+      } else {
+        calendarApi[direction]();
+      }
+    }
+  };
+
+  return (
+    <div className="h-full w-full bg-slate-900 flex flex-col">
+      {/* ✅ ANPASSAD HEADER MED VY-KNAPPAR */}
+      <div className="p-4 bg-slate-800/50 border-b border-slate-700 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
+          
+          <div className="flex items-center gap-4">
+            {/* Vy-väljare */}
+            <div className="flex bg-slate-700 rounded-lg p-1">
+              <button 
+                onClick={() => changeView('resourceTimelineDay')}
+                className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors"
+              >
+                Dag
+              </button>
+              <button 
+                onClick={() => changeView('resourceTimelineWeek')}
+                className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors"
+              >
+                Vecka
+              </button>
+              <button 
+                onClick={() => changeView('resourceTimelineMonth')}
+                className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors"
+              >
+                Månad
+              </button>
+            </div>
+            
+            {/* Navigeringsknappar */}
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => navigateCalendar('prev')}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+                title="Föregående"
+              >
+                ←
+              </button>
+              <button 
+                onClick={() => navigateCalendar('today')}
+                className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+              >
+                Idag
+              </button>
+              <button 
+                onClick={() => navigateCalendar('next')}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+                title="Nästa"
+              >
+                →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ FULLCALENDAR MED MINIMAL HEADER */}
+      <div className="flex-grow p-4">
+        <FullCalendar
+          ref={calendarRef}
+          schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+          plugins={[resourceTimelinePlugin, interactionPlugin]}
+          locale={svLocale}
+
+          // ✅ MINIMAL HEADER - ENDAST TITEL
+          headerToolbar={{
+            left: '',
+            center: 'title',
+            right: '',
+          }}
+          
+          // ✅ SVENSKA KNAPPTEXTER
+          buttonText={{
+            today: 'Idag',
+            month: 'Månad',
+            week: 'Vecka',
+            day: 'Dag'
+          }}
+          
+          initialView="resourceTimelineDay" // Starta med dagsvyn för bäst detaljnivå
+          
+          resources={calendarResources}
+          events={calendarEvents}
+          eventClick={handleEventClick}
+          
+          height="100%"
+          resourceAreaHeaderContent="Tekniker"
+          resourceAreaWidth="15%" // Lite mindre för mer schemayta
+          
+          // ✅ FÖRBÄTTRADE INSTÄLLNINGAR FÖR TIDSVISNING
+          slotMinWidth={60}            // Bredd på tids-slots
+          nowIndicator={true}          // Röd linje för nuvarande tid
+          
+          // ✅ FÖRBÄTTRADE VY-INSTÄLLNINGAR
+          views={{
+            resourceTimelineDay: {
+              slotDuration: '01:00:00',
+              slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+              slotLabelInterval: '02:00:00'
+            },
+            resourceTimelineWeek: {
+              slotDuration: { days: 1 },
+              slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' },
+              dayHeaderFormat: { weekday: 'short', day: 'numeric' }
+            },
+            resourceTimelineMonth: {
+              slotDuration: { days: 1 },
+              slotLabelFormat: { day: 'numeric' },
+              dayHeaderFormat: { day: 'numeric' }
+            }
+          }}
+          
+          eventContent={renderEventContent}
+          
+          // ✅ VISA ARBETSTIDER
+          slotMinTime="06:00:00"
+          slotMaxTime="19:00:00"
+          scrollTime="07:00:00" // Scrolla till arbetsdagens början
+          
+          // ✅ GRUNDLÄGGANDE INSTÄLLNINGAR
+          weekends={true}              // Visa helger
+          hiddenDays={[]}              // Dölj inga dagar
+          expandRows={true}            // Expandera rader
+          
+          noEventsContent="Inga bokade ärenden att visa"
+          defaultTimedEventDuration="02:00"
+          
+          // ✅ INTERAKTIVITET
+          editable={false}
+          selectable={true}
+          selectMirror={true}
+          eventInteractionEnabled={true}
+          displayEventTime={true}
+          displayEventEnd={false}
+        />
+      </div>
     </div>
   );
 }
