@@ -27,15 +27,26 @@ export default function Login() {
     setIsSubmitting(false); 
   };
 
-  // ✅ KÄRNAN I FIXEN: Detta är den nya, stabila logiken.
-  // Om autentiseringen INTE laddar och en profil redan finns, betyder det
-  // att en inloggad användare felaktigt har hamnat på loginsidan.
+  // ✅ FIXAD NAVIGATION: Matchar nu AuthContext exakt
   if (!authLoading && profile) {
     let targetPath = '/customer'; // Fallback
-    if (profile.role === 'admin') targetPath = '/koordinator/dashboard';
-    else if (profile.role === 'technician') targetPath = '/technician/dashboard';
     
-    // Omdirigera omedelbart för att bryta loopen.
+    switch (profile.role) {
+      case 'admin':
+        targetPath = '/admin/dashboard'; // ✅ ÄNDRAT: Matchar AuthContext
+        break;
+      case 'koordinator':
+        targetPath = '/koordinator/dashboard'; // ✅ NYTT: Koordinator-stöd
+        break;
+      case 'technician':
+        targetPath = '/technician/dashboard';
+        break;
+      case 'customer':
+        targetPath = '/customer';
+        break;
+    }
+    
+    // Omdirigera omedelbart för att bryta loopen
     return <Navigate to={targetPath} replace />;
   }
   
