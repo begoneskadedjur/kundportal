@@ -42,7 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!profileData) throw new Error('Ingen profil hittades.');
       if (!profileData.is_active) {
         toast.error('Ditt konto är inaktiverat.', { id: 'inactive-account' });
-        return supabase.auth.signOut();
+        await supabase.auth.signOut();
+        return;
       }
 
       setProfile(profileData);
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('💥 Profile fetch error:', error.message);
       toast.error('Kunde inte hämta profil.', { id: 'profile-fetch-error' });
       await supabase.auth.signOut();
+      throw error; // ✅ NYTT: Kasta felet så signIn kan fånga det
     } finally {
       setLoading(false);
     }
@@ -113,6 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw error;
       if (!data.user) throw new Error('Ingen användare returnerades efter inloggning.');
+      
+      // ✅ KRITISK FIX: Vänta på att profilen laddas innan vi returnerar success
+      await fetchProfile(data.user.id);
+      
       toast.success('Inloggning lyckades!', { id: 'login-success' });
       return { success: true };
     } catch (error: any) {
