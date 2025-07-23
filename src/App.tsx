@@ -1,51 +1,55 @@
-      // src/App.tsx - UPPDATERAD MED RUTT FÖR BOOKING ASSISTANT
+// src/App.tsx - KOMPLETT VERSION MED NY KOORDINATOR-DASHBOARD
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
-import { Toaster } from 'react-hot-toast'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 // Auth pages
-import Login from './pages/auth/Login'
-import SetPassword from './pages/auth/SetPassword'
-import ForgotPassword from './pages/auth/ForgotPassword'
+import Login from './pages/auth/Login';
+import SetPassword from './pages/auth/SetPassword';
+import ForgotPassword from './pages/auth/ForgotPassword';
 
 // Admin pages
-import AdminDashboard from './pages/admin/Dashboard'
-import Customers from './pages/admin/Customers'
-import CustomerDetails from './pages/admin/CustomerDetails'
-import NewCustomer from './pages/admin/NewCustomer'
-import Economics from './pages/admin/Economics'
-import BillingManagement from './pages/admin/BillingManagement'
-import Technicians from './pages/admin/Technicians'
-import TechnicianManagement from './pages/admin/TechnicianManagement'
-import TechnicianCommissions from './pages/admin/TechnicianCommissions'
-import SalesOpportunities from './pages/admin/SalesOpportunities'
+import AdminDashboard from './pages/admin/Dashboard';
+import Customers from './pages/admin/Customers';
+import CustomerDetails from './pages/admin/CustomerDetails';
+import NewCustomer from './pages/admin/NewCustomer';
+import Economics from './pages/admin/Economics';
+import BillingManagement from './pages/admin/BillingManagement';
+import Technicians from './pages/admin/Technicians';
+import TechnicianManagement from './pages/admin/TechnicianManagement';
+import TechnicianCommissions from './pages/admin/TechnicianCommissions';
+import SalesOpportunities from './pages/admin/SalesOpportunities';
 
 // ONEFLOW ROUTES
-import OneflowContractCreator from './pages/admin/OneflowContractCreator'
-import OneflowDiagnostics from './pages/admin/OneflowDiagnostics'
+import OneflowContractCreator from './pages/admin/OneflowContractCreator';
+import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 
-// ✅ KOORDINATOR IMPORTS
-import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard'
-import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule'
-import BookingAssistant from './pages/coordinator/BookingAssistant' // ✅ NY IMPORT
+// --- KOORDINATOR IMPORTS (MED NYA DASHBOARDEN) ---
+// ✅ NY: Importerar den nya huvudsidan för koordinatorn.
+import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
+
+// Befintliga sidor. Notera att "CoordinatorDashboard" är er specifika ruttplanerare.
+import RoutePlanner from './pages/coordinator/CoordinatorDashboard'; // Omdöpt för tydlighet, pekar på samma fil.
+import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
+import BookingAssistant from './pages/coordinator/BookingAssistant';
 
 // TEKNIKER PAGES
-import TechnicianDashboard from './pages/technician/TechnicianDashboard'
-import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions'
-import TechnicianCases from './pages/technician/TechnicianCases'
-import TechnicianSchedule from './pages/technician/TechnicianSchedule' 
+import TechnicianDashboard from './pages/technician/TechnicianDashboard';
+import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions';
+import TechnicianCases from './pages/technician/TechnicianCases';
+import TechnicianSchedule from './pages/technician/TechnicianSchedule'; 
 
 // Customer pages
-import CustomerPortal from './pages/customer/Portal'
-import Cases from './pages/customer/Cases'
-import Schedule from './pages/customer/Schedule'
+import CustomerPortal from './pages/customer/Portal';
+import Cases from './pages/customer/Cases';
+import Schedule from './pages/customer/Schedule';
 
 // Shared components
-import ProtectedRoute from './components/shared/ProtectedRoute'
+import ProtectedRoute from './components/shared/ProtectedRoute';
 
 // Global styles
-import './styles/globals.css'
+import './styles/globals.css';
 
 function App() {
   return (
@@ -160,15 +164,29 @@ function App() {
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
-            {/* KOORDINATOR ROUTES */}
+            {/* --- KOORDINATOR ROUTES (UPPDATERADE) --- */}
+            
+            {/* ✅ NY ROUTE: Detta är den nya huvudsidan som länkar till de andra verktygen. */}
+            <Route 
+              path="/koordinator/dashboard" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CoordinatorMainDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Befintlig rutt för den specifika ruttplaneraren */}
             <Route 
               path="/koordinator/ruttplanerare" 
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <CoordinatorDashboard />
+                  <RoutePlanner />
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Befintlig rutt för schema-vyn */}
             <Route 
               path="/koordinator/schema" 
               element={
@@ -177,7 +195,8 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* ✅ NY ROUTE FÖR BOKNINGSASSISTENTEN */}
+            
+            {/* Befintlig rutt för bokningsassistenten */}
             <Route 
               path="/koordinator/booking-assistant" 
               element={
@@ -260,6 +279,9 @@ function App() {
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/technician" element={<Navigate to="/technician/dashboard" replace />} />
             
+            {/* ✅ NY REDIRECT: Om någon går till /koordinator, skicka dem till den nya dashboarden. */}
+            <Route path="/koordinator" element={<Navigate to="/koordinator/dashboard" replace />} />
+
             {/* Legacy portal redirects */}
             <Route path="/portal" element={<Navigate to="/customer" replace />} />
             <Route path="/customer/portal" element={<Navigate to="/customer" replace />} />
@@ -297,4 +319,4 @@ function App() {
   )
 }
 
-export default App
+export default App;
