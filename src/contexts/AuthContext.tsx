@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.tsx - SLUTGILTIG VERSION FÖR STRIKT BEHÖRIGHETSSTYRNING
+// src/contexts/AuthContext.tsx - SLUTGILTIG, RENAD VERSION
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+// Typer (oförändrade)
 type Profile = {
   id: string; email: string; is_admin: boolean; is_active: boolean;
   customer_id: string | null; user_id: string; technician_id?: string | null;
@@ -13,17 +14,16 @@ type Profile = {
   technicians?: { name: string; role: string; email: string; } | null;
 };
 
+// ✅ UPPDATERAD TYP: fetchProfile är borttagen härifrån.
 type AuthContextType = {
   user: User | null; profile: Profile | null; loading: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  // ✅ STRIKT DEFINIERADE ROLLER
   isAdmin: boolean;
   isCustomer: boolean;
   isTechnician: boolean;
 };
 
-// Skapar kontexten
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // fetchProfile är nu en intern funktion, endast använd inom denna kontext.
   const fetchProfile = async (userId: string) => {
     try {
       const { data: profileData, error } = await supabase.from('profiles').select(`*, technicians(*)`).eq('user_id', userId).single();
@@ -46,13 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setProfile(profileData);
 
-      // Omdirigering efter lyckad inloggning
       const onAuthPage = ['/', '/login', '/set-password', '/forgot-password'].includes(location.pathname);
       if (onAuthPage) {
-        let targetPath = '/login'; // Fallback
+        let targetPath = '/login';
         switch (profileData.role) {
           case 'admin':
-            targetPath = '/koordinator/dashboard'; // Admins/Koordinatorer startar här
+            targetPath = '/koordinator/dashboard';
             break;
           case 'technician':
             targetPath = '/technician/dashboard';
@@ -77,7 +77,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (initialized) return;
     setInitialized(true);
 
-    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setUser(session.user);
@@ -87,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         setUser(session.user);
@@ -122,11 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     toast.success('Du har loggats ut.', { id: 'logout-success' });
   };
   
-  // ✅ ENKEL OCH TYDLIG ROLDEFINITION
   const isAdmin = profile?.role === 'admin';
   const isTechnician = profile?.role === 'technician';
   const isCustomer = profile?.role === 'customer';
 
+  // ✅ UPPDATERAT VÄRDE: fetchProfile är borttagen härifrån.
   const value = {
     user,
     profile,
@@ -141,7 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Hook för att använda kontexten
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
