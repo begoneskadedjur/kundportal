@@ -1,11 +1,16 @@
 // 📁 src/pages/coordinator/CoordinatorDashboard.tsx
-// ⭐ VERSION 1.2 - KORRIGERAD API-SÖKVÄG ⭐
-// Denna version uppdaterar fetch-anropet för att matcha den exakta
-// filstrukturen på Vercel (`api/ruttplanerare/optimize-route`).
+// ⭐ VERSION 1.3 - STABILISERAD DATAHÄMTNING ⭐
+// Denna version löser problemet med automatisk utloggning.
+// 1. ANVÄND AUTHCONTEXT: Importerar och använder useAuth för att få
+//    åtkomst till autentiseringsstatus.
+// 2. KONTROLLERAD DATAHÄMTNING: useEffect-hooksen väntar nu på att
+//    AuthContext INTE längre är i ett 'loading'-läge innan de försöker
+//    hämta data från Supabase. Detta förhindrar race conditions.
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '../../lib/supabase'; // Antar att du har en supabase-klient här
+import { supabase } from '../../lib/supabase';
 import { Map, Zap, ChevronsRight } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext'; // ✅ STEG 1: Importera useAuth
 
 // Definiera datatyper för tydlighet
 interface Technician {
@@ -16,7 +21,7 @@ interface Technician {
 interface Case {
     id: string;
     title: string;
-    adress: any; // Behåll 'any' för flexibilitet med adressformatet
+    adress: any;
 }
 
 // Liten laddningsspinner-komponent
@@ -29,6 +34,8 @@ const formatAddress = (address: any): string => {
 };
 
 export default function CoordinatorDashboard() {
+    const { loading: authLoading } = useAuth(); // ✅ STEG 2: Hämta laddningsstatus från AuthContext
+
     // State-hantering
     const [technicians, setTechnicians] = useState<Technician[]>([]);
     const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
@@ -41,8 +48,11 @@ export default function CoordinatorDashboard() {
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // 1. Hämta listan över alla tekniker när sidan laddas
+    // 1. Hämta listan över alla tekniker
     useEffect(() => {
+        // ✅ STEG 2: Vänta tills auth är klar innan vi hämtar data
+        if (authLoading) return;
+
         const fetchTechnicians = async () => {
             const { data, error } = await supabase
                 .from('technicians')
@@ -57,7 +67,7 @@ export default function CoordinatorDashboard() {
             }
         };
         fetchTechnicians();
-    }, []);
+    }, [authLoading]); // Kör om när authLoading ändras
 
     // 2. Hämta ärenden för en specifik tekniker och ett datum
     const fetchCasesForTechnician = useCallback(async (technicianId: string, date: string) => {
@@ -102,8 +112,10 @@ export default function CoordinatorDashboard() {
     }, []);
     
     useEffect(() => {
+        // ✅ STEG 2: Vänta tills auth är klar innan vi hämtar data
+        if (authLoading) return;
         fetchCasesForTechnician(selectedTechnicianId, selectedDate);
-    }, [selectedTechnicianId, selectedDate, fetchCasesForTechnician]);
+    }, [selectedTechnicianId, selectedDate, fetchCasesForTechnician, authLoading]); // Kör om när authLoading ändras
 
     // 3. Optimera rutten
     const handleOptimizeRoute = async () => {
@@ -119,8 +131,8 @@ export default function CoordinatorDashboard() {
             if(addresses.length < cases.length) {
                 console.warn("Vissa ärenden saknar giltiga adresser och kommer ignoreras.");
             }
-
-            // ✅ UPPDATERAD SÖKVÄG HÄR
+            
+            // Notera: du hade redan korrigerat sökvägen här, den är rätt.
             const response = await fetch('/api/ruttplanerare/optimize-route', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
