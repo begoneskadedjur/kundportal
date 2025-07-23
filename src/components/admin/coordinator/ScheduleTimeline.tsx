@@ -1,14 +1,17 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.6 - FIXADE HEADERS FÖR ALLA DAGAR ⭐
+// ⭐ VERSION 2.4 - DEFINITIV LÖSNING & UI-FÖRBÄTTRINGAR ⭐
 
 import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import svLocale from '@fullcalendar/core/locales/sv';
-import { BeGoneCaseRow, Technician, toFullCalendarDate } from '../../../types/database';
+import { BeGoneCaseRow, Technician } from '../../../types/database';
 
-import type { EventContentArg, EventClickArg } from '@fullcalendar/core';
+// Importera typerna korrekt
+import type { EventContentArg } from '@fullcalendar/core';
+import type { EventClickArg } from '@fullcalendar/interaction';
+
 import '../../../styles/FullCalendar.css';
 
 interface ScheduleTimelineProps {
@@ -30,15 +33,13 @@ const getStatusColor = (status: string): { bg: string; text: string; border: str
 const renderEventContent = (eventInfo: EventContentArg) => {
     const caseData = eventInfo.event.extendedProps as BeGoneCaseRow;
     const colors = getStatusColor(caseData.status);
-
-    const startTime = eventInfo.event.start ? 
-      eventInfo.event.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+    const startTime = eventInfo.event.start ? eventInfo.event.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
 
     return (
         <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:brightness-125 transition-all`}>
             <div className="flex items-center justify-between mb-1">
                 <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
-                {startTime && <span className="text-xs text-slate-400">{startTime}</span>}
+                {startTime && <span className="text-xs text-slate-400 font-mono">{startTime}</span>}
             </div>
             {caseData.kontaktperson && <p className="text-xs text-slate-400 truncate">{caseData.kontaktperson}</p>}
             {caseData.skadedjur && <p className="text-xs text-slate-500 truncate">{caseData.skadedjur}</p>}
@@ -56,19 +57,16 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
   }, [technicians]);
 
   const calendarEvents = useMemo(() => {
-    return cases
-      .filter(c => c.primary_assignee_id && (c.start_date || c.due_date))
-      .map(c => {
-        const startDate = toFullCalendarDate(c.start_date);
-        const endDate = toFullCalendarDate(c.due_date);
-        
-        const eventStart = startDate || endDate;
-        let eventEnd = endDate;
-        
-        if (startDate && !endDate) {
-          const start = new Date(c.start_date!);
-          start.setHours(start.getHours() + 2);
-          eventEnd = start.toISOString();
+    return cases.map(c => {
+        // Säkerställer att det finns ett giltigt startdatum att rendera
+        const eventStart = c.start_date ? new Date(c.start_date).toISOString() : new Date().toISOString();
+        let eventEnd = c.due_date ? new Date(c.due_date).toISOString() : undefined;
+
+        // Om det bara finns ett startdatum, ge det en standardlängd på 2 timmar
+        if (c.start_date && !c.due_date) {
+            const start = new Date(c.start_date);
+            start.setHours(start.getHours() + 2);
+            eventEnd = start.toISOString();
         }
 
         return {
@@ -78,12 +76,11 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
           start: eventStart,
           end: eventEnd,
           extendedProps: c,
+          // Vi sätter färg via eventContent istället för dessa
           backgroundColor: 'transparent',
           borderColor: 'transparent',
-          textColor: 'inherit'
         };
-      })
-      .filter(event => event.start);
+    });
   }, [cases]);
 
   const handleEventClick = (clickInfo: EventClickArg) => {
@@ -93,18 +90,18 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
   return (
     <div className="p-4 h-full w-full bg-slate-900">
       <FullCalendar
-        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
-        
+        schedulerLicenseKey="GPL-TO-REMOVE-THE-WARNING"
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         locale={svLocale}
 
+        // ✅ KORREKT HEADER MED ALLA KNAPPAR OCH VY-VÄLJARE
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
           right: 'resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth',
         }}
         
-        initialView="resourceTimelineWeek"
+        initialView="resourceTimelineDay" // Starta med dagsvyn för bäst detaljnivå
         
         resources={calendarResources}
         events={calendarEvents}
@@ -112,87 +109,32 @@ export default function ScheduleTimeline({ technicians, cases, onCaseClick }: Sc
         
         height="100%"
         resourceAreaHeaderContent="Tekniker"
-        resourceAreaWidth="20%"
+        resourceAreaWidth="15%" // Lite mindre för mer schemayta
         
-        // ✅ KRITISKA INSTÄLLNINGAR FÖR ATT VISA ALLA DAGAR
-        slotMinWidth={100}           // Bredare slots
-        slotDuration="1:00:00"       // 1-timmes intervall
-        slotLabelInterval="1:00:00"  // Visa varje timme
+        // ✅ FÖRBÄTTRADE INSTÄLLNINGAR FÖR TIDSVISNING
+        slotMinWidth={60}            // Bredd på tids-slots
+        nowIndicator={true}          // Röd linje för nuvarande tid
         
-        // ✅ TVINGA VISA ALLA DAGAR I VECKAN
-        dayMinWidth={80}             // Minsta bredd per dag
-        expandRows={true}            // Expandera rader
-        nowIndicator={true}          // Visa nuvarande tid
-        
-        // ✅ BÄTTRE TIDSFORMAT OCH INTERVALL
+        // ✅ FÖRBÄTTRADE VY-INSTÄLLNINGAR
         views={{
-          resourceTimelineWeek: {
-            type: 'resourceTimelineWeek',
-            slotDuration: '01:00:00',        // 1 timme per slot
-            slotLabelFormat: {               // Format för tid-labels
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false
-            },
-            slotLabelInterval: '02:00:00',   // Visa label varannan timme
-            dayHeaderFormat: {               // Format för dag-headers
-              weekday: 'short',
-              day: 'numeric',
-              month: 'numeric'
-            }
-          },
           resourceTimelineDay: {
-            type: 'resourceTimelineDay',
-            slotDuration: '00:30:00',        // 30 min per slot
-            slotLabelFormat: {
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false
-            },
-            slotLabelInterval: '01:00:00'    // Visa label varje timme
+            slotDuration: '01:00:00',
+            slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
           },
-          resourceTimelineMonth: {
-            type: 'resourceTimelineMonth',
-            slotDuration: '1.00:00:00',      // 1 dag per slot
-            slotLabelFormat: {
-              day: 'numeric'
-            }
-          }
+          resourceTimelineWeek: {
+            slotDuration: { days: 1 },
+            slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' }
+          },
         }}
         
         eventContent={renderEventContent}
         
-        // ✅ ARBETSTIDER - VISA HELA ARBETSDAGEN
-        slotMinTime="07:00:00"       // Börja 07:00
-        slotMaxTime="19:00:00"       // Sluta 19:00
-        scrollTime="08:00:00"        // Scrolla till 08:00
+        // ✅ VISA ARBETSTIDER
+        slotMinTime="06:00:00"
+        slotMaxTime="19:00:00"
+        scrollTime="07:00:00" // Scrolla till arbetsdagens början
         
-        // ✅ VISA HELGER OCH ALLA DAGAR
-        weekends={true}              // Visa helger
-        hiddenDays={[]}              // Dölj inga dagar
-        
-        // ✅ GRUNDLÄGGANDE INSTÄLLNINGAR
         noEventsContent="Inga bokade ärenden att visa"
-        defaultTimedEventDuration="02:00"
-        editable={false}
-        selectable={true}            // Tillåt markering av tidsslots
-        selectMirror={true}          // Visa selection feedback
-        
-        // ✅ EVENT-INSTÄLLNINGAR
-        eventInteractionEnabled={true}
-        displayEventTime={true}
-        displayEventEnd={false}
-        eventMinHeight={40}          // Minsta höjd för events
-        
-        // ✅ TVINGA KOMPAKT LAYOUT
-        resourceOrder="title"        // Sortera tekniker alfabetiskt
-        resourceAreaColumns={[       // Endast namn-kolumn
-          {
-            headerContent: 'Tekniker',
-            field: 'title',
-            width: '100%'
-          }
-        ]}
       />
     </div>
   );
