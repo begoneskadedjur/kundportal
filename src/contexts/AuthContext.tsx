@@ -1,11 +1,12 @@
-// src/contexts/AuthContext.tsx - SÄKERT UPPDATERAD MED TEKNIKER-STÖD OCH FIX FÖR LADDNING
+// src/contexts/AuthContext.tsx - KORRIGERAD VERSION
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-// 🆕 UPPDATERAD PROFILE MED TEKNIKER-STÖD
+// Typer (oförändrade)
 type Profile = {
   id: string;
   email: string;
@@ -13,11 +14,9 @@ type Profile = {
   is_active: boolean;
   customer_id: string | null;
   user_id: string;
-  // 🆕 TEKNIKER-FÄLT
   technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician';
   display_name?: string | null;
-  // Tekniker-data från join (optional)
   technicians?: {
     name: string;
     role: string; 
@@ -33,9 +32,8 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isCustomer: boolean;
-  isTechnician: boolean; // 🆕 TEKNIKER-CHECK
+  isTechnician: boolean;
   fetchProfile: (userId: string) => Promise<void>;
-  // 🆕 TEKNIKER-SPECIFIK DATA
   technician: {
     id: string | null;
     name: string | null;
@@ -54,33 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Auto-acceptering av inbjudan (oförändrad)
   const autoAcceptInvitation = async (customerId: string, email: string, userId: string) => {
     try {
       console.log('🎫 Auto-accepting invitation for customer:', customerId);
-      
       const response = await fetch('/api/accept-invitation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          customerId, 
-          email,
-          userId
-        })
+        body: JSON.stringify({ customerId, email, userId })
       });
-      
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Invitation auto-accepted:', result.message);
-        
-        // Visa notifiering endast för nya accepteringar
         if (result.message !== 'Inbjudan redan accepterad') {
-          toast.success('Välkommen! Ditt konto är nu aktiverat.', {
-            duration: 4000,
-            icon: '🎉'
-          });
+          toast.success('Välkommen! Ditt konto är nu aktiverat.', { duration: 4000, icon: '🎉' });
         }
-        
         return true;
       } else {
         const error = await response.json();
@@ -93,10 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ✅ UPPDATERAD FETCHPROFILE-FUNKTION FÖR ATT LÖSA LADDNINGSPROBLEMET
   const fetchProfile = async (userId: string, authUser?: User) => {
-    // Sätt loading till true i början av funktionen
-    setLoading(true);
+    // ✅ DEN KRITISKA ÄNDRINGEN: Denna rad är borttagen!
+    // Vi sätter inte längre loading till true här, eftersom detta skapar en race condition.
+    // setLoading(true); 
+
     try {
       console.log('📋 Fetching profile for user:', userId);
       
@@ -106,8 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .single();
 
-      // Supabase returnerar ett fel (PGRST116) om en join (som på technicians)
-      // inte hittar några rader. Detta är förväntat för admin/kunder och inget riktigt fel.
       if (error && error.code !== 'PGRST116') {
         console.error('Profile fetch error:', error);
         throw new Error(`Kunde inte hämta profil: ${error.message}`);
@@ -120,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!profileData.is_active) {
         toast.error('Ditt konto är inaktiverat. Kontakta support.');
         await signOut();
-        return; // 'finally' kommer fortfarande att köras
+        return;
       }
       
       console.log('✅ Profile loaded:', {
@@ -145,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const shouldNavigate = ['/', '/login', '/auth/login', '/portal'].includes(currentPath);
       
       if (shouldNavigate) {
-        let targetPath = '/customer'; // Säker default
+        let targetPath = '/customer';
         if (profileData.is_admin) {
           targetPath = '/admin';
         } else if (profileData.role === 'technician' && profileData.technician_id) {
@@ -164,12 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setProfile(null);
     } finally {
-      // ✅ DEN KRITISKA ÄNDRINGEN: Säkerställer att 'loading' ALLTID sätts till false.
+      // Vi sätter fortfarande loading till false för att säkerställa att appen blir interaktiv
+      // efter den allra första laddningen.
       setLoading(false);
     }
   };
 
-  // Auth initialization (oförändrad)
   useEffect(() => {
     let isMounted = true;
     let authSubscription: any = null;
@@ -268,12 +252,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // signIn funktion (oförändrad)
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setLoading(true);
     try {
       console.log('🔐 Attempting sign in for:', email);
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password
@@ -309,7 +291,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // signOut funktion (oförändrad)
   const signOut = async () => {
     try {
       console.log('👋 Signing out user...');
@@ -332,14 +313,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Beräkna tekniker-data (oförändrad)
   const technicianData = profile?.role === 'technician' && profile?.technician_id ? {
     id: profile.technician_id,
     name: profile.technicians?.name || profile.display_name || null,
     email: profile.technicians?.email || profile.email || null
   } : null;
 
-  // Debug information (oförändrad)
   useEffect(() => {
     console.log('🐛 AuthContext State:', {
       user: user?.email || 'null',
