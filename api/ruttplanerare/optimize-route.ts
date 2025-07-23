@@ -1,7 +1,7 @@
 // 📁 api/ruttplanerare/optimize-route.ts
-// ⭐ VERSION 2.2 - ROBUST DATAPARSNING ENLIGT NY DOKUMENTATION ⭐
-// Denna version är uppdaterad för att hantera den exakta datastrukturen
-// från ABAX API, vilket förhindrar framtida fel.
+// ⭐ VERSION 2.3 - FIX FÖR "response is not defined" ⭐
+// Denna version åtgärdar ett ReferenceError som orsakades av ett stavfel
+// i variabelnamnet vid hantering av Google Maps-svaret.
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -32,7 +32,6 @@ async function getAbaxToken() {
     return data.access_token;
 }
 
-// ✅ UPPDATERAD FUNKTION: Hanterar nu det fullständiga Vehicle-objektet
 async function getVehicleLocation(token: string, vehicleId: string) {
     const response = await fetch(`https://api.abax.cloud/v1/vehicles/${vehicleId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -42,10 +41,8 @@ async function getVehicleLocation(token: string, vehicleId: string) {
         throw new Error('Kunde inte hämta fordonsposition');
     }
 
-    // Tolkar svaret som ett fullständigt Vehicle-objekt
     const vehicleData = await response.json() as { location?: { latitude?: number, longitude?: number } };
     
-    // Plockar ut latitud och longitud från det nästlade location-objektet
     const lat = vehicleData?.location?.latitude;
     const lng = vehicleData?.location?.longitude;
 
@@ -93,7 +90,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const directionsResponse = await fetch(googleApiUrl);
         if (!directionsResponse.ok) throw new Error('Kunde inte hämta rutt från Google Maps');
         
-        const directionsData = await response.json() as any;
+        // ✅ KORRIGERAD RAD: Använder nu 'directionsResponse' istället för 'response'
+        const directionsData = await directionsResponse.json() as any;
         if (directionsData.status !== 'OK') throw new Error(`Google Maps fel: ${directionsData.status}`);
 
         // 4. Skicka tillbaka den optimerade ordningen och en navigeringslänk
@@ -111,3 +109,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(500).json({ error: error.message });
     }
 }
+
+// SLUT PÅ DEL 2 AV 2
