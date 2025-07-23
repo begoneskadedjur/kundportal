@@ -1,12 +1,11 @@
-// src/components/shared/ProtectedRoute.tsx - SLUTGILTIG, ROBUST VERSION MED SWITCH-LOGIK
-
+// src/components/shared/ProtectedRoute.tsx - MED KOORDINATOR-STÖD
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'customer' | 'technician'; 
+  requiredRole?: 'admin' | 'customer' | 'technician' | 'koordinator'; // ✅ NYTT: Lägg till koordinator
 };
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
@@ -27,31 +26,38 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ 3. NY, TYDLIG LOGIK MED SWITCH-SATS
+  // ✅ 3. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST
   let hasAccess = false;
   
   switch (profile.role) {
     case 'admin':
-      // En admin har ALLTID tillgång, oavsett vad `requiredRole` är.
+      // Admins har FULL åtkomst till ALLT (admin, koordinator, technician, customer)
       hasAccess = true;
       break;
     
-    case 'technician':
-      // En tekniker har tillgång OM den begärda sidan är en tekniker-sida.
-      if (requiredRole === 'technician') {
+    case 'koordinator':
+      // Koordinatorer har endast tillgång till koordinator-sidor
+      if (requiredRole === 'koordinator') {
         hasAccess = true;
       }
       break;
-
+    
+    case 'technician':
+      // Tekniker har tillgång till tekniker-sidor
+      if (requiredRole === 'technician') {
+        hasAccess = true;  
+      }
+      break;
+      
     case 'customer':
-      // En kund har tillgång OM den begärda sidan är en kund-sida.
+      // Kunder har tillgång till kund-sidor
       if (requiredRole === 'customer') {
         hasAccess = true;
       }
       break;
-
+      
     default:
-      // Om rollen är okänd, nekas alltid tillträde.
+      // Om rollen är okänd, nekas alltid tillträde
       hasAccess = false;
       break;
   }
@@ -60,11 +66,24 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   if (hasAccess) {
     return <>{children}</>;
   } else {
-    // Om access nekas, skicka användaren till deras egen startsida.
+    // Om access nekas, skicka användaren till deras egen startsida
     let redirectPath = '/login'; // Fallback
-    if (profile.role === 'technician') redirectPath = '/technician/dashboard';
-    if (profile.role === 'customer') redirectPath = '/customer';
-
+    
+    switch (profile.role) {
+      case 'admin':
+        redirectPath = '/admin/dashboard';
+        break;
+      case 'koordinator':
+        redirectPath = '/koordinator/dashboard';
+        break;
+      case 'technician':
+        redirectPath = '/technician/dashboard';
+        break;
+      case 'customer':
+        redirectPath = '/customer';
+        break;
+    }
+    
     console.warn(`Access DENIED for role '${profile.role}' to path '${location.pathname}'. Redirecting to '${redirectPath}'.`);
     return <Navigate to={redirectPath} replace />;
   }

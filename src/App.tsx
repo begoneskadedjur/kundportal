@@ -160,11 +160,11 @@ function App() {
               element={<Navigate to="/admin/oneflow-contract-creator" replace />}
             />
 
-            {/* Koordinator-rutter (skyddas också av 'admin'-rollen) */}
+            {/* Koordinator-rutter (skyddas av 'koordinator'-rollen) */}
             <Route 
               path="/koordinator/dashboard" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <ProtectedRoute requiredRole="koordinator">
                   <CoordinatorMainDashboard />
                 </ProtectedRoute>
               } 
@@ -172,7 +172,7 @@ function App() {
             <Route 
               path="/koordinator/schema" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <ProtectedRoute requiredRole="koordinator">
                   <CoordinatorSchedule />
                 </ProtectedRoute>
               } 
@@ -180,7 +180,7 @@ function App() {
             <Route 
               path="/koordinator/booking-assistant" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <ProtectedRoute requiredRole="koordinator">
                   <BookingAssistant />
                 </ProtectedRoute>
               } 

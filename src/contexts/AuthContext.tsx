@@ -6,15 +6,14 @@ import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-// Typer (oförändrade)
+// Typer (uppdaterade med koordinator-roll)
 type Profile = {
   id: string; email: string; is_admin: boolean; is_active: boolean;
   customer_id: string | null; user_id: string; technician_id?: string | null;
-  role?: 'admin' | 'customer' | 'technician'; display_name?: string | null;
+  role?: 'admin' | 'customer' | 'technician' | 'koordinator'; display_name?: string | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };
 
-// ✅ UPPDATERAD TYP: fetchProfile är borttagen härifrån.
 type AuthContextType = {
   user: User | null; profile: Profile | null; loading: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -22,6 +21,7 @@ type AuthContextType = {
   isAdmin: boolean;
   isCustomer: boolean;
   isTechnician: boolean;
+  isKoordinator: boolean; // ✅ NYTT: Lägg till koordinator-check
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let targetPath = '/login';
         switch (profileData.role) {
           case 'admin':
-            targetPath = '/koordinator/dashboard';
+            targetPath = '/admin/dashboard';
+            break;
+          case 'koordinator':
+            targetPath = '/koordinator/dashboard'; // ✅ NYTT: Koordinator-navigation
             break;
           case 'technician':
             targetPath = '/technician/dashboard';
@@ -62,7 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             break;
         }
         console.log(`User role is '${profileData.role}'. Navigating to ${targetPath}`);
-        navigate(targetPath, { replace: true });
+        
+        // ✅ FÖRBÄTTRING: Använd setTimeout för att säkerställa att navigationen fungerar
+        setTimeout(() => {
+          navigate(targetPath, { replace: true });
+        }, 100);
       }
     } catch (error: any) {
       console.error('💥 Profile fetch error:', error.message);
@@ -99,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [initialized, navigate]);
+  }, [initialized, navigate, location.pathname]); // ✅ ÄNDRAT: Lägg till location.pathname som dependency
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -123,8 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = profile?.role === 'admin';
   const isTechnician = profile?.role === 'technician';
   const isCustomer = profile?.role === 'customer';
+  const isKoordinator = profile?.role === 'koordinator'; // ✅ NYTT: Koordinator-check
 
-  // ✅ UPPDATERAT VÄRDE: fetchProfile är borttagen härifrån.
   const value = {
     user,
     profile,
@@ -134,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin,
     isCustomer,
     isTechnician,
+    isKoordinator, // ✅ NYTT: Exportera koordinator-check
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
