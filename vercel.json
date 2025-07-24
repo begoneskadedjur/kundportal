@@ -1,12 +1,7 @@
 {
-  "buildCommand": "tsc --noEmit false --skipLibCheck && vite build",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "functions": {
-    "api/ruttplanerare/booking-assistant/index.ts": {
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
