@@ -1,7 +1,8 @@
-// src/pages/admin/TechnicianManagement.tsx - UPPDATERAD MED MODULÄRA AUTH KOMPONENTER
+// src/pages/admin/TechnicianManagement.tsx - KORREKT OCH FULLSTÄNDIG VERSION
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Plus, Search, User, UserCheck, Users, ArrowLeft, Key, AlertCircle
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -17,14 +18,11 @@ import TechnicianModal from '../../components/admin/technicians/management/Techn
 // Importera våra services
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
 
-// Tekniker-roller för filter
-const TECHNICIAN_ROLES = [
+// ✅ OMDÖPT OCH RENODLAD: Endast de relevanta rollerna för systemet
+const STAFF_ROLES = [
   'Skadedjurstekniker',
-  'VD',
-  'Marknad & Försäljningschef',
-  'Regionchef Dalarna',
-  'Koordinator/kundtjänst',
-  'Annan'
+  'Koordinator',
+  'Admin'
 ] as const
 
 export default function TechnicianManagement() {
@@ -52,7 +50,7 @@ export default function TechnicianManagement() {
   const [editingTechnician, setEditingTechnician] = useState<Technician | undefined>()
   const [authTechnician, setAuthTechnician] = useState<Technician | undefined>()
 
-  // Ladda tekniker när komponenten mountas
+  // Ladda data när komponenten mountas
   useEffect(() => {
     fetchTechnicians()
   }, [])
@@ -63,12 +61,12 @@ export default function TechnicianManagement() {
   }, [technicians, searchTerm, roleFilter, statusFilter])
 
   /**
-   * Hämta alla tekniker och statistik
+   * Hämta all personal och statistik
    */
   const fetchTechnicians = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Fetching technicians...')
+      console.log('🔄 Fetching staff...')
       
       const [techniciansData, statsData] = await Promise.all([
         technicianManagementService.getAllTechnicians(),
@@ -78,17 +76,16 @@ export default function TechnicianManagement() {
       setTechnicians(techniciansData)
       setStats(statsData)
       
-      console.log(`✅ Loaded ${techniciansData.length} technicians`)
+      console.log(`✅ Loaded ${techniciansData.length} staff members`)
     } catch (error) {
-      console.error('Error fetching technicians:', error)
-      // Fel hanteras av service med toast
+      console.error('Error fetching staff:', error)
     } finally {
       setLoading(false)
     }
   }
 
   /**
-   * Filtrera tekniker baserat på sök och filter
+   * Filtrera personal baserat på sök och filter
    */
   const applyFilters = () => {
     let filtered = technicians
@@ -130,7 +127,7 @@ export default function TechnicianManagement() {
   }
 
   /**
-   * Event handlers för tekniker-operationer
+   * Event handlers för personal-operationer
    */
   const handleCreateTechnician = () => {
     setEditingTechnician(undefined)
@@ -178,15 +175,15 @@ export default function TechnicianManagement() {
                 <Button 
                   variant="secondary" 
                   size="sm" 
-                  onClick={() => navigate('/admin')} 
+                  onClick={() => navigate('/admin/dashboard')} 
                   className="flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" /> 
                   Tillbaka
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">Teknikerhantering</h1>
-                  <p className="text-slate-400 text-sm">Hantera tekniker och deras inloggningar</p>
+                  <h1 className="text-2xl font-bold text-white">Personalhantering</h1>
+                  <p className="text-slate-400 text-sm">Hantera personal och deras inloggningar</p>
                 </div>
               </div>
             </div>
@@ -195,7 +192,7 @@ export default function TechnicianManagement() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <LoadingSpinner />
-            <p className="text-slate-400 mt-4">Laddar tekniker...</p>
+            <p className="text-slate-400 mt-4">Laddar personal...</p>
           </div>
         </div>
       </div>
@@ -215,22 +212,22 @@ export default function TechnicianManagement() {
               <Button 
                 variant="secondary" 
                 size="sm" 
-                onClick={() => navigate('/admin')} 
+                onClick={() => navigate('/admin/dashboard')} 
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" /> 
                 Tillbaka
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Teknikerhantering</h1>
+                <h1 className="text-2xl font-bold text-white">Personalhantering</h1>
                 <p className="text-slate-400 text-sm">
-                  Hantera tekniker och deras inloggningar • {filteredTechnicians.length} av {stats.total} visas
+                  Hantera personal och deras inloggningar • {filteredTechnicians.length} av {stats.total} visas
                 </p>
               </div>
             </div>
             <Button onClick={handleCreateTechnician} className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
-              Lägg till tekniker
+              Lägg till Personal
             </Button>
           </div>
         </div>
@@ -239,7 +236,7 @@ export default function TechnicianManagement() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {/* Förbättrad Statistik med Auth Info */}
+          {/* Statistik */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card className="p-6">
               <div className="flex items-center justify-between">
@@ -290,10 +287,10 @@ export default function TechnicianManagement() {
                   <Key className="w-6 h-6 text-blue-400" />
                   <div>
                     <h3 className="text-white font-medium">
-                      {stats.total - stats.withLogin} tekniker utan inloggning
+                      {stats.total - stats.withLogin} personer utan inloggning
                     </h3>
                     <p className="text-slate-400 text-sm">
-                      Aktivera inloggning för tekniker som ska kunna använda systemet för OneFlow och ärendehantering
+                      Aktivera inloggning för de som ska kunna använda systemet.
                     </p>
                   </div>
                 </div>
@@ -302,7 +299,7 @@ export default function TechnicianManagement() {
                   onClick={() => setStatusFilter('without_login')}
                   className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                 >
-                  Visa tekniker utan inloggning
+                  Visa personer utan inloggning
                 </Button>
               </div>
             </Card>
@@ -328,7 +325,7 @@ export default function TechnicianManagement() {
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
               >
                 <option value="all">Alla roller</option>
-                {TECHNICIAN_ROLES.map(role => (
+                {STAFF_ROLES.map(role => (
                   <option key={role} value={role}>{role}</option>
                 ))}
               </select>
@@ -347,7 +344,7 @@ export default function TechnicianManagement() {
 
               <div className="flex items-center text-slate-400 text-sm">
                 <span>
-                  {filteredTechnicians.length} av {technicians.length} tekniker
+                  {filteredTechnicians.length} av {technicians.length} personer
                 </span>
               </div>
             </div>
@@ -386,22 +383,22 @@ export default function TechnicianManagement() {
             )}
           </Card>
 
-          {/* Tekniker Grid */}
+          {/* Personal-Grid */}
           {filteredTechnicians.length === 0 ? (
             <Card className="p-12">
               <div className="text-center">
                 <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Inga tekniker hittades</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">Ingen personal hittades</h3>
                 <p className="text-slate-400 mb-4">
                   {searchTerm || roleFilter !== 'all' || statusFilter !== 'all'
                     ? 'Prova att ändra dina filter eller sökord.'
-                    : 'Lägg till din första tekniker för att komma igång.'
+                    : 'Lägg till din första person för att komma igång.'
                   }
                 </p>
                 {!searchTerm && roleFilter === 'all' && statusFilter === 'all' && (
                   <Button onClick={handleCreateTechnician}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Lägg till första tekniker
+                    Lägg till första person
                   </Button>
                 )}
               </div>
@@ -429,8 +426,8 @@ export default function TechnicianManagement() {
                 <div className="text-slate-400 text-sm">
                   <p className="font-medium text-slate-300 mb-1">Systemintegration</p>
                   <p>
-                    Alla tekniker är automatiskt integrerade med befintliga ärenden och analytics-system. 
-                    Ändringar här påverkar tekniker-prestanda dashboards och ärendehistorik.
+                    All personal är automatiskt integrerad med befintliga ärenden och analytics-system. 
+                    Ändringar här påverkar dashboards och ärendehistorik.
                   </p>
                 </div>
               </div>

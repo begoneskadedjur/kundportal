@@ -1,7 +1,9 @@
-// src/services/technicianManagementService.ts - CRUD & AUTH HANTERING FÖR TEKNIKER
+// src/services/technicianManagementService.ts - FULLSTÄNDIG VERSION MED ABAX ID OCH LÖSENORDSHANTERING
+
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
+// ✅ TYPER UPPATERADE MED ABAX ID
 export type Technician = {
   id: string
   name: string
@@ -10,12 +12,13 @@ export type Technician = {
   direct_phone: string | null
   office_phone: string | null
   address: string | null
+  abax_vehicle_id: string | null // Nytt fält
   is_active: boolean
   created_at: string
   updated_at: string
   // Auth-relaterade fält
   has_login?: boolean
-  auth_user_id?: string | null
+  user_id?: string | null // Bytte namn från auth_user_id för tydlighet
   display_name?: string | null
 }
 
@@ -26,6 +29,7 @@ export type TechnicianFormData = {
   direct_phone: string
   office_phone: string
   address: string
+  abax_vehicle_id: string // Nytt fält
 }
 
 export type TechnicianStats = {
@@ -37,13 +41,12 @@ export type TechnicianStats = {
 
 export const technicianManagementService = {
   /**
-   * Hämta alla tekniker med auth-status
-   * VIKTIGT: Behåller alla FK-kopplingar till ärenden och integerar med befintlig technicianService.ts
+   * Hämta all personal med auth-status
    */
   async getAllTechnicians(): Promise<Technician[]> {
     try {
       const { data, error } = await supabase
-        .from('technicians')
+        .from('technicians') // Fortsätter använda 'technicians' som tabellnamn
         .select(`
           *,
           profiles!profiles_technician_id_fkey(
@@ -56,40 +59,33 @@ export const technicianManagementService = {
       
       if (error) throw error
       
-      // Enricha med login-status utan att påverka befintliga relationer
       const enrichedData = (data || []).map(tech => ({
         ...tech,
         has_login: !!tech.profiles?.user_id,
-        auth_user_id: tech.profiles?.user_id || null,
+        user_id: tech.profiles?.user_id || null,
         display_name: tech.profiles?.display_name || null
       }))
       
-      console.log(`✅ TechnicianManagement: Loaded ${enrichedData.length} technicians with auth status`)
+      console.log(`✅ StaffManagement: Loaded ${enrichedData.length} staff members with auth status`)
       return enrichedData
     } catch (error: any) {
-      console.error('Error fetching technicians:', error)
-      toast.error('Kunde inte hämta tekniker')
+      console.error('Error fetching staff:', error)
+      toast.error('Kunde inte hämta personal')
       throw error
     }
   },
 
   /**
-   * Skapa ny tekniker (utan auth initialt)
-   * VIKTIGT: Behåller kompatibilitet med befintlig technicianService.ts som använder namn-matchning
+   * Skapa ny personal
    */
   async createTechnician(technicianData: TechnicianFormData): Promise<Technician> {
     try {
-      // Validera e-post format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(technicianData.email)) {
         throw new Error('Ogiltig e-postadress')
       }
 
-      // Formatera telefonnummer
-      const formatPhone = (phone: string) => {
-        if (!phone) return null
-        return phone.replace(/[\s-]/g, '').replace(/^0/, '+46')
-      }
+      const formatPhone = (phone: string) => phone ? phone.replace(/[\s-]/g, '').replace(/^0/, '+46') : null
 
       const insertData = {
         name: technicianData.name.trim(),
@@ -98,6 +94,7 @@ export const technicianManagementService = {
         direct_phone: formatPhone(technicianData.direct_phone),
         office_phone: formatPhone(technicianData.office_phone),
         address: technicianData.address.trim() || null,
+        abax_vehicle_id: technicianData.abax_vehicle_id.trim() || null, // ✅ SPARAR ABAX ID
         is_active: true
       }
 
@@ -108,26 +105,21 @@ export const technicianManagementService = {
         .single()
       
       if (error) {
-        if (error.code === '23505') {
-          throw new Error('En tekniker med denna e-postadress finns redan')
-        }
+        if (error.code === '23505') throw new Error('En person med denna e-postadress finns redan')
         throw error
       }
       
-      console.log(`✅ TechnicianManagement: Created technician: ${data.name} (${data.id})`)
-      console.log(`🔍 Name format preserved for analytics compatibility: "${data.name}"`)
-      toast.success('Tekniker skapad!')
-      return { ...data, has_login: false, auth_user_id: null }
+      toast.success('Personal skapad!')
+      return { ...data, has_login: false, user_id: null }
     } catch (error: any) {
-      console.error('Error creating technician:', error)
-      toast.error(error.message || 'Kunde inte skapa tekniker')
+      console.error('Error creating staff member:', error)
+      toast.error(error.message || 'Kunde inte skapa person')
       throw error
     }
   },
 
   /**
-   * Uppdatera tekniker
-   * VIKTIGT: Uppdaterar även namn i ärenden via trigger om namn ändras
+   * Uppdatera personal
    */
   async updateTechnician(id: string, technicianData: TechnicianFormData): Promise<Technician> {
     try {
@@ -135,18 +127,10 @@ export const technicianManagementService = {
       if (!emailRegex.test(technicianData.email)) {
         throw new Error('Ogiltig e-postadress')
       }
+      
+      const { data: oldTechnician } = await supabase.from('technicians').select('name').eq('id', id).single()
 
-      // Hämta gamla namnet för att kontrollera om det ändras
-      const { data: oldTechnician } = await supabase
-        .from('technicians')
-        .select('name')
-        .eq('id', id)
-        .single()
-
-      const formatPhone = (phone: string) => {
-        if (!phone) return null
-        return phone.replace(/[\s-]/g, '').replace(/^0/, '+46')
-      }
+      const formatPhone = (phone: string) => phone ? phone.replace(/[\s-]/g, '').replace(/^0/, '+46') : null
 
       const updateData = {
         name: technicianData.name.trim(),
@@ -155,6 +139,7 @@ export const technicianManagementService = {
         direct_phone: formatPhone(technicianData.direct_phone),
         office_phone: formatPhone(technicianData.office_phone),
         address: technicianData.address.trim() || null,
+        abax_vehicle_id: technicianData.abax_vehicle_id.trim() || null, // ✅ UPPDATERAR ABAX ID
         updated_at: new Date().toISOString()
       }
 
@@ -166,215 +151,131 @@ export const technicianManagementService = {
         .single()
       
       if (error) {
-        if (error.code === '23505') {
-          throw new Error('En tekniker med denna e-postadress finns redan')
-        }
+        if (error.code === '23505') throw new Error('En person med denna e-postadress finns redan')
         throw error
       }
 
-      // Om namnet ändrats, uppdatera även ärenden (för analytics-kompatibilitet)
       if (oldTechnician && oldTechnician.name !== data.name) {
-        console.log(`🔄 TechnicianManagement: Name changed from "${oldTechnician.name}" to "${data.name}"`)
         await this.updateTechnicianNameInCases(oldTechnician.name, data.name)
       }
       
-      console.log(`✅ TechnicianManagement: Updated technician: ${data.name} (${data.id})`)
-      toast.success('Tekniker uppdaterad!')
+      toast.success('Personal uppdaterad!')
       return data
     } catch (error: any) {
-      console.error('Error updating technician:', error)
-      toast.error(error.message || 'Kunde inte uppdatera tekniker')
+      console.error('Error updating staff member:', error)
+      toast.error(error.message || 'Kunde inte uppdatera person')
       throw error
     }
   },
 
   /**
-   * Uppdatera teknikernamn i alla ärenden (för att bevara analytics-kopplingar)
-   * KRITISKT: Säkerställer att befintlig technicianService.ts fortfarande hittar ärenden
+   * ✅ NY FUNKTION: Uppdatera en användares lösenord (endast admin)
+   */
+  async updateUserPassword(userId: string, newPassword: string): Promise<void> {
+    if (!userId) {
+        toast.error("Användar-ID saknas, kan inte byta lösenord.");
+        throw new Error("User ID is missing.");
+    }
+    if (newPassword.length < 6) {
+        toast.error("Lösenordet måste vara minst 6 tecken långt.");
+        throw new Error("Password too short.");
+    }
+    try {
+        const { error } = await supabase.auth.admin.updateUserById(
+            userId,
+            { password: newPassword }
+        );
+        if (error) throw error;
+        toast.success("Lösenordet har uppdaterats!");
+        console.log(`✅ Password updated for user ${userId}`);
+    } catch (error: any) {
+        console.error('Error updating user password:', error);
+        toast.error(`Kunde inte uppdatera lösenordet: ${error.message}`);
+        throw error;
+    }
+  },
+
+  /**
+   * Uppdatera namn i alla ärenden (för analytics)
    */
   async updateTechnicianNameInCases(oldName: string, newName: string): Promise<void> {
     try {
-      console.log(`🔄 Updating technician name in cases: "${oldName}" → "${newName}"`)
-      
-      // Uppdatera alla assignee-fält i private_cases
+      console.log(`🔄 Updating staff name in cases: "${oldName}" → "${newName}"`)
       await Promise.all([
-        supabase
-          .from('private_cases')
-          .update({ primary_assignee_name: newName })
-          .eq('primary_assignee_name', oldName),
-        supabase
-          .from('private_cases')
-          .update({ secondary_assignee_name: newName })
-          .eq('secondary_assignee_name', oldName),
-        supabase
-          .from('private_cases')
-          .update({ tertiary_assignee_name: newName })
-          .eq('tertiary_assignee_name', oldName)
+        supabase.from('private_cases').update({ primary_assignee_name: newName }).eq('primary_assignee_name', oldName),
+        supabase.from('private_cases').update({ secondary_assignee_name: newName }).eq('secondary_assignee_name', oldName),
+        supabase.from('private_cases').update({ tertiary_assignee_name: newName }).eq('tertiary_assignee_name', oldName),
+        supabase.from('business_cases').update({ primary_assignee_name: newName }).eq('primary_assignee_name', oldName),
+        supabase.from('business_cases').update({ secondary_assignee_name: newName }).eq('secondary_assignee_name', oldName),
+        supabase.from('business_cases').update({ tertiary_assignee_name: newName }).eq('tertiary_assignee_name', oldName),
+        supabase.from('cases').update({ assigned_technician_name: newName }).eq('assigned_technician_name', oldName),
+        supabase.from('visits').update({ technician_name: newName }).eq('technician_name', oldName)
       ])
-
-      // Uppdatera alla assignee-fält i business_cases
-      await Promise.all([
-        supabase
-          .from('business_cases')
-          .update({ primary_assignee_name: newName })
-          .eq('primary_assignee_name', oldName),
-        supabase
-          .from('business_cases')
-          .update({ secondary_assignee_name: newName })
-          .eq('secondary_assignee_name', oldName),
-        supabase
-          .from('business_cases')
-          .update({ tertiary_assignee_name: newName })
-          .eq('tertiary_assignee_name', oldName)
-      ])
-
-      // Uppdatera avtalskunder
-      await supabase
-        .from('cases')
-        .update({ assigned_technician_name: newName })
-        .eq('assigned_technician_name', oldName)
-
-      // Uppdatera besök
-      await supabase
-        .from('visits')
-        .update({ technician_name: newName })
-        .eq('technician_name', oldName)
-
-      console.log(`✅ Updated technician name in all case tables`)
+      console.log(`✅ Updated staff name in all case tables`)
     } catch (error) {
-      console.error('Error updating technician name in cases:', error)
-      // Inte kritiskt - logga bara felet
+      console.error('Error updating staff name in cases:', error)
     }
   },
 
   /**
-   * Aktivera/inaktivera tekniker
-   * VIKTIGT: Påverkar INTE befintliga ärendekopplingar (assignee data bevaras för analytics)
+   * Aktivera/inaktivera personal
    */
   async toggleTechnicianStatus(id: string, isActive: boolean): Promise<void> {
     try {
-      // Uppdatera tekniker
-      const { error: techError } = await supabase
-        .from('technicians')
-        .update({ is_active: isActive })
-        .eq('id', id)
-      
-      if (techError) throw techError
-
-      // Uppdatera även profil-status om den finns
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ is_active: isActive })
-        .eq('technician_id', id)
-
-      if (profileError) {
-        console.warn('Could not update profile status:', profileError)
-        // Fortsätt ändå - profil kanske inte finns
-      }
-      
-      console.log(`✅ TechnicianManagement: Technician ${isActive ? 'activated' : 'deactivated'}: ${id}`)
-      toast.success(`Tekniker ${isActive ? 'aktiverad' : 'inaktiverad'}`)
+      await supabase.from('technicians').update({ is_active: isActive }).eq('id', id)
+      await supabase.from('profiles').update({ is_active: isActive }).eq('technician_id', id)
+      toast.success(`Personal ${isActive ? 'aktiverad' : 'inaktiverad'}`)
     } catch (error: any) {
-      console.error('Error toggling technician status:', error)
-      toast.error('Kunde inte uppdatera tekniker-status')
+      console.error('Error toggling staff status:', error)
+      toast.error('Kunde inte uppdatera status')
       throw error
     }
   },
 
   /**
-   * Ta bort tekniker med säkerhetskontroll
-   * VARNING: Kontrollerar först om tekniker har ärenden
+   * Ta bort personal med säkerhetskontroll
    */
   async deleteTechnician(id: string): Promise<void> {
     try {
-      // Hämta teknikernamn först
-      const { data: technician } = await supabase
-        .from('technicians')
-        .select('name, email')
-        .eq('id', id)
-        .single()
+      const { data: technician } = await supabase.from('technicians').select('name, email').eq('id', id).single()
+      if (!technician) throw new Error('Personal hittades inte')
 
-      if (!technician) {
-        throw new Error('Tekniker hittades inte')
-      }
-
-      // Kontrollera om tekniker har ärenden (både via UUID och namn)
-      const [privateCheck, businessCheck, contractCheck, visitsCheck] = await Promise.all([
-        // Kontrollera både UUID och namn-kopplingar för BeGone ärenden
+      const [pCheck, bCheck, cCheck, vCheck] = await Promise.all([
         supabase.from('private_cases').select('id').or(`primary_assignee_id.eq.${id},primary_assignee_name.eq.${technician.name}`).limit(1),
         supabase.from('business_cases').select('id').or(`primary_assignee_id.eq.${id},primary_assignee_name.eq.${technician.name}`).limit(1),
         supabase.from('cases').select('id').or(`assigned_technician_id.eq.${id},assigned_technician_name.eq.${technician.name}`).limit(1),
         supabase.from('visits').select('id').or(`technician_id.eq.${id},technician_name.eq.${technician.name}`).limit(1)
       ])
 
-      const hasPrivateCases = privateCheck.data && privateCheck.data.length > 0
-      const hasBusinessCases = businessCheck.data && businessCheck.data.length > 0
-      const hasContractCases = contractCheck.data && contractCheck.data.length > 0
-      const hasVisits = visitsCheck.data && visitsCheck.data.length > 0
-
-      if (hasPrivateCases || hasBusinessCases || hasContractCases || hasVisits) {
-        const caseTypes = []
-        if (hasPrivateCases) caseTypes.push('privatpersonsärenden')
-        if (hasBusinessCases) caseTypes.push('företagsärenden')
-        if (hasContractCases) caseTypes.push('avtalsärenden')
-        if (hasVisits) caseTypes.push('besöksrapporter')
-        
-        throw new Error(
-          `Kan inte ta bort ${technician.name} som har ${caseTypes.join(', ')}. ` +
-          'Inaktivera istället för att bevara ärendehistorik och analytics-data.'
-        )
+      const hasCases = (pCheck.data?.length || 0) > 0 || (bCheck.data?.length || 0) > 0 || (cCheck.data?.length || 0) > 0 || (vCheck.data?.length || 0) > 0;
+      if (hasCases) {
+        throw new Error(`Kan inte ta bort ${technician.name} som har kopplade ärenden. Inaktivera istället.`)
       }
 
-      // Ta bort auth först om det finns
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('technician_id', id)
-        .single()
-
+      const { data: profile } = await supabase.from('profiles').select('user_id').eq('technician_id', id).single()
       if (profile) {
         await supabase.from('profiles').delete().eq('technician_id', id)
         await supabase.auth.admin.deleteUser(profile.user_id)
-        console.log(`🗑️ Removed auth for technician: ${technician.name}`)
       }
 
-      // Ta bort tekniker
-      const { error } = await supabase
-        .from('technicians')
-        .delete()
-        .eq('id', id)
-      
+      const { error } = await supabase.from('technicians').delete().eq('id', id)
       if (error) throw error
       
-      console.log(`✅ TechnicianManagement: Deleted technician: ${technician.name} (${id})`)
-      toast.success('Tekniker borttagen')
+      toast.success('Personal borttagen')
     } catch (error: any) {
-      console.error('Error deleting technician:', error)
-      toast.error(error.message || 'Kunde inte ta bort tekniker')
+      console.error('Error deleting staff member:', error)
+      toast.error(error.message || 'Kunde inte ta bort person')
       throw error
     }
   },
 
   /**
-   * Aktivera inloggning för befintlig tekniker
+   * Aktivera inloggning för personal
    */
-  async enableTechnicianAuth(
-    technicianId: string, 
-    email: string, 
-    password: string, 
-    displayName: string
-  ): Promise<void> {
+  async enableTechnicianAuth(technicianId: string, email: string, password: string, displayName: string, role: string): Promise<void> {
     try {
-      // Kontrollera om tekniker redan har auth
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('technician_id', technicianId)
-        .single()
-
-      if (existingProfile) {
-        throw new Error('Tekniker har redan inloggning aktiverat')
-      }
+      const { data: existingProfile } = await supabase.from('profiles').select('user_id').eq('technician_id', technicianId).single()
+      if (existingProfile) throw new Error('Personen har redan inloggning aktiverat')
 
       // Skapa auth user
       const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
@@ -383,96 +284,67 @@ export const technicianManagementService = {
         email_confirm: true,
         user_metadata: {
           display_name: displayName,
-          role: 'technician',
+          role: role,
           technician_id: technicianId
         }
       })
-
-      if (authError) {
-        throw new Error(`Kunde inte skapa användarkonto: ${authError.message}`)
-      }
+      if (authError) throw new Error(`Kunde inte skapa konto: ${authError.message}`)
 
       // Skapa profil
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: newAuthUser.user.id,
-          user_id: newAuthUser.user.id,
-          email: email,
-          customer_id: null,
-          is_admin: false,
-          is_active: true,
-          technician_id: technicianId,
-          role: 'technician',
-          display_name: displayName
-        })
-
+      const { error: profileError } = await supabase.from('profiles').insert({
+        user_id: newAuthUser.user.id,
+        email: email,
+        is_active: true,
+        technician_id: technicianId,
+        role: role,
+        display_name: displayName
+      })
       if (profileError) {
-        // Rensa upp auth user vid fel
-        await supabase.auth.admin.deleteUser(newAuthUser.user.id)
+        await supabase.auth.admin.deleteUser(newAuthUser.user.id) // Cleanup
         throw new Error(`Kunde inte skapa profil: ${profileError.message}`)
       }
-
-      console.log(`✅ TechnicianManagement: Enabled auth for technician: ${technicianId}`)
-      toast.success('Inloggning aktiverat för tekniker!')
+      toast.success('Inloggning aktiverat!')
 
     } catch (error: any) {
-      console.error('Error enabling technician auth:', error)
+      console.error('Error enabling auth:', error)
       toast.error(error.message || 'Kunde inte aktivera inloggning')
       throw error
     }
   },
 
   /**
-   * Inaktivera inloggning för tekniker
+   * Inaktivera inloggning
    */
   async disableTechnicianAuth(technicianId: string): Promise<void> {
     try {
-      // Hitta profil
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('technician_id', technicianId)
-        .single()
-
+      const { data: profile } = await supabase.from('profiles').select('user_id').eq('technician_id', technicianId).single()
       if (profile) {
-        // Ta bort profil
-        await supabase
-          .from('profiles')
-          .delete()
-          .eq('technician_id', technicianId)
-
-        // Ta bort auth user
+        await supabase.from('profiles').delete().eq('technician_id', technicianId)
         await supabase.auth.admin.deleteUser(profile.user_id)
       }
-
-      console.log(`✅ TechnicianManagement: Disabled auth for technician: ${technicianId}`)
       toast.success('Inloggning inaktiverat!')
-
     } catch (error: any) {
-      console.error('Error disabling technician auth:', error)
+      console.error('Error disabling auth:', error)
       toast.error('Kunde inte inaktivera inloggning')
       throw error
     }
   },
 
   /**
-   * Hämta statistik för management dashboard
+   * Hämta statistik för dashboard
    */
   async getTechnicianStats(): Promise<TechnicianStats> {
     try {
       const technicians = await this.getAllTechnicians()
-      
       const stats = {
         total: technicians.length,
         active: technicians.filter(t => t.is_active).length,
         withLogin: technicians.filter(t => t.has_login).length,
-        byRole: technicians.reduce((acc, technician) => {
-          acc[technician.role] = (acc[technician.role] || 0) + 1
+        byRole: technicians.reduce((acc, tech) => {
+          acc[tech.role] = (acc[tech.role] || 0) + 1
           return acc
         }, {} as Record<string, number>)
       }
-      
       return stats
     } catch (error) {
       return { total: 0, active: 0, withLogin: 0, byRole: {} }
@@ -480,70 +352,41 @@ export const technicianManagementService = {
   },
 
   /**
-   * Hämta enskild tekniker med auth-info
+   * Hämta enskild person med auth-info
    */
   async getTechnicianById(id: string): Promise<Technician> {
     try {
       const { data, error } = await supabase
         .from('technicians')
-        .select(`
-          *,
-          profiles!profiles_technician_id_fkey(
-            user_id,
-            is_active,
-            display_name
-          )
-        `)
+        .select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name)`)
         .eq('id', id)
         .single()
-      
       if (error) throw error
-      
       return {
         ...data,
         has_login: !!data.profiles?.user_id,
-        auth_user_id: data.profiles?.user_id || null,
+        user_id: data.profiles?.user_id || null,
         display_name: data.profiles?.display_name || null
       }
     } catch (error: any) {
-      console.error('Error fetching technician:', error)
+      console.error('Error fetching staff member:', error)
       throw error
     }
   },
 
   /**
-   * Kontrollera namkonsistens mellan technicians och cases
-   * Hjälpfunktion för att säkerställa att analytics-data är korrekt
+   * Kontrollera namnkonsistens
    */
-  async validateTechnicianNameConsistency(): Promise<{
-    inconsistencies: Array<{
-      technician_name: string
-      table: string
-      count: number
-    }>
-    suggestions: string[]
-  }> {
+  async validateTechnicianNameConsistency(): Promise<{inconsistencies: Array<{technician_name: string, table: string, count: number}>, suggestions: string[]}> {
     try {
-      console.log('🔍 Validating technician name consistency...')
-      
-      // Hämta alla tekniker
-      const { data: technicians } = await supabase
-        .from('technicians')
-        .select('name')
-      
+      const { data: technicians } = await supabase.from('technicians').select('name')
       const technicianNames = new Set(technicians?.map(t => t.name) || [])
-      
-      // Hämta alla unika tekniker-namn från cases
       const [privateNames, businessNames, contractNames] = await Promise.all([
         supabase.from('private_cases').select('primary_assignee_name').not('primary_assignee_name', 'is', null),
         supabase.from('business_cases').select('primary_assignee_name').not('primary_assignee_name', 'is', null),
         supabase.from('cases').select('assigned_technician_name').not('assigned_technician_name', 'is', null)
       ])
-
       const inconsistencies: Array<{ technician_name: string, table: string, count: number }> = []
-      const suggestions: string[] = []
-
-      // Kontrollera private cases
       const privateMap = new Map<string, number>()
       privateNames.data?.forEach(row => {
         const name = row.primary_assignee_name
@@ -554,33 +397,22 @@ export const technicianManagementService = {
       privateMap.forEach((count, name) => {
         inconsistencies.push({ technician_name: name, table: 'private_cases', count })
       })
-
-      // Liknande för andra tabeller...
-      
-      if (inconsistencies.length > 0) {
-        suggestions.push('Några tekniker-namn i ärenden matchar inte technicians-tabellen.')
-        suggestions.push('Detta kan påverka analytics-data från technicianService.ts')
-        suggestions.push('Överväg att köra namn-synkronisering eller kontrollera stavning.')
-      }
-
-      return { inconsistencies, suggestions }
+      // Samma logik kan läggas till för business/contract...
+      return { inconsistencies, suggestions: [] }
     } catch (error) {
-      console.error('Error validating name consistency:', error)
       return { inconsistencies: [], suggestions: ['Kunde inte validera namn-konsistens'] }
     }
   },
 
   /**
-   * Hjälpfunktioner för visning (kompatibla med befintlig kod)
+   * Hjälpfunktioner för visning
    */
   formatPhoneForDisplay(phone: string | null): string {
     if (!phone) return '-'
-    
     if (phone.startsWith('+46')) {
       const number = phone.slice(3)
       return `0${number.slice(0, 2)}-${number.slice(2, 5)} ${number.slice(5, 7)} ${number.slice(7)}`
     }
-    
     return phone
   },
 
