@@ -1,14 +1,15 @@
-// 📁 src/pages/admin/AdminDashboard.tsx - KOMPLETT MED ALLA FUNKTIONER + ONEFLOW SEKTION
+// 📁 src/pages/admin/AdminDashboard.tsx - KORRIGERAD MED UPPDATERAD UTLOGGNINGSFUNKTION
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { 
-  Users, 
-  FileText, 
-  TrendingUp, 
-  DollarSign, 
-  BarChart3, 
+import {
+  Users,
+  FileText,
+  TrendingUp,
+  DollarSign,
+  BarChart3,
   Calendar,
   Building2,
   User,
@@ -113,10 +114,11 @@ const AdminDashboard: React.FC = () => {
     }
   }
 
+  // ✅ KORRIGERAD FUNKTION: Den manuella navigeringen är borttagen.
+  // AuthContext kommer nu att sköta omdirigeringen automatiskt.
   const handleSignOut = async () => {
     try {
       await signOut()
-      navigate('/login')
     } catch (err) {
       console.error('Error signing out:', err)
     }
