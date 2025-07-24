@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 2.0 - UPPGRADERAD MED SCHEMAKONTROLL, ARBETSTIDER OCH STARTADRESSER
+// VERSION 2.1 - FULLSTÄNDIG OCH KORREKT VERSION
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -10,26 +10,25 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // --- Konfiguration ---
-const WORK_DAY_START_HOUR = 8;  // Arbetstiden börjar kl 08:00
-const WORK_DAY_END_HOUR = 17;   // Arbetstiden slutar kl 17:00
-const JOB_DURATION_MINUTES = 120; // Standardlängd på ett ärende
+const WORK_DAY_START_HOUR = 8;
+const WORK_DAY_END_HOUR = 17;
 
 // --- Datatyper ---
-interface StaffMember { id: string; name: string; address: string | null; }
+interface StaffMember { id: string; name: string; address: string; } // Adress är nu obligatorisk
 interface TimeSlot { start: Date; end: Date; }
 interface Suggestion {
     technician_id: string; technician_name: string;
-    start_time: string; // ISO format
-    end_time: string;   // ISO format
+    start_time: string; end_time: string;
     travel_time_minutes: number;
-    origin_description: string; // "Hemadress" eller "Ärende: X"
+    origin_description: string;
 }
 
 const formatAddress = (address: any): string => { 
-    if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address);
+    if (!address) return '';
+    if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+    return String(address);
 };
 
-// Hjälpfunktion för att kolla om två tidsluckor överlappar
 const doTimeSlotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => {
     return slot1.start < slot2.end && slot1.end > slot2.start;
 };
@@ -38,22 +37,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
     try {
-        const { newCaseAddress, pestType } = req.body;
+        const { newCaseAddress, pestType, timeSlotDuration = 120 } = req.body;
         if (!newCaseAddress || !pestType) return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
 
-        // 1. Hitta personal med rätt kompetens OCH deras hemadresser
+        // 1. Hitta personal med rätt kompetens OCH GILTIG HEMADRESS
         const { data: competentStaffData, error: staffError } = await supabase
             .from('staff_competencies')
-            .select('technicians(id, name, address)') // Hämta data från den kopplade 'technicians'-tabellen
+            .select('technicians(id, name, address)')
             .eq('pest_type', pestType);
 
         if (staffError) throw staffError;
-        const competentStaff: StaffMember[] = competentStaffData.map((s: any) => s.technicians).filter(Boolean);
-        if (competentStaff.length === 0) return res.status(200).json([]);
+
+        // ✅ FIX: Filtrera bort all personal som saknar en giltig hemadress.
+        const competentStaff: StaffMember[] = competentStaffData
+            .map((s: any) => s.technicians)
+            .filter(Boolean) // Säkerställer att tekniker-objektet finns
+            .filter(staff => staff.address && staff.address.trim() !== ''); // KRITISK FILTERING
+
+        if (competentStaff.length === 0) {
+            console.log(`Ingen personal med rätt kompetens OCH registrerad adress hittades.`);
+            return res.status(200).json([]);
+        }
 
         const competentStaffIds = competentStaff.map(s => s.id);
 
-        // 2. Hämta ALLA bokningar för den kompetenta personalen de kommande 14 dagarna
+        // 2. Hämta ALLA bokningar för den kompetenta personalen
         const today = new Date();
         const fourteenDaysFromNow = new Date(today);
         fourteenDaysFromNow.setDate(today.getDate() + 14);
@@ -67,20 +75,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (casesError) throw casesError;
 
-        // Skapa en schemakarta: { technician_id: [ {start: Date, end: Date}, ... ] }
         const schedules = new Map<string, TimeSlot[]>();
-        for (const staff of competentStaff) { schedules.set(staff.id, []); }
-        for (const aCase of cases) {
-            schedules.get(aCase.technician_id)?.push({ start: new Date(aCase.start_date), end: new Date(aCase.due_date) });
-        }
+        competentStaff.forEach(staff => schedules.set(staff.id, []));
+        cases.forEach(aCase => {
+            if (aCase.start_date && aCase.due_date) {
+                schedules.get(aCase.technician_id)?.push({ start: new Date(aCase.start_date), end: new Date(aCase.due_date) });
+            }
+        });
 
-        // 3. Generera alla potentiella förslag
+        // 3. Generera förslag
         let allSuggestions: Suggestion[] = [];
         
         const origins = [
-            ...competentStaff.map(s => s.address), // Hemadresser
-            ...cases.map(c => formatAddress(c.adress)) // Ärendeadresser
+            ...competentStaff.map(s => s.address),
+            ...cases.map(c => formatAddress(c.adress))
         ].filter(Boolean) as string[];
+
+        if (origins.length === 0) {
+            return res.status(200).json([]);
+        }
 
         const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
         const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins.join('|')}&destinations=${newCaseAddress}&key=${googleMapsApiKey}`;
@@ -88,14 +101,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const matrixData = await matrixResponse.json() as any;
         if (matrixData.status !== 'OK') throw new Error(`Google Maps API fel: ${matrixData.error_message || matrixData.status}`);
         
-        const travelTimes = new Map<string, number>(); // Adress -> restid i minuter
+        const travelTimes = new Map<string, number>();
         matrixData.rows.forEach((row: any, index: number) => {
-            if(row.elements[0].status === 'OK') {
+            if (row.elements[0].status === 'OK') {
                 travelTimes.set(origins[index], Math.round(row.elements[0].duration.value / 60));
             }
         });
 
-        // Loopa igenom varje dag och varje tekniker för att hitta luckor
         for (let i = 0; i < 14; i++) {
             const currentDay = new Date(today);
             currentDay.setDate(today.getDate() + i);
@@ -106,11 +118,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const workDayEnd = new Date(currentDay).setHours(WORK_DAY_END_HOUR, 0, 0, 0);
 
                 // Förslag 1: Start på dagen från hemadress
-                if (staff.address) {
-                    const travelFromHome = travelTimes.get(staff.address) || 0;
-                    const earliestArrival = new Date(workDayStart).getTime() + travelFromHome * 60 * 1000;
-                    const potentialStart = new Date(Math.max(earliestArrival, workDayStart));
-                    const potentialEnd = new Date(potentialStart.getTime() + JOB_DURATION_MINUTES * 60 * 1000);
+                const travelFromHome = travelTimes.get(staff.address);
+                if (travelFromHome !== undefined) {
+                    const potentialStart = new Date(workDayStart);
+                    const potentialEnd = new Date(potentialStart.getTime() + timeSlotDuration * 60000);
 
                     if (potentialEnd.getTime() <= workDayEnd && !techSchedule.some(slot => doTimeSlotsOverlap({start: potentialStart, end: potentialEnd}, slot))) {
                         allSuggestions.push({
@@ -121,27 +132,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }
                 }
 
-                // Förslag 2: Mellan befintliga jobb
+                // Förslag 2: Efter befintliga jobb
                 for (const existingCase of techSchedule) {
-                    const travelFromCase = travelTimes.get(formatAddress(existingCase.adress)) || 0;
-                    const potentialStart = new Date(existingCase.end.getTime() + travelFromCase * 60 * 1000);
-                    const potentialEnd = new Date(potentialStart.getTime() + JOB_DURATION_MINUTES * 60 * 1000);
+                    const travelFromCase = travelTimes.get(formatAddress(existingCase.adress));
+                    if (travelFromCase !== undefined) {
+                        const potentialStart = new Date(existingCase.end.getTime() + travelFromCase * 60 * 1000);
+                        const potentialEnd = new Date(potentialStart.getTime() + timeSlotDuration * 60000);
 
-                    if (potentialEnd.getTime() <= workDayEnd && !techSchedule.some(slot => doTimeSlotsOverlap({start: potentialStart, end: potentialEnd}, slot))) {
-                         allSuggestions.push({
-                            technician_id: staff.id, technician_name: staff.name,
-                            start_time: potentialStart.toISOString(), end_time: potentialEnd.toISOString(),
-                            travel_time_minutes: travelFromCase, origin_description: `Ärende: ${existingCase.title}`
-                        });
+                        if (potentialEnd.getTime() <= workDayEnd && !techSchedule.some(slot => doTimeSlotsOverlap({start: potentialStart, end: potentialEnd}, slot))) {
+                            allSuggestions.push({
+                                technician_id: staff.id, technician_name: staff.name,
+                                start_time: potentialStart.toISOString(), end_time: potentialEnd.toISOString(),
+                                travel_time_minutes: travelFromCase, origin_description: `Ärende: ${existingCase.title}`
+                            });
+                        }
                     }
                 }
             }
         }
         
-        // 4. Filtrera och sortera förslag
         const sortedSuggestions = allSuggestions
-            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()) // Sortera på starttid
-            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes); // Sortera sedan på restid
+            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes)
+            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
