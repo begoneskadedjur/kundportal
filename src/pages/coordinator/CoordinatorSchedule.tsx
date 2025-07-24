@@ -1,5 +1,5 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 2.1 - UPPDATERAD FÖR NYA DATABASE TYPER OCH TIMESTAMPTZ ⭐
+// ⭐ VERSION 2.2 - INTEGRERAD MED "SKAPA ÄRENDE"-MODAL ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -8,10 +8,12 @@ import { BeGoneCaseRow, Technician, isUnplannedCase, isScheduledCase } from '../
 // ✅ IMPORTERAR ALLA RIKTIGA KOMPONENTER
 import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleControlPanel';
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
-
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
-import { LayoutGrid } from 'lucide-react';
+import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'; // ✅ NYTT: Importera den nya modalen
+import Button from '../../components/ui/Button'; // ✅ NYTT: Importera Button-komponenten
+
+import { LayoutGrid, Plus } from 'lucide-react'; // ✅ NYTT: Importera Plus-ikonen
 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
@@ -25,26 +27,29 @@ export default function CoordinatorSchedule() {
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
+  // States för modaler
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // ✅ NYTT: State för skapa-modalen
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // Vi sätter inte loading till true här om vi inte vill ha en helskärmsladdning varje gång.
+    // Kan justeras om en mindre laddningsindikator behövs.
     try {
-      // ✅ Hämta tekniker med alla kolumner inklusive abax_vehicle_id
+      // Hämta tekniker
       const techniciansResult = await supabase
         .from('technicians')
         .select('*')
         .eq('is_active', true)
         .order('name');
 
-      // ✅ Hämta private_cases med alla kolumner inklusive commissionskolumner
+      // Hämta privatärenden
       const privateCasesResult = await supabase
         .from('private_cases')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // ✅ Hämta business_cases med alla kolumner inklusive commissionskolumner  
+      // Hämta företagsärenden
       const businessCasesResult = await supabase
         .from('business_cases')
         .select('*')
@@ -56,7 +61,6 @@ export default function CoordinatorSchedule() {
 
       setTechnicians(techniciansResult.data || []);
       
-      // ✅ Kombinera ärenden med case_type markering
       const combinedCases = [
         ...(privateCasesResult.data || []).map(c => ({ ...c, case_type: 'private' as const })),
         ...(businessCasesResult.data || []).map(c => ({ ...c, case_type: 'business' as const }))
@@ -64,103 +68,66 @@ export default function CoordinatorSchedule() {
       
       setAllCases(combinedCases as BeGoneCaseRow[]);
 
-      // ✅ Sätt alla tekniker som valda som standard
-      setSelectedTechnicianIds(new Set(techniciansResult.data?.map(t => t.id) || []));
+      // Sätt alla tekniker som valda som standard (bara vid första laddningen)
+      if (selectedTechnicianIds.size === 0) {
+        setSelectedTechnicianIds(new Set(techniciansResult.data?.map(t => t.id) || []));
+      }
 
     } catch (err) {
       console.error("Fel vid datahämtning för koordinatorvyn:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedTechnicianIds.size]); // Beroendet här säkerställer att teknikerlistan bara fylls en gång
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // ✅ Använd hjälpfunktionerna från database.ts för att separera ärenden
-  const scheduledCases = useMemo(() => {
-    return allCases.filter(isScheduledCase);
-  }, [allCases]);
-
+  // --- Befintlig logik för filtrering (oförändrad) ---
+  const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
   const unplannedCases = useMemo(() => {
-    // ✅ Filtrera oplanerade ärenden och exkludera stängda
-    return allCases.filter(c => {
-      const isUnplanned = isUnplannedCase(c);
-      const isNotClosed = !c.status.includes('Avslutat') && !c.status.includes('Stängt');
-      return isUnplanned && isNotClosed;
-    });
+    return allCases.filter(c => isUnplannedCase(c) && !c.status.includes('Avslutat') && !c.status.includes('Stängt'));
   }, [allCases]);
 
   const filteredScheduledCases = useMemo(() => {
     return scheduledCases.filter(c => {
-      // Status-filter
       const matchesStatus = activeStatuses.has(c.status);
       if (!matchesStatus) return false;
-
-      // Tekniker-filter
-      if (selectedTechnicianIds.size > 0 && c.primary_assignee_id) {
-        if (!selectedTechnicianIds.has(c.primary_assignee_id)) {
-          return false;
-        }
-      }
-      
-      // Sök-filter
+      if (selectedTechnicianIds.size > 0 && c.primary_assignee_id && !selectedTechnicianIds.has(c.primary_assignee_id)) return false;
       const query = searchQuery.toLowerCase();
       if (query) {
-        // ✅ Hantera adress som kan vara objekt eller string
         let fullAddress = '';
-        if (typeof c.adress === 'object' && c.adress?.formatted_address) {
-          fullAddress = c.adress.formatted_address.toLowerCase();
-        } else if (typeof c.adress === 'string') {
-          fullAddress = c.adress.toLowerCase();
-        }
-        
+        if (typeof c.adress === 'object' && c.adress?.formatted_address) fullAddress = c.adress.formatted_address.toLowerCase();
+        else if (typeof c.adress === 'string') fullAddress = c.adress.toLowerCase();
         const contactPerson = c.kontaktperson?.toLowerCase() || '';
         const title = c.title.toLowerCase();
         const assigneeName = c.primary_assignee_name?.toLowerCase() || '';
         const pestType = c.skadedjur?.toLowerCase() || '';
-        
-        return title.includes(query) || 
-               contactPerson.includes(query) || 
-               fullAddress.includes(query) ||
-               assigneeName.includes(query) ||
-               pestType.includes(query);
+        return title.includes(query) || contactPerson.includes(query) || fullAddress.includes(query) || assigneeName.includes(query) || pestType.includes(query);
       }
-      
       return true;
     });
   }, [scheduledCases, activeStatuses, selectedTechnicianIds, searchQuery]);
 
   const filteredUnplannedCases = useMemo(() => {
     return unplannedCases.filter(c => {
-      // Status-filter för oplanerade
       const matchesStatus = activeStatuses.has(c.status);
       if (!matchesStatus) return false;
-      
-      // Sök-filter för oplanerade
       const query = searchQuery.toLowerCase();
       if (query) {
         let fullAddress = '';
-        if (typeof c.adress === 'object' && c.adress?.formatted_address) {
-          fullAddress = c.adress.formatted_address.toLowerCase();
-        } else if (typeof c.adress === 'string') {
-          fullAddress = c.adress.toLowerCase();
-        }
-        
+        if (typeof c.adress === 'object' && c.adress?.formatted_address) fullAddress = c.adress.formatted_address.toLowerCase();
+        else if (typeof c.adress === 'string') fullAddress = c.adress.toLowerCase();
         const contactPerson = c.kontaktperson?.toLowerCase() || '';
         const title = c.title.toLowerCase();
         const pestType = c.skadedjur?.toLowerCase() || '';
-        
-        return title.includes(query) || 
-               contactPerson.includes(query) || 
-               fullAddress.includes(query) ||
-               pestType.includes(query);
+        return title.includes(query) || contactPerson.includes(query) || fullAddress.includes(query) || pestType.includes(query);
       }
-      
       return true;
     });
   }, [unplannedCases, activeStatuses, searchQuery]);
+  // --- Slut på filtreringslogik ---
 
   const handleOpenCaseModal = (caseData: BeGoneCaseRow) => {
     setSelectedCase(caseData);
@@ -172,6 +139,12 @@ export default function CoordinatorSchedule() {
     fetchData(); // Ladda om data efter uppdatering
   };
   
+  // ✅ NYTT: Hanterare för när ett nytt ärende har skapats
+  const handleCreateSuccess = () => {
+    setIsCreateModalOpen(false); // Stäng modalen
+    fetchData(); // Ladda om all data för att visa det nya ärendet
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -183,7 +156,7 @@ export default function CoordinatorSchedule() {
   return (
     <>
       <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-        {/* ✅ Header med statistik */}
+        {/* ✅ Header med statistik och ny knapp */}
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
           <div className="max-w-screen-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -198,31 +171,38 @@ export default function CoordinatorSchedule() {
               </div>
             </div>
             
-            {/* ✅ Snabb-statistik */}
-            <div className="hidden lg:flex items-center gap-6 text-sm">
-              <div className="text-center">
-                <div className="text-lg font-bold text-green-400">{filteredScheduledCases.length}</div>
-                <div className="text-slate-400">Schemalagda</div>
+            <div className="flex items-center gap-8">
+              {/* Snabb-statistik */}
+              <div className="hidden lg:flex items-center gap-6 text-sm">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-green-400">{filteredScheduledCases.length}</div>
+                  <div className="text-slate-400">Schemalagda</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-yellow-400">{filteredUnplannedCases.length}</div>
+                  <div className="text-slate-400">Oplanerade</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-blue-400">{selectedTechnicianIds.size}</div>
+                  <div className="text-slate-400">Tekniker</div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-yellow-400">{filteredUnplannedCases.length}</div>
-                <div className="text-slate-400">Oplanerade</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-blue-400">{selectedTechnicianIds.size}</div>
-                <div className="text-slate-400">Tekniker</div>
-              </div>
+
+              {/* ✅ NY KNAPP */}
+              <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Skapa Nytt Ärende
+              </Button>
             </div>
           </div>
         </header>
 
-        {/* ✅ Huvudlayout med sidopanel och schema */}
+        {/* ✅ Huvudlayout med sidopanel och schema (oförändrad) */}
         <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-[calc(100vh-65px)]">
-          {/* Vänster sidopanel */}
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
               technicians={technicians}
-              unplannedCases={filteredUnplannedCases} // ✅ Använd filtrerade oplanerade
+              unplannedCases={filteredUnplannedCases}
               activeStatuses={activeStatuses}
               setActiveStatuses={setActiveStatuses}
               selectedTechnicianIds={selectedTechnicianIds}
@@ -233,25 +213,32 @@ export default function CoordinatorSchedule() {
             />
           </aside>
           
-          {/* Höger huvudområde med tidslinjen */}
           <main className="w-3/4 xl:w-4/5 flex-grow h-full">
             <ScheduleTimeline
               technicians={technicians.filter(t => 
                 selectedTechnicianIds.size === 0 || selectedTechnicianIds.has(t.id)
               )}
-              cases={filteredScheduledCases} // ✅ Använd filtrerade schemalagda
+              cases={filteredScheduledCases}
               onCaseClick={handleOpenCaseModal}
             />
           </main>
         </div>
       </div>
       
-      {/* ✅ Modal för ärendedetaljer */}
+      {/* Modal för att redigera befintliga ärenden */}
       <EditCaseModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
         onSuccess={handleUpdateSuccess} 
         caseData={selectedCase as any} 
+      />
+
+      {/* ✅ NYTT: Modal för att skapa nya ärenden */}
+      <CreateCaseModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+        technicians={technicians}
       />
     </>
   );
