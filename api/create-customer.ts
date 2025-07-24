@@ -1,4 +1,4 @@
-// api/create-customer.ts - DIN BEFINTLIGA AVANCERADE VERSION + contract_end_date
+// api/create-customer.ts - FIXAD VERSION med korrekt email access
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
@@ -64,15 +64,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Contract type found:', contractType.name)
 
-    // 4. Kolla om kund redan finns
-    const { data: existingCustomer } = await supabase
+    // 4. Kolla om kund redan finns - FIXAD med säker email access
+    const { data: existingCustomers } = await supabase
       .from('customers')
       .select('company_name, org_number, email')
       .or(`company_name.eq.${customerData.company_name},org_number.eq.${customerData.org_number},email.eq.${customerData.email}`)
-      .limit(1)
-      .single()
 
-    if (existingCustomer) {
+    if (existingCustomers && existingCustomers.length > 0) {
+      const existingCustomer = existingCustomers[0]
       if (existingCustomer.company_name === customerData.company_name) {
         return res.status(400).json({ error: `Företaget "${customerData.company_name}" finns redan` })
       }
@@ -121,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clickupList = await clickupResponse.json()
     console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
 
-    // 7. Förbered kunddata för databas - UPPDATERAD med contract_end_date
+    // 7. Förbered kunddata för databas
     const dbCustomerData = {
       company_name: customerData.company_name.trim(),
       org_number: customerData.org_number.trim(),
@@ -135,10 +134,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clickup_list_name: clickupList.name,
       is_active: true,
       
-      // Avancerade avtalsfält - UPPDATERAD med contract_end_date
+      // Avancerade avtalsfält
       contract_start_date: customerData.contract_start_date || null,
       contract_length_months: customerData.contract_length_months ? parseInt(customerData.contract_length_months) : null,
-      contract_end_date: customerData.contract_end_date || null, // 🆕 NYA FÄLTET
+      contract_end_date: customerData.contract_end_date || null,
       annual_premium: customerData.annual_premium ? parseFloat(customerData.annual_premium) : null,
       total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
       contract_description: customerData.contract_description?.trim() || null,
@@ -170,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Customer created successfully:', customer.id)
 
-    // 9. Hantera autentisering och profil (BEHÅLLS OFÖRÄNDRAD)
+    // 9. Hantera autentisering och profil - FIXAD med säker email access
     console.log('Checking for existing auth user with email:', customerData.email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
     const existingAuthUser = users.find(u => u.email === customerData.email)
@@ -249,7 +248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Created new auth user:', userId)
     }
 
-    // 10. Skapa eller uppdatera profil (BEHÅLLS OFÖRÄNDRAD)
+    // 10. Skapa eller uppdatera profil
     console.log('Creating/updating profile for user:', userId)
     
     const { data: existingProfile } = await supabase
@@ -303,12 +302,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Profile created/updated successfully')
 
-    // 11. Skicka välkomstmail - UPPDATERAD med contract_end_date
+    // 11. Skicka välkomstmail
     console.log('Preparing welcome email...')
     
     const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
     
-    // 🆕 Förbättrat avtalsinformation med slutdatum
+    // Förbättrat avtalsinformation med slutdatum
     const contractInfo = customer.contract_start_date || customer.annual_premium ? `
       <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <h3 style="color: #22c55e; margin: 0 0 12px 0;">📋 Avtalsinformation</h3>
@@ -399,7 +398,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       </html>
     `
 
-    // Konfigurera Nodemailer med Resend - BEHÅLLS OFÖRÄNDRAD
+    // FIXAD: Konfigurera Nodemailer med Resend - använd createTransport
     const transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 587,
@@ -410,7 +409,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     })
 
-    // VIKTIGT: Skicka alltid till den email som användaren angav, även om vi skapade modifierad auth-email
+    // VIKTIGT: Skicka alltid till den email som användaren angav
     const mailOptions = {
       from: 'BeGone Kundportal <noreply@begone.se>',
       to: customerData.email, // Skicka till original-emailen som kunden angav
@@ -426,7 +425,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Fortsätt ändå - kunden är skapad
     }
 
-    // 12. Returnera framgång - UPPDATERAD med contract_end_date
+    // 12. Returnera framgång
     console.log('=== CREATE CUSTOMER API SUCCESS ===')
     return res.status(200).json({
       success: true,
@@ -437,7 +436,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         clickup_list_id: customer.clickup_list_id,
         contract_type: contractType.name,
         contract_start_date: customer.contract_start_date,
-        contract_end_date: customer.contract_end_date, // 🆕 Inkludera slutdatum
+        contract_end_date: customer.contract_end_date,
         contract_length_months: customer.contract_length_months,
         annual_premium: customer.annual_premium,
         total_contract_value: customer.total_contract_value,

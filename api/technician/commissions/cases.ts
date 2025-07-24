@@ -1,4 +1,4 @@
-// 📁 api/technician/commissions/cases.ts - UPPDATERAD MED UUID-BASERAD SÖKNING
+// 📁 api/technician/commissions/cases.ts - FIXAD SUPABASE QUERY SYNTAX
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -29,16 +29,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startDate = `${monthStr}-01`
     const endDate = `${monthStr}-31`
 
-    // ✅ DIREKT UUID-SÖKNING - INGEN NAMN-LOOKUP BEHÖVS
+    // ✅ FIXAD QUERY SYNTAX - Inga multi-line select strings
     const [privateCases, businessCases] = await Promise.all([
       // Private cases för månaden med UUID
       supabase
         .from('private_cases')
-        .select(`
-          id, clickup_task_id, title, commission_amount, pris as case_price, completed_date,
-          kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
-        `)
-        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .select('id, clickup_task_id, title, commission_amount, pris, completed_date, kontaktperson, telefon, e_post_kontaktperson, adress, skadedjur, beskrivning, billing_status')
+        .eq('primary_assignee_id', technician_id)
         .not('commission_amount', 'is', null)
         .gte('completed_date', startDate)
         .lte('completed_date', endDate)
@@ -47,28 +44,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Business cases för månaden med UUID
       supabase
         .from('business_cases')
-        .select(`
-          id, clickup_task_id, title, commission_amount, pris as case_price, completed_date,
-          kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
-        `)
-        .eq('primary_assignee_id', technician_id)  // ✅ DIREKT UUID-SÖKNING
+        .select('id, clickup_task_id, title, commission_amount, pris, completed_date, kontaktperson, telefon, e_post_kontaktperson, adress, foretag, org_nr, skadedjur, beskrivning, billing_status')
+        .eq('primary_assignee_id', technician_id)
         .not('commission_amount', 'is', null)
         .gte('completed_date', startDate)
         .lte('completed_date', endDate)
         .order('completed_date', { ascending: false })
     ])
 
+    // ✅ SÄKER ERROR HANDLING
+    if (privateCases.error) {
+      console.error('Private cases error:', privateCases.error)
+    }
+    if (businessCases.error) {
+      console.error('Business cases error:', businessCases.error)
+    }
+
     // Kombinera och formatera
     const cases = [
       ...(privateCases.data || []).map(c => ({
         ...c,
         type: 'private' as const,
+        case_price: c.pris,
+        email: c.e_post_kontaktperson,
         case_number: `P-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
       ...(businessCases.data || []).map(c => ({
         ...c,
         type: 'business' as const,
+        case_price: c.pris,
+        email: c.e_post_kontaktperson,
         case_number: `B-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       }))

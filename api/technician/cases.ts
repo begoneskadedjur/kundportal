@@ -1,4 +1,4 @@
-// 📁 api/technician/cases.ts - ANVÄND SAMMA LOGIK SOM ADMIN
+// 📁 api/technician/cases.ts - FIXAD SUPABASE QUERY SYNTAX
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -37,16 +37,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('🔄 Fetching cases for technician:', technician_id)
 
-    // ✅ SAMMA PARALLELLA QUERIES SOM ADMIN
+    // ✅ FIXAD QUERY SYNTAX - Inga multi-line select strings
     const [privateResult, businessResult, contractResult] = await Promise.allSettled([
       // Private cases - ALLA STATUS (inte bara avslutade)
       supabase
         .from('private_cases')
-        .select(`
-          id, clickup_task_id, title, status, priority, start_date as created_date, completed_date,
-          commission_amount, pris as case_price, primary_assignee_name as assignee_name,
-          kontaktperson, telefon, email, adress, skadedjur, beskrivning, billing_status
-        `)
+        .select('id, clickup_task_id, title, status, priority, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, e_post_kontaktperson, adress, skadedjur, beskrivning, billing_status')
         .eq('primary_assignee_id', technician_id)
         .order('start_date', { ascending: false })
         .limit(parseInt(limit as string)),
@@ -54,11 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Business cases - ALLA STATUS (inte bara avslutade)
       supabase
         .from('business_cases')
-        .select(`
-          id, clickup_task_id, title, status, priority, start_date as created_date, completed_date,
-          commission_amount, pris as case_price, primary_assignee_name as assignee_name,
-          kontaktperson, telefon, email, adress, foretag, org_nr, skadedjur, beskrivning, billing_status
-        `)
+        .select('id, clickup_task_id, title, status, priority, start_date, completed_date, commission_amount, pris, primary_assignee_name, kontaktperson, telefon, e_post_kontaktperson, adress, foretag, org_nr, skadedjur, beskrivning, billing_status')
         .eq('primary_assignee_id', technician_id)
         .order('start_date', { ascending: false })
         .limit(parseInt(limit as string)),
@@ -66,11 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Contract cases - använder assigned_technician_id
       supabase
         .from('cases')
-        .select(`
-          id, clickup_task_id, title, status, priority, created_date, completed_date,
-          price as case_price, assigned_technician_name as assignee_name,
-          billing_status
-        `)
+        .select('id, clickup_task_id, title, status, priority, created_date, completed_date, price, assigned_technician_name, billing_status')
         .eq('assigned_technician_id', technician_id)
         .order('created_date', { ascending: false })
         .limit(parseInt(limit as string))
@@ -96,18 +84,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...privateCases.map(c => ({
         ...c,
         case_type: 'private' as const,
+        created_date: c.start_date,
+        case_price: c.pris,
+        assignee_name: c.primary_assignee_name,
+        email: c.e_post_kontaktperson,
         case_number: `P-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
       ...businessCases.map(c => ({
         ...c,
         case_type: 'business' as const,
+        created_date: c.start_date,
+        case_price: c.pris,
+        assignee_name: c.primary_assignee_name,
+        email: c.e_post_kontaktperson,
         case_number: `B-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`
       })),
       ...contractCases.map(c => ({
         ...c,
         case_type: 'contract' as const,
+        case_price: c.price,
+        assignee_name: c.assigned_technician_name,
         case_number: `C-${c.clickup_task_id}`,
         clickup_url: `https://app.clickup.com/t/${c.clickup_task_id}`,
         commission_amount: 0 // Avtalskunder har ingen provision
@@ -115,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ]
 
     // ✅ SORTERA EFTER DATUM (senaste först)
-    allCases.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())
+    allCases.sort((a, b) => new Date(b.created_date || '').getTime() - new Date(a.created_date || '').getTime())
 
     // ✅ BERÄKNA STATS
     const stats = {
