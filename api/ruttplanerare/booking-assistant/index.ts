@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 3.1 - SLUTGILTIG VERSION MED EXAKT TIDSBERÄKNING (INGEN AVRUNDNING)
+// VERSION 3.2 - KORRIGERAD FÖR FÖRSTA ÄRENDE OCH HELGDAGAR
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -12,6 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // --- Konfiguration ---
 const WORK_DAY_START_HOUR = 8;
 const WORK_DAY_END_HOUR = 17;
+const SEARCH_DAYS_LIMIT = 14;
 
 // --- Datatyper och hjälpfunktioner ---
 interface StaffMember { id: string; name: string; address: string; }
@@ -35,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         startDate.setHours(0, 0, 0, 0);
         
         const fourteenDaysFromStart = new Date(startDate);
-        fourteenDaysFromStart.setDate(startDate.getDate() + 14);
+        fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
 
         const schedules = await getSchedules(competentStaff, startDate, fourteenDaysFromStart);
         
@@ -44,9 +45,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let allSuggestions: Suggestion[] = [];
 
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < SEARCH_DAYS_LIMIT; i++) {
             const currentDay = new Date(startDate);
             currentDay.setDate(startDate.getDate() + i);
+
+            // ✅ FIX 1: Ignorera helger (Söndag = 0, Lördag = 6)
+            const dayOfWeek = currentDay.getDay();
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                continue;
+            }
 
             for (const staff of competentStaff) {
                 const techSchedule = schedules.get(staff.id)!.sort((a,b) => a.start.getTime() - b.start.getTime());
@@ -55,36 +62,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const workDayEnd = new Date(currentDay);
                 workDayEnd.setHours(WORK_DAY_END_HOUR, 0, 0, 0);
 
-                // Kombinera "hemmet" med befintliga bokningar för att skapa en fullständig händelsekedja
-                const events: CaseInfo[] = [
-                    { start: new Date(0), end: workDayStart, title: 'Hemadress', adress: staff.address },
-                    ...techSchedule
+                // --- ✅ FIX 2: Ny, korrekt logik för att hitta luckor ---
+                // Skapa en lista över alla "händelser" inklusive arbetspass-start och slut
+                const events: TimeSlot[] = [
+                    // Start på dagen (fiktiv händelse)
+                    { start: new Date(0), end: workDayStart },
+                    // Alla bokade ärenden
+                    ...techSchedule,
+                    // Slut på dagen (fiktiv händelse)
+                    { start: workDayEnd, end: new Date(workDayEnd.getTime() + 1) } 
                 ];
 
-                for (const currentEvent of events) {
-                    const travelTime = travelTimes.get(formatAddress(currentEvent.adress)) ?? 999;
-                    
-                    // Beräkna den tidigaste möjliga starttiden efter föregående händelse + restid
-                    const earliestStartTime = new Date(currentEvent.end.getTime() + travelTime * 60000);
-                    
-                    // Säkerställ att vi inte börjar före arbetsdagens start
-                    const potentialStartTime = new Date(Math.max(earliestStartTime.getTime(), workDayStart.getTime()));
+                // Hitta alla lediga luckor mellan händelserna
+                for (let j = 0; j < events.length - 1; j++) {
+                    const previousEvent = events[j];
+                    const nextEvent = events[j+1];
 
+                    // Beskrivning av var teknikern kommer ifrån
+                    const originDescription = (previousEvent as CaseInfo).title || 'Hemadress';
+                    const originAddress = (previousEvent as CaseInfo).adress || staff.address;
+                    
+                    const travelTimeFromPrev = travelTimes.get(formatAddress(originAddress)) ?? 999;
+                    if (travelTimeFromPrev === 999) continue; // Hoppa över om vi inte har restid
+
+                    // Tiden då teknikern tidigast kan vara framme hos nya kunden
+                    const arrivalTime = new Date(previousEvent.end.getTime() + travelTimeFromPrev * 60000);
+                    
+                    const potentialStartTime = new Date(Math.max(arrivalTime.getTime(), workDayStart.getTime()));
                     const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
 
-                    // Kontrollera att luckan är giltig
-                    if (potentialEndTime <= workDayEnd) {
-                        const isOverlapping = techSchedule.some(booking => doTimeSlotsOverlap({start: potentialStartTime, end: potentialEndTime}, booking));
-                        if (!isOverlapping) {
-                            allSuggestions.push({
-                                technician_id: staff.id,
-                                technician_name: staff.name,
-                                start_time: potentialStartTime.toISOString(),
-                                end_time: potentialEndTime.toISOString(),
-                                travel_time_minutes: travelTime,
-                                origin_description: currentEvent.title
-                            });
-                        }
+                    // Kontrollera om hela det nya ärendet (inkl. restid) ryms i luckan
+                    if (potentialEndTime.getTime() <= nextEvent.start.getTime()) {
+                         allSuggestions.push({
+                            technician_id: staff.id,
+                            technician_name: staff.name,
+                            start_time: potentialStartTime.toISOString(),
+                            end_time: potentialEndTime.toISOString(),
+                            travel_time_minutes: travelTimeFromPrev,
+                            origin_description: originDescription
+                        });
                     }
                 }
             }
@@ -103,11 +119,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 }
 
-// --- HJÄLPFUNKTIONER ---
+// --- HJÄLPFUNKTIONER (Oförändrade) ---
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
-    return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && staff.address.trim() !== '');
+    // Filtrera bort tekniker som saknar en giltig hemadress
+    return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
 
 async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, CaseInfo[]>> {
@@ -121,17 +138,32 @@ async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise
 }
 
 function getOrigins(staff: StaffMember[], cases: CaseInfo[]): string[] {
-    return [...new Set([...staff.map(s => s.address), ...cases.map(c => formatAddress(c.adress))])].filter(Boolean) as string[];
+    const staffAddresses = staff.map(s => s.address).filter(Boolean) as string[];
+    const caseAddresses = cases.map(c => formatAddress(c.adress)).filter(Boolean);
+    return [...new Set([...staffAddresses, ...caseAddresses])];
 }
 
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
-    const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
+    const uniqueOrigins = [...new Set(origins)]; // Säkerställ unika origo-adresser för API-anropet
+    const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${uniqueOrigins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
+    
     const matrixResponse = await fetch(matrixApiUrl);
     const matrixData = await matrixResponse.json() as any;
-    if (matrixData.status !== 'OK') throw new Error(`Google Maps API fel: ${matrixData.error_message || matrixData.status}`);
+    
+    if (matrixData.status !== 'OK') {
+        console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
+        throw new Error(`Google Maps API fel: ${matrixData.error_message || matrixData.status}`);
+    }
+    
     const travelTimes = new Map<string, number>();
-    matrixData.rows.forEach((row: any, index: number) => { if (row.elements[0].status === 'OK') { travelTimes.set(origins[index], Math.round(row.elements[0].duration.value / 60)); }});
+    matrixData.rows.forEach((row: any, index: number) => { 
+        if (row.elements[0].status === 'OK') { 
+            // Använd exakta sekunder och avrunda i front-end om det behövs, eller här om du föredrar det.
+            // Math.round är rimligt.
+            travelTimes.set(uniqueOrigins[index], Math.round(row.elements[0].duration.value / 60)); 
+        }
+    });
     return travelTimes;
 }
