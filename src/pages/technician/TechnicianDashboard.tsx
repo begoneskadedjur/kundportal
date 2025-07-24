@@ -1,4 +1,4 @@
-// 📁 src/pages/technician/TechnicianDashboard.tsx - KORREKT FORMATERAD
+// 📁 src/pages/technician/TechnicianDashboard.tsx - FIXAD FÖR PROFILE DATA
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -43,12 +43,17 @@ interface DashboardData {
 }
 
 export default function TechnicianDashboard() {
-  const { profile, technician, isTechnician } = useAuth()
+  const { profile, isTechnician } = useAuth()
   const navigate = useNavigate()
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
+
+  // ✅ FIXAD: Använd profile data istället för technician prop
+  const technicianId = profile?.technician_id
+  const technicianData = profile?.technicians
+  const displayName = technicianData?.name || profile?.display_name || 'Tekniker'
 
   useEffect(() => {
     if (profile && !isTechnician) {
@@ -58,13 +63,13 @@ export default function TechnicianDashboard() {
   }, [isTechnician, profile, navigate])
 
   useEffect(() => {
-    if (isTechnician && technician?.id) {
+    if (isTechnician && technicianId) {
       fetchDashboardData()
     }
-  }, [isTechnician, technician?.id])
+  }, [isTechnician, technicianId])
 
   const fetchDashboardData = async () => {
-    if (!technician?.id) {
+    if (!technicianId) {
       setError('Ingen tekniker-ID tillgänglig');
       setLoading(false);
       return;
@@ -72,7 +77,7 @@ export default function TechnicianDashboard() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/technician/dashboard?technician_id=${technician.id}`)
+      const response = await fetch(`/api/technician/dashboard?technician_id=${technicianId}`)
       if (!response.ok) {
         throw new Error(`API Error: ${response.status} - ${await response.text()}`)
       }
@@ -118,8 +123,6 @@ export default function TechnicianDashboard() {
       </div>
     )
   }
-
-  const displayName = data.stats.technician_name || technician?.name || 'Tekniker'
 
   return (
     <div className="min-h-screen bg-slate-950">
