@@ -1,9 +1,9 @@
-// src/pages/admin/TechnicianManagement.tsx - KORREKT OCH FULLSTÄNDIG VERSION
+// src/pages/admin/TechnicianManagement.tsx - FULLSTÄNDIG VERSION MED ABAX-LISTA INTEGRERAD
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Search, User, UserCheck, Users, ArrowLeft, Key, AlertCircle
+  Plus, Search, User, UserCheck, Users, ArrowLeft, Key, AlertCircle, Car // ✅ NY IKON
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -14,11 +14,11 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import TechnicianCard from '../../components/admin/technicians/management/TechnicianCard'
 import TechnicianAuthModal from '../../components/admin/technicians/management/TechnicianAuthModal'
 import TechnicianModal from '../../components/admin/technicians/management/TechnicianModal'
+import AbaxVehicleModal from '../../components/admin/technicians/management/AbaxVehicleModal' // ✅ NY IMPORT
 
 // Importera våra services
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
 
-// ✅ OMDÖPT OCH RENODLAD: Endast de relevanta rollerna för systemet
 const STAFF_ROLES = [
   'Skadedjurstekniker',
   'Koordinator',
@@ -47,6 +47,7 @@ export default function TechnicianManagement() {
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [isAbaxModalOpen, setIsAbaxModalOpen] = useState(false) // ✅ NYTT STATE FÖR ABAX-MODAL
   const [editingTechnician, setEditingTechnician] = useState<Technician | undefined>()
   const [authTechnician, setAuthTechnician] = useState<Technician | undefined>()
 
@@ -225,10 +226,16 @@ export default function TechnicianManagement() {
                 </p>
               </div>
             </div>
-            <Button onClick={handleCreateTechnician} className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Lägg till Personal
-            </Button>
+            {/* ✅ NY KNAPPGRUPP MED ABAX-KNAPP */}
+            <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setIsAbaxModalOpen(true)} className="flex items-center gap-2">
+                    <Car className="w-4 h-4" /> Visa Fordons-ID
+                </Button>
+                <Button onClick={handleCreateTechnician} className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Lägg till Personal
+                </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -457,6 +464,12 @@ export default function TechnicianManagement() {
             technician={authTechnician}
           />
         )}
+
+        {/* ✅ NY MODAL FÖR ABAX */}
+        <AbaxVehicleModal
+          isOpen={isAbaxModalOpen}
+          onClose={() => setIsAbaxModalOpen(false)}
+        />
       </main>
     </div>
   )
