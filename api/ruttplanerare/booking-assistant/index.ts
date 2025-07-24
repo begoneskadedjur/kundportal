@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 3.0 - SLUTGILTIG VERSION MED KORREKT "HITTA NÄSTA LUCKA"-LOGIK
+// VERSION 3.1 - SLUTGILTIG VERSION MED EXAKT TIDSBERÄKNING (INGEN AVRUNDNING)
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -55,46 +55,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const workDayEnd = new Date(currentDay);
                 workDayEnd.setHours(WORK_DAY_END_HOUR, 0, 0, 0);
 
-                let lastEventEndTime = workDayStart;
-                let lastEventAddress = staff.address;
-                let lastEventTitle = "Hemadress";
+                // Kombinera "hemmet" med befintliga bokningar för att skapa en fullständig händelsekedja
+                const events: CaseInfo[] = [
+                    { start: new Date(0), end: workDayStart, title: 'Hemadress', adress: staff.address },
+                    ...techSchedule
+                ];
 
-                let potentialSlots = [];
+                for (const currentEvent of events) {
+                    const travelTime = travelTimes.get(formatAddress(currentEvent.adress)) ?? 999;
+                    
+                    // Beräkna den tidigaste möjliga starttiden efter föregående händelse + restid
+                    const earliestStartTime = new Date(currentEvent.end.getTime() + travelTime * 60000);
+                    
+                    // Säkerställ att vi inte börjar före arbetsdagens start
+                    const potentialStartTime = new Date(Math.max(earliestStartTime.getTime(), workDayStart.getTime()));
 
-                // Förslag 1: Första luckan på dagen
-                let travelTime = travelTimes.get(lastEventAddress) ?? 0;
-                let potentialStartTime = new Date(lastEventEndTime.getTime() + travelTime * 60000);
-                if (potentialStartTime < workDayStart) potentialStartTime = workDayStart;
+                    const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
 
-                let collidingBooking = techSchedule.find(booking => doTimeSlotsOverlap({start: potentialStartTime, end: new Date(potentialStartTime.getTime() + 1)}, booking));
-                
-                if(!collidingBooking) {
-                    potentialSlots.push({ time: potentialStartTime, travel: travelTime, origin: lastEventTitle });
-                }
-
-                // Förslag 2: Luckor efter varje befintligt jobb
-                for (const booking of techSchedule) {
-                    travelTime = travelTimes.get(formatAddress(booking.adress)) ?? 0;
-                    potentialStartTime = new Date(booking.end.getTime() + travelTime * 60000);
-                    potentialSlots.push({ time: potentialStartTime, travel: travelTime, origin: `Ärende: ${booking.title}` });
-                }
-
-                for(const slot of potentialSlots) {
-                    const potentialEnd = new Date(slot.time.getTime() + timeSlotDuration * 60000);
-                    const isOverlapping = techSchedule.some(booking => doTimeSlotsOverlap({start: slot.time, end: potentialEnd}, booking));
-
-                    if (potentialEnd <= workDayEnd && !isOverlapping) {
-                        allSuggestions.push({
-                            technician_id: staff.id, technician_name: staff.name,
-                            start_time: slot.time.toISOString(), end_time: potentialEnd.toISOString(),
-                            travel_time_minutes: slot.travel, origin_description: slot.origin
-                        });
+                    // Kontrollera att luckan är giltig
+                    if (potentialEndTime <= workDayEnd) {
+                        const isOverlapping = techSchedule.some(booking => doTimeSlotsOverlap({start: potentialStartTime, end: potentialEndTime}, booking));
+                        if (!isOverlapping) {
+                            allSuggestions.push({
+                                technician_id: staff.id,
+                                technician_name: staff.name,
+                                start_time: potentialStartTime.toISOString(),
+                                end_time: potentialEndTime.toISOString(),
+                                travel_time_minutes: travelTime,
+                                origin_description: currentEvent.title
+                            });
+                        }
                     }
                 }
             }
         }
         
-        // Ta bort dubbletter och sortera
         const uniqueSuggestions = Array.from(new Map(allSuggestions.map(item => [`${item.technician_id}-${item.start_time}`, item])).values());
         const sortedSuggestions = uniqueSuggestions
             .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes)
@@ -108,12 +103,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 }
 
-// --- HJÄLPFUNKTIONER (oförändrade) ---
+// --- HJÄLPFUNKTIONER ---
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
     return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && staff.address.trim() !== '');
 }
+
 async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, CaseInfo[]>> {
     const staffIds = staff.map(s => s.id);
     const { data, error } = await supabase.from('cases_with_technician_view').select('start_date, due_date, technician_id, adress, title').in('technician_id', staffIds).gte('start_date', from.toISOString()).lte('start_date', to.toISOString());
@@ -123,10 +119,13 @@ async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise
     data.forEach(c => { if(c.start_date && c.due_date) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title, adress: c.adress }); });
     return schedules;
 }
+
 function getOrigins(staff: StaffMember[], cases: CaseInfo[]): string[] {
     return [...new Set([...staff.map(s => s.address), ...cases.map(c => formatAddress(c.adress))])].filter(Boolean) as string[];
 }
+
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
+    if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
     const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
     const matrixResponse = await fetch(matrixApiUrl);
