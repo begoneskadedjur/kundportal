@@ -1,5 +1,5 @@
 // src/components/admin/coordinator/CreateCaseModal.tsx
-// FULLSTÄNDIG OCH KORREKT VERSION MED NY DESIGN OCH ALLA FÄLT
+// VERSION 2.2 - FULLSTÄNDIG OCH KORREKT VERSION MED DATUMVÄLJARE
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -34,10 +34,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [searchStartDate, setSearchStartDate] = useState('');
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
+    setSearchStartDate('');
   }, []);
 
   useEffect(() => { if (isOpen) handleReset(); }, [isOpen, handleReset]);
@@ -72,7 +74,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         body: JSON.stringify({
             newCaseAddress: formData.adress,
             pestType: formData.skadedjur,
-            timeSlotDuration: timeSlotDuration
+            timeSlotDuration: timeSlotDuration,
+            searchStartDate: searchStartDate || null
         })
       });
       const data = await response.json();
@@ -165,7 +168,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             <div className="p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
               <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
+                 <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
+                 <Input type="date" label="Hitta tider från datum:" name="searchStartDate" value={searchStartDate} onChange={(e) => setSearchStartDate(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Skadedjur *</label>
                   <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
@@ -173,33 +179,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       {PEST_TYPES.map(pest => <option key={pest} value={pest}>{pest}</option>)}
                   </select>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
-                <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                    <option value={120}>2 timmar (standard)</option><option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={180}>3 timmar</option>
-                </select>
-              </div>
-               <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg">
-                  <Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker
-              </Button>
-              {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter och kompetenser..." /></div>}
-              {suggestions.length > 0 && (
-                <div className="pt-4 border-t border-slate-700 space-y-2">
-                  <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
-                  {suggestions.map((sugg, index) => (
-                    <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-md bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
-                      <div className="flex justify-between items-center">
-                        <div className="font-semibold text-white">{sugg.technician_name}</div>
-                        <div className="text-sm font-bold text-blue-300 flex items-center gap-1.5"><MapPin size={12}/> {sugg.travel_time_minutes} min restid</div>
-                      </div>
-                      <div className="text-sm text-slate-300 font-medium">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                      <div className="text-lg font-bold text-white mt-1">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                      <div className="text-xs text-slate-500 mt-1">Från: {sugg.origin_description}</div>
-                    </div>
-                  ))}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
+                  <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                      <option value={120}>2 timmar (standard)</option><option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={180}>3 timmar</option>
+                  </select>
                 </div>
-              )}
+              </div>
+               <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
+               {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter och kompetenser..." /></div>}
+               {suggestions.length > 0 && (
+                 <div className="pt-4 border-t border-slate-700 space-y-2">
+                   <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
+                   {suggestions.map((sugg, index) => (
+                     <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-md bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
+                       <div className="flex justify-between items-center"><div className="font-semibold text-white">{sugg.technician_name}</div><div className="text-sm font-bold text-blue-300 flex items-center gap-1.5"><MapPin size={12}/> {sugg.travel_time_minutes} min restid</div></div>
+                       <div className="text-sm text-slate-300 font-medium">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                       <div className="text-lg font-bold text-white mt-1">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                       <div className="text-xs text-slate-500 mt-1">Från: {sugg.origin_description}</div>
+                     </div>
+                   ))}
+                 </div>
+               )}
             </div>
             
             <div className="p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
