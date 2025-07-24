@@ -1,4 +1,4 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - SLUTGILTIG VERSION MED ALLA FIXAR
+// 📁 src/components/admin/technicians/EditCaseModal.tsx - UPPDATERAD VERSION
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
