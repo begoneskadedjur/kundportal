@@ -1,5 +1,5 @@
 // src/components/admin/coordinator/CreateCaseModal.tsx
-// VERSION 2.4 - LÄGGER TILL TEKNIKERFILTER FÖR SÖKNING
+// VERSION 2.5 - ANVÄNDER ANPASSAD SVENSK DATUMVÄLJARE
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -12,6 +12,14 @@ import Button from '../../ui/Button';
 import Input from '../../ui/Input';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+
+// ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
+import DatePicker from 'react-datepicker'
+import { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
+import "react-datepicker/dist/react-datepicker.css"
+
+registerLocale('sv', sv) // Registrera svenskt språk
 
 // Hjälpfunktion för färgkodning av restid
 const getTravelTimeColor = (minutes: number): string => {
@@ -42,22 +50,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
-  const [searchStartDate, setSearchStartDate] = useState('');
-
-  // ✅ NYTT STATE FÖR ATT HÅLLA VALDA TEKNIKER
+  
+  // ✅ ÄNDRAT STATE FÖR DATUMVÄLJAREN
+  const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
+  
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
-    setSearchStartDate('');
-    setSelectedTechnicianIds([]); // ✅ Återställ även valda tekniker
+    setSearchStartDate(new Date()); // ✅ Återställ till dagens datum
+    setSelectedTechnicianIds([]);
   }, []);
 
   useEffect(() => {
     if (isOpen) {
         handleReset();
-        // Välj alla tekniker som standard när modalen öppnas
         if (technicians.length > 0) {
             setSelectedTechnicianIds(technicians.map(t => t.id));
         }
@@ -79,13 +87,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   };
 
-  // ✅ NY HANTERARE FÖR CHECKBOXARNA
   const handleTechnicianSelectionChange = (technicianId: string) => {
     setSelectedTechnicianIds(prev =>
       prev.includes(technicianId)
-        ? prev.filter(id => id !== technicianId) // Ta bort om den redan finns
-        : [...prev, technicianId] // Lägg till om den inte finns
+        ? prev.filter(id => id !== technicianId)
+        : [...prev, technicianId]
     );
+  };
+  
+  // ✅ NY HANTERARE FÖR DATUMVÄLJAREN
+  const handleDateChange = (date: Date | null) => {
+    setSearchStartDate(date);
   };
 
   const handleSuggestTime = async () => {
@@ -104,8 +116,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             newCaseAddress: formData.adress,
             pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration,
-            searchStartDate: searchStartDate || null,
-            selectedTechnicianIds: selectedTechnicianIds // ✅ SKICKA MED DE VALDA TEKNIKERNA
+            // ✅ FORMATERA DATUMET KORREKT FÖR API:ET
+            searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
+            selectedTechnicianIds: selectedTechnicianIds
         })
       });
       const data = await response.json();
@@ -199,7 +212,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
-                 <Input type="date" label="Hitta tider från datum:" name="searchStartDate" value={searchStartDate} onChange={(e) => setSearchStartDate(e.target.value)} />
+                 {/* ✅ ERSATT MED DEN NYA DATUMVÄLJAREN */}
+                 <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från datum:</label>
+                    <DatePicker
+                        selected={searchStartDate}
+                        onChange={handleDateChange}
+                        locale="sv"
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Välj startdatum..."
+                        isClearable
+                    />
+                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -217,7 +241,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 </div>
               </div>
 
-              {/* ✅ NY SEKTION FÖR ATT VÄLJA TEKNIKER */}
               <div className="pt-4 border-t border-slate-600">
                 <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
                   <Users size={16} /> Sök endast bland valda tekniker

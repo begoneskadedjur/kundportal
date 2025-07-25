@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.4 - KORREKT DAGS-FILTRERING FÖR LUCK-ANALYS
+// VERSION 4.5 - KORRIGERAR RESTID FÖR FÖRSTA JOBBET
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -61,20 +61,16 @@ async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Ma
     data.forEach(a => { absences.get(a.technician_id)?.push({ start: new Date(a.start_date), end: new Date(a.end_date), type: 'absence' }); });
     return absences;
 }
-
-// HJÄLPFUNKTIONER FRÅN V4.3
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
     return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
-
 function getOrigins(staff: StaffMember[], cases: EventSlot[]): string[] {
     const staffAddresses = staff.map(s => s.address).filter(Boolean) as string[];
     const caseAddresses = cases.map(c => formatAddress(c.adress)).filter(Boolean);
     return [...new Set([...staffAddresses, ...caseAddresses])];
 }
-
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
@@ -129,10 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             getAbsences(staffIdsToSearch, startDate, fourteenDaysFromStart)
         ]);
         
-        const allCaseAddresses = Array.from(schedules.values()).flat().map(c => formatAddress(c.adress));
-        const allHomeAddresses = staffToSearch.map(s => s.address);
-        const allKnownAddresses = [...new Set([...allCaseAddresses, ...allHomeAddresses])].filter(Boolean);
-
+        const allKnownAddresses = getOrigins(staffToSearch, Array.from(schedules.values()).flat());
         const travelTimes = await getTravelTimes(allKnownAddresses, newCaseAddress);
 
         let allSuggestions: Suggestion[] = [];
@@ -144,33 +137,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dayOfWeek = currentDay.getUTCDay();
             if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-            // ✅ DEFINIERA START OCH SLUT FÖR DEN SPECIFIKA DAGEN VI ANALYSERAR
-            const dayStart = new Date(currentDay);
-            dayStart.setUTCHours(0, 0, 0, 0);
-            const dayEnd = new Date(currentDay);
-            dayEnd.setUTCHours(23, 59, 59, 999);
+            const dayStart = new Date(currentDay); dayStart.setUTCHours(0, 0, 0, 0);
+            const dayEnd = new Date(currentDay); dayEnd.setUTCHours(23, 59, 59, 999);
 
             for (const staff of staffToSearch) {
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
-                // ✅ KORRIGERING: Filtrera ner alla händelser till BARA den aktuella dagen.
                 const techScheduleForDay = (schedules.get(staff.id) || []).filter(e => e.start >= dayStart && e.start < dayEnd);
                 const techAbsencesForDay = (absences.get(staff.id) || []).filter(e => e.start < dayEnd && e.end > dayStart);
-                
                 const allBookedSlotsToday = [...techScheduleForDay, ...techAbsencesForDay].sort((a,b) => a.start.getTime() - b.start.getTime());
 
-                const events: EventSlot[] = [
-                    { start: new Date(0), end: workDayStart, type: 'absence' },
-                    ...allBookedSlotsToday,
-                ];
+                const events: EventSlot[] = [ { start: new Date(0), end: workDayStart, type: 'absence' }, ...allBookedSlotsToday ];
 
                 for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
                     
-                    let originAddress: string;
-                    let originDescription: string;
+                    let originAddress: string, originDescription: string, actualStartTime: Date;
                     
                     if (previousEvent.type === 'case' && previousEvent.adress) {
                         originAddress = formatAddress(previousEvent.adress);
@@ -183,8 +167,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
                     if (travelTimeMinutes === -1) continue;
 
-                    const potentialStartTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
-                    const actualStartTime = new Date(Math.max(potentialStartTime.getTime(), workDayStart.getTime()));
+                    // ✅ KORRIGERING: Speciallogik för dagens första jobb
+                    if (j === 0) {
+                        // Första jobbet startar ALLTID kl 08:00, restiden sker innan.
+                        actualStartTime = workDayStart;
+                    } else {
+                        // För jobb mitt på dagen, beräkna ankomsttid.
+                        const potentialStartTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
+                        actualStartTime = new Date(Math.max(potentialStartTime.getTime(), workDayStart.getTime()));
+                    }
+
                     const potentialEndTime = new Date(actualStartTime.getTime() + timeSlotDuration * 60000);
                     
                     if (actualStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
@@ -204,23 +196,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortedSuggestions = allSuggestions.sort((a, b) => {
             const dateA = new Date(a.start_time).getTime();
             const dateB = new Date(b.start_time).getTime();
-
-            // Sortera efter datum först (ignorerar tid på dygnet)
             const dayA = new Date(a.start_time).setHours(0,0,0,0);
             const dayB = new Date(b.start_time).setHours(0,0,0,0);
             if (dayA !== dayB) return dayA - dayB;
-            
-            // Sortera efter tid på dagen
             if (dateA !== dateB) return dateA - dateB;
-
-            // Sortera efter restid som sista utväg
             return a.travel_time_minutes - b.travel_time_minutes;
         });
         
-        res.status(200).json(sortedSuggestions.slice(0, 10)); // Öka antalet förslag
+        res.status(200).json(sortedSuggestions.slice(0, 10));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.4):", error);
+        console.error("Fel i bokningsassistent (v4.5):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
