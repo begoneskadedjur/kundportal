@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 3.3 - KORREKT HANTERING AV FÖRSTA OCH SISTA ÄRENDET
+// VERSION 3.4 - TIDSZONSKORRIGERING FÖR SVERIGE
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -13,6 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const WORK_DAY_START_HOUR = 8;
 const WORK_DAY_END_HOUR = 17;
 const SEARCH_DAYS_LIMIT = 14;
+const TARGET_TIMEZONE = 'Europe/Stockholm'; // ✅ VIKTIGT: Definiera måltidszonen
 
 // --- Datatyper och hjälpfunktioner ---
 interface StaffMember { id: string; name: string; address: string; }
@@ -21,6 +22,39 @@ interface CaseInfo extends TimeSlot { title: string; adress: any; }
 interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
 const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
 
+/**
+ * ✅ NY HJÄLPFUNKTION
+ * Skapar ett Date-objekt för en specifik tidpunkt i en given tidszon.
+ * Detta kringgår problemet med att servern kör i UTC.
+ * @param date - Datumdelen (t.ex. en Date-objekt för en specifik dag)
+ * @param hour - Timmen som ska sättas (0-23)
+ * @returns Ett korrekt Date-objekt som representerar den tidpunkten i måltidszonen.
+ */
+const createDateInTimeZone = (date: Date, hour: number): Date => {
+    // Skapa en ISO-sträng för datumet (YYYY-MM-DD)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hourStr = String(hour).padStart(2, '0');
+    
+    // Skapa en fullständig datum-tid-sträng med korrekt tidszoninformation
+    const isoStringInTimeZone = `${year}-${month}-${day}T${hourStr}:00:00`;
+
+    // Skapa datumet genom att tolka strängen som att den tillhör måltidszonen
+    // Detta är en robust metod för att säkerställa korrekt tidpunkt
+    const timeInZone = new Date(isoStringInTimeZone + '.000Z');
+    
+    // Justera för tidszonsskillnaden mellan UTC och den lokala tiden för det datumet
+    const utcDate = new Date(timeInZone.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(timeInZone.toLocaleString('en-US', { timeZone: TARGET_TIMEZONE }));
+    const offset = utcDate.getTime() - tzDate.getTime();
+    
+    timeInZone.setTime(timeInZone.getTime() - offset);
+    
+    return timeInZone;
+};
+
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
@@ -28,11 +62,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { newCaseAddress, pestType, timeSlotDuration = 120, searchStartDate } = req.body;
         if (!newCaseAddress || !pestType) return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
 
+        // `new Date("YYYY-MM-DD")` skapar ett datum vid midnatt UTC, vilket är säkert.
+        const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
+        startDate.setUTCHours(0, 0, 0, 0);
+
         const competentStaff = await getCompetentStaff(pestType);
         if (competentStaff.length === 0) return res.status(200).json([]);
-        
-        const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
-        startDate.setHours(0, 0, 0, 0);
         
         const fourteenDaysFromStart = new Date(startDate);
         fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
@@ -48,63 +83,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const currentDay = new Date(startDate);
             currentDay.setDate(startDate.getDate() + i);
 
-            const dayOfWeek = currentDay.getDay();
+            // getUTCDay() är säkrare än getDay() på servrar
+            const dayOfWeek = currentDay.getUTCDay();
             if (dayOfWeek === 0 || dayOfWeek === 6) { // Ignorera Söndag (0) och Lördag (6)
                 continue;
             }
 
             for (const staff of competentStaff) {
-                const techSchedule = schedules.get(staff.id)!.sort((a,b) => a.start.getTime() - b.start.getTime());
-                const workDayStart = new Date(currentDay);
-                workDayStart.setHours(WORK_DAY_START_HOUR, 0, 0, 0);
-                const workDayEnd = new Date(currentDay);
-                workDayEnd.setHours(WORK_DAY_END_HOUR, 0, 0, 0);
+                const techSchedule = schedules.get(staff.id)?.sort((a,b) => a.start.getTime() - b.start.getTime()) || [];
+                
+                // ✅ ANVÄND DEN NYA TIDSZONS-MEDVETNA FUNKTIONEN
+                const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
+                const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
-                // Skapa en lista över alla "händelser" inklusive arbetspassets start och slut
                 const events: TimeSlot[] = [
-                    // Fiktiv händelse FÖRE arbetsdagen börjar. Markerar startpunkten.
                     { start: new Date(0), end: workDayStart },
-                    // Alla bokade ärenden för dagen
                     ...techSchedule,
                 ];
 
-                // Hitta alla lediga luckor mellan händelserna
                 for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
-                    // Nästa händelse är antingen nästa bokning eller slutet på arbetsdagen
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
 
                     let potentialStartTime: Date;
                     let travelTimeMinutes: number;
                     let originDescription: string;
                     
-                    // --- NY, KORRIGERAD LOGIK ---
                     if (j === 0) {
-                        // FALL 1: Första ärendet på dagen.
-                        // FÖRKLARING: Teknikern ska anlända kl 08.00. Restiden sker innan 08.00.
-                        potentialStartTime = workDayStart;
+                        potentialStartTime = workDayStart; // Startar kl 08:00 svensk tid
                         originDescription = 'Hemadress';
                         travelTimeMinutes = travelTimes.get(formatAddress(staff.address)) ?? -1;
                     } else {
-                        // FALL 2: Ärende mitt på dagen.
-                        // FÖRKLARING: Starttiden är när föregående jobb slutade + restid.
                         const originAddress = formatAddress((previousEvent as CaseInfo).adress);
                         travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
-                        if (travelTimeMinutes === -1) continue; // Hoppa över om vi saknar restid
+                        if (travelTimeMinutes === -1) continue; 
                         
-                        // Tidigast möjliga ankomst till nya kunden
                         const arrivalTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
                         potentialStartTime = arrivalTime;
                         originDescription = (previousEvent as CaseInfo).title || 'Föregående kund';
                     }
 
-                    if (travelTimeMinutes === -1) continue; // Kan inte boka utan restid
+                    if (travelTimeMinutes === -1) continue;
 
                     const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
                     
-                    // KONTROLLERA OM DEN POTENTIELLA TIDEN ÄR GILTIG
-                    // 1. Hela ärendet måste sluta INNAN nästa ärende börjar.
-                    // 2. Hela ärendet måste sluta INNAN arbetsdagens slut (17:00).
                     if (potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
                             technician_id: staff.id,
@@ -121,13 +143,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         const uniqueSuggestions = Array.from(new Map(allSuggestions.map(item => [`${item.technician_id}-${item.start_time}`, item])).values());
         const sortedSuggestions = uniqueSuggestions
-            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()) // Sortera på tid först
-            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes); // Sedan på kortast restid
+            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes);
 
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent:", error);
+        console.error("Fel i bokningsassistent (v3.4):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
@@ -136,7 +158,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
-    // Filtrera bort tekniker som saknar en giltig hemadress
     return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
 
@@ -146,7 +167,7 @@ async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise
     if (error) throw error;
     const schedules = new Map<string, CaseInfo[]>();
     staff.forEach(s => schedules.set(s.id, []));
-    data.forEach(c => { if(c.start_date && c.due_date) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title, adress: c.adress }); });
+    data?.forEach(c => { if(c.start_date && c.due_date) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title, adress: c.adress }); });
     return schedules;
 }
 
@@ -175,7 +196,7 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
         if (row.elements[0].status === 'OK') { 
             travelTimes.set(uniqueOrigins[index], Math.round(row.elements[0].duration.value / 60)); 
         } else {
-             travelTimes.set(uniqueOrigins[index], -1); // Markera att vi inte kunde hitta restid
+             travelTimes.set(uniqueOrigins[index], -1);
         }
     });
     return travelTimes;
