@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 6.5 - IMPLEMENTERAR "END-OF-DAY OPTIMIZATION" MED HEMRESE-BETYG
+// VERSION 6.5 - TYDLIGGÖR RESTID I BESKRIVNING OCH IMPLEMENTERAR HEMRESE-OPTIMERING
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -154,6 +154,9 @@ function calculateEfficiencyScore(travelTime: number, isFirstJob: boolean, gapUt
   return Math.round(score);
 }
 
+/**
+ * ✅ FÖRBÄTTRAD: Tydliggör beskrivning och beräknar hemresa för sista jobbet.
+ */
 async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
   const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
@@ -169,28 +172,30 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     const isFirstJob = (currentEvent.title === 'Hemadress');
     let currentTry = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
-    
-    // ✅ NY LOGIK: Identifiera om detta är en lucka i slutet av dagen
     const isLastGap = !nextEvent;
 
     while (currentTry <= absoluteLatestStart) {
       let travelTimeHome: number | undefined = undefined;
-      // Om det är sista luckan, beräkna hemresan.
       if (isLastGap) {
           const homeTravelTimes = await getTravelTimes([newCaseAddress], daySchedule.technician.address);
           travelTimeHome = homeTravelTimes.get(newCaseAddress);
       }
       
+      // ✅ NY BESKRIVNING: Gör det tydligt varför starttiden är som den är.
+      const originDescription = isFirstJob
+        ? 'Hemadress'
+        : `Efter "${currentEvent.title}" (+${travelTime} min)`;
+
       const slotEnd = addMinutes(currentTry, timeSlotDuration);
       const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
       const usedDuration = timeSlotDuration + (isFirstJob ? 0 : travelTime);
       const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
-
+      
       suggestions.push({
         technician_id: daySchedule.technician.id, technician_name: daySchedule.technician.name,
         start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
-        travel_time_minutes: travelTime, origin_description: currentEvent.title || "Föregående ärende",
-        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome),
+        travel_time_minutes: travelTime, origin_description: originDescription,
+        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome), 
         is_first_job: isFirstJob,
         travel_time_home_minutes: travelTimeHome
       });
@@ -203,7 +208,6 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 // --- Huvudfunktion ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
-
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds } = req.body;
     if (!newCaseAddress || !pestType) { return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' }); }
@@ -222,19 +226,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allAddresses = new Set<string>(staffToSearch.map(s => s.address).filter(Boolean));
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
     
-    // ✅ Vi behöver nu både restider TILL nya jobbet och potentiellt FRÅN nya jobbet.
-    // Vi förbereder genom att samla alla möjliga start- och slutpunkter.
-    const uniqueDestinations = new Set<string>([newCaseAddress, ...staffToSearch.map(s => s.address).filter(Boolean)]);
-    
     const travelTimesToJob = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
-    
     const dailySchedules = buildDailySchedules(staffToSearch, schedules, absences, searchStart, searchEnd);
     
-    let allSuggestions: Suggestion[] = [];
-    for (const daySchedule of dailySchedules) {
-      const slots = await findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress);
-      allSuggestions.push(...slots);
-    }
+    // ✅ Hantera asynkrona anrop på ett säkert sätt
+    const suggestionPromises = dailySchedules.map(daySchedule => 
+        findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress)
+    );
+    const nestedSuggestions = await Promise.all(suggestionPromises);
+    const allSuggestions = nestedSuggestions.flat();
     
     const groupedByDayAndTech = allSuggestions.reduce((acc, sugg) => {
         const day = sugg.start_time.split('T')[0];
