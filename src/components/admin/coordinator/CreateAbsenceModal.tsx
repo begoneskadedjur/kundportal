@@ -18,6 +18,7 @@ const ABSENCE_REASONS = [
   'Vård av barn (VAB)',
   'Utbildning',
   'Tjänstledighet',
+  'Föräldraledighet', // ✅ NYTT
   'Övrigt'
 ];
 
@@ -33,13 +34,12 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
     technician_id: '',
     start_date: '',
     end_date: '',
-    reason: ABSENCE_REASONS[0], // Sätt semester som default
+    reason: ABSENCE_REASONS[0],
     notes: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Återställ formuläret när modalen stängs eller öppnas
   useEffect(() => {
     if (isOpen) {
       setFormData({
