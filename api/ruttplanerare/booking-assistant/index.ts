@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.0 - LUCK-ANALYS & SMART SORTERING
+// VERSION 4.1 - RESPEKTERAR FRÅNVARO
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -37,6 +37,28 @@ const createDateInTimeZone = (date: Date, hour: number): Date => {
     return timeInZone;
 };
 
+// ✅ NY HJÄLPFUNKTION FÖR ATT HÄMTA FRÅNVARO
+async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, TimeSlot[]>> {
+    const { data, error } = await supabase
+        .from('technician_absences')
+        .select('technician_id, start_date, end_date')
+        .in('technician_id', staffIds)
+        .lt('start_date', to.toISOString())
+        .gt('end_date', from.toISOString());
+    
+    if (error) throw error;
+
+    const absences = new Map<string, TimeSlot[]>();
+    staffIds.forEach(id => absences.set(id, []));
+    data.forEach(a => {
+        absences.get(a.technician_id)?.push({
+            start: new Date(a.start_date),
+            end: new Date(a.end_date)
+        });
+    });
+    return absences;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
@@ -46,16 +68,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
         startDate.setUTCHours(0, 0, 0, 0);
-
+        
         const competentStaff = await getCompetentStaff(pestType);
         if (competentStaff.length === 0) return res.status(200).json([]);
-        
+        const staffIds = competentStaff.map(s => s.id);
+
         const fourteenDaysFromStart = new Date(startDate);
         fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
 
-        const schedules = await getSchedules(competentStaff, startDate, fourteenDaysFromStart);
+        // ✅ HÄMTA BÅDE ÄRENDEN OCH FRÅNVARO
+        const [schedules, absences] = await Promise.all([
+            getSchedules(competentStaff, startDate, fourteenDaysFromStart),
+            getAbsences(staffIds, startDate, fourteenDaysFromStart)
+        ]);
         
-        // ✅ NYTT: Vi behöver nu hämta restider från ALLA potentiella startpunkter (hem + alla kundadresser) till den nya adressen.
         const allKnownAddresses = getOrigins(competentStaff, Array.from(schedules.values()).flat());
         const travelTimes = await getTravelTimes(allKnownAddresses, newCaseAddress);
 
@@ -69,23 +95,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
             for (const staff of competentStaff) {
-                const techSchedule = schedules.get(staff.id)?.sort((a,b) => a.start.getTime() - b.start.getTime()) || [];
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
-                // ✅ NY LOGIK: Skapa en lista över alla "händelser" under dagen för att hitta luckor mellan dem.
-                // Vi inkluderar start och slut på dagen som fiktiva händelser.
+                // ✅ KÄRNLOGIK: Slå ihop ärenden och frånvaro till EN lista med "upptagna tider"
+                const techSchedule = schedules.get(staff.id) || [];
+                const techAbsences = absences.get(staff.id) || [];
+                
+                const allBookedSlots = [...techSchedule, ...techAbsences].sort((a,b) => a.start.getTime() - b.start.getTime());
+
                 const events: TimeSlot[] = [
-                    // Fiktiv händelse FÖRE arbetsdagen börjar. Markerar startpunkten.
                     { start: new Date(0), end: workDayStart },
-                    // Alla faktiska bokade ärenden för dagen
-                    ...techSchedule,
+                    ...allBookedSlots,
                 ];
 
-                // Hitta alla lediga luckor mellan händelserna
+                // Resten av logiken för att hitta luckor är densamma, men opererar nu på den kombinerade listan
                 for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
-                    // Nästa händelse är antingen nästa bokning eller slutet på arbetsdagen
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
 
                     let potentialStartTime: Date;
@@ -93,19 +119,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     let originDescription: string;
                     let originAddress: string;
                     
-                    // ✅ KÄRNLOGIK: Hantera två olika fall
                     if (j === 0) {
-                        // FALL 1: Första ärendet på dagen. Resan sker från hemmet.
                         potentialStartTime = workDayStart;
                         originDescription = 'Hemadress';
                         originAddress = formatAddress(staff.address);
                     } else {
-                        // FALL 2: Ärende mitt på dagen. Resan sker från föregående kund.
+                        // 'title' finns bara på ärenden, inte frånvaro, men det gör inget.
                         originAddress = formatAddress((previousEvent as CaseInfo).adress);
                         const travelFromPrev = travelTimes.get(originAddress) ?? -1;
-                        if (travelFromPrev === -1) continue; // Kan inte boka om vi inte har restid
+                        if (travelFromPrev === -1) continue;
                         
-                        // Tidigast möjliga ankomst till nya kunden
                         potentialStartTime = new Date(previousEvent.end.getTime() + travelFromPrev * 60000);
                         originDescription = (previousEvent as CaseInfo).title || 'Föregående kund';
                     }
@@ -115,10 +138,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
                     
-                    // KONTROLLERA OM TIDEN ÄR GILTIG
-                    // 1. Måste starta efter arbetsdagens början.
-                    // 2. Hela ärendet måste sluta INNAN nästa ärende börjar.
-                    // 3. Hela ärendet måste sluta INNAN arbetsdagens slut (17:00).
                     if (potentialStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
                             technician_id: staff.id,
@@ -133,30 +152,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
-        // ✅ NY SORTERINGSLOGIK
-        // 1. Sortera alla förslag efter datum (tidigast först).
-        // 2. För förslag på samma dag, sortera efter restid (kortast först).
         const sortedSuggestions = allSuggestions.sort((a, b) => {
             const dateA = new Date(a.start_time).setHours(0,0,0,0);
             const dateB = new Date(b.start_time).setHours(0,0,0,0);
-            if (dateA !== dateB) {
-                return dateA - dateB; // Sortera efter datum
-            }
-            return a.travel_time_minutes - b.travel_time_minutes; // Sortera efter restid för samma dag
+            if (dateA !== dateB) return dateA - dateB;
+            return a.travel_time_minutes - b.travel_time_minutes;
         });
         
-        // Skicka tillbaka de 5 bästa förslagen.
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.0):", error);
+        console.error("Fel i bokningsassistent (v4.1):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
 
-// ... resten av hjälpfunktionerna (getCompetentStaff, getSchedules, etc) är oförändrade ...
-// (Klistra in dem här från din föregående fil)
-// ...
+
+// --- Övriga hjälpfunktioner (oförändrade) ---
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
