@@ -1,10 +1,10 @@
 // src/components/admin/coordinator/CreateCaseModal.tsx
-// VERSION 2.5 - ANVÄNDER ANPASSAD SVENSK DATUMVÄLJARE
+// VERSION 2.6 - FIXAR DATUMVÄLJARE & MODALSTORLEK
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician } from '../../../types/database';
-import { Building, User, Zap, MapPin, CheckCircle, PlusCircle, ChevronLeft, AlertCircle, FileText, Users } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 
 import Modal from '../../ui/Modal';
@@ -13,15 +13,13 @@ import Input from '../../ui/Input';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
-// ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import "react-datepicker/dist/react-datepicker.css"
 
-registerLocale('sv', sv) // Registrera svenskt språk
+registerLocale('sv', sv)
 
-// Hjälpfunktion för färgkodning av restid
 const getTravelTimeColor = (minutes: number): string => {
   if (minutes <= 20) return 'text-green-400';
   if (minutes <= 35) return 'text-blue-400';
@@ -29,37 +27,26 @@ const getTravelTimeColor = (minutes: number): string => {
   return 'text-red-400';
 };
 
-// Datatyper
-interface Suggestion {
-  technician_id: string; technician_name: string;
-  start_time: string; end_time: string;
-  travel_time_minutes: number; origin_description: string;
-}
-interface CreateCaseModalProps {
-  isOpen: boolean; onClose: () => void; onSuccess: () => void;
-  technicians: Technician[];
-}
+interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
+interface CreateCaseModalProps { isOpen: boolean; onClose: () => void; onSuccess: () => void; technicians: Technician[]; }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
-  const [timeSlotDuration, setTimeSlotDuration] = useState(120);
+  const [timeSlotDuration, setTimeSlotDuration] = useState(60); // Default till 1 timme
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
-  
-  // ✅ ÄNDRAT STATE FÖR DATUMVÄLJAREN
   const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
-  
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
-    setSearchStartDate(new Date()); // ✅ Återställ till dagens datum
+    setSearchStartDate(new Date());
     setSelectedTechnicianIds([]);
   }, []);
 
@@ -94,12 +81,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         : [...prev, technicianId]
     );
   };
-  
-  // ✅ NY HANTERARE FÖR DATUMVÄLJAREN
-  const handleDateChange = (date: Date | null) => {
-    setSearchStartDate(date);
-  };
 
+  const handleDateChange = (date: Date | null, fieldName: 'searchStartDate' | 'start_date' | 'due_date') => {
+    if (fieldName === 'searchStartDate') {
+      setSearchStartDate(date);
+    } else {
+      const isoString = date ? date.toISOString() : null;
+      setFormData(prev => ({ ...prev, [fieldName]: isoString }));
+    }
+  };
+  
   const handleSuggestTime = async () => {
     if (!formData.adress || !formData.skadedjur) {
       toast.error('Adress och Skadedjur måste vara ifyllda.');
@@ -116,7 +107,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             newCaseAddress: formData.adress,
             pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration,
-            // ✅ FORMATERA DATUMET KORREKT FÖR API:ET
             searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
             selectedTechnicianIds: selectedTechnicianIds
         })
@@ -166,19 +156,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   };
 
-  const formatForInput = (isoString?: string): string => { 
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    const ten = (n: number) => (n < 10 ? '0' : '') + n;
-    return `${date.getFullYear()}-${ten(date.getMonth() + 1)}-${ten(date.getDate())}T${ten(date.getHours())}:${ten(date.getMinutes())}`;
-  };
-
   const formatTime = (isoString: string) => new Date(isoString).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
   if (submitted) {
     return (
       <Modal isOpen={isOpen} onClose={() => {}} title="Skapat!" size="md" preventClose={true}>
-        <div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /><h3 className="text-xl font-semibold text-white mb-2">Ärendet har skapats</h3><p className="text-slate-400">Det nya ärendet kommer nu synas i schemat.</p></div>
+        <div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /></div>
       </Modal>
     );
   }
@@ -195,8 +178,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   ) : null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`} size={step === 'form' ? "3xl" : "md"} preventClose={loading} footer={footer}>
-      <div className="p-6 max-h-[85vh] overflow-y-auto">
+    <Modal isOpen={isOpen} onClose={onClose} title={step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`} size={step === 'form' ? "2xl" : "md"} preventClose={loading} footer={footer}>
+      <div className="p-6 max-h-[80vh] overflow-y-auto">
         {step === 'selectType' && (
             <div className="flex flex-col md:flex-row gap-4">
                 <button onClick={() => selectCaseType('private')} className="flex-1 p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><User className="w-12 h-12 mx-auto mb-4 text-blue-400" /><h3 className="text-xl font-bold">Privatperson</h3></button>
@@ -212,17 +195,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
-                 {/* ✅ ERSATT MED DEN NYA DATUMVÄLJAREN */}
                  <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från datum:</label>
-                    <DatePicker
-                        selected={searchStartDate}
-                        onChange={handleDateChange}
-                        locale="sv"
-                        dateFormat="yyyy-MM-dd"
-                        placeholderText="Välj startdatum..."
-                        isClearable
-                    />
+                    <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable />
                  </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -248,12 +223,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {technicians.map(tech => (
                     <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500"
-                        checked={selectedTechnicianIds.includes(tech.id)}
-                        onChange={() => handleTechnicianSelectionChange(tech.id)}
-                      />
+                      <input type="checkbox" className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" checked={selectedTechnicianIds.includes(tech.id)} onChange={() => handleTechnicianSelectionChange(tech.id)} />
                       <span className="text-sm text-white">{tech.name}</span>
                     </label>
                   ))}
@@ -261,7 +231,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               </div>
 
                <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
-               {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter och kompetenser..." /></div>}
+               {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter..." /></div>}
               
                {suggestions.length > 0 && (
                  <div className="pt-4 border-t border-slate-700 space-y-2">
@@ -272,9 +242,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                        <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-md bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
                          <div className="flex justify-between items-center">
                            <div className="font-semibold text-white">{sugg.technician_name}</div>
-                           <div className={`text-sm font-bold flex items-center gap-1.5 ${travelColor}`}>
-                             <MapPin size={12}/> {sugg.travel_time_minutes} min restid
-                           </div>
+                           <div className={`text-sm font-bold flex items-center gap-1.5 ${travelColor}`}><MapPin size={12}/> {sugg.travel_time_minutes} min restid</div>
                          </div>
                          <div className="text-sm text-slate-300 font-medium">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                          <div className="text-lg font-bold text-white mt-1">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
@@ -293,10 +261,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
                 </div>
                  {caseType === 'private' ? (<Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />) : (<Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />)}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input type="datetime-local" label="Starttid *" name="start_date" value={formatForInput(formData.start_date)} onChange={handleChange} required />
-                  <Input type="datetime-local" label="Sluttid *" name="due_date" value={formatForInput(formData.due_date)} onChange={handleChange} required />
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                        <DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj starttid..." isClearable required scrollToTime={new Date(new Date().setHours(12, 0, 0, 0))} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
+                        <DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj sluttid..." isClearable required scrollToTime={new Date(new Date().setHours(12, 0, 0, 0))} />
+                    </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
                   <select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">

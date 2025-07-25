@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.5 - KORRIGERAR RESTID FÖR FÖRSTA JOBBET
+// VERSION 4.6 - KORRIGERAD SORTERING & FÖRSTA JOBB-LOGIK
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -96,7 +96,6 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
     return travelTimes;
 }
 
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
@@ -153,7 +152,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
-                    
                     let originAddress: string, originDescription: string, actualStartTime: Date;
                     
                     if (previousEvent.type === 'case' && previousEvent.adress) {
@@ -167,12 +165,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
                     if (travelTimeMinutes === -1) continue;
 
-                    // ✅ KORRIGERING: Speciallogik för dagens första jobb
                     if (j === 0) {
-                        // Första jobbet startar ALLTID kl 08:00, restiden sker innan.
                         actualStartTime = workDayStart;
                     } else {
-                        // För jobb mitt på dagen, beräkna ankomsttid.
                         const potentialStartTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
                         actualStartTime = new Date(Math.max(potentialStartTime.getTime(), workDayStart.getTime()));
                     }
@@ -181,12 +176,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     
                     if (actualStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
-                            technician_id: staff.id,
-                            technician_name: staff.name,
-                            start_time: actualStartTime.toISOString(),
-                            end_time: potentialEndTime.toISOString(),
-                            travel_time_minutes: travelTimeMinutes,
-                            origin_description: originDescription
+                            technician_id: staff.id, technician_name: staff.name,
+                            start_time: actualStartTime.toISOString(), end_time: potentialEndTime.toISOString(),
+                            travel_time_minutes: travelTimeMinutes, origin_description: originDescription
                         });
                     }
                 }
@@ -196,9 +188,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortedSuggestions = allSuggestions.sort((a, b) => {
             const dateA = new Date(a.start_time).getTime();
             const dateB = new Date(b.start_time).getTime();
-            const dayA = new Date(a.start_time).setHours(0,0,0,0);
-            const dayB = new Date(b.start_time).setHours(0,0,0,0);
-            if (dayA !== dayB) return dayA - dayB;
             if (dateA !== dateB) return dateA - dateB;
             return a.travel_time_minutes - b.travel_time_minutes;
         });
@@ -206,7 +195,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json(sortedSuggestions.slice(0, 10));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.5):", error);
+        console.error("Fel i bokningsassistent (v4.6):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
