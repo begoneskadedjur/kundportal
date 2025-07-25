@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.1 - RESPEKTERAR FRÅNVARO
+// VERSION 4.2 - KORREKT HANTERING AV LUCKOR EFTER FRÅNVARO
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -18,7 +18,12 @@ const TARGET_TIMEZONE = 'Europe/Stockholm';
 // --- Datatyper och hjälpfunktioner ---
 interface StaffMember { id: string; name: string; address: string; }
 interface TimeSlot { start: Date; end: Date; }
-interface CaseInfo extends TimeSlot { title: string; adress: any; }
+// ✅ Utökad typ för att skilja på ärenden och frånvaro
+interface EventSlot extends TimeSlot {
+    type: 'case' | 'absence';
+    title?: string;
+    adress?: any;
+}
 interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
 const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
 
@@ -37,25 +42,22 @@ const createDateInTimeZone = (date: Date, hour: number): Date => {
     return timeInZone;
 };
 
-// ✅ NY HJÄLPFUNKTION FÖR ATT HÄMTA FRÅNVARO
-async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, TimeSlot[]>> {
-    const { data, error } = await supabase
-        .from('technician_absences')
-        .select('technician_id, start_date, end_date')
-        .in('technician_id', staffIds)
-        .lt('start_date', to.toISOString())
-        .gt('end_date', from.toISOString());
-    
+// Hjälpfunktioner för att hämta data (oförändrade men inklistrade för fullständighet)
+async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
+    const staffIds = staff.map(s => s.id);
+    const { data, error } = await supabase.from('cases_with_technician_view').select('start_date, due_date, technician_id, adress, title').in('technician_id', staffIds).gte('start_date', from.toISOString()).lte('start_date', to.toISOString());
     if (error) throw error;
-
-    const absences = new Map<string, TimeSlot[]>();
+    const schedules = new Map<string, EventSlot[]>();
+    staff.forEach(s => schedules.set(s.id, []));
+    data?.forEach(c => { if(c.start_date && c.due_date) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title, adress: c.adress, type: 'case' }); });
+    return schedules;
+}
+async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
+    const { data, error } = await supabase.from('technician_absences').select('technician_id, start_date, end_date').in('technician_id', staffIds).lt('start_date', to.toISOString()).gt('end_date', from.toISOString());
+    if (error) throw error;
+    const absences = new Map<string, EventSlot[]>();
     staffIds.forEach(id => absences.set(id, []));
-    data.forEach(a => {
-        absences.get(a.technician_id)?.push({
-            start: new Date(a.start_date),
-            end: new Date(a.end_date)
-        });
-    });
+    data.forEach(a => { absences.get(a.technician_id)?.push({ start: new Date(a.start_date), end: new Date(a.end_date), type: 'absence' }); });
     return absences;
 }
 
@@ -76,13 +78,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const fourteenDaysFromStart = new Date(startDate);
         fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
 
-        // ✅ HÄMTA BÅDE ÄRENDEN OCH FRÅNVARO
         const [schedules, absences] = await Promise.all([
             getSchedules(competentStaff, startDate, fourteenDaysFromStart),
             getAbsences(staffIds, startDate, fourteenDaysFromStart)
         ]);
         
-        const allKnownAddresses = getOrigins(competentStaff, Array.from(schedules.values()).flat());
+        const allCaseAddresses = Array.from(schedules.values()).flat().map(c => formatAddress(c.adress));
+        const allHomeAddresses = competentStaff.map(s => s.address);
+        const allKnownAddresses = [...new Set([...allCaseAddresses, ...allHomeAddresses])].filter(Boolean);
+
         const travelTimes = await getTravelTimes(allKnownAddresses, newCaseAddress);
 
         let allSuggestions: Suggestion[] = [];
@@ -98,51 +102,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
-                // ✅ KÄRNLOGIK: Slå ihop ärenden och frånvaro till EN lista med "upptagna tider"
                 const techSchedule = schedules.get(staff.id) || [];
                 const techAbsences = absences.get(staff.id) || [];
-                
                 const allBookedSlots = [...techSchedule, ...techAbsences].sort((a,b) => a.start.getTime() - b.start.getTime());
 
-                const events: TimeSlot[] = [
-                    { start: new Date(0), end: workDayStart },
+                const events: EventSlot[] = [
+                    { start: new Date(0), end: workDayStart, type: 'absence' }, // Fiktiv start, behandlas som frånvaro
                     ...allBookedSlots,
                 ];
 
-                // Resten av logiken för att hitta luckor är densamma, men opererar nu på den kombinerade listan
                 for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
-
-                    let potentialStartTime: Date;
-                    let travelTimeMinutes: number;
-                    let originDescription: string;
+                    
+                    // ✅ KÄRNLOGIKEN FÖR ATT HITTA STARTPUNKT
                     let originAddress: string;
+                    let originDescription: string;
                     
-                    if (j === 0) {
-                        potentialStartTime = workDayStart;
-                        originDescription = 'Hemadress';
-                        originAddress = formatAddress(staff.address);
+                    if (previousEvent.type === 'case' && previousEvent.adress) {
+                        // FALL 1: Föregående händelse var ett ärende. Använd dess adress.
+                        originAddress = formatAddress(previousEvent.adress);
+                        originDescription = previousEvent.title || 'Föregående kund';
                     } else {
-                        // 'title' finns bara på ärenden, inte frånvaro, men det gör inget.
-                        originAddress = formatAddress((previousEvent as CaseInfo).adress);
-                        const travelFromPrev = travelTimes.get(originAddress) ?? -1;
-                        if (travelFromPrev === -1) continue;
-                        
-                        potentialStartTime = new Date(previousEvent.end.getTime() + travelFromPrev * 60000);
-                        originDescription = (previousEvent as CaseInfo).title || 'Föregående kund';
+                        // FALL 2: Föregående händelse var frånvaro (eller dagens start). Använd hemadressen.
+                        originAddress = formatAddress(staff.address);
+                        originDescription = 'Hemadress';
                     }
-                    
-                    travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
+
+                    const travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
                     if (travelTimeMinutes === -1) continue;
 
-                    const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
+                    // Beräkna tidigaste ankomsttid.
+                    const potentialStartTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
                     
-                    if (potentialStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
+                    // Dagens första lucka måste alltid börja tidigast kl 08:00
+                    const actualStartTime = new Date(Math.max(potentialStartTime.getTime(), workDayStart.getTime()));
+
+                    const potentialEndTime = new Date(actualStartTime.getTime() + timeSlotDuration * 60000);
+                    
+                    if (actualStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
                             technician_id: staff.id,
                             technician_name: staff.name,
-                            start_time: potentialStartTime.toISOString(),
+                            start_time: actualStartTime.toISOString(),
                             end_time: potentialEndTime.toISOString(),
                             travel_time_minutes: travelTimeMinutes,
                             origin_description: originDescription
@@ -162,33 +164,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.1):", error);
+        console.error("Fel i bokningsassistent (v4.2):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
-
 
 // --- Övriga hjälpfunktioner (oförändrade) ---
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
     if (error) throw error;
     return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
-}
-
-async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, CaseInfo[]>> {
-    const staffIds = staff.map(s => s.id);
-    const { data, error } = await supabase.from('cases_with_technician_view').select('start_date, due_date, technician_id, adress, title').in('technician_id', staffIds).gte('start_date', from.toISOString()).lte('start_date', to.toISOString());
-    if (error) throw error;
-    const schedules = new Map<string, CaseInfo[]>();
-    staff.forEach(s => schedules.set(s.id, []));
-    data?.forEach(c => { if(c.start_date && c.due_date) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title, adress: c.adress }); });
-    return schedules;
-}
-
-function getOrigins(staff: StaffMember[], cases: CaseInfo[]): string[] {
-    const staffAddresses = staff.map(s => s.address).filter(Boolean) as string[];
-    const caseAddresses = cases.map(c => formatAddress(c.adress)).filter(Boolean);
-    return [...new Set([...staffAddresses, ...caseAddresses])];
 }
 
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
