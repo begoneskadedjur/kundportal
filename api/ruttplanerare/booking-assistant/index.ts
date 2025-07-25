@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 6.1 - IMPLEMENTERAR ITERATIV SÖKNING FÖR ATT ALLTID PRIORITERA MORGONTIDER
+// VERSION 6.2 - KORRIGERAR HANTERING AV LÅNGVARIG FRÅNVARO
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -14,7 +14,8 @@ import {
   max,
   min,
   getDay,
-  parse
+  parse,
+  areIntervalsOverlapping // ✅ NY IMPORT: Korrekt funktion för att kontrollera frånvaro
 } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -26,13 +27,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const SEARCH_DAYS_LIMIT = 7;
 const TIMEZONE = 'Europe/Stockholm';
 const DEFAULT_TRAVEL_TIME = 30;
-const SUGGESTION_INCREMENT_MINUTES = 15; // Stega fram 15 min åt gången när vi letar luckor
+const SUGGESTION_INCREMENT_MINUTES = 15;
 
 // --- Datatyper (matchar er uppdaterade database.ts) ---
 
 type DaySchedule = {
-  start: string; // "HH:MM"
-  end: string;   // "HH:MM"
+  start: string; "HH:MM";
+  end: string;   "HH:MM";
   active: boolean;
 };
 
@@ -235,23 +236,34 @@ function buildDailySchedules(
       const workEnd = toZonedTime(parse(daySchedule.end, 'HH:mm', dayStart), TIMEZONE);
       
       const techAbsences = absences.get(tech.id) || [];
-      const dayAbsences = techAbsences.filter(a => isWithinInterval(a.start, { start: dayStart, end: dayEnd }) || isWithinInterval(a.end, { start: dayStart, end: dayEnd }));
+      
+      // ✅ KORRIGERING: Använder nu areIntervalsOverlapping för att korrekt identifiera all frånvaro.
+      const dayAbsences = techAbsences.filter(a => 
+        areIntervalsOverlapping(
+          { start: a.start, end: a.end },
+          { start: dayStart, end: dayEnd }
+        )
+      );
       
       const isFullyAbsent = dayAbsences.some(a => a.start <= workStart && a.end >= workEnd);
       
-      if (!isFullyAbsent) {
-        const techCases = schedules.get(tech.id) || [];
-        const dayCases = techCases.filter(c => isWithinInterval(c.start, { start: dayStart, end: dayEnd }));
-        
-        dailySchedules.push({
-          technician: tech,
-          date: currentDate,
-          workStart,
-          workEnd,
-          absences: dayAbsences,
-          existingCases: dayCases,
-        });
+      // Hoppa över hela dagen om teknikern är helt frånvarande.
+      if (isFullyAbsent) {
+          currentDate = addDays(currentDate, 1);
+          continue;
       }
+
+      const techCases = schedules.get(tech.id) || [];
+      const dayCases = techCases.filter(c => isWithinInterval(c.start, { start: dayStart, end: dayEnd }));
+      
+      dailySchedules.push({
+        technician: tech,
+        date: currentDate,
+        workStart,
+        workEnd,
+        absences: dayAbsences, // Skicka med frånvaro som bara är en del av dagen
+        existingCases: dayCases,
+      });
       
       currentDate = addDays(currentDate, 1);
     }
@@ -276,9 +288,6 @@ function calculateEfficiencyScore(
   return Math.round(travelScore + utilizationScore + efficiencyBonus);
 }
 
-/**
- * ✅ HELT OM-FAKTORERAD: Algoritmen är nu iterativ och hittar ALLA luckor.
- */
 function findAvailableSlots(
   daySchedule: TechnicianDaySchedule,
   timeSlotDuration: number,
@@ -318,7 +327,6 @@ function findAvailableSlots(
     
     let currentTry = earliestStartInGap;
 
-    // ✅ NY ITERATIV LOGIK: Stega igenom luckan och skapa flera förslag
     while (currentTry <= min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob])) {
       const isFirstJob = (currentEvent.title === 'Hemadress');
       const slotEnd = addMinutes(currentTry, timeSlotDuration);
@@ -338,7 +346,6 @@ function findAvailableSlots(
         is_first_job: isFirstJob
       });
       
-      // Stega framåt för att hitta nästa möjliga starttid
       currentTry = addMinutes(currentTry, SUGGESTION_INCREMENT_MINUTES);
     }
   }
@@ -435,7 +442,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v6.1):", error);
+    console.error("Fel i bokningsassistent (v6.2):", error);
     res.status(500).json({ 
       error: "Ett internt fel uppstod.", 
       details: process.env.NODE_ENV === 'development' ? error.message : undefined 
