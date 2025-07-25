@@ -1,5 +1,5 @@
 // src/components/admin/coordinator/CreateCaseModal.tsx
-// VERSION 2.6 - FIXAR DATUMVÄLJARE & MODALSTORLEK
+// VERSION 2.7 - JUSTERAR FÖRVALDA TEKNIKER BASERAT PÅ ROLL
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -34,7 +34,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
-  const [timeSlotDuration, setTimeSlotDuration] = useState(60); // Default till 1 timme
+  const [timeSlotDuration, setTimeSlotDuration] = useState(60);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (isOpen) {
         handleReset();
         if (technicians.length > 0) {
-            setSelectedTechnicianIds(technicians.map(t => t.id));
+            // ✅ Välj endast tekniker med rollen "Skadedjurstekniker" som standard
+            const defaultSelectedTechnicians = technicians.filter(tech => 
+                tech.role === 'Skadedjurstekniker'
+            );
+            setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
         }
     }
   }, [isOpen, handleReset, technicians]);

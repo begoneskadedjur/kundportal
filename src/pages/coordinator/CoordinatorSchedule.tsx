@@ -1,5 +1,5 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 2.4 - HÄMTAR OCH HANTERAR FRÅNVARO ⭐
+// ⭐ VERSION 2.5 - FÖRVALJER TEKNIKER BASERAT PÅ ROLL ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -15,7 +15,6 @@ import Button from '../../components/ui/Button';
 
 import { LayoutGrid, Plus, CalendarOff } from 'lucide-react';
 
-// ✅ NY DATATYP FÖR FRÅNVARO
 export interface Absence {
   id: string;
   technician_id: string;
@@ -30,14 +29,13 @@ const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('
 export default function CoordinatorSchedule() {
   const [loading, setLoading] = useState(true);
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
-  const [absences, setAbsences] = useState<Absence[]>([]); // ✅ NYTT STATE FÖR FRÅNVARO
+  const [absences, setAbsences] = useState<Absence[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
-  // States för modaler
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -45,21 +43,21 @@ export default function CoordinatorSchedule() {
 
   const fetchData = useCallback(async () => {
     try {
-      // ✅ HÄMTA ALL DATA PARALLELLT FÖR BÄSTA PRESTANDA
       const [techniciansResult, privateCasesResult, businessCasesResult, absencesResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
         supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('technician_absences').select('*') // ✅ HÄMTA FRÅNVARO
+        supabase.from('technician_absences').select('*')
       ]);
 
       if (techniciansResult.error) throw techniciansResult.error;
       if (privateCasesResult.error) throw privateCasesResult.error;
       if (businessCasesResult.error) throw businessCasesResult.error;
-      if (absencesResult.error) throw absencesResult.error; // ✅ FELHANTERING FÖR FRÅNVARO
+      if (absencesResult.error) throw absencesResult.error;
 
-      setTechnicians(techniciansResult.data || []);
-      setAbsences(absencesResult.data || []); // ✅ SPARA FRÅNVARODATAN
+      const fetchedTechnicians = techniciansResult.data || [];
+      setTechnicians(fetchedTechnicians);
+      setAbsences(absencesResult.data || []);
 
       const combinedCases = [
         ...(privateCasesResult.data || []).map(c => ({ ...c, case_type: 'private' as const })),
@@ -68,8 +66,12 @@ export default function CoordinatorSchedule() {
       
       setAllCases(combinedCases as BeGoneCaseRow[]);
 
-      if (selectedTechnicianIds.size === 0 && techniciansResult.data) {
-        setSelectedTechnicianIds(new Set(techniciansResult.data.map(t => t.id)));
+      // ✅ SÄTT KORREKTA TEKNIKER SOM VALDA SOM STANDARD (BARA VID FÖRSTA LADDNINGEN)
+      if (selectedTechnicianIds.size === 0 && fetchedTechnicians.length > 0) {
+        const defaultSelected = fetchedTechnicians
+          .filter(t => t.role === 'Skadedjurstekniker')
+          .map(t => t.id);
+        setSelectedTechnicianIds(new Set(defaultSelected));
       }
 
     } catch (err) {
@@ -83,7 +85,6 @@ export default function CoordinatorSchedule() {
     fetchData();
   }, [fetchData]);
 
-  // --- Filtreringslogik (oförändrad) ---
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
   const unplannedCases = useMemo(() => {
     return allCases.filter(c => isUnplannedCase(c) && !c.status.includes('Avslutat') && !c.status.includes('Stängt'));
@@ -102,8 +103,7 @@ export default function CoordinatorSchedule() {
       return true;
     });
   }, [scheduledCases, activeStatuses, selectedTechnicianIds, searchQuery]);
-  // --- Slut på filtreringslogik ---
-
+  
   const handleOpenCaseModal = (caseData: BeGoneCaseRow) => {
     setSelectedCase(caseData);
     setIsEditModalOpen(true);
@@ -129,7 +129,6 @@ export default function CoordinatorSchedule() {
                 <p className="text-sm text-slate-400">{filteredScheduledCases.length} schemalagda • {unplannedCases.length} oplanerade • {technicians.length} tekniker</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
                 <Button onClick={() => setIsCreateModalOpen(true)} variant="primary">
                     <Plus className="w-4 h-4 mr-2" />
@@ -146,7 +145,7 @@ export default function CoordinatorSchedule() {
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
               technicians={technicians}
-              unplannedCases={unplannedCases} // Använd ofiltrerade oplanerade här
+              unplannedCases={unplannedCases}
               activeStatuses={activeStatuses}
               setActiveStatuses={setActiveStatuses}
               selectedTechnicianIds={selectedTechnicianIds}
@@ -161,7 +160,7 @@ export default function CoordinatorSchedule() {
             <ScheduleTimeline
               technicians={technicians.filter(t => selectedTechnicianIds.size === 0 || selectedTechnicianIds.has(t.id))}
               cases={filteredScheduledCases}
-              absences={absences} // ✅ SKICKA MED FRÅNVARO-DATAN
+              absences={absences}
               onCaseClick={handleOpenCaseModal}
             />
           </main>
