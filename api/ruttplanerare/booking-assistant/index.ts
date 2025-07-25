@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 6.3 - IMPLEMENTERAR STRATEGISK LUCK-SÖKNING OCH RESPEKTERAR SLUTTIDER
+// VERSION 6.3 - IMPLEMENTERAR STRATEGISK LUCK-SÖKNING, KORRIGERAR TIDSZONER OCH RESPEKTERAR SLUTTIDER
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -19,7 +19,7 @@ import {
   startOfHour,
   addHours
 } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
+import { fromZonedTime } from 'date-fns-tz';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
@@ -30,63 +30,15 @@ const SEARCH_DAYS_LIMIT = 7;
 const TIMEZONE = 'Europe/Stockholm';
 const DEFAULT_TRAVEL_TIME = 30;
 
-// --- Datatyper (matchar er uppdaterade database.ts) ---
+// --- Datatyper ---
 
-type DaySchedule = {
-  start: string; "HH:MM";
-  end: string;   "HH:MM";
-  active: boolean;
-};
-
-type WorkSchedule = {
-  monday: DaySchedule;
-  tuesday: DaySchedule;
-  wednesday: DaySchedule;
-  thursday: DaySchedule;
-  friday: DaySchedule;
-  saturday: DaySchedule;
-  sunday: DaySchedule;
-};
-
-interface StaffMember { 
-  id: string; 
-  name: string; 
-  address: string;
-  work_schedule: WorkSchedule | null;
-}
-
-interface EventSlot {
-  start: Date;
-  end: Date;
-  type: 'case' | 'absence';
-  title?: string;
-  address?: string;
-}
-
-interface AbsencePeriod {
-  start: Date;
-  end: Date;
-}
-
-interface TechnicianDaySchedule {
-  technician: StaffMember;
-  date: Date;
-  workStart: Date;
-  workEnd: Date;
-  absences: AbsencePeriod[];
-  existingCases: EventSlot[];
-}
-
-interface Suggestion { 
-  technician_id: string; 
-  technician_name: string; 
-  start_time: string; 
-  end_time: string; 
-  travel_time_minutes: number; 
-  origin_description: string;
-  efficiency_score: number;
-  is_first_job: boolean;
-}
+type DaySchedule = { start: string; end: string; active: boolean; };
+type WorkSchedule = { monday: DaySchedule; tuesday: DaySchedule; wednesday: DaySchedule; thursday: DaySchedule; friday: DaySchedule; saturday: DaySchedule; sunday: DaySchedule; };
+interface StaffMember { id: string; name: string; address: string; work_schedule: WorkSchedule | null; }
+interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
+interface AbsencePeriod { start: Date; end: Date; }
+interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
+interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; efficiency_score: number; is_first_job: boolean; }
 
 // --- Hjälpfunktioner ---
 
@@ -168,8 +120,15 @@ function buildDailySchedules(
       
       const dayStart = startOfDay(currentDate);
       const dayEnd = endOfDay(currentDate);
-      const workStart = toZonedTime(parse(daySchedule.start, 'HH:mm', dayStart), TIMEZONE);
-      const workEnd = toZonedTime(parse(daySchedule.end, 'HH:mm', dayStart), TIMEZONE);
+
+      // ✅ KORRIGERING: Skapar arbetstider på ett tidszon-säkert sätt för att undvika buggar.
+      const year = currentDate.getUTCFullYear();
+      const month = currentDate.getUTCMonth();
+      const day = currentDate.getUTCDate();
+      const workStartDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${daySchedule.start}`;
+      const workEndDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${daySchedule.end}`;
+      const workStart = fromZonedTime(workStartDateString, TIMEZONE);
+      const workEnd = fromZonedTime(workEndDateString, TIMEZONE);
       
       const techAbsences = absences.get(tech.id) || [];
       const dayAbsences = techAbsences.filter(a => areIntervalsOverlapping({ start: a.start, end: a.end }, { start: dayStart, end: dayEnd }));
@@ -231,29 +190,25 @@ function findAvailableSlots(
     const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
     const isFirstJob = (currentEvent.title === 'Hemadress');
     
-    // ✅ KORRIGERING: Första jobbet startar ALLTID när arbetsdagen börjar. Restid påverkar bara poäng.
-    const earliestStart = isFirstJob
-      ? daySchedule.workStart
-      : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
-
+    const earliestStartInGap = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     const latestStartInGap = subMinutes(gapEnd, timeSlotDuration);
     
-    // Skapa en uppsättning unika förslag för att undvika dubbletter
+    // ✅ Begränsa senast möjliga start till arbetsdagens slut
+    const absoluteLatestStart = min([latestStartInGap, lastPossibleStartForJob]);
+    
+    if (earliestStartInGap > absoluteLatestStart) continue;
+
     const potentialStarts = new Set<number>();
     
-    // 1. Alltid det tidigaste möjliga förslaget
-    if (earliestStart <= latestStartInGap && earliestStart <= lastPossibleStartForJob) {
-      potentialStarts.add(earliestStart.getTime());
-    }
+    // 1. Alltid det tidigaste förslaget (för att fånga 08:00)
+    potentialStarts.add(earliestStartInGap.getTime());
     
-    // 2. Förslag vid nästa jämna timme
-    let nextHour = startOfHour(addHours(earliestStart, 1));
-    if (nextHour < earliestStart) nextHour = addHours(nextHour, 1);
-    if (nextHour <= latestStartInGap && nextHour <= lastPossibleStartForJob) {
+    // 2. Förslag vid nästa jämna timme (för att fånga 09:00, 10:00 etc)
+    let nextHour = startOfHour(addMinutes(earliestStartInGap, 59)); // Gå till nästa timme
+    if (nextHour <= absoluteLatestStart) {
       potentialStarts.add(nextHour.getTime());
     }
 
-    // Lägg till förslagen i listan
     potentialStarts.forEach(startTimeMs => {
       const startTime = new Date(startTimeMs);
       const slotEnd = addMinutes(startTime, timeSlotDuration);
@@ -313,7 +268,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allSuggestions.push(...findAvailableSlots(daySchedule, timeSlotDuration, travelTimes));
     }
     
-    // ✅ FÖRBÄTTRAD SORTERING & FILTRERING: Tar bort dubbletter och sorterar sedan.
     const uniqueSuggestions = Array.from(new Map(allSuggestions.map(s => [`${s.technician_id}-${s.start_time}`, s])).values());
     
     const sortedSuggestions = uniqueSuggestions
