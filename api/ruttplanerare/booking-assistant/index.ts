@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 3.2 - KORRIGERAD FÖR FÖRSTA ÄRENDE OCH HELGDAGAR
+// VERSION 3.3 - KORREKT HANTERING AV FÖRSTA OCH SISTA ÄRENDET
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -20,7 +20,6 @@ interface TimeSlot { start: Date; end: Date; }
 interface CaseInfo extends TimeSlot { title: string; adress: any; }
 interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
 const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
-const doTimeSlotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => { return slot1.start < slot2.end && slot1.end > slot2.start; };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
@@ -49,9 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const currentDay = new Date(startDate);
             currentDay.setDate(startDate.getDate() + i);
 
-            // ✅ FIX 1: Ignorera helger (Söndag = 0, Lördag = 6)
             const dayOfWeek = currentDay.getDay();
-            if (dayOfWeek === 0 || dayOfWeek === 6) {
+            if (dayOfWeek === 0 || dayOfWeek === 6) { // Ignorera Söndag (0) och Lördag (6)
                 continue;
             }
 
@@ -62,43 +60,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const workDayEnd = new Date(currentDay);
                 workDayEnd.setHours(WORK_DAY_END_HOUR, 0, 0, 0);
 
-                // --- ✅ FIX 2: Ny, korrekt logik för att hitta luckor ---
-                // Skapa en lista över alla "händelser" inklusive arbetspass-start och slut
+                // Skapa en lista över alla "händelser" inklusive arbetspassets start och slut
                 const events: TimeSlot[] = [
-                    // Start på dagen (fiktiv händelse)
+                    // Fiktiv händelse FÖRE arbetsdagen börjar. Markerar startpunkten.
                     { start: new Date(0), end: workDayStart },
-                    // Alla bokade ärenden
+                    // Alla bokade ärenden för dagen
                     ...techSchedule,
-                    // Slut på dagen (fiktiv händelse)
-                    { start: workDayEnd, end: new Date(workDayEnd.getTime() + 1) } 
                 ];
 
                 // Hitta alla lediga luckor mellan händelserna
-                for (let j = 0; j < events.length - 1; j++) {
+                for (let j = 0; j < events.length; j++) {
                     const previousEvent = events[j];
-                    const nextEvent = events[j+1];
+                    // Nästa händelse är antingen nästa bokning eller slutet på arbetsdagen
+                    const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
 
-                    // Beskrivning av var teknikern kommer ifrån
-                    const originDescription = (previousEvent as CaseInfo).title || 'Hemadress';
-                    const originAddress = (previousEvent as CaseInfo).adress || staff.address;
+                    let potentialStartTime: Date;
+                    let travelTimeMinutes: number;
+                    let originDescription: string;
                     
-                    const travelTimeFromPrev = travelTimes.get(formatAddress(originAddress)) ?? 999;
-                    if (travelTimeFromPrev === 999) continue; // Hoppa över om vi inte har restid
+                    // --- NY, KORRIGERAD LOGIK ---
+                    if (j === 0) {
+                        // FALL 1: Första ärendet på dagen.
+                        // FÖRKLARING: Teknikern ska anlända kl 08.00. Restiden sker innan 08.00.
+                        potentialStartTime = workDayStart;
+                        originDescription = 'Hemadress';
+                        travelTimeMinutes = travelTimes.get(formatAddress(staff.address)) ?? -1;
+                    } else {
+                        // FALL 2: Ärende mitt på dagen.
+                        // FÖRKLARING: Starttiden är när föregående jobb slutade + restid.
+                        const originAddress = formatAddress((previousEvent as CaseInfo).adress);
+                        travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
+                        if (travelTimeMinutes === -1) continue; // Hoppa över om vi saknar restid
+                        
+                        // Tidigast möjliga ankomst till nya kunden
+                        const arrivalTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
+                        potentialStartTime = arrivalTime;
+                        originDescription = (previousEvent as CaseInfo).title || 'Föregående kund';
+                    }
 
-                    // Tiden då teknikern tidigast kan vara framme hos nya kunden
-                    const arrivalTime = new Date(previousEvent.end.getTime() + travelTimeFromPrev * 60000);
-                    
-                    const potentialStartTime = new Date(Math.max(arrivalTime.getTime(), workDayStart.getTime()));
+                    if (travelTimeMinutes === -1) continue; // Kan inte boka utan restid
+
                     const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
-
-                    // Kontrollera om hela det nya ärendet (inkl. restid) ryms i luckan
-                    if (potentialEndTime.getTime() <= nextEvent.start.getTime()) {
+                    
+                    // KONTROLLERA OM DEN POTENTIELLA TIDEN ÄR GILTIG
+                    // 1. Hela ärendet måste sluta INNAN nästa ärende börjar.
+                    // 2. Hela ärendet måste sluta INNAN arbetsdagens slut (17:00).
+                    if (potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
                             technician_id: staff.id,
                             technician_name: staff.name,
                             start_time: potentialStartTime.toISOString(),
                             end_time: potentialEndTime.toISOString(),
-                            travel_time_minutes: travelTimeFromPrev,
+                            travel_time_minutes: travelTimeMinutes,
                             origin_description: originDescription
                         });
                     }
@@ -108,8 +121,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         const uniqueSuggestions = Array.from(new Map(allSuggestions.map(item => [`${item.technician_id}-${item.start_time}`, item])).values());
         const sortedSuggestions = uniqueSuggestions
-            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes)
-            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()) // Sortera på tid först
+            .sort((a, b) => a.travel_time_minutes - b.travel_time_minutes); // Sedan på kortast restid
 
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
@@ -146,7 +159,7 @@ function getOrigins(staff: StaffMember[], cases: CaseInfo[]): string[] {
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
-    const uniqueOrigins = [...new Set(origins)]; // Säkerställ unika origo-adresser för API-anropet
+    const uniqueOrigins = [...new Set(origins)]; 
     const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${uniqueOrigins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
     
     const matrixResponse = await fetch(matrixApiUrl);
@@ -160,9 +173,9 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
     const travelTimes = new Map<string, number>();
     matrixData.rows.forEach((row: any, index: number) => { 
         if (row.elements[0].status === 'OK') { 
-            // Använd exakta sekunder och avrunda i front-end om det behövs, eller här om du föredrar det.
-            // Math.round är rimligt.
             travelTimes.set(uniqueOrigins[index], Math.round(row.elements[0].duration.value / 60)); 
+        } else {
+             travelTimes.set(uniqueOrigins[index], -1); // Markera att vi inte kunde hitta restid
         }
     });
     return travelTimes;
