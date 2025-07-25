@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import type { WorkSchedule, DaySchedule } from '../../../../services/technicianManagementService'; // Importera typerna från din service eller types-fil
+// ✅ TYPERNA IMPORTERAS NU FRÅN RÄTT STÄLLE ENLIGT DIN STRUKTUR
+import type { WorkSchedule, DaySchedule } from '../../../../types/database'; 
 import Input from '../../../ui/Input';
 import Button from '../../../ui/Button';
-import { Switch } from '../../../ui/Switch'; // Antag att ni har en Switch-komponent, annars använd en checkbox
+// ✅ BORTTAGEN: Importen av den saknade Switch-komponenten är borta.
+// import { Switch } from '../../../ui/Switch'; 
 
 interface WorkScheduleEditorProps {
   initialSchedule: WorkSchedule;
@@ -74,9 +76,12 @@ export default function WorkScheduleEditor({ initialSchedule, onSave, onCancel }
               />
             </div>
             <div className="col-span-1 flex justify-end">
-               <Switch
+               {/* ✅ ERSATT: Den saknade Switch-komponenten är nu ersatt med en standard kryssruta. */}
+               <input
+                  type="checkbox"
+                  className="h-5 w-5 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500 cursor-pointer"
                   checked={schedule[day].active}
-                  onCheckedChange={(checked) => handleDayChange(day, 'active', checked)}
+                  onChange={(e) => handleDayChange(day, 'active', e.target.checked)}
                 />
             </div>
           </div>
