@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 5.0 - FÖRBÄTTRAD MED KORREKT FRÅNVAROHANTERING OCH OPTIMERAD RUTTPLANERING
+// VERSION 5.1 - KORRIGERAR RESTID FÖR FÖRSTA JOBBET
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -27,9 +27,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // --- Konfiguration ---
 const WORK_DAY_START_HOUR = 8;
 const WORK_DAY_END_HOUR = 17;
-const SEARCH_DAYS_LIMIT = 7; // Ändrat från 14 till 7 enligt din spec
+const SEARCH_DAYS_LIMIT = 7;
 const TIMEZONE = 'Europe/Stockholm';
-const DEFAULT_TRAVEL_TIME = 30; // minuter
+const DEFAULT_TRAVEL_TIME = 30;
 
 // --- Datatyper ---
 interface StaffMember { 
@@ -80,17 +80,14 @@ const formatAddress = (address: any): string => {
   return String(address); 
 };
 
-// Konvertera UTC till Stockholm-tid
 const toStockholmTime = (date: Date): Date => {
   return toZonedTime(date, TIMEZONE);
 };
 
-// Konvertera Stockholm-tid till UTC för lagring
 const fromStockholmTime = (date: Date): Date => {
   return fromZonedTime(date, TIMEZONE);
 };
 
-// Skapa arbetstider för en specifik dag
 const createWorkHours = (date: Date): { start: Date; end: Date } => {
   const dayStart = startOfDay(date);
   const workStart = setMinutes(setHours(dayStart, WORK_DAY_START_HOUR), 0);
@@ -156,7 +153,6 @@ async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Ma
     const startTime = toStockholmTime(start);
     const endTime = toStockholmTime(end);
     
-    // Kontrollera om det är heldagsfrånvaro
     const isFullDay = (
       startTime.getHours() <= WORK_DAY_START_HOUR && 
       endTime.getHours() >= WORK_DAY_END_HOUR
@@ -186,7 +182,6 @@ async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
     .filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
 
-// Batch-anrop till Google Distance Matrix API
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
   if (origins.length === 0) return new Map();
   
@@ -194,7 +189,6 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
   const uniqueOrigins = [...new Set(origins)];
   const travelTimes = new Map<string, number>();
   
-  // Google Distance Matrix tillåter max 25 origins per anrop
   for (let i = 0; i < uniqueOrigins.length; i += 25) {
     const batch = uniqueOrigins.slice(i, i + 25);
     const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(batch.join('|'))}&destinations=${encodeURIComponent(destination)}&key=${googleMapsApiKey}&mode=driving&language=sv&units=metric`;
@@ -205,7 +199,6 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
       
       if (matrixData.status !== 'OK') {
         console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
-        // Använd default-värde istället för att kasta fel
         batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME));
         continue;
       }
@@ -226,7 +219,6 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
   return travelTimes;
 }
 
-// Bygg dagliga scheman
 function buildDailySchedules(
   technicians: StaffMember[],
   schedules: Map<string, EventSlot[]>,
@@ -240,7 +232,6 @@ function buildDailySchedules(
     let currentDate = new Date(searchStart);
     
     while (currentDate <= searchEnd) {
-      // Hoppa över helger
       if (isWeekend(currentDate)) {
         currentDate = addDays(currentDate, 1);
         continue;
@@ -250,27 +241,20 @@ function buildDailySchedules(
       const dayStart = startOfDay(currentDate);
       const dayEnd = endOfDay(currentDate);
       
-      // Hämta frånvaro för dagen
       const techAbsences = absences.get(tech.id) || [];
-      const dayAbsences = techAbsences.filter(a => 
-        isWithinInterval(dayStart, { start: a.start, end: a.end })
-      );
+      const dayAbsences = techAbsences.filter(a => isWithinInterval(dayStart, { start: a.start, end: a.end }) );
       
-      // Kontrollera om tekniker är helt frånvarande denna dag
       const isFullyAbsent = dayAbsences.some(a => a.isFullDay);
       
       if (!isFullyAbsent) {
-        // Hämta ärenden för dagen
         const techCases = schedules.get(tech.id) || [];
-        const dayCases = techCases.filter(c => 
-          c.start >= dayStart && c.start < dayEnd
-        );
+        const dayCases = techCases.filter(c => c.start >= dayStart && c.start < dayEnd);
         
         dailySchedules.push({
           technician: tech,
           date: currentDate,
           isAvailable: true,
-          absences: dayAbsences.filter(a => !a.isFullDay), // Bara delvis frånvaro
+          absences: dayAbsences.filter(a => !a.isFullDay),
           existingCases: dayCases,
           workStart: workHours.start,
           workEnd: workHours.end
@@ -284,28 +268,18 @@ function buildDailySchedules(
   return dailySchedules;
 }
 
-// Beräkna effektivitetspoäng
 function calculateEfficiencyScore(
   travelTime: number,
   isFirstJob: boolean,
-  gapUtilization: number // 0-1, hur väl luckan fylls
+  gapUtilization: number
 ): number {
-  // Baspoäng för första jobbet (ingen restid)
   if (isFirstJob) return 100;
-  
-  // Restidspoäng (0-40 poäng)
   const travelScore = Math.max(0, 40 - (travelTime * 0.8));
-  
-  // Luckanvändningspoäng (0-40 poäng)
   const utilizationScore = gapUtilization * 40;
-  
-  // Bonuspoäng för kort restid (0-20 poäng)
   const efficiencyBonus = travelTime <= 15 ? 20 : travelTime <= 25 ? 10 : 0;
-  
   return Math.round(travelScore + utilizationScore + efficiencyBonus);
 }
 
-// Hitta tillgängliga tidsluckor
 function findAvailableSlots(
   daySchedule: TechnicianDaySchedule,
   timeSlotDuration: number,
@@ -314,7 +288,6 @@ function findAvailableSlots(
   const suggestions: Suggestion[] = [];
   const lastPossibleStart = subMinutes(daySchedule.workEnd, timeSlotDuration);
   
-  // Kombinera ärenden och deltidsfrånvaro
   const allEvents = [
     ...daySchedule.existingCases,
     ...daySchedule.absences.map(a => ({
@@ -325,55 +298,45 @@ function findAvailableSlots(
     }))
   ].sort((a, b) => a.start.getTime() - b.start.getTime());
   
-  // Fall 1: Första ärendet på dagen (ingen restid)
   if (allEvents.length === 0 || allEvents[0].start > daySchedule.workStart) {
     const firstEventStart = allEvents.length > 0 ? allEvents[0].start : daySchedule.workEnd;
     const slotEnd = addMinutes(daySchedule.workStart, timeSlotDuration);
     
     if (slotEnd <= firstEventStart && slotEnd <= daySchedule.workEnd) {
+      // ✅ KORRIGERING: Hämta den faktiska restiden från hemmet.
+      const travelTimeFromHome = travelTimes.get(daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
+      
       suggestions.push({
         technician_id: daySchedule.technician.id,
         technician_name: daySchedule.technician.name,
         start_time: daySchedule.workStart.toISOString(),
         end_time: slotEnd.toISOString(),
-        travel_time_minutes: 0,
-        origin_description: "Första ärendet - startar från kontor/hem",
+        travel_time_minutes: travelTimeFromHome, // ✅ Använd den beräknade restiden
+        origin_description: "Hemadress", // ✅ Tydligare beskrivning
         efficiency_score: 100,
         is_first_job: true
       });
     }
   }
   
-  // Fall 2: Luckor mellan ärenden
   for (let i = 0; i < allEvents.length; i++) {
     const currentEvent = allEvents[i];
     const nextEvent = allEvents[i + 1];
     const gapStart = currentEvent.end;
     const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
     
-    // Hoppa över om luckan är för liten
     if (gapEnd <= gapStart) continue;
     
-    // Beräkna restid från föregående position
     const originAddress = currentEvent.address || daySchedule.technician.address;
     const travelTime = travelTimes.get(originAddress) || DEFAULT_TRAVEL_TIME;
     
-    // Tidigaste möjliga start efter restid
-    const earliestStart = max([
-      addMinutes(gapStart, travelTime),
-      daySchedule.workStart
-    ]);
-    
-    const latestStart = min([
-      subMinutes(gapEnd, timeSlotDuration),
-      lastPossibleStart
-    ]);
+    const earliestStart = max([ addMinutes(gapStart, travelTime), daySchedule.workStart ]);
+    const latestStart = min([ subMinutes(gapEnd, timeSlotDuration), lastPossibleStart ]);
     
     if (earliestStart < latestStart) {
       const slotEnd = addMinutes(earliestStart, timeSlotDuration);
       
       if (slotEnd <= gapEnd && slotEnd <= daySchedule.workEnd) {
-        // Beräkna hur väl luckan utnyttjas
         const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
         const usedDuration = timeSlotDuration + travelTime;
         const gapUtilization = Math.min(1, usedDuration / gapDuration);
@@ -410,7 +373,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       selectedTechnicianIds 
     } = req.body;
     
-    // Validering
     if (!newCaseAddress || !pestType) {
       return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
     }
@@ -419,19 +381,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Arbetstid måste vara mellan 30 minuter och 8 timmar.' });
     }
 
-    // Sätt upp sökperiod
     const searchStart = searchStartDate 
       ? startOfDay(new Date(searchStartDate))
       : startOfDay(new Date());
     const searchEnd = addDays(searchStart, SEARCH_DAYS_LIMIT);
     
-    // Hämta kompetent personal
     const allCompetentStaff = await getCompetentStaff(pestType);
     if (allCompetentStaff.length === 0) {
       return res.status(200).json([]);
     }
 
-    // Filtrera baserat på val
     const staffToSearch = selectedTechnicianIds && Array.isArray(selectedTechnicianIds) && selectedTechnicianIds.length > 0
       ? allCompetentStaff.filter(staff => selectedTechnicianIds.includes(staff.id))
       : allCompetentStaff;
@@ -440,26 +399,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json([]);
     }
     
-    // Hämta all nödvändig data
     const staffIds = staffToSearch.map(s => s.id);
     const [schedules, absences] = await Promise.all([
       getSchedules(staffToSearch, searchStart, searchEnd),
       getAbsences(staffIds, searchStart, searchEnd)
     ]);
     
-    // Förbered adresser för restidsberäkning
     const allAddresses = new Set<string>();
-    staffToSearch.forEach(staff => allAddresses.add(staff.address));
+    staffToSearch.forEach(staff => {
+      if(staff.address) allAddresses.add(staff.address);
+    });
     schedules.forEach(cases => {
       cases.forEach(c => {
         if (c.address) allAddresses.add(c.address);
       });
     });
     
-    // Beräkna restider
     const travelTimes = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
     
-    // Bygg dagliga scheman
     const dailySchedules = buildDailySchedules(
       staffToSearch,
       schedules,
@@ -468,7 +425,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       searchEnd
     );
     
-    // Hitta alla möjliga tidsluckor
     const allSuggestions: Suggestion[] = [];
     
     for (const daySchedule of dailySchedules) {
@@ -480,14 +436,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allSuggestions.push(...slots);
     }
     
-    // Sortera och returnera topp 10
     const sortedSuggestions = allSuggestions
       .sort((a, b) => {
-        // Primär: Datum/tid
         const timeDiff = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
         if (timeDiff !== 0) return timeDiff;
-        
-        // Sekundär: Effektivitetspoäng
         return b.efficiency_score - a.efficiency_score;
       })
       .slice(0, 10);
@@ -495,7 +447,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v5.0):", error);
+    console.error("Fel i bokningsassistent (v5.1):", error);
     res.status(500).json({ 
       error: "Ett internt fel uppstod.", 
       details: process.env.NODE_ENV === 'development' ? error.message : undefined 
