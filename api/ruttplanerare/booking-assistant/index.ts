@@ -1,22 +1,22 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 5.1 - KORRIGERAR RESTID FÖR FÖRSTA JOBBET
+// VERSION 6.0 - INTEGRERAR INDIVIDUELLA SCHEMAN, KORRIGERAR LUCK-LOGIK & FÖRBÄTTRAR POÄNGSÄTTNING
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 import { 
-  format, 
   addDays, 
   addMinutes, 
   subMinutes,
   setHours,
   setMinutes,
-  isWeekend,
   startOfDay,
   endOfDay,
   isWithinInterval,
   max,
-  min
+  min,
+  getDay, // Används för att få veckodagen
+  parse
 } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
@@ -25,17 +25,33 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // --- Konfiguration ---
-const WORK_DAY_START_HOUR = 8;
-const WORK_DAY_END_HOUR = 17;
 const SEARCH_DAYS_LIMIT = 7;
 const TIMEZONE = 'Europe/Stockholm';
 const DEFAULT_TRAVEL_TIME = 30;
 
-// --- Datatyper ---
+// --- Datatyper (matchar er uppdaterade database.ts) ---
+
+type DaySchedule = {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+  active: boolean;
+};
+
+type WorkSchedule = {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
+};
+
 interface StaffMember { 
   id: string; 
   name: string; 
-  address: string; 
+  address: string;
+  work_schedule: WorkSchedule | null; // Individuellt arbetsschema
 }
 
 interface EventSlot {
@@ -49,17 +65,15 @@ interface EventSlot {
 interface AbsencePeriod {
   start: Date;
   end: Date;
-  isFullDay: boolean;
 }
 
 interface TechnicianDaySchedule {
   technician: StaffMember;
   date: Date;
-  isAvailable: boolean;
-  absences: AbsencePeriod[];
-  existingCases: EventSlot[];
   workStart: Date;
   workEnd: Date;
+  absences: AbsencePeriod[];
+  existingCases: EventSlot[];
 }
 
 interface Suggestion { 
@@ -74,32 +88,22 @@ interface Suggestion {
 }
 
 // --- Hjälpfunktioner ---
+
 const formatAddress = (address: any): string => { 
   if (!address) return ''; 
   if (typeof address === 'object' && address.formatted_address) return address.formatted_address; 
   return String(address); 
 };
 
-const toStockholmTime = (date: Date): Date => {
-  return toZonedTime(date, TIMEZONE);
-};
-
-const fromStockholmTime = (date: Date): Date => {
-  return fromZonedTime(date, TIMEZONE);
-};
-
-const createWorkHours = (date: Date): { start: Date; end: Date } => {
-  const dayStart = startOfDay(date);
-  const workStart = setMinutes(setHours(dayStart, WORK_DAY_START_HOUR), 0);
-  const workEnd = setMinutes(setHours(dayStart, WORK_DAY_END_HOUR), 0);
-  
-  return {
-    start: fromStockholmTime(workStart),
-    end: fromStockholmTime(workEnd)
-  };
-};
+// Konverterar veckodag-index (Sön=0, Mån=1...) till nyckel i vårt WorkSchedule-objekt
+const getDayKey = (date: Date): keyof WorkSchedule => {
+    const dayIndex = getDay(date);
+    const dayMap: (keyof WorkSchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return dayMap[dayIndex];
+}
 
 // --- Data-hämtning ---
+
 async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
   const staffIds = staff.map(s => s.id);
   if (staffIds.length === 0) return new Map();
@@ -148,30 +152,22 @@ async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Ma
   staffIds.forEach(id => absences.set(id, []));
   
   data.forEach(a => {
-    const start = new Date(a.start_date);
-    const end = new Date(a.end_date);
-    const startTime = toStockholmTime(start);
-    const endTime = toStockholmTime(end);
-    
-    const isFullDay = (
-      startTime.getHours() <= WORK_DAY_START_HOUR && 
-      endTime.getHours() >= WORK_DAY_END_HOUR
-    );
-    
     absences.get(a.technician_id)?.push({
-      start,
-      end,
-      isFullDay
+      start: new Date(a.start_date),
+      end: new Date(a.end_date)
     });
   });
   
   return absences;
 }
 
+/**
+ * ✅ FÖRBÄTTRAD: Hämtar kompetent personal och deras individuella arbetsscheman.
+ */
 async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
   const { data, error } = await supabase
     .from('staff_competencies')
-    .select('technicians(id, name, address)')
+    .select('technicians(id, name, address, work_schedule)') // Hämtar work_schedule
     .eq('pest_type', pestType);
     
   if (error) throw error;
@@ -183,42 +179,46 @@ async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
 }
 
 async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
-  if (origins.length === 0) return new Map();
+    if (origins.length === 0) return new Map();
   
-  const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
-  const uniqueOrigins = [...new Set(origins)];
-  const travelTimes = new Map<string, number>();
-  
-  for (let i = 0; i < uniqueOrigins.length; i += 25) {
-    const batch = uniqueOrigins.slice(i, i + 25);
-    const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(batch.join('|'))}&destinations=${encodeURIComponent(destination)}&key=${googleMapsApiKey}&mode=driving&language=sv&units=metric`;
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
+    const uniqueOrigins = [...new Set(origins)];
+    const travelTimes = new Map<string, number>();
     
-    try {
-      const matrixResponse = await fetch(matrixApiUrl);
-      const matrixData = await matrixResponse.json() as any;
+    // Använd en cache i framtiden för att minska kostnader
+    for (let i = 0; i < uniqueOrigins.length; i += 25) {
+      const batch = uniqueOrigins.slice(i, i + 25);
+      const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(batch.join('|'))}&destinations=${encodeURIComponent(destination)}&key=${googleMapsApiKey}&mode=driving&language=sv`;
       
-      if (matrixData.status !== 'OK') {
-        console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
-        batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME));
-        continue;
-      }
-      
-      matrixData.rows.forEach((row: any, index: number) => { 
-        if (row.elements[0].status === 'OK') { 
-          travelTimes.set(batch[index], Math.ceil(row.elements[0].duration.value / 60)); 
-        } else {
-          travelTimes.set(batch[index], DEFAULT_TRAVEL_TIME);
+      try {
+        const matrixResponse = await fetch(matrixApiUrl);
+        const matrixData = await matrixResponse.json() as any;
+        
+        if (matrixData.status !== 'OK') {
+          console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
+          batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME));
+          continue;
         }
-      });
-    } catch (error) {
-      console.error('Error calling Google Maps API:', error);
-      batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME));
+        
+        matrixData.rows.forEach((row: any, index: number) => { 
+          if (row.elements[0].status === 'OK') { 
+            travelTimes.set(batch[index], Math.ceil(row.elements[0].duration.value / 60)); 
+          } else {
+            travelTimes.set(batch[index], DEFAULT_TRAVEL_TIME);
+          }
+        });
+      } catch (error) {
+        console.error('Error calling Google Maps API:', error);
+        batch.forEach(origin => travelTimes.set(origin, DEFAULT_TRAVEL_TIME));
+      }
     }
-  }
-  
-  return travelTimes;
+    
+    return travelTimes;
 }
 
+/**
+ * ✅ FÖRBÄTTRAD: Bygger dagsscheman baserat på varje teknikers individuella arbetstider.
+ */
 function buildDailySchedules(
   technicians: StaffMember[],
   schedules: Map<string, EventSlot[]>,
@@ -232,19 +232,29 @@ function buildDailySchedules(
     let currentDate = new Date(searchStart);
     
     while (currentDate <= searchEnd) {
-      if (isWeekend(currentDate)) {
+      const dayKey = getDayKey(currentDate);
+      const daySchedule = tech.work_schedule?.[dayKey];
+
+      // Hoppa över dagen om teknikern inte har ett schema eller inte är aktiv den dagen
+      if (!daySchedule || !daySchedule.active) {
         currentDate = addDays(currentDate, 1);
         continue;
       }
       
-      const workHours = createWorkHours(currentDate);
       const dayStart = startOfDay(currentDate);
       const dayEnd = endOfDay(currentDate);
+
+      // Skapa korrekta start- och sluttider för dagen i Stockholm-tidszon
+      const workStart = toZonedTime(parse(daySchedule.start, 'HH:mm', dayStart), TIMEZONE);
+      const workEnd = toZonedTime(parse(daySchedule.end, 'HH:mm', dayStart), TIMEZONE);
       
       const techAbsences = absences.get(tech.id) || [];
-      const dayAbsences = techAbsences.filter(a => isWithinInterval(dayStart, { start: a.start, end: a.end }) );
+      const dayAbsences = techAbsences.filter(a => 
+        isWithinInterval(dayStart, { start: a.start, end: a.end }) ||
+        isWithinInterval(dayEnd, { start: a.start, end: a.end })
+      );
       
-      const isFullyAbsent = dayAbsences.some(a => a.isFullDay);
+      const isFullyAbsent = dayAbsences.some(a => a.start <= workStart && a.end >= workEnd);
       
       if (!isFullyAbsent) {
         const techCases = schedules.get(tech.id) || [];
@@ -253,11 +263,10 @@ function buildDailySchedules(
         dailySchedules.push({
           technician: tech,
           date: currentDate,
-          isAvailable: true,
-          absences: dayAbsences.filter(a => !a.isFullDay),
+          workStart,
+          workEnd,
+          absences: dayAbsences,
           existingCases: dayCases,
-          workStart: workHours.start,
-          workEnd: workHours.end
         });
       }
       
@@ -268,18 +277,31 @@ function buildDailySchedules(
   return dailySchedules;
 }
 
+/**
+ * ✅ FÖRBÄTTRAD: Ny, smartare poängsättning.
+ */
 function calculateEfficiencyScore(
   travelTime: number,
   isFirstJob: boolean,
-  gapUtilization: number
+  gapUtilization: number // Andel av en lucka som fylls (0 för första jobbet)
 ): number {
-  if (isFirstJob) return 100;
-  const travelScore = Math.max(0, 40 - (travelTime * 0.8));
-  const utilizationScore = gapUtilization * 40;
-  const efficiencyBonus = travelTime <= 15 ? 20 : travelTime <= 25 ? 10 : 0;
-  return Math.round(travelScore + utilizationScore + efficiencyBonus);
+  // POÄNGSÄTTNING FÖR FÖRSTA JOBBET: Prioriterar kort restid.
+  // En hög baspoäng som straffas av restid. En restid på 20 min ger 100 poäng.
+  if (isFirstJob) {
+    const score = 120 - travelTime;
+    return Math.max(0, Math.round(score)); 
+  }
+  
+  // POÄNGSÄTTNING FÖR JOBB UNDER DAGEN: Mix av restid och effektivt luck-utnyttjande.
+  const travelScore = Math.max(0, 40 - (travelTime * 0.8)); // Max 40p
+  const utilizationScore = gapUtilization * 40; // Max 40p
+  const efficiencyBonus = travelTime <= 15 ? 20 : travelTime <= 25 ? 10 : 0; // Bonus 20p
+  return Math.round(travelScore + utilizationScore + efficiencyBonus); // Max ~100p
 }
 
+/**
+ * ✅ HELT NY: Robust algoritm som hittar alla tillgängliga luckor korrekt.
+ */
 function findAvailableSlots(
   daySchedule: TechnicianDaySchedule,
   timeSlotDuration: number,
@@ -288,77 +310,86 @@ function findAvailableSlots(
   const suggestions: Suggestion[] = [];
   const lastPossibleStart = subMinutes(daySchedule.workEnd, timeSlotDuration);
   
+  // 1. Skapa "virtuella" events för arbetsdagens början och slut.
+  // Detta gör att vi kan använda en enda loop för att hitta alla luckor.
+  const virtualStartEvent: EventSlot = {
+    start: subMinutes(daySchedule.workStart, 1),
+    end: daySchedule.workStart,
+    type: 'case',
+    title: 'Hemadress',
+    address: daySchedule.technician.address
+  };
+  
+  const virtualEndEvent: EventSlot = {
+    start: daySchedule.workEnd,
+    end: addMinutes(daySchedule.workEnd, 1),
+    type: 'case',
+    title: 'Slut på dagen',
+    address: daySchedule.technician.address // Adress för ev. beräkning av hemresa
+  };
+
+  // 2. Samla alla "blockerande" händelser under dagen
   const allEvents = [
+    virtualStartEvent,
     ...daySchedule.existingCases,
     ...daySchedule.absences.map(a => ({
       start: a.start,
       end: a.end,
       type: 'absence' as const,
       title: 'Frånvaro'
-    }))
+    })),
+    virtualEndEvent
   ].sort((a, b) => a.start.getTime() - b.start.getTime());
   
-  if (allEvents.length === 0 || allEvents[0].start > daySchedule.workStart) {
-    const firstEventStart = allEvents.length > 0 ? allEvents[0].start : daySchedule.workEnd;
-    const slotEnd = addMinutes(daySchedule.workStart, timeSlotDuration);
-    
-    if (slotEnd <= firstEventStart && slotEnd <= daySchedule.workEnd) {
-      // ✅ KORRIGERING: Hämta den faktiska restiden från hemmet.
-      const travelTimeFromHome = travelTimes.get(daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
-      
-      suggestions.push({
-        technician_id: daySchedule.technician.id,
-        technician_name: daySchedule.technician.name,
-        start_time: daySchedule.workStart.toISOString(),
-        end_time: slotEnd.toISOString(),
-        travel_time_minutes: travelTimeFromHome, // ✅ Använd den beräknade restiden
-        origin_description: "Hemadress", // ✅ Tydligare beskrivning
-        efficiency_score: 100,
-        is_first_job: true
-      });
-    }
-  }
-  
-  for (let i = 0; i < allEvents.length; i++) {
+  // 3. Loopa igenom alla händelser och analysera luckorna MELLAN dem
+  for (let i = 0; i < allEvents.length - 1; i++) {
     const currentEvent = allEvents[i];
     const nextEvent = allEvents[i + 1];
+
     const gapStart = currentEvent.end;
-    const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
+    const gapEnd = nextEvent.start;
     
+    // Om det inte finns någon tid mellan events, fortsätt
     if (gapEnd <= gapStart) continue;
-    
+
     const originAddress = currentEvent.address || daySchedule.technician.address;
     const travelTime = travelTimes.get(originAddress) || DEFAULT_TRAVEL_TIME;
     
-    const earliestStart = max([ addMinutes(gapStart, travelTime), daySchedule.workStart ]);
-    const latestStart = min([ subMinutes(gapEnd, timeSlotDuration), lastPossibleStart ]);
+    // Tidigaste möjliga start i luckan, med hänsyn till restid från föregående plats.
+    const earliestStartInGap = addMinutes(gapStart, travelTime);
     
-    if (earliestStart < latestStart) {
+    // Starttiden kan inte vara före arbetsdagens början
+    const earliestStart = max([earliestStartInGap, daySchedule.workStart]);
+    
+    // Senast möjliga start är så att jobbet hinner slutföras innan nästa event börjar.
+    const latestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStart]);
+    
+    if (earliestStart <= latestStart) {
+      const isFirstJob = (currentEvent.title === 'Hemadress');
       const slotEnd = addMinutes(earliestStart, timeSlotDuration);
       
-      if (slotEnd <= gapEnd && slotEnd <= daySchedule.workEnd) {
-        const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
-        const usedDuration = timeSlotDuration + travelTime;
-        const gapUtilization = Math.min(1, usedDuration / gapDuration);
-        
-        suggestions.push({
-          technician_id: daySchedule.technician.id,
-          technician_name: daySchedule.technician.name,
-          start_time: earliestStart.toISOString(),
-          end_time: slotEnd.toISOString(),
-          travel_time_minutes: travelTime,
-          origin_description: currentEvent.title || "Föregående ärende",
-          efficiency_score: calculateEfficiencyScore(travelTime, false, gapUtilization),
-          is_first_job: false
-        });
-      }
+      // Beräkna hur väl luckan utnyttjas
+      const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
+      const usedDuration = timeSlotDuration + (isFirstJob ? 0 : travelTime);
+      const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
+
+      suggestions.push({
+        technician_id: daySchedule.technician.id,
+        technician_name: daySchedule.technician.name,
+        start_time: earliestStart.toISOString(),
+        end_time: slotEnd.toISOString(),
+        travel_time_minutes: travelTime,
+        origin_description: currentEvent.title || "Föregående ärende",
+        efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization),
+        is_first_job: isFirstJob
+      });
     }
   }
   
   return suggestions;
 }
 
-// Huvudfunktion
+// --- Huvudfunktion ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Endast POST är tillåtet' });
@@ -438,16 +469,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const sortedSuggestions = allSuggestions
       .sort((a, b) => {
+        // Sortera först på starttid (tidigast först)
         const timeDiff = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
         if (timeDiff !== 0) return timeDiff;
+        // Om starttid är samma, sortera på högst poäng
         return b.efficiency_score - a.efficiency_score;
       })
-      .slice(0, 10);
+      .slice(0, 15); // Visa 15 bästa förslagen
     
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v5.1):", error);
+    console.error("Fel i bokningsassistent (v6.0):", error);
     res.status(500).json({ 
       error: "Ett internt fel uppstod.", 
       details: process.env.NODE_ENV === 'development' ? error.message : undefined 

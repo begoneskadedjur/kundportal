@@ -1,4 +1,22 @@
-// src/types/database.ts - KOMPLETT UPPDATERAD med alla saknade exports och PestType integration
+// src/types/database.ts - KOMPLETT UPPDATERAD med alla saknade exports och PestType integration + work_schedule
+
+// 🆕 SCHEMA TYPER FÖR TEKNIKER-SCHEMA
+export type DaySchedule = {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+  active: boolean;
+};
+
+export type WorkSchedule = {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -50,7 +68,7 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contract_types']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contract_types']['Insert']>
       }
-      // ✅ KORRIGERAD TEKNIKER-TABELL MED ABAX_VEHICLE_ID
+      // ✅ KORRIGERAD TEKNIKER-TABELL MED ABAX_VEHICLE_ID + WORK_SCHEDULE
       technicians: {
         Row: {
           id: string
@@ -63,7 +81,8 @@ export type Database = {
           is_active: boolean
           created_at: string
           updated_at: string
-          abax_vehicle_id: string | null // ✅ DENNA RAD VAR SAKNAD - NU TILLAGD
+          abax_vehicle_id: string | null
+          work_schedule: WorkSchedule | null // 🆕 TILLAGD WORK_SCHEDULE JSONB
         }
         Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['technicians']['Insert']>
@@ -490,7 +509,15 @@ export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 
 export type ContractType = Database['public']['Tables']['contract_types']['Row']
 
-export type Technician = Database['public']['Tables']['technicians']['Row']
+// ✅ UPPDATERAD TECHNICIAN TYPE MED WORK_SCHEDULE + HJÄLPFÄLT
+export type Technician = Database['public']['Tables']['technicians']['Row'] & {
+  // Autentisering hjälpfält
+  has_login?: boolean
+  user_id?: string | null
+  display_name?: string
+  auth_is_active?: boolean
+}
+
 export type TechnicianInsert = Database['public']['Tables']['technicians']['Insert']
 export type TechnicianUpdate = Database['public']['Tables']['technicians']['Update']
 
@@ -557,6 +584,8 @@ export type TechnicianFormData = {
   direct_phone: string
   office_phone: string
   address: string
+  abax_vehicle_id: string // 🆕 TILLAGD ABAX_VEHICLE_ID
+  work_schedule?: WorkSchedule | null // 🆕 TILLAGD WORK_SCHEDULE
 }
 
 export type SpendFormData = {
@@ -574,6 +603,97 @@ export const ACCOUNT_MANAGERS = [
 ] as const
 
 export type AccountManager = typeof ACCOUNT_MANAGERS[number]['value']
+
+// 🆕 WORK_SCHEDULE HJÄLPFUNKTIONER
+export const DEFAULT_WORK_SCHEDULE: WorkSchedule = {
+  monday: { start: "08:00", end: "17:00", active: true },
+  tuesday: { start: "08:00", end: "17:00", active: true },
+  wednesday: { start: "08:00", end: "17:00", active: true },
+  thursday: { start: "08:00", end: "17:00", active: true },
+  friday: { start: "08:00", end: "17:00", active: true },
+  saturday: { start: "08:00", end: "17:00", active: false },
+  sunday: { start: "08:00", end: "17:00", active: false }
+}
+
+export const WEEKDAY_NAMES: { [key in keyof WorkSchedule]: string } = {
+  monday: 'Måndag',
+  tuesday: 'Tisdag',
+  wednesday: 'Onsdag',
+  thursday: 'Torsdag',
+  friday: 'Fredag',
+  saturday: 'Lördag',
+  sunday: 'Söndag'
+}
+
+export const isWorkingDay = (schedule: WorkSchedule | null, dayKey: keyof WorkSchedule): boolean => {
+  if (!schedule) return false
+  return schedule[dayKey]?.active || false
+}
+
+export const getWorkingHours = (schedule: WorkSchedule | null, dayKey: keyof WorkSchedule): { start: string; end: string } | null => {
+  if (!schedule || !schedule[dayKey]?.active) return null
+  return {
+    start: schedule[dayKey].start,
+    end: schedule[dayKey].end
+  }
+}
+
+export const formatWorkingHours = (schedule: WorkSchedule | null, dayKey: keyof WorkSchedule): string => {
+  const hours = getWorkingHours(schedule, dayKey)
+  if (!hours) return 'Ledig'
+  return `${hours.start} - ${hours.end}`
+}
+
+export const getTotalWorkingHoursPerWeek = (schedule: WorkSchedule | null): number => {
+  if (!schedule) return 0
+  
+  let totalHours = 0
+  Object.keys(schedule).forEach(dayKey => {
+    const day = schedule[dayKey as keyof WorkSchedule]
+    if (day.active) {
+      const startTime = new Date(`2024-01-01T${day.start}:00`)
+      const endTime = new Date(`2024-01-01T${day.end}:00`)
+      const diffMs = endTime.getTime() - startTime.getTime()
+      const diffHours = diffMs / (1000 * 60 * 60)
+      totalHours += diffHours
+    }
+  })
+  
+  return totalHours
+}
+
+export const validateWorkSchedule = (schedule: WorkSchedule): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = []
+  
+  Object.entries(schedule).forEach(([dayKey, daySchedule]) => {
+    if (daySchedule.active) {
+      const startTime = new Date(`2024-01-01T${daySchedule.start}:00`)
+      const endTime = new Date(`2024-01-01T${daySchedule.end}:00`)
+      
+      if (startTime >= endTime) {
+        errors.push(`${WEEKDAY_NAMES[dayKey as keyof WorkSchedule]}: Starttid måste vara före sluttid`)
+      }
+      
+      const diffMs = endTime.getTime() - startTime.getTime()
+      const diffHours = diffMs / (1000 * 60 * 60)
+      
+      if (diffHours > 16) {
+        errors.push(`${WEEKDAY_NAMES[dayKey as keyof WorkSchedule]}: Arbetsdagen kan inte vara längre än 16 timmar`)
+      }
+      
+      if (diffHours < 1) {
+        errors.push(`${WEEKDAY_NAMES[dayKey as keyof WorkSchedule]}: Arbetsdagen måste vara minst 1 timme`)
+      }
+    }
+  })
+  
+  const totalHours = getTotalWorkingHoursPerWeek(schedule)
+  if (totalHours > 60) {
+    errors.push('Total arbetstid per vecka kan inte överstiga 60 timmar')
+  }
+  
+  return { isValid: errors.length === 0, errors }
+}
 
 // 📅 DATUM-HJÄLPFUNKTIONER
 export const formatSwedishDate = (dateString?: string): string => {

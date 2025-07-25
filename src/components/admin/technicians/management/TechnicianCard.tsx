@@ -1,19 +1,20 @@
-// src/components/admin/technicians/management/TechnicianCard.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import { 
   User, Mail, Phone, MapPin, MoreVertical, Edit, 
-  Trash2, Power, Key, UserCheck, UserX 
+  Trash2, Power, Key, UserCheck, UserX, Clock // ✅ NY IKON: Clock
 } from 'lucide-react'
 import Button from '../../../ui/Button'
 import Card from '../../../ui/Card'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
 
+// ✅ PROP-TYPEN ÄR UPPDATERAD
 type TechnicianCardProps = {
   technician: Technician
   onEdit: (technician: Technician) => void
   onToggleStatus: (id: string, isActive: boolean) => void
   onDelete: (id: string) => void
   onManageAuth: (technician: Technician) => void
+  onManageWorkSchedule: (technician: Technician) => void // ✅ NY PROP FÖR ARBETSSCHEMA
 }
 
 export default function TechnicianCard({ 
@@ -21,7 +22,8 @@ export default function TechnicianCard({
   onEdit, 
   onToggleStatus, 
   onDelete,
-  onManageAuth
+  onManageAuth,
+  onManageWorkSchedule // ✅ NY PROP TILLAGD
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -37,13 +39,13 @@ export default function TechnicianCard({
   }
 
   // Stäng dropdown när man klickar utanför
-  useState(() => {
+  useEffect(() => {
     if (showDropdown) {
       const handleClick = () => setShowDropdown(false)
       document.addEventListener('click', handleClick)
       return () => document.removeEventListener('click', handleClick)
     }
-  })
+  }, [showDropdown])
 
   return (
     <Card className={`transition-all duration-200 ${!technician.is_active ? 'opacity-60' : ''}`}>
@@ -90,7 +92,7 @@ export default function TechnicianCard({
           </Button>
 
           {showDropdown && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
+            <div className="absolute right-0 top-full mt-1 w-52 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -100,7 +102,20 @@ export default function TechnicianCard({
                 className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2 rounded-t-lg"
               >
                 <Edit className="w-4 h-4" />
-                Redigera
+                Redigera uppgifter
+              </button>
+              
+              {/* ✅ NY KNAPP FÖR ARBETSSCHEMA */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onManageWorkSchedule(technician)
+                  setShowDropdown(false)
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
+              >
+                <Clock className="w-4 h-4" />
+                Hantera arbetstider
               </button>
               
               <button
@@ -114,12 +129,12 @@ export default function TechnicianCard({
                 {technician.has_login ? (
                   <>
                     <UserCheck className="w-4 h-4" />
-                    Hantera Inloggning
+                    Hantera inloggning
                   </>
                 ) : (
                   <>
                     <UserX className="w-4 h-4" />
-                    Aktivera Inloggning
+                    Aktivera inloggning
                   </>
                 )}
               </button>
@@ -141,7 +156,7 @@ export default function TechnicianCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (window.confirm(`Är du säker på att du vill ta bort ${technician.name}?`)) {
+                  if (window.confirm(`Är du säker på att du vill ta bort ${technician.name}? All historik kopplad till personen kommer att förloras.`)) {
                     onDelete(technician.id)
                   }
                   setShowDropdown(false)
@@ -149,7 +164,7 @@ export default function TechnicianCard({
                 className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 flex items-center gap-2 rounded-b-lg"
               >
                 <Trash2 className="w-4 h-4" />
-                Ta bort
+                Ta bort permanent
               </button>
             </div>
           )}

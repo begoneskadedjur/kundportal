@@ -1,10 +1,7 @@
-// src/components/admin/coordinator/CreateCaseModal.tsx
-// VERSION 2.7 - JUSTERAR FÖRVALDA TEKNIKER BASERAT PÅ ROLL
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician } from '../../../types/database';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 
 import Modal from '../../ui/Modal';
@@ -20,14 +17,37 @@ import "react-datepicker/dist/react-datepicker.css"
 
 registerLocale('sv', sv)
 
+// --- Hjälpfunktioner för visning ---
+
 const getTravelTimeColor = (minutes: number): string => {
   if (minutes <= 20) return 'text-green-400';
-  if (minutes <= 35) return 'text-blue-400';
+  if (minutes <= 35) return 'text-sky-400';
   if (minutes <= 60) return 'text-orange-400';
   return 'text-red-400';
 };
 
-interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
+/**
+ * ✅ NYTT: Funktion för att tolka efficiency_score till ett användarvänligt betyg.
+ */
+const getEfficiencyScoreInfo = (score: number): { text: string; color: string; icon: React.ReactNode } => {
+    if (score >= 100) return { text: 'Utmärkt', color: 'text-green-400', icon: <Star size={14} /> };
+    if (score >= 85) return { text: 'Bra', color: 'text-sky-400', icon: <ThumbsUp size={14} /> };
+    if (score >= 60) return { text: 'OK', color: 'text-orange-400', icon: <Meh size={14} /> };
+    return { text: 'Låg', color: 'text-red-400', icon: <ThumbsDown size={14} /> };
+};
+
+
+// ✅ UPPDATERAD: Suggestion-typen inkluderar nu efficiency_score.
+interface Suggestion {
+    technician_id: string;
+    technician_name: string;
+    start_time: string;
+    end_time: string;
+    travel_time_minutes: number;
+    origin_description: string;
+    efficiency_score: number;
+}
+
 interface CreateCaseModalProps { isOpen: boolean; onClose: () => void; onSuccess: () => void; technicians: Technician[]; }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians }: CreateCaseModalProps) {
@@ -54,7 +74,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (isOpen) {
         handleReset();
         if (technicians.length > 0) {
-            // ✅ Välj endast tekniker med rollen "Skadedjurstekniker" som standard
             const defaultSelectedTechnicians = technicians.filter(tech => 
                 tech.role === 'Skadedjurstekniker'
             );
@@ -171,23 +190,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }
 
   const footer = step === 'form' ? (
-    <div className="flex justify-end pt-4 border-t border-slate-800">
-      <div className="flex gap-3">
-        <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>Avbryt</Button>
-        <Button type="submit" form="create-case-form" loading={loading} disabled={loading} size="lg">
-          <CheckCircle className="w-5 h-5 mr-2"/> Skapa & Boka Ärende
-        </Button>
-      </div>
+    // ✅ MOBILANPASSNING: Knapparna stackas snyggt på små skärmar.
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 p-4 border-t border-slate-800">
+      <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">Avbryt</Button>
+      <Button type="submit" form="create-case-form" loading={loading} disabled={loading} size="lg" className="w-full sm:w-auto">
+        <CheckCircle className="w-5 h-5 mr-2"/> Skapa & Boka Ärende
+      </Button>
     </div>
   ) : null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`} size={step === 'form' ? "2xl" : "md"} preventClose={loading} footer={footer}>
-      <div className="p-6 max-h-[80vh] overflow-y-auto">
+    // ✅ MOBILANPASSNING: Storleken är nu flexibel för att passa alla skärmar.
+    <Modal isOpen={isOpen} onClose={onClose} title={step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer}>
+      {/* Scrollbar för innehållet på mindre skärmar */}
+      <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
         {step === 'selectType' && (
+            // ✅ MOBILANPASSNING: Byter från rad till kolumn på små skärmar.
             <div className="flex flex-col md:flex-row gap-4">
-                <button onClick={() => selectCaseType('private')} className="flex-1 p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><User className="w-12 h-12 mx-auto mb-4 text-blue-400" /><h3 className="text-xl font-bold">Privatperson</h3></button>
-                <button onClick={() => selectCaseType('business')} className="flex-1 p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><Building className="w-12 h-12 mx-auto mb-4 text-green-400" /><h3 className="text-xl font-bold">Företag</h3></button>
+                <button onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" /><h3 className="text-xl font-bold">Privatperson</h3></button>
+                <button onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" /><h3 className="text-xl font-bold">Företag</h3></button>
             </div>
         )}
         {step === 'form' && (
@@ -195,100 +216,110 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
             {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
             
-            <div className="p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
-              <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
-                 <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från datum:</label>
-                    <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable />
-                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Skadedjur *</label>
-                  <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                      <option value="" disabled>Välj typ...</option>
-                      {PEST_TYPES.map(pest => <option key={pest} value={pest}>{pest}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
-                  <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                      <option value={120}>2 timmar (standard)</option><option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={180}>3 timmar</option>
-                  </select>
-                </div>
-              </div>
+            {/* ✅ MOBILANPASSNING: Hela modulen är nu uppdelad i två kolumner på stora skärmar för bättre överblick */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              <div className="pt-4 border-t border-slate-600">
-                <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <Users size={16} /> Sök endast bland valda tekniker
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {technicians.map(tech => (
-                    <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
-                      <input type="checkbox" className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" checked={selectedTechnicianIds.includes(tech.id)} onChange={() => handleTechnicianSelectionChange(tech.id)} />
-                      <span className="text-sm text-white">{tech.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-               <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
-               {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter..." /></div>}
-              
-               {suggestions.length > 0 && (
-                 <div className="pt-4 border-t border-slate-700 space-y-2">
-                   <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
-                   {suggestions.map((sugg, index) => {
-                     const travelColor = getTravelTimeColor(sugg.travel_time_minutes);
-                     return (
-                       <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-md bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
-                         <div className="flex justify-between items-center">
-                           <div className="font-semibold text-white">{sugg.technician_name}</div>
-                           <div className={`text-sm font-bold flex items-center gap-1.5 ${travelColor}`}><MapPin size={12}/> {sugg.travel_time_minutes} min restid</div>
-                         </div>
-                         <div className="text-sm text-slate-300 font-medium">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                         <div className="text-lg font-bold text-white mt-1">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                         <div className="text-xs text-slate-400 mt-1">Från: {sugg.origin_description}</div>
-                       </div>
-                     );
-                   })}
-                 </div>
-               )}
-            </div>
-            
-            <div className="p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
-                <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
+              {/* VÄNSTER KOLUMN: Intelligent Bokning */}
+              <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
+                <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Kontaktperson *" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} required />
-                  <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
+                  <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
+                  <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från:</label>
+                      <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />
+                  </div>
                 </div>
-                 {caseType === 'private' ? (<Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />) : (<Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />)}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Skadedjur *</label>
+                    <select name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                        <option value="" disabled>Välj typ...</option>
+                        {PEST_TYPES.map(pest => <option key={pest} value={pest}>{pest}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Tidsåtgång</label>
+                    <select value={timeSlotDuration} onChange={e => setTimeSlotDuration(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                        <option value={60}>1 timme</option><option value={90}>1.5 timmar</option><option value={120}>2 timmar</option><option value={180}>3 timmar</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-700">
+                  <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2"><Users size={16} /> Sök bland valda tekniker</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {technicians.map(tech => (
+                      <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
+                        <input type="checkbox" className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" checked={selectedTechnicianIds.includes(tech.id)} onChange={() => handleTechnicianSelectionChange(tech.id)} />
+                        <span className="text-sm text-white truncate">{tech.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full mt-auto" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
+                {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
-                        <DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj starttid..." isClearable required scrollToTime={new Date(new Date().setHours(12, 0, 0, 0))} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
-                        <DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj sluttid..." isClearable required scrollToTime={new Date(new Date().setHours(12, 0, 0, 0))} />
-                    </div>
-                </div>
+                {suggestions.length > 0 && (
+                  <div className="pt-4 border-t border-slate-700 space-y-2">
+                    <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
+                    {suggestions.map((sugg, index) => {
+                      const travelColor = getTravelTimeColor(sugg.travel_time_minutes);
+                      const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score); // ✅ Hämta betyget
+                      return (
+                        <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                            <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
+                            {/* ✅ NYTT: Komponent för att visa både restid och betyg */}
+                            <div className="flex items-center gap-3 text-xs sm:text-sm">
+                                <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
+                                <div className={`font-bold flex items-center gap-1.5 ${travelColor}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
+                            </div>
+                          </div>
+                          <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                          <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                          <div className="text-xs text-slate-400 mt-1">Från: {sugg.origin_description}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
-                  <select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                      <option value="" disabled>Välj tekniker...</option>
-                      {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <Input label="Ärendetitel (auto-ifylls från namn)" name="title" value={formData.title || ''} onChange={handleChange} required />
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning till tekniker</label>
-                  <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={4} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" placeholder="Kort om ärendet, portkod, etc."/>
-                </div>
+              {/* HÖGER KOLUMN: Manuell Bokning */}
+              <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
+                  <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Kontaktperson *" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} required />
+                    <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
+                  </div>
+                  {caseType === 'private' ? (<Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />) : (<Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />)}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
+                          <DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj starttid..." isClearable required className="w-full" />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid *</label>
+                          <DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj sluttid..." isClearable required className="w-full" />
+                      </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
+                    <select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                        <option value="" disabled>Välj tekniker...</option>
+                        {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <Input label="Ärendetitel (auto-ifylls från namn)" name="title" value={formData.title || ''} onChange={handleChange} required />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning till tekniker</label>
+                    <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={4} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" placeholder="Kort om ärendet, portkod, etc."/>
+                  </div>
+              </div>
+
             </div>
           </form>
         )}

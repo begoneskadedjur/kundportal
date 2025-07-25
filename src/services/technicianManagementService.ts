@@ -1,10 +1,28 @@
-// src/services/technicianManagementService.ts - FULLSTÄNDIG VERSION MED KOMPETENSHANTERING
-
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { PestType } from '../utils/clickupFieldMapper' // ✅ IMPORTERAR FRÅN RÄTT STÄLLE
+import { PestType } from '../utils/clickupFieldMapper' 
 
-// Typer är uppdaterade för att inkludera abax_vehicle_id
+// --- TYPDEFINITIONER ---
+
+// ✅ NYA TYPER FÖR DET FLEXIBLA ARBETSSCHEMAT
+export type DaySchedule = {
+  start: string; // Format "HH:MM"
+  end: string;   // Format "HH:MM"
+  active: boolean;
+};
+
+export type WorkSchedule = {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
+};
+
+
+// ✅ TEKNIKER-TYPEN ÄR UPPDATERAD MED work_schedule
 export type Technician = {
   id: string
   name: string
@@ -17,6 +35,7 @@ export type Technician = {
   is_active: boolean
   created_at: string
   updated_at: string
+  work_schedule: WorkSchedule | null // ✅ FÄLT TILLAGT
   has_login?: boolean
   user_id?: string | null
   display_name?: string | null
@@ -41,9 +60,30 @@ export type TechnicianStats = {
 
 export const technicianManagementService = {
 
+  /**
+   * ✅ NY FUNKTION: Uppdaterar en teknikers arbetsschema i databasen.
+   */
+  async updateWorkSchedule(technicianId: string, schedule: WorkSchedule): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('technicians')
+        .update({ work_schedule: schedule })
+        .eq('id', technicianId);
+
+      if (error) {
+        throw error;
+      }
+      toast.success('Arbetsschemat har uppdaterats!');
+    } catch (error: any) {
+      console.error('Error updating work schedule:', error);
+      toast.error('Kunde inte spara det nya arbetsschemat.');
+      throw error;
+    }
+  },
+
   // --- KOMPETENS-FUNKTIONER ---
   /**
-   * ✅ NY FUNKTION: Hämta en persons specifika kompetenser.
+   * Hämta en persons specifika kompetenser.
    */
   async getCompetencies(staffId: string): Promise<PestType[]> {
     try {
@@ -63,7 +103,7 @@ export const technicianManagementService = {
   },
 
   /**
-   * ✅ NY FUNKTION: Uppdatera en persons hela kompetenslista.
+   * Uppdatera en persons hela kompetenslista.
    */
   async updateCompetencies(staffId: string, competencies: PestType[]): Promise<void> {
     try {
@@ -84,7 +124,7 @@ export const technicianManagementService = {
     }
   },
   
-  // --- Dina befintliga funktioner nedan (kompletta och oförändrade från din originalfil) ---
+  // --- Befintliga funktioner nedan (kompletta och oförändrade) ---
 
   async getAllTechnicians(): Promise<Technician[]> {
     try {

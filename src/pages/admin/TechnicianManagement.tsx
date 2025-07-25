@@ -1,9 +1,7 @@
-// src/pages/admin/TechnicianManagement.tsx - FULLSTÄNDIG VERSION MED ABAX-LISTA INTEGRERAD
-
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Search, User, UserCheck, Users, ArrowLeft, Key, AlertCircle, Car // ✅ NY IKON
+  Plus, Search, User, UserCheck, Users, ArrowLeft, Key, AlertCircle, Car, Clock
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -14,9 +12,10 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import TechnicianCard from '../../components/admin/technicians/management/TechnicianCard'
 import TechnicianAuthModal from '../../components/admin/technicians/management/TechnicianAuthModal'
 import TechnicianModal from '../../components/admin/technicians/management/TechnicianModal'
-import AbaxVehicleModal from '../../components/admin/technicians/management/AbaxVehicleModal' // ✅ NY IMPORT
+import AbaxVehicleModal from '../../components/admin/technicians/management/AbaxVehicleModal'
+import WorkScheduleModal from '../../components/admin/technicians/management/WorkScheduleModal' // ✅ NY IMPORT: Modal för arbetsschema
 
-// Importera våra services
+// Importera våra services och typer
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
 
 const STAFF_ROLES = [
@@ -47,9 +46,13 @@ export default function TechnicianManagement() {
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
-  const [isAbaxModalOpen, setIsAbaxModalOpen] = useState(false) // ✅ NYTT STATE FÖR ABAX-MODAL
+  const [isAbaxModalOpen, setIsAbaxModalOpen] = useState(false)
   const [editingTechnician, setEditingTechnician] = useState<Technician | undefined>()
   const [authTechnician, setAuthTechnician] = useState<Technician | undefined>()
+
+  // ✅ NYA MODAL STATES FÖR ARBETSSCHEMA
+  const [isWorkScheduleModalOpen, setIsWorkScheduleModalOpen] = useState(false)
+  const [editingScheduleFor, setEditingScheduleFor] = useState<Technician | undefined>()
 
   // Ladda data när komponenten mountas
   useEffect(() => {
@@ -144,6 +147,12 @@ export default function TechnicianManagement() {
     setAuthTechnician(technician)
     setShowAuthModal(true)
   }
+  
+  // ✅ NY HANDLER FÖR ATT ÖPPNA SCHEMA-MODALEN
+  const handleManageWorkSchedule = (technician: Technician) => {
+    setEditingScheduleFor(technician);
+    setIsWorkScheduleModalOpen(true);
+  };
 
   const handleToggleStatus = async (id: string, isActive: boolean) => {
     try {
@@ -226,7 +235,6 @@ export default function TechnicianManagement() {
                 </p>
               </div>
             </div>
-            {/* ✅ NY KNAPPGRUPP MED ABAX-KNAPP */}
             <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setIsAbaxModalOpen(true)} className="flex items-center gap-2">
                     <Car className="w-4 h-4" /> Visa Fordons-ID
@@ -420,6 +428,7 @@ export default function TechnicianManagement() {
                   onToggleStatus={handleToggleStatus}
                   onDelete={handleDeleteTechnician}
                   onManageAuth={handleManageAuth}
+                  onManageWorkSchedule={handleManageWorkSchedule} // ✅ SKICKA MED DEN NYA HANDLERN
                 />
               ))}
             </div>
@@ -464,12 +473,24 @@ export default function TechnicianManagement() {
             technician={authTechnician}
           />
         )}
-
-        {/* ✅ NY MODAL FÖR ABAX */}
+        
         <AbaxVehicleModal
           isOpen={isAbaxModalOpen}
           onClose={() => setIsAbaxModalOpen(false)}
         />
+
+        {/* ✅ RENDERA DEN NYA MODALEN FÖR ARBETSSCHEMA */}
+        {editingScheduleFor && (
+            <WorkScheduleModal
+                isOpen={isWorkScheduleModalOpen}
+                onClose={() => setIsWorkScheduleModalOpen(false)}
+                onSuccess={() => {
+                    setIsWorkScheduleModalOpen(false);
+                    fetchTechnicians(); // Ladda om data för att se ändringar
+                }}
+                technician={editingScheduleFor}
+            />
+        )}
       </main>
     </div>
   )

@@ -1,0 +1,93 @@
+import React, { useState } from 'react';
+import type { WorkSchedule, DaySchedule } from '../../../../services/technicianManagementService'; // Importera typerna från din service eller types-fil
+import Input from '../../../ui/Input';
+import Button from '../../../ui/Button';
+import { Switch } from '../../../ui/Switch'; // Antag att ni har en Switch-komponent, annars använd en checkbox
+
+interface WorkScheduleEditorProps {
+  initialSchedule: WorkSchedule;
+  onSave: (newSchedule: WorkSchedule) => Promise<void>;
+  onCancel: () => void;
+}
+
+const weekDays: (keyof WorkSchedule)[] = [
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+];
+
+const dayTranslations: Record<keyof WorkSchedule, string> = {
+  monday: 'Måndag',
+  tuesday: 'Tisdag',
+  wednesday: 'Onsdag',
+  thursday: 'Torsdag',
+  friday: 'Fredag',
+  saturday: 'Lördag',
+  sunday: 'Söndag'
+};
+
+export default function WorkScheduleEditor({ initialSchedule, onSave, onCancel }: WorkScheduleEditorProps) {
+  const [schedule, setSchedule] = useState<WorkSchedule>(initialSchedule);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleDayChange = (day: keyof WorkSchedule, field: keyof DaySchedule, value: string | boolean) => {
+    setSchedule(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }));
+  };
+  
+  const handleSaveClick = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(schedule);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-1">
+      <h3 className="text-lg font-medium text-white mb-4">Anpassa Arbetstider</h3>
+      <div className="space-y-4">
+        {weekDays.map(day => (
+          <div key={day} className={`grid grid-cols-4 items-center gap-4 p-3 rounded-lg ${schedule[day].active ? 'bg-slate-800/70' : 'bg-slate-800/30'}`}>
+            <label className={`font-medium col-span-1 ${schedule[day].active ? 'text-white' : 'text-slate-400'}`}>
+              {dayTranslations[day]}
+            </label>
+            <div className="col-span-2 flex items-center gap-2">
+              <Input
+                type="time"
+                value={schedule[day].start}
+                onChange={(e) => handleDayChange(day, 'start', e.target.value)}
+                disabled={!schedule[day].active}
+                className="bg-slate-700 border-slate-600 disabled:opacity-50"
+              />
+              <span className={schedule[day].active ? 'text-slate-400' : 'text-slate-600'}>-</span>
+              <Input
+                type="time"
+                value={schedule[day].end}
+                onChange={(e) => handleDayChange(day, 'end', e.target.value)}
+                disabled={!schedule[day].active}
+                className="bg-slate-700 border-slate-600 disabled:opacity-50"
+              />
+            </div>
+            <div className="col-span-1 flex justify-end">
+               <Switch
+                  checked={schedule[day].active}
+                  onCheckedChange={(checked) => handleDayChange(day, 'active', checked)}
+                />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-700">
+        <Button variant="secondary" onClick={onCancel}>Avbryt</Button>
+        <Button onClick={handleSaveClick} isLoading={isSaving}>
+          {isSaving ? 'Sparar...' : 'Spara Schema'}
+        </Button>
+      </div>
+    </div>
+  );
+}
