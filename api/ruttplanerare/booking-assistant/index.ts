@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.3 - HANTERAR VALDA TEKNIKER FRÅN FRONTEND
+// VERSION 4.4 - KORREKT DAGS-FILTRERING FÖR LUCK-ANALYS
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -62,45 +62,68 @@ async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Ma
     return absences;
 }
 
+// HJÄLPFUNKTIONER FRÅN V4.3
+async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
+    const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
+    if (error) throw error;
+    return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
+}
+
+function getOrigins(staff: StaffMember[], cases: EventSlot[]): string[] {
+    const staffAddresses = staff.map(s => s.address).filter(Boolean) as string[];
+    const caseAddresses = cases.map(c => formatAddress(c.adress)).filter(Boolean);
+    return [...new Set([...staffAddresses, ...caseAddresses])];
+}
+
+async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
+    if (origins.length === 0) return new Map();
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
+    const uniqueOrigins = [...new Set(origins)]; 
+    const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${uniqueOrigins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
+    
+    const matrixResponse = await fetch(matrixApiUrl);
+    const matrixData = await matrixResponse.json() as any;
+    
+    if (matrixData.status !== 'OK') {
+        console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
+        throw new Error(`Google Maps API fel: ${matrixData.error_message || matrixData.status}`);
+    }
+    
+    const travelTimes = new Map<string, number>();
+    matrixData.rows.forEach((row: any, index: number) => { 
+        if (row.elements[0].status === 'OK') { 
+            travelTimes.set(uniqueOrigins[index], Math.round(row.elements[0].duration.value / 60)); 
+        } else {
+             travelTimes.set(uniqueOrigins[index], -1);
+        }
+    });
+    return travelTimes;
+}
+
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
     try {
-        // ✅ HÄMTA DEN NYA PARAMETERN
         const { newCaseAddress, pestType, timeSlotDuration = 120, searchStartDate, selectedTechnicianIds } = req.body;
-        
         if (!newCaseAddress || !pestType) return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
 
         const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
         startDate.setUTCHours(0, 0, 0, 0);
         
-        // 1. Hämta ALLA tekniker som har rätt kompetens
         const allCompetentStaff = await getCompetentStaff(pestType);
-        if (allCompetentStaff.length === 0) {
-             return res.status(200).json([]);
-        }
+        if (allCompetentStaff.length === 0) return res.status(200).json([]);
 
-        // ✅ 2. FILTRERA BASERAT PÅ KOORDINATORNS VAL
-        let staffToSearch: StaffMember[];
-        if (selectedTechnicianIds && Array.isArray(selectedTechnicianIds) && selectedTechnicianIds.length > 0) {
-            const selectedIdsSet = new Set(selectedTechnicianIds);
-            // Inkludera endast de tekniker som är BÅDE kompetenta OCH valda
-            staffToSearch = allCompetentStaff.filter(staff => selectedIdsSet.has(staff.id));
-        } else {
-            // Om ingen lista skickas med (eller om den är tom), sök bland alla kompetenta
-            staffToSearch = allCompetentStaff;
-        }
+        let staffToSearch = selectedTechnicianIds && Array.isArray(selectedTechnicianIds) && selectedTechnicianIds.length > 0
+            ? allCompetentStaff.filter(staff => new Set(selectedTechnicianIds).has(staff.id))
+            : allCompetentStaff;
 
-        if (staffToSearch.length === 0) {
-            return res.status(200).json([]); // Inga av de valda teknikerna hade rätt kompetens
-        }
+        if (staffToSearch.length === 0) return res.status(200).json([]);
         
         const staffIdsToSearch = staffToSearch.map(s => s.id);
-
         const fourteenDaysFromStart = new Date(startDate);
         fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
 
-        // ✅ 3. ANVÄND DEN FILTRERADE LISTAN FÖR ATT HÄMTA DATA
         const [schedules, absences] = await Promise.all([
             getSchedules(staffToSearch, startDate, fourteenDaysFromStart),
             getAbsences(staffIdsToSearch, startDate, fourteenDaysFromStart)
@@ -121,18 +144,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dayOfWeek = currentDay.getUTCDay();
             if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-            // ✅ 4. SÖK LUCKOR BLAND DEN FILTRERADE LISTAN
+            // ✅ DEFINIERA START OCH SLUT FÖR DEN SPECIFIKA DAGEN VI ANALYSERAR
+            const dayStart = new Date(currentDay);
+            dayStart.setUTCHours(0, 0, 0, 0);
+            const dayEnd = new Date(currentDay);
+            dayEnd.setUTCHours(23, 59, 59, 999);
+
             for (const staff of staffToSearch) {
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
-                const techSchedule = schedules.get(staff.id) || [];
-                const techAbsences = absences.get(staff.id) || [];
-                const allBookedSlots = [...techSchedule, ...techAbsences].sort((a,b) => a.start.getTime() - b.start.getTime());
+                // ✅ KORRIGERING: Filtrera ner alla händelser till BARA den aktuella dagen.
+                const techScheduleForDay = (schedules.get(staff.id) || []).filter(e => e.start >= dayStart && e.start < dayEnd);
+                const techAbsencesForDay = (absences.get(staff.id) || []).filter(e => e.start < dayEnd && e.end > dayStart);
+                
+                const allBookedSlotsToday = [...techScheduleForDay, ...techAbsencesForDay].sort((a,b) => a.start.getTime() - b.start.getTime());
 
                 const events: EventSlot[] = [
                     { start: new Date(0), end: workDayStart, type: 'absence' },
-                    ...allBookedSlots,
+                    ...allBookedSlotsToday,
                 ];
 
                 for (let j = 0; j < events.length; j++) {
@@ -172,48 +202,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         const sortedSuggestions = allSuggestions.sort((a, b) => {
-            const dateA = new Date(a.start_time).setHours(0,0,0,0);
-            const dateB = new Date(b.start_time).setHours(0,0,0,0);
+            const dateA = new Date(a.start_time).getTime();
+            const dateB = new Date(b.start_time).getTime();
+
+            // Sortera efter datum först (ignorerar tid på dygnet)
+            const dayA = new Date(a.start_time).setHours(0,0,0,0);
+            const dayB = new Date(b.start_time).setHours(0,0,0,0);
+            if (dayA !== dayB) return dayA - dayB;
+            
+            // Sortera efter tid på dagen
             if (dateA !== dateB) return dateA - dateB;
+
+            // Sortera efter restid som sista utväg
             return a.travel_time_minutes - b.travel_time_minutes;
         });
         
-        res.status(200).json(sortedSuggestions.slice(0, 5));
+        res.status(200).json(sortedSuggestions.slice(0, 10)); // Öka antalet förslag
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.3):", error);
+        console.error("Fel i bokningsassistent (v4.4):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
-}
-
-// --- Övriga hjälpfunktioner (oförändrade) ---
-async function getCompetentStaff(pestType: string): Promise<StaffMember[]> {
-    const { data, error } = await supabase.from('staff_competencies').select('technicians(id, name, address)').eq('pest_type', pestType);
-    if (error) throw error;
-    return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
-}
-
-async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
-    if (origins.length === 0) return new Map();
-    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
-    const uniqueOrigins = [...new Set(origins)]; 
-    const matrixApiUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${uniqueOrigins.join('|')}&destinations=${destination}&key=${googleMapsApiKey}`;
-    
-    const matrixResponse = await fetch(matrixApiUrl);
-    const matrixData = await matrixResponse.json() as any;
-    
-    if (matrixData.status !== 'OK') {
-        console.error('Google Maps API Error:', matrixData.error_message || matrixData.status);
-        throw new Error(`Google Maps API fel: ${matrixData.error_message || matrixData.status}`);
-    }
-    
-    const travelTimes = new Map<string, number>();
-    matrixData.rows.forEach((row: any, index: number) => { 
-        if (row.elements[0].status === 'OK') { 
-            travelTimes.set(uniqueOrigins[index], Math.round(row.elements[0].duration.value / 60)); 
-        } else {
-             travelTimes.set(uniqueOrigins[index], -1);
-        }
-    });
-    return travelTimes;
 }
