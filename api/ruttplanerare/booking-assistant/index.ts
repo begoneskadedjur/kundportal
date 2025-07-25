@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 5.2 - FÖRBÄTTRAD LUCKSÖKNING OCH RESTIDSPRIORITERING
+// VERSION 5.1 - KORRIGERAR RESTID FÖR FÖRSTA JOBBET
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -30,7 +30,6 @@ const WORK_DAY_END_HOUR = 17;
 const SEARCH_DAYS_LIMIT = 7;
 const TIMEZONE = 'Europe/Stockholm';
 const DEFAULT_TRAVEL_TIME = 30;
-const TIME_SLOT_INTERVAL = 30; // Generera förslag var 30:e minut
 
 // --- Datatyper ---
 interface StaffMember { 
@@ -72,13 +71,6 @@ interface Suggestion {
   origin_description: string;
   efficiency_score: number;
   is_first_job: boolean;
-}
-
-interface TimeGap {
-  start: Date;
-  end: Date;
-  previousEvent?: EventSlot;
-  isFirstOfDay: boolean;
 }
 
 // --- Hjälpfunktioner ---
@@ -276,156 +268,90 @@ function buildDailySchedules(
   return dailySchedules;
 }
 
-// UPPDATERAD: Kraftigare viktning för kort restid
 function calculateEfficiencyScore(
   travelTime: number,
   isFirstJob: boolean,
-  timeOfDay: number // 8-17
+  gapUtilization: number
 ): number {
-  if (isFirstJob && timeOfDay === 8) return 100;
-  
-  // Kraftig viktning för kort restid (0-60 poäng)
-  let travelScore = 0;
-  if (travelTime <= 10) travelScore = 60;
-  else if (travelTime <= 20) travelScore = 50;
-  else if (travelTime <= 30) travelScore = 40;
-  else if (travelTime <= 45) travelScore = 25;
-  else if (travelTime <= 60) travelScore = 10;
-  else travelScore = Math.max(0, 5 - (travelTime - 60) / 10);
-  
-  // Tidspoäng - prioritera tidigare tider (0-30 poäng)
-  const timeScore = Math.max(0, 30 - (timeOfDay - 8) * 3);
-  
-  // Bonus för att packa ihop ärenden tidigt på dagen (0-10 poäng)
-  const packingBonus = timeOfDay <= 12 ? 10 : 0;
-  
-  return Math.round(travelScore + timeScore + packingBonus);
+  if (isFirstJob) return 100;
+  const travelScore = Math.max(0, 40 - (travelTime * 0.8));
+  const utilizationScore = gapUtilization * 40;
+  const efficiencyBonus = travelTime <= 15 ? 20 : travelTime <= 25 ? 10 : 0;
+  return Math.round(travelScore + utilizationScore + efficiencyBonus);
 }
 
-// NY FUNKTION: Hitta alla luckor i ett schema
-function findTimeGaps(daySchedule: TechnicianDaySchedule): TimeGap[] {
-  const gaps: TimeGap[] = [];
-  const allEvents = [
-    ...daySchedule.existingCases,
-    ...daySchedule.absences.map(a => ({
-      start: a.start,
-      end: a.end,
-      type: 'absence' as const,
-      title: 'Frånvaro',
-      address: undefined
-    }))
-  ].sort((a, b) => a.start.getTime() - b.start.getTime());
-  
-  let currentTime = daySchedule.workStart;
-  let previousEvent: EventSlot | undefined = undefined;
-  
-  // Kontrollera lucka i början av dagen
-  if (allEvents.length === 0 || allEvents[0].start > daySchedule.workStart) {
-    gaps.push({
-      start: daySchedule.workStart,
-      end: allEvents.length > 0 ? allEvents[0].start : daySchedule.workEnd,
-      previousEvent: undefined,
-      isFirstOfDay: true
-    });
-  }
-  
-  // Hitta luckor mellan event
-  for (let i = 0; i < allEvents.length; i++) {
-    const currentEvent = allEvents[i];
-    
-    // Lucka före detta event
-    if (currentEvent.start > currentTime) {
-      gaps.push({
-        start: currentTime,
-        end: currentEvent.start,
-        previousEvent: previousEvent,
-        isFirstOfDay: currentTime.getTime() === daySchedule.workStart.getTime()
-      });
-    }
-    
-    currentTime = currentEvent.end;
-    previousEvent = currentEvent;
-  }
-  
-  // Lucka efter sista event
-  if (currentTime < daySchedule.workEnd) {
-    gaps.push({
-      start: currentTime,
-      end: daySchedule.workEnd,
-      previousEvent: previousEvent,
-      isFirstOfDay: false
-    });
-  }
-  
-  return gaps;
-}
-
-// HELT NY findAvailableSlots funktion
 function findAvailableSlots(
   daySchedule: TechnicianDaySchedule,
   timeSlotDuration: number,
   travelTimes: Map<string, number>
 ): Suggestion[] {
   const suggestions: Suggestion[] = [];
-  const gaps = findTimeGaps(daySchedule);
+  const lastPossibleStart = subMinutes(daySchedule.workEnd, timeSlotDuration);
   
-  for (const gap of gaps) {
-    const gapDurationMinutes = (gap.end.getTime() - gap.start.getTime()) / 60000;
+  const allEvents = [
+    ...daySchedule.existingCases,
+    ...daySchedule.absences.map(a => ({
+      start: a.start,
+      end: a.end,
+      type: 'absence' as const,
+      title: 'Frånvaro'
+    }))
+  ].sort((a, b) => a.start.getTime() - b.start.getTime());
+  
+  if (allEvents.length === 0 || allEvents[0].start > daySchedule.workStart) {
+    const firstEventStart = allEvents.length > 0 ? allEvents[0].start : daySchedule.workEnd;
+    const slotEnd = addMinutes(daySchedule.workStart, timeSlotDuration);
     
-    // Hoppa över för små luckor
-    if (gapDurationMinutes < timeSlotDuration) continue;
-    
-    // Beräkna restid och tidigaste start
-    let travelTime = 0;
-    let earliestStart = gap.start;
-    let originDescription = "";
-    
-    if (gap.isFirstOfDay) {
-      // Första jobbet - ingen påverkan på starttid men visa restid
-      travelTime = travelTimes.get(daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
-      originDescription = "Hemadress";
-    } else if (gap.previousEvent) {
-      // Efter ett tidigare event
-      const originAddress = gap.previousEvent.address || daySchedule.technician.address;
-      travelTime = travelTimes.get(originAddress) || DEFAULT_TRAVEL_TIME;
-      earliestStart = max([
-        addMinutes(gap.start, travelTime),
-        gap.start
-      ]);
-      originDescription = gap.previousEvent.title || "Föregående ärende";
-    }
-    
-    // Generera alla möjliga starttider i denna lucka
-    let possibleStart = earliestStart;
-    const lastPossibleStart = subMinutes(gap.end, timeSlotDuration);
-    
-    while (possibleStart <= lastPossibleStart) {
-      const endTime = addMinutes(possibleStart, timeSlotDuration);
+    if (slotEnd <= firstEventStart && slotEnd <= daySchedule.workEnd) {
+      // ✅ KORRIGERING: Hämta den faktiska restiden från hemmet.
+      const travelTimeFromHome = travelTimes.get(daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
       
-      // Kontrollera att sluttiden inte går över luckans slut eller arbetsdagens slut
-      if (endTime <= gap.end && endTime <= daySchedule.workEnd) {
-        const hour = toStockholmTime(possibleStart).getHours();
+      suggestions.push({
+        technician_id: daySchedule.technician.id,
+        technician_name: daySchedule.technician.name,
+        start_time: daySchedule.workStart.toISOString(),
+        end_time: slotEnd.toISOString(),
+        travel_time_minutes: travelTimeFromHome, // ✅ Använd den beräknade restiden
+        origin_description: "Hemadress", // ✅ Tydligare beskrivning
+        efficiency_score: 100,
+        is_first_job: true
+      });
+    }
+  }
+  
+  for (let i = 0; i < allEvents.length; i++) {
+    const currentEvent = allEvents[i];
+    const nextEvent = allEvents[i + 1];
+    const gapStart = currentEvent.end;
+    const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
+    
+    if (gapEnd <= gapStart) continue;
+    
+    const originAddress = currentEvent.address || daySchedule.technician.address;
+    const travelTime = travelTimes.get(originAddress) || DEFAULT_TRAVEL_TIME;
+    
+    const earliestStart = max([ addMinutes(gapStart, travelTime), daySchedule.workStart ]);
+    const latestStart = min([ subMinutes(gapEnd, timeSlotDuration), lastPossibleStart ]);
+    
+    if (earliestStart < latestStart) {
+      const slotEnd = addMinutes(earliestStart, timeSlotDuration);
+      
+      if (slotEnd <= gapEnd && slotEnd <= daySchedule.workEnd) {
+        const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
+        const usedDuration = timeSlotDuration + travelTime;
+        const gapUtilization = Math.min(1, usedDuration / gapDuration);
         
         suggestions.push({
           technician_id: daySchedule.technician.id,
           technician_name: daySchedule.technician.name,
-          start_time: possibleStart.toISOString(),
-          end_time: endTime.toISOString(),
+          start_time: earliestStart.toISOString(),
+          end_time: slotEnd.toISOString(),
           travel_time_minutes: travelTime,
-          origin_description: gap.isFirstOfDay && possibleStart.getTime() === daySchedule.workStart.getTime() 
-            ? "Första jobbet kl 08:00" 
-            : originDescription,
-          efficiency_score: calculateEfficiencyScore(
-            travelTime, 
-            gap.isFirstOfDay && possibleStart.getTime() === daySchedule.workStart.getTime(),
-            hour
-          ),
-          is_first_job: gap.isFirstOfDay && possibleStart.getTime() === daySchedule.workStart.getTime()
+          origin_description: currentEvent.title || "Föregående ärende",
+          efficiency_score: calculateEfficiencyScore(travelTime, false, gapUtilization),
+          is_first_job: false
         });
       }
-      
-      // Flytta fram till nästa möjliga starttid
-      possibleStart = addMinutes(possibleStart, TIME_SLOT_INTERVAL);
     }
   }
   
@@ -510,29 +436,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allSuggestions.push(...slots);
     }
     
-    // UPPDATERAD SORTERING: Prioritera kort restid mycket högre
     const sortedSuggestions = allSuggestions
       .sort((a, b) => {
-        // Först sortera på dag
-        const dayA = startOfDay(new Date(a.start_time)).getTime();
-        const dayB = startOfDay(new Date(b.start_time)).getTime();
-        if (dayA !== dayB) return dayA - dayB;
-        
-        // Inom samma dag, prioritera kraftigt baserat på restid
-        const travelDiff = a.travel_time_minutes - b.travel_time_minutes;
-        
-        // Om restidsskillnaden är stor (>20 min), använd bara restid
-        if (Math.abs(travelDiff) > 20) return travelDiff;
-        
-        // Annars använd effektivitetspoäng
+        const timeDiff = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+        if (timeDiff !== 0) return timeDiff;
         return b.efficiency_score - a.efficiency_score;
       })
-      .slice(0, 20); // Visa fler förslag för bättre översikt
+      .slice(0, 10);
     
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v5.2):", error);
+    console.error("Fel i bokningsassistent (v5.1):", error);
     res.status(500).json({ 
       error: "Ett internt fel uppstod.", 
       details: process.env.NODE_ENV === 'development' ? error.message : undefined 
