@@ -1,5 +1,5 @@
 // 📁 src/components/admin/technicians/EditCaseModal.tsx
-// ⭐ VERSION 2.1 - LÄGGER TILL DATUM/TID-REDIGERING FÖR KOORDINATORER ⭐
+// ⭐ VERSION 2.2 - ANVÄNDER ANPASSAD SVENSK DATUMVÄLJARE ⭐
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
@@ -9,7 +9,14 @@ import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 import toast from 'react-hot-toast'
 
-// ✅ UTÖKAD TYP FÖR ATT INKLUDERA DATUMFÄLT
+// ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
+import DatePicker from 'react-datepicker'
+import { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
+import "react-datepicker/dist/react-datepicker.css"
+
+registerLocale('sv', sv) // Registrera svenskt språk för komponenten
+
 interface TechnicianCase {
   id: string;
   case_type: 'private' | 'business' | 'contract';
@@ -26,8 +33,8 @@ interface TechnicianCase {
   material_cost?: number;
   time_spent_minutes?: number;
   work_started_at?: string | null;
-  start_date?: string | null; // ✅ NYTT
-  due_date?: string | null;   // ✅ NYTT
+  start_date?: string | null;
+  due_date?: string | null;
 }
 
 interface EditCaseModalProps {
@@ -225,19 +232,6 @@ const BackupRestorePrompt: React.FC<{
   );
 };
 
-// ✅ NY HJÄLPFUNKTION FÖR ATT FORMATERA DATUM FÖR INPUT-FÄLTET
-const formatForInput = (isoString?: string | null): string => { 
-    if (!isoString) return '';
-    try {
-        const date = new Date(isoString);
-        if (isNaN(date.getTime())) return ''; // Kontrollera om datumet är giltigt
-        const ten = (n: number) => (n < 10 ? '0' : '') + n;
-        return `${date.getFullYear()}-${ten(date.getMonth() + 1)}-${ten(date.getDate())}T${ten(date.getHours())}:${ten(date.getMinutes())}`;
-    } catch {
-        return '';
-    }
-};
-
 export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
   const [loading, setLoading] = useState(false)
   const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
@@ -264,8 +258,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         org_nr: caseData.org_nr || '',
         personnummer: caseData.personnummer || '',
         material_cost: caseData.material_cost || 0,
-        start_date: caseData.start_date, // ✅ LADDA IN DATUM-DATAN
-        due_date: caseData.due_date,     // ✅ LADDA IN DATUM-DATAN
+        start_date: caseData.start_date,
+        due_date: caseData.due_date,
       });
       setError(null);
       setTimeTrackingLoading(false);
@@ -302,8 +296,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.skadedjur = formData.skadedjur;
         updateData.pris = formData.case_price;
         updateData.material_cost = formData.material_cost;
-        updateData.start_date = formData.start_date; // ✅ LÄGG TILL I UPPDATERINGEN
-        updateData.due_date = formData.due_date;     // ✅ LÄGG TILL I UPPDATERINGEN
+        updateData.start_date = formData.start_date;
+        updateData.due_date = formData.due_date;
       }
       
       if (tableName === 'private_cases') { updateData.personnummer = formData.personnummer; } 
@@ -397,6 +391,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     const finalValue = type === 'number' ? (value === '' ? null : parseFloat(value)) : value;
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   }
+  
+  // ✅ NY HANTERARE FÖR DEN ANPASSADE DATUMVÄLJAREN
+  const handleDateChange = (date: Date | null, fieldName: 'start_date' | 'due_date') => {
+    const isoString = date ? date.toISOString() : null;
+    setFormData(prev => ({ ...prev, [fieldName]: isoString }));
+  };
 
   const handleSuccessfulRestore = async () => {
     const result = await restoreFromBackup();
@@ -467,115 +467,127 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           </div>
 
-          {/* ✅ NY SEKTION FÖR SCHEMALÄGGNING */}
-          {showTimeTracking && (
-            <div className="space-y-4 pt-6 border-t border-slate-700">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-purple-400" />Schemaläggning</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input 
-                        label="Starttid"
-                        type="datetime-local"
-                        name="start_date"
-                        value={formatForInput(formData.start_date)}
-                        onChange={handleChange}
-                    />
-                    <Input 
-                        label="Sluttid"
-                        type="datetime-local"
-                        name="due_date"
-                        value={formatForInput(formData.due_date)}
-                        onChange={handleChange}
-                    />
-                </div>
-            </div>
-          )}
-
-          {showTimeTracking && (
-            <div className="space-y-4 pt-6 border-t border-slate-700">
-              <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
-                {currentCase.case_type === 'business' && (
-                  <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
-                )}
-                {currentCase.case_type === 'private' && (
-                  <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
-                <Input label="E-post" name="e_post_kontaktperson" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
-              </div>
-            </div>
-          )}
-          
           <div className="space-y-4 pt-6 border-t border-slate-700">
-            <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Kostnader & Tid</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
-              {showTimeTracking && (
-                <Input label="Materialkostnad" name="material_cost" type="number" value={formData.material_cost === null ? '' : formData.material_cost} onChange={handleChange} />
-              )}
-            </div>
-            
+            {/* ✅ UPPDATERAD SEKTION FÖR SCHEMALÄGGNING */}
             {showTimeTracking && (
-              <div className="p-4 bg-slate-800/50 rounded-lg border-2 border-slate-700">
-                <div className="flex items-center justify-between mb-4">
-                  <label className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                    <Clock className="w-4 h-4" />Arbetstid
-                    <span className="text-xs text-slate-500">({currentCase.id.slice(0, 8)})</span>
-                  </label>
-                  <div className="flex items-center gap-2 text-xs">
-                    {isRunning && <div className="flex items-center gap-2 text-green-400"><div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>AKTIV</div>}
-                    {lastBackup && <span className="text-slate-500">Backup: {lastBackup.toLocaleTimeString()}</span>}
+              <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-white flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-purple-400" />Schemaläggning</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Starttid</label>
+                          <DatePicker
+                              selected={formData.start_date ? new Date(formData.start_date) : null}
+                              onChange={(date) => handleDateChange(date, 'start_date')}
+                              locale="sv"
+                              showTimeSelect
+                              timeFormat="HH:mm"
+                              timeIntervals={15}
+                              dateFormat="yyyy-MM-dd HH:mm"
+                              placeholderText="Välj starttid..."
+                              isClearable
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Sluttid</label>
+                          <DatePicker
+                              selected={formData.due_date ? new Date(formData.due_date) : null}
+                              onChange={(date) => handleDateChange(date, 'due_date')}
+                              locale="sv"
+                              showTimeSelect
+                              timeFormat="HH:mm"
+                              timeIntervals={15}
+                              dateFormat="yyyy-MM-dd HH:mm"
+                              placeholderText="Välj sluttid..."
+                              isClearable
+                          />
+                      </div>
                   </div>
-                </div>
+              </div>
+            )}
 
-                <div className="text-center mb-6">
-                  <div className={`text-4xl font-bold font-mono mb-2 transition-colors duration-300 ${isRunning ? 'text-green-400' : 'text-white'}`}>
-                    {formatMinutesDetailed(displayTime)}
-                  </div>
-                  <div className="text-sm text-slate-400">
-                    {isRunning ? (
-                      <span className="text-green-400 flex items-center justify-center gap-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        Startad kl. {new Date(currentCase.work_started_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    ) : displayTime > 0 ? 'Pausad' : 'Ej påbörjad'}
-                  </div>
-                  {isRunning && displayTime > (currentCase.time_spent_minutes || 0) && (
-                    <div className="mt-2 text-xs text-slate-500">
-                      Denna session: {formatMinutesDetailed(displayTime - (currentCase.time_spent_minutes || 0))}
-                      {(currentCase.time_spent_minutes || 0) > 0 && (
-                        <span className="ml-2">(Tidigare: {formatMinutesDetailed(currentCase.time_spent_minutes)})</span>
-                      )}
-                    </div>
-                  )}
+            {showTimeTracking && (
+              <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
+                  {currentCase.case_type === 'business' && ( <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} /> )}
+                  {currentCase.case_type === 'private' && ( <Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} /> )}
                 </div>
-
-                <div className="space-y-3">
-                  {isRunning ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button type="button" variant="warning" onClick={() => handleTimeTracking('pause')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
-                        <Pause className="w-4 h-4" />{timeTrackingLoading ? 'Pausar...' : 'Pausa'}
-                      </Button>
-                      <Button type="button" variant="success" onClick={() => handleTimeTracking('complete')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
-                        <Save className="w-4 h-4" />{timeTrackingLoading ? 'Slutför...' : 'Slutför'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button type="button" variant="primary" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 py-3">
-                      <Play className="w-5 h-5" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
-                    </Button>
-                  )}
-                  {displayTime > 0 && !isRunning && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleTimeTracking('reset')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 transition-colors">
-                      <RotateCcw className="w-4 h-4" />{timeTrackingLoading ? 'Återställer...' : 'Nollställ arbetstid'}
-                    </Button>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
+                  <Input label="E-post" name="e_post_kontaktperson" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
                 </div>
               </div>
             )}
+            
+            <div className="space-y-4 pt-6 border-t border-slate-700">
+              <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Kostnader & Tid</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
+                {showTimeTracking && (
+                  <Input label="Materialkostnad" name="material_cost" type="number" value={formData.material_cost === null ? '' : formData.material_cost} onChange={handleChange} />
+                )}
+              </div>
+              
+              {showTimeTracking && (
+                <div className="p-4 bg-slate-800/50 rounded-lg border-2 border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />Arbetstid
+                      <span className="text-xs text-slate-500">({currentCase.id.slice(0, 8)})</span>
+                    </label>
+                    <div className="flex items-center gap-2 text-xs">
+                      {isRunning && <div className="flex items-center gap-2 text-green-400"><div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>AKTIV</div>}
+                      {lastBackup && <span className="text-slate-500">Backup: {lastBackup.toLocaleTimeString()}</span>}
+                    </div>
+                  </div>
+
+                  <div className="text-center mb-6">
+                    <div className={`text-4xl font-bold font-mono mb-2 transition-colors duration-300 ${isRunning ? 'text-green-400' : 'text-white'}`}>
+                      {formatMinutesDetailed(displayTime)}
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      {isRunning ? (
+                        <span className="text-green-400 flex items-center justify-center gap-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          Startad kl. {new Date(currentCase.work_started_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      ) : displayTime > 0 ? 'Pausad' : 'Ej påbörjad'}
+                    </div>
+                    {isRunning && displayTime > (currentCase.time_spent_minutes || 0) && (
+                      <div className="mt-2 text-xs text-slate-500">
+                        Denna session: {formatMinutesDetailed(displayTime - (currentCase.time_spent_minutes || 0))}
+                        {(currentCase.time_spent_minutes || 0) > 0 && (
+                          <span className="ml-2">(Tidigare: {formatMinutesDetailed(currentCase.time_spent_minutes)})</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    {isRunning ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button type="button" variant="warning" onClick={() => handleTimeTracking('pause')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
+                          <Pause className="w-4 h-4" />{timeTrackingLoading ? 'Pausar...' : 'Pausa'}
+                        </Button>
+                        <Button type="button" variant="success" onClick={() => handleTimeTracking('complete')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="flex items-center justify-center gap-2">
+                          <Save className="w-4 h-4" />{timeTrackingLoading ? 'Slutför...' : 'Slutför'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button type="button" variant="primary" onClick={() => handleTimeTracking('start')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 py-3">
+                        <Play className="w-5 h-5" />{timeTrackingLoading ? 'Startar...' : (displayTime > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid')}
+                      </Button>
+                    )}
+                    {displayTime > 0 && !isRunning && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleTimeTracking('reset')} loading={timeTrackingLoading} disabled={timeTrackingLoading} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 transition-colors">
+                        <RotateCcw className="w-4 h-4" />{timeTrackingLoading ? 'Återställer...' : 'Nollställ arbetstid'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </form>
       </div>
