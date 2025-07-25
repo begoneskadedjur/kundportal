@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 6.6 - IMPLEMENTERAR DYNAMISK OCH DETALJERAD FÖRSLAGS-BESKRIVNING
+// VERSION 6.7 - DEFINIERAR OCH IMPLEMENTERAR "SENT JOBB"-LOGIK FÖR HEMRESA
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -33,6 +33,7 @@ const MAX_SUGGESTIONS_TOTAL = 20;
 const MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE = 5;
 const MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE = 2;
 const HIGH_SCORE_THRESHOLD = 80;
+const LATE_JOB_THRESHOLD_MINUTES = 90; // ✅ NY KONFIGURATION: Definierar när ett jobb anses vara "sent".
 
 // --- Datatyper ---
 type DaySchedule = { start: string; end: string; active: boolean; };
@@ -43,23 +44,13 @@ interface AbsencePeriod { start: Date; end: Date; }
 interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
 
 interface Suggestion { 
-  technician_id: string; 
-  technician_name: string; 
-  start_time: string; 
-  end_time: string; 
-  travel_time_minutes: number; 
-  origin_description: string;
-  efficiency_score: number;
-  is_first_job: boolean;
-  travel_time_home_minutes?: number;
+  technician_id: string; technician_name: string; start_time: string; end_time: string; 
+  travel_time_minutes: number; origin_description: string; efficiency_score: number; 
+  is_first_job: boolean; travel_time_home_minutes?: number; 
 }
 
 // --- Hjälpfunktioner ---
-const formatAddress = (address: any): string => { 
-  if (!address) return ''; 
-  if (typeof address === 'object' && address.formatted_address) return address.formatted_address; 
-  return String(address); 
-};
+const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
 const getDayKey = (date: Date): keyof WorkSchedule => {
     const dayIndex = getDay(date);
     const dayMap: (keyof WorkSchedule)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -135,8 +126,7 @@ function buildDailySchedules(technicians: StaffMember[], schedules: Map<string, 
 
 function calculateEfficiencyScore(travelTime: number, isFirstJob: boolean, gapUtilization: number, travelTimeHome?: number): number {
   let score = 0;
-  if (isFirstJob) {
-    score = 120 - travelTime;
+  if (isFirstJob) { score = 120 - travelTime;
   } else {
     const travelScore = Math.max(0, 40 - (travelTime * 0.8));
     const utilizationScore = gapUtilization * 40;
@@ -150,9 +140,6 @@ function calculateEfficiencyScore(travelTime: number, isFirstJob: boolean, gapUt
   return Math.round(score);
 }
 
-/**
- * ✅ FOKUSERAD ÄNDRING: Funktionen har uppdaterats för att skapa en dynamisk och mer informativ beskrivning.
- */
 async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
   const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
@@ -171,14 +158,18 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     const isLastGap = !nextEvent;
 
     while (currentTry <= absoluteLatestStart) {
+      const slotEnd = addMinutes(currentTry, timeSlotDuration);
       let travelTimeHome: number | undefined = undefined;
-      if (isLastGap) {
+      let originDescription = '';
+
+      // ✅ NYTT VILLKOR: Beräkna och beskriv endast hemresan om jobbet är BÅDE sist på dagen OCH sent.
+      const isLateJob = slotEnd >= subMinutes(daySchedule.workEnd, LATE_JOB_THRESHOLD_MINUTES);
+
+      if (isLastGap && isLateJob) {
           const homeTravelTimes = await getTravelTimes([newCaseAddress], daySchedule.technician.address);
           travelTimeHome = homeTravelTimes.get(newCaseAddress);
       }
       
-      // ✅ NY, DETALJERAD BESKRIVNINGSLOGIK
-      let originDescription = '';
       const arrivalTimeStr = formatDate(currentTry, 'HH:mm');
       if (isFirstJob) {
           originDescription = `Startar från hemadress, framme ${arrivalTimeStr}`;
@@ -190,8 +181,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
       if (travelTimeHome !== undefined) {
           originDescription += `. Beräknad hemresa: ${travelTimeHome} min.`;
       }
-
-      const slotEnd = addMinutes(currentTry, timeSlotDuration);
+      
       const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
       const usedDuration = timeSlotDuration + (isFirstJob ? 0 : travelTime);
       const gapUtilization = gapDuration > 0 ? Math.min(1, usedDuration / gapDuration) : 1;
@@ -201,8 +191,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
         start_time: currentTry.toISOString(), end_time: slotEnd.toISOString(),
         travel_time_minutes: travelTime, origin_description: originDescription,
         efficiency_score: calculateEfficiencyScore(travelTime, isFirstJob, gapUtilization, travelTimeHome), 
-        is_first_job: isFirstJob,
-        travel_time_home_minutes: travelTimeHome
+        is_first_job: isFirstJob, travel_time_home_minutes: travelTimeHome
       });
       currentTry = addMinutes(currentTry, SUGGESTION_STRIDE_MINUTES);
     }
@@ -267,7 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v6.6):", error);
+    console.error("Fel i bokningsassistent (v6.7):", error);
     res.status(500).json({ error: "Ett internt fel uppstod.", details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 }
