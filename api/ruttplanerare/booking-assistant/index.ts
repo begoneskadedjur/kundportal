@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 6.7 - DEFINIERAR OCH IMPLEMENTERAR "SENT JOBB"-LOGIK FÖR HEMRESA
+// VERSION 6.8 - POLERAR BESKRIVNINGAR, KORRIGERAR TIDSZON-BUGG, SLUTGILITG VERSION
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -16,9 +16,8 @@ import {
   getDay,
   parse,
   areIntervalsOverlapping,
-  format as formatDate
 } from 'date-fns';
-import { fromZonedTime } from 'date-fns-tz';
+import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'; // ✅ KORREKT IMPORT för tidszon-formatering
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
@@ -33,7 +32,7 @@ const MAX_SUGGESTIONS_TOTAL = 20;
 const MAX_SUGGESTIONS_PER_TECH_DAY_HIGH_SCORE = 5;
 const MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE = 2;
 const HIGH_SCORE_THRESHOLD = 80;
-const LATE_JOB_THRESHOLD_MINUTES = 90; // ✅ NY KONFIGURATION: Definierar när ett jobb anses vara "sent".
+const LATE_JOB_THRESHOLD_MINUTES = 90;
 
 // --- Datatyper ---
 type DaySchedule = { start: string; end: string; active: boolean; };
@@ -42,7 +41,6 @@ interface StaffMember { id: string; name: string; address: string; work_schedule
 interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
 interface AbsencePeriod { start: Date; end: Date; }
 interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
-
 interface Suggestion { 
   technician_id: string; technician_name: string; start_time: string; end_time: string; 
   travel_time_minutes: number; origin_description: string; efficiency_score: number; 
@@ -98,7 +96,7 @@ async function getTravelTimes(origins: string[], destination: string): Promise<M
     return travelTimes;
 }
 
-// --- Kärnlogik (uppdaterad) ---
+// --- Kärnlogik ---
 
 function buildDailySchedules(technicians: StaffMember[], schedules: Map<string, EventSlot[]>, absences: Map<string, AbsencePeriod[]>, searchStart: Date, searchEnd: Date): TechnicianDaySchedule[] {
   const dailySchedules: TechnicianDaySchedule[] = [];
@@ -162,7 +160,6 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
       let travelTimeHome: number | undefined = undefined;
       let originDescription = '';
 
-      // ✅ NYTT VILLKOR: Beräkna och beskriv endast hemresan om jobbet är BÅDE sist på dagen OCH sent.
       const isLateJob = slotEnd >= subMinutes(daySchedule.workEnd, LATE_JOB_THRESHOLD_MINUTES);
 
       if (isLastGap && isLateJob) {
@@ -170,16 +167,17 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
           travelTimeHome = homeTravelTimes.get(newCaseAddress);
       }
       
-      const arrivalTimeStr = formatDate(currentTry, 'HH:mm');
+      // ✅ BUGGFIX OCH FÖRBÄTTRING: Använder 'formatInTimeZone' för att garantera korrekt tid i beskrivningen.
+      const arrivalTimeStr = formatInTimeZone(currentTry, TIMEZONE, 'HH:mm');
       if (isFirstJob) {
-          originDescription = `Startar från hemadress, framme ${arrivalTimeStr}`;
+          originDescription = `Från hemadress (Ankomst beräknad kl. ${arrivalTimeStr})`;
       } else {
-          const prevEndTimeStr = formatDate(currentEvent.end, 'HH:mm');
+          const prevEndTimeStr = formatInTimeZone(currentEvent.end, TIMEZONE, 'HH:mm');
           const prevEventTitle = currentEvent.title ? `"${currentEvent.title.substring(0, 20)}..."` : "föregående ärende";
-          originDescription = `${daySchedule.technician.name.split(' ')[0]} avslutar ${prevEventTitle} kl. ${prevEndTimeStr} och är framme kl. ${arrivalTimeStr} (${travelTime} min restid)`;
+          originDescription = `Efter ${prevEventTitle} (slutar ${prevEndTimeStr}). Ankomst beräknad kl. ${arrivalTimeStr} (+${travelTime} min restid).`;
       }
       if (travelTimeHome !== undefined) {
-          originDescription += `. Beräknad hemresa: ${travelTimeHome} min.`;
+          originDescription += ` Sista jobbet för dagen (Beräknad hemresa: ${travelTimeHome} min).`;
       }
       
       const gapDuration = (gapEnd.getTime() - gapStart.getTime()) / 60000;
@@ -256,7 +254,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v6.7):", error);
+    console.error("Fel i bokningsassistent (v6.8):", error);
     res.status(500).json({ error: "Ett internt fel uppstod.", details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 }
