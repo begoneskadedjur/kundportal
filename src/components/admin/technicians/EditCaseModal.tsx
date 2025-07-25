@@ -1,19 +1,33 @@
-// 📁 src/components/admin/technicians/EditCaseModal.tsx - SLUTGILTIG VERSION MED ALLA FIXAR
+// 📁 src/components/admin/technicians/EditCaseModal.tsx
+// ⭐ VERSION 2.1 - LÄGGER TILL DATUM/TID-REDIGERING FÖR KOORDINATORER ⭐
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 import toast from 'react-hot-toast'
 
+// ✅ UTÖKAD TYP FÖR ATT INKLUDERA DATUMFÄLT
 interface TechnicianCase {
-  id: string; case_type: 'private' | 'business' | 'contract'; title: string;
-  description?: string; status: string; case_price?: number;
-  kontaktperson?: string; telefon_kontaktperson?: string; e_post_kontaktperson?: string;
-  skadedjur?: string; org_nr?: string; personnummer?: string;
-  material_cost?: number; time_spent_minutes?: number; work_started_at?: string | null;
+  id: string;
+  case_type: 'private' | 'business' | 'contract';
+  title: string;
+  description?: string;
+  status: string;
+  case_price?: number;
+  kontaktperson?: string;
+  telefon_kontaktperson?: string;
+  e_post_kontaktperson?: string;
+  skadedjur?: string;
+  org_nr?: string;
+  personnummer?: string;
+  material_cost?: number;
+  time_spent_minutes?: number;
+  work_started_at?: string | null;
+  start_date?: string | null; // ✅ NYTT
+  due_date?: string | null;   // ✅ NYTT
 }
 
 interface EditCaseModalProps {
@@ -39,12 +53,10 @@ const safeRoundMinutes = (minutes: number): number => {
 
 const formatMinutesDetailed = (minutes: number | null | undefined): string => {
   if (minutes === null || minutes === undefined || minutes < 0.1) return '0:00';
-  
   const totalMinutes = Math.max(0, minutes);
   const hours = Math.floor(totalMinutes / 60);
   const mins = Math.floor(totalMinutes % 60);
   const seconds = Math.floor((totalMinutes * 60) % 60);
-  
   if (hours > 0) {
     return `${hours}:${mins.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
@@ -71,14 +83,11 @@ const useRealTimeTimer = (case_: TechnicianCase | null) => {
       setIsRunning(false);
       return;
     }
-
     const baseTime = case_.time_spent_minutes || 0;
     const isActive = Boolean(case_.work_started_at);
     setIsRunning(isActive);
-
     if (isActive) {
       const startTime = new Date(case_.work_started_at!).getTime();
-      
       const updateTimer = () => {
         const now = Date.now();
         const sessionMinutes = (now - startTime) / (1000 * 60);
@@ -103,7 +112,6 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
     if (!currentCase) return;
     const backupKey = `time_backup_${currentCase.id}`;
     const backup = localStorage.getItem(backupKey);
-    
     if (backup) {
       try {
         const data: BackupData = JSON.parse(backup);
@@ -112,7 +120,6 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         const backupMinutes = safeRoundMinutes(data.totalMinutes);
         const currentMinutes = currentCase.time_spent_minutes || 0;
         const hoursSinceBackup = (now.getTime() - backupTime.getTime()) / (1000 * 60 * 60);
-        
         if (backupMinutes > currentMinutes && hoursSinceBackup < 8) {
           setPendingRestore({ ...data, totalMinutes: backupMinutes });
         } else {
@@ -127,13 +134,11 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
 
   useEffect(() => {
     if (!currentCase?.work_started_at) return;
-
     const backupInterval = setInterval(() => {
       const now = new Date();
       const startTime = new Date(currentCase.work_started_at!);
       const sessionMinutes = (now.getTime() - startTime.getTime()) / 1000 / 60;
       const totalMinutes = (currentCase.time_spent_minutes || 0) + sessionMinutes;
-
       const backup: BackupData = {
         caseId: currentCase.id,
         totalMinutes: safeRoundMinutes(totalMinutes),
@@ -141,32 +146,24 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         startedAt: currentCase.work_started_at,
         timestamp: now.toISOString()
       };
-
       localStorage.setItem(`time_backup_${currentCase.id}`, JSON.stringify(backup));
       setLastBackup(now);
     }, 30000);
-
     return () => clearInterval(backupInterval);
   }, [currentCase?.work_started_at, currentCase?.time_spent_minutes, currentCase?.id]);
 
   const restoreFromBackup = useCallback(async (): Promise<Partial<TechnicianCase> | false> => {
     if (!pendingRestore || !currentCase) return false;
-
     try {
-      const tableName = currentCase.case_type === 'private' ? 'private_cases' 
-                     : currentCase.case_type === 'business' ? 'business_cases' 
-                     : 'cases';
+      const tableName = currentCase.case_type === 'private' ? 'private_cases' : currentCase.case_type === 'business' ? 'business_cases' : 'cases';
       const safeMinutes = safeRoundMinutes(pendingRestore.totalMinutes);
-      
       const { data, error } = await supabase
         .from(tableName)
         .update({ time_spent_minutes: safeMinutes, work_started_at: null })
         .eq('id', currentCase.id)
         .select()
         .single();
-
       if (error) throw error;
-
       localStorage.removeItem(`time_backup_${currentCase.id}`);
       setPendingRestore(null);
       toast.success(`Återställde ${formatMinutes(safeMinutes)} arbetstid!`);
@@ -228,6 +225,19 @@ const BackupRestorePrompt: React.FC<{
   );
 };
 
+// ✅ NY HJÄLPFUNKTION FÖR ATT FORMATERA DATUM FÖR INPUT-FÄLTET
+const formatForInput = (isoString?: string | null): string => { 
+    if (!isoString) return '';
+    try {
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return ''; // Kontrollera om datumet är giltigt
+        const ten = (n: number) => (n < 10 ? '0' : '') + n;
+        return `${date.getFullYear()}-${ten(date.getMonth() + 1)}-${ten(date.getDate())}T${ten(date.getHours())}:${ten(date.getMinutes())}`;
+    } catch {
+        return '';
+    }
+};
+
 export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
   const [loading, setLoading] = useState(false)
   const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
@@ -243,11 +253,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     if (caseData) {
       setCurrentCase(caseData);
       setFormData({
-        title: caseData.title || '', status: caseData.status || '', description: caseData.description || '',
-        kontaktperson: caseData.kontaktperson || '', telefon_kontaktperson: caseData.telefon_kontaktperson || '',
-        e_post_kontaktperson: caseData.e_post_kontaktperson || '', case_price: caseData.case_price || 0,
-        skadedjur: caseData.skadedjur || '', org_nr: caseData.org_nr || '', personnummer: caseData.personnummer || '',
-        material_cost: caseData.material_cost || 0
+        title: caseData.title || '',
+        status: caseData.status || '',
+        description: caseData.description || '',
+        kontaktperson: caseData.kontaktperson || '',
+        telefon_kontaktperson: caseData.telefon_kontaktperson || '',
+        e_post_kontaktperson: caseData.e_post_kontaktperson || '',
+        case_price: caseData.case_price || 0,
+        skadedjur: caseData.skadedjur || '',
+        org_nr: caseData.org_nr || '',
+        personnummer: caseData.personnummer || '',
+        material_cost: caseData.material_cost || 0,
+        start_date: caseData.start_date, // ✅ LADDA IN DATUM-DATAN
+        due_date: caseData.due_date,     // ✅ LADDA IN DATUM-DATAN
       });
       setError(null);
       setTimeTrackingLoading(false);
@@ -272,7 +290,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     
     try {
       const updateData: { [key: string]: any } = {
-        title: formData.title, status: formData.status, description: formData.description,
+        title: formData.title,
+        status: formData.status,
+        description: formData.description,
       };
       
       if (tableName === 'private_cases' || tableName === 'business_cases') {
@@ -282,6 +302,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.skadedjur = formData.skadedjur;
         updateData.pris = formData.case_price;
         updateData.material_cost = formData.material_cost;
+        updateData.start_date = formData.start_date; // ✅ LÄGG TILL I UPPDATERINGEN
+        updateData.due_date = formData.due_date;     // ✅ LÄGG TILL I UPPDATERINGEN
       }
       
       if (tableName === 'private_cases') { updateData.personnummer = formData.personnummer; } 
@@ -414,7 +436,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading}>
-      <div className="p-6 max-h-[70vh] overflow-y-auto">
+      <div className="p-6 max-h-[80vh] overflow-y-auto">
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
@@ -445,8 +467,31 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           </div>
 
+          {/* ✅ NY SEKTION FÖR SCHEMALÄGGNING */}
           {showTimeTracking && (
-            <div className="space-y-4">
+            <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-purple-400" />Schemaläggning</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input 
+                        label="Starttid"
+                        type="datetime-local"
+                        name="start_date"
+                        value={formatForInput(formData.start_date)}
+                        onChange={handleChange}
+                    />
+                    <Input 
+                        label="Sluttid"
+                        type="datetime-local"
+                        name="due_date"
+                        value={formatForInput(formData.due_date)}
+                        onChange={handleChange}
+                    />
+                </div>
+            </div>
+          )}
+
+          {showTimeTracking && (
+            <div className="space-y-4 pt-6 border-t border-slate-700">
               <h3 className="text-lg font-medium text-white flex items-center gap-2"><User className="w-5 h-5 text-green-400" />Kontaktinformation</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Kontaktperson" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
@@ -464,7 +509,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             </div>
           )}
           
-          <div className="space-y-4">
+          <div className="space-y-4 pt-6 border-t border-slate-700">
             <h3 className="text-lg font-medium text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-yellow-400" />Kostnader & Tid</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Ärendepris (exkl. material)" name="case_price" type="number" value={formData.case_price === null ? '' : formData.case_price} onChange={handleChange} />
