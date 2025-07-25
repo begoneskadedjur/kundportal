@@ -1,5 +1,5 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 2.2 - INTEGRERAD MED "SKAPA ÄRENDE"-MODAL ⭐
+// ⭐ VERSION 2.3 - INTEGRERAD MED "SKAPA FRÅNVARO"-MODAL ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -10,10 +10,11 @@ import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleCon
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
-import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'; // ✅ NYTT: Importera den nya modalen
-import Button from '../../components/ui/Button'; // ✅ NYTT: Importera Button-komponenten
+import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal';
+import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal'; // ✅ NYTT: Importera frånvaro-modalen
+import Button from '../../components/ui/Button';
 
-import { LayoutGrid, Plus } from 'lucide-react'; // ✅ NYTT: Importera Plus-ikonen
+import { LayoutGrid, Plus, CalendarOff } from 'lucide-react'; // ✅ NYTT: Importera CalendarOff-ikonen
 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
@@ -30,11 +31,10 @@ export default function CoordinatorSchedule() {
   // States för modaler
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // ✅ NYTT: State för skapa-modalen
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false); // ✅ NYTT: State för frånvaro-modalen
 
   const fetchData = useCallback(async () => {
-    // Vi sätter inte loading till true här om vi inte vill ha en helskärmsladdning varje gång.
-    // Kan justeras om en mindre laddningsindikator behövs.
     try {
       // Hämta tekniker
       const techniciansResult = await supabase
@@ -68,7 +68,6 @@ export default function CoordinatorSchedule() {
       
       setAllCases(combinedCases as BeGoneCaseRow[]);
 
-      // Sätt alla tekniker som valda som standard (bara vid första laddningen)
       if (selectedTechnicianIds.size === 0) {
         setSelectedTechnicianIds(new Set(techniciansResult.data?.map(t => t.id) || []));
       }
@@ -78,7 +77,7 @@ export default function CoordinatorSchedule() {
     } finally {
       setLoading(false);
     }
-  }, [selectedTechnicianIds.size]); // Beroendet här säkerställer att teknikerlistan bara fylls en gång
+  }, [selectedTechnicianIds.size]);
 
   useEffect(() => {
     fetchData();
@@ -136,13 +135,18 @@ export default function CoordinatorSchedule() {
 
   const handleUpdateSuccess = () => {
     setIsEditModalOpen(false);
-    fetchData(); // Ladda om data efter uppdatering
+    fetchData();
   };
   
-  // ✅ NYTT: Hanterare för när ett nytt ärende har skapats
   const handleCreateSuccess = () => {
-    setIsCreateModalOpen(false); // Stäng modalen
-    fetchData(); // Ladda om all data för att visa det nya ärendet
+    setIsCreateModalOpen(false);
+    fetchData();
+  };
+  
+  // ✅ NYTT: Hanterare för när en ny frånvaro har skapats
+  const handleAbsenceCreateSuccess = () => {
+    setIsAbsenceModalOpen(false); // Stäng modalen
+    fetchData(); // Ladda om all data för att säkerställa att allt är up-to-date
   };
 
   if (loading) {
@@ -156,7 +160,7 @@ export default function CoordinatorSchedule() {
   return (
     <>
       <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-        {/* ✅ Header med statistik och ny knapp */}
+        {/* Header med statistik och nya knappar */}
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
           <div className="max-w-screen-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -188,16 +192,21 @@ export default function CoordinatorSchedule() {
                 </div>
               </div>
 
-              {/* ✅ NY KNAPP */}
-              <Button onClick={() => setIsCreateModalOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Skapa Nytt Ärende
-              </Button>
+              {/* ✅ UPPDATERAD KNAPP-GRUPP */}
+              <div className="flex items-center gap-2">
+                <Button onClick={() => setIsCreateModalOpen(true)} variant="primary">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Skapa Nytt Ärende
+                </Button>
+                <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro för en tekniker">
+                    <CalendarOff className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* ✅ Huvudlayout med sidopanel och schema (oförändrad) */}
+        {/* Huvudlayout med sidopanel och schema (oförändrad) */}
         <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-[calc(100vh-65px)]">
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
@@ -233,11 +242,19 @@ export default function CoordinatorSchedule() {
         caseData={selectedCase as any} 
       />
 
-      {/* ✅ NYTT: Modal för att skapa nya ärenden */}
+      {/* Modal för att skapa nya ärenden */}
       <CreateCaseModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
+        technicians={technicians}
+      />
+
+      {/* ✅ NYTT: Modal för att registrera frånvaro */}
+      <CreateAbsenceModal
+        isOpen={isAbsenceModalOpen}
+        onClose={() => setIsAbsenceModalOpen(false)}
+        onSuccess={handleAbsenceCreateSuccess}
         technicians={technicians}
       />
     </>
