@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician } from '../../../types/database';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 
 import Modal from '../../ui/Modal';
@@ -10,12 +10,12 @@ import Input from '../../ui/Input';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
-import DatePicker from 'react-datepicker'
-import { registerLocale } from 'react-datepicker'
-import sv from 'date-fns/locale/sv'
-import "react-datepicker/dist/react-datepicker.css"
+import DatePicker from 'react-datepicker';
+import { registerLocale } from 'react-datepicker';
+import sv from 'date-fns/locale/sv';
+import "react-datepicker/dist/react-datepicker.css";
 
-registerLocale('sv', sv)
+registerLocale('sv', sv);
 
 // --- Hjälpfunktioner för visning ---
 
@@ -26,9 +26,6 @@ const getTravelTimeColor = (minutes: number): string => {
   return 'text-red-400';
 };
 
-/**
- * ✅ NYTT: Funktion för att tolka efficiency_score till ett användarvänligt betyg.
- */
 const getEfficiencyScoreInfo = (score: number): { text: string; color: string; icon: React.ReactNode } => {
     if (score >= 100) return { text: 'Utmärkt', color: 'text-green-400', icon: <Star size={14} /> };
     if (score >= 85) return { text: 'Bra', color: 'text-sky-400', icon: <ThumbsUp size={14} /> };
@@ -36,8 +33,7 @@ const getEfficiencyScoreInfo = (score: number): { text: string; color: string; i
     return { text: 'Låg', color: 'text-red-400', icon: <ThumbsDown size={14} /> };
 };
 
-
-// ✅ UPPDATERAD: Suggestion-typen inkluderar nu efficiency_score.
+// ✅ UPPDATERAD: Suggestion-typen matchar nu exakt API:ets svar.
 interface Suggestion {
     technician_id: string;
     technician_name: string;
@@ -46,7 +42,20 @@ interface Suggestion {
     travel_time_minutes: number;
     origin_description: string;
     efficiency_score: number;
+    travel_time_home_minutes?: number; // Inkluderar nu hemresan
 }
+
+/**
+ * ✅ NY KOMPONENT: En dedikerad komponent för att snyggt visa den detaljerade beskrivningen.
+ */
+const SuggestionDescription = ({ sugg }: { sugg: Suggestion }) => {
+    return (
+        <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">
+            {sugg.origin_description}
+        </p>
+    );
+};
+
 
 interface CreateCaseModalProps { isOpen: boolean; onClose: () => void; onSuccess: () => void; technicians: Technician[]; }
 
@@ -74,9 +83,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (isOpen) {
         handleReset();
         if (technicians.length > 0) {
-            const defaultSelectedTechnicians = technicians.filter(tech => 
-                tech.role === 'Skadedjurstekniker'
-            );
+            const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
             setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
         }
     }
@@ -90,47 +97,29 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    if (name === 'kontaktperson') {
-        setFormData(prev => ({ ...prev, [name]: value, title: value }));
-    } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    if (name === 'kontaktperson') { setFormData(prev => ({ ...prev, [name]: value, title: value }));
+    } else { setFormData(prev => ({ ...prev, [name]: value })); }
   };
 
   const handleTechnicianSelectionChange = (technicianId: string) => {
-    setSelectedTechnicianIds(prev =>
-      prev.includes(technicianId)
-        ? prev.filter(id => id !== technicianId)
-        : [...prev, technicianId]
-    );
+    setSelectedTechnicianIds(prev => prev.includes(technicianId) ? prev.filter(id => id !== technicianId) : [...prev, technicianId]);
   };
 
   const handleDateChange = (date: Date | null, fieldName: 'searchStartDate' | 'start_date' | 'due_date') => {
-    if (fieldName === 'searchStartDate') {
-      setSearchStartDate(date);
-    } else {
-      const isoString = date ? date.toISOString() : null;
-      setFormData(prev => ({ ...prev, [fieldName]: isoString }));
-    }
+    if (fieldName === 'searchStartDate') { setSearchStartDate(date);
+    } else { const isoString = date ? date.toISOString() : null; setFormData(prev => ({ ...prev, [fieldName]: isoString })); }
   };
   
   const handleSuggestTime = async () => {
-    if (!formData.adress || !formData.skadedjur) {
-      toast.error('Adress och Skadedjur måste vara ifyllda.');
-      return;
-    }
-    setSuggestionLoading(true);
-    setSuggestions([]);
-    setError(null);
+    if (!formData.adress || !formData.skadedjur) { toast.error('Adress och Skadedjur måste vara ifyllda.'); return; }
+    setSuggestionLoading(true); setSuggestions([]); setError(null);
     try {
       const response = await fetch('/api/ruttplanerare/booking-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            newCaseAddress: formData.adress,
-            pestType: formData.skadedjur,
-            timeSlotDuration: timeSlotDuration,
-            searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
+            newCaseAddress: formData.adress, pestType: formData.skadedjur,
+            timeSlotDuration: timeSlotDuration, searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
             selectedTechnicianIds: selectedTechnicianIds
         })
       });
@@ -139,32 +128,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       setSuggestions(data);
       if (data.length === 0) toast.success('Inga optimala tider hittades för de valda teknikerna.');
     } catch (err: any) {
-      setError(err.message);
-      toast.error(err.message);
+      setError(err.message); toast.error(err.message);
     } finally {
       setSuggestionLoading(false);
     }
   };
   
   const applySuggestion = (suggestion: Suggestion) => {
-    setFormData(prev => ({
-      ...prev,
-      start_date: suggestion.start_time,
-      due_date: suggestion.end_time,
-      primary_assignee_id: suggestion.technician_id,
-    }));
+    setFormData(prev => ({ ...prev, start_date: suggestion.start_time, due_date: suggestion.end_time, primary_assignee_id: suggestion.technician_id }));
     const startTimeFormatted = new Date(suggestion.start_time).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     toast.success(`${suggestion.technician_name} vald för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')} kl. ${startTimeFormatted}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault();
-    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) {
-        toast.error("Alla fält under 'Bokning & Detaljer' måste vara ifyllda.");
-        return;
-    }
-    setLoading(true);
-    setError(null);
+    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { toast.error("Alla fält under 'Bokning & Detaljer' måste vara ifyllda."); return; }
+    setLoading(true); setError(null);
     try {
       const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
       await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim() }]);
@@ -190,7 +169,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }
 
   const footer = step === 'form' ? (
-    // ✅ MOBILANPASSNING: Knapparna stackas snyggt på små skärmar.
     <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 p-4 border-t border-slate-800">
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">Avbryt</Button>
       <Button type="submit" form="create-case-form" loading={loading} disabled={loading} size="lg" className="w-full sm:w-auto">
@@ -200,12 +178,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   ) : null;
 
   return (
-    // ✅ MOBILANPASSNING: Storleken är nu flexibel för att passa alla skärmar.
     <Modal isOpen={isOpen} onClose={onClose} title={step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer}>
-      {/* Scrollbar för innehållet på mindre skärmar */}
       <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
         {step === 'selectType' && (
-            // ✅ MOBILANPASSNING: Byter från rad till kolumn på små skärmar.
             <div className="flex flex-col md:flex-row gap-4">
                 <button onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" /><h3 className="text-xl font-bold">Privatperson</h3></button>
                 <button onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" /><h3 className="text-xl font-bold">Företag</h3></button>
@@ -216,7 +191,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
             {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
             
-            {/* ✅ MOBILANPASSNING: Hela modulen är nu uppdelad i två kolumner på stora skärmar för bättre överblick */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
               {/* VÄNSTER KOLUMN: Intelligent Bokning */}
@@ -265,20 +239,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
                     {suggestions.map((sugg, index) => {
                       const travelColor = getTravelTimeColor(sugg.travel_time_minutes);
-                      const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score); // ✅ Hämta betyget
+                      const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
                       return (
                         <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
                           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
-                            {/* ✅ NYTT: Komponent för att visa både restid och betyg */}
                             <div className="flex items-center gap-3 text-xs sm:text-sm">
                                 <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
+                                {sugg.travel_time_home_minutes && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
                                 <div className={`font-bold flex items-center gap-1.5 ${travelColor}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
                             </div>
                           </div>
                           <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                           <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                          <div className="text-xs text-slate-400 mt-1">Från: {sugg.origin_description}</div>
+                          {/* ✅ ANROP AV DEN NYA KOMPONENTEN FÖR ATT VISA TYDLIG BESKRIVNING */}
+                          <SuggestionDescription sugg={sugg} />
                         </div>
                       );
                     })}
@@ -319,7 +294,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={4} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white" placeholder="Kort om ärendet, portkod, etc."/>
                   </div>
               </div>
-
             </div>
           </form>
         )}
