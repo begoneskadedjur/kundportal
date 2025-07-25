@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 4.2 - KORREKT HANTERING AV LUCKOR EFTER FRÅNVARO
+// VERSION 4.3 - HANTERAR VALDA TEKNIKER FRÅN FRONTEND
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -18,7 +18,6 @@ const TARGET_TIMEZONE = 'Europe/Stockholm';
 // --- Datatyper och hjälpfunktioner ---
 interface StaffMember { id: string; name: string; address: string; }
 interface TimeSlot { start: Date; end: Date; }
-// ✅ Utökad typ för att skilja på ärenden och frånvaro
 interface EventSlot extends TimeSlot {
     type: 'case' | 'absence';
     title?: string;
@@ -42,9 +41,10 @@ const createDateInTimeZone = (date: Date, hour: number): Date => {
     return timeInZone;
 };
 
-// Hjälpfunktioner för att hämta data (oförändrade men inklistrade för fullständighet)
+// Hjälpfunktioner för att hämta data (oförändrade)
 async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
     const staffIds = staff.map(s => s.id);
+    if (staffIds.length === 0) return new Map();
     const { data, error } = await supabase.from('cases_with_technician_view').select('start_date, due_date, technician_id, adress, title').in('technician_id', staffIds).gte('start_date', from.toISOString()).lte('start_date', to.toISOString());
     if (error) throw error;
     const schedules = new Map<string, EventSlot[]>();
@@ -53,6 +53,7 @@ async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise
     return schedules;
 }
 async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
+    if (staffIds.length === 0) return new Map();
     const { data, error } = await supabase.from('technician_absences').select('technician_id, start_date, end_date').in('technician_id', staffIds).lt('start_date', to.toISOString()).gt('end_date', from.toISOString());
     if (error) throw error;
     const absences = new Map<string, EventSlot[]>();
@@ -65,26 +66,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
 
     try {
-        const { newCaseAddress, pestType, timeSlotDuration = 120, searchStartDate } = req.body;
+        // ✅ HÄMTA DEN NYA PARAMETERN
+        const { newCaseAddress, pestType, timeSlotDuration = 120, searchStartDate, selectedTechnicianIds } = req.body;
+        
         if (!newCaseAddress || !pestType) return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
 
         const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
         startDate.setUTCHours(0, 0, 0, 0);
         
-        const competentStaff = await getCompetentStaff(pestType);
-        if (competentStaff.length === 0) return res.status(200).json([]);
-        const staffIds = competentStaff.map(s => s.id);
+        // 1. Hämta ALLA tekniker som har rätt kompetens
+        const allCompetentStaff = await getCompetentStaff(pestType);
+        if (allCompetentStaff.length === 0) {
+             return res.status(200).json([]);
+        }
+
+        // ✅ 2. FILTRERA BASERAT PÅ KOORDINATORNS VAL
+        let staffToSearch: StaffMember[];
+        if (selectedTechnicianIds && Array.isArray(selectedTechnicianIds) && selectedTechnicianIds.length > 0) {
+            const selectedIdsSet = new Set(selectedTechnicianIds);
+            // Inkludera endast de tekniker som är BÅDE kompetenta OCH valda
+            staffToSearch = allCompetentStaff.filter(staff => selectedIdsSet.has(staff.id));
+        } else {
+            // Om ingen lista skickas med (eller om den är tom), sök bland alla kompetenta
+            staffToSearch = allCompetentStaff;
+        }
+
+        if (staffToSearch.length === 0) {
+            return res.status(200).json([]); // Inga av de valda teknikerna hade rätt kompetens
+        }
+        
+        const staffIdsToSearch = staffToSearch.map(s => s.id);
 
         const fourteenDaysFromStart = new Date(startDate);
         fourteenDaysFromStart.setDate(startDate.getDate() + SEARCH_DAYS_LIMIT);
 
+        // ✅ 3. ANVÄND DEN FILTRERADE LISTAN FÖR ATT HÄMTA DATA
         const [schedules, absences] = await Promise.all([
-            getSchedules(competentStaff, startDate, fourteenDaysFromStart),
-            getAbsences(staffIds, startDate, fourteenDaysFromStart)
+            getSchedules(staffToSearch, startDate, fourteenDaysFromStart),
+            getAbsences(staffIdsToSearch, startDate, fourteenDaysFromStart)
         ]);
         
         const allCaseAddresses = Array.from(schedules.values()).flat().map(c => formatAddress(c.adress));
-        const allHomeAddresses = competentStaff.map(s => s.address);
+        const allHomeAddresses = staffToSearch.map(s => s.address);
         const allKnownAddresses = [...new Set([...allCaseAddresses, ...allHomeAddresses])].filter(Boolean);
 
         const travelTimes = await getTravelTimes(allKnownAddresses, newCaseAddress);
@@ -98,7 +121,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dayOfWeek = currentDay.getUTCDay();
             if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-            for (const staff of competentStaff) {
+            // ✅ 4. SÖK LUCKOR BLAND DEN FILTRERADE LISTAN
+            for (const staff of staffToSearch) {
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
@@ -107,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const allBookedSlots = [...techSchedule, ...techAbsences].sort((a,b) => a.start.getTime() - b.start.getTime());
 
                 const events: EventSlot[] = [
-                    { start: new Date(0), end: workDayStart, type: 'absence' }, // Fiktiv start, behandlas som frånvaro
+                    { start: new Date(0), end: workDayStart, type: 'absence' },
                     ...allBookedSlots,
                 ];
 
@@ -115,16 +139,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const previousEvent = events[j];
                     const nextEventStart = (j + 1 < events.length) ? events[j+1].start : workDayEnd;
                     
-                    // ✅ KÄRNLOGIKEN FÖR ATT HITTA STARTPUNKT
                     let originAddress: string;
                     let originDescription: string;
                     
                     if (previousEvent.type === 'case' && previousEvent.adress) {
-                        // FALL 1: Föregående händelse var ett ärende. Använd dess adress.
                         originAddress = formatAddress(previousEvent.adress);
                         originDescription = previousEvent.title || 'Föregående kund';
                     } else {
-                        // FALL 2: Föregående händelse var frånvaro (eller dagens start). Använd hemadressen.
                         originAddress = formatAddress(staff.address);
                         originDescription = 'Hemadress';
                     }
@@ -132,12 +153,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const travelTimeMinutes = travelTimes.get(originAddress) ?? -1;
                     if (travelTimeMinutes === -1) continue;
 
-                    // Beräkna tidigaste ankomsttid.
                     const potentialStartTime = new Date(previousEvent.end.getTime() + travelTimeMinutes * 60000);
-                    
-                    // Dagens första lucka måste alltid börja tidigast kl 08:00
                     const actualStartTime = new Date(Math.max(potentialStartTime.getTime(), workDayStart.getTime()));
-
                     const potentialEndTime = new Date(actualStartTime.getTime() + timeSlotDuration * 60000);
                     
                     if (actualStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
@@ -164,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v4.2):", error);
+        console.error("Fel i bokningsassistent (v4.3):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }

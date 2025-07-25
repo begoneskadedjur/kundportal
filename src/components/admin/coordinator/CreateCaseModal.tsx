@@ -1,10 +1,10 @@
 // src/components/admin/coordinator/CreateCaseModal.tsx
-// VERSION 2.3 - FÄRGKODAD RESTID & FÖRBÄTTRADE FÖRSLAG
+// VERSION 2.4 - LÄGGER TILL TEKNIKERFILTER FÖR SÖKNING
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician } from '../../../types/database';
-import { Building, User, Zap, MapPin, CheckCircle, PlusCircle, ChevronLeft, AlertCircle, FileText } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, PlusCircle, ChevronLeft, AlertCircle, FileText, Users } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 
 import Modal from '../../ui/Modal';
@@ -13,7 +13,7 @@ import Input from '../../ui/Input';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
-// ✅ NY HJÄLPFUNKTION FÖR FÄRGKODNING AV RESTID
+// Hjälpfunktion för färgkodning av restid
 const getTravelTimeColor = (minutes: number): string => {
   if (minutes <= 20) return 'text-green-400';
   if (minutes <= 35) return 'text-blue-400';
@@ -44,13 +44,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [searchStartDate, setSearchStartDate] = useState('');
 
+  // ✅ NYTT STATE FÖR ATT HÅLLA VALDA TEKNIKER
+  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
+
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
     setSearchStartDate('');
+    setSelectedTechnicianIds([]); // ✅ Återställ även valda tekniker
   }, []);
 
-  useEffect(() => { if (isOpen) handleReset(); }, [isOpen, handleReset]);
+  useEffect(() => {
+    if (isOpen) {
+        handleReset();
+        // Välj alla tekniker som standard när modalen öppnas
+        if (technicians.length > 0) {
+            setSelectedTechnicianIds(technicians.map(t => t.id));
+        }
+    }
+  }, [isOpen, handleReset, technicians]);
 
   const selectCaseType = (type: 'private' | 'business') => {
     setCaseType(type);
@@ -65,6 +77,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  // ✅ NY HANTERARE FÖR CHECKBOXARNA
+  const handleTechnicianSelectionChange = (technicianId: string) => {
+    setSelectedTechnicianIds(prev =>
+      prev.includes(technicianId)
+        ? prev.filter(id => id !== technicianId) // Ta bort om den redan finns
+        : [...prev, technicianId] // Lägg till om den inte finns
+    );
   };
 
   const handleSuggestTime = async () => {
@@ -83,13 +104,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             newCaseAddress: formData.adress,
             pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration,
-            searchStartDate: searchStartDate || null
+            searchStartDate: searchStartDate || null,
+            selectedTechnicianIds: selectedTechnicianIds // ✅ SKICKA MED DE VALDA TEKNIKERNA
         })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Något gick fel.');
       setSuggestions(data);
-      if (data.length === 0) toast.success('Inga optimala rutter hittades.');
+      if (data.length === 0) toast.success('Inga optimala tider hittades för de valda teknikerna.');
     } catch (err: any) {
       setError(err.message);
       toast.error(err.message);
@@ -194,29 +216,45 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </select>
                 </div>
               </div>
+
+              {/* ✅ NY SEKTION FÖR ATT VÄLJA TEKNIKER */}
+              <div className="pt-4 border-t border-slate-600">
+                <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                  <Users size={16} /> Sök endast bland valda tekniker
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {technicians.map(tech => (
+                    <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500"
+                        checked={selectedTechnicianIds.includes(tech.id)}
+                        onChange={() => handleTechnicianSelectionChange(tech.id)}
+                      />
+                      <span className="text-sm text-white">{tech.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
                <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                {suggestionLoading && <div className="text-center"><LoadingSpinner text="Analyserar rutter och kompetenser..." /></div>}
               
-               {/* ✅ UPPDATERAD LISTA MED FÖRSLAG */}
                {suggestions.length > 0 && (
                  <div className="pt-4 border-t border-slate-700 space-y-2">
                    <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
                    {suggestions.map((sugg, index) => {
-                     // Hämta färgklassen för restiden
                      const travelColor = getTravelTimeColor(sugg.travel_time_minutes);
-
                      return (
                        <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-md bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
                          <div className="flex justify-between items-center">
                            <div className="font-semibold text-white">{sugg.technician_name}</div>
-                           {/* Använd den dynamiska färgklassen här */}
                            <div className={`text-sm font-bold flex items-center gap-1.5 ${travelColor}`}>
                              <MapPin size={12}/> {sugg.travel_time_minutes} min restid
                            </div>
                          </div>
                          <div className="text-sm text-slate-300 font-medium">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                          <div className="text-lg font-bold text-white mt-1">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                         {/* Visa varifrån teknikern kommer med en diskret färg */}
                          <div className="text-xs text-slate-400 mt-1">Från: {sugg.origin_description}</div>
                        </div>
                      );
