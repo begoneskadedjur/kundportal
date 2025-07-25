@@ -1,5 +1,5 @@
 // api/ruttplanerare/booking-assistant/index.ts
-// VERSION 3.4 - TIDSZONSKORRIGERING FÖR SVERIGE
+// VERSION 3.5 - KORRIGERAD TIDSZONS-MATEMATIK
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const WORK_DAY_START_HOUR = 8;
 const WORK_DAY_END_HOUR = 17;
 const SEARCH_DAYS_LIMIT = 14;
-const TARGET_TIMEZONE = 'Europe/Stockholm'; // ✅ VIKTIGT: Definiera måltidszonen
+const TARGET_TIMEZONE = 'Europe/Stockholm';
 
 // --- Datatyper och hjälpfunktioner ---
 interface StaffMember { id: string; name: string; address: string; }
@@ -22,38 +22,25 @@ interface CaseInfo extends TimeSlot { title: string; adress: any; }
 interface Suggestion { technician_id: string; technician_name: string; start_time: string; end_time: string; travel_time_minutes: number; origin_description: string; }
 const formatAddress = (address: any): string => { if (!address) return ''; if (typeof address === 'object' && address.formatted_address) return address.formatted_address; return String(address); };
 
-/**
- * ✅ NY HJÄLPFUNKTION
- * Skapar ett Date-objekt för en specifik tidpunkt i en given tidszon.
- * Detta kringgår problemet med att servern kör i UTC.
- * @param date - Datumdelen (t.ex. en Date-objekt för en specifik dag)
- * @param hour - Timmen som ska sättas (0-23)
- * @returns Ett korrekt Date-objekt som representerar den tidpunkten i måltidszonen.
- */
 const createDateInTimeZone = (date: Date, hour: number): Date => {
-    // Skapa en ISO-sträng för datumet (YYYY-MM-DD)
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
     const hourStr = String(hour).padStart(2, '0');
     
-    // Skapa en fullständig datum-tid-sträng med korrekt tidszoninformation
-    const isoStringInTimeZone = `${year}-${month}-${day}T${hourStr}:00:00`;
-
-    // Skapa datumet genom att tolka strängen som att den tillhör måltidszonen
-    // Detta är en robust metod för att säkerställa korrekt tidpunkt
-    const timeInZone = new Date(isoStringInTimeZone + '.000Z');
+    const isoStringForTime = `${year}-${month}-${day}T${hourStr}:00:00.000Z`;
+    const timeInZone = new Date(isoStringForTime);
     
-    // Justera för tidszonsskillnaden mellan UTC och den lokala tiden för det datumet
     const utcDate = new Date(timeInZone.toLocaleString('en-US', { timeZone: 'UTC' }));
     const tzDate = new Date(timeInZone.toLocaleString('en-US', { timeZone: TARGET_TIMEZONE }));
     const offset = utcDate.getTime() - tzDate.getTime();
     
-    timeInZone.setTime(timeInZone.getTime() - offset);
+    // ✅ KORRIGERING: Ändrat från '-' till '+' för att korrekt applicera den negativa offseten.
+    // Ex: 8:00 UTC + (-2 timmar) = 6:00 UTC, vilket är 8:00 i Sverige (CEST).
+    timeInZone.setTime(timeInZone.getTime() + offset);
     
     return timeInZone;
 };
-
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' });
@@ -62,7 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { newCaseAddress, pestType, timeSlotDuration = 120, searchStartDate } = req.body;
         if (!newCaseAddress || !pestType) return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' });
 
-        // `new Date("YYYY-MM-DD")` skapar ett datum vid midnatt UTC, vilket är säkert.
         const startDate = searchStartDate ? new Date(searchStartDate) : new Date();
         startDate.setUTCHours(0, 0, 0, 0);
 
@@ -83,16 +69,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const currentDay = new Date(startDate);
             currentDay.setDate(startDate.getDate() + i);
 
-            // getUTCDay() är säkrare än getDay() på servrar
             const dayOfWeek = currentDay.getUTCDay();
-            if (dayOfWeek === 0 || dayOfWeek === 6) { // Ignorera Söndag (0) och Lördag (6)
+            if (dayOfWeek === 0 || dayOfWeek === 6) { 
                 continue;
             }
 
             for (const staff of competentStaff) {
                 const techSchedule = schedules.get(staff.id)?.sort((a,b) => a.start.getTime() - b.start.getTime()) || [];
                 
-                // ✅ ANVÄND DEN NYA TIDSZONS-MEDVETNA FUNKTIONEN
                 const workDayStart = createDateInTimeZone(currentDay, WORK_DAY_START_HOUR);
                 const workDayEnd = createDateInTimeZone(currentDay, WORK_DAY_END_HOUR);
 
@@ -110,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     let originDescription: string;
                     
                     if (j === 0) {
-                        potentialStartTime = workDayStart; // Startar kl 08:00 svensk tid
+                        potentialStartTime = workDayStart;
                         originDescription = 'Hemadress';
                         travelTimeMinutes = travelTimes.get(formatAddress(staff.address)) ?? -1;
                     } else {
@@ -127,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     const potentialEndTime = new Date(potentialStartTime.getTime() + timeSlotDuration * 60000);
                     
-                    if (potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
+                    if (potentialStartTime >= workDayStart && potentialEndTime.getTime() <= nextEventStart.getTime() && potentialEndTime.getTime() <= workDayEnd.getTime()) {
                          allSuggestions.push({
                             technician_id: staff.id,
                             technician_name: staff.name,
@@ -149,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json(sortedSuggestions.slice(0, 5));
 
     } catch (error: any) {
-        console.error("Fel i bokningsassistent (v3.4):", error);
+        console.error("Fel i bokningsassistent (v3.5):", error);
         res.status(500).json({ error: "Ett internt fel uppstod.", details: error.message });
     }
 }
