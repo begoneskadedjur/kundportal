@@ -1,16 +1,16 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
-// ⭐ VERSION 7.0 - REFAKTORERAD FÖR ATT ANVÄNDA DELAD LOGIK. FUNKTIONEN ÄR ORÖRD.
+// ⭐ VERSION 7.2 - KORRIGERAR SÖKVÄG TILL DELAD LOGIK.
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { startOfDay, addDays, subMinutes, max, min, format as formatDate } from 'date-fns';
+import { startOfDay, addDays, subMinutes, max, min } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
-// ✅ All grundlogik importeras nu från den säkra, delade filen.
+// ✅ KORRIGERING: Importerar nu från den korrekt namngivna filen på rätt plats.
 import { 
-    TechnicianDaySchedule, SingleSuggestion, EventSlot,
+    TechnicianDaySchedule, Suggestion, EventSlot,
     getCompetentStaff, getSchedules, getAbsences, getTravelTimes,
-    buildDailySchedules, calculateEfficiencyScore, TIMEZONE
-} from './_utils';
+    buildDailySchedules, calculateEfficiencyScore, TIMEZONE, DEFAULT_TRAVEL_TIME
+} from '../assistant-utils';
 
 // --- Konfiguration (specifik för denna fil) ---
 const SEARCH_DAYS_LIMIT = 7;
@@ -21,9 +21,8 @@ const MAX_SUGGESTIONS_PER_TECH_DAY_LOW_SCORE = 2;
 const HIGH_SCORE_THRESHOLD = 80;
 const LATE_JOB_THRESHOLD_MINUTES = 90;
 
-// Denna funktion är specifik för singel-bokning och stannar därför här.
-async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<SingleSuggestion[]> {
-  const suggestions: SingleSuggestion[] = [];
+async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDuration: number, travelTimes: Map<string, number>, newCaseAddress: string): Promise<Suggestion[]> {
+  const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
   const virtualStartEvent: EventSlot = { start: subMinutes(daySchedule.workStart, 1), end: daySchedule.workStart, type: 'case', title: 'Hemadress', address: daySchedule.technician.address };
   const allEvents = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
@@ -33,7 +32,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
     const gapStart = currentEvent.end; const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
     if (gapEnd <= gapStart) continue;
 
-    const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || 30;
+    const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
     const isFirstJob = (currentEvent.title === 'Hemadress');
     let currentTry = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
     const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
@@ -79,7 +78,6 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
   return suggestions;
 }
 
-// Huvudfunktionen är nästan identisk, men använder importerade funktioner.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
   try {
@@ -113,9 +111,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!acc[key]) acc[key] = [];
         acc[key].push(sugg);
         return acc;
-    }, {} as Record<string, SingleSuggestion[]>);
+    }, {} as Record<string, Suggestion[]>);
 
-    let balancedSuggestions: SingleSuggestion[] = [];
+    let balancedSuggestions: Suggestion[] = [];
     for (const key in groupedByDayAndTech) {
         const group = groupedByDayAndTech[key].sort((a,b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
         const score = group[0].efficiency_score;
@@ -136,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v7.0):", error);
+    console.error("Fel i bokningsassistent (v7.2):", error);
     res.status(500).json({ error: "Ett internt fel uppstod.", details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 }

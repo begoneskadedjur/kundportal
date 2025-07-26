@@ -1,13 +1,15 @@
 // 📁 api/ruttplanerare/find-team-assistant.ts
-// ⭐ VERSION 1.0 - SÖKER EFTER BÄSTA MÖJLIGA TEAM AV TEKNIKER ⭐
+// ⭐ VERSION 1.2 - KORRIGERAR SÖKVÄG TILL DELAD LOGIK ⭐
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping } from 'date-fns';
+
+// ✅ KORRIGERING: Importerar nu från den korrekt namngivna filen.
 import {
     TechnicianDaySchedule, TeamSuggestion,
     getCompetentStaff, getSchedules, getAbsences, getTravelTimes,
-    buildDailySchedules
-} from './_utils';
+    buildDailySchedules, DEFAULT_TRAVEL_TIME
+} from './assistant-utils';
 
 // --- Konfiguration ---
 const SEARCH_DAYS_LIMIT = 7;
@@ -73,18 +75,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const referenceSchedule = teamCombination[0];
             let currentTime = referenceSchedule.workStart;
 
-            while (currentTime < subMinutes(referenceSchedule.workEnd, timeSlotDuration)) {
+            while (currentTime <= subMinutes(referenceSchedule.workEnd, timeSlotDuration)) {
                 const slot = { start: currentTime, end: addMinutes(currentTime, timeSlotDuration) };
                 const isTeamAvailable = teamCombination.every(techSchedule => isAvailable(techSchedule, slot));
 
                 if (isTeamAvailable) {
                     let totalTravelTime = 0;
                     const teamDetails = teamCombination.map(ts => {
-                        const travel_time_minutes = travelTimes.get(ts.technician.address) || 30;
+                        const travel_time_minutes = travelTimes.get(ts.technician.address) || DEFAULT_TRAVEL_TIME;
                         totalTravelTime += travel_time_minutes;
                         return { id: ts.technician.id, name: ts.technician.name, travel_time_minutes, origin_description: "Startar från hemadress" };
                     });
-
+                    
                     allTeamSuggestions.push({
                         technicians: teamDetails,
                         start_time: slot.start.toISOString(),

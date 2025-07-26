@@ -1,5 +1,5 @@
-// 📁 api/ruttplanerare/_utils.ts
-// ⭐ VERSION 1.1 - LÄGGER TILL STÖD FÖR TEAM-DATATYPER OCH FILTRERING ⭐
+// 📁 api/ruttplanerare/assistant-utils.ts
+// ⭐ VERSION 1.2 - SLUTGILITG VERSION MED KORREKTA DATATYPER
 
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -21,12 +21,13 @@ export interface StaffMember { id: string; name: string; address: string; work_s
 export interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
 export interface AbsencePeriod { start: Date; end: Date; }
 export interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
-export interface SingleSuggestion { 
+
+// ✅ KORRIGERING: Bytte namn från SingleSuggestion för att matcha all annan kod.
+export interface Suggestion { 
   technician_id: string; technician_name: string; start_time: string; end_time: string; 
   travel_time_minutes: number; origin_description: string; efficiency_score: number; 
   is_first_job: boolean; travel_time_home_minutes?: number; 
 }
-// ✅ NY DATATYP: För team-förslag
 export interface TeamSuggestion {
     technicians: { id: string; name: string; travel_time_minutes: number; origin_description: string; }[];
     start_time: string;
@@ -60,8 +61,6 @@ export async function getAbsences(staffIds: string[], from: Date, to: Date): Pro
   data.forEach(a => { absences.get(a.technician_id)?.push({ start: new Date(a.start_date), end: new Date(a.end_date) }); });
   return absences;
 }
-
-// ✅ FÖRBÄTTRAD: Kan nu valfritt filtrera på en specifik lista av tekniker.
 export async function getCompetentStaff(pestType: string, requiredTechnicianIds?: string[]): Promise<StaffMember[]> {
   let query = supabase.from('staff_competencies').select('technicians(id, name, address, work_schedule)').eq('pest_type', pestType);
   
@@ -74,7 +73,6 @@ export async function getCompetentStaff(pestType: string, requiredTechnicianIds?
   
   return data.map((s: any) => s.technicians).filter(Boolean).filter(staff => staff.address && typeof staff.address === 'string' && staff.address.trim() !== '');
 }
-
 export async function getTravelTimes(origins: string[], destination: string): Promise<Map<string, number>> {
     if (origins.length === 0) return new Map();
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY!;
