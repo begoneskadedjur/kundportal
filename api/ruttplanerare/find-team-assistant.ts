@@ -1,8 +1,5 @@
-// 📁 api/ruttplanerare/find-team-assistant.ts
-// ⭐ VERSION 1.3 - ANVÄNDER NU DEN KORRIGERADE VERKTYGSLÅDAN FÖR FRÅNVARO
-
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping } from 'date-fns';
+import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping, max, min } from 'date-fns';
 
 import {
     TechnicianDaySchedule, TeamSuggestion,
@@ -53,7 +50,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allAddresses = new Set<string>(allCompetentStaff.map(s => s.address).filter(Boolean));
     const travelTimes = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
     
-    // Använder den nu korrigerade buildDailySchedules-funktionen
     const allDailySchedules = buildDailySchedules(allCompetentStaff, schedules, absences, searchStart, searchEnd);
     
     const schedulesByDay = allDailySchedules.reduce((acc, s) => {
@@ -72,10 +68,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const technicianCombinations = getCombinations(daySchedules, numberOfTechnicians);
 
         for (const teamCombination of technicianCombinations) {
-            const referenceSchedule = teamCombination[0];
-            let currentTime = referenceSchedule.workStart;
+            
+            // ✅ NY LOGIK: Beräkna den gemensamma, överlappande arbetstiden för teamet.
+            const teamWorkStart = max(teamCombination.map(ts => ts.workStart)); // Senaste starttid
+            const teamWorkEnd = min(teamCombination.map(ts => ts.workEnd));     // Tidigaste sluttid
 
-            while (currentTime <= subMinutes(referenceSchedule.workEnd, timeSlotDuration)) {
+            // Om det inte finns någon överlappande tid alls, hoppa över detta team.
+            if (teamWorkStart >= teamWorkEnd) continue;
+
+            let currentTime = teamWorkStart; // Starta sökningen från den gemensamma starttiden
+
+            while (currentTime <= subMinutes(teamWorkEnd, timeSlotDuration)) { // Sluta vid den gemensamma sluttiden
                 const slot = { start: currentTime, end: addMinutes(currentTime, timeSlotDuration) };
                 const isTeamAvailable = teamCombination.every(techSchedule => isAvailable(techSchedule, slot));
 
@@ -91,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         technicians: teamDetails,
                         start_time: slot.start.toISOString(),
                         end_time: slot.end.toISOString(),
-                        efficiency_score: 200 - totalTravelTime,
+                        efficiency_score: 300 - totalTravelTime, // Högre poäng för lägre total restid
                     });
                 }
                 currentTime = addMinutes(currentTime, TIME_SLOT_INCREMENT);
@@ -100,7 +103,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const sortedSuggestions = allTeamSuggestions
-        .sort((a, b) => b.efficiency_score - a.efficiency_score)
+        .sort((a, b) => {
+            // Sortera först på tid på dagen
+            const timeDiff = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+            if (timeDiff !== 0) return timeDiff;
+            // Därefter på bästa poäng
+            return b.efficiency_score - a.efficiency_score;
+        })
         .slice(0, MAX_TEAM_SUGGESTIONS);
 
     res.status(200).json(sortedSuggestions);
