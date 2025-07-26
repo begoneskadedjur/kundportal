@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/CreateCaseModal.tsx
-// ⭐ VERSION 3.0 - HANTERAR BÅDE NYSKAPANDE OCH INBOKNING AV BEFINTLIGA ÄRENDEN ⭐
+// ⭐ VERSION 3.2 - IMPLEMENTERAR VAL AV ANTAL TEKNIKER ⭐
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -39,12 +39,17 @@ const formatCaseAddress = (address: any): string => {
   return address.formatted_address || '';
 };
 
-interface Suggestion {
+// --- Datatyper ---
+interface SingleSuggestion {
     technician_id: string; technician_name: string; start_time: string; end_time: string;
     travel_time_minutes: number; origin_description: string; efficiency_score: number;
     travel_time_home_minutes?: number;
 }
-const SuggestionDescription = ({ sugg }: { sugg: Suggestion }) => {
+interface TeamSuggestion {
+    technicians: { id: string; name: string; travel_time_minutes: number; }[];
+    start_time: string; end_time: string; efficiency_score: number;
+}
+const SuggestionDescription = ({ sugg }: { sugg: SingleSuggestion }) => {
     return (<p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{sugg.origin_description}</p>);
 };
 
@@ -61,15 +66,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<SingleSuggestion[]>([]);
+  const [teamSuggestions, setTeamSuggestions] = useState<TeamSuggestion[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
-  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
+  const [numberOfTechnicians, setNumberOfTechnicians] = useState(1);
 
   const handleReset = useCallback(() => {
-    setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
+    setStep('selectType'); setCaseType(null); setFormData({}); 
+    setSuggestions([]); setTeamSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
-    setSearchStartDate(new Date()); setSelectedTechnicianIds([]);
+    setSearchStartDate(new Date()); setNumberOfTechnicians(1);
   }, []);
 
   useEffect(() => {
@@ -79,20 +86,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
       setFormData({ ...initialCaseData, status: 'Bokad', adress: formattedAddress });
       setStep('form');
-      if (initialCaseData.primary_assignee_id) {
-        setSelectedTechnicianIds([initialCaseData.primary_assignee_id]);
-      } else if (technicians.length > 0) {
-        const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
-        setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
-      }
+      const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
+      setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
     } else if (isOpen) {
       handleReset();
-      if (technicians.length > 0) {
-        const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
-        setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
-      }
     }
-  }, [isOpen, initialCaseData, handleReset, technicians]);
+  }, [isOpen, initialCaseData, handleReset]);
 
   const selectCaseType = (type: 'private' | 'business') => {
     setCaseType(type); setFormData({ status: 'Bokad' }); setStep('form');
@@ -103,10 +102,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setFormData(prev => ({ ...prev, [name]: value, ...(name === 'kontaktperson' && !initialCaseData && { title: value }) }));
   };
 
-  const handleTechnicianSelectionChange = (technicianId: string) => {
-    setSelectedTechnicianIds(prev => prev.includes(technicianId) ? prev.filter(id => id !== technicianId) : [...prev, technicianId]);
-  };
-
   const handleDateChange = (date: Date | null, fieldName: 'searchStartDate' | 'start_date' | 'due_date') => {
     if (fieldName === 'searchStartDate') { setSearchStartDate(date);
     } else { const isoString = date ? date.toISOString() : null; setFormData(prev => ({ ...prev, [fieldName]: isoString })); }
@@ -114,20 +109,27 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   
   const handleSuggestTime = async () => {
     if (!formData.adress || !formData.skadedjur) { return toast.error('Adress och Skadedjur måste vara ifyllda.'); }
-    setSuggestionLoading(true); setSuggestions([]); setError(null);
+    setSuggestionLoading(true); setSuggestions([]); setTeamSuggestions([]); setError(null);
+
+    const isTeamBooking = numberOfTechnicians > 1;
+    const endpoint = isTeamBooking ? '/api/ruttplanerare/find-team-assistant' : '/api/ruttplanerare/booking-assistant';
+
     try {
-      const response = await fetch('/api/ruttplanerare/booking-assistant', {
+      const response = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             newCaseAddress: formData.adress, pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration, searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
-            selectedTechnicianIds: selectedTechnicianIds
+            ...(isTeamBooking ? { numberOfTechnicians } : { selectedTechnicianIds: technicians.map(t => t.id) })
         })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Något gick fel.');
-      setSuggestions(data);
-      if (data.length === 0) toast.success('Inga optimala tider hittades för de valda teknikerna.');
+      
+      if (isTeamBooking) { setTeamSuggestions(data); } 
+      else { setSuggestions(data); }
+
+      if (data.length === 0) toast.success('Inga optimala tider hittades.');
     } catch (err: any) {
       setError(err.message); toast.error(err.message);
     } finally {
@@ -135,10 +137,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   };
   
-  const applySuggestion = (suggestion: Suggestion) => {
+  const applySuggestion = (suggestion: SingleSuggestion) => {
     setFormData(prev => ({ ...prev, start_date: suggestion.start_time, due_date: suggestion.end_time, primary_assignee_id: suggestion.technician_id, secondary_assignee_id: null, tertiary_assignee_id: null, }));
     const startTimeFormatted = new Date(suggestion.start_time).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     toast.success(`${suggestion.technician_name} vald som ansvarig tekniker för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')} kl. ${startTimeFormatted}`);
+  };
+
+  const applyTeamSuggestion = (suggestion: TeamSuggestion) => {
+    setFormData(prev => ({
+      ...prev,
+      start_date: suggestion.start_time, due_date: suggestion.end_time,
+      primary_assignee_id: suggestion.technicians[0]?.id || null,
+      secondary_assignee_id: suggestion.technicians[1]?.id || null,
+      tertiary_assignee_id: suggestion.technicians[2]?.id || null,
+    }));
+    toast.success(`Team bokat för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => { 
@@ -227,26 +240,23 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </div>
                   </div>
                   <div className="pt-4 border-t border-slate-700">
-                    <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2"><Users size={16} /> Sök bland valda tekniker</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {technicians.map(tech => (
-                        <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
-                          <input type="checkbox" className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" checked={selectedTechnicianIds.includes(tech.id)} onChange={() => handleTechnicianSelectionChange(tech.id)} />
-                          <span className="text-sm text-white truncate">{tech.name}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Antal tekniker som krävs</label>
+                    <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                        <option value={1}>1 tekniker (Hitta bästa individ)</option>
+                        <option value={2}>2 tekniker (Hitta bästa team)</option>
+                        <option value={3}>3 tekniker (Hitta bästa team)</option>
+                    </select>
                   </div>
                   <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full mt-auto" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
                   {suggestions.length > 0 && (
                     <div className="pt-4 border-t border-slate-700 space-y-2">
-                      <h4 className="text-md font-medium text-slate-300">Bokningsförslag:</h4>
+                      <h4 className="text-md font-medium text-slate-300">Bokningsförslag (1 tekniker):</h4>
                       {suggestions.map((sugg, index) => {
                         const travelColor = getTravelTimeColor(sugg.travel_time_minutes);
                         const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
                         return (
-                          <div key={`${sugg.technician_id}-${sugg.start_time}-${index}`} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
+                          <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
                             <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                               <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
                               <div className="flex items-center gap-3 text-xs sm:text-sm">
@@ -258,6 +268,36 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                             <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
                             <SuggestionDescription sugg={sugg} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {teamSuggestions.length > 0 && (
+                    <div className="pt-4 border-t border-slate-700 space-y-2">
+                      <h4 className="text-md font-medium text-slate-300">Team-förslag ({numberOfTechnicians} tekniker):</h4>
+                      {teamSuggestions.map((sugg, index) => {
+                        const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
+                        const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
+                        return (
+                          <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applyTeamSuggestion(sugg)}>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                              <div className="font-semibold text-white">Teamförslag</div>
+                              <div className="flex items-center gap-3 text-xs sm:text-sm">
+                                  <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
+                                  <div className={`font-bold flex items-center gap-1.5 text-sky-400`}><Users size={12}/> Total restid: {totalTravel} min</div>
+                              </div>
+                            </div>
+                            <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                            <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                            <div className="mt-2 pt-2 border-t border-slate-600/50 space-y-1 text-xs text-slate-400">
+                              {sugg.technicians.map(tech => (
+                                  <div key={tech.id} className="flex justify-between">
+                                      <span>{tech.name}</span>
+                                      <span className="font-mono">🚗 {tech.travel_time_minutes} min</span>
+                                  </div>
+                              ))}
+                            </div>
                           </div>
                         );
                       })}
