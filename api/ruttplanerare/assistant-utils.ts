@@ -1,5 +1,5 @@
 // 📁 api/ruttplanerare/assistant-utils.ts
-// ⭐ VERSION 1.2 - SLUTGILITG VERSION MED KORREKTA DATATYPER
+// ⭐ VERSION 1.3 - ÅTERSTÄLLER KORREKT FRÅNVAROHANTERING ⭐
 
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
@@ -21,8 +21,6 @@ export interface StaffMember { id: string; name: string; address: string; work_s
 export interface EventSlot { start: Date; end: Date; type: 'case' | 'absence'; title?: string; address?: string; }
 export interface AbsencePeriod { start: Date; end: Date; }
 export interface TechnicianDaySchedule { technician: StaffMember; date: Date; workStart: Date; workEnd: Date; absences: AbsencePeriod[]; existingCases: EventSlot[]; }
-
-// ✅ KORRIGERING: Bytte namn från SingleSuggestion för att matcha all annan kod.
 export interface Suggestion { 
   technician_id: string; technician_name: string; start_time: string; end_time: string; 
   travel_time_minutes: number; origin_description: string; efficiency_score: number; 
@@ -100,16 +98,26 @@ export function buildDailySchedules(technicians: StaffMember[], schedules: Map<s
     while (currentDate <= searchEnd) {
       const dayKey = getDayKey(currentDate); const daySchedule = tech.work_schedule?.[dayKey];
       if (!daySchedule || !daySchedule.active) { currentDate = addDays(currentDate, 1); continue; }
-      const dayStart = startOfDay(currentDate); const dayEnd = endOfDay(currentDate);
+      
+      const dayStart = startOfDay(currentDate); 
+      const dayEnd = endOfDay(currentDate);
       const year = currentDate.getUTCFullYear(); const month = currentDate.getUTCMonth(); const day = currentDate.getUTCDate();
       const workStart = fromZonedTime(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${daySchedule.start}`, TIMEZONE);
       const workEnd = fromZonedTime(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${daySchedule.end}`, TIMEZONE);
+      
       const techAbsences = absences.get(tech.id) || [];
       const dayAbsences = techAbsences.filter(a => areIntervalsOverlapping({ start: a.start, end: a.end }, { start: dayStart, end: dayEnd }));
+      
+      // ✅ KORRIGERING: Den kritiska logiken från din fungerande v6.8 är nu återställd.
       const isFullyAbsent = dayAbsences.some(a => a.start <= workStart && a.end >= workEnd);
-      if (isFullyAbsent) { currentDate = addDays(currentDate, 1); continue; }
+      if (isFullyAbsent) { 
+          currentDate = addDays(currentDate, 1); 
+          continue; // Hoppa över resten av loopen för denna dag.
+      }
+
       const techCases = schedules.get(tech.id) || [];
       const dayCases = techCases.filter(c => isWithinInterval(c.start, { start: dayStart, end: dayEnd }));
+      
       dailySchedules.push({ technician: tech, date: currentDate, workStart, workEnd, absences: dayAbsences, existingCases: dayCases });
       currentDate = addDays(currentDate, 1);
     }

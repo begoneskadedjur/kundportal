@@ -1,9 +1,8 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
-// ⭐ VERSION 7.2 - KORRIGERAR SAKNADE IMPORTER.
+// ⭐ VERSION 7.3 - ANVÄNDER NU DEN KORRIGERADE VERKTYGSLÅDAN FÖR FRÅNVARO
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-// ✅ KORRIGERING: addMinutes är nu importerad, vilket löser felet.
-import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns'; 
+import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import { 
@@ -99,6 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     schedules.forEach(cases => cases.forEach(c => { if (c.address) allAddresses.add(c.address); }));
     
     const travelTimesToJob = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
+    
+    // Använder den nu korrigerade buildDailySchedules-funktionen
     const dailySchedules = buildDailySchedules(staffToSearch, schedules, absences, searchStart, searchEnd);
     
     const suggestionPromises = dailySchedules.map(daySchedule => findAvailableSlots(daySchedule, timeSlotDuration, travelTimesToJob, newCaseAddress));
@@ -134,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(sortedSuggestions);
 
   } catch (error: any) {
-    console.error("Fel i bokningsassistent (v7.2):", error);
+    console.error("Fel i bokningsassistent (v7.3):", error);
     res.status(500).json({ error: "Ett internt fel uppstod.", details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 }

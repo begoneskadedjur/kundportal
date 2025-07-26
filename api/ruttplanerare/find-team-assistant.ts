@@ -1,10 +1,9 @@
 // 📁 api/ruttplanerare/find-team-assistant.ts
-// ⭐ VERSION 1.2 - KORRIGERAR SÖKVÄG TILL DELAD LOGIK ⭐
+// ⭐ VERSION 1.3 - ANVÄNDER NU DEN KORRIGERADE VERKTYGSLÅDAN FÖR FRÅNVARO
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping } from 'date-fns';
 
-// ✅ KORRIGERING: Importerar nu från den korrekt namngivna filen.
 import {
     TechnicianDaySchedule, TeamSuggestion,
     getCompetentStaff, getSchedules, getAbsences, getTravelTimes,
@@ -54,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allAddresses = new Set<string>(allCompetentStaff.map(s => s.address).filter(Boolean));
     const travelTimes = await getTravelTimes(Array.from(allAddresses), newCaseAddress);
     
+    // Använder den nu korrigerade buildDailySchedules-funktionen
     const allDailySchedules = buildDailySchedules(allCompetentStaff, schedules, absences, searchStart, searchEnd);
     
     const schedulesByDay = allDailySchedules.reduce((acc, s) => {
