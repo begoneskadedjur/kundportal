@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/CreateCaseModal.tsx
-// ⭐ VERSION 3.4 - IMPLEMENTERAR ALLA FÄLT FRÅN CLICKUP-MAPPNING INKL. SMART ROT/RUT ⭐
+// ⭐ VERSION 3.5 - FÖRBÄTTRAR UI/UX FÖR KNAPPAR OCH PRISSÄTTNING ⭐
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -240,66 +240,74 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </select>
                     </div>
                   </div>
-                  <div className="pt-4 border-t border-slate-700">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Antal tekniker som krävs</label>
-                    <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                        <option value={1}>1 tekniker (Hitta bästa individ)</option>
-                        <option value={2}>2 tekniker (Hitta bästa team)</option>
-                        <option value={3}>3 tekniker (Hitta bästa team)</option>
-                    </select>
+
+                  {/* ✅ FÖRBÄTTRING: Knapp och dropdown är nu grupperade och flyttade högre upp. */}
+                  <div className="pt-4 border-t border-slate-700 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Antal tekniker som krävs</label>
+                      <select value={numberOfTechnicians} onChange={e => setNumberOfTechnicians(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                          <option value={1}>1 tekniker (Hitta bästa individ)</option>
+                          <option value={2}>2 tekniker (Hitta bästa team)</option>
+                          <option value={3}>3 tekniker (Hitta bästa team)</option>
+                      </select>
+                    </div>
+                    <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   </div>
-                  <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full mt-auto" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
-                  {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
-                  {suggestions.length > 0 && (
-                    <div className="pt-4 border-t border-slate-700 space-y-2">
-                      <h4 className="text-md font-medium text-slate-300">Bokningsförslag (1 tekniker):</h4>
-                      {suggestions.map((sugg, index) => (
-                        <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
-                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                            <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
-                            <div className="flex items-center gap-3 text-xs sm:text-sm">
-                                <div className={`font-bold flex items-center gap-1.5 ${getEfficiencyScoreInfo(sugg.efficiency_score).color}`}>{getEfficiencyScoreInfo(sugg.efficiency_score).icon} {getEfficiencyScoreInfo(sugg.efficiency_score).text}</div>
-                                {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
-                                <div className={`font-bold flex items-center gap-1.5 ${getTravelTimeColor(sugg.travel_time_minutes)}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
-                            </div>
-                          </div>
-                          <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                          <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                          <SuggestionDescription sugg={sugg} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {teamSuggestions.length > 0 && (
-                    <div className="pt-4 border-t border-slate-700 space-y-2">
-                      <h4 className="text-md font-medium text-slate-300">Team-förslag ({numberOfTechnicians} tekniker):</h4>
-                      {teamSuggestions.map((sugg, index) => {
-                        const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
-                        const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
-                        return (
-                          <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applyTeamSuggestion(sugg)}>
-                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                              <div className="font-semibold text-white">Teamförslag</div>
-                              <div className="flex items-center gap-3 text-xs sm:text-sm">
-                                  <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
-                                  <div className={`font-bold flex items-center gap-1.5 text-sky-400`}><Users size={12}/> Total restid: {totalTravel} min</div>
-                              </div>
-                            </div>
-                            <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                            <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                            <div className="mt-2 pt-2 border-t border-slate-600/50 space-y-1 text-xs text-slate-400">
-                              {sugg.technicians.map(tech => (
-                                  <div key={tech.id} className="flex justify-between">
-                                      <span>{tech.name}</span>
-                                      <span className="font-mono">🚗 {tech.travel_time_minutes} min</span>
+                  
+                  {/* Denna div tar upp resterande utrymme och visar förslagen */}
+                  <div className="flex-grow">
+                      {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
+                      {suggestions.length > 0 && (
+                        <div className="pt-4 border-t border-slate-700 space-y-2">
+                          <h4 className="text-md font-medium text-slate-300">Bokningsförslag (1 tekniker):</h4>
+                          {suggestions.map((sugg, index) => (
+                            <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                                  <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
+                                  <div className="flex items-center gap-3 text-xs sm:text-sm">
+                                      <div className={`font-bold flex items-center gap-1.5 ${getEfficiencyScoreInfo(sugg.efficiency_score).color}`}>{getEfficiencyScoreInfo(sugg.efficiency_score).icon} {getEfficiencyScoreInfo(sugg.efficiency_score).text}</div>
+                                      {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
+                                      <div className={`font-bold flex items-center gap-1.5 ${getTravelTimeColor(sugg.travel_time_minutes)}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
                                   </div>
-                              ))}
+                                </div>
+                                <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                                <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                                <SuggestionDescription sugg={sugg} />
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          ))}
+                        </div>
+                      )}
+                      {teamSuggestions.length > 0 && (
+                        <div className="pt-4 border-t border-slate-700 space-y-2">
+                          <h4 className="text-md font-medium text-slate-300">Team-förslag ({numberOfTechnicians} tekniker):</h4>
+                          {teamSuggestions.map((sugg, index) => {
+                            const scoreInfo = getEfficiencyScoreInfo(sugg.efficiency_score);
+                            const totalTravel = sugg.technicians.reduce((sum, tech) => sum + tech.travel_time_minutes, 0);
+                            return (
+                              <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applyTeamSuggestion(sugg)}>
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                                  <div className="font-semibold text-white">Teamförslag</div>
+                                  <div className="flex items-center gap-3 text-xs sm:text-sm">
+                                      <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
+                                      <div className={`font-bold flex items-center gap-1.5 text-sky-400`}><Users size={12}/> Total restid: {totalTravel} min</div>
+                                  </div>
+                                </div>
+                                <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                                <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                                <div className="mt-2 pt-2 border-t border-slate-600/50 space-y-1 text-xs text-slate-400">
+                                  {sugg.technicians.map(tech => (
+                                      <div key={tech.id} className="flex justify-between">
+                                          <span>{tech.name}</span>
+                                          <span className="font-mono">🚗 {tech.travel_time_minutes} min</span>
+                                      </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                  </div>
                 </div>
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-6">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
@@ -339,7 +347,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   </div>
                   <div className="space-y-4">
                       <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2"><Euro size={16}/> Ekonomi & Utskick</h4>
-                      <Input type="number" label="Pris (exkl. moms)" name="pris" value={formData.pris ?? ''} onChange={handleChange} />
+                      {/* ✅ FÖRBÄTTRING: Etiketten för pris ändras nu baserat på kundtyp. */}
+                      <Input type="number" label={caseType === 'private' ? 'Pris (inkl. moms)' : 'Pris (exkl. moms)'} name="pris" value={formData.pris ?? ''} onChange={handleChange} />
                       {caseType === 'private' && (
                           <div>
                               <label className="block text-sm font-medium text-slate-300 mb-2">ROT/RUT</label>
