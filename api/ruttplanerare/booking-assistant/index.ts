@@ -1,11 +1,11 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
-// ⭐ VERSION 7.2 - KORRIGERAR SÖKVÄG TILL DELAD LOGIK.
+// ⭐ VERSION 7.2 - KORRIGERAR SAKNADE IMPORTER.
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { startOfDay, addDays, subMinutes, max, min } from 'date-fns';
+// ✅ KORRIGERING: addMinutes är nu importerad, vilket löser felet.
+import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns'; 
 import { formatInTimeZone } from 'date-fns-tz';
 
-// ✅ KORRIGERING: Importerar nu från den korrekt namngivna filen på rätt plats.
 import { 
     TechnicianDaySchedule, Suggestion, EventSlot,
     getCompetentStaff, getSchedules, getAbsences, getTravelTimes,
