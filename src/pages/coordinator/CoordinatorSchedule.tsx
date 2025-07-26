@@ -1,9 +1,9 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 2.5 - FÖRVALJER TEKNIKER BASERAT PÅ ROLL ⭐
+// ⭐ VERSION 2.6 - IMPLEMENTERAR "ACTIONABLE CASES" & FÖRBEREDER FÖR FLERA TEKNIKER ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { BeGoneCaseRow, Technician, isUnplannedCase, isScheduledCase } from '../../types/database';
+import { BeGoneCaseRow, Technician, isScheduledCase } from '../../types/database';
 
 import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleControlPanel';
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
@@ -66,11 +66,8 @@ export default function CoordinatorSchedule() {
       
       setAllCases(combinedCases as BeGoneCaseRow[]);
 
-      // ✅ SÄTT KORREKTA TEKNIKER SOM VALDA SOM STANDARD (BARA VID FÖRSTA LADDNINGEN)
       if (selectedTechnicianIds.size === 0 && fetchedTechnicians.length > 0) {
-        const defaultSelected = fetchedTechnicians
-          .filter(t => t.role === 'Skadedjurstekniker')
-          .map(t => t.id);
+        const defaultSelected = fetchedTechnicians.filter(t => t.role === 'Skadedjurstekniker').map(t => t.id);
         setSelectedTechnicianIds(new Set(defaultSelected));
       }
 
@@ -86,14 +83,22 @@ export default function CoordinatorSchedule() {
   }, [fetchData]);
 
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
-  const unplannedCases = useMemo(() => {
-    return allCases.filter(c => isUnplannedCase(c) && !c.status.includes('Avslutat') && !c.status.includes('Stängt'));
+
+  // ✅ FÖRBÄTTRING: Denna panel visar nu endast ärenden som kräver en åtgärd.
+  const actionableCases = useMemo(() => {
+    return allCases.filter(c => c.status === 'Offert signerad - boka in');
   }, [allCases]);
 
   const filteredScheduledCases = useMemo(() => {
     return scheduledCases.filter(c => {
       if (!activeStatuses.has(c.status)) return false;
-      if (selectedTechnicianIds.size > 0 && c.primary_assignee_id && !selectedTechnicianIds.has(c.primary_assignee_id)) return false;
+      // ✅ FÖRBÄTTRING: Kollar nu alla tre möjliga tekniker på ett ärende.
+      if (selectedTechnicianIds.size > 0) {
+        const caseTechnicians = [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean);
+        if (caseTechnicians.length > 0 && !caseTechnicians.some(id => selectedTechnicianIds.has(id!))) {
+          return false;
+        }
+      }
       const query = searchQuery.toLowerCase();
       if (query) {
         return (c.title?.toLowerCase() || '').includes(query) ||
@@ -126,17 +131,12 @@ export default function CoordinatorSchedule() {
                 <LayoutGrid className="w-6 h-6 text-blue-400" />
               <div>
                 <h1 className="text-xl font-bold text-white">Koordinator - Schemaöversikt</h1>
-                <p className="text-sm text-slate-400">{filteredScheduledCases.length} schemalagda • {unplannedCases.length} oplanerade • {technicians.length} tekniker</p>
+                <p className="text-sm text-slate-400">{filteredScheduledCases.length} schemalagda • {actionableCases.length} att boka in • {technicians.length} tekniker</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button onClick={() => setIsCreateModalOpen(true)} variant="primary">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Skapa Nytt Ärende
-                </Button>
-                <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro för en tekniker">
-                    <CalendarOff className="w-4 h-4" />
-                </Button>
+                <Button onClick={() => setIsCreateModalOpen(true)} variant="primary"><Plus className="w-4 h-4 mr-2" />Skapa Nytt Ärende</Button>
+                <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro"><CalendarOff className="w-4 h-4" /></Button>
             </div>
           </div>
         </header>
@@ -145,7 +145,7 @@ export default function CoordinatorSchedule() {
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
               technicians={technicians}
-              unplannedCases={unplannedCases}
+              actionableCases={actionableCases} // ✅ Skickar nu "actionableCases"
               activeStatuses={activeStatuses}
               setActiveStatuses={setActiveStatuses}
               selectedTechnicianIds={selectedTechnicianIds}
@@ -167,7 +167,7 @@ export default function CoordinatorSchedule() {
         </div>
       </div>
       
-      <EditCaseModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSuccess={handleUpdateSuccess} caseData={selectedCase as any} />
+      <EditCaseModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSuccess={handleUpdateSuccess} caseData={selectedCase as any} technicians={technicians} />
       <CreateCaseModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleCreateSuccess} technicians={technicians} />
       <CreateAbsenceModal isOpen={isAbsenceModalOpen} onClose={() => setIsAbsenceModalOpen(false)} onSuccess={handleAbsenceCreateSuccess} technicians={technicians} />
     </>

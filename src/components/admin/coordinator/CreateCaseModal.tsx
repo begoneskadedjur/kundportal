@@ -33,7 +33,6 @@ const getEfficiencyScoreInfo = (score: number): { text: string; color: string; i
     return { text: 'Låg', color: 'text-red-400', icon: <ThumbsDown size={14} /> };
 };
 
-// ✅ UPPDATERAD: Suggestion-typen matchar nu exakt API:ets svar.
 interface Suggestion {
     technician_id: string;
     technician_name: string;
@@ -42,12 +41,9 @@ interface Suggestion {
     travel_time_minutes: number;
     origin_description: string;
     efficiency_score: number;
-    travel_time_home_minutes?: number; // Inkluderar nu hemresan
+    travel_time_home_minutes?: number;
 }
 
-/**
- * ✅ NY KOMPONENT: En dedikerad komponent för att snyggt visa den detaljerade beskrivningen.
- */
 const SuggestionDescription = ({ sugg }: { sugg: Suggestion }) => {
     return (
         <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">
@@ -55,7 +51,6 @@ const SuggestionDescription = ({ sugg }: { sugg: Suggestion }) => {
         </p>
     );
 };
-
 
 interface CreateCaseModalProps { isOpen: boolean; onClose: () => void; onSuccess: () => void; technicians: Technician[]; }
 
@@ -75,8 +70,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); setSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
-    setSearchStartDate(new Date());
-    setSelectedTechnicianIds([]);
+    setSearchStartDate(new Date()); setSelectedTechnicianIds([]);
   }, []);
 
   useEffect(() => {
@@ -90,15 +84,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }, [isOpen, handleReset, technicians]);
 
   const selectCaseType = (type: 'private' | 'business') => {
-    setCaseType(type);
-    setFormData({ status: 'Bokad' });
-    setStep('form');
+    setCaseType(type); setFormData({ status: 'Bokad' }); setStep('form');
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    if (name === 'kontaktperson') { setFormData(prev => ({ ...prev, [name]: value, title: value }));
-    } else { setFormData(prev => ({ ...prev, [name]: value })); }
+    setFormData(prev => ({ ...prev, [name]: value, ...(name === 'kontaktperson' && { title: value }) }));
   };
 
   const handleTechnicianSelectionChange = (technicianId: string) => {
@@ -111,12 +102,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
   
   const handleSuggestTime = async () => {
-    if (!formData.adress || !formData.skadedjur) { toast.error('Adress och Skadedjur måste vara ifyllda.'); return; }
+    if (!formData.adress || !formData.skadedjur) { return toast.error('Adress och Skadedjur måste vara ifyllda.'); }
     setSuggestionLoading(true); setSuggestions([]); setError(null);
     try {
       const response = await fetch('/api/ruttplanerare/booking-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             newCaseAddress: formData.adress, pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration, searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
@@ -135,14 +125,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
   
   const applySuggestion = (suggestion: Suggestion) => {
-    setFormData(prev => ({ ...prev, start_date: suggestion.start_time, due_date: suggestion.end_time, primary_assignee_id: suggestion.technician_id }));
+    setFormData(prev => ({
+      ...prev,
+      start_date: suggestion.start_time,
+      due_date: suggestion.end_time,
+      primary_assignee_id: suggestion.technician_id,
+      secondary_assignee_id: null,
+      tertiary_assignee_id: null,
+    }));
     const startTimeFormatted = new Date(suggestion.start_time).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-    toast.success(`${suggestion.technician_name} vald för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')} kl. ${startTimeFormatted}`);
+    toast.success(`${suggestion.technician_name} vald som ansvarig tekniker för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')} kl. ${startTimeFormatted}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault();
-    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { toast.error("Alla fält under 'Bokning & Detaljer' måste vara ifyllda."); return; }
+    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { return toast.error("Alla fält under 'Bokning & Detaljer' måste vara ifyllda."); }
     setLoading(true); setError(null);
     try {
       const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
@@ -193,7 +190,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              {/* VÄNSTER KOLUMN: Intelligent Bokning */}
               <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
                 <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -218,7 +214,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </select>
                   </div>
                 </div>
-
                 <div className="pt-4 border-t border-slate-700">
                   <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2"><Users size={16} /> Sök bland valda tekniker</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -230,7 +225,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     ))}
                   </div>
                 </div>
-
                 <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full mt-auto" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                 {suggestionLoading && <div className="text-center pt-4"><LoadingSpinner text="Analyserar rutter..." /></div>}
                 
@@ -246,13 +240,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
                             <div className="flex items-center gap-3 text-xs sm:text-sm">
                                 <div className={`font-bold flex items-center gap-1.5 ${scoreInfo.color}`}>{scoreInfo.icon} {scoreInfo.text}</div>
-                                {sugg.travel_time_home_minutes && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
+                                {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
                                 <div className={`font-bold flex items-center gap-1.5 ${travelColor}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
                             </div>
                           </div>
                           <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                           <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                          {/* ✅ ANROP AV DEN NYA KOMPONENTEN FÖR ATT VISA TYDLIG BESKRIVNING */}
                           <SuggestionDescription sugg={sugg} />
                         </div>
                       );
@@ -261,7 +254,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 )}
               </div>
 
-              {/* HÖGER KOLUMN: Manuell Bokning */}
               <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><FileText className="text-green-400"/>Bokning & Detaljer</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,7 +261,6 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
                   </div>
                   {caseType === 'private' ? (<Input label="Personnummer" name="personnummer" value={formData.personnummer || ''} onChange={handleChange} />) : (<Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />)}
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                           <label className="block text-sm font-medium text-slate-300 mb-2">Starttid *</label>
@@ -280,14 +271,34 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           <DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" placeholderText="Välj sluttid..." isClearable required className="w-full" />
                       </div>
                   </div>
+                  
+                  {/* ✅ FÖRBÄTTRING: Ersätter den gamla select-menyn med tre nya med tydligare texter. */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Ansvarig tekniker *</label>
+                      <select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                          <option value="" disabled>Välj tekniker...</option>
+                          {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
-                    <select name="primary_assignee_id" value={formData.primary_assignee_id || ''} onChange={handleChange} required className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
-                        <option value="" disabled>Välj tekniker...</option>
-                        {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker (valfri)</label>
+                      <select name="secondary_assignee_id" value={formData.secondary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                          <option value="">Ingen vald</option>
+                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.tertiary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Extra tekniker 2 (valfri)</label>
+                      <select name="tertiary_assignee_id" value={formData.tertiary_assignee_id || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white">
+                          <option value="">Ingen vald</option>
+                          {technicians.filter(t => t.id !== formData.primary_assignee_id && t.id !== formData.secondary_assignee_id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
                   </div>
+
                   <Input label="Ärendetitel (auto-ifylls från namn)" name="title" value={formData.title || ''} onChange={handleChange} required />
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning till tekniker</label>
