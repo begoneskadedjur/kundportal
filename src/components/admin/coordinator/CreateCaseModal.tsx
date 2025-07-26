@@ -255,17 +255,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <h4 className="text-md font-medium text-slate-300">Bokningsförslag (1 tekniker):</h4>
                       {suggestions.map((sugg, index) => (
                         <div key={index} className="p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => applySuggestion(sugg)}>
-                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                              <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
-                              <div className="flex items-center gap-3 text-xs sm:text-sm">
-                                  <div className={`font-bold flex items-center gap-1.5 ${getEfficiencyScoreInfo(sugg.efficiency_score).color}`}>{getEfficiencyScoreInfo(sugg.efficiency_score).icon} {getEfficiencyScoreInfo(sugg.efficiency_score).text}</div>
-                                  {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
-                                  <div className={`font-bold flex items-center gap-1.5 ${getTravelTimeColor(sugg.travel_time_minutes)}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
-                              </div>
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                            <div className="font-semibold text-white truncate">{sugg.technician_name}</div>
+                            <div className="flex items-center gap-3 text-xs sm:text-sm">
+                                <div className={`font-bold flex items-center gap-1.5 ${getEfficiencyScoreInfo(sugg.efficiency_score).color}`}>{getEfficiencyScoreInfo(sugg.efficiency_score).icon} {getEfficiencyScoreInfo(sugg.efficiency_score).text}</div>
+                                {sugg.travel_time_home_minutes != null && (<div className={`font-bold flex items-center gap-1.5 text-blue-400`}><Home size={12}/> {sugg.travel_time_home_minutes} min</div>)}
+                                <div className={`font-bold flex items-center gap-1.5 ${getTravelTimeColor(sugg.travel_time_minutes)}`}><MapPin size={12}/> {sugg.travel_time_minutes} min</div>
                             </div>
-                            <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                            <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
-                            <SuggestionDescription sugg={sugg} />
+                          </div>
+                          <div className="text-sm text-slate-300 font-medium mt-1">{new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                          <div className="text-lg font-bold text-white">{formatTime(sugg.start_time)} - {formatTime(sugg.end_time)}</div>
+                          <SuggestionDescription sugg={sugg} />
                         </div>
                       ))}
                     </div>
