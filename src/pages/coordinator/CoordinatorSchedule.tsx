@@ -1,5 +1,5 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 2.6 - IMPLEMENTERAR "ACTIONABLE CASES" & FÖRBEREDER FÖR FLERA TEKNIKER ⭐
+// ⭐ VERSION 2.7 - IMPLEMENTERAR KORREKT ARBETSFLÖDE FÖR "ÄRENDEN ATT BOKA IN" ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -43,6 +43,7 @@ export default function CoordinatorSchedule() {
 
   const fetchData = useCallback(async () => {
     try {
+      setLoading(true); // Sätt loading här för att täcka hela hämtningen
       const [techniciansResult, privateCasesResult, businessCasesResult, absencesResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
@@ -84,7 +85,6 @@ export default function CoordinatorSchedule() {
 
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
 
-  // ✅ FÖRBÄTTRING: Denna panel visar nu endast ärenden som kräver en åtgärd.
   const actionableCases = useMemo(() => {
     return allCases.filter(c => c.status === 'Offert signerad - boka in');
   }, [allCases]);
@@ -92,7 +92,6 @@ export default function CoordinatorSchedule() {
   const filteredScheduledCases = useMemo(() => {
     return scheduledCases.filter(c => {
       if (!activeStatuses.has(c.status)) return false;
-      // ✅ FÖRBÄTTRING: Kollar nu alla tre möjliga tekniker på ett ärende.
       if (selectedTechnicianIds.size > 0) {
         const caseTechnicians = [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean);
         if (caseTechnicians.length > 0 && !caseTechnicians.some(id => selectedTechnicianIds.has(id!))) {
@@ -101,9 +100,7 @@ export default function CoordinatorSchedule() {
       }
       const query = searchQuery.toLowerCase();
       if (query) {
-        return (c.title?.toLowerCase() || '').includes(query) ||
-               (c.kontaktperson?.toLowerCase() || '').includes(query) ||
-               (c.adress?.toString().toLowerCase() || '').includes(query);
+        return (c.title?.toLowerCase() || '').includes(query) || (c.kontaktperson?.toLowerCase() || '').includes(query) || (c.adress?.toString().toLowerCase() || '').includes(query);
       }
       return true;
     });
@@ -113,9 +110,15 @@ export default function CoordinatorSchedule() {
     setSelectedCase(caseData);
     setIsEditModalOpen(true);
   };
+  
+  // ✅ NY HANDLER: Öppnar SKAPA-modalen med förifylld data för att BOKA IN ett ärende.
+  const handleScheduleActionableCase = (caseData: BeGoneCaseRow) => {
+    setSelectedCase(caseData);
+    setIsCreateModalOpen(true);
+  };
 
   const handleUpdateSuccess = () => { setIsEditModalOpen(false); fetchData(); };
-  const handleCreateSuccess = () => { setIsCreateModalOpen(false); fetchData(); };
+  const handleCreateSuccess = () => { setIsCreateModalOpen(false); setSelectedCase(null); fetchData(); }; // Nollställ selectedCase
   const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData(); };
 
   if (loading) {
@@ -135,7 +138,7 @@ export default function CoordinatorSchedule() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button onClick={() => setIsCreateModalOpen(true)} variant="primary"><Plus className="w-4 h-4 mr-2" />Skapa Nytt Ärende</Button>
+                <Button onClick={() => { setSelectedCase(null); setIsCreateModalOpen(true); }} variant="primary"><Plus className="w-4 h-4 mr-2" />Skapa Nytt Ärende</Button>
                 <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro"><CalendarOff className="w-4 h-4" /></Button>
             </div>
           </div>
@@ -145,14 +148,14 @@ export default function CoordinatorSchedule() {
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
               technicians={technicians}
-              actionableCases={actionableCases} // ✅ Skickar nu "actionableCases"
+              actionableCases={actionableCases}
               activeStatuses={activeStatuses}
               setActiveStatuses={setActiveStatuses}
               selectedTechnicianIds={selectedTechnicianIds}
               setSelectedTechnicianIds={setSelectedTechnicianIds}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
-              onCaseClick={handleOpenCaseModal}
+              onCaseClick={handleScheduleActionableCase} // ✅ Använder den nya, korrekta handlern.
             />
           </aside>
           
@@ -168,7 +171,8 @@ export default function CoordinatorSchedule() {
       </div>
       
       <EditCaseModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSuccess={handleUpdateSuccess} caseData={selectedCase as any} technicians={technicians} />
-      <CreateCaseModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleCreateSuccess} technicians={technicians} />
+      {/* ✅ Skickar nu med "initialCaseData" till CreateCaseModal */}
+      <CreateCaseModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); }} onSuccess={handleCreateSuccess} technicians={technicians} initialCaseData={selectedCase} />
       <CreateAbsenceModal isOpen={isAbsenceModalOpen} onClose={() => setIsAbsenceModalOpen(false)} onSuccess={handleAbsenceCreateSuccess} technicians={technicians} />
     </>
   );

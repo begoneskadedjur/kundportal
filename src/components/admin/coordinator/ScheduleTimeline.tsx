@@ -1,5 +1,5 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
-// ⭐ VERSION 2.8 - IMPLEMENTERAR STÖD FÖR FLERA TEKNIKER PER ÄRENDE ⭐
+// ⭐ VERSION 2.9 - FIXAR UI-BUGG FÖR VY-VÄXLARE ⭐
 
 import React, { useMemo, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
@@ -11,7 +11,7 @@ import { BeGoneCaseRow, Technician } from '../../../types/database';
 import type { EventContentArg } from '@fullcalendar/core';
 import type { EventClickArg } from '@fullcalendar/interaction';
 import { Absence } from '../../../pages/coordinator/CoordinatorSchedule';
-import { Users } from 'lucide-react'; // Importera ikon för flera användare
+import { Users } from 'lucide-react';
 
 import '../../../styles/FullCalendar.css';
 
@@ -54,12 +54,11 @@ const renderEventContent = (eventInfo: EventContentArg) => {
     const endTime = formatTime(eventInfo.event.end);
     const timeSpan = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || '');
 
-    // ✅ FÖRBÄTTRING: Samla alla tekniker för att visa dem.
     const allTechnicians = [
         caseData.primary_assignee_name,
         caseData.secondary_assignee_name,
         caseData.tertiary_assignee_name
-    ].filter(Boolean); // Filtrera bort null/undefined
+    ].filter(Boolean);
 
     return (
         <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm`}>
@@ -68,7 +67,6 @@ const renderEventContent = (eventInfo: EventContentArg) => {
                 {timeSpan && <span className={`text-xs font-mono ${colors.text} opacity-90`}>{timeSpan}</span>}
             </div>
             
-            {/* ✅ FÖRBÄTTRING: Visa alla tekniker på ärendet. */}
             <div className={`flex items-center gap-1.5 text-xs ${colors.text} opacity-80 truncate`}>
                 <Users size={12} className="shrink-0"/>
                 <span className="truncate">{allTechnicians.join(', ')}</span>
@@ -85,21 +83,17 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
   
   const calendarResources = useMemo(() => technicians.map(tech => ({ id: tech.id, title: tech.name })), [technicians]);
 
-  // ✅ HELT OMbyggd: Skapar nu ett event per tekniker, vilket gör att ett ärende kan synas på flera rader.
   const calendarEvents = useMemo(() => {
     const caseEvents = cases.flatMap(c => {
         if (!c.start_date || !c.due_date) return [];
-
         const assignees = [
             { id: c.primary_assignee_id, name: c.primary_assignee_name, role: 'primary' },
             { id: c.secondary_assignee_id, name: c.secondary_assignee_name, role: 'secondary' },
             { id: c.tertiary_assignee_id, name: c.tertiary_assignee_name, role: 'tertiary' }
-        ].filter(a => a.id); // Filtrera bort de utan ID
-
+        ].filter(a => a.id);
         if (assignees.length === 0) return [];
-        
         return assignees.map(assignee => ({
-            id: `${c.id}-${assignee.role}`, // Unikt ID för varje event-instans
+            id: `${c.id}-${assignee.role}`,
             resourceId: assignee.id,
             title: c.title,
             start: new Date(c.start_date!).toISOString(),
@@ -109,7 +103,6 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
             borderColor: 'transparent'
         }));
     });
-
     const absenceEvents = absences.map(a => ({
         id: `absence-${a.id}`,
         resourceId: a.technician_id,
@@ -121,9 +114,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
         borderColor: 'transparent',
         editable: false,
     }));
-
     return [...caseEvents, ...absenceEvents].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-
   }, [cases, absences]);
 
   const handleEventClick = (clickInfo: EventClickArg) => {
@@ -146,18 +137,26 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                   <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
-                  {/* ... befintlig legend ... */}
+                  <div className="hidden xl:flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-500 rounded"></div><span className="text-slate-300">Öppen</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded"></div><span className="text-slate-300">Bokad</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded"></div><span className="text-slate-300">Offert</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded"></div><span className="text-slate-300">Signerad</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-600 rounded"></div><span className="text-slate-300">Återbesök</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-600 rounded"></div><span className="text-slate-300">Avslutat</span></div>
+                  </div>
               </div>
               <div className="flex items-center gap-4">
-                  <div className="flex bg-slate-700 rounded-lg p-1">
-                      <button onClick={() => changeView('resourceTimelineDay')} className="...">Dag</button>
-                      <button onClick={() => changeView('resourceTimelineWeek')} className="...">Vecka</button>
-                      <button onClick={() => changeView('resourceTimelineMonth')} className="...">Månad</button>
+                  {/* ✅ FÖRBÄTTRING: "flex-shrink-0" förhindrar att knapparna trycks ihop på mindre skärmar. */}
+                  <div className="flex bg-slate-700 rounded-lg p-1 flex-shrink-0">
+                      <button onClick={() => changeView('resourceTimelineDay')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Dag</button>
+                      <button onClick={() => changeView('resourceTimelineWeek')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Vecka</button>
+                      <button onClick={() => changeView('resourceTimelineMonth')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Månad</button>
                   </div>
                   <div className="flex items-center gap-1">
-                      <button onClick={() => navigateCalendar('prev')} className="...">←</button>
-                      <button onClick={() => navigateCalendar('today')} className="...">Idag</button>
-                      <button onClick={() => navigateCalendar('next')} className="...">→</button>
+                      <button onClick={() => navigateCalendar('prev')} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Föregående">←</button>
+                      <button onClick={() => navigateCalendar('today')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors">Idag</button>
+                      <button onClick={() => navigateCalendar('next')} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Nästa">→</button>
                   </div>
               </div>
           </div>
