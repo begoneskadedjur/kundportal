@@ -1,3 +1,6 @@
+// 📁 src/components/admin/coordinator/CreateCaseModal.tsx
+// ⭐ VERSION 3.0 - HANTERAR BÅDE NYSKAPANDE OCH INBOKNING AV BEFINTLIGA ÄRENDEN ⭐
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
@@ -17,47 +20,37 @@ import "react-datepicker/dist/react-datepicker.css";
 
 registerLocale('sv', sv);
 
-// --- Hjälpfunktioner för visning ---
-
+// --- Hjälpfunktioner ---
 const getTravelTimeColor = (minutes: number): string => {
   if (minutes <= 20) return 'text-green-400';
   if (minutes <= 35) return 'text-sky-400';
   if (minutes <= 60) return 'text-orange-400';
   return 'text-red-400';
 };
-
 const getEfficiencyScoreInfo = (score: number): { text: string; color: string; icon: React.ReactNode } => {
     if (score >= 100) return { text: 'Utmärkt', color: 'text-green-400', icon: <Star size={14} /> };
     if (score >= 85) return { text: 'Bra', color: 'text-sky-400', icon: <ThumbsUp size={14} /> };
     if (score >= 60) return { text: 'OK', color: 'text-orange-400', icon: <Meh size={14} /> };
     return { text: 'Låg', color: 'text-red-400', icon: <ThumbsDown size={14} /> };
 };
+const formatCaseAddress = (address: any): string => {
+  if (!address) return '';
+  if (typeof address === 'string') { try { const parsed = JSON.parse(address); return parsed.formatted_address || address; } catch (e) { return address; } }
+  return address.formatted_address || '';
+};
 
 interface Suggestion {
-    technician_id: string;
-    technician_name: string;
-    start_time: string;
-    end_time: string;
-    travel_time_minutes: number;
-    origin_description: string;
-    efficiency_score: number;
+    technician_id: string; technician_name: string; start_time: string; end_time: string;
+    travel_time_minutes: number; origin_description: string; efficiency_score: number;
     travel_time_home_minutes?: number;
 }
-
 const SuggestionDescription = ({ sugg }: { sugg: Suggestion }) => {
-    return (
-        <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">
-            {sugg.origin_description}
-        </p>
-    );
+    return (<p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{sugg.origin_description}</p>);
 };
 
 interface CreateCaseModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  technicians: Technician[];
-  initialCaseData?: BeGoneCaseRow | null;
+  isOpen: boolean; onClose: () => void; onSuccess: () => void;
+  technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
 }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData }: CreateCaseModalProps) {
@@ -83,7 +76,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (isOpen && initialCaseData) {
       const type = initialCaseData.case_type === 'private' ? 'private' : 'business';
       setCaseType(type);
-      setFormData({ ...initialCaseData, status: 'Bokad' });
+      const formattedAddress = formatCaseAddress(initialCaseData.adress);
+      setFormData({ ...initialCaseData, status: 'Bokad', adress: formattedAddress });
       setStep('form');
       if (initialCaseData.primary_assignee_id) {
         setSelectedTechnicianIds([initialCaseData.primary_assignee_id]);
@@ -207,12 +201,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
-              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={formData.adress || ''} onChange={handleChange} required />
+                    <Input label="Adress *" name="adress" placeholder="Fullständig adress..." value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleChange} required />
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">Hitta tider från:</label>
                         <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />
