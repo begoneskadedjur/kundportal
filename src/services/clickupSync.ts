@@ -4,7 +4,8 @@
 import { supabase } from '../lib/supabase'
 import { ClickUpClient } from './clickup/client'
 import { 
-  convertSupabaseToClickUp, 
+  convertSupabaseToClickUp,
+  convertSupabaseToClickUpAsync, 
   convertClickUpToSupabase, 
   getListIdFromCaseType,
   getCaseTypeFromListId 
@@ -56,8 +57,8 @@ class ClickUpSyncService {
         return { success: false, error: `Could not fetch case: ${fetchError?.message}` }
       }
 
-      // 2. Konvertera till ClickUp format
-      const clickupTask = convertSupabaseToClickUp(caseData, caseType)
+      // 2. Konvertera till ClickUp format med geocoding
+      const clickupTask = await convertSupabaseToClickUpAsync(caseData, caseType)
       const listId = getListIdFromCaseType(caseType)
       
       console.log(`[ClickUpSync] Sending task to ClickUp:`, {
@@ -130,8 +131,8 @@ class ClickUpSyncService {
         return this.syncCaseToClickUp(caseId, caseType)
       }
 
-      // 2. Konvertera till ClickUp format
-      const clickupTask = convertSupabaseToClickUp(caseData, caseType)
+      // 2. Konvertera till ClickUp format med geocoding
+      const clickupTask = await convertSupabaseToClickUpAsync(caseData, caseType)
 
       // 3. Uppdatera task i ClickUp
       const updatedTask = await this.client.updateTask(caseData.clickup_task_id, clickupTask)

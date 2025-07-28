@@ -1,6 +1,8 @@
 // src/services/clickupFieldMapper.ts
 // EXAKT FIELD MAPPING FÖR CLICKUP INTEGRATION BASERAT PÅ DIN DATA
 
+import { geocodeAddress, isAddressGeocoded, type GeocodeResult } from './geocoding'
+
 export interface ClickUpField {
   id: string
   name: string
@@ -69,53 +71,338 @@ function convertPriorityToClickUp(priority: any): number {
   return priorityMap[priority.toLowerCase()] || 3
 }
 
-// KONVERTERA FRÅN SUPABASE TILL CLICKUP FORMAT
+// ASYNC HJÄLPFUNKTIONER FÖR GEOCODING
+async function handleAddressFieldAsync(caseData: any, customFields: any[]): Promise<void> {
+  if (!caseData.adress) return
+
+  let addressValue: any
+
+  // Kontrollera om adressen redan är geocodad
+  if (isAddressGeocoded(caseData.adress)) {
+    // Adressen har redan koordinater, använd den direkt
+    if (typeof caseData.adress === 'string') {
+      try {
+        const parsed = JSON.parse(caseData.adress)
+        addressValue = {
+          location: {
+            lat: parsed.location.lat,
+            lng: parsed.location.lng
+          },
+          formatted_address: parsed.formatted_address
+        }
+      } catch (e) {
+        console.warn('[ClickUpMapper] Failed to parse existing geocoded address:', e)
+        return // Skippa fältet om parsing misslyckas
+      }
+    } else {
+      addressValue = {
+        location: {
+          lat: caseData.adress.location.lat,
+          lng: caseData.adress.location.lng
+        },
+        formatted_address: caseData.adress.formatted_address
+      }
+    }
+  } else {
+    // Adressen är bara text, geocoda den
+    const addressText = typeof caseData.adress === 'string' ? caseData.adress : String(caseData.adress)
+    console.log(`[ClickUpMapper] Geocoding address: "${addressText}"`)
+
+    const geocodeResult = await geocodeAddress(addressText)
+
+    if (geocodeResult.success) {
+      addressValue = {
+        location: {
+          lat: geocodeResult.result.location.lat,
+          lng: geocodeResult.result.location.lng
+        },
+        formatted_address: geocodeResult.result.formatted_address
+      }
+      console.log(`[ClickUpMapper] Geocoding successful: ${addressText} -> ${geocodeResult.result.formatted_address}`)
+    } else {
+      console.warn(`[ClickUpMapper] Geocoding failed for "${addressText}": ${geocodeResult.error}`)
+      // Skippa address field om geocoding misslyckas för att undvika ClickUp API fel
+      return
+    }
+  }
+
+  // Lägg till address field med korrekta koordinater
+  customFields.push({
+    id: CLICKUP_FIELD_IDS.ADRESS,
+    value: addressValue
+  })
+}
+
+async function buildRemainingCustomFields(caseData: any, caseType: 'private' | 'business'): Promise<any[]> {
+  const customFields: any[] = []
+
+  // Alla andra fält utom adress (som redan hanterats)
+  if (caseData.avvikelser_tillbud_olyckor) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.AVVIKELSER_TILLBUD_OLYCKOR,
+      value: String(caseData.avvikelser_tillbud_olyckor)
+    })
+  }
+
+  if (caseData.rapport) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.RAPPORT,
+      value: String(caseData.rapport)
+    })
+  }
+
+  if (caseData.status_saneringsrapport) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.STATUS_SANERINGSRAPPORT,
+      value: caseData.status_saneringsrapport
+    })
+  }
+
+  if (caseData.kontaktperson) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.KONTAKTPERSON,
+      value: caseData.kontaktperson
+    })
+  }
+
+  if (caseData.skadedjur) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.SKADEDJUR,
+      value: caseData.skadedjur
+    })
+  }
+
+  if (caseData.skicka_bokningsbekraftelse !== undefined && caseData.skicka_bokningsbekraftelse !== null) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.SKICKA_BOKNINGSBEKRAFTELSE,
+      value: Boolean(caseData.skicka_bokningsbekraftelse)
+    })
+  }
+
+  if (caseData.reklamation) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.REKLAMATION,
+      value: caseData.reklamation
+    })
+  }
+
+  if (caseData.e_post_kontaktperson) {
+    const emailValue = String(caseData.e_post_kontaktperson).trim()
+    if (emailValue && emailValue.includes('@')) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.E_POST_KONTAKTPERSON,
+        value: emailValue
+      })
+    }
+  }
+
+  if (caseData.telefon_kontaktperson) {
+    const phoneValue = String(caseData.telefon_kontaktperson).trim()
+    if (phoneValue) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.TELEFON_KONTAKTPERSON,
+        value: phoneValue
+      })
+    }
+  }
+
+  if (caseData.vaggloss_angade_rum) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.VAGGLOSS_ANGADE_RUM,
+      value: caseData.vaggloss_angade_rum
+    })
+  }
+
+  if (caseData.pris) {
+    const priceValue = parseFloat(caseData.pris)
+    if (!isNaN(priceValue)) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.PRIS,
+        value: priceValue
+      })
+    }
+  }
+
+  if (caseData.filer) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.FILER,
+      value: typeof caseData.filer === 'string' ? JSON.parse(caseData.filer) : caseData.filer
+    })
+  }
+
+  if (caseData.annat_skadedjur) {
+    customFields.push({
+      id: CLICKUP_FIELD_IDS.ANNAT_SKADEDJUR,
+      value: caseData.annat_skadedjur
+    })
+  }
+
+  // Privatperson-specifika fält
+  if (caseType === 'private') {
+    if (caseData.r_arbetskostnad) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.R_ARBETSKOSTNAD,
+        value: caseData.r_arbetskostnad
+      })
+    }
+
+    if (caseData.r_rot_rut) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.R_ROT_RUT,
+        value: caseData.r_rot_rut
+      })
+    }
+
+    if (caseData.r_fastighetsbeteckning) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.R_FASTIGHETSBETECKNING,
+        value: caseData.r_fastighetsbeteckning
+      })
+    }
+
+    if (caseData.personnummer) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.PERSONNUMMER,
+        value: caseData.personnummer
+      })
+    }
+
+    if (caseData.r_material_utrustning) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.R_MATERIAL_UTRUSTNING,
+        value: caseData.r_material_utrustning
+      })
+    }
+
+    if (caseData.r_servicebil) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.R_SERVICEBIL,
+        value: caseData.r_servicebil
+      })
+    }
+  }
+
+  // Företag-specifika fält
+  if (caseType === 'business') {
+    if (caseData.markning_faktura) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.MARKNING_FAKTURA,
+        value: caseData.markning_faktura
+      })
+    }
+
+    if (caseData.e_post_faktura) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.E_POST_FAKTURA,
+        value: caseData.e_post_faktura
+      })
+    }
+
+    if (caseData.org_nr) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.ORG_NR,
+        value: caseData.org_nr
+      })
+    }
+
+    if (caseData.skicka_erbjudande !== undefined && caseData.skicka_erbjudande !== null) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.SKICKA_ERBJUDANDE,
+        value: Boolean(caseData.skicka_erbjudande)
+      })
+    }
+
+    if (caseData.bestallare) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.BESTALLARE,
+        value: caseData.bestallare
+      })
+    }
+  }
+
+  return customFields
+}
+
+// KONVERTERA FRÅN SUPABASE TILL CLICKUP FORMAT (ASYNC VERSION MED GEOCODING)
+export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'private' | 'business') {
+  const customFields: any[] = []
+
+  // Geocoda adress om nödvändigt
+  await handleAddressFieldAsync(caseData, customFields)
+
+  // Resten av custom fields (utan adress som redan hanterats)
+  const remainingFields = await buildRemainingCustomFields(caseData, caseType)
+  customFields.push(...remainingFields)
+
+  return {
+    name: caseData.title,
+    description: caseData.description || '',
+    status: caseData.status || 'open',
+    priority: convertPriorityToClickUp(caseData.priority),
+    custom_fields: customFields,
+    due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
+    start_date: caseData.start_date ? new Date(caseData.start_date).getTime() : undefined
+  }
+}
+
+// URSPRUNGLIG SYNC VERSION (BEHÅLLS FÖR BAKÅTKOMPATIBILITET)
 export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'business') {
   const customFields: any[] = []
 
   // Gemensamma fält för båda typerna
   if (caseData.adress) {
     let addressValue;
+    let hasValidLocation = false;
     
     if (typeof caseData.adress === 'string') {
       try {
         // Försök parsa som JSON först
         const parsedAddress = JSON.parse(caseData.adress);
         
-        // Kontrollera om det redan är i ClickUp location format
-        if (parsedAddress.location && parsedAddress.formatted_address) {
-          addressValue = parsedAddress;
-        } else {
-          // Konvertera till ClickUp location format
+        // Kontrollera om det har giltiga koordinater enligt ClickUp API spec
+        if (parsedAddress.location && 
+            typeof parsedAddress.location.lat === 'number' && 
+            typeof parsedAddress.location.lng === 'number' &&
+            parsedAddress.formatted_address) {
           addressValue = {
-            location: parsedAddress.location || null,
-            formatted_address: parsedAddress.formatted_address || caseData.adress
+            location: {
+              lat: parsedAddress.location.lat,
+              lng: parsedAddress.location.lng
+            },
+            formatted_address: parsedAddress.formatted_address
           };
+          hasValidLocation = true;
         }
       } catch (e) {
-        // Om det inte är JSON, skapa ClickUp location format med bara formatted_address
-        addressValue = {
-          location: null,
-          formatted_address: caseData.adress
-        };
+        // JSON parse misslyckades, ingen giltig location data
       }
     } else if (caseData.adress && typeof caseData.adress === 'object') {
-      // Om det redan är ett objekt, säkerställ ClickUp format
-      addressValue = {
-        location: caseData.adress.location || null,
-        formatted_address: caseData.adress.formatted_address || caseData.adress.address || 'Ingen adress'
-      };
-    } else {
-      addressValue = {
-        location: null,
-        formatted_address: String(caseData.adress)
-      };
+      // Kontrollera om objektet har giltiga koordinater
+      if (caseData.adress.location &&
+          typeof caseData.adress.location.lat === 'number' &&
+          typeof caseData.adress.location.lng === 'number' &&
+          caseData.adress.formatted_address) {
+        addressValue = {
+          location: {
+            lat: caseData.adress.location.lat,
+            lng: caseData.adress.location.lng
+          },
+          formatted_address: caseData.adress.formatted_address
+        };
+        hasValidLocation = true;
+      }
     }
     
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.ADRESS,
-      value: addressValue
-    });
+    // Lägg bara till location field om vi har giltiga koordinater
+    // Enligt ClickUp API spec måste location fields ha lat/lng koordinater
+    if (hasValidLocation && addressValue) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.ADRESS,
+        value: addressValue
+      });
+    }
+    // Annars kan vi spara adressen som ett text field eller skippa det helt
+    // för att undvika API-fel
   }
 
   if (caseData.avvikelser_tillbud_olyckor) {
