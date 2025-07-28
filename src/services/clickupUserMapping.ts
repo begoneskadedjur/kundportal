@@ -52,12 +52,26 @@ export async function getClickUpUsers(): Promise<ClickUpUser[]> {
     const client = new ClickUpClient(CLICKUP_API_TOKEN)
     const response = await client.getTeamMembers()
     
-    // ClickUp API returnerar { teams: [{ members: [...] }] }
+    // ClickUp API returnerar { teams: [{ members: [{ user: {...} }] }] }
     const users: ClickUpUser[] = []
     if (response.teams && Array.isArray(response.teams)) {
       for (const team of response.teams) {
         if (team.members && Array.isArray(team.members)) {
-          users.push(...team.members)
+          // Varje member har en 'user' property med användardata
+          const teamUsers = team.members.map((member: any) => ({
+            id: member.user.id,
+            username: member.user.username,
+            email: member.user.email,
+            color: member.user.color,
+            profilePicture: member.user.profilePicture,
+            initials: member.user.initials,
+            role: member.user.role,
+            custom_role: member.user.custom_role,
+            last_active: member.user.last_active,
+            delete_date: member.user.delete_date || null,
+            teams: [team.id] // Lägg till team info
+          }))
+          users.push(...teamUsers)
         }
       }
     }

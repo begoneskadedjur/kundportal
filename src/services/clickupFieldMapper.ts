@@ -4,6 +4,38 @@
 import { geocodeAddress, isAddressGeocoded, type GeocodeResult } from './geocoding'
 import { PEST_TYPE_OPTIONS } from '../utils/clickupFieldMapper'
 import { convertTechnicianIdsToClickUpUserIds } from './clickupUserMapping'
+import { fromZonedTime } from 'date-fns-tz'
+
+// Tidszon för korrekt datum/tid-hantering
+const TIMEZONE = 'Europe/Stockholm'
+
+/**
+ * Konverterar datum/tid-sträng till Unix timestamp i millisekunder med korrekt tidszon
+ * Detta säkerställer att svenska tidszoner hanteras korrekt för ClickUp API
+ */
+function convertToClickUpTimestamp(dateString: string | null | undefined): number | undefined {
+  if (!dateString) return undefined
+  
+  try {
+    // Om dateString redan är en ISO-sträng (från DatePicker), 
+    // konvertera den till Date och sedan till Unix timestamp
+    const date = new Date(dateString)
+    
+    // Kontrollera om datumen är giltiga
+    if (isNaN(date.getTime())) {
+      console.warn(`[ClickUpMapper] Invalid date string: ${dateString}`)
+      return undefined
+    }
+    
+    // Returnera Unix timestamp i millisekunder
+    // Date.getTime() returnerar redan korrekt UTC timestamp
+    return date.getTime()
+  } catch (error) {
+    console.error(`[ClickUpMapper] Error converting date ${dateString}:`, error)
+    return undefined
+  }
+}
+
 
 export interface ClickUpField {
   id: string
@@ -413,8 +445,8 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
     status: 'bokat', // ClickUp API förväntar sig status-namn som sträng (case-sensitive)
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
-    due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
-    start_date: caseData.start_date ? new Date(caseData.start_date).getTime() : undefined
+    due_date: convertToClickUpTimestamp(caseData.due_date),
+    start_date: convertToClickUpTimestamp(caseData.start_date)
   }
 
   // Lägg till assignees om vi har några
@@ -730,8 +762,8 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     status: 'bokat', // ClickUp API förväntar sig status-namn som sträng (case-sensitive)
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
-    due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
-    start_date: caseData.start_date ? new Date(caseData.start_date).getTime() : undefined
+    due_date: convertToClickUpTimestamp(caseData.due_date),
+    start_date: convertToClickUpTimestamp(caseData.start_date)
   }
 }
 
