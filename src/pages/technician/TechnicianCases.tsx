@@ -41,7 +41,7 @@ const getStatusColor = (status: string) => {
   const lowerStatus = status?.toLowerCase() || '';
   if (lowerStatus.includes('avslutat') || lowerStatus.includes('completed')) return 'bg-green-500/20 text-green-400';
   if (lowerStatus.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400';
-  if (lowerStatus.includes('bokad') || lowerStatus.includes('offert signerad')) return 'bg-blue-500/20 text-blue-400';
+  if (lowerStatus.includes('bokad') || lowerStatus.includes('bokat') || lowerStatus.includes('offert signerad')) return 'bg-blue-500/20 text-blue-400';
   if (lowerStatus.includes('öppen') || lowerStatus.includes('offert skickad')) return 'bg-yellow-500/20 text-yellow-400';
   if (lowerStatus.includes('review')) return 'bg-purple-500/20 text-purple-400';
   if (lowerStatus.includes('stängt')) return 'bg-slate-600/50 text-slate-400';
@@ -55,7 +55,7 @@ const formatAddress = (address: any): string => {
   return 'Okänt format';
 };
 
-const statusOrder = [ 'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
+const statusOrder = [ 'Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
 
 export default function TechnicianCases() {
   const { profile, isTechnician } = useAuth()
@@ -70,7 +70,7 @@ export default function TechnicianCases() {
   const [statusFilter, setStatusFilter] = useState<string>('Öppen')
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
-  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'start_date', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TechnicianCase; direction: 'asc' | 'desc' }>({ key: 'due_date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
@@ -94,8 +94,8 @@ export default function TechnicianCases() {
     try {
       const selectQuery = '*, pris'; // Hämta allt + pris för enkelhetens skull
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select(selectQuery).eq('primary_assignee_id', technicianId),
-        supabase.from('business_cases').select(selectQuery).eq('primary_assignee_id', technicianId),
+        supabase.from('private_cases').select(selectQuery).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('business_cases').select(selectQuery).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
         supabase.from('cases').select('*').eq('assigned_technician_id', technicianId)
       ]);
       
@@ -110,7 +110,7 @@ export default function TechnicianCases() {
           total_cases: allCases.length,
           completed_cases: allCases.filter(c => c.status?.toLowerCase() === 'avslutat').length,
           pending_cases: allCases.filter(c => c.status?.toLowerCase() === 'öppen').length,
-          in_progress_cases: allCases.filter(c => c.status?.toLowerCase().includes('bokad') || c.status?.toLowerCase().includes('återbesök')).length,
+          in_progress_cases: allCases.filter(c => c.status?.toLowerCase().includes('bokad') || c.status?.toLowerCase().includes('bokat') || c.status?.toLowerCase().includes('återbesök')).length,
           total_commission: allCases.reduce((sum, c) => sum + (c.commission_amount || 0), 0)
       });
     } catch (error: any) {
@@ -208,8 +208,8 @@ export default function TechnicianCases() {
                         <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('title')}>Ärende</th>
                         <th scope="col" className="px-4 py-3">Kund</th>
                         <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('status')}>Status</th>
-                        <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('start_date')}>
-                           <div className="flex items-center">Startdatum {sortConfig.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                        <th scope="col" className="px-4 py-3 cursor-pointer" onClick={() => requestSort('due_date')}>
+                           <div className="flex items-center">Datum {sortConfig.key === 'due_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                         </th>
                         <th scope="col" className="px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('case_price')}>Pris</th>
                         <th scope="col" className="px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('commission_amount')}>Provision</th>
@@ -234,7 +234,7 @@ export default function TechnicianCases() {
                                 </div>
                             </td>
                             <td className="px-4 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(case_.status)}`}>{case_.status}</span></td>
-                            <td className="px-4 py-4 text-slate-300">{case_.start_date ? formatDate(case_.start_date) : '-'}</td>
+                            <td className="px-4 py-4 text-slate-300">{case_.due_date ? formatDate(case_.due_date) : (case_.start_date ? formatDate(case_.start_date) : '-')}</td>
                             <td className="px-4 py-4 text-right text-slate-300">{formatCurrency(case_.case_price)}</td>
                             <td className="px-4 py-4 text-right font-semibold text-green-400">{formatCurrency(case_.commission_amount)}</td>
                             <td className="px-4 py-4">
