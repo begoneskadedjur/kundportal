@@ -19,10 +19,19 @@ export class ClickUpClient {
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`ClickUp API error (${response.status}):`, errorText)
       throw new Error(`ClickUp API error: ${response.status} ${response.statusText}`)
     }
 
-    return response.json()
+    // Säker JSON parsing
+    const responseText = await response.text()
+    try {
+      return JSON.parse(responseText)
+    } catch (error) {
+      console.error('ClickUp response was not valid JSON:', responseText.substring(0, 200))
+      throw new Error('ClickUp returned invalid response format')
+    }
   }
 
   // Skapa en ny lista i en folder

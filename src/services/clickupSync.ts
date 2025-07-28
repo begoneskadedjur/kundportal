@@ -59,6 +59,13 @@ class ClickUpSyncService {
       // 2. Konvertera till ClickUp format
       const clickupTask = convertSupabaseToClickUp(caseData, caseType)
       const listId = getListIdFromCaseType(caseType)
+      
+      console.log(`[ClickUpSync] Sending task to ClickUp:`, {
+        listId,
+        taskName: clickupTask.name,
+        customFieldsCount: clickupTask.custom_fields?.length || 0,
+        addressField: clickupTask.custom_fields?.find(f => f.id === '0a889578-6c38-4fe2-bda4-6258f628bb68')
+      })
 
       // 3. Skapa task i ClickUp
       const createdTask = await this.client.createTask(listId, clickupTask)

@@ -55,10 +55,28 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
 
   // Gemensamma fält för båda typerna
   if (caseData.adress) {
+    let addressValue;
+    
+    if (typeof caseData.adress === 'string') {
+      try {
+        // Försök parsa som JSON först
+        addressValue = JSON.parse(caseData.adress);
+      } catch (e) {
+        // Om det inte är JSON, skapa ett enkelt objekt
+        addressValue = {
+          formatted_address: caseData.adress,
+          location: null,
+          place_id: null
+        };
+      }
+    } else {
+      addressValue = caseData.adress;
+    }
+    
     customFields.push({
       id: CLICKUP_FIELD_IDS.ADRESS,
-      value: typeof caseData.adress === 'string' ? JSON.parse(caseData.adress) : caseData.adress
-    })
+      value: addressValue
+    });
   }
 
   if (caseData.avvikelser_tillbud_olyckor) {
@@ -264,7 +282,8 @@ export function convertClickUpToSupabase(clickupTask: any, caseType: 'private' |
     for (const field of clickupTask.custom_fields) {
       switch (field.id) {
         case CLICKUP_FIELD_IDS.ADRESS:
-          supabaseData.adress = field.value
+          // Spara ClickUp adress-objekt som JSON-sträng för Supabase
+          supabaseData.adress = typeof field.value === 'object' ? JSON.stringify(field.value) : field.value
           break
         case CLICKUP_FIELD_IDS.AVVIKELSER_TILLBUD_OLYCKOR:
           supabaseData.avvikelser_tillbud_olyckor = field.value
