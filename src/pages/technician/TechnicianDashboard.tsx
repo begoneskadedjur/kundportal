@@ -13,6 +13,13 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
+const formatAddress = (address: any): string => {
+  if (!address) return 'Saknas';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } }
+  return 'Okänt format';
+};
+
 interface DashboardData {
   stats: {
     total_commission_ytd: number;
@@ -250,11 +257,8 @@ export default function TechnicianDashboard() {
                   key={case_.id} 
                   className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors cursor-pointer"
                   onClick={() => {
-                    if (case_.case_type === 'private') {
-                      window.open(`https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')
-                    } else {
-                      window.open(`https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')  
-                    }
+                    // Navigera till teknikerens ärendevy istället för ClickUp
+                    navigate('/technician/cases')
                   }}
                 >
                   <div className="flex-1">
@@ -275,7 +279,7 @@ export default function TechnicianDashboard() {
                         <span>🏢 {case_.foretag}</span>
                       )}
                       {case_.adress && (
-                        <span>📍 {case_.adress}</span>
+                        <span>📍 {formatAddress(case_.adress)}</span>
                       )}
                       <span>📅 {formatDate(case_.created_at)}</span>
                     </div>
