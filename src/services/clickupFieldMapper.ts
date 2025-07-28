@@ -337,7 +337,7 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
   return {
     name: caseData.title,
     description: caseData.description || '',
-    status: caseData.status || 'open',
+    // Ta bort status - låt ClickUp använda default status för listan
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
@@ -598,7 +598,7 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   return {
     name: caseData.title,
     description: caseData.description || '',
-    status: caseData.status || 'open',
+    // Ta bort status - låt ClickUp använda default status för listan
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,

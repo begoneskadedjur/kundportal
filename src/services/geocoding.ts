@@ -60,9 +60,10 @@ export async function geocodeAddress(address: string): Promise<GeocodingResponse
       : process.env.GOOGLE_MAPS_API_KEY
     
     if (!apiKey) {
+      console.warn('[Geocoding] Google Maps API key missing. Add VITE_GOOGLE_MAPS_API_KEY to environment variables.')
       return {
         success: false,
-        error: 'Google Maps API-nyckel saknas (ingen VITE_GOOGLE_MAPS_API_KEY eller GOOGLE_MAPS_API_KEY)',
+        error: 'Google Maps API-nyckel saknas. Lägg till VITE_GOOGLE_MAPS_API_KEY i miljövariabler.',
         originalAddress: address
       }
     }
