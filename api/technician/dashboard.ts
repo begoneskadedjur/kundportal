@@ -195,6 +195,10 @@ async function getRecentCases(technicianId: string) {
 
 // ✅ PÅGÅENDE ÄRENDEN - ALLA UTOM AVSLUTADE OCH SLASKADE
 async function getPendingCases(technicianId: string) {
+  // Debug: kontrollera att isCompletedStatus fungerar
+  console.log('🔍 Test isCompletedStatus("Avslutat"):', isCompletedStatus('Avslutat'))
+  console.log('🔍 Test isCompletedStatus("Stängt - slasklogg"):', isCompletedStatus('Stängt - slasklogg'))
+  console.log('🔍 Test isCompletedStatus("Öppen"):', isCompletedStatus('Öppen'))
   const [pendingPrivate, pendingBusiness] = await Promise.allSettled([
     // Private cases - ALLA FÄLT för EditCaseModal
     supabase
@@ -232,12 +236,24 @@ async function getPendingCases(technicianId: string) {
     ...businessPending.map(c => ({ ...c, case_type: 'business' }))
   ]
 
+  // Debug logga alla statusar innan filtrering
+  console.log('📋 Alla case statusar före filtrering:', allPendingCases.map(c => c.status))
+  
   // Filtrera ut avslutade och slaskade ärenden med isCompletedStatus
-  const activeCases = allPendingCases.filter(c => 
-    c.status && !isCompletedStatus(c.status)
-  ).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+  const activeCases = allPendingCases.filter(c => {
+    if (!c.status) {
+      console.log(`⚠️ Case ${c.id} har ingen status`)
+      return false
+    }
+    
+    const isCompleted = isCompletedStatus(c.status)
+    console.log(`📋 Case ${c.id}: status="${c.status}", isCompleted=${isCompleted}`)
+    
+    return !isCompleted
+  }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
 
   console.log(`📋 Active pending cases after filtering: ${activeCases.length}`)
+  console.log('📋 Aktiva cases:', activeCases.map(c => ({ id: c.id, status: c.status })))
 
   return activeCases
 }
