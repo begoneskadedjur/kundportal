@@ -122,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clickupPayload = {
       name: `${caseNumber}: ${title}`,
       description: fullDescription,
-      status: getStatusId('Bokad'), // Använd status ID från database.ts
+      status: getStatusId('Bokat'), // Använd status ID från database.ts
       priority: priority === 'urgent' ? 1 : priority === 'high' ? 2 : priority === 'normal' ? 3 : 4
       // TA BORT CUSTOM FIELDS TILLS VI HAR RÄTT IDs
       // custom_fields: [] - Kommenterat ut för att förhindra fel

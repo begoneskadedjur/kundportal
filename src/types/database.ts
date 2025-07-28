@@ -327,7 +327,7 @@ export type Database = {
 // 🎯 CLICKUP STATUS SYSTEM - Med kapitalisering för portal-visning
 export type ClickUpStatus = 
   | 'Öppen'
-  | 'Bokad'
+  | 'Bokat'
   | 'Återbesök 1'
   | 'Återbesök 2'
   | 'Återbesök 3'
@@ -346,7 +346,7 @@ export type ClickUpStatus =
 // 🆔 STATUS ID TILL NAMN MAPPNING - Med kapitalisering
 export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
   'c127553498_fwlMbGKH': 'Öppen',
-  'c127553498_E9tR4uKl': 'Bokad',
+  'c127553498_E9tR4uKl': 'Bokat',
   'c127553498_vUiYm1mz': 'Återbesök 1',
   'c127553498_oWvoXUqP': 'Återbesök 2',
   'c127553498_Pk6EAmNr': 'Återbesök 3',
@@ -366,7 +366,7 @@ export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
 // 📝 STATUS NAMN TILL ID MAPPNING
 export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
   'Öppen': 'c127553498_fwlMbGKH',
-  'Bokad': 'c127553498_E9tR4uKl',
+  'Bokat': 'c127553498_E9tR4uKl',
   'Återbesök 1': 'c127553498_vUiYm1mz',
   'Återbesök 2': 'c127553498_oWvoXUqP',
   'Återbesök 3': 'c127553498_Pk6EAmNr',
@@ -386,7 +386,7 @@ export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
 // 🎨 STATUS KONFIGURATION med färger och typer
 export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: string; type: string; orderindex: number } } = {
   'Öppen': { id: 'c127553498_fwlMbGKH', color: '#87909e', type: 'open', orderindex: 0 },
-  'Bokad': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
+  'Bokat': { id: 'c127553498_E9tR4uKl', color: '#f8ae00', type: 'custom', orderindex: 1 },
   'Återbesök 1': { id: 'c127553498_vUiYm1mz', color: '#1090e0', type: 'custom', orderindex: 2 },
   'Återbesök 2': { id: 'c127553498_oWvoXUqP', color: '#1090e0', type: 'custom', orderindex: 3 },
   'Återbesök 3': { id: 'c127553498_Pk6EAmNr', color: '#1090e0', type: 'custom', orderindex: 4 },
