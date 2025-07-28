@@ -1,4 +1,4 @@
-// 📁 api/technician/dashboard.ts - ANVÄND BEFINTLIGA ADMIN SERVICES!
+// 📁 api/technician/dashboard.ts - FIXAD VERSION SOM ÅTERGÅR TILL URSPRUNGLIG LOGIK
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { isCompletedStatus } from '../../src/types/database'
@@ -160,24 +160,35 @@ async function getTechnicianMonthlyData(technicianId: string) {
   return monthlyData
 }
 
-// ✅ RECENT CASES - VISA ALLA ÄRENDEN (INTE BARA AVSLUTADE)
+// ✅ RECENT CASES - MED UTÖKADE FÄLT FÖR EDITCASEMODAL
 async function getRecentCases(technicianId: string) {
   const [recentPrivate, recentBusiness] = await Promise.allSettled([
-    // Private cases - ALLA STATUS (inte bara Avslutat)
+    // Private cases - ALLA FÄLT för både visning och pending-räkning
     supabase
       .from('private_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at')
+      .select(`
+        id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at,
+        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
+        personnummer, pris, material_cost, time_spent_minutes, work_started_at,
+        start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad,
+        r_materialkostnad, r_ovrig_kostnad, saneringsrapport, adress
+      `)
       .eq('primary_assignee_id', technicianId)
-      .order('created_at', { ascending: false })  // Sortera på created_at istället
-      .limit(15),
+      .order('created_at', { ascending: false })
+      .limit(50), // Öka limit för att få fler cases för pending-räkning
 
-    // Business cases - ALLA STATUS (inte bara Avslutat)
+    // Business cases - ALLA FÄLT för både visning och pending-räkning
     supabase
       .from('business_cases')
-      .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, foretag, created_at')
+      .select(`
+        id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, foretag, created_at,
+        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
+        org_nr, pris, material_cost, time_spent_minutes, work_started_at,
+        start_date, due_date, saneringsrapport, adress
+      `)
       .eq('primary_assignee_id', technicianId)
-      .order('created_at', { ascending: false })  // Sortera på created_at istället
-      .limit(15)
+      .order('created_at', { ascending: false })
+      .limit(50) // Öka limit för att få fler cases för pending-räkning
   ])
 
   const privateRecent = recentPrivate.status === 'fulfilled' ? recentPrivate.value.data || [] : []
@@ -190,72 +201,7 @@ async function getRecentCases(technicianId: string) {
     ...businessRecent.map(c => ({ ...c, case_type: 'business' }))
   ].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
 
-  return allRecentCases.slice(0, 10)
-}
-
-// ✅ PÅGÅENDE ÄRENDEN - ALLA UTOM AVSLUTADE OCH SLASKADE
-async function getPendingCases(technicianId: string) {
-  // Debug: kontrollera att isCompletedStatus fungerar
-  console.log('🔍 Test isCompletedStatus("Avslutat"):', isCompletedStatus('Avslutat'))
-  console.log('🔍 Test isCompletedStatus("Stängt - slasklogg"):', isCompletedStatus('Stängt - slasklogg'))
-  console.log('🔍 Test isCompletedStatus("Öppen"):', isCompletedStatus('Öppen'))
-  const [pendingPrivate, pendingBusiness] = await Promise.allSettled([
-    // Private cases - ALLA FÄLT för EditCaseModal
-    supabase
-      .from('private_cases')
-      .select(`
-        id, clickup_task_id, title, status, created_at, kontaktperson, adress,
-        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
-        personnummer, pris, material_cost, time_spent_minutes, work_started_at,
-        start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad,
-        r_materialkostnad, r_ovrig_kostnad, saneringsrapport
-      `)
-      .eq('primary_assignee_id', technicianId)
-      .order('created_at', { ascending: false }),
-
-    // Business cases - ALLA FÄLT för EditCaseModal
-    supabase
-      .from('business_cases')
-      .select(`
-        id, clickup_task_id, title, status, created_at, kontaktperson, foretag, adress,
-        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
-        org_nr, pris, material_cost, time_spent_minutes, work_started_at,
-        start_date, due_date, saneringsrapport
-      `)
-      .eq('primary_assignee_id', technicianId)
-      .order('created_at', { ascending: false })
-  ])
-
-  const privatePending = pendingPrivate.status === 'fulfilled' ? pendingPrivate.value.data || [] : []
-  const businessPending = pendingBusiness.status === 'fulfilled' ? pendingBusiness.value.data || [] : []
-
-  console.log(`📋 Pending cases found: Private: ${privatePending.length}, Business: ${businessPending.length}`)
-
-  const allPendingCases = [
-    ...privatePending.map(c => ({ ...c, case_type: 'private' })),
-    ...businessPending.map(c => ({ ...c, case_type: 'business' }))
-  ]
-
-  // Debug logga alla statusar innan filtrering
-  console.log('📋 Alla case statusar före filtrering:', allPendingCases.map(c => c.status))
-  
-  // Filtrera ut avslutade och slaskade ärenden med isCompletedStatus
-  const activeCases = allPendingCases.filter(c => {
-    if (!c.status) {
-      console.log(`⚠️ Case ${c.id} har ingen status`)
-      return false
-    }
-    
-    const isCompleted = isCompletedStatus(c.status)
-    console.log(`📋 Case ${c.id}: status="${c.status}", isCompleted=${isCompleted}`)
-    
-    return !isCompleted
-  }).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-
-  console.log(`📋 Active pending cases after filtering: ${activeCases.length}`)
-  console.log('📋 Aktiva cases:', activeCases.map(c => ({ id: c.id, status: c.status })))
-
-  return activeCases
+  return allRecentCases
 }
 
 // ✅ MAIN HANDLER
@@ -285,12 +231,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('🔄 Fetching dashboard data for technician:', technician_id)
 
-    // ✅ ANVÄND BEFINTLIGA ADMIN SERVICES
-    const [performanceData, monthlyData, recentCases, pendingCases] = await Promise.all([
+    // ✅ ANVÄND BEFINTLIGA ADMIN SERVICES - UTAN getPendingCases
+    const [performanceData, monthlyData, recentCases] = await Promise.all([
       getTechnicianPerformanceById(technician_id as string),
       getTechnicianMonthlyData(technician_id as string),
-      getRecentCases(technician_id as string),
-      getPendingCases(technician_id as string)
+      getRecentCases(technician_id as string)
     ])
 
     // ✅ BERÄKNA DASHBOARD STATS SAMMA SOM ADMIN
@@ -300,8 +245,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentMonthCommission = currentMonthData?.total_commission || 0
     const completedCasesThisMonth = currentMonthData?.case_count || 0
 
-    // Pågående ärenden (använd nya pendingCases listan)
-    const pendingCasesCount = pendingCases.length
+    // ✅ ÅTERGÅ TILL URSPRUNGLIG PENDING LOGIC - filtrera recentCases
+    const pendingCases = recentCases.filter(c => 
+      c.status && !isCompletedStatus(c.status)
+    )
+
+    console.log(`📋 Total recent cases: ${recentCases.length}`)
+    console.log(`📋 Pending cases after filtering: ${pendingCases.length}`)
 
     const avgCommissionPerCase = performanceData.totalCases > 0 ? 
       performanceData.totalCommissionYtd / performanceData.totalCases : 0
@@ -314,14 +264,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         total_cases_ytd: performanceData.totalCases,
         avg_commission_per_case: avgCommissionPerCase,
         current_month_commission: currentMonthCommission,
-        pending_cases: pendingCasesCount,
+        pending_cases: pendingCases.length,
         completed_cases_this_month: completedCasesThisMonth,
         technician_name: performanceData.technician.name,
         technician_email: performanceData.technician.email
       },
       monthly_data: monthlyData,
-      recent_cases: recentCases,
-      pending_cases: pendingCases,
+      recent_cases: recentCases.slice(0, 10), // Bara visa 10 för "Senaste ärenden"
+      pending_cases: pendingCases, // Alla pending för klickbar lista
       meta: {
         technician_id,
         timestamp: new Date().toISOString(),
@@ -341,7 +291,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       total_commission: performanceData.totalCommissionYtd,
       cases: performanceData.totalCases,
       months: monthlyData.length,
-      current_month_commission: currentMonthCommission
+      current_month_commission: currentMonthCommission,
+      pending_count: pendingCases.length
     })
 
     return res.status(200).json(response)
