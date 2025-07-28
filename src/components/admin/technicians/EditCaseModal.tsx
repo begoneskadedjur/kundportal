@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -35,6 +35,14 @@ interface TechnicianCase {
   work_started_at?: string | null;
   start_date?: string | null;
   due_date?: string | null;
+  // ROT/RUT fält
+  r_rot_rut?: string;
+  r_fastighetsbeteckning?: string;
+  r_arbetskostnad?: number;
+  r_materialkostnad?: number;
+  r_ovrig_kostnad?: number;
+  // Rapport
+  saneringsrapport?: string;
 }
 
 interface EditCaseModalProps {
@@ -588,6 +596,92 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 </div>
               )}
             </div>
+
+            {/* ROT/RUT sektion - bara för privatpersoner */}
+            {showTimeTracking && currentCase.case_type === 'private' && (
+              <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                  <Percent className="w-5 h-5 text-blue-400" />ROT/RUT-avdrag
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">ROT/RUT</label>
+                  <select 
+                    name="r_rot_rut" 
+                    value={formData.r_rot_rut || 'Nej'} 
+                    onChange={handleChange} 
+                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Nej">Ej avdragsgillt</option>
+                    <option value="ROT">ROT</option>
+                    <option value="RUT">RUT</option>
+                    <option value="INKL moms">Pris inkl. moms</option>
+                  </select>
+                </div>
+                
+                {(formData.r_rot_rut === 'ROT' || formData.r_rot_rut === 'RUT') && (
+                  <div className="p-4 bg-slate-900/70 border border-slate-700 rounded-lg space-y-4">
+                    <h5 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Percent size={14}/>Detaljer för ROT/RUT-avdrag
+                    </h5>
+                    <Input 
+                      label="Fastighetsbeteckning" 
+                      name="r_fastighetsbeteckning" 
+                      value={formData.r_fastighetsbeteckning || ''} 
+                      onChange={handleChange} 
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Input 
+                        type="number" 
+                        label="Arbetskostnad" 
+                        name="r_arbetskostnad" 
+                        value={formData.r_arbetskostnad === null ? '' : formData.r_arbetskostnad} 
+                        onChange={handleChange} 
+                      />
+                      <Input 
+                        type="number" 
+                        label="Materialkostnad" 
+                        name="r_materialkostnad" 
+                        value={formData.r_materialkostnad === null ? '' : formData.r_materialkostnad} 
+                        onChange={handleChange} 
+                      />
+                      <Input 
+                        type="number" 
+                        label="Övrig kostnad" 
+                        name="r_ovrig_kostnad" 
+                        value={formData.r_ovrig_kostnad === null ? '' : formData.r_ovrig_kostnad} 
+                        onChange={handleChange} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Saneringsrapport sektion */}
+            {showTimeTracking && (
+              <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-purple-400" />Saneringsrapport
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Rapport & Dokumentation</label>
+                  <textarea 
+                    name="saneringsrapport" 
+                    value={formData.saneringsrapport || ''} 
+                    onChange={handleChange} 
+                    rows={6} 
+                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                    placeholder="Skriv en detaljerad rapport över utfört arbete, använda metoder, resultat och eventuella rekommendationer för kunden..."
+                  />
+                </div>
+                <div className="text-xs text-slate-400">
+                  <p>• Beskriv vilka metoder som användes</p>
+                  <p>• Dokumentera resultatet av behandlingen</p>
+                  <p>• Ge rekommendationer för framtida förebyggande åtgärder</p>
+                  <p>• Notera eventuella uppföljningsbehov</p>
+                </div>
+              </div>
+            )}
           </div>
         </form>
       </div>

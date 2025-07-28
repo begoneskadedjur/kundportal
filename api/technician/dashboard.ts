@@ -196,17 +196,28 @@ async function getRecentCases(technicianId: string) {
 // ✅ PÅGÅENDE ÄRENDEN - ALLA UTOM AVSLUTADE OCH SLASKADE
 async function getPendingCases(technicianId: string) {
   const [pendingPrivate, pendingBusiness] = await Promise.allSettled([
-    // Private cases - ALLA som inte är completed
+    // Private cases - ALLA FÄLT för EditCaseModal
     supabase
       .from('private_cases')
-      .select('id, clickup_task_id, title, status, created_at, kontaktperson, adress')
+      .select(`
+        id, clickup_task_id, title, status, created_at, kontaktperson, adress,
+        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
+        personnummer, pris, material_cost, time_spent_minutes, work_started_at,
+        start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad,
+        r_materialkostnad, r_ovrig_kostnad, saneringsrapport
+      `)
       .eq('primary_assignee_id', technicianId)
       .order('created_at', { ascending: false }),
 
-    // Business cases - ALLA som inte är completed  
+    // Business cases - ALLA FÄLT för EditCaseModal
     supabase
       .from('business_cases')
-      .select('id, clickup_task_id, title, status, created_at, kontaktperson, foretag, adress')
+      .select(`
+        id, clickup_task_id, title, status, created_at, kontaktperson, foretag, adress,
+        beskrivning, skadedjur, telefon_kontaktperson, e_post_kontaktperson,
+        org_nr, pris, material_cost, time_spent_minutes, work_started_at,
+        start_date, due_date, saneringsrapport
+      `)
       .eq('primary_assignee_id', technicianId)
       .order('created_at', { ascending: false })
   ])

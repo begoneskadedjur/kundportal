@@ -21,7 +21,7 @@ const formatAddress = (address: any): string => {
   return 'Okänt format';
 };
 
-// Interface för EditCaseModal compatibility
+// Interface för EditCaseModal compatibility - KOMPLETT med alla fält
 interface TechnicianCase {
   id: string;
   clickup_task_id: string;
@@ -51,6 +51,14 @@ interface TechnicianCase {
   material_cost?: number;
   time_spent_minutes?: number;
   work_started_at?: string;
+  // ROT/RUT fält
+  r_rot_rut?: string;
+  r_fastighetsbeteckning?: string;
+  r_arbetskostnad?: number;
+  r_materialkostnad?: number;
+  r_ovrig_kostnad?: number;
+  // Rapport
+  saneringsrapport?: string;
 }
 
 interface DashboardData {
@@ -134,7 +142,7 @@ export default function TechnicianDashboard() {
   }
 
   const handleOpenCase = (pendingCase: any) => {
-    // Konvertera pending case till TechnicianCase format
+    // Konvertera pending case till TechnicianCase format med ALLA fält
     const technicianCase: TechnicianCase = {
       id: pendingCase.id,
       clickup_task_id: pendingCase.clickup_task_id,
@@ -142,9 +150,29 @@ export default function TechnicianDashboard() {
       status: pendingCase.status,
       case_type: pendingCase.case_type,
       created_date: pendingCase.created_at,
+      description: pendingCase.beskrivning,
       kontaktperson: pendingCase.kontaktperson,
+      telefon_kontaktperson: pendingCase.telefon_kontaktperson,
+      e_post_kontaktperson: pendingCase.e_post_kontaktperson,
+      skadedjur: pendingCase.skadedjur,
+      personnummer: pendingCase.personnummer,
+      org_nr: pendingCase.org_nr,
       foretag: pendingCase.foretag,
       adress: pendingCase.adress,
+      case_price: pendingCase.pris,
+      material_cost: pendingCase.material_cost,
+      time_spent_minutes: pendingCase.time_spent_minutes,
+      work_started_at: pendingCase.work_started_at,
+      start_date: pendingCase.start_date,
+      due_date: pendingCase.due_date,
+      // ROT/RUT fält (bara för privatpersoner)
+      r_rot_rut: pendingCase.r_rot_rut,
+      r_fastighetsbeteckning: pendingCase.r_fastighetsbeteckning,
+      r_arbetskostnad: pendingCase.r_arbetskostnad,
+      r_materialkostnad: pendingCase.r_materialkostnad,
+      r_ovrig_kostnad: pendingCase.r_ovrig_kostnad,
+      // Rapport
+      saneringsrapport: pendingCase.saneringsrapport,
     }
     setSelectedCase(technicianCase)
     setIsEditModalOpen(true)
