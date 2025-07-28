@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
+import { useClickUpSync } from '../../../hooks/useClickUpSync';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -70,6 +71,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
   const [numberOfTechnicians, setNumberOfTechnicians] = useState(1);
+  
+  // ClickUp sync hook
+  const { syncAfterCreate } = useClickUpSync();
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({}); 
@@ -164,9 +168,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         if (error) throw error;
         toast.success(`Ärendet "${formData.title}" har bokats in!`);
       } else {
-        const { error } = await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim() }]);
+        const { data, error } = await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim() }]).select('id');
         if (error) throw error;
         toast.success('Ärendet har skapats!');
+        
+        // Synka till ClickUp i bakgrunden om case skapades
+        if (data && data[0]?.id && caseType) {
+          syncAfterCreate(data[0].id, caseType);
+        }
       }
       setSubmitted(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1500);

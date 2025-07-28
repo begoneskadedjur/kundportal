@@ -50,6 +50,19 @@ export class ClickUpClient {
       body: JSON.stringify(taskData),
     })
   }
+
+  // Hämta en task
+  async getTask(taskId: string) {
+    return this.request(`/task/${taskId}`)
+  }
+
+  // Uppdatera en task
+  async updateTask(taskId: string, taskData: any) {
+    return this.request(`/task/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+    })
+  }
 }
 
 // src/services/clickup/lists.ts

@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { useClickUpSync } from '../../../hooks/useClickUpSync'
 import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -250,6 +251,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
+  
+  // ClickUp sync hook
+  const { syncAfterUpdate } = useClickUpSync();
 
   useEffect(() => {
     if (caseData) {
@@ -323,6 +327,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       
       setSubmitted(true);
       toast.success('Ärendet har uppdaterats!');
+      
+      // Synka till ClickUp i bakgrunden om det är private eller business case
+      if ((tableName === 'private_cases' || tableName === 'business_cases') && currentCase.id) {
+        const caseType = tableName === 'private_cases' ? 'private' : 'business';
+        syncAfterUpdate(currentCase.id, caseType);
+      }
       
       setTimeout(() => {
         setSubmitted(false);
