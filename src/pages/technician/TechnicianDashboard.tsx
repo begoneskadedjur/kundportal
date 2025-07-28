@@ -12,6 +12,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -19,6 +20,38 @@ const formatAddress = (address: any): string => {
   if (typeof address === 'string') { try { const p = JSON.parse(address); return p.formatted_address || address; } catch (e) { return address; } }
   return 'Okänt format';
 };
+
+// Interface för EditCaseModal compatibility
+interface TechnicianCase {
+  id: string;
+  clickup_task_id: string;
+  case_number?: string;
+  title: string;
+  status: string;
+  priority?: string;
+  case_type: 'private' | 'business' | 'contract';
+  created_date: string;
+  start_date?: string;
+  due_date?: string;
+  completed_date?: string;
+  commission_amount?: number;
+  case_price?: number;
+  kontaktperson?: string;
+  telefon_kontaktperson?: string;
+  e_post_kontaktperson?: string;
+  adress?: any;
+  foretag?: string;
+  org_nr?: string;
+  skadedjur?: string;
+  description?: string;
+  clickup_url?: string;
+  assignee_name?: string;
+  billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
+  personnummer?: string;
+  material_cost?: number;
+  time_spent_minutes?: number;
+  work_started_at?: string;
+}
 
 interface DashboardData {
   stats: {
@@ -68,6 +101,8 @@ export default function TechnicianDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
   const [showPendingCases, setShowPendingCases] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null)
 
   // ✅ FIXAD: Använd profile data istället för technician prop
   const technicianId = profile?.technician_id
@@ -86,6 +121,34 @@ export default function TechnicianDashboard() {
       fetchDashboardData()
     }
   }, [isTechnician, technicianId])
+
+  // Modal handlers
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedCase(null)
+  }
+
+  const handleUpdateSuccess = () => {
+    // Refetch dashboard data efter uppdatering
+    fetchDashboardData()
+  }
+
+  const handleOpenCase = (pendingCase: any) => {
+    // Konvertera pending case till TechnicianCase format
+    const technicianCase: TechnicianCase = {
+      id: pendingCase.id,
+      clickup_task_id: pendingCase.clickup_task_id,
+      title: pendingCase.title,
+      status: pendingCase.status,
+      case_type: pendingCase.case_type,
+      created_date: pendingCase.created_at,
+      kontaktperson: pendingCase.kontaktperson,
+      foretag: pendingCase.foretag,
+      adress: pendingCase.adress,
+    }
+    setSelectedCase(technicianCase)
+    setIsEditModalOpen(true)
+  }
 
   const fetchDashboardData = async () => {
     if (!technicianId) {
@@ -256,10 +319,7 @@ export default function TechnicianDashboard() {
                 <div 
                   key={case_.id} 
                   className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors cursor-pointer"
-                  onClick={() => {
-                    // Navigera till teknikerens ärendevy istället för ClickUp
-                    navigate('/technician/cases')
-                  }}
+                  onClick={() => handleOpenCase(case_)}
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -392,6 +452,13 @@ export default function TechnicianDashboard() {
           </div>
         </Card>
       </main>
+
+      <EditCaseModal 
+        isOpen={isEditModalOpen} 
+        onClose={handleCloseEditModal} 
+        onSuccess={handleUpdateSuccess} 
+        caseData={selectedCase} 
+      />
     </div>
   )
 }
