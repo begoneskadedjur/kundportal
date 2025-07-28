@@ -121,8 +121,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clickupPayload = {
       name: `${caseNumber}: ${title}`,
       description: fullDescription,
+      status: 'bokad', // Sätt alla nya ärenden till status "bokad"
       priority: priority === 'urgent' ? 1 : priority === 'high' ? 2 : priority === 'normal' ? 3 : 4
-      // TA BORT STATUS - låt ClickUp använda default status för listan
       // TA BORT CUSTOM FIELDS TILLS VI HAR RÄTT IDs
       // custom_fields: [] - Kommenterat ut för att förhindra fel
     }
