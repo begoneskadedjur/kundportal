@@ -2,6 +2,7 @@
 // EXAKT FIELD MAPPING FÖR CLICKUP INTEGRATION BASERAT PÅ DIN DATA
 
 import { geocodeAddress, isAddressGeocoded, type GeocodeResult } from './geocoding'
+import { PEST_TYPE_OPTIONS } from '../utils/clickupFieldMapper'
 
 export interface ClickUpField {
   id: string
@@ -31,9 +32,9 @@ export const CLICKUP_FIELD_IDS = {
 
   // Endast Privatperson
   R_ARBETSKOSTNAD: '1cf9bb02-d2ef-4f61-bc3e-b5bbcaa6a928',
-  R_ROT_RUT: '392f5c55-931b-4841-8275-c7bc748ce92f',
+  R_ROT_RUT: '2631b671-43aa-4705-8275-c7bc748ce92f',
   R_FASTIGHETSBETECKNING: '3874f7c0-2c0e-4044-abca-3d35f3ee93ab',
-  PERSONNUMMER: '2631b671-43aa-4705-8275-c7bc748ce92f', // KORRIGERAT UUID
+  PERSONNUMMER: '392f5c55-931b-4841-8275-c7bc748ce92f', // KORRIGERAT UUID enligt ClickUp API
   R_MATERIAL_UTRUSTNING: '4a275ed4-d795-4b14-b6f9-77f4507294c0',
   R_SERVICEBIL: 'e81100ce-3b5b-4c1f-839b-2ed8e4bf416e',
 
@@ -152,10 +153,23 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
   }
 
   if (caseData.status_saneringsrapport) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.STATUS_SANERINGSRAPPORT,
-      value: caseData.status_saneringsrapport
-    })
+    // ClickUp dropdown för Status Saneringsrapport - mappa text till orderindex
+    let orderindex: number | null = null
+    const value = String(caseData.status_saneringsrapport).toLowerCase()
+    
+    if (value.includes('genomförd')) {
+      orderindex = 0 // "Genomförd"
+    } else if (value.includes('pågående')) {
+      orderindex = 1 // "Pågående"
+    }
+    
+    if (orderindex !== null) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.STATUS_SANERINGSRAPPORT,
+        value: orderindex
+      })
+      console.log(`[ClickUpMapper] Mapped status_saneringsrapport "${caseData.status_saneringsrapport}" -> orderindex ${orderindex}`)
+    }
   }
 
   if (caseData.kontaktperson) {
@@ -166,17 +180,39 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
   }
 
   if (caseData.skadedjur) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.SKADEDJUR,
-      value: caseData.skadedjur
-    })
+    // ClickUp dropdown kräver orderindex, inte textnamnet
+    const pestOption = PEST_TYPE_OPTIONS.find(option => option.name === caseData.skadedjur)
+    if (pestOption) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.SKADEDJUR,
+        value: pestOption.orderindex
+      })
+      console.log(`[ClickUpMapper] Mapped skadedjur "${caseData.skadedjur}" -> orderindex ${pestOption.orderindex}`)
+    } else {
+      console.warn(`[ClickUpMapper] Unknown pest type: "${caseData.skadedjur}". Available options:`, PEST_TYPE_OPTIONS.map(o => o.name))
+    }
   }
 
   if (caseData.skicka_bokningsbekraftelse !== undefined && caseData.skicka_bokningsbekraftelse !== null) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.SKICKA_BOKNINGSBEKRAFTELSE,
-      value: Boolean(caseData.skicka_bokningsbekraftelse)
-    })
+    // ClickUp dropdown för bokningsbekräftelse - mappa text till orderindex
+    let orderindex: number | null = null
+    const value = String(caseData.skicka_bokningsbekraftelse).toLowerCase()
+    
+    if (value.includes('tidsspann')) {
+      orderindex = 0 // "JA - Tidsspann"
+    } else if (value.includes('första') || value.includes('klockslag')) {
+      orderindex = 1 // "JA - Första Klockslaget"
+    } else if (value === 'nej' || value === 'false') {
+      orderindex = 2 // "Nej"
+    }
+    
+    if (orderindex !== null) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.SKICKA_BOKNINGSBEKRAFTELSE,
+        value: orderindex
+      })
+      console.log(`[ClickUpMapper] Mapped skicka_bokningsbekraftelse "${caseData.skicka_bokningsbekraftelse}" -> orderindex ${orderindex}`)
+    }
   }
 
   if (caseData.reklamation) {
@@ -247,10 +283,27 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
     }
 
     if (caseData.r_rot_rut) {
-      customFields.push({
-        id: CLICKUP_FIELD_IDS.R_ROT_RUT,
-        value: caseData.r_rot_rut
-      })
+      // ClickUp dropdown för ROT/RUT - mappa text till orderindex
+      let orderindex: number | null = null
+      const value = String(caseData.r_rot_rut).toLowerCase()
+      
+      if (value === 'nej') {
+        orderindex = 0 // "Nej"
+      } else if (value === 'rot') {
+        orderindex = 1 // "ROT"
+      } else if (value === 'rut') {
+        orderindex = 2 // "RUT"
+      } else if (value.includes('inkl') || value.includes('moms')) {
+        orderindex = 3 // "INKL moms"
+      }
+      
+      if (orderindex !== null) {
+        customFields.push({
+          id: CLICKUP_FIELD_IDS.R_ROT_RUT,
+          value: orderindex
+        })
+        console.log(`[ClickUpMapper] Mapped r_rot_rut "${caseData.r_rot_rut}" -> orderindex ${orderindex}`)
+      }
     }
 
     if (caseData.r_fastighetsbeteckning) {
@@ -422,10 +475,23 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   }
 
   if (caseData.status_saneringsrapport) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.STATUS_SANERINGSRAPPORT,
-      value: caseData.status_saneringsrapport
-    })
+    // ClickUp dropdown för Status Saneringsrapport - mappa text till orderindex
+    let orderindex: number | null = null
+    const value = String(caseData.status_saneringsrapport).toLowerCase()
+    
+    if (value.includes('genomförd')) {
+      orderindex = 0 // "Genomförd"
+    } else if (value.includes('pågående')) {
+      orderindex = 1 // "Pågående"
+    }
+    
+    if (orderindex !== null) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.STATUS_SANERINGSRAPPORT,
+        value: orderindex
+      })
+      console.log(`[ClickUpMapper] Mapped status_saneringsrapport "${caseData.status_saneringsrapport}" -> orderindex ${orderindex}`)
+    }
   }
 
   if (caseData.kontaktperson) {
@@ -436,10 +502,17 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   }
 
   if (caseData.skadedjur) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.SKADEDJUR,
-      value: caseData.skadedjur
-    })
+    // ClickUp dropdown kräver orderindex, inte textnamnet
+    const pestOption = PEST_TYPE_OPTIONS.find(option => option.name === caseData.skadedjur)
+    if (pestOption) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.SKADEDJUR,
+        value: pestOption.orderindex
+      })
+      console.log(`[ClickUpMapper] Mapped skadedjur "${caseData.skadedjur}" -> orderindex ${pestOption.orderindex}`)
+    } else {
+      console.warn(`[ClickUpMapper] Unknown pest type: "${caseData.skadedjur}". Available options:`, PEST_TYPE_OPTIONS.map(o => o.name))
+    }
   }
 
   if (caseData.skicka_bokningsbekraftelse !== undefined && caseData.skicka_bokningsbekraftelse !== null) {
@@ -521,10 +594,27 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     }
 
     if (caseData.r_rot_rut) {
-      customFields.push({
-        id: CLICKUP_FIELD_IDS.R_ROT_RUT,
-        value: caseData.r_rot_rut
-      })
+      // ClickUp dropdown för ROT/RUT - mappa text till orderindex
+      let orderindex: number | null = null
+      const value = String(caseData.r_rot_rut).toLowerCase()
+      
+      if (value === 'nej') {
+        orderindex = 0 // "Nej"
+      } else if (value === 'rot') {
+        orderindex = 1 // "ROT"
+      } else if (value === 'rut') {
+        orderindex = 2 // "RUT"
+      } else if (value.includes('inkl') || value.includes('moms')) {
+        orderindex = 3 // "INKL moms"
+      }
+      
+      if (orderindex !== null) {
+        customFields.push({
+          id: CLICKUP_FIELD_IDS.R_ROT_RUT,
+          value: orderindex
+        })
+        console.log(`[ClickUpMapper] Mapped r_rot_rut "${caseData.r_rot_rut}" -> orderindex ${orderindex}`)
+      }
     }
 
     if (caseData.r_fastighetsbeteckning) {
@@ -580,11 +670,23 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     }
 
     if (caseData.skicka_erbjudande !== undefined && caseData.skicka_erbjudande !== null) {
-      // Checkbox field - måste vara boolean enligt ClickUp API
-      customFields.push({
-        id: CLICKUP_FIELD_IDS.SKICKA_ERBJUDANDE,
-        value: Boolean(caseData.skicka_erbjudande)
-      })
+      // ClickUp dropdown för Skicka erbjudande - mappa till orderindex
+      let orderindex: number | null = null
+      const value = String(caseData.skicka_erbjudande).toLowerCase()
+      
+      if (value === 'ja' || value === 'true') {
+        orderindex = 0 // "JA"
+      } else if (value === 'nej' || value === 'false') {
+        orderindex = 1 // "NEJ"
+      }
+      
+      if (orderindex !== null) {
+        customFields.push({
+          id: CLICKUP_FIELD_IDS.SKICKA_ERBJUDANDE,
+          value: orderindex
+        })
+        console.log(`[ClickUpMapper] Mapped skicka_erbjudande "${caseData.skicka_erbjudande}" -> orderindex ${orderindex}`)
+      }
     }
 
     if (caseData.bestallare) {
