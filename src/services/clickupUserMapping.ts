@@ -4,7 +4,16 @@
 import { supabase } from '../lib/supabase'
 import { ClickUpClient } from './clickup/client'
 
-const CLICKUP_API_TOKEN = import.meta.env.VITE_CLICKUP_API_TOKEN || ''
+// Dynamisk token-hämtning för att hantera olika miljöer
+function getClickUpToken(): string {
+  if (typeof window !== 'undefined' && typeof import.meta !== 'undefined') {
+    // Browser-miljö
+    return import.meta.env?.VITE_CLICKUP_API_TOKEN || ''
+  } else {
+    // Serverless/Node-miljö
+    return process.env.VITE_CLICKUP_API_TOKEN || process.env.CLICKUP_API_TOKEN || ''
+  }
+}
 
 export interface ClickUpUser {
   id: number
@@ -42,12 +51,13 @@ export async function getClickUpUsers(): Promise<ClickUpUser[]> {
     return clickUpUsersCache
   }
 
-  if (!CLICKUP_API_TOKEN) {
+  const token = getClickUpToken()
+  if (!token) {
     throw new Error('ClickUp API token is not configured')
   }
 
   try {
-    const client = new ClickUpClient(CLICKUP_API_TOKEN)
+    const client = new ClickUpClient(token)
     const response = await client.getTeamMembers()
     
     // ClickUp API returnerar { teams: [{ members: [...] }] }
