@@ -2,6 +2,7 @@
 // EXAKT FIELD MAPPING FÖR CLICKUP INTEGRATION BASERAT PÅ DIN DATA
 
 import { geocodeAddress, isAddressGeocoded, type GeocodeResult } from './geocoding'
+import { getStatusId } from '../types/database'
 
 export interface ClickUpField {
   id: string
@@ -337,7 +338,7 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
   return {
     name: caseData.title,
     description: caseData.description || '',
-    status: 'bokad', // Sätt alla nya ärenden till status "bokad"
+    status: getStatusId('Bokad'), // Använd status ID från database.ts
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
@@ -598,7 +599,7 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   return {
     name: caseData.title,
     description: caseData.description || '',
-    status: 'bokad', // Sätt alla nya ärenden till status "bokad"
+    status: getStatusId('Bokad'), // Använd status ID från database.ts
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,

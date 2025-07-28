@@ -1,6 +1,7 @@
 // api/create-case.ts - FIXAD VERSION som tar bort felaktiga custom fields
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getStatusId } from '../src/types/database'
 
 // Supabase admin client
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
@@ -121,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clickupPayload = {
       name: `${caseNumber}: ${title}`,
       description: fullDescription,
-      status: 'bokad', // Sätt alla nya ärenden till status "bokad"
+      status: getStatusId('Bokad'), // Använd status ID från database.ts
       priority: priority === 'urgent' ? 1 : priority === 'high' ? 2 : priority === 'normal' ? 3 : 4
       // TA BORT CUSTOM FIELDS TILLS VI HAR RÄTT IDs
       // custom_fields: [] - Kommenterat ut för att förhindra fel
