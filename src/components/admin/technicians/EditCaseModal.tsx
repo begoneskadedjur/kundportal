@@ -444,7 +444,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading}>
-      <div className="p-6 max-h-[80vh] overflow-y-auto">
+      <div className="p-6">
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
