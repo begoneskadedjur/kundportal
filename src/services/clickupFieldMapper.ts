@@ -3,6 +3,7 @@
 
 import { geocodeAddress, isAddressGeocoded, type GeocodeResult } from './geocoding'
 import { PEST_TYPE_OPTIONS } from '../utils/clickupFieldMapper'
+import { convertTechnicianIdsToClickUpUserIds } from './clickupUserMapping'
 
 export interface ClickUpField {
   id: string
@@ -387,7 +388,20 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
   const remainingFields = await buildRemainingCustomFields(caseData, caseType)
   customFields.push(...remainingFields)
 
-  return {
+  // Konvertera tekniker-IDs till ClickUp user-IDs för assignees
+  const technicianIds = [
+    caseData.primary_assignee_id,
+    caseData.secondary_assignee_id,
+    caseData.tertiary_assignee_id
+  ]
+  
+  const assignees = await convertTechnicianIdsToClickUpUserIds(technicianIds)
+  console.log(`[ClickUpMapper] Mapped technicians to assignees:`, {
+    technicianIds: technicianIds.filter(Boolean),
+    clickUpUserIds: assignees
+  })
+
+  const taskData = {
     name: caseData.title,
     description: caseData.description || '',
     status: 'bokat', // ClickUp API förväntar sig status-namn som sträng (case-sensitive)
@@ -396,6 +410,13 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
     start_date: caseData.start_date ? new Date(caseData.start_date).getTime() : undefined
   }
+
+  // Lägg till assignees om vi har några
+  if (assignees.length > 0) {
+    taskData.assignees = assignees
+  }
+
+  return taskData
 }
 
 // URSPRUNGLIG SYNC VERSION (BEHÅLLS FÖR BAKÅTKOMPATIBILITET)

@@ -72,6 +72,11 @@ export class ClickUpClient {
       body: JSON.stringify(taskData),
     })
   }
+
+  // Hämta alla team members (workspace users)
+  async getTeamMembers() {
+    return this.request(`/team`)
+  }
 }
 
 // src/services/clickup/lists.ts
