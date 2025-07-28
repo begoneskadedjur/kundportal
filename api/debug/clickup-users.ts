@@ -1,21 +1,27 @@
 // api/debug/clickup-users.ts
 // DEBUG ENDPOINT FÖR CLICKUP USER MAPPING
 
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '../../src/lib/supabase'
-import { getClickUpUsers, createTechnicianMapping } from '../../src/services/clickupUserMapping'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-export async function GET(request: NextRequest) {
+// Vercel serverless function format
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Kontrollera HTTP-metod
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
   try {
-    // Grundläggande säkerhet - kräv admin-tillgång
-    const { searchParams } = new URL(request.url)
-    const adminKey = searchParams.get('admin_key')
-    
+    // Grundläggande säkerhet
+    const adminKey = req.query.admin_key as string
     if (adminKey !== process.env.ADMIN_DEBUG_KEY && adminKey !== 'begone_debug_2025') {
-      return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 })
+      return res.status(401).json({ error: 'Unauthorized access' })
     }
 
     console.log('[Debug] ClickUp users endpoint called')
+
+    // Dynamiska imports för att undvika build-problem
+    const { supabase } = await import('../../src/lib/supabase')
+    const { getClickUpUsers, createTechnicianMapping } = await import('../../src/services/clickupUserMapping')
 
     // Hämta ClickUp users
     const clickUpUsers = await getClickUpUsers()
@@ -127,25 +133,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(debugData, { 
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    })
+    // Sätt headers för JSON response
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    
+    return res.status(200).json(debugData)
 
   } catch (error) {
     console.error('[Debug] Error in clickup-users endpoint:', error)
     
-    return NextResponse.json({
+    return res.status(500).json({
       error: 'Failed to fetch debug data',
       message: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
-    }, { status: 500 })
+    })
   }
-}
-
-export async function POST(request: NextRequest) {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
 }
