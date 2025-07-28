@@ -11,14 +11,13 @@ const TIMEZONE = 'Europe/Stockholm'
 
 /**
  * Konverterar datum/tid-sträng till Unix timestamp i millisekunder med korrekt tidszon
- * Detta säkerställer att svenska tidszoner hanteras korrekt för ClickUp API
+ * Hanterar svensk tidszon (Europe/Stockholm) korrekt för ClickUp API
  */
 function convertToClickUpTimestamp(dateString: string | null | undefined): number | undefined {
   if (!dateString) return undefined
   
   try {
-    // Om dateString redan är en ISO-sträng (från DatePicker), 
-    // konvertera den till Date och sedan till Unix timestamp
+    // Parse ISO string to Date object
     const date = new Date(dateString)
     
     // Kontrollera om datumen är giltiga
@@ -27,9 +26,20 @@ function convertToClickUpTimestamp(dateString: string | null | undefined): numbe
       return undefined
     }
     
-    // Returnera Unix timestamp i millisekunder
-    // Date.getTime() returnerar redan korrekt UTC timestamp
-    return date.getTime()
+    // DatePicker's toISOString() already converts local Swedish time to UTC
+    // The resulting timestamp should be correct for ClickUp
+    const timestamp = date.getTime()
+    
+    // Debug logging to verify conversion
+    const debugLocalTime = new Date(timestamp).toLocaleString('sv-SE', { timeZone: TIMEZONE })
+    const debugUTCTime = new Date(timestamp).toISOString()
+    console.log(`[ClickUpMapper] Date conversion:`)
+    console.log(`  Input: ${dateString}`)
+    console.log(`  Timestamp: ${timestamp}`)
+    console.log(`  Swedish time: ${debugLocalTime}`)
+    console.log(`  UTC time: ${debugUTCTime}`)
+    
+    return timestamp
   } catch (error) {
     console.error(`[ClickUpMapper] Error converting date ${dateString}:`, error)
     return undefined
