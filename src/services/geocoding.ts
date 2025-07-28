@@ -29,7 +29,7 @@ const geocodeCache = new Map<string, GeocodeResult>()
 
 /**
  * Geocoda en adress till koordinater med Google Maps API
- * Använder samma API-nyckel som redan finns för ruttoptimering
+ * Använder specifik VITE_GOOGLE_GEOCODING API-nyckel
  */
 export async function geocodeAddress(address: string): Promise<GeocodingResponse> {
   if (!address || address.trim() === '') {
@@ -53,17 +53,17 @@ export async function geocodeAddress(address: string): Promise<GeocodingResponse
   }
 
   try {
-    // Använd samma miljövariabel som ruttoptimeraren
+    // Använd specifik geocoding API-nyckel
     // I browser context används VITE_, i server context används vanlig env var
     const apiKey = typeof window !== 'undefined' 
-      ? import.meta.env.VITE_GOOGLE_MAPS_API_KEY 
-      : process.env.GOOGLE_MAPS_API_KEY
+      ? import.meta.env.VITE_GOOGLE_GEOCODING 
+      : process.env.GOOGLE_GEOCODING
     
     if (!apiKey) {
-      console.warn('[Geocoding] Google Maps API key missing. Add VITE_GOOGLE_MAPS_API_KEY to environment variables.')
+      console.warn('[Geocoding] Google Geocoding API key missing. Add VITE_GOOGLE_GEOCODING to environment variables.')
       return {
         success: false,
-        error: 'Google Maps API-nyckel saknas. Lägg till VITE_GOOGLE_MAPS_API_KEY i miljövariabler.',
+        error: 'Google Geocoding API-nyckel saknas. Lägg till VITE_GOOGLE_GEOCODING i miljövariabler.',
         originalAddress: address
       }
     }
