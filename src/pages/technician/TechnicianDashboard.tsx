@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   DollarSign, FileText, ClipboardList, Calendar, 
   TrendingUp, Award, Clock, AlertCircle,
-  Plus, Eye, ArrowRight
+  Plus, Eye, ArrowRight, ChevronDown, ChevronUp
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -40,6 +40,17 @@ interface DashboardData {
     completed_date?: string;
     commission_amount?: number;
   }>
+  pending_cases: Array<{
+    id: string;
+    clickup_task_id: string;
+    title: string;  
+    status: string;
+    case_type: 'private' | 'business';
+    created_at: string;
+    kontaktperson?: string;
+    foretag?: string;
+    adress?: string;
+  }>
 }
 
 export default function TechnicianDashboard() {
@@ -49,6 +60,7 @@ export default function TechnicianDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [showPendingCases, setShowPendingCases] = useState(false)
 
   // ✅ FIXAD: Använd profile data istället för technician prop
   const technicianId = profile?.technician_id
@@ -191,19 +203,89 @@ export default function TechnicianDashboard() {
             </div>
           </Card>
 
-          <Card className="p-6 bg-gradient-to-br from-orange-500/20 to-red-600/20 border-orange-500/30">
+          <Card 
+            className="p-6 bg-gradient-to-br from-orange-500/20 to-red-600/20 border-orange-500/30 cursor-pointer hover:from-orange-500/30 hover:to-red-600/30 transition-all"
+            onClick={() => setShowPendingCases(!showPendingCases)}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-orange-400 text-sm font-medium">Pågående ärenden</p>
                 <p className="text-2xl font-bold text-white mt-1">{data.stats.pending_cases}</p>
-                <p className="text-orange-300 text-xs mt-1">Kräver uppmärksamhet</p>
+                <p className="text-orange-300 text-xs mt-1">Klicka för att se alla</p>
               </div>
-              <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center">
-                <Clock className="w-6 h-6 text-orange-400" />
+              <div className="flex items-center gap-2">
+                <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-orange-400" />
+                </div>
+                {showPendingCases ? (
+                  <ChevronUp className="w-5 h-5 text-orange-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-orange-400" />
+                )}
               </div>
             </div>
           </Card>
         </div>
+
+        {showPendingCases && data.pending_cases && data.pending_cases.length > 0 && (
+          <Card className="p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-500" />
+                Pågående ärenden ({data.pending_cases.length})
+              </h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowPendingCases(false)}
+                className="flex items-center gap-2"
+              >
+                <ChevronUp className="w-4 h-4" />
+                Dölj
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {data.pending_cases.map(case_ => (
+                <div 
+                  key={case_.id} 
+                  className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (case_.case_type === 'private') {
+                      window.open(`https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')
+                    } else {
+                      window.open(`https://app.clickup.com/t/${case_.clickup_task_id}`, '_blank')  
+                    }
+                  }}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="font-medium text-white text-sm truncate">{case_.title}</p>
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400">
+                        {case_.status}
+                      </span>
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-600/50 text-slate-300">
+                        {case_.case_type === 'private' ? 'Privat' : 'Företag'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-slate-400 text-xs">
+                      {case_.kontaktperson && (
+                        <span>👤 {case_.kontaktperson}</span>
+                      )}
+                      {case_.foretag && (
+                        <span>🏢 {case_.foretag}</span>
+                      )}
+                      {case_.adress && (
+                        <span>📍 {case_.adress}</span>
+                      )}
+                      <span>📅 {formatDate(case_.created_at)}</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="p-6">

@@ -1,6 +1,7 @@
 // 📁 api/technician/dashboard.ts - ANVÄND BEFINTLIGA ADMIN SERVICES!
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { isCompletedStatus } from '../../src/types/database'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -192,6 +193,44 @@ async function getRecentCases(technicianId: string) {
   return allRecentCases.slice(0, 10)
 }
 
+// ✅ PÅGÅENDE ÄRENDEN - ALLA UTOM AVSLUTADE OCH SLASKADE
+async function getPendingCases(technicianId: string) {
+  const [pendingPrivate, pendingBusiness] = await Promise.allSettled([
+    // Private cases - ALLA som inte är completed
+    supabase
+      .from('private_cases')
+      .select('id, clickup_task_id, title, status, created_at, kontaktperson, adress')
+      .eq('primary_assignee_id', technicianId)
+      .order('created_at', { ascending: false }),
+
+    // Business cases - ALLA som inte är completed  
+    supabase
+      .from('business_cases')
+      .select('id, clickup_task_id, title, status, created_at, kontaktperson, foretag, adress')
+      .eq('primary_assignee_id', technicianId)
+      .order('created_at', { ascending: false })
+  ])
+
+  const privatePending = pendingPrivate.status === 'fulfilled' ? pendingPrivate.value.data || [] : []
+  const businessPending = pendingBusiness.status === 'fulfilled' ? pendingBusiness.value.data || [] : []
+
+  console.log(`📋 Pending cases found: Private: ${privatePending.length}, Business: ${businessPending.length}`)
+
+  const allPendingCases = [
+    ...privatePending.map(c => ({ ...c, case_type: 'private' })),
+    ...businessPending.map(c => ({ ...c, case_type: 'business' }))
+  ]
+
+  // Filtrera ut avslutade och slaskade ärenden med isCompletedStatus
+  const activeCases = allPendingCases.filter(c => 
+    c.status && !isCompletedStatus(c.status)
+  ).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+
+  console.log(`📋 Active pending cases after filtering: ${activeCases.length}`)
+
+  return activeCases
+}
+
 // ✅ MAIN HANDLER
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
@@ -220,10 +259,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('🔄 Fetching dashboard data for technician:', technician_id)
 
     // ✅ ANVÄND BEFINTLIGA ADMIN SERVICES
-    const [performanceData, monthlyData, recentCases] = await Promise.all([
+    const [performanceData, monthlyData, recentCases, pendingCases] = await Promise.all([
       getTechnicianPerformanceById(technician_id as string),
       getTechnicianMonthlyData(technician_id as string),
-      getRecentCases(technician_id as string)
+      getRecentCases(technician_id as string),
+      getPendingCases(technician_id as string)
     ])
 
     // ✅ BERÄKNA DASHBOARD STATS SAMMA SOM ADMIN
@@ -233,12 +273,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentMonthCommission = currentMonthData?.total_commission || 0
     const completedCasesThisMonth = currentMonthData?.case_count || 0
 
-    // Pågående ärenden (inte avslutade)
-    const pendingCases = recentCases.filter(c => 
-      c.status?.toLowerCase() !== 'avslutat' && 
-      c.status?.toLowerCase() !== 'completed' &&
-      !c.completed_date
-    ).length
+    // Pågående ärenden (använd nya pendingCases listan)
+    const pendingCasesCount = pendingCases.length
 
     const avgCommissionPerCase = performanceData.totalCases > 0 ? 
       performanceData.totalCommissionYtd / performanceData.totalCases : 0
@@ -251,13 +287,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         total_cases_ytd: performanceData.totalCases,
         avg_commission_per_case: avgCommissionPerCase,
         current_month_commission: currentMonthCommission,
-        pending_cases: pendingCases,
+        pending_cases: pendingCasesCount,
         completed_cases_this_month: completedCasesThisMonth,
         technician_name: performanceData.technician.name,
         technician_email: performanceData.technician.email
       },
       monthly_data: monthlyData,
       recent_cases: recentCases,
+      pending_cases: pendingCases,
       meta: {
         technician_id,
         timestamp: new Date().toISOString(),
@@ -266,6 +303,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           business_cases: performanceData.businessCases.length,
           contract_cases: performanceData.contractCases.length,
           recent_cases: recentCases.length,
+          pending_cases: pendingCases.length,
           monthly_periods: monthlyData.length
         }
       }
