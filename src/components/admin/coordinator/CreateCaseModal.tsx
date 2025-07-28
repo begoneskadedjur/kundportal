@@ -71,6 +71,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
   const [numberOfTechnicians, setNumberOfTechnicians] = useState(1);
+  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
@@ -79,7 +80,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setStep('selectType'); setCaseType(null); setFormData({}); 
     setSuggestions([]); setTeamSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
-    setSearchStartDate(new Date()); setNumberOfTechnicians(1);
+    setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
   }, []);
 
   useEffect(() => {
@@ -93,6 +94,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
     } else if (isOpen) {
       handleReset();
+      if (technicians.length > 0) {
+        const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
+        setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
+      }
     }
   }, [isOpen, initialCaseData, handleReset]);
 
@@ -103,6 +108,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value, ...(name === 'kontaktperson' && !initialCaseData && { title: value }) }));
+  };
+
+  const handleTechnicianSelectionChange = (technicianId: string) => {
+    setSelectedTechnicianIds(prev => 
+      prev.includes(technicianId) 
+        ? prev.filter(id => id !== technicianId) 
+        : [...prev, technicianId]
+    );
   };
 
   const handleDateChange = (date: Date | null, fieldName: 'searchStartDate' | 'start_date' | 'due_date') => {
@@ -123,7 +136,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         body: JSON.stringify({
             newCaseAddress: formData.adress, pestType: formData.skadedjur,
             timeSlotDuration: timeSlotDuration, searchStartDate: searchStartDate ? searchStartDate.toISOString().split('T')[0] : null,
-            ...(isTeamBooking ? { numberOfTechnicians } : { selectedTechnicianIds: technicians.map(t => t.id) })
+            ...(isTeamBooking ? { numberOfTechnicians } : { selectedTechnicianIds })
         })
       });
       const data = await response.json();
@@ -141,18 +154,43 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
   
   const applySuggestion = (suggestion: SingleSuggestion) => {
-    setFormData(prev => ({ ...prev, start_date: suggestion.start_time, due_date: suggestion.end_time, primary_assignee_id: suggestion.technician_id, secondary_assignee_id: null, tertiary_assignee_id: null, }));
+    const primaryTech = technicians.find(t => t.id === suggestion.technician_id);
+    setFormData(prev => ({ 
+      ...prev, 
+      start_date: suggestion.start_time, 
+      due_date: suggestion.end_time, 
+      primary_assignee_id: suggestion.technician_id,
+      primary_assignee_name: primaryTech?.name || null,
+      primary_assignee_email: primaryTech?.email || null,
+      secondary_assignee_id: null, 
+      secondary_assignee_name: null,
+      secondary_assignee_email: null,
+      tertiary_assignee_id: null,
+      tertiary_assignee_name: null,
+      tertiary_assignee_email: null
+    }));
     const startTimeFormatted = new Date(suggestion.start_time).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     toast.success(`${suggestion.technician_name} vald som ansvarig tekniker för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')} kl. ${startTimeFormatted}`);
   };
 
   const applyTeamSuggestion = (suggestion: TeamSuggestion) => {
+    const primaryTech = technicians.find(t => t.id === suggestion.technicians[0]?.id);
+    const secondaryTech = technicians.find(t => t.id === suggestion.technicians[1]?.id);
+    const tertiaryTech = technicians.find(t => t.id === suggestion.technicians[2]?.id);
+    
     setFormData(prev => ({
       ...prev,
-      start_date: suggestion.start_time, due_date: suggestion.end_time,
+      start_date: suggestion.start_time, 
+      due_date: suggestion.end_time,
       primary_assignee_id: suggestion.technicians[0]?.id || null,
+      primary_assignee_name: primaryTech?.name || null,
+      primary_assignee_email: primaryTech?.email || null,
       secondary_assignee_id: suggestion.technicians[1]?.id || null,
+      secondary_assignee_name: secondaryTech?.name || null,
+      secondary_assignee_email: secondaryTech?.email || null,
       tertiary_assignee_id: suggestion.technicians[2]?.id || null,
+      tertiary_assignee_name: tertiaryTech?.name || null,
+      tertiary_assignee_email: tertiaryTech?.email || null
     }));
     toast.success(`Team bokat för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')}`);
   };
@@ -260,6 +298,27 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           <option value={3}>3 tekniker (Hitta bästa team)</option>
                       </select>
                     </div>
+                    
+                    {/* Checkbox för att välja tekniker (endast för single booking) */}
+                    {numberOfTechnicians === 1 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2"><Users size={16} /> Sök bland valda tekniker</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {technicians.map(tech => (
+                            <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
+                              <input 
+                                type="checkbox" 
+                                className="h-4 w-4 rounded bg-slate-900 border-slate-600 text-blue-500 focus:ring-blue-500" 
+                                checked={selectedTechnicianIds.includes(tech.id)} 
+                                onChange={() => handleTechnicianSelectionChange(tech.id)} 
+                              />
+                              <span className="text-sm text-white truncate">{tech.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary" size="lg"><Zap className="w-4 h-4 mr-2"/> Hitta bästa tid & tekniker</Button>
                   </div>
                   
