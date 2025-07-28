@@ -206,7 +206,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         if (error) throw error;
         toast.success(`Ärendet "${formData.title}" har bokats in!`);
       } else {
-        const { data, error } = await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim(), clickup_task_id: 'pending' }]).select('id');
+        const { data, error } = await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim(), clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }]).select('id');
         if (error) throw error;
         toast.success('Ärendet har skapats!');
         
