@@ -55,10 +55,19 @@ interface TechnicianCase {
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
   r_arbetskostnad?: number;
-  r_materialkostnad?: number;
-  r_ovrig_kostnad?: number;
+  r_material_utrustning?: string;
+  r_servicebil?: string;
   // Rapport
-  saneringsrapport?: string;
+  rapport?: string;
+  // Övriga fält från databas
+  priority?: string;
+  case_number?: string;
+  billing_status?: 'pending' | 'sent' | 'paid' | 'skip';
+  filer?: any;
+  reklamation?: string;
+  avvikelser_tillbud_olyckor?: string;
+  annat_skadedjur?: string;
+  skicka_bokningsbekraftelse?: string;
 }
 
 interface DashboardData {
@@ -150,7 +159,7 @@ export default function TechnicianDashboard() {
       status: pendingCase.status,
       case_type: pendingCase.case_type,
       created_date: pendingCase.created_at,
-      description: pendingCase.beskrivning,
+      description: pendingCase.description,
       kontaktperson: pendingCase.kontaktperson,
       telefon_kontaktperson: pendingCase.telefon_kontaktperson,
       e_post_kontaktperson: pendingCase.e_post_kontaktperson,
@@ -169,10 +178,14 @@ export default function TechnicianDashboard() {
       r_rot_rut: pendingCase.r_rot_rut,
       r_fastighetsbeteckning: pendingCase.r_fastighetsbeteckning,
       r_arbetskostnad: pendingCase.r_arbetskostnad,
-      r_materialkostnad: pendingCase.r_materialkostnad,
-      r_ovrig_kostnad: pendingCase.r_ovrig_kostnad,
+      r_material_utrustning: pendingCase.r_material_utrustning,
+      r_servicebil: pendingCase.r_servicebil,
       // Rapport
-      saneringsrapport: pendingCase.saneringsrapport,
+      rapport: pendingCase.rapport,
+      // Övriga fält
+      priority: pendingCase.priority,
+      case_number: pendingCase.case_number,
+      billing_status: pendingCase.billing_status,
     }
     setSelectedCase(technicianCase)
     setIsEditModalOpen(true)

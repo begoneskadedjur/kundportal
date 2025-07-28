@@ -39,10 +39,10 @@ interface TechnicianCase {
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
   r_arbetskostnad?: number;
-  r_materialkostnad?: number;
-  r_ovrig_kostnad?: number;
+  r_material_utrustning?: string;
+  r_servicebil?: string;
   // Rapport
-  saneringsrapport?: string;
+  rapport?: string;
 }
 
 interface EditCaseModalProps {
@@ -638,17 +638,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         onChange={handleChange} 
                       />
                       <Input 
-                        type="number" 
-                        label="Materialkostnad" 
-                        name="r_materialkostnad" 
-                        value={formData.r_materialkostnad === null ? '' : formData.r_materialkostnad} 
+                        label="Material & Utrustning" 
+                        name="r_material_utrustning" 
+                        value={formData.r_material_utrustning || ''} 
                         onChange={handleChange} 
                       />
                       <Input 
-                        type="number" 
-                        label="Övrig kostnad" 
-                        name="r_ovrig_kostnad" 
-                        value={formData.r_ovrig_kostnad === null ? '' : formData.r_ovrig_kostnad} 
+                        label="Servicebil" 
+                        name="r_servicebil" 
+                        value={formData.r_servicebil || ''} 
                         onChange={handleChange} 
                       />
                     </div>
@@ -666,8 +664,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Rapport & Dokumentation</label>
                   <textarea 
-                    name="saneringsrapport" 
-                    value={formData.saneringsrapport || ''} 
+                    name="rapport" 
+                    value={formData.rapport || ''} 
                     onChange={handleChange} 
                     rows={6} 
                     className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors" 
