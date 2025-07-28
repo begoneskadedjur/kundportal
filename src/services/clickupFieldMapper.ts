@@ -395,11 +395,17 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
     caseData.tertiary_assignee_id
   ]
   
-  const assignees = await convertTechnicianIdsToClickUpUserIds(technicianIds)
-  console.log(`[ClickUpMapper] Mapped technicians to assignees:`, {
-    technicianIds: technicianIds.filter(Boolean),
-    clickUpUserIds: assignees
-  })
+  let assignees: number[] = []
+  try {
+    assignees = await convertTechnicianIdsToClickUpUserIds(technicianIds)
+    console.log(`[ClickUpMapper] Mapped technicians to assignees:`, {
+      technicianIds: technicianIds.filter(Boolean),
+      clickUpUserIds: assignees
+    })
+  } catch (error) {
+    console.warn(`[ClickUpMapper] Could not map technicians to assignees:`, error)
+    // Fortsätt utan assignees om mappningen misslyckas
+  }
 
   const taskData = {
     name: caseData.title,
