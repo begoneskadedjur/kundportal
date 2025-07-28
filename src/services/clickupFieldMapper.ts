@@ -11,7 +11,7 @@ export interface ClickUpField {
   type_config?: any
 }
 
-// EXAKTA FIELD IDs FRÅN DIN MAPPING DATA
+// KORREKTA FIELD IDs FRÅN CLICKUP API (uppdaterade 2025-07-28)
 export const CLICKUP_FIELD_IDS = {
   // Gemensamma fält (finns i båda listorna)
   ADRESS: '0a889578-6c38-4fe2-bda4-6258f628bb68',
@@ -33,11 +33,11 @@ export const CLICKUP_FIELD_IDS = {
   R_ARBETSKOSTNAD: '1cf9bb02-d2ef-4f61-bc3e-b5bbcaa6a928',
   R_ROT_RUT: '392f5c55-931b-4841-8275-c7bc748ce92f',
   R_FASTIGHETSBETECKNING: '3874f7c0-2c0e-4044-abca-3d35f3ee93ab',
-  PERSONNUMMER: '41c3c841-ad00-b1ed5f41abdf',
+  PERSONNUMMER: '2631b671-43aa-4705-8275-c7bc748ce92f', // KORRIGERAT UUID
   R_MATERIAL_UTRUSTNING: '4a275ed4-d795-4b14-b6f9-77f4507294c0',
   R_SERVICEBIL: 'e81100ce-3b5b-4c1f-839b-2ed8e4bf416e',
 
-  // Endast Företag
+  // Endast Företag  
   MARKNING_FAKTURA: '30042231-13c6-4372-8d11-4274381a98b2',
   E_POST_FAKTURA: '66b53666-120f-4742-89ba-3b01488de9b5',
   ORG_NR: '8d885f6e-1a51-4dd4-83ae-d6dd4eef91bb',

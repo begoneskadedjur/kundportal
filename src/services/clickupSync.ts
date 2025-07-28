@@ -61,6 +61,17 @@ class ClickUpSyncService {
       const clickupTask = await convertSupabaseToClickUpAsync(caseData, caseType)
       const listId = getListIdFromCaseType(caseType)
       
+      // DEBUG: Logga alla custom fields för att hitta invalid UUIDs
+      console.log(`[DEBUG] All custom fields being sent to ClickUp:`, clickupTask.custom_fields)
+      
+      // DEBUG: Kontrollera om några fields har invalid IDs
+      const invalidField = clickupTask.custom_fields?.find(f => !f.id || typeof f.id !== 'string' || f.id.length < 36)
+      if (invalidField) {
+        console.error(`[ERROR] Invalid custom field found:`, invalidField)
+        console.error(`[ERROR] Field ID is:`, typeof invalidField.id, invalidField.id)
+        throw new Error(`Invalid custom field ID: ${invalidField.id}`)
+      }
+      
       console.log(`[ClickUpSync] Sending task to ClickUp:`, {
         listId,
         taskName: clickupTask.name,
