@@ -119,8 +119,32 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
 
   const handleDateChange = (date: Date | null, fieldName: 'searchStartDate' | 'start_date' | 'due_date') => {
-    if (fieldName === 'searchStartDate') { setSearchStartDate(date);
-    } else { const isoString = date ? date.toISOString() : null; setFormData(prev => ({ ...prev, [fieldName]: isoString })); }
+    if (fieldName === 'searchStartDate') { 
+      setSearchStartDate(date);
+    } else { 
+      // Bevara lokal svensk tid genom att formatera manuellt istället för toISOString()
+      if (date) {
+        // Format: YYYY-MM-DDTHH:mm:ss+02:00 (svensk sommartid)
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        // Svensk tidszon offset (UTC+1 vintertid, UTC+2 sommartid)
+        const timezoneOffset = date.getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+        const offsetMinutes = Math.abs(timezoneOffset) % 60;
+        const offsetSign = timezoneOffset <= 0 ? '+' : '-';
+        const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+        
+        const isoString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetString}`;
+        setFormData(prev => ({ ...prev, [fieldName]: isoString }));
+      } else {
+        setFormData(prev => ({ ...prev, [fieldName]: null }));
+      }
+    }
   };
   
   const handleSuggestTime = async () => {
