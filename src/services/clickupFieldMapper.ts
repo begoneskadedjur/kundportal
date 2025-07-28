@@ -38,6 +38,7 @@ function convertToClickUpTimestamp(dateString: string | null | undefined): numbe
     console.log(`  Timestamp: ${timestamp}`)
     console.log(`  Swedish time: ${debugLocalTime}`)
     console.log(`  UTC time: ${debugUTCTime}`)
+    console.log(`  Time flags will be set to: true`)
     
     return timestamp
   } catch (error) {
@@ -456,7 +457,9 @@ export async function convertSupabaseToClickUpAsync(caseData: any, caseType: 'pr
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: convertToClickUpTimestamp(caseData.due_date),
-    start_date: convertToClickUpTimestamp(caseData.start_date)
+    due_date_time: caseData.due_date ? true : undefined, // Krävs för att ClickUp ska visa tid
+    start_date: convertToClickUpTimestamp(caseData.start_date),
+    start_date_time: caseData.start_date ? true : undefined // Krävs för att ClickUp ska visa tid
   }
 
   // Lägg till assignees om vi har några
@@ -773,7 +776,9 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: convertToClickUpTimestamp(caseData.due_date),
-    start_date: convertToClickUpTimestamp(caseData.start_date)
+    due_date_time: caseData.due_date ? true : undefined, // Krävs för att ClickUp ska visa tid
+    start_date: convertToClickUpTimestamp(caseData.start_date),
+    start_date_time: caseData.start_date ? true : undefined // Krävs för att ClickUp ska visa tid
   }
 }
 
