@@ -245,12 +245,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentMonthCommission = currentMonthData?.total_commission || 0
     const completedCasesThisMonth = currentMonthData?.case_count || 0
 
-    // ✅ ÅTERGÅ TILL URSPRUNGLIG PENDING LOGIC - filtrera recentCases
+    // ✅ KORREKT LOGIK - separera recent_cases och pending_cases
     const pendingCases = recentCases.filter(c => 
       c.status && !isCompletedStatus(c.status)
     )
 
-    console.log(`📋 Total recent cases: ${recentCases.length}`)
+    // Recent cases - de 10 senaste oavsett status för "Senaste ärenden" sektionen
+    const recentCasesForDisplay = recentCases.slice(0, 10)
+
+    console.log(`📋 Total cases fetched: ${recentCases.length}`)
+    console.log(`📋 Recent cases for display: ${recentCasesForDisplay.length}`)
     console.log(`📋 Pending cases after filtering: ${pendingCases.length}`)
 
     const avgCommissionPerCase = performanceData.totalCases > 0 ? 
@@ -270,8 +274,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         technician_email: performanceData.technician.email
       },
       monthly_data: monthlyData,
-      recent_cases: recentCases.slice(0, 10), // Bara visa 10 för "Senaste ärenden"
-      pending_cases: pendingCases, // Alla pending för klickbar lista
+      recent_cases: recentCasesForDisplay, // De 10 senaste för "Senaste ärenden"
+      pending_cases: pendingCases, // Alla pending för "Pågående ärenden" klickbar lista
       meta: {
         technician_id,
         timestamp: new Date().toISOString(),
@@ -279,7 +283,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           private_cases: performanceData.privateCases.length,
           business_cases: performanceData.businessCases.length,
           contract_cases: performanceData.contractCases.length,
-          recent_cases: recentCases.length,
+          recent_cases: recentCasesForDisplay.length,
           pending_cases: pendingCases.length,
           monthly_periods: monthlyData.length
         }
@@ -292,7 +296,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cases: performanceData.totalCases,
       months: monthlyData.length,
       current_month_commission: currentMonthCommission,
-      pending_count: pendingCases.length
+      pending_count: pendingCases.length,
+      recent_count: recentCasesForDisplay.length
     })
 
     return res.status(200).json(response)
