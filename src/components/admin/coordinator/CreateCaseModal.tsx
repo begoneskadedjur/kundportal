@@ -88,7 +88,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const type = initialCaseData.case_type === 'private' ? 'private' : 'business';
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
-      setFormData({ ...initialCaseData, status: 'Bokad', adress: formattedAddress });
+      setFormData({ ...initialCaseData, status: 'Bokat', adress: formattedAddress });
       setStep('form');
       const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
@@ -102,7 +102,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }, [isOpen, initialCaseData, handleReset]);
 
   const selectCaseType = (type: 'private' | 'business') => {
-    setCaseType(type); setFormData({ status: 'Bokad' }); setStep('form');
+    setCaseType(type); setFormData({ status: 'Bokat' }); setStep('form');
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

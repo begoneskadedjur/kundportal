@@ -28,7 +28,7 @@ const getStatusColor = (status: string): { bg: string; text: string; border: str
     if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' };
     if (ls.includes('signerad')) return { bg: 'bg-emerald-500', text: 'text-white', border: 'border-emerald-600' };
     if (ls.includes('offert')) return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' };
-    if (ls.includes('bokad')) return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
+    if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
     if (ls.includes('review')) return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
     if (ls.includes('stängt')) return { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' };
     return { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' };

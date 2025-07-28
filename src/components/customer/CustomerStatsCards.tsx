@@ -46,7 +46,7 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId, cli
           total: tasks.length,
           open: tasks.filter((t: any) => t.status?.status?.toLowerCase() === 'open').length,
           inProgress: tasks.filter((t: any) => 
-            ['bokat', 'under hantering', 'in progress'].includes(t.status?.status?.toLowerCase())
+            ['bokat', 'bokad', 'under hantering', 'in progress'].includes(t.status?.status?.toLowerCase())
           ).length,
           completed: tasks.filter((t: any) => 
             ['genomfört', 'genomförd', 'avslutad', 'klar', 'complete'].includes(t.status?.status?.toLowerCase())
