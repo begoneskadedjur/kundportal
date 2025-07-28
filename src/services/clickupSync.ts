@@ -61,8 +61,18 @@ class ClickUpSyncService {
       const clickupTask = await convertSupabaseToClickUpAsync(caseData, caseType)
       const listId = getListIdFromCaseType(caseType)
       
-      // DEBUG: Logga alla custom fields för att hitta invalid UUIDs
+      // DEBUG: Logga alla custom fields för att identifiera dropdown värden
       console.log(`[DEBUG] All custom fields being sent to ClickUp:`, clickupTask.custom_fields)
+      
+      // DEBUG: Detaljerad logging av varje field
+      clickupTask.custom_fields?.forEach((field, index) => {
+        console.log(`[DEBUG] Field ${index}:`, {
+          id: field.id,
+          value: field.value,
+          valueType: typeof field.value,
+          valueLength: field.value && typeof field.value === 'string' ? field.value.length : 'N/A'
+        })
+      })
       
       // DEBUG: Kontrollera om några fields har invalid IDs
       const invalidField = clickupTask.custom_fields?.find(f => !f.id || typeof f.id !== 'string' || f.id.length < 36)
