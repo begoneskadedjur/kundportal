@@ -50,21 +50,23 @@ export const CLICKUP_LISTS = {
 } as const
 
 // HJÄLPFUNKTION FÖR PRIORITY KONVERTERING
-function convertPriorityToClickUp(priority: any): string {
-  if (!priority) return 'normal'
+// Baserat på ClickUp API dokumentation: 1=Urgent, 2=High, 3=Normal, 4=Low
+function convertPriorityToClickUp(priority: any): number {
+  if (!priority) return 3 // Default to Normal
   
   if (typeof priority === 'number') {
-    return priority === 1 ? 'urgent' : priority === 2 ? 'high' : 'normal'
+    return priority === 1 ? 1 : priority === 2 ? 2 : 3
   }
   
-  // Om det redan är text-sträng
-  const priorityMap: { [key: string]: string } = {
-    'urgent': 'urgent',
-    'high': 'high', 
-    'normal': 'normal'
+  // Konvertera string-prioriteter till nummer enligt ClickUp API spec
+  const priorityMap: { [key: string]: number } = {
+    'urgent': 1,
+    'high': 2, 
+    'normal': 3,
+    'low': 4
   }
   
-  return priorityMap[priority.toLowerCase()] || 'normal'
+  return priorityMap[priority.toLowerCase()] || 3
 }
 
 // KONVERTERA FRÅN SUPABASE TILL CLICKUP FORMAT
