@@ -80,17 +80,36 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     if (typeof caseData.adress === 'string') {
       try {
         // Försök parsa som JSON först
-        addressValue = JSON.parse(caseData.adress);
+        const parsedAddress = JSON.parse(caseData.adress);
+        
+        // Kontrollera om det redan är i ClickUp location format
+        if (parsedAddress.location && parsedAddress.formatted_address) {
+          addressValue = parsedAddress;
+        } else {
+          // Konvertera till ClickUp location format
+          addressValue = {
+            location: parsedAddress.location || null,
+            formatted_address: parsedAddress.formatted_address || caseData.adress
+          };
+        }
       } catch (e) {
-        // Om det inte är JSON, skapa ett enkelt objekt
+        // Om det inte är JSON, skapa ClickUp location format med bara formatted_address
         addressValue = {
-          formatted_address: caseData.adress,
           location: null,
-          place_id: null
+          formatted_address: caseData.adress
         };
       }
+    } else if (caseData.adress && typeof caseData.adress === 'object') {
+      // Om det redan är ett objekt, säkerställ ClickUp format
+      addressValue = {
+        location: caseData.adress.location || null,
+        formatted_address: caseData.adress.formatted_address || caseData.adress.address || 'Ingen adress'
+      };
     } else {
-      addressValue = caseData.adress;
+      addressValue = {
+        location: null,
+        formatted_address: String(caseData.adress)
+      };
     }
     
     customFields.push({
@@ -100,16 +119,18 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   }
 
   if (caseData.avvikelser_tillbud_olyckor) {
+    // Text field - måste vara sträng enligt ClickUp API
     customFields.push({
       id: CLICKUP_FIELD_IDS.AVVIKELSER_TILLBUD_OLYCKOR,
-      value: caseData.avvikelser_tillbud_olyckor
+      value: String(caseData.avvikelser_tillbud_olyckor)
     })
   }
 
   if (caseData.rapport) {
+    // Text field - måste vara sträng enligt ClickUp API
     customFields.push({
       id: CLICKUP_FIELD_IDS.RAPPORT,
-      value: caseData.rapport
+      value: String(caseData.rapport)
     })
   }
 
@@ -134,10 +155,11 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     })
   }
 
-  if (caseData.skicka_bokningsbekraftelse) {
+  if (caseData.skicka_bokningsbekraftelse !== undefined && caseData.skicka_bokningsbekraftelse !== null) {
+    // Checkbox field - måste vara boolean enligt ClickUp API
     customFields.push({
       id: CLICKUP_FIELD_IDS.SKICKA_BOKNINGSBEKRAFTELSE,
-      value: caseData.skicka_bokningsbekraftelse
+      value: Boolean(caseData.skicka_bokningsbekraftelse)
     })
   }
 
@@ -149,17 +171,25 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   }
 
   if (caseData.e_post_kontaktperson) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.E_POST_KONTAKTPERSON,
-      value: caseData.e_post_kontaktperson
-    })
+    // Email field - måste vara en giltig email-sträng enligt ClickUp API
+    const emailValue = String(caseData.e_post_kontaktperson).trim();
+    if (emailValue && emailValue.includes('@')) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.E_POST_KONTAKTPERSON,
+        value: emailValue
+      })
+    }
   }
 
   if (caseData.telefon_kontaktperson) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.TELEFON_KONTAKTPERSON,
-      value: caseData.telefon_kontaktperson
-    })
+    // Phone field - måste vara en giltig telefon-sträng enligt ClickUp API
+    const phoneValue = String(caseData.telefon_kontaktperson).trim();
+    if (phoneValue) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.TELEFON_KONTAKTPERSON,
+        value: phoneValue
+      })
+    }
   }
 
   if (caseData.vaggloss_angade_rum) {
@@ -170,10 +200,14 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   }
 
   if (caseData.pris) {
-    customFields.push({
-      id: CLICKUP_FIELD_IDS.PRIS,
-      value: caseData.pris
-    })
+    // Currency/Number field - måste vara ett numeriskt värde enligt ClickUp API
+    const priceValue = parseFloat(caseData.pris);
+    if (!isNaN(priceValue)) {
+      customFields.push({
+        id: CLICKUP_FIELD_IDS.PRIS,
+        value: priceValue
+      })
+    }
   }
 
   if (caseData.filer) {
@@ -258,10 +292,11 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
       })
     }
 
-    if (caseData.skicka_erbjudande) {
+    if (caseData.skicka_erbjudande !== undefined && caseData.skicka_erbjudande !== null) {
+      // Checkbox field - måste vara boolean enligt ClickUp API
       customFields.push({
         id: CLICKUP_FIELD_IDS.SKICKA_ERBJUDANDE,
-        value: caseData.skicka_erbjudande
+        value: Boolean(caseData.skicka_erbjudande)
       })
     }
 
