@@ -49,6 +49,24 @@ export const CLICKUP_LISTS = {
   FORETAG: '901204857574'
 } as const
 
+// HJÄLPFUNKTION FÖR PRIORITY KONVERTERING
+function convertPriorityToClickUp(priority: any): string {
+  if (!priority) return 'normal'
+  
+  if (typeof priority === 'number') {
+    return priority === 1 ? 'urgent' : priority === 2 ? 'high' : 'normal'
+  }
+  
+  // Om det redan är text-sträng
+  const priorityMap: { [key: string]: string } = {
+    'urgent': 'urgent',
+    'high': 'high', 
+    'normal': 'normal'
+  }
+  
+  return priorityMap[priority.toLowerCase()] || 'normal'
+}
+
 // KONVERTERA FRÅN SUPABASE TILL CLICKUP FORMAT
 export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'business') {
   const customFields: any[] = []
@@ -257,7 +275,7 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     name: caseData.title,
     description: caseData.description || '',
     status: caseData.status || 'open',
-    priority: caseData.priority || 3,
+    priority: convertPriorityToClickUp(caseData.priority),
     custom_fields: customFields,
     due_date: caseData.due_date ? new Date(caseData.due_date).getTime() : undefined,
     start_date: caseData.start_date ? new Date(caseData.start_date).getTime() : undefined
