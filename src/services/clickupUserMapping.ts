@@ -4,9 +4,8 @@
 import { supabase } from '../lib/supabase'
 import { ClickUpClient } from './clickup/client'
 
-// Serverless-miljö: använd process.env (samma som map-clickup-fields.ts)
-// Browser-miljö: behöver hanteras separat då import.meta inte fungerar i Node.js
-const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN || process.env.VITE_CLICKUP_API_TOKEN || ''
+// Frontend-miljö: använd import.meta.env för Vite environment variables
+const CLICKUP_API_TOKEN = import.meta.env.VITE_CLICKUP_API_TOKEN || ''
 
 export interface ClickUpUser {
   id: number
