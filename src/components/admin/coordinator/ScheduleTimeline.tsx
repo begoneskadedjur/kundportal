@@ -139,7 +139,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
                   <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
                   <div className="hidden xl:flex items-center gap-2 text-xs">
                     <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-500 rounded"></div><span className="text-slate-300">Öppen</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded"></div><span className="text-slate-300">Bokad</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded"></div><span className="text-slate-300">Bokat</span></div>
                     <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded"></div><span className="text-slate-300">Offert</span></div>
                     <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded"></div><span className="text-slate-300">Signerad</span></div>
                     <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-600 rounded"></div><span className="text-slate-300">Återbesök</span></div>
