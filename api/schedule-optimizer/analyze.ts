@@ -1918,6 +1918,35 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
   
   technicianCases = technicianCases.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
   console.log(`[RouteContext] Final sorted cases for route context: ${technicianCases.length}`);
+  
+  // Om tekniker inte har några ärenden samma dag, kolla föregående dag
+  if (technicianCases.length === 0 && scheduleContext && scheduleContext.schedules.has(technician.id)) {
+    console.log(`[RouteContext] No cases found for ${caseDate}, checking previous day...`);
+    const previousDate = new Date(caseDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    const previousDateStr = previousDate.toISOString().split('T')[0];
+    
+    const techSchedules = scheduleContext.schedules.get(technician.id);
+    const previousDaySchedule = techSchedules?.find(s => s.date === previousDateStr);
+    
+    if (previousDaySchedule && previousDaySchedule.booked_slots.length > 0) {
+      console.log(`[RouteContext] Found ${previousDaySchedule.booked_slots.length} bookings from previous day`);
+      
+      // Ta sista ärendet från föregående dag som "previous case"
+      const lastSlot = previousDaySchedule.booked_slots[previousDaySchedule.booked_slots.length - 1];
+      const lastCaseAsPrevious = {
+        id: lastSlot.case_id,
+        title: lastSlot.title,
+        adress: lastSlot.address,
+        start_date: `${previousDateStr}T${lastSlot.start_time}:00+00:00`,
+        due_date: `${previousDateStr}T${lastSlot.end_time}:00+00:00`,
+        is_from_previous_day: true
+      };
+      
+      technicianCases = [lastCaseAsPrevious];
+      console.log(`[RouteContext] Using last case from previous day: ${lastSlot.title} at ${lastSlot.address}`);
+    }
+  }
 
   const currentCaseTime = new Date(currentCase.start_date);
   let previousCase = null;
@@ -1939,7 +1968,15 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
   if (previousCase) {
     const prevAddress = getAddressFromCase(previousCase);
     const prevShortAddress = shortenAddress(prevAddress || 'Okänt område');
-    primaryReason = `${technician.name} avslutar föregående ärende på ${prevShortAddress}`;
+    if (previousCase.is_from_previous_day) {
+      primaryReason = `${technician.name} startar från gårdagens sista ärende på ${prevShortAddress}`;
+    } else {
+      primaryReason = `${technician.name} avslutar föregående ärende på ${prevShortAddress}`;
+    }
+  } else {
+    // Om ingen tidigare ärende, anta start från hemadress
+    const homeAddress = shortenAddress(technician.address || 'Stockholm');
+    primaryReason = `${technician.name} startar från ${homeAddress}`;
   }
 
   const result = {

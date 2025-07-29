@@ -882,11 +882,11 @@ export default function ScheduleOptimizer() {
 
   const formatTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const mins = Math.round(minutes % 60);
     if (hours > 0) {
       return `${hours}h ${mins}min`;
     }
-    return `${mins}min`;
+    return `${Math.round(minutes)}min`;
   };
 
   const selectedTechnicians = allTechnicians.filter(t => selectedTechnicianIds.has(t.id));
