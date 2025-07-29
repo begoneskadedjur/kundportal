@@ -446,7 +446,8 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           height="100%"
           resourceAreaHeaderContent="Tekniker"
           resourceAreaWidth="15%"
-          slotMinWidth={60}
+          slotMinWidth={currentView === 'week' ? 35 : 60}
+          slotMaxWidth={currentView === 'week' ? 50 : undefined}
           nowIndicator={true}
           views={{
             resourceTimelineDay: { 
@@ -456,9 +457,13 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
               snapDuration: '00:15:00'
             },
             resourceTimelineWeek: { 
-              slotDuration: { days: 1 }, 
-              slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' },
-              snapDuration: '01:00:00'
+              slotDuration: '01:00:00',
+              slotLabelFormat: [
+                { weekday: 'short', day: 'numeric', month: 'numeric' }, // Översta raden - datum
+                { hour: '2-digit', minute: '2-digit', hour12: false }    // Andra raden - tid
+              ],
+              slotLabelInterval: '02:00:00',
+              snapDuration: '00:15:00'
             },
             resourceTimelineMonth: { 
               slotDuration: { days: 1 }, 
