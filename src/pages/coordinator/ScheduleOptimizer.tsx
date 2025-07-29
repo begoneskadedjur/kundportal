@@ -84,28 +84,72 @@ export default function ScheduleOptimizer() {
     }
   }, [startDate, periodType]);
 
+  // Uppdatera valda tekniker när datum ändras
+  useEffect(() => {
+    if (allTechnicians.length > 0) {
+      updateSelectedTechnicians(allTechnicians);
+    }
+  }, [startDate, endDate]);
+
   const fetchTechnicians = async () => {
     try {
       const { data, error } = await supabase
         .from('technicians')
         .select('*')
         .eq('is_active', true)
+        .in('role', ['Skadedjurstekniker', 'Admin', 'Koordinator'])
         .order('name');
       
       if (error) throw error;
       
       setAllTechnicians(data || []);
+      updateSelectedTechnicians(data || []);
+    } catch (err) {
+      console.error('Fel vid hämtning av tekniker:', err);
+    }
+  };
+
+  const updateSelectedTechnicians = async (technicians: Technician[]) => {
+    try {
+      // Hämta frånvaro för den valda perioden
+      const periodStartDate = startDate.toISOString().split('T')[0];
+      const periodEndDate = endDate.toISOString().split('T')[0];
       
-      // Välj alla tekniker som standard, förutom Christian, Peter och Sofia
-      const excludedNames = ['christian', 'peter', 'sofia'];
+      const { data: absences, error: absenceError } = await supabase
+        .from('technician_absences')
+        .select('technician_id, start_date, end_date')
+        .or(`start_date.lte.${periodEndDate},end_date.gte.${periodStartDate}`);
+      
+      if (absenceError) {
+        console.error('Fel vid hämtning av frånvaro:', absenceError);
+      }
+      
+      // Skapa set med tekniker som är frånvarande under perioden
+      const absentTechnicianIds = new Set(
+        (absences || []).map(a => a.technician_id)
+      );
+      
+      // Välj bara "Skadedjurstekniker" som standard och som inte är frånvarande
       const technicianIds = new Set(
-        (data || [])
-          .filter(t => !excludedNames.includes(t.name.toLowerCase()))
+        technicians
+          .filter(t => 
+            t.role === 'Skadedjurstekniker' && 
+            !absentTechnicianIds.has(t.id)
+          )
+          .map(t => t.id)
+      );
+      
+      setSelectedTechnicianIds(technicianIds);
+    } catch (err) {
+      console.error('Fel vid uppdatering av valda tekniker:', err);
+      
+      // Fallback: välj bara Skadedjurstekniker utan frånvaro-kontroll
+      const technicianIds = new Set(
+        technicians
+          .filter(t => t.role === 'Skadedjurstekniker')
           .map(t => t.id)
       );
       setSelectedTechnicianIds(technicianIds);
-    } catch (err) {
-      console.error('Fel vid hämtning av tekniker:', err);
     }
   };
 
@@ -307,10 +351,18 @@ export default function ScheduleOptimizer() {
                         onChange={() => toggleTechnician(technician.id)}
                         className="w-4 h-4 text-blue-500 focus:ring-blue-500 rounded border-slate-600 bg-slate-700"
                       />
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="w-4 h-4 text-slate-500" />
-                        <span className="text-white">{technician.name}</span>
-                        <span className="text-slate-500">({technician.role})</span>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="w-4 h-4 text-slate-500" />
+                          <span className="text-white">{technician.name}</span>
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            technician.role === 'Skadedjurstekniker' 
+                              ? 'bg-green-500/20 text-green-300' 
+                              : 'bg-slate-700 text-slate-400'
+                          }`}>
+                            {technician.role}
+                          </span>
+                        </div>
                       </div>
                     </label>
                   ))}
