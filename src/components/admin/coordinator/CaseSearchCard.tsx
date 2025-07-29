@@ -2,7 +2,7 @@
 // ⭐ Sökkomponent för koordinatorns dashboard ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, FileSearch } from 'lucide-react';
+import { Search, X, FileSearch, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import Card from '../../ui/Card';
 import { BeGoneCaseRow } from '../../../types/database';
 import { supabase } from '../../../lib/supabase';
@@ -12,6 +12,9 @@ import EditCaseModal from '../technicians/EditCaseModal';
 interface CaseSearchCardProps {
   className?: string;
 }
+
+type SortOption = 'pris' | 'kontaktperson' | 'status' | 'created_at';
+type SortDirection = 'asc' | 'desc';
 
 // Debounce hook för sökning
 function useDebounce<T>(value: T, delay: number): T {
@@ -37,6 +40,8 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Debounce search query för prestanda
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -77,8 +82,8 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
     fetchAllCases();
   }, [fetchAllCases]);
 
-  // Filtrera ärenden baserat på sökning
-  const filteredResults = useMemo(() => {
+  // Filtrera och sortera ärenden baserat på sökning
+  const filteredAndSortedResults = useMemo(() => {
     if (!debouncedSearchQuery.trim()) return [];
     
     const query = debouncedSearchQuery.toLowerCase();
@@ -116,9 +121,42 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
       return false;
     });
 
+    // Sortera resultaten
+    const sorted = [...filtered].sort((a, b) => {
+      let valueA: any = '';
+      let valueB: any = '';
+
+      switch (sortBy) {
+        case 'pris':
+          valueA = a.pris || 0;
+          valueB = b.pris || 0;
+          break;
+        case 'kontaktperson':
+          valueA = a.kontaktperson || '';
+          valueB = b.kontaktperson || '';
+          break;
+        case 'status':
+          valueA = a.status || '';
+          valueB = b.status || '';
+          break;
+        case 'created_at':
+          valueA = new Date(a.created_at || 0).getTime();
+          valueB = new Date(b.created_at || 0).getTime();
+          break;
+      }
+
+      if (typeof valueA === 'string' && typeof valueB === 'string') {
+        const comparison = valueA.localeCompare(valueB, 'sv');
+        return sortDirection === 'asc' ? comparison : -comparison;
+      } else {
+        const comparison = valueA - valueB;
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+    });
+
     // Begränsa till 15 resultat för prestanda
-    return filtered.slice(0, 15);
-  }, [allCases, debouncedSearchQuery]);
+    return sorted.slice(0, 15);
+  }, [allCases, debouncedSearchQuery, sortBy, sortDirection]);
 
   const handleCaseClick = (caseData: BeGoneCaseRow) => {
     setSelectedCase(caseData);
@@ -138,6 +176,22 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
 
   const clearSearch = () => {
     setSearchQuery('');
+  };
+
+  const handleSort = (option: SortOption) => {
+    if (sortBy === option) {
+      // Växla riktning om samma kolumn klickas
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Ny kolumn, börja med desc för pris, asc för text
+      setSortBy(option);
+      setSortDirection(option === 'pris' ? 'desc' : 'asc');
+    }
+  };
+
+  const getSortIcon = (option: SortOption) => {
+    if (sortBy !== option) return <ArrowUpDown className="w-4 h-4" />;
+    return sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
   };
 
   const hasSearchQuery = searchQuery.trim().length > 0;
@@ -192,17 +246,53 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
           {/* Search results */}
           {!initialLoading && showResults && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h4 className="font-medium text-slate-300">
-                  Sökresultat ({filteredResults.length})
+                  Sökresultat ({filteredAndSortedResults.length})
                 </h4>
+                
+                {/* Sorteringsknapppar */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 mr-2">Sortera efter:</span>
+                  <button
+                    onClick={() => handleSort('pris')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                      sortBy === 'pris' 
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' 
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600 border border-slate-600'
+                    }`}
+                  >
+                    Pris {getSortIcon('pris')}
+                  </button>
+                  <button
+                    onClick={() => handleSort('kontaktperson')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                      sortBy === 'kontaktperson' 
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' 
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600 border border-slate-600'
+                    }`}
+                  >
+                    Namn {getSortIcon('kontaktperson')}
+                  </button>
+                  <button
+                    onClick={() => handleSort('status')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                      sortBy === 'status' 
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' 
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600 border border-slate-600'
+                    }`}
+                  >
+                    Status {getSortIcon('status')}
+                  </button>
+                </div>
+                
                 {debouncedSearchQuery !== searchQuery && (
                   <div className="text-xs text-slate-500">Söker...</div>
                 )}
               </div>
               
               <CaseSearchResults 
-                results={filteredResults}
+                results={filteredAndSortedResults}
                 onCaseClick={handleCaseClick}
                 loading={debouncedSearchQuery !== searchQuery}
               />
