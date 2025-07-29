@@ -155,8 +155,26 @@ class ClickUpSyncService {
       // 2. Konvertera till ClickUp format med geocoding
       const clickupTask = await convertSupabaseToClickUpAsync(caseData, caseType)
 
-      // 3. Uppdatera task i ClickUp
-      const updatedTask = await this.client.updateTask(caseData.clickup_task_id, clickupTask)
+      // 3. Separera custom fields från task data (enligt ClickUp API dokumentation)
+      const { custom_fields, ...taskDataWithoutCustomFields } = clickupTask
+      
+      // 4. Uppdatera task metadata först
+      const updatedTask = await this.client.updateTask(caseData.clickup_task_id, taskDataWithoutCustomFields)
+      
+      // 5. Uppdatera custom fields separat (enligt ClickUp API dokumentation)
+      if (custom_fields && Array.isArray(custom_fields)) {
+        console.log(`[ClickUpSync] Updating ${custom_fields.length} custom fields...`)
+        
+        for (const field of custom_fields) {
+          try {
+            await this.client.setCustomField(caseData.clickup_task_id, field.id, field.value)
+            console.log(`[ClickUpSync] Updated custom field ${field.id} with value:`, field.value)
+          } catch (fieldError) {
+            console.error(`[ClickUpSync] Failed to update custom field ${field.id}:`, fieldError)
+            // Fortsätt med andra fält även om ett misslyckas
+          }
+        }
+      }
 
       console.log(`[ClickUpSync] Successfully updated ClickUp task ${caseData.clickup_task_id}`)
       return { 

@@ -73,6 +73,14 @@ export class ClickUpClient {
     })
   }
 
+  // Uppdatera ett custom field på en task
+  async setCustomField(taskId: string, fieldId: string, value: any) {
+    return this.request(`/task/${taskId}/field/${fieldId}`, {
+      method: 'POST',
+      body: JSON.stringify({ value }),
+    })
+  }
+
   // Hämta alla team members (workspace users)
   async getTeamMembers() {
     return this.request(`/team`)
