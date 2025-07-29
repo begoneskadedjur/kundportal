@@ -478,12 +478,35 @@ function generateSuggestedChanges(cases: any[], technicians: any[], currentAnaly
   return changes;
 }
 
+// Hjälpfunktion för att formatera adress (baserat på ruttplanerarens formatAddress)
+function formatAddress(address: any): string {
+  if (!address) return '';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  return String(address);
+}
+
 // Hjälpfunktion för att extrahera adress från ärende
 function getAddressFromCase(caseItem: any): string | null {
+  console.log(`[Address Debug] Checking case ${caseItem.id} for addresses...`);
+  
   // Kolla olika adressfält som kan finnas
-  if (caseItem.address) return caseItem.address;
-  if (caseItem.location) return caseItem.location;
-  if (caseItem.customer_address) return caseItem.customer_address;
+  const addressFields = [
+    'address',
+    'adress', // Svenska stavning som används i ruttplaneraren
+    'location', 
+    'customer_address',
+    'formatted_address'
+  ];
+
+  for (const field of addressFields) {
+    if (caseItem[field]) {
+      const formatted = formatAddress(caseItem[field]);
+      if (formatted.trim()) {
+        console.log(`[Address Debug] Found address in field '${field}': ${formatted}`);
+        return formatted;
+      }
+    }
+  }
   
   // För ClickUp-integrerade ärenden kan adressen vara i custom_fields
   if (caseItem.custom_fields) {
@@ -494,23 +517,28 @@ function getAddressFromCase(caseItem: any): string | null {
       
       if (Array.isArray(fields)) {
         const addressField = fields.find((field: any) => 
-          field.name && field.name.toLowerCase().includes('adress') ||
-          field.name && field.name.toLowerCase().includes('address') ||
-          field.type_config?.location
+          field.name && (
+            field.name.toLowerCase().includes('adress') ||
+            field.name.toLowerCase().includes('address') ||
+            field.type_config?.location
+          )
         );
         
         if (addressField && addressField.value) {
-          if (typeof addressField.value === 'string') {
-            return addressField.value;
-          } else if (addressField.value.formatted_address) {
-            return addressField.value.formatted_address;
+          const formatted = formatAddress(addressField.value);
+          if (formatted.trim()) {
+            console.log(`[Address Debug] Found address in custom_fields '${addressField.name}': ${formatted}`);
+            return formatted;
           }
         }
       }
     } catch (e) {
-      console.warn('Kunde inte parsa custom_fields för ärende:', caseItem.id);
+      console.warn('Kunde inte parsa custom_fields för ärende:', caseItem.id, e);
     }
   }
+  
+  console.log(`[Address Debug] No address found for case ${caseItem.id}`);
+  console.log(`[Address Debug] Available fields:`, Object.keys(caseItem));
   
   return null;
 }
