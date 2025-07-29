@@ -68,7 +68,11 @@ const renderEventContent = (eventInfo: EventContentArg) => {
         <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm`}>
             <div className="flex items-center justify-between mb-1">
                 <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
-                {timeSpan && <span className={`text-xs font-mono ${colors.text} opacity-90`}>{timeSpan}</span>}
+                {timeSpan && (
+                    <span className={`text-xs font-mono ${colors.text} bg-black bg-opacity-20 px-1.5 py-0.5 rounded font-bold`}>
+                        {timeSpan}
+                    </span>
+                )}
             </div>
             
             <div className={`flex items-center gap-1.5 text-xs ${colors.text} opacity-80 truncate`}>
@@ -446,8 +450,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           height="100%"
           resourceAreaHeaderContent="Tekniker"
           resourceAreaWidth="15%"
-          slotMinWidth={currentView === 'week' ? 35 : 60}
-          slotMaxWidth={currentView === 'week' ? 50 : undefined}
+          slotMinWidth={60}
           nowIndicator={true}
           views={{
             resourceTimelineDay: { 
@@ -457,12 +460,8 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
               snapDuration: '00:15:00'
             },
             resourceTimelineWeek: { 
-              slotDuration: '01:00:00',
-              slotLabelFormat: [
-                { weekday: 'short', day: 'numeric', month: 'numeric' }, // Översta raden - datum
-                { hour: '2-digit', minute: '2-digit', hour12: false }    // Andra raden - tid
-              ],
-              slotLabelInterval: '02:00:00',
+              slotDuration: { days: 1 }, 
+              slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' },
               snapDuration: '00:15:00'
             },
             resourceTimelineMonth: { 

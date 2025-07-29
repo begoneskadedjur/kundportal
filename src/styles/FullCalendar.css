@@ -250,21 +250,9 @@
   border-right: 1px solid rgba(148, 163, 184, 0.15);
 }
 
-/* Veckovisning - förbättra tidskolumner */
+/* Veckovisning - behåll enkel dagvy */
 .fc-resourceTimelineWeek .fc-timeline-slot {
-  min-width: 40px;
   border-right: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-/* Markera dag-gränser i veckovisning */
-.fc-resourceTimelineWeek .fc-timeline-slot[data-time*="T00:00:00"] {
-  border-left: 2px solid rgba(148, 163, 184, 0.4);
-  background-color: rgba(148, 163, 184, 0.02);
-}
-
-/* Förbättra hover i veckovisning */
-.fc-resourceTimelineWeek .fc-timeline-slot:hover {
-  background-color: rgba(59, 130, 246, 0.03);
 }
 
 /* Highlight tidsslots vid hover under drag */
