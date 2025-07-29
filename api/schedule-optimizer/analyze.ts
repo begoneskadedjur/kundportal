@@ -1,10 +1,12 @@
-// api/schedule-optimizer/analyze.js
+// api/schedule-optimizer/analyze.ts
 // Backend endpoint för schemaoptimering med Google Maps Distance Matrix API
 
+import { VercelRequest, VercelResponse } from '@vercel/node';
+import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing required environment variables:', {
@@ -15,7 +17,16 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -162,7 +173,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json(result);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Schedule Optimizer] Optimeringsfel:', error);
     console.error('[Schedule Optimizer] Error stack:', error.stack);
     return res.status(500).json({ 
@@ -173,7 +184,7 @@ export default async function handler(req, res) {
 }
 
 // Huvudfunktion för schemaoptimering med Distance Matrix API
-async function optimizeScheduleWithDistanceMatrix(cases, technicians, optimizationType) {
+async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any[], optimizationType: string) {
   console.log(`[Optimization] Startar optimering för ${cases.length} ärenden och ${technicians.length} tekniker`);
   
   // Extrahera alla unika adresser
@@ -218,7 +229,7 @@ async function optimizeScheduleWithDistanceMatrix(cases, technicians, optimizati
 }
 
 // Beräkna Distance Matrix med Google Maps API
-async function calculateDistanceMatrix(addresses) {
+async function calculateDistanceMatrix(addresses: string[]) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   
   if (!apiKey) {
@@ -261,7 +272,7 @@ async function calculateDistanceMatrix(addresses) {
 }
 
 // Hämta Distance Matrix batch från Google Maps API
-async function fetchDistanceMatrixBatch(origins, destinations, apiKey) {
+async function fetchDistanceMatrixBatch(origins: string[], destinations: string[], apiKey: string) {
   const encodedOrigins = origins.map(addr => encodeURIComponent(addr)).join('|');
   const encodedDestinations = destinations.map(addr => encodeURIComponent(addr)).join('|');
   
@@ -279,16 +290,16 @@ async function fetchDistanceMatrixBatch(origins, destinations, apiKey) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as any;
 
   if (data.status !== 'OK') {
     throw new Error(`Distance Matrix API fel: ${data.status}`);
   }
 
-  const results = [];
+  const results: any[] = [];
 
-  data.rows.forEach((row, originIndex) => {
-    row.elements.forEach((element, destinationIndex) => {
+  data.rows.forEach((row: any, originIndex: number) => {
+    row.elements.forEach((element: any, destinationIndex: number) => {
       results.push({
         from: origins[originIndex],
         to: destinations[destinationIndex],
@@ -302,7 +313,7 @@ async function fetchDistanceMatrixBatch(origins, destinations, apiKey) {
 }
 
 // Fallback: Generera uppskattad avståndsmatrix
-function generateEstimatedDistanceMatrix(addresses) {
+function generateEstimatedDistanceMatrix(addresses: string[]) {
   const distanceMap = new Map();
   
   addresses.forEach(from => {
@@ -324,12 +335,12 @@ function generateEstimatedDistanceMatrix(addresses) {
 }
 
 // Analysera nuvarande tilldelningar
-function analyzeCurrentAssignments(cases, technicians, distanceMatrix) {
+function analyzeCurrentAssignments(cases: any[], technicians: any[], distanceMatrix: Map<string, any>) {
   let totalTravelTime = 0;
   let totalDistance = 0;
   let totalWorkingHours = 0;
   
-  technicians.forEach(tech => {
+  technicians.forEach((tech: any) => {
     const techCases = cases.filter(c => 
       c.primary_assignee === tech.id || 
       c.secondary_assignee === tech.id || 
@@ -374,7 +385,7 @@ function analyzeCurrentAssignments(cases, technicians, distanceMatrix) {
 }
 
 // Optimera tilldelningar (förenklad algoritm)
-function optimizeAssignments(cases, technicians, distanceMatrix, optimizationType) {
+function optimizeAssignments(cases: any[], technicians: any[], distanceMatrix: Map<string, any>, optimizationType: string) {
   // För denna version använder vi en förenklad optimering som minskar restid med 10-20%
   const currentAnalysis = analyzeCurrentAssignments(cases, technicians, distanceMatrix);
   
@@ -388,7 +399,7 @@ function optimizeAssignments(cases, technicians, distanceMatrix, optimizationTyp
 }
 
 // Beräkna optimal rutt för en tekniker
-function calculateOptimalRoute(startAddress, addresses, distanceMatrix) {
+function calculateOptimalRoute(startAddress: string, addresses: string[], distanceMatrix: Map<string, any>) {
   if (addresses.length === 0) {
     return { total_distance: 0, total_duration: 0 };
   }
@@ -436,20 +447,20 @@ function calculateOptimalRoute(startAddress, addresses, distanceMatrix) {
 }
 
 // Generera föreslagna förändringar
-function generateSuggestedChanges(cases, technicians, currentAnalysis, optimizedAnalysis) {
-  const changes = [];
+function generateSuggestedChanges(cases: any[], technicians: any[], currentAnalysis: any, optimizedAnalysis: any) {
+  const changes: any[] = [];
   
   if (cases.length > 1 && technicians.length > 1) {
     const numChanges = Math.min(5, Math.floor(cases.length * 0.3));
     
     for (let i = 0; i < numChanges; i++) {
       const caseItem = cases[i];
-      const currentTech = technicians.find(t => 
+      const currentTech = technicians.find((t: any) => 
         t.id === caseItem.primary_assignee || 
         t.id === caseItem.secondary_assignee || 
         t.id === caseItem.tertiary_assignee
       );
-      const alternativeTech = technicians.find(t => t.id !== currentTech?.id);
+      const alternativeTech = technicians.find((t: any) => t.id !== currentTech?.id);
 
       if (currentTech && alternativeTech) {
         changes.push({
@@ -468,7 +479,7 @@ function generateSuggestedChanges(cases, technicians, currentAnalysis, optimized
 }
 
 // Hjälpfunktion för att extrahera adress från ärende
-function getAddressFromCase(caseItem) {
+function getAddressFromCase(caseItem: any): string | null {
   // Kolla olika adressfält som kan finnas
   if (caseItem.address) return caseItem.address;
   if (caseItem.location) return caseItem.location;
@@ -482,7 +493,7 @@ function getAddressFromCase(caseItem) {
         : caseItem.custom_fields;
       
       if (Array.isArray(fields)) {
-        const addressField = fields.find(field => 
+        const addressField = fields.find((field: any) => 
           field.name && field.name.toLowerCase().includes('adress') ||
           field.name && field.name.toLowerCase().includes('address') ||
           field.type_config?.location
