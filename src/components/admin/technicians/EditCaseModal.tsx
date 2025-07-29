@@ -41,7 +41,7 @@ interface TechnicianCase {
   r_fastighetsbeteckning?: string;
   r_arbetskostnad?: number;
   r_material_utrustning?: number;
-  r_servicebil?: string;
+  r_servicebil?: number;
   // Rapport
   rapport?: string;
 }
@@ -279,7 +279,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         r_fastighetsbeteckning: caseData.r_fastighetsbeteckning || '',
         r_arbetskostnad: caseData.r_arbetskostnad || 0,
         r_material_utrustning: caseData.r_material_utrustning || 0,
-        r_servicebil: caseData.r_servicebil || '',
+        r_servicebil: caseData.r_servicebil || 0,
       });
       setError(null);
       setTimeTrackingLoading(false);
@@ -315,13 +315,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
         updateData.skadedjur = formData.skadedjur;
-        updateData.pris = formData.case_price;
+        updateData.pris = formData.case_price || null;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
         updateData.rapport = formData.rapport; // Synkas till ClickUp
         
         // Lokala fält (synkas INTE till ClickUp)
-        updateData.material_cost = formData.material_cost;
+        updateData.material_cost = formData.material_cost || null;
       }
       
       if (tableName === 'private_cases') { 
@@ -329,9 +329,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         // ROT/RUT-fält för privatpersoner (synkas till ClickUp)
         updateData.r_rot_rut = formData.r_rot_rut;
         updateData.r_fastighetsbeteckning = formData.r_fastighetsbeteckning;
-        updateData.r_arbetskostnad = formData.r_arbetskostnad;
-        updateData.r_material_utrustning = formData.r_material_utrustning;
-        updateData.r_servicebil = formData.r_servicebil;
+        // Konvertera tomma strängar till null för numeriska fält
+        updateData.r_arbetskostnad = formData.r_arbetskostnad || null;
+        updateData.r_material_utrustning = formData.r_material_utrustning || null;
+        updateData.r_servicebil = formData.r_servicebil || null;
       } 
       else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
       else if (tableName === 'cases') { updateData.price = formData.case_price; }
@@ -683,9 +684,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         onChange={handleChange} 
                       />
                       <Input 
+                        type="number"
                         label="Servicebil" 
                         name="r_servicebil" 
-                        value={formData.r_servicebil || ''} 
+                        value={formData.r_servicebil === null ? '' : formData.r_servicebil} 
                         onChange={handleChange} 
                       />
                     </div>
