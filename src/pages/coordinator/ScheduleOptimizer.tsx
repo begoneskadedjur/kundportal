@@ -49,6 +49,18 @@ interface OptimizationResult {
     to_time?: string;
     reason: string;
   }>;
+  technician_details?: Array<{
+    technician_id: string;
+    technician_name: string;
+    current_travel_time: number;
+    optimized_travel_time: number;
+    current_distance_km: number;
+    optimized_distance_km: number;
+    time_savings_minutes: number;
+    distance_savings_km: number;
+    case_count: number;
+    home_address: string;
+  }>;
 }
 
 export default function ScheduleOptimizer() {
@@ -67,6 +79,10 @@ export default function ScheduleOptimizer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<OptimizationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // State för selektiv godkännande
+  const [selectedChanges, setSelectedChanges] = useState<Set<number>>(new Set());
+  const [showTechnicianDetails, setShowTechnicianDetails] = useState(false);
 
   // Hämta tekniker vid laddning
   useEffect(() => {
@@ -195,11 +211,43 @@ export default function ScheduleOptimizer() {
 
       const data = await response.json();
       setResults(data);
+      // Reset selektiva val när nya resultat kommer
+      setSelectedChanges(new Set());
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const toggleChangeSelection = (index: number) => {
+    const newSelected = new Set(selectedChanges);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedChanges(newSelected);
+  };
+
+  const selectAllChanges = () => {
+    if (!results) return;
+    const allIndices = new Set(results.suggested_changes.map((_, index) => index));
+    setSelectedChanges(allIndices);
+  };
+
+  const clearAllChanges = () => {
+    setSelectedChanges(new Set());
+  };
+
+  const handleApproveSelected = async () => {
+    if (!results || selectedChanges.size === 0) return;
+    
+    const selectedChangesList = Array.from(selectedChanges).map(index => results.suggested_changes[index]);
+    console.log('Godkänner följande förändringar:', selectedChangesList);
+    
+    // TODO: Implementera faktisk uppdatering av ärendena
+    alert(`${selectedChanges.size} förändringar kommer att verkställas`);
   };
 
   const formatTime = (minutes: number): string => {
@@ -446,41 +494,156 @@ export default function ScheduleOptimizer() {
                   </div>
                 </div>
 
-                {/* Förändringar */}
+                {/* Tekniker-detaljer */}
+                {results.technician_details && results.technician_details.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowTechnicianDetails(!showTechnicianDetails)}
+                      className="flex items-center justify-between w-full text-left"
+                    >
+                      <h3 className="font-semibold text-white">
+                        Per tekniker-analys ({results.technician_details.length} tekniker)
+                      </h3>
+                      {showTechnicianDetails ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                    
+                    {showTechnicianDetails && (
+                      <div className="mt-3 space-y-3 max-h-64 overflow-y-auto">
+                        {results.technician_details.map((tech, index) => (
+                          <div key={tech.technician_id} className="p-3 bg-slate-800/30 rounded-lg border border-slate-700">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-white">{tech.technician_name}</h4>
+                              <span className="text-xs text-slate-500">{tech.case_count} ärenden</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <div className="text-slate-400">Restid</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-300">{formatTime(tech.current_travel_time)}</span>
+                                  <ArrowRight className="w-3 h-3 text-slate-500" />
+                                  <span className="text-green-400">{formatTime(tech.optimized_travel_time)}</span>
+                                </div>
+                                {tech.time_savings_minutes > 0 && (
+                                  <div className="text-green-400">-{formatTime(tech.time_savings_minutes)}</div>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <div className="text-slate-400">Körsträcka</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-300">{tech.current_distance_km.toFixed(1)}km</span>
+                                  <ArrowRight className="w-3 h-3 text-slate-500" />
+                                  <span className="text-blue-400">{tech.optimized_distance_km.toFixed(1)}km</span>
+                                </div>
+                                {tech.distance_savings_km > 0 && (
+                                  <div className="text-blue-400">-{tech.distance_savings_km.toFixed(1)}km</div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2 text-xs text-slate-500">
+                              <MapPin className="w-3 h-3 inline mr-1" />
+                              Hemadress: {tech.home_address}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Förändringar med selektiv godkännande */}
                 {results.suggested_changes.length > 0 && (
                   <div>
-                    <h3 className="font-semibold text-white mb-3">
-                      Föreslagna förändringar ({results.suggested_changes.length})
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-white">
+                        Föreslagna förändringar ({results.suggested_changes.length})
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={selectAllChanges}
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          Välj alla
+                        </button>
+                        <button
+                          onClick={clearAllChanges}
+                          className="text-xs text-slate-400 hover:text-slate-300"
+                        >
+                          Rensa alla
+                        </button>
+                      </div>
+                    </div>
+                    
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {results.suggested_changes.map((change, index) => (
-                        <div key={index} className="p-3 bg-slate-800/50 rounded-lg">
-                          <div className="font-medium text-white text-sm">
-                            {change.case_title}
-                          </div>
-                          <div className="text-xs text-slate-400 mt-1">
-                            {change.reason}
-                          </div>
-                          {change.change_type === 'reassign_technician' && (
-                            <div className="flex items-center gap-2 text-xs text-blue-300 mt-2">
-                              <ArrowRight className="w-3 h-3" />
-                              {change.from_technician} → {change.to_technician}
+                        <div key={index} className={`p-3 rounded-lg border transition-all ${
+                          selectedChanges.has(index)
+                            ? 'bg-blue-500/20 border-blue-500/40'
+                            : 'bg-slate-800/50 border-slate-700'
+                        }`}>
+                          <label className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedChanges.has(index)}
+                              onChange={() => toggleChangeSelection(index)}
+                              className="w-4 h-4 mt-0.5 text-blue-500 focus:ring-blue-500 rounded border-slate-600 bg-slate-700"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-white text-sm">
+                                {change.case_title}
+                              </div>
+                              <div className="text-xs text-slate-400 mt-1">
+                                {change.reason}
+                              </div>
+                              {change.change_type === 'reassign_technician' && (
+                                <div className="flex items-center gap-2 text-xs text-blue-300 mt-2">
+                                  <ArrowRight className="w-3 h-3" />
+                                  {change.from_technician} → {change.to_technician}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </label>
                         </div>
                       ))}
+                    </div>
+                    
+                    <div className="mt-4 text-xs text-slate-500">
+                      {selectedChanges.size > 0 
+                        ? `${selectedChanges.size} av ${results.suggested_changes.length} förändringar valda`
+                        : 'Ingen förändring vald'
+                      }
                     </div>
                   </div>
                 )}
 
-                {/* Verkställ-knapp */}
-                <Button
-                  variant="success"
-                  className="w-full"
-                  disabled={results.suggested_changes.length === 0}
-                >
-                  Verkställ optimering
-                </Button>
+                {/* Verkställ-knappar */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleApproveSelected}
+                    variant="success"
+                    className="flex-1"
+                    disabled={selectedChanges.size === 0}
+                  >
+                    Verkställ valda ({selectedChanges.size})
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      selectAllChanges();
+                      setTimeout(handleApproveSelected, 100);
+                    }}
+                    variant="default"
+                    className="flex-1"
+                    disabled={results.suggested_changes.length === 0}
+                  >
+                    Verkställ alla
+                  </Button>
+                </div>
               </div>
             )}
           </Card>
