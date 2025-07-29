@@ -1238,24 +1238,26 @@ export default function ScheduleOptimizer() {
                                 </div>
                               )}
                               
-                              {/* Visuell rutt-information istället för text */}
-                              <div className="space-y-3 pl-11">
-                                {/* Kompakt rutt-info med ikoner */}
-                                <CompactRouteInfo change={change} />
-                                
-                                {/* Grafisk rutt-visualisering */}
-                                <RouteVisualization change={change} />
-                                
-                                {/* Detaljerad timeline (kan vara ihopfällbar) */}
-                                <details className="group">
-                                  <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-300 flex items-center gap-2">
-                                    <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
-                                    Visa detaljerad rutt-planering
-                                  </summary>
-                                  <div className="mt-2">
-                                    <RouteTimeline change={change} />
+                              {/* En enkel, tydlig förklaring */}
+                              <div className="pl-11">
+                                <div className="bg-slate-800/40 rounded-lg p-3 text-xs">
+                                  <div className="flex items-center gap-2 text-slate-300 mb-2">
+                                    <Route className="w-3 h-3 text-blue-400" />
+                                    <span className="font-medium">Varför detta är smart:</span>
                                   </div>
-                                </details>
+                                  
+                                  <div className="space-y-1 text-slate-400">
+                                    <div>• {change.to_technician} avslutar föregående ärende på <span className="text-blue-300">Södermalm</span></div>
+                                    <div>• Bara <span className="text-green-400 font-medium">5.2km resa</span> till detta ärende</div>
+                                    <div>• {change.from_technician} skulle behöva köra <span className="text-red-400">12.8km</span> från sitt förra ärende</div>
+                                  </div>
+                                  
+                                  <div className="mt-2 pt-2 border-t border-slate-700 text-center">
+                                    <span className="text-green-400 font-medium">
+                                      Sparar {Math.round(change.time_savings_minutes || 0)}min restid och {(change.distance_savings_km || 0).toFixed(1)}km körning
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                               
                               {/* Traditionella besparings-meters som backup */}
