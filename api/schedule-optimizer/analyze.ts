@@ -1138,10 +1138,20 @@ async function buildTechnicianSchedules(technicians: any[], bookings: any[], sta
       
       console.log(`[Schedule Debug] Found ${dayBookings.length} bookings for ${technician.name} on ${dateStr}`);
       
-      // Konvertera bokningar till time slots
+      // Konvertera bokningar till time slots (svensk tidszon)
       const bookedSlots = dayBookings.map(booking => {
-        const startTime = new Date(booking.start_date).toTimeString().slice(0, 5);
-        const endTime = new Date(booking.due_date).toTimeString().slice(0, 5);
+        const startTime = new Date(booking.start_date).toLocaleTimeString('sv-SE', {
+          timeZone: 'Europe/Stockholm',
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        });
+        const endTime = new Date(booking.due_date).toLocaleTimeString('sv-SE', {
+          timeZone: 'Europe/Stockholm',
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        });
         const duration = Math.round((new Date(booking.due_date).getTime() - new Date(booking.start_date).getTime()) / (1000 * 60));
         
         console.log(`[Schedule Debug] Converting booking "${booking.title}": ${booking.start_date} -> ${startTime}, ${booking.due_date} -> ${endTime}, duration=${duration}min`);
@@ -1453,7 +1463,12 @@ function generateScheduleAwareSuggestedChanges(cases: any[], technicians: any[],
 function findBestTechnicianWithScheduleAwareness(caseItem: any, currentTech: any, technicians: any[], scheduleContext: ScheduleOptimizationContext) {
   const caseAddress = getAddressFromCase(caseItem);
   const caseDate = new Date(caseItem.start_date).toISOString().split('T')[0];
-  const caseStartTime = new Date(caseItem.start_date).toTimeString().slice(0, 5);
+  const caseStartTime = new Date(caseItem.start_date).toLocaleTimeString('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false
+  });
   
   if (!caseAddress) return null;
   
