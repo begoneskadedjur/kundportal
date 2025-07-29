@@ -6,6 +6,7 @@ import CoordinatorDashboardCard from '../../components/admin/coordinator/Coordin
 import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKpiCard';
 import CaseSearchCard from '../../components/admin/coordinator/CaseSearchCard';
 import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
+import GeographicOverview from '../../components/admin/coordinator/GeographicOverview';
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
@@ -256,6 +257,11 @@ export default function CoordinatorDashboard() {
         {/* --- Söksektion --- */}
         <section className="mt-16">
           <CaseSearchCard />
+        </section>
+
+        {/* --- Geografisk översikt --- */}
+        <section className="mt-16">
+          <GeographicOverview />
         </section>
 
         {/* --- Huvudsektion med verktyg (denna del påverkas inte av datahämtningen) --- */}
