@@ -1305,7 +1305,7 @@ export default function ScheduleOptimizer() {
                                       </>
                                     ) : (
                                       <>
-                                        <div>• {change.to_technician} startar från hemmet (<span className="text-blue-300">{change.reason_details?.to_technician?.home_address_short || 'hemadress'}</span>)</div>
+                                        <div>• {change.to_technician} startar från <span className="text-blue-300">hemmet</span></div>
                                         <div>• <span className="text-green-400 font-medium">{change.reason_details?.distance_comparison?.to_distance_km?.toFixed(1) || '?'}km resa</span> från hemmet till detta ärende</div>
                                       </>
                                     )}
