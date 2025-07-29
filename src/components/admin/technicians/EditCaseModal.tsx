@@ -40,7 +40,7 @@ interface TechnicianCase {
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
   r_arbetskostnad?: number;
-  r_material_utrustning?: string;
+  r_material_utrustning?: number;
   r_servicebil?: string;
   // Rapport
   rapport?: string;
@@ -278,7 +278,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         r_rot_rut: caseData.r_rot_rut || '',
         r_fastighetsbeteckning: caseData.r_fastighetsbeteckning || '',
         r_arbetskostnad: caseData.r_arbetskostnad || 0,
-        r_material_utrustning: caseData.r_material_utrustning || '',
+        r_material_utrustning: caseData.r_material_utrustning || 0,
         r_servicebil: caseData.r_servicebil || '',
       });
       setError(null);
@@ -335,6 +335,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       } 
       else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
       else if (tableName === 'cases') { updateData.price = formData.case_price; }
+
+      // Debug logging för att identifiera problemet
+      console.log('[EditCaseModal] Updating case with data:', {
+        tableName,
+        caseId: currentCase.id,
+        updateData,
+        formDataRapport: formData.rapport
+      });
 
       const { data, error: updateError } = await supabase
         .from(tableName).update(updateData).eq('id', currentCase.id).select().single();
@@ -668,9 +676,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                         onChange={handleChange} 
                       />
                       <Input 
+                        type="number"
                         label="Material & Utrustning" 
                         name="r_material_utrustning" 
-                        value={formData.r_material_utrustning || ''} 
+                        value={formData.r_material_utrustning === null ? '' : formData.r_material_utrustning} 
                         onChange={handleChange} 
                       />
                       <Input 
