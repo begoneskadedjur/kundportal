@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase'; // Säkerställ att sökvägen ti
 import CoordinatorDashboardCard from '../../components/admin/coordinator/CoordinatorDashboardCard';
 import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKpiCard';
 import CaseSearchCard from '../../components/admin/coordinator/CaseSearchCard';
+import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
+import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
 import { CalendarDays, Map, Wand2, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
@@ -19,6 +21,24 @@ export default function CoordinatorDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // State för modal och data
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<{
+    title: string;
+    cases: BeGoneCaseRow[];
+    technicians?: Technician[];
+    kpiType: 'unplanned' | 'scheduled' | 'completed' | 'technicians';
+  }>({
+    title: '',
+    cases: [],
+    technicians: [],
+    kpiType: 'unplanned'
+  });
+  
+  // State för alla ärenden och tekniker
+  const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
+  const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
 
   useEffect(() => {
     // Funktion för att hämta all nödvändig data från Supabase
@@ -48,6 +68,8 @@ export default function CoordinatorDashboard() {
           completedPrivate,
           completedBusiness,
           techniciansResult,
+          allPrivateCases,
+          allBusinessCases,
         ] = await Promise.all([
           // 1. Räkna oplanerade ärenden
           supabase.from('private_cases').select('id', { count: 'exact', head: true }).in('status', unplannedStatuses),
@@ -62,7 +84,11 @@ export default function CoordinatorDashboard() {
           supabase.from('business_cases').select('id', { count: 'exact', head: true }).gte('completed_date', weekAgoStart),
 
           // 4. Räkna aktiva tekniker
-          supabase.from('technicians').select('id', { count: 'exact', head: true }).eq('is_active', true)
+          supabase.from('technicians').select('*').eq('is_active', true),
+          
+          // 5. Hämta alla ärenden för modal-visning
+          supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
+          supabase.from('business_cases').select('*').order('created_at', { ascending: false })
         ]);
         
         // Kombinera alla potentiella fel till ett meddelande för enklare felsökning
@@ -70,18 +96,27 @@ export default function CoordinatorDashboard() {
             unplannedPrivate.error, unplannedBusiness.error,
             scheduledPrivate.error, scheduledBusiness.error,
             completedPrivate.error, completedBusiness.error,
-            techniciansResult.error
+            techniciansResult.error, allPrivateCases.error, allBusinessCases.error
         ].filter(Boolean);
 
         if (errors.length > 0) {
             throw new Error(errors.map(e => e.message).join(', '));
         }
 
+        // Kombinera alla ärenden för modal-visning
+        const combinedCases = [
+          ...(allPrivateCases.data || []).map(c => ({ ...c, case_type: 'private' as const })),
+          ...(allBusinessCases.data || []).map(c => ({ ...c, case_type: 'business' as const }))
+        ];
+        
+        setAllCases(combinedCases as BeGoneCaseRow[]);
+        setAllTechnicians(techniciansResult.data || []);
+
         // Summera resultaten från de olika tabellerna
         const totalUnplanned = (unplannedPrivate.count ?? 0) + (unplannedBusiness.count ?? 0);
         const totalScheduledToday = (scheduledPrivate.count ?? 0) + (scheduledBusiness.count ?? 0);
         const totalCompletedWeek = (completedPrivate.count ?? 0) + (completedBusiness.count ?? 0);
-        const totalActiveTechnicians = techniciansResult.count ?? 0;
+        const totalActiveTechnicians = (techniciansResult.data || []).length;
 
         // Uppdatera state med den nya datan
         setKpiData({
@@ -101,6 +136,65 @@ export default function CoordinatorDashboard() {
 
     fetchDashboardData();
   }, []); // Den tomma arrayen [] betyder att denna effekt bara körs en gång.
+
+  // Funktioner för att filtrera ärenden baserat på KPI-typ
+  const getUnplannedCases = () => {
+    const unplannedStatuses = ['Öppen', 'Offert signerad - boka in'];
+    return allCases.filter(c => unplannedStatuses.includes(c.status));
+  };
+
+  const getScheduledTodayCases = () => {
+    const today = new Date();
+    const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+    
+    return allCases.filter(c => {
+      if (!c.start_date) return false;
+      const caseDate = c.start_date;
+      return caseDate >= todayStart && caseDate <= todayEnd;
+    });
+  };
+
+  const getCompletedWeekCases = () => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStart = new Date(weekAgo.setHours(0, 0, 0, 0)).toISOString();
+    
+    return allCases.filter(c => {
+      if (!c.completed_date) return false;
+      return c.completed_date >= weekAgoStart;
+    });
+  };
+
+  // Funktioner för att hantera klick på KPI-kort
+  const handleKpiCardClick = (kpiType: 'unplanned' | 'scheduled' | 'completed' | 'technicians') => {
+    let title = '';
+    let cases: BeGoneCaseRow[] = [];
+    let technicians: Technician[] | undefined = undefined;
+
+    switch (kpiType) {
+      case 'unplanned':
+        title = 'Oplanerade Ärenden';
+        cases = getUnplannedCases();
+        break;
+      case 'scheduled':
+        title = 'Schemalagda Idag';
+        cases = getScheduledTodayCases();
+        break;
+      case 'completed':
+        title = 'Avslutade (7 dagar)';
+        cases = getCompletedWeekCases();
+        break;
+      case 'technicians':
+        title = 'Aktiva Tekniker';
+        cases = [];
+        technicians = allTechnicians;
+        break;
+    }
+
+    setModalData({ title, cases, technicians, kpiType });
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -132,10 +226,30 @@ export default function CoordinatorDashboard() {
           ) : (
             // Visa de riktiga korten med data
             <>
-              <CoordinatorKpiCard title="Oplanerade Ärenden" value={kpiData.unplanned} icon={Wrench} />
-              <CoordinatorKpiCard title="Schemalagda Idag" value={kpiData.scheduledToday} icon={CalendarDays} />
-              <CoordinatorKpiCard title="Aktiva Tekniker" value={kpiData.activeTechnicians} icon={Users} />
-              <CoordinatorKpiCard title="Avslutade (7 dagar)" value={kpiData.completedWeek} icon={PieChart} />
+              <CoordinatorKpiCard 
+                title="Oplanerade Ärenden" 
+                value={kpiData.unplanned} 
+                icon={Wrench} 
+                onClick={() => handleKpiCardClick('unplanned')}
+              />
+              <CoordinatorKpiCard 
+                title="Schemalagda Idag" 
+                value={kpiData.scheduledToday} 
+                icon={CalendarDays} 
+                onClick={() => handleKpiCardClick('scheduled')}
+              />
+              <CoordinatorKpiCard 
+                title="Aktiva Tekniker" 
+                value={kpiData.activeTechnicians} 
+                icon={Users} 
+                onClick={() => handleKpiCardClick('technicians')}
+              />
+              <CoordinatorKpiCard 
+                title="Avslutade (7 dagar)" 
+                value={kpiData.completedWeek} 
+                icon={PieChart} 
+                onClick={() => handleKpiCardClick('completed')}
+              />
             </>
           )}
         </section>
@@ -173,6 +287,16 @@ export default function CoordinatorDashboard() {
           </div>
         </main>
       </div>
+
+      {/* KPI Case List Modal */}
+      <KpiCaseListModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={modalData.title}
+        cases={modalData.cases}
+        technicians={modalData.technicians}
+        kpiType={modalData.kpiType}
+      />
     </div>
   );
 }
