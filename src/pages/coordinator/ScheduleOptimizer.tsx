@@ -1304,7 +1304,10 @@ export default function ScheduleOptimizer() {
                                         <div>• Bara <span className="text-green-400 font-medium">{change.reason_details.route_context.previous_case.distance_to_current.toFixed(1)}km resa</span> till detta ärende</div>
                                       </>
                                     ) : (
-                                      <div>• {change.to_technician} har kortare restid från sin position</div>
+                                      <>
+                                        <div>• {change.to_technician} startar från hemmet (<span className="text-blue-300">{change.reason_details?.to_technician?.home_address_short || 'hemadress'}</span>)</div>
+                                        <div>• <span className="text-green-400 font-medium">{change.reason_details?.distance_comparison?.to_distance_km?.toFixed(1) || '?'}km resa</span> från hemmet till detta ärende</div>
+                                      </>
                                     )}
                                     
                                     {/* Visa jämförelse med nuvarande tekniker */}

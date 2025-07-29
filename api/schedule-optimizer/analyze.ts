@@ -1927,6 +1927,7 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
     const previousDateStr = previousDate.toISOString().split('T')[0];
     
     const techSchedules = scheduleContext.schedules.get(technician.id);
+    console.log(`[RouteContext] Available schedule dates for ${technician.name}:`, techSchedules?.map(s => s.date));
     const previousDaySchedule = techSchedules?.find(s => s.date === previousDateStr);
     
     if (previousDaySchedule && previousDaySchedule.booked_slots.length > 0) {
@@ -1945,6 +1946,8 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
       
       technicianCases = [lastCaseAsPrevious];
       console.log(`[RouteContext] Using last case from previous day: ${lastSlot.title} at ${lastSlot.address}`);
+    } else {
+      console.log(`[RouteContext] No previous day schedule found, will use home address as starting point`);
     }
   }
 
