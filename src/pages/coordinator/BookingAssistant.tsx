@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { Clock, MapPin, User, Zap, ArrowRight, Check } from 'lucide-react';
+import { PageHeader } from '../../components/shared';
 
 // Datatyper
 interface Suggestion {
@@ -54,10 +55,12 @@ export default function BookingAssistant() {
     };
 
     return (
-        <div style={{ padding: '2rem', background: '#111827', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Intelligent Bokningsassistent</h1>
-                <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>Få förslag på den mest effektiva tiden att boka ett nytt ärende.</p>
+        <div style={{ background: '#111827', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+            <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+                <PageHeader 
+                  title="Intelligent Bokningsassistent"
+                  backPath="/koordinator/dashboard"
+                />
 
                 <form onSubmit={findSuggestions} style={{ background: '#1f2937', padding: '1.5rem', borderRadius: '0.5rem' }}>
                     <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Ny adress</label>

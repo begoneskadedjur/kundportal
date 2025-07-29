@@ -13,7 +13,10 @@ import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
 import Button from '../../components/ui/Button';
 
-import { LayoutGrid, Plus, CalendarOff } from 'lucide-react';
+import { LayoutGrid, Plus, CalendarOff, ArrowLeft, LogOut } from 'lucide-react';
+import { PageHeader } from '../../components/shared';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export interface Absence {
   id: string;
@@ -27,6 +30,8 @@ const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert sign
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 export default function CoordinatorSchedule() {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
@@ -131,7 +136,16 @@ export default function CoordinatorSchedule() {
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
           <div className="max-w-screen-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-                <LayoutGrid className="w-6 h-6 text-blue-400" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/koordinator/dashboard')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Tillbaka
+              </Button>
+              <LayoutGrid className="w-6 h-6 text-blue-400" />
               <div>
                 <h1 className="text-xl font-bold text-white">Koordinator - Schemaöversikt</h1>
                 <p className="text-sm text-slate-400">{filteredScheduledCases.length} schemalagda • {actionableCases.length} att boka in • {technicians.length} tekniker</p>
@@ -140,6 +154,18 @@ export default function CoordinatorSchedule() {
             <div className="flex items-center gap-2">
                 <Button onClick={() => { setSelectedCase(null); setIsCreateModalOpen(true); }} variant="primary"><Plus className="w-4 h-4 mr-2" />Skapa Nytt Ärende</Button>
                 <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro"><CalendarOff className="w-4 h-4" /></Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    await signOut();
+                    navigate('/login');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logga ut
+                </Button>
             </div>
           </div>
         </header>
