@@ -401,7 +401,14 @@ async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any
   // Beräkna faktiska besparingar baserat på föreslagna ändringar
   const actualSavings = calculateActualSavings(suggestedChanges, technicianDetails);
   
-  console.log(`[Schedule-Aware] Optimization complete: ${actualSavings.time_minutes}min, ${actualSavings.distance_km}km savings`);
+  // Om inga förslag finns, visa inga besparingar för att undvika förvirring
+  const finalSavings = suggestedChanges.length > 0 ? actualSavings : {
+    time_minutes: 0,
+    distance_km: 0,
+    efficiency_gain: 0
+  };
+  
+  console.log(`[Schedule-Aware] Optimization complete: ${finalSavings.time_minutes}min, ${finalSavings.distance_km}km savings with ${suggestedChanges.length} suggestions`);
   
   return {
     current_stats: {
@@ -414,7 +421,7 @@ async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any
       total_distance_km: optimizedAnalysis.total_distance_km,
       utilization_rate: optimizedAnalysis.utilization_rate
     },
-    savings: actualSavings,
+    savings: finalSavings,
     suggested_changes: suggestedChanges,
     technician_details: technicianDetails
   };
@@ -1230,7 +1237,7 @@ function findAvailableGaps(workStart: string, workEnd: string, bookedSlots: any[
     });
   }
   
-  return gaps.filter(gap => gap.duration_minutes >= 30); // Endast luckor på minst 30 min
+  return gaps.filter(gap => gap.duration_minutes >= 60); // Endast luckor på minst 60 min
 }
 
 // Hjälpfunktioner för tid-konvertering
@@ -1498,15 +1505,15 @@ function findBestTechnicianWithScheduleAwareness(caseItem: any, currentTech: any
     let availableGap = null;
     
     // Om ärendet är utanför arbetstid, hitta bästa luckan istället
-    if (caseTimeMinutes < workStartMinutes || caseTimeMinutes > workEndMinutes - 120) {
+    if (caseTimeMinutes < workStartMinutes || caseTimeMinutes > workEndMinutes - 60) {
       console.log(`[Schedule-Aware Match] ${tech.name}: Case scheduled outside work hours (${caseStartTime}), finding best available gap`);
-      availableGap = daySchedule.available_gaps.find(gap => gap.duration_minutes >= 120);
+      availableGap = daySchedule.available_gaps.find(gap => gap.duration_minutes >= 60);
     } else {
       // Ärendet är inom arbetstid, kolla om det finns plats
       availableGap = daySchedule.available_gaps.find(gap => 
-        gap.duration_minutes >= 120 && // Minst 2h för ärendet
+        gap.duration_minutes >= 60 && // Minst 1h för ärendet
         timeToMinutes(gap.start_time) <= caseTimeMinutes &&
-        timeToMinutes(gap.end_time) >= caseTimeMinutes + 120
+        timeToMinutes(gap.end_time) >= caseTimeMinutes + 60
       );
     }
     
