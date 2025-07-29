@@ -18,6 +18,35 @@ import toast from 'react-hot-toast';
 
 import '../../../styles/FullCalendar.css';
 
+// Hjälpfunktion för att formatera adress från JSON till läsbar sträng
+const formatAddress = (address: any): string => {
+  if (!address) return '';
+  
+  // Om det redan är en sträng, returnera den
+  if (typeof address === 'string') {
+    try {
+      // Försök att parsa som JSON om det ser ut som JSON
+      const parsed = JSON.parse(address);
+      return parsed.formatted_address || address;
+    } catch (e) {
+      // Om det inte går att parsa, returnera ursprungssträngen
+      return address;
+    }
+  }
+  
+  // Om det är ett objekt med formatted_address
+  if (address.formatted_address) {
+    return address.formatted_address;
+  }
+  
+  // Om det är ett objekt med separata fält, bygg adressen
+  if (address.street && address.city) {
+    return `${address.street}, ${address.postal_code || ''} ${address.city}`.trim();
+  }
+  
+  return '';
+};
+
 interface ScheduleTimelineProps {
   technicians: Technician[];
   cases: BeGoneCaseRow[];
@@ -64,12 +93,14 @@ const renderEventContent = (eventInfo: EventContentArg) => {
         caseData.tertiary_assignee_name
     ].filter(Boolean);
 
+    const formattedAddress = formatAddress(caseData.adress);
+
     return (
         <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm`}>
             <div className="flex items-center justify-between mb-1">
                 <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
                 {timeSpan && (
-                    <span className={`text-xs font-mono ${colors.text} bg-white bg-opacity-20 px-1.5 py-0.5 rounded font-bold border border-white border-opacity-30`}>
+                    <span className={`text-xs font-mono ${colors.text} font-bold`}>
                         {timeSpan}
                     </span>
                 )}
@@ -80,7 +111,13 @@ const renderEventContent = (eventInfo: EventContentArg) => {
                 <span className="truncate">{allTechnicians.join(', ')}</span>
             </div>
 
-            {caseData.skadedjur && <p className={`text-xs ${colors.text} opacity-70 truncate mt-1`}>{caseData.skadedjur}</p>}
+            {formattedAddress && (
+                <p className={`text-xs ${colors.text} opacity-70 truncate mt-1`}>
+                    📍 {formattedAddress}
+                </p>
+            )}
+
+            {caseData.skadedjur && <p className={`text-xs ${colors.text} opacity-70 truncate mt-0.5`}>{caseData.skadedjur}</p>}
         </div>
     );
 };
