@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       supabase
         .from('private_cases')
         .select('*')
-        .or(`primary_assignee.in.(${technician_ids.join(',')}),secondary_assignee.in.(${technician_ids.join(',')}),tertiary_assignee.in.(${technician_ids.join(',')})`)
+        .or(`primary_assignee_id.in.(${technician_ids.join(',')}),secondary_assignee_id.in.(${technician_ids.join(',')}),tertiary_assignee_id.in.(${technician_ids.join(',')})`)
         .gte('start_date', startDateTime)
         .lte('start_date', endDateTime)
         .not('status', 'in', '("Avslutat","Avbokat")'),
@@ -99,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       supabase
         .from('business_cases')
         .select('*')
-        .or(`primary_assignee.in.(${technician_ids.join(',')}),secondary_assignee.in.(${technician_ids.join(',')}),tertiary_assignee.in.(${technician_ids.join(',')})`)
+        .or(`primary_assignee_id.in.(${technician_ids.join(',')}),secondary_assignee_id.in.(${technician_ids.join(',')}),tertiary_assignee_id.in.(${technician_ids.join(',')})`)
         .gte('start_date', startDateTime)
         .lte('start_date', endDateTime)
         .not('status', 'in', '("Avslutat","Avbokat")')
@@ -342,9 +342,9 @@ function analyzeCurrentAssignments(cases: any[], technicians: any[], distanceMat
   
   technicians.forEach((tech: any) => {
     const techCases = cases.filter(c => 
-      c.primary_assignee === tech.id || 
-      c.secondary_assignee === tech.id || 
-      c.tertiary_assignee === tech.id
+      c.primary_assignee_id === tech.id || 
+      c.secondary_assignee_id === tech.id || 
+      c.tertiary_assignee_id === tech.id
     );
     
     if (techCases.length === 0) return;
@@ -456,9 +456,9 @@ function generateSuggestedChanges(cases: any[], technicians: any[], currentAnaly
     for (let i = 0; i < numChanges; i++) {
       const caseItem = cases[i];
       const currentTech = technicians.find((t: any) => 
-        t.id === caseItem.primary_assignee || 
-        t.id === caseItem.secondary_assignee || 
-        t.id === caseItem.tertiary_assignee
+        t.id === caseItem.primary_assignee_id || 
+        t.id === caseItem.secondary_assignee_id || 
+        t.id === caseItem.tertiary_assignee_id
       );
       const alternativeTech = technicians.find((t: any) => t.id !== currentTech?.id);
 
