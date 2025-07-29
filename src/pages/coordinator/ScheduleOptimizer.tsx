@@ -476,6 +476,62 @@ const RouteVisualization: React.FC<{
   );
 };
 
+// HomeCommuteInfo - visar hemresa-information för ärenden nära slutet av dagen
+const HomeCommuteInfo: React.FC<{ 
+  change: any;
+}> = ({ change }) => {
+  // Simulera att detta ärende är inom 90 minuter från slutet (för demo)
+  const caseDate = new Date(change.case_start_time || '2024-01-01T15:30:00');
+  const caseHour = caseDate.getHours();
+  
+  // Endast visa för ärenden efter 15:00 (som demonstration)
+  const isNearEndOfDay = caseHour >= 15;
+  
+  if (!isNearEndOfDay) return null;
+  
+  // Simulera hemresa-data
+  const homeCommuteData = {
+    workEndsAt: '17:00',
+    minutesUntilWorkEnds: Math.max(0, (17 * 60) - (caseHour * 60 + caseDate.getMinutes())),
+    toTechnician: {
+      homeDistance: Math.random() * 15 + 5, // 5-20km
+      homeTravelTime: Math.random() * 25 + 15, // 15-40min
+      estimatedHomeArrival: `${Math.min(18, caseHour + 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`
+    },
+    fromTechnician: {
+      homeDistance: Math.random() * 20 + 10, // 10-30km
+      homeTravelTime: Math.random() * 35 + 20, // 20-55min
+      estimatedHomeArrival: `${Math.min(19, caseHour + 3)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`
+    }
+  };
+  
+  const timeSavedGettingHome = homeCommuteData.fromTechnician.homeTravelTime - homeCommuteData.toTechnician.homeTravelTime;
+  const distanceSavedGettingHome = homeCommuteData.fromTechnician.homeDistance - homeCommuteData.toTechnician.homeDistance;
+  
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-600">
+      <div className="flex items-center gap-2 text-slate-300 mb-1">
+        <Home className="w-3 h-3 text-orange-400" />
+        <span className="font-medium">Hemresa-fördel:</span>
+        <span className="text-xs text-slate-500">({homeCommuteData.minutesUntilWorkEnds}min kvar av arbetsdagen)</span>
+      </div>
+      
+      <div className="space-y-1 text-slate-400">
+        <div>• {change.to_technician} hem: <span className="text-green-400">{homeCommuteData.toTechnician.homeTravelTime}min, {homeCommuteData.toTechnician.homeDistance.toFixed(1)}km</span> → hemma {homeCommuteData.toTechnician.estimatedHomeArrival}</div>
+        <div>• {change.from_technician} hem: <span className="text-red-400">{homeCommuteData.fromTechnician.homeTravelTime}min, {homeCommuteData.fromTechnician.homeDistance.toFixed(1)}km</span> → hemma {homeCommuteData.fromTechnician.estimatedHomeArrival}</div>
+      </div>
+      
+      {(timeSavedGettingHome > 5 || distanceSavedGettingHome > 2) && (
+        <div className="mt-1 text-center">
+          <span className="text-orange-400 font-medium text-xs">
+            {change.to_technician} kommer hem {Math.round(timeSavedGettingHome)}min tidigare, {distanceSavedGettingHome.toFixed(1)}km kortare hemresa
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Typer
 interface OptimizationRequest {
   period_type: 'day' | 'week';
@@ -1238,7 +1294,7 @@ export default function ScheduleOptimizer() {
                                 </div>
                               )}
                               
-                              {/* En enkel, tydlig förklaring */}
+                              {/* En enkel, tydlig förklaring med hemresa-info */}
                               <div className="pl-11">
                                 <div className="bg-slate-800/40 rounded-lg p-3 text-xs">
                                   <div className="flex items-center gap-2 text-slate-300 mb-2">
@@ -1251,6 +1307,9 @@ export default function ScheduleOptimizer() {
                                     <div>• Bara <span className="text-green-400 font-medium">5.2km resa</span> till detta ärende</div>
                                     <div>• {change.from_technician} skulle behöva köra <span className="text-red-400">12.8km</span> från sitt förra ärende</div>
                                   </div>
+                                  
+                                  {/* Hemresa-information för ärenden nära slutet av dagen */}
+                                  <HomeCommuteInfo change={change} />
                                   
                                   <div className="mt-2 pt-2 border-t border-slate-700 text-center">
                                     <span className="text-green-400 font-medium">
