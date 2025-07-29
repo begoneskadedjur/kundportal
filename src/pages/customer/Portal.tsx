@@ -211,9 +211,8 @@ const CustomerPortal: React.FC = () => {
           </section>
 
         </div>
-      </main>
 
-      {/* Footer */}
+        {/* Footer */}
       <footer className="bg-slate-900/50 border-t border-slate-800 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between text-sm text-slate-400">

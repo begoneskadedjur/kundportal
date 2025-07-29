@@ -950,9 +950,8 @@ const BillingManagement: React.FC = () => {
 
         {/* NEW: Billing History Section - visas under huvudtabellen */}
         <BillingHistorySection cases={cases} />
-      </main>
 
-      {/* Modals */}
+        {/* Modals */}
       <BillingModal
         case_={selectedCase}
         isOpen={isModalOpen}
