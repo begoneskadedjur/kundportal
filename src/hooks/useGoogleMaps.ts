@@ -26,7 +26,7 @@ export function useGoogleMaps(config: GoogleMapsConfig = {}) {
     // Försök hitta API-nyckel från olika källor
     const apiKey = config.apiKey || 
       import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
-      import.meta.env.VITE_GOOGLE_GEOCODING;
+      import.meta.env.GOOGLE_MAPS_API_KEY;
 
     console.log('[useGoogleMaps] API key tillgänglig:', !!apiKey);
 

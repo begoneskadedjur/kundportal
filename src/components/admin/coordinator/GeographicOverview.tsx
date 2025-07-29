@@ -83,11 +83,16 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       const today = new Date();
       const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
       const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      
+      // Lägg till backup-intervall (senaste 7 dagarna) om inga ärenden idag
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+      const weekAgoStart = weekAgo.toISOString();
 
-      console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd });
+      console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd, weekAgoStart });
 
-      // Hämta dagens ärenden
-      const [privateCases, businessCases, techniciansData] = await Promise.all([
+      // Hämta dagens ärenden först, sedan senaste veckan som backup
+      const [privateCasesToday, businessCasesToday, techniciansData] = await Promise.all([
         supabase
           .from('private_cases')
           .select('*')
@@ -108,6 +113,33 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           .eq('is_active', true)
           .not('address', 'is', null)
       ]);
+
+      let privateCases = privateCasesToday;
+      let businessCases = businessCasesToday;
+
+      // Om inga ärenden idag, hämta från senaste veckan
+      if ((privateCasesToday.data?.length || 0) + (businessCasesToday.data?.length || 0) === 0) {
+        console.log('[GeographicOverview] Inga ärenden idag, hämtar från senaste veckan...');
+        
+        const [privateWeekCases, businessWeekCases] = await Promise.all([
+          supabase
+            .from('private_cases')
+            .select('*')
+            .gte('start_date', weekAgoStart)
+            .not('adress', 'is', null)
+            .limit(20),
+          
+          supabase
+            .from('business_cases')
+            .select('*')
+            .gte('start_date', weekAgoStart)
+            .not('adress', 'is', null)
+            .limit(20)
+        ]);
+
+        privateCases = privateWeekCases;
+        businessCases = businessWeekCases;
+      }
 
       if (privateCases.error) throw privateCases.error;
       if (businessCases.error) throw businessCases.error;
@@ -269,15 +301,15 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     return techniciansWithLocations;
   };
 
-  const generateClusters = () => {
+  const generateClusters = async () => {
     console.log('[GeographicOverview] Genererar kluster för', todaysCases.length, 'ärenden');
     
-    const CLUSTER_RADIUS_KM = 10; // Öka till 10km för bättre klustering
+    const CLUSTER_RADIUS_KM = 15; // Öka till 15km för bättre klustering
     const clusters: CaseCluster[] = [];
     const processed = new Set<string>();
 
-    todaysCases.forEach(caseData => {
-      if (!caseData.coordinates || processed.has(caseData.id)) return;
+    for (const caseData of todaysCases) {
+      if (!caseData.coordinates || processed.has(caseData.id)) continue;
 
       const clusterCases = [caseData];
       processed.add(caseData.id);
@@ -301,7 +333,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       // Beräkna kluster-center
       const center = calculateClusterCenter(clusterCases);
-      const area = getAreaName(center);
+      const area = await getAreaName(center);
 
       console.log('[GeographicOverview] Skapade kluster:', {
         area,
@@ -311,12 +343,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       });
 
       clusters.push({
-        id: `cluster-${Date.now()}-${clusters.length}`, // Mer unik ID
+        id: `cluster-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Helt unik ID
         cases: clusterCases,
         center,
         area
       });
-    });
+    }
 
     console.log('[GeographicOverview] Totalt antal kluster:', clusters.length);
     setClusters(clusters);
@@ -343,11 +375,41 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     };
   };
 
-  const getAreaName = (coordinates: { lat: number; lng: number }): string => {
-    // Enkel approximation av svenska områden baserat på koordinater
-    // Detta kan förbättras med reverse geocoding
+  const getAreaName = async (coordinates: { lat: number; lng: number }): Promise<string> => {
+    try {
+      // Använd reverse geocoding för att få riktig platsinfo
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinates.lat},${coordinates.lng}&key=${import.meta.env.VITE_GOOGLE_GEOCODING || import.meta.env.GOOGLE_MAPS_API_KEY}&language=sv&region=se`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+          // Hitta stad/kommun från adresskomponenter
+          const addressComponents = data.results[0].address_components;
+          
+          // Leta efter locality eller administrative_area_level_2 för staden
+          for (const component of addressComponents) {
+            if (component.types.includes('locality') || 
+                component.types.includes('administrative_area_level_2')) {
+              return component.long_name;
+            }
+          }
+          
+          // Fallback: ta första delen av formatted_address
+          const parts = data.results[0].formatted_address.split(',');
+          if (parts.length > 1) {
+            return parts[parts.length - 2].trim();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[GeographicOverview] Reverse geocoding fel:', error);
+    }
+    
+    // Fallback till enkel koordinat-baserad approximation
     if (coordinates.lat > 59.4 && coordinates.lng > 17.8) return 'Stockholm';
-    if (coordinates.lat > 57.6 && coordinates.lng > 11.8) return 'Göteborg';
+    if (coordinates.lat > 57.6 && coordinates.lng > 11.8) return 'Göteborg';  
     if (coordinates.lat > 55.5 && coordinates.lng > 12.9) return 'Malmö';
     return 'Övriga Sverige';
   };
@@ -369,8 +431,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
           { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
           { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-          { elementType: "water", stylers: [{ color: "#17263c" }] },
-          { elementType: "road", stylers: [{ color: "#3a3b3c" }] }
+          { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+          { featureType: "road", elementType: "geometry", stylers: [{ color: "#3a3b3c" }] },
+          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#2c3e50" }] }
         ]
       });
 
@@ -471,12 +534,27 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     );
   }
 
-  if (error) {
+  if (error || mapsError) {
     return (
       <Card className={className}>
         <div className="p-6 text-center text-red-400">
           <MapPin className="w-8 h-8 mx-auto mb-4" />
-          <p>{error}</p>
+          <p className="mb-4">{error || mapsError}</p>
+          {mapsError?.includes('ApiNotActivatedMapError') && (
+            <div className="text-left bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+              <h4 className="font-bold text-white mb-2">Google Maps API inte aktiverat</h4>
+              <p className="text-sm text-slate-300 mb-2">
+                För att visa kartan behöver du aktivera "Maps JavaScript API" i Google Cloud Console:
+              </p>
+              <ol className="text-sm text-slate-400 list-decimal list-inside space-y-1">
+                <li>Gå till Google Cloud Console</li>
+                <li>Välj ditt projekt</li>
+                <li>Gå till "APIs & Services" → "Library"</li>
+                <li>Sök efter "Maps JavaScript API"</li>
+                <li>Klicka "Enable"</li>
+              </ol>
+            </div>
+          )}
         </div>
       </Card>
     );
