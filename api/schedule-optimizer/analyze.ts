@@ -311,11 +311,14 @@ async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any
     efficiency_gain: Math.max(0, Math.round((optimizedAnalysis.utilization_rate - currentAnalysis.utilization_rate) * 10) / 10)
   };
   
-  // Generera föreslagna förändringar
-  const suggestedChanges = generateSuggestedChanges(cases, technicians, currentAnalysis, optimizedAnalysis);
+  // Generera föreslagna förändringar med faktiska besparingar
+  const suggestedChanges = generateSuggestedChanges(cases, technicians, distanceMatrix);
   
   // Generera detaljerad per-tekniker analys
   const technicianDetails = generateTechnicianDetails(cases, technicians, distanceMatrix);
+  
+  // Beräkna faktiska besparingar baserat på föreslagna ändringar
+  const actualSavings = calculateActualSavings(suggestedChanges, technicianDetails);
   
   return {
     current_stats: {
@@ -328,7 +331,7 @@ async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any
       total_distance_km: optimizedAnalysis.total_distance_km,
       utilization_rate: optimizedAnalysis.utilization_rate
     },
-    savings,
+    savings: actualSavings,
     suggested_changes: suggestedChanges,
     technician_details: technicianDetails
   };
@@ -556,8 +559,8 @@ function calculateOptimalRoute(startAddress: string, addresses: string[], distan
   };
 }
 
-// Generera föreslagna förändringar
-function generateSuggestedChanges(cases: any[], technicians: any[], currentAnalysis: any, optimizedAnalysis: any) {
+// Generera föreslagna förändringar med detaljerade besparingar
+function generateSuggestedChanges(cases: any[], technicians: any[], distanceMatrix: Map<string, any>) {
   const changes: any[] = [];
   
   if (cases.length > 1 && technicians.length > 1) {
@@ -573,19 +576,152 @@ function generateSuggestedChanges(cases: any[], technicians: any[], currentAnaly
       const alternativeTech = technicians.find((t: any) => t.id !== currentTech?.id);
 
       if (currentTech && alternativeTech) {
+        // Beräkna faktiska besparingar för denna förändring
+        const savings = calculateChangeImpact(caseItem, currentTech, alternativeTech, distanceMatrix);
+        
+        // Generera detaljerad beskrivning av förändringen
+        const reason = generateDetailedChangeReason(caseItem, currentTech, alternativeTech, savings);
+        
         changes.push({
           case_id: caseItem.id,
           case_title: caseItem.title || 'Namnlöst ärende',
           change_type: 'reassign_technician',
           from_technician: currentTech.name,
           to_technician: alternativeTech.name,
-          reason: `Minska restid genom att tilldela till närmare tekniker (beräknat med Distance Matrix API)`
+          reason: reason,
+          time_savings_minutes: savings.time_savings,
+          distance_savings_km: savings.distance_savings
         });
       }
     }
   }
   
   return changes;
+}
+
+// Generera detaljerad beskrivning av förändringen
+function generateDetailedChangeReason(caseItem: any, fromTech: any, toTech: any, savings: any): string {
+  const caseAddress = getAddressFromCase(caseItem);
+  const fromHomeAddress = fromTech.address && fromTech.address.trim() 
+    ? fromTech.address.trim() 
+    : "Stockholm, Sverige";
+  const toHomeAddress = toTech.address && toTech.address.trim() 
+    ? toTech.address.trim() 
+    : "Stockholm, Sverige";
+
+  // Förkorta adresser för bättre läsbarhet
+  const shortFromHome = shortenAddress(fromHomeAddress);
+  const shortToHome = shortenAddress(toHomeAddress);
+  const shortCaseAddress = shortenAddress(caseAddress || 'Okänd adress');
+
+  let reason = `Tilldela ${toTech.name} istället för ${fromTech.name}. `;
+  
+  if (savings.time_savings > 0 || savings.distance_savings > 0) {
+    reason += `${toTech.name} bor närmare (${shortToHome} vs ${shortFromHome}) vilket ger kortare resa till ${shortCaseAddress}`;
+    
+    if (savings.time_savings > 0 && savings.distance_savings > 0) {
+      reason += ` - sparar ${Math.round(savings.time_savings)}min och ${savings.distance_savings.toFixed(1)}km`;
+    } else if (savings.time_savings > 0) {
+      reason += ` - sparar ${Math.round(savings.time_savings)}min restid`;
+    } else if (savings.distance_savings > 0) {
+      reason += ` - sparar ${savings.distance_savings.toFixed(1)}km körsträcka`;
+    }
+  } else {
+    reason += `Bättre geografisk fördelning av ärenden mellan tekniker`;
+  }
+
+  return reason;
+}
+
+// Förkorta adresser för bättre läsbarhet
+function shortenAddress(address: string): string {
+  if (!address) return 'Okänd';
+  
+  // Ta bort "Sverige" och onödiga delar
+  let short = address.replace(/, Sverige$/, '').replace(/ Sverige$/, '');
+  
+  // Om adressen är längre än 25 tecken, förkorta den
+  if (short.length > 25) {
+    const parts = short.split(',');
+    if (parts.length > 1) {
+      // Ta första delen (gata) och sista delen (stad)
+      short = `${parts[0].trim()}, ${parts[parts.length - 1].trim()}`;
+    }
+    
+    // Om fortfarande för lång, trunkera
+    if (short.length > 25) {
+      short = short.substring(0, 22) + '...';
+    }
+  }
+  
+  return short;
+}
+
+// Beräkna påverkan av en specifik förändring
+function calculateChangeImpact(caseItem: any, fromTech: any, toTech: any, distanceMatrix: Map<string, any>) {
+  const caseAddress = getAddressFromCase(caseItem);
+  
+  // Hämta hemadresser
+  const fromHomeAddress = fromTech.address && fromTech.address.trim() 
+    ? fromTech.address.trim() 
+    : "Stockholm, Sverige";
+  const toHomeAddress = toTech.address && toTech.address.trim() 
+    ? toTech.address.trim() 
+    : "Stockholm, Sverige";
+  
+  // Beräkna nuvarande resa (från nuvarande tekniker till ärendet)
+  const currentKey = `${fromHomeAddress}|${caseAddress}`;
+  const currentDistance = distanceMatrix.get(currentKey) || { distance_km: 25, duration_minutes: 30 };
+  
+  // Beräkna ny resa (från alternativ tekniker till ärendet) 
+  const newKey = `${toHomeAddress}|${caseAddress}`;
+  const newDistance = distanceMatrix.get(newKey) || { distance_km: 25, duration_minutes: 30 };
+  
+  // Tur och retur för båda
+  const currentTotal = {
+    time: currentDistance.duration_minutes * 2,
+    distance: currentDistance.distance_km * 2
+  };
+  
+  const newTotal = {
+    time: newDistance.duration_minutes * 2,
+    distance: newDistance.distance_km * 2
+  };
+  
+  return {
+    time_savings: Math.max(0, currentTotal.time - newTotal.time),
+    distance_savings: Math.max(0, Math.round((currentTotal.distance - newTotal.distance) * 10) / 10)
+  };
+}
+
+// Beräkna totala besparingar från alla föreslagna ändringar
+function calculateActualSavings(suggestedChanges: any[], technicianDetails: any[]) {
+  let totalTimeSavings = 0;
+  let totalDistanceSavings = 0;
+  
+  // Summera besparingar från föreslagna ändringar
+  suggestedChanges.forEach(change => {
+    if (change.time_savings_minutes) {
+      totalTimeSavings += change.time_savings_minutes;
+    }
+    if (change.distance_savings_km) {
+      totalDistanceSavings += change.distance_savings_km;
+    }
+  });
+  
+  // Om inga specifika ändringar, använd tekniker-detaljernas totala potential
+  if (totalTimeSavings === 0 && totalDistanceSavings === 0 && technicianDetails.length > 0) {
+    technicianDetails.forEach(tech => {
+      totalTimeSavings += tech.time_savings_minutes || 0;
+      totalDistanceSavings += tech.distance_savings_km || 0;
+    });
+  }
+  
+  return {
+    time_minutes: Math.round(totalTimeSavings),
+    distance_km: Math.round(totalDistanceSavings * 10) / 10,
+    efficiency_gain: totalTimeSavings > 0 ? Math.round((totalTimeSavings / 60) * 1.5) : 0 // Uppskattad effektivitetsökning
+  };
 }
 
 // Hjälpfunktion för att formatera adress (baserat på ruttplanerarens formatAddress)

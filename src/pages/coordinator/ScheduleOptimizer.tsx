@@ -48,6 +48,8 @@ interface OptimizationResult {
     from_time?: string;
     to_time?: string;
     reason: string;
+    time_savings_minutes?: number;
+    distance_savings_km?: number;
   }>;
   technician_details?: Array<{
     technician_id: string;
@@ -244,10 +246,20 @@ export default function ScheduleOptimizer() {
     if (!results || selectedChanges.size === 0) return;
     
     const selectedChangesList = Array.from(selectedChanges).map(index => results.suggested_changes[index]);
+    
+    // Beräkna totala besparingar för valda ändringar
+    const totalTimeSavings = selectedChangesList.reduce((sum, change) => 
+      sum + (change.time_savings_minutes || 0), 0
+    );
+    const totalDistanceSavings = selectedChangesList.reduce((sum, change) => 
+      sum + (change.distance_savings_km || 0), 0
+    );
+    
     console.log('Godkänner följande förändringar:', selectedChangesList);
+    console.log(`Totala besparingar: ${formatTime(totalTimeSavings)}, ${totalDistanceSavings.toFixed(1)}km`);
     
     // TODO: Implementera faktisk uppdatering av ärendena
-    alert(`${selectedChanges.size} förändringar kommer att verkställas`);
+    alert(`${selectedChanges.size} förändringar kommer att verkställas\nBesparingar: ${formatTime(totalTimeSavings)}, ${totalDistanceSavings.toFixed(1)}km`);
   };
 
   const formatTime = (minutes: number): string => {
@@ -260,6 +272,30 @@ export default function ScheduleOptimizer() {
   };
 
   const selectedTechnicians = allTechnicians.filter(t => selectedTechnicianIds.has(t.id));
+
+  // Beräkna dynamiska besparingar baserat på valda ändringar
+  const getDisplayedSavings = () => {
+    if (!results) return { time_minutes: 0, distance_km: 0 };
+    
+    if (selectedChanges.size === 0) {
+      // Visa totala möjliga besparingar om inga ändringar är valda
+      return results.savings;
+    }
+    
+    // Beräkna besparingar för valda ändringar
+    const selectedChangesList = Array.from(selectedChanges).map(index => results.suggested_changes[index]);
+    const totalTimeSavings = selectedChangesList.reduce((sum, change) => 
+      sum + (change.time_savings_minutes || 0), 0
+    );
+    const totalDistanceSavings = selectedChangesList.reduce((sum, change) => 
+      sum + (change.distance_savings_km || 0), 0
+    );
+    
+    return {
+      time_minutes: totalTimeSavings,
+      distance_km: totalDistanceSavings
+    };
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -481,15 +517,25 @@ export default function ScheduleOptimizer() {
                 {/* Översikt */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-800/50 rounded-lg">
-                    <div className="text-slate-400 text-sm">Tidsbesparingar</div>
+                    <div className="text-slate-400 text-sm">
+                      Tidsbesparingar
+                      {selectedChanges.size > 0 && (
+                        <span className="text-xs ml-1">({selectedChanges.size} valda)</span>
+                      )}
+                    </div>
                     <div className="text-2xl font-bold text-green-400">
-                      {formatTime(results.savings.time_minutes)}
+                      {formatTime(getDisplayedSavings().time_minutes)}
                     </div>
                   </div>
                   <div className="p-4 bg-slate-800/50 rounded-lg">
-                    <div className="text-slate-400 text-sm">Kilometrar</div>
+                    <div className="text-slate-400 text-sm">
+                      Kilometrar
+                      {selectedChanges.size > 0 && (
+                        <span className="text-xs ml-1">({selectedChanges.size} valda)</span>
+                      )}
+                    </div>
                     <div className="text-2xl font-bold text-blue-400">
-                      -{results.savings.distance_km.toFixed(1)} km
+                      -{getDisplayedSavings().distance_km.toFixed(1)} km
                     </div>
                   </div>
                 </div>
