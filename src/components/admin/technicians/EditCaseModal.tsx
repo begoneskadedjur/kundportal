@@ -315,7 +315,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
         updateData.skadedjur = formData.skadedjur;
-        updateData.pris = formData.case_price || null;
+        updateData.pris = formData.case_price === "" ? null : formData.case_price;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
         updateData.rapport = formData.rapport; // Synkas till ClickUp
