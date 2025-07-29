@@ -1039,9 +1039,12 @@ export default function ScheduleOptimizer() {
                                   <div className="font-medium text-white text-sm">
                                     {change.case_title}
                                   </div>
-                                  {/* Kort beskrivning istället för lång text */}
+                                  {/* Kort beskrivning med specifik information */}
                                   <div className="text-xs text-slate-400 mt-1">
-                                    {change.change_type === 'reassign_technician' ? 'Tekniker-ombyte för kortare resa' : change.reason}
+                                    {change.change_type === 'reassign_technician' ? 
+                                      `${change.to_technician} har kortare restid - sparar ${Math.round(change.time_savings_minutes || 0)}min och ${(change.distance_savings_km || 0).toFixed(1)}km` : 
+                                      change.reason
+                                    }
                                   </div>
                                 </div>
                               </div>
