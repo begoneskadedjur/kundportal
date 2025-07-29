@@ -94,10 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Minst en tekniker måste väljas' });
     }
 
-    // Hämta tekniker-information inklusive hemadresser
+    // Hämta tekniker-information inklusive hemadresser och work_schedule
     const { data: technicians, error: techError } = await supabase
       .from('technicians')
-      .select('id, name, role, is_active, address')
+      .select('id, name, role, is_active, address, work_schedule')
       .in('id', technician_ids)
       .eq('is_active', true);
 
@@ -241,24 +241,36 @@ async function getCompetentTechniciansForPestTypes(pestTypes: string[], technici
     console.log(`[Competency] Hämtar kompetenta tekniker för: ${pestTypes.join(', ')}`);
     
     // Hämta alla kompetenser för de tekniker som är valda och för de aktuella skadedjurstyperna
-    const { data: competencies, error } = await supabase
+    const { data: competencyData, error: compError } = await supabase
       .from('staff_competencies')
-      .select(`
-        staff_id,
-        pest_type,
-        technicians!staff_competencies_staff_id_fkey(id, name, role, is_active, address)
-      `)
+      .select('staff_id, pest_type')
       .in('staff_id', technicianIds)
-      .in('pest_type', pestTypes)
-      .eq('technicians.is_active', true);
+      .in('pest_type', pestTypes);
     
-    if (error) {
-      console.error('[Competency] Fel vid hämtning av kompetenser:', error);
+    if (compError) {
+      console.error('[Competency] Fel vid hämtning av kompetenser:', compError);
       return [];
     }
     
-    if (!competencies || competencies.length === 0) {
+    if (!competencyData || competencyData.length === 0) {
       console.log('[Competency] Inga kompetenser hittades för de valda kriterierna');
+      return [];
+    }
+    
+    // Hämta tekniker-data separat
+    const { data: technicians, error: techError } = await supabase
+      .from('technicians')
+      .select('id, name, role, is_active, address, work_schedule')
+      .in('id', technicianIds)
+      .eq('is_active', true);
+    
+    if (techError) {
+      console.error('[Competency] Fel vid hämtning av tekniker:', techError);
+      return [];
+    }
+    
+    if (!technicians || technicians.length === 0) {
+      console.log('[Competency] Inga tekniker hittades');
       return [];
     }
     
@@ -266,15 +278,18 @@ async function getCompetentTechniciansForPestTypes(pestTypes: string[], technici
     const technicianCompetencies = new Map<string, Set<string>>();
     const technicianDetails = new Map<string, any>();
     
-    competencies.forEach((comp: any) => {
+    // Populera technician details map
+    technicians.forEach(tech => {
+      technicianDetails.set(tech.id, tech);
+      technicianCompetencies.set(tech.id, new Set());
+    });
+    
+    // Lägg till kompetenser
+    competencyData.forEach((comp: any) => {
       const techId = comp.staff_id;
-      
-      if (!technicianCompetencies.has(techId)) {
-        technicianCompetencies.set(techId, new Set());
-        technicianDetails.set(techId, comp.technicians);
+      if (technicianCompetencies.has(techId)) {
+        technicianCompetencies.get(techId)?.add(comp.pest_type);
       }
-      
-      technicianCompetencies.get(techId)?.add(comp.pest_type);
     });
     
     // Filtrera tekniker som har kompetens för ALLA skadedjurstyper som behövs
@@ -916,40 +931,6 @@ function getPestTypeFromCase(caseItem: any): string | null {
     return caseItem.skadedjur;
   }
   
-  // För ClickUp-integrerade ärenden kan skadedjurstypen vara i custom_fields
-  if (caseItem.custom_fields) {
-    try {
-      const fields = typeof caseItem.custom_fields === 'string' 
-        ? JSON.parse(caseItem.custom_fields) 
-        : caseItem.custom_fields;
-      
-      if (Array.isArray(fields)) {
-        // Leta efter fält som innehåller skadedjurstyp
-        const pestField = fields.find((field: any) => 
-          field.name && (
-            field.name.toLowerCase().includes('skadedjur') ||
-            field.name.toLowerCase().includes('pest') ||
-            field.name.toLowerCase().includes('typ') ||
-            field.name === 'Typ av skadedjur' // Exakt matchning för ClickUp
-          )
-        );
-        
-        if (pestField && pestField.value) {
-          const pestType = typeof pestField.value === 'string' 
-            ? pestField.value 
-            : pestField.value.name || pestField.value.value;
-          
-          if (pestType && pestType.trim()) {
-            console.log(`[Pest Type Debug] Found pest type in custom_fields '${pestField.name}': ${pestType}`);
-            return pestType.trim();
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Kunde inte parsa custom_fields för skadedjurstyp:', caseItem.id, e);
-    }
-  }
-  
   console.log(`[Pest Type Debug] No pest type found for case ${caseItem.id}`);
   return null;
 }
@@ -1031,7 +1012,7 @@ function getAddressFromCase(caseItem: any): string | null {
   // Kolla olika adressfält som kan finnas
   const addressFields = [
     'address',
-    'adress', // Svenska stavning som används i ruttplaneraren
+    'adress', // Svenska stavning som används i private_cases och business_cases
     'location', 
     'customer_address',
     'formatted_address'
@@ -1044,35 +1025,6 @@ function getAddressFromCase(caseItem: any): string | null {
         console.log(`[Address Debug] Found address in field '${field}': ${formatted}`);
         return formatted;
       }
-    }
-  }
-  
-  // För ClickUp-integrerade ärenden kan adressen vara i custom_fields
-  if (caseItem.custom_fields) {
-    try {
-      const fields = typeof caseItem.custom_fields === 'string' 
-        ? JSON.parse(caseItem.custom_fields) 
-        : caseItem.custom_fields;
-      
-      if (Array.isArray(fields)) {
-        const addressField = fields.find((field: any) => 
-          field.name && (
-            field.name.toLowerCase().includes('adress') ||
-            field.name.toLowerCase().includes('address') ||
-            field.type_config?.location
-          )
-        );
-        
-        if (addressField && addressField.value) {
-          const formatted = formatAddress(addressField.value);
-          if (formatted.trim()) {
-            console.log(`[Address Debug] Found address in custom_fields '${addressField.name}': ${formatted}`);
-            return formatted;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Kunde inte parsa custom_fields för ärende:', caseItem.id, e);
     }
   }
   
@@ -1091,7 +1043,7 @@ async function fetchExistingBookings(technicianIds: string[], startDate: string,
     const [privateCases, businessCases] = await Promise.all([
       supabase
         .from('private_cases')
-        .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, custom_fields')
+        .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, skadedjur')
         .or(`primary_assignee_id.in.(${technicianIds.join(',')}),secondary_assignee_id.in.(${technicianIds.join(',')}),tertiary_assignee_id.in.(${technicianIds.join(',')})`)
         .gte('start_date', `${startDate}T00:00:00`)
         .lte('start_date', `${endDate}T23:59:59`)
@@ -1099,7 +1051,7 @@ async function fetchExistingBookings(technicianIds: string[], startDate: string,
       
       supabase
         .from('business_cases')
-        .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, custom_fields')
+        .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, skadedjur')
         .or(`primary_assignee_id.in.(${technicianIds.join(',')}),secondary_assignee_id.in.(${technicianIds.join(',')}),tertiary_assignee_id.in.(${technicianIds.join(',')})`)
         .gte('start_date', `${startDate}T00:00:00`)
         .lte('start_date', `${endDate}T23:59:59`)
@@ -1523,11 +1475,25 @@ function findBestTechnicianWithScheduleAwareness(caseItem: any, currentTech: any
     }
     
     // Kontrollera om tekniker har tillgänglig tid
-    const availableGap = daySchedule.available_gaps.find(gap => 
-      gap.duration_minutes >= 120 && // Minst 2h för ärendet
-      timeToMinutes(gap.start_time) <= timeToMinutes(caseStartTime) &&
-      timeToMinutes(gap.end_time) >= timeToMinutes(caseStartTime) + 120
-    );
+    // Först kolla om ärendet är schemalagt utanför arbetstid - då kan vi föreslå omtid
+    const caseTimeMinutes = timeToMinutes(caseStartTime);
+    const workStartMinutes = timeToMinutes(daySchedule.work_start);
+    const workEndMinutes = timeToMinutes(daySchedule.work_end);
+    
+    let availableGap = null;
+    
+    // Om ärendet är utanför arbetstid, hitta bästa luckan istället
+    if (caseTimeMinutes < workStartMinutes || caseTimeMinutes > workEndMinutes - 120) {
+      console.log(`[Schedule-Aware Match] ${tech.name}: Case scheduled outside work hours (${caseStartTime}), finding best available gap`);
+      availableGap = daySchedule.available_gaps.find(gap => gap.duration_minutes >= 120);
+    } else {
+      // Ärendet är inom arbetstid, kolla om det finns plats
+      availableGap = daySchedule.available_gaps.find(gap => 
+        gap.duration_minutes >= 120 && // Minst 2h för ärendet
+        timeToMinutes(gap.start_time) <= caseTimeMinutes &&
+        timeToMinutes(gap.end_time) >= caseTimeMinutes + 120
+      );
+    }
     
     if (!availableGap) {
       console.log(`[Schedule-Aware Match] ${tech.name}: No available gap for the required time`);
