@@ -1131,6 +1131,13 @@ async function buildTechnicianSchedules(technicians: any[], bookings: any[], sta
   const schedules = new Map<string, TechnicianSchedule[]>();
   
   console.log(`[Schedule] Building schedules for ${technicians.length} technicians from ${startDate} to ${endDate}`);
+  console.log(`[Schedule Debug] Processing ${bookings.length} total bookings`);
+  console.log(`[Schedule Debug] Sample bookings:`, bookings.slice(0, 3).map(b => ({
+    title: b.title, 
+    start_date: b.start_date, 
+    due_date: b.due_date, 
+    primary_assignee_id: b.primary_assignee_id
+  })));
   
   for (const technician of technicians) {
     const technicianSchedules: TechnicianSchedule[] = [];
@@ -1162,20 +1169,30 @@ async function buildTechnicianSchedules(technicians: any[], bookings: any[], sta
       }
       
       // Hitta alla bokningar för denna tekniker och dag
+      console.log(`[Schedule Debug] Looking for bookings for ${technician.name} (${technician.id}) on ${dateStr}`);
+      
       const dayBookings = bookings.filter(booking => {
         const bookingDate = new Date(booking.start_date).toISOString().split('T')[0];
-        return bookingDate === dateStr && (
+        const technicianMatch = (
           booking.primary_assignee_id === technician.id ||
           booking.secondary_assignee_id === technician.id ||
           booking.tertiary_assignee_id === technician.id
         );
+        
+        console.log(`[Schedule Debug] Booking "${booking.title}": date=${bookingDate}, target=${dateStr}, match=${bookingDate === dateStr}, tech_match=${technicianMatch}, primary=${booking.primary_assignee_id}`);
+        
+        return bookingDate === dateStr && technicianMatch;
       });
+      
+      console.log(`[Schedule Debug] Found ${dayBookings.length} bookings for ${technician.name} on ${dateStr}`);
       
       // Konvertera bokningar till time slots
       const bookedSlots = dayBookings.map(booking => {
         const startTime = new Date(booking.start_date).toTimeString().slice(0, 5);
         const endTime = new Date(booking.due_date).toTimeString().slice(0, 5);
         const duration = Math.round((new Date(booking.due_date).getTime() - new Date(booking.start_date).getTime()) / (1000 * 60));
+        
+        console.log(`[Schedule Debug] Converting booking "${booking.title}": ${booking.start_date} -> ${startTime}, ${booking.due_date} -> ${endTime}, duration=${duration}min`);
         
         return {
           case_id: booking.id,
@@ -1187,8 +1204,12 @@ async function buildTechnicianSchedules(technicians: any[], bookings: any[], sta
         };
       }).sort((a, b) => a.start_time.localeCompare(b.start_time));
       
+      console.log(`[Schedule Debug] Created ${bookedSlots.length} time slots:`, bookedSlots.map(s => `${s.start_time}-${s.end_time}`));
+      
       // Identifiera luckor mellan bokningarna
+      console.log(`[Schedule Debug] Calculating gaps for work hours ${workStart}-${workEnd} with ${bookedSlots.length} booked slots`);
       const availableGaps = findAvailableGaps(workStart, workEnd, bookedSlots);
+      console.log(`[Schedule Debug] Found ${availableGaps.length} available gaps:`, availableGaps.map(g => `${g.start_time}-${g.end_time} (${g.duration_minutes}min)`));
       
       technicianSchedules.push({
         technician_id: technician.id,
