@@ -3,21 +3,49 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing required environment variables:', {
+    VITE_SUPABASE_URL: !!supabaseUrl,
+    SUPABASE_SERVICE_KEY: !!supabaseServiceKey
+  });
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Verifiera att Supabase är korrekt konfigurerad
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('[Schedule Optimizer] Missing Supabase configuration');
+    return res.status(500).json({ 
+      error: 'Server configuration error - missing database credentials' 
+    });
+  }
+
+  console.log('[Schedule Optimizer] API anrop mottaget:', {
+    method: req.method,
+    hasBody: !!req.body,
+    bodyKeys: req.body ? Object.keys(req.body) : []
+  });
+
   try {
     const { period_type, start_date, end_date, technician_ids, optimization_type } = req.body;
 
     // Validera input
     if (!period_type || !start_date || !end_date || !technician_ids || !optimization_type) {
+      console.error('[Schedule Optimizer] Saknade fält i request body:', {
+        period_type: !!period_type,
+        start_date: !!start_date,
+        end_date: !!end_date,
+        technician_ids: !!technician_ids,
+        optimization_type: !!optimization_type
+      });
       return res.status(400).json({ 
         error: 'Alla fält krävs: period_type, start_date, end_date, technician_ids, optimization_type' 
       });
@@ -135,7 +163,8 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
 
   } catch (error) {
-    console.error('Optimeringsfel:', error);
+    console.error('[Schedule Optimizer] Optimeringsfel:', error);
+    console.error('[Schedule Optimizer] Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internt serverfel vid schemaoptimering',
       details: error.message 
