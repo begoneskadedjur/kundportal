@@ -570,43 +570,89 @@ function calculateOptimalRoute(startAddress: string, addresses: string[], distan
   };
 }
 
-// Generera föreslagna förändringar med detaljerade besparingar
+// Hitta bästa tekniker för ett ärende baserat på distance matrix
+function findBestTechnicianForCase(caseItem: any, currentTech: any, technicians: any[], distanceMatrix: Map<string, any>) {
+  const caseAddress = getAddressFromCase(caseItem);
+  if (!caseAddress) return null;
+  
+  let bestTechnician = null;
+  let bestSavings = { time_savings: 0, distance_savings: 0 };
+  
+  console.log(`[Best Tech] Finding best technician for case ${caseItem.title} at ${caseAddress}`);
+  console.log(`[Best Tech] Current technician: ${currentTech.name}`);
+  
+  // Testa alla andra tekniker
+  for (const tech of technicians) {
+    if (tech.id === currentTech.id) continue;
+    
+    const savings = calculateChangeImpact(caseItem, currentTech, tech, distanceMatrix);
+    
+    console.log(`[Best Tech] ${tech.name}: ${savings.time_savings}min, ${savings.distance_savings}km savings`);
+    
+    // Endast föreslå om det finns faktiska besparingar
+    if (savings.time_savings > 0 || savings.distance_savings > 0) {
+      // Beräkna total poäng (prioritera tidsbesparingar)
+      const totalScore = savings.time_savings * 2 + savings.distance_savings;
+      const currentBestScore = bestSavings.time_savings * 2 + bestSavings.distance_savings;
+      
+      if (totalScore > currentBestScore) {
+        bestTechnician = tech;
+        bestSavings = savings;
+        console.log(`[Best Tech] New best: ${tech.name} with score ${totalScore}`);
+      }
+    }
+  }
+  
+  if (bestTechnician) {
+    console.log(`[Best Tech] Selected ${bestTechnician.name} with ${bestSavings.time_savings}min, ${bestSavings.distance_savings}km savings`);
+  } else {
+    console.log(`[Best Tech] No technician found with actual savings`);
+  }
+  
+  return bestTechnician ? { technician: bestTechnician, savings: bestSavings } : null;
+}
+
+// Generera föreslagna förändringar med intelligenta besparingar
 function generateSuggestedChanges(cases: any[], technicians: any[], distanceMatrix: Map<string, any>) {
   const changes: any[] = [];
   
   if (cases.length > 1 && technicians.length > 1) {
-    const numChanges = Math.min(5, Math.floor(cases.length * 0.3));
+    console.log(`[Suggestions] Analyzing ${cases.length} cases for optimization opportunities`);
     
-    for (let i = 0; i < numChanges; i++) {
-      const caseItem = cases[i];
+    // Analysera alla ärenden för potentiella förbättringar
+    for (const caseItem of cases) {
       const currentTech = technicians.find((t: any) => 
         t.id === caseItem.primary_assignee_id || 
         t.id === caseItem.secondary_assignee_id || 
         t.id === caseItem.tertiary_assignee_id
       );
-      const alternativeTech = technicians.find((t: any) => t.id !== currentTech?.id);
 
-      if (currentTech && alternativeTech) {
-        // Beräkna faktiska besparingar för denna förändring
-        const savings = calculateChangeImpact(caseItem, currentTech, alternativeTech, distanceMatrix);
+      if (currentTech) {
+        const bestMatch = findBestTechnicianForCase(caseItem, currentTech, technicians, distanceMatrix);
         
-        // Generera detaljerad beskrivning av förändringen
-        const reason = generateDetailedChangeReason(caseItem, currentTech, alternativeTech, savings);
-        
-        changes.push({
-          case_id: caseItem.id,
-          case_title: caseItem.title || 'Namnlöst ärende',
-          change_type: 'reassign_technician',
-          from_technician: currentTech.name,
-          to_technician: alternativeTech.name,
-          reason: reason,
-          time_savings_minutes: savings.time_savings,
-          distance_savings_km: savings.distance_savings
-        });
+        if (bestMatch) {
+          // Generera detaljerad beskrivning av förändringen
+          const reason = generateDetailedChangeReason(caseItem, currentTech, bestMatch.technician, bestMatch.savings);
+          
+          changes.push({
+            case_id: caseItem.id,
+            case_title: caseItem.title || 'Namnlöst ärende',
+            change_type: 'reassign_technician',
+            from_technician: currentTech.name,
+            to_technician: bestMatch.technician.name,
+            reason: reason,
+            time_savings_minutes: bestMatch.savings.time_savings,
+            distance_savings_km: bestMatch.savings.distance_savings
+          });
+        }
       }
+      
+      // Begränsa till max 5 förslag för att undvika överbelastning
+      if (changes.length >= 5) break;
     }
   }
   
+  console.log(`[Suggestions] Generated ${changes.length} optimization suggestions`);
   return changes;
 }
 
