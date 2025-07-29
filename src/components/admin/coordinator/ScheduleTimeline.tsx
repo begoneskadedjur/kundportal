@@ -9,9 +9,12 @@ import svLocale from '@fullcalendar/core/locales/sv';
 import { BeGoneCaseRow, Technician } from '../../../types/database';
 
 import type { EventContentArg } from '@fullcalendar/core';
-import type { EventClickArg } from '@fullcalendar/interaction';
+import type { EventClickArg, EventDropArg } from '@fullcalendar/interaction';
 import { Absence } from '../../../pages/coordinator/CoordinatorSchedule';
 import { Users } from 'lucide-react';
+import { useScheduleUpdate } from '../../../hooks/useScheduleUpdate';
+import { toSwedishISOString } from '../../../utils/dateHelpers';
+import toast from 'react-hot-toast';
 
 import '../../../styles/FullCalendar.css';
 
@@ -20,6 +23,7 @@ interface ScheduleTimelineProps {
   cases: BeGoneCaseRow[];
   absences: Absence[];
   onCaseClick: (caseData: BeGoneCaseRow) => void;
+  onUpdate?: () => void;
 }
 
 const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
@@ -110,11 +114,14 @@ const getWeekNumber = (date: Date): number => {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
 };
 
-export default function ScheduleTimeline({ technicians, cases, absences, onCaseClick }: ScheduleTimelineProps) {
+export default function ScheduleTimeline({ technicians, cases, absences, onCaseClick, onUpdate }: ScheduleTimelineProps) {
   
   const calendarRef = useRef<FullCalendar>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<'day' | 'week' | 'month'>('day');
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const { updating, updateCaseTechnician, updateCaseTime, validateWorkingHours, checkConflicts } = useScheduleUpdate();
   
   const calendarResources = useMemo(() => technicians.map(tech => ({ id: tech.id, title: tech.name })), [technicians]);
 
@@ -148,6 +155,8 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
         backgroundColor: 'transparent',
         borderColor: 'transparent',
         editable: false,
+        durationEditable: false,
+        resourceEditable: false,
     }));
     return [...caseEvents, ...absenceEvents].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   }, [cases, absences]);
@@ -156,6 +165,95 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
     if (clickInfo.event.extendedProps.type === 'case') {
       onCaseClick(clickInfo.event.extendedProps as BeGoneCaseRow);
     }
+  };
+
+  // Hantera när ett ärende släpps på ny plats
+  const handleEventDrop = async (dropInfo: EventDropArg) => {
+    const { event, oldResource, newResource } = dropInfo;
+    const caseData = event.extendedProps as BeGoneCaseRow;
+    
+    // Förhindra drag & drop för frånvaro
+    if (caseData.type === 'absence') {
+      dropInfo.revert();
+      return;
+    }
+
+    // Validera arbetstider (bara varning, inte blockering)
+    validateWorkingHours(event.start!, event.end!);
+
+    // Om tekniker har ändrats
+    if (oldResource && newResource && oldResource !== newResource) {
+      // Hitta teknikerns namn
+      const newTechnician = technicians.find(t => t.id === newResource);
+      if (!newTechnician) {
+        dropInfo.revert();
+        return;
+      }
+
+      // Kontrollera konflikter
+      const hasConflict = await checkConflicts(
+        newResource,
+        toSwedishISOString(event.start!),
+        toSwedishISOString(event.end!),
+        caseData.id
+      );
+
+      if (!hasConflict) {
+        dropInfo.revert();
+        return;
+      }
+
+      // Uppdatera tekniker
+      const result = await updateCaseTechnician(
+        caseData.id,
+        caseData.case_type as 'private' | 'business',
+        newResource,
+        newTechnician.name
+      );
+
+      if (!result.success) {
+        toast.error(result.error || 'Kunde inte uppdatera tekniker');
+        dropInfo.revert();
+        return;
+      }
+
+      toast.success(`✅ Flyttade ${caseData.title} till ${newTechnician.name}`);
+    }
+
+    // Om tiden har ändrats
+    if (event.start && event.end) {
+      const result = await updateCaseTime(
+        caseData.id,
+        caseData.case_type as 'private' | 'business',
+        toSwedishISOString(event.start),
+        toSwedishISOString(event.end)
+      );
+
+      if (!result.success) {
+        toast.error(result.error || 'Kunde inte uppdatera tid');
+        dropInfo.revert();
+        return;
+      }
+
+      if (!oldResource || oldResource === newResource) {
+        toast.success(`✅ Uppdaterade tid för ${caseData.title}`);
+      }
+    }
+
+    // Anropa onUpdate callback för att ladda om data
+    if (onUpdate) {
+      onUpdate();
+    }
+  };
+
+  // Visuell feedback när drag startar
+  const handleEventDragStart = () => {
+    setIsDragging(true);
+  };
+
+  // Ta bort visuell feedback när drag slutar
+  const handleEventDragStop = () => {
+    setIsDragging(false);
   };
 
   // Synkronisera kalendern med vår state
@@ -186,7 +284,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
   };
 
   return (
-    <div className="h-full w-full bg-slate-900 flex flex-col">
+    <div className={`h-full w-full bg-slate-900 flex flex-col ${isDragging ? 'dragging' : ''}`}>
       <div className="bg-slate-800/50 border-b border-slate-700 flex-shrink-0">
           {/* Ny datumvisning inspirerad av modalernas design */}
           <div className="px-6 py-4 border-b border-slate-700">
@@ -330,11 +428,17 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
             resourceTimelineMonth: { slotDuration: { days: 1 }, slotLabelFormat: { day: 'numeric' } }
           }}
           eventContent={renderEventContent}
-          slotMinTime="06:00:00"
-          slotMaxTime="19:00:00"
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
           scrollTime="07:00:00"
           expandRows={true}
-          editable={false}
+          editable={true}
+          droppable={true}
+          eventResourceEditable={true}
+          eventDurationEditable={true}
+          eventDrop={handleEventDrop}
+          eventDragStart={handleEventDragStart}
+          eventDragStop={handleEventDragStop}
           eventMinHeight={70}
         />
       </div>

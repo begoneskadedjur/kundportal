@@ -175,6 +175,61 @@
   border-left-color: var(--fc-event-border-color) !important;
 }
 
+/* ⭐ DRAG & DROP STYLING ⭐ */
+/* När ett event dras */
+.fc-event-dragging {
+  opacity: 0.75 !important;
+  cursor: grabbing !important;
+  z-index: 9999 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  transform: rotate(2deg) !important;
+}
+
+/* När hela schemat är i drag-läge */
+.dragging .fc-event:not(.fc-event-dragging) {
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+/* Highlight på möjliga drop-zoner */
+.dragging .fc-resource-timeline-divider {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Cursor för dragbara events */
+.fc-event-draggable {
+  cursor: grab !important;
+}
+
+.fc-event-draggable:active {
+  cursor: grabbing !important;
+}
+
+/* Förhindra drag av frånvaro */
+.fc-event[title*="Frånvaro"],
+.fc-event[title*="Semester"],
+.fc-event[title*="Sjuk"] {
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+/* Resource timeline specifik styling */
+.fc-resource-timeline .fc-event {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover effekt för dragbara events */
+.fc-resource-timeline .fc-event-draggable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Drop preview */
+.fc-event-mirror {
+  opacity: 0.3 !important;
+  background: #3b82f6 !important;
+}
+
 /* --- MOBIL KALENDER TOOLBAR --- */
 .fc .fc-header-toolbar {
   margin-bottom: 1rem !important;

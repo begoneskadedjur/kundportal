@@ -191,6 +191,7 @@ export default function CoordinatorSchedule() {
               cases={filteredScheduledCases}
               absences={absences}
               onCaseClick={handleOpenCaseModal}
+              onUpdate={fetchData}
             />
           </main>
         </div>
