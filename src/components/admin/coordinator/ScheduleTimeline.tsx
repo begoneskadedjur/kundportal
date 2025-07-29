@@ -436,28 +436,8 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           </div>
       </div>
 
-      <div className="flex-grow p-4 relative">
-        {/* Vertikal tidskolumn för veckovy */}
-        {currentView === 'week' && (
-          <div className="absolute left-0 top-4 bottom-4 w-16 bg-slate-800/80 border-r border-slate-700 z-10 flex flex-col">
-            <div className="text-xs font-semibold text-slate-400 p-2 border-b border-slate-700">
-              TID
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {Array.from({ length: 17 }, (_, i) => {
-                const hour = i + 6; // 06:00 till 22:00
-                return (
-                  <div key={hour} className="flex items-center justify-center py-2 border-b border-slate-700/50 text-xs text-slate-300">
-                    {hour.toString().padStart(2, '0')}:00
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        
-        <div className={currentView === 'week' ? 'ml-16' : ''}>
-          <FullCalendar
+      <div className="flex-grow p-4">
+        <FullCalendar
           ref={calendarRef}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           plugins={[resourceTimelinePlugin, interactionPlugin]}
@@ -516,7 +496,6 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           dragRevertDuration={300}
           eventMinHeight={70}
         />
-        </div>
       </div>
     </div>
   );
