@@ -57,6 +57,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   const [technicians, setTechnicians] = useState<TechnicianWithLocation[]>([]);
   const [clusters, setClusters] = useState<TechnicianCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<TechnicianCluster | null>(null);
+  const [routeLines, setRouteLines] = useState<google.maps.Polyline[]>([]);
 
   // Ladda Google Maps API
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
@@ -100,71 +101,57 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd, weekAgoStart });
 
-      // Hämta dagens ärenden först, sedan senaste veckan som backup
-      const [privateCasesToday, businessCasesToday, techniciansData] = await Promise.all([
+      // Hämta ärenden och kompetenta tekniker (samma som ruttplaneraren)
+      const [casesToday, competentTechnicians] = await Promise.all([
         supabase
-          .from('private_cases')
+          .from('cases_with_technician_view')
           .select('*')
           .gte('start_date', todayStart)
           .lte('start_date', todayEnd)
           .not('adress', 'is', null),
         
         supabase
-          .from('business_cases')
-          .select('*')
-          .gte('start_date', todayStart)
-          .lte('start_date', todayEnd)
-          .not('adress', 'is', null),
-        
-        supabase
-          .from('technicians')
-          .select('*')
-          .eq('is_active', true)
-          .not('address', 'is', null)
+          .from('staff_competencies')
+          .select(`
+            technicians!inner (
+              id, name, address, work_schedule
+            )
+          `)
+          .not('technicians.address', 'is', null)
       ]);
 
-      let privateCases = privateCasesToday;
-      let businessCases = businessCasesToday;
+      let allCasesData = casesToday;
 
       // Om inga ärenden idag, hämta från senaste veckan
-      if ((privateCasesToday.data?.length || 0) + (businessCasesToday.data?.length || 0) === 0) {
+      if ((casesToday.data?.length || 0) === 0) {
         console.log('[GeographicOverview] Inga ärenden idag, hämtar från senaste veckan...');
         
-        const [privateWeekCases, businessWeekCases] = await Promise.all([
-          supabase
-            .from('private_cases')
-            .select('*')
-            .gte('start_date', weekAgoStart)
-            .not('adress', 'is', null)
-            .limit(20),
-          
-          supabase
-            .from('business_cases')
-            .select('*')
-            .gte('start_date', weekAgoStart)
-            .not('adress', 'is', null)
-            .limit(20)
-        ]);
-
-        privateCases = privateWeekCases;
-        businessCases = businessWeekCases;
+        allCasesData = await supabase
+          .from('cases_with_technician_view')
+          .select('*')
+          .gte('start_date', weekAgoStart)
+          .not('adress', 'is', null)
+          .limit(20);
       }
 
-      if (privateCases.error) throw privateCases.error;
-      if (businessCases.error) throw businessCases.error;
-      if (techniciansData.error) throw techniciansData.error;
+      if (allCasesData.error) throw allCasesData.error;
+      if (competentTechnicians.error) throw competentTechnicians.error;
+
+      // Extrahera unika tekniker från staff_competencies
+      const uniqueTechnicianMap = new Map();
+      competentTechnicians.data?.forEach((comp: any) => {
+        if (comp.technicians) {
+          uniqueTechnicianMap.set(comp.technicians.id, comp.technicians);
+        }
+      });
+      const uniqueTechnicians = Array.from(uniqueTechnicianMap.values());
 
       console.log('[GeographicOverview] Raw data:', {
-        privateCases: privateCases.data?.length,
-        businessCases: businessCases.data?.length,
-        technicians: techniciansData.data?.length
+        cases: allCasesData.data?.length,
+        technicians: uniqueTechnicians.length
       });
 
-      // Kombinera ärenden
-      const allCases = [
-        ...(privateCases.data || []).map(c => ({ ...c, case_type: 'private' as const })),
-        ...(businessCases.data || []).map(c => ({ ...c, case_type: 'business' as const }))
-      ] as BeGoneCaseRow[];
+      const allCases = (allCasesData.data || []) as BeGoneCaseRow[];
 
       console.log('[GeographicOverview] Kombinerade ärenden:', allCases.length);
       console.log('[GeographicOverview] Exempel på ärendeadresser:', 
@@ -173,15 +160,13 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       // Geocoda adresser
       const casesWithLocations = await geocodeCases(allCases);
-      const techniciansWithLocations = await geocodeTechnicians(techniciansData.data || []);
+      const techniciansWithLocations = await geocodeTechnicians(uniqueTechnicians);
 
       // Lägg till ärendekopp
 
       techniciansWithLocations.forEach(tech => {
         tech.todaysCases = casesWithLocations.filter(c => 
-          c.primary_assignee_id === tech.id ||
-          c.secondary_assignee_id === tech.id ||
-          c.tertiary_assignee_id === tech.id
+          c.technician_id === tech.id // cases_with_technician_view har redan korrekt koppling
         );
       });
 
@@ -466,6 +451,119 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     }
   };
 
+  const clearRoutes = () => {
+    routeLines.forEach(line => line.setMap(null));
+    setRouteLines([]);
+  };
+
+  const showTechnicianRoute = (cluster: TechnicianCluster) => {
+    if (!googleMapRef.current) return;
+
+    console.log('[GeographicOverview] Visar rutt för tekniker:', cluster.technicianName);
+
+    // Rensa tidigare ruttlinjer
+    clearRoutes();
+
+    // Hitta tekniker och deras position
+    const technician = technicians.find(t => t.id === cluster.technicianId);
+    if (!technician?.coordinates) {
+      console.log('[GeographicOverview] Kan inte hitta tekniker-koordinater för rutt');
+      return;
+    }
+
+    const newRouteLines: google.maps.Polyline[] = [];
+
+    // Skapa ruttlinjer från tekniker hem till varje ärende
+    cluster.cases.forEach((caseData, index) => {
+      if (!caseData.coordinates) return;
+
+      const routeLine = new google.maps.Polyline({
+        path: [
+          technician.coordinates!,
+          caseData.coordinates
+        ],
+        geodesic: true,
+        strokeColor: '#3b82f6',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        map: googleMapRef.current
+      });
+
+      newRouteLines.push(routeLine);
+
+      // Lägg till numrering på ärendena för att visa ordning
+      const orderMarker = new google.maps.Marker({
+        position: caseData.coordinates,
+        map: googleMapRef.current,
+        title: `Ärende ${index + 1}: ${caseData.title}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="15" cy="15" r="12" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+              <text x="15" y="20" text-anchor="middle" fill="white" font-size="14" font-weight="bold">
+                ${index + 1}
+              </text>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(30, 30),
+          anchor: new google.maps.Point(15, 15)
+        },
+        zIndex: 1000
+      });
+
+      newRouteLines.push(orderMarker as any); // Spara även markers för cleanup
+    });
+
+    // Om det finns fler än ett ärende, visa även rutter mellan ärenden
+    if (cluster.cases.length > 1) {
+      for (let i = 0; i < cluster.cases.length - 1; i++) {
+        const currentCase = cluster.cases[i];
+        const nextCase = cluster.cases[i + 1];
+        
+        if (currentCase.coordinates && nextCase.coordinates) {
+          const caseToCase = new google.maps.Polyline({
+            path: [
+              currentCase.coordinates,
+              nextCase.coordinates
+            ],
+            geodesic: true,
+            strokeColor: '#10b981',
+            strokeOpacity: 0.6,
+            strokeWeight: 2,
+            map: googleMapRef.current
+          });
+
+          newRouteLines.push(caseToCase);
+        }
+      }
+    }
+
+    // Visa rutt tillbaka hem från sista ärendet
+    if (cluster.cases.length > 0) {
+      const lastCase = cluster.cases[cluster.cases.length - 1];
+      if (lastCase.coordinates) {
+        const homeRoute = new google.maps.Polyline({
+          path: [
+            lastCase.coordinates,
+            technician.coordinates!
+          ],
+          geodesic: true,
+          strokeColor: '#f59e0b',
+          strokeOpacity: 0.7,
+          strokeWeight: 2,
+          strokeDashSymbol: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 },
+          map: googleMapRef.current
+        });
+
+        newRouteLines.push(homeRoute);
+      }
+    }
+
+    setRouteLines(newRouteLines);
+    
+    console.log('[GeographicOverview] Skapade', newRouteLines.length, 'ruttlinjer för', cluster.technicianName);
+  };
+
   const addMarkersToMap = (map: google.maps.Map) => {
     console.log('[GeographicOverview] Lägger till markers:', {
       clusters: clusters.length,
@@ -500,29 +598,112 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       marker.addListener('click', () => {
         console.log('[GeographicOverview] Tekniker-kluster klickad:', cluster.technicianName);
         setSelectedCluster(cluster);
+        showTechnicianRoute(cluster);
       });
     });
 
-    // Lägg till markers för tekniker
+    // Lägg till individuella ärende-markers
+    todaysCases.forEach(caseData => {
+      if (!caseData.coordinates) return;
+
+      console.log('[GeographicOverview] Skapar marker för ärende:', caseData.title, caseData.coordinates);
+
+      const marker = new google.maps.Marker({
+        position: caseData.coordinates,
+        map: map,
+        title: `${caseData.title} - ${caseData.formatted_address}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+              <circle cx="12" cy="12" r="4" fill="white"/>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(24, 24),
+          anchor: new google.maps.Point(12, 12)
+        }
+      });
+
+      // Klickbar ärende-marker
+      marker.addListener('click', () => {
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 250px;">
+              <h3 style="margin: 0 0 8px 0; color: #1f2937; font-size: 16px; font-weight: 600;">
+                ${caseData.title}
+              </h3>
+              <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                📍 ${caseData.formatted_address}
+              </p>
+              <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                👤 ${caseData.technician_name || 'Ej tilldelad'}
+              </p>
+              <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                🕐 ${caseData.start_date ? new Date(caseData.start_date).toLocaleString('sv-SE', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }) : 'Ingen tid'}
+              </p>
+              ${caseData.skadedjur ? `<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">🐛 ${caseData.skadedjur}</p>` : ''}
+            </div>
+          `
+        });
+        infoWindow.open(map, marker);
+      });
+    });
+
+    // Lägg till tekniker hemadress-markers (mindre och diskreta)
     technicians.forEach(tech => {
       if (!tech.coordinates) return;
 
-      console.log('[GeographicOverview] Skapar marker för tekniker:', tech.name, tech.coordinates);
+      console.log('[GeographicOverview] Skapar hemadress-marker för tekniker:', tech.name, tech.coordinates);
 
-      new google.maps.Marker({
+      const marker = new google.maps.Marker({
         position: tech.coordinates,
         map: map,
-        title: `${tech.name} (${tech.todaysCases?.length || 0} ärenden)`,
+        title: `${tech.name} - Hemadress`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="15" cy="15" r="12" fill="#10b981" stroke="#047857" stroke-width="2"/>
-              <path d="M10 15l4 4 8-8" stroke="white" stroke-width="2" fill="none"/>
+            <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8" fill="#10b981" stroke="#047857" stroke-width="1.5"/>
+              <path d="M6 10l2 2 4-4" stroke="white" stroke-width="1.5" fill="none"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(30, 30),
-          anchor: new google.maps.Point(15, 15)
+          scaledSize: new google.maps.Size(20, 20),
+          anchor: new google.maps.Point(10, 10)
         }
+      });
+
+      // Klickbar tekniker-marker
+      marker.addListener('click', () => {
+        const techCases = tech.todaysCases || [];
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 200px;">
+              <h3 style="margin: 0 0 8px 0; color: #1f2937; font-size: 16px; font-weight: 600;">
+                🏠 ${tech.name}
+              </h3>
+              <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                📍 ${formatAddress(tech.address)}
+              </p>
+              <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                📋 ${techCases.length} ärenden idag
+              </p>
+              ${techCases.length > 0 ? `
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 4px 0; font-weight: 600; color: #374151; font-size: 12px;">Dagens ärenden:</p>
+                  ${techCases.slice(0, 3).map(c => `
+                    <p style="margin: 2px 0; color: #6b7280; font-size: 12px;">• ${c.title}</p>
+                  `).join('')}
+                  ${techCases.length > 3 ? `<p style="margin: 2px 0; color: #9ca3af; font-size: 12px;">... +${techCases.length - 3} till</p>` : ''}
+                </div>
+              ` : ''}
+            </div>
+          `
+        });
+        infoWindow.open(map, marker);
       });
     });
 
@@ -642,7 +823,11 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
               {clusters.map(cluster => (
                 <div
                   key={cluster.id}
-                  onClick={() => setSelectedCluster(cluster)}
+                  onClick={() => {
+                    clearRoutes();
+                    setSelectedCluster(cluster);
+                    showTechnicianRoute(cluster);
+                  }}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedCluster?.id === cluster.id
                       ? 'bg-blue-500/20 border-blue-500/40'
@@ -689,16 +874,44 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 </p>
               </div>
               <button
-                onClick={() => setSelectedCluster(null)}
+                onClick={() => {
+                  clearRoutes();
+                  setSelectedCluster(null);
+                }}
                 className="text-slate-400 hover:text-white"
               >
                 ✕
               </button>
             </div>
+
+            {/* Rutt-information */}
+            {routeLines.length > 0 && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <h5 className="text-sm font-medium text-blue-400 mb-2">🗺️ Rutt visas på kartan</h5>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-blue-500"></div>
+                    <span>Hem → Ärenden</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-green-500"></div>
+                    <span>Ärende → Ärende</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-yellow-500" style={{borderTop: '2px dashed'}}></div>
+                    <span>Sista → Hem</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {selectedCluster.cases.map(caseData => (
-                <div key={caseData.id} className="p-3 bg-slate-800 rounded-lg">
-                  <div className="font-medium text-white text-sm truncate">
+              {selectedCluster.cases.map((caseData, index) => (
+                <div key={caseData.id} className="p-3 bg-slate-800 rounded-lg relative">
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {index + 1}
+                  </div>
+                  <div className="font-medium text-white text-sm truncate pr-8">
                     {caseData.title}
                   </div>
                   <div className="text-xs text-slate-400 mt-1">
