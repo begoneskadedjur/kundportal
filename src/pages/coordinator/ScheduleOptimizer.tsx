@@ -1297,9 +1297,20 @@ export default function ScheduleOptimizer() {
                                   </div>
                                   
                                   <div className="space-y-1 text-slate-400">
-                                    <div>• {change.to_technician} avslutar föregående ärende på <span className="text-blue-300">Södermalm</span></div>
-                                    <div>• Bara <span className="text-green-400 font-medium">5.2km resa</span> till detta ärende</div>
-                                    <div>• {change.from_technician} skulle behöva köra <span className="text-red-400">12.8km</span> från sitt förra ärende</div>
+                                    {/* Visa verklig rutt-kontext från backend */}
+                                    {change.reason_details?.route_context?.previous_case ? (
+                                      <>
+                                        <div>• {change.to_technician} avslutar föregående ärende på <span className="text-blue-300">{change.reason_details.route_context.previous_case.address}</span></div>
+                                        <div>• Bara <span className="text-green-400 font-medium">{change.reason_details.route_context.previous_case.distance_to_current.toFixed(1)}km resa</span> till detta ärende</div>
+                                      </>
+                                    ) : (
+                                      <div>• {change.to_technician} har kortare restid från sin position</div>
+                                    )}
+                                    
+                                    {/* Visa jämförelse med nuvarande tekniker */}
+                                    {change.reason_details?.distance_comparison && (
+                                      <div>• {change.from_technician} skulle behöva köra <span className="text-red-400">{change.reason_details.distance_comparison.from_distance_km.toFixed(1)}km</span> från sin position</div>
+                                    )}
                                   </div>
                                   
                                   {/* Hemresa-information för ärenden nära slutet av dagen */}
