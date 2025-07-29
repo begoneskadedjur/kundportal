@@ -272,6 +272,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         material_cost: caseData.material_cost || 0,
         start_date: caseData.start_date,
         due_date: caseData.due_date,
+        // ClickUp-synkade fält
+        rapport: caseData.rapport || '',
+        // ROT/RUT-fält för privatpersoner
+        r_rot_rut: caseData.r_rot_rut || '',
+        r_fastighetsbeteckning: caseData.r_fastighetsbeteckning || '',
+        r_arbetskostnad: caseData.r_arbetskostnad || 0,
+        r_material_utrustning: caseData.r_material_utrustning || '',
+        r_servicebil: caseData.r_servicebil || '',
       });
       setError(null);
       setTimeTrackingLoading(false);
@@ -302,17 +310,29 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       };
       
       if (tableName === 'private_cases' || tableName === 'business_cases') {
+        // ClickUp-synkade fält
         updateData.kontaktperson = formData.kontaktperson;
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
         updateData.skadedjur = formData.skadedjur;
         updateData.pris = formData.case_price;
-        updateData.material_cost = formData.material_cost;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
+        updateData.rapport = formData.rapport; // Synkas till ClickUp
+        
+        // Lokala fält (synkas INTE till ClickUp)
+        updateData.material_cost = formData.material_cost;
       }
       
-      if (tableName === 'private_cases') { updateData.personnummer = formData.personnummer; } 
+      if (tableName === 'private_cases') { 
+        updateData.personnummer = formData.personnummer;
+        // ROT/RUT-fält för privatpersoner (synkas till ClickUp)
+        updateData.r_rot_rut = formData.r_rot_rut;
+        updateData.r_fastighetsbeteckning = formData.r_fastighetsbeteckning;
+        updateData.r_arbetskostnad = formData.r_arbetskostnad;
+        updateData.r_material_utrustning = formData.r_material_utrustning;
+        updateData.r_servicebil = formData.r_servicebil;
+      } 
       else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
       else if (tableName === 'cases') { updateData.price = formData.case_price; }
 
