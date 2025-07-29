@@ -13,6 +13,7 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
+import { PageHeader } from '../../components/shared'
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -249,31 +250,12 @@ export default function TechnicianDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">
-                Välkommen, {displayName}! 👷‍♂️
-              </h1>
-              <p className="text-slate-400 mt-1">
-                Din personliga översikt över provisioner, ärenden och verktyg
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button 
-                onClick={() => navigate('/admin/oneflow-contract-creator')}
-                className="flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Skapa Avtal
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <PageHeader 
+          title={`Välkommen, ${displayName}! 👷‍♂️`}
+          showBackButton={false}
+        />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="p-6 bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30">
             <div className="flex items-center justify-between">
@@ -492,14 +474,14 @@ export default function TechnicianDashboard() {
 
           </div>
         </Card>
-      </main>
 
-      <EditCaseModal 
+        <EditCaseModal 
         isOpen={isEditModalOpen} 
         onClose={handleCloseEditModal} 
         onSuccess={handleUpdateSuccess} 
         caseData={selectedCase} 
       />
+      </div>
     </div>
   )
 }

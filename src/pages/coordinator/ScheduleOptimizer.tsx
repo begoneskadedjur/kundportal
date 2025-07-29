@@ -11,6 +11,7 @@ import DatePicker from 'react-datepicker';
 import { registerLocale } from 'react-datepicker';
 import sv from 'date-fns/locale/sv';
 import "react-datepicker/dist/react-datepicker.css";
+import { PageHeader } from '../../components/shared';
 
 registerLocale('sv', sv);
 
@@ -918,20 +919,10 @@ export default function ScheduleOptimizer() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="max-w-7xl mx-auto p-6 md:p-8">
-        {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-purple-500/10 rounded-lg">
-              <TrendingDown className="w-8 h-8 text-purple-400" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Schemaoptimerare</h1>
-              <p className="text-slate-400">
-                Optimera schema för att minska körsträckor och maximera effektivitet
-              </p>
-            </div>
-          </div>
-        </header>
+        <PageHeader 
+          title="Schemaoptimerare"
+          backPath="/koordinator/dashboard"
+        />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Inställningar */}

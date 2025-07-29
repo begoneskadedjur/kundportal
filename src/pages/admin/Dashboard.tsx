@@ -27,6 +27,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
+import { PageHeader } from '../../components/shared'
 
 interface DashboardStats {
   totalCustomers: number
@@ -149,30 +150,13 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-              <p className="text-slate-400">Välkommen tillbaka, {user?.email}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSignOut}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Logga ut
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageHeader 
+          title="Admin Dashboard" 
+          showBackButton={false}
+        />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content */}
         <div className="space-y-8">
           
           {/* Stats Cards */}
@@ -512,7 +496,7 @@ const AdminDashboard: React.FC = () => {
             </Card>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

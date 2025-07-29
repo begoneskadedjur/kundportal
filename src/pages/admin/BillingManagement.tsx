@@ -15,6 +15,7 @@ import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
+import { PageHeader } from '../../components/shared';
 
 // Interfaces
 interface BillingAuditEntry {
@@ -743,33 +744,11 @@ const BillingManagement: React.FC = () => {
   // Main render
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="secondary" size="sm" onClick={() => navigate('/admin/dashboard')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Fakturering</h1>
-              <p className="text-sm text-slate-400">{cases.length} avslutade ärenden</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={fetchBillingCases} 
-              disabled={loading} 
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Uppdatera
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageHeader 
+          title="Faktureringshantering"
+          backPath="/admin/dashboard"
+        />
         {/* Warning banner */}
         {error && error.startsWith('Varning') && (
           <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -995,6 +974,7 @@ const BillingManagement: React.FC = () => {
           }}
         />
       )}
+      </div>
     </div>
   );
 };

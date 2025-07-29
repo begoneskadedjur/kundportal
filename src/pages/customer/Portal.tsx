@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Card from '../../components/ui/Card'
+import { PageHeader } from '../../components/shared'
 
 // Import customer portal components
 import CustomerStatsCards from '../../components/customer/CustomerStatsCards'
@@ -134,58 +135,11 @@ const CustomerPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">🐛</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">BeGone Kundportal</h1>
-                <p className="text-slate-400 text-sm">
-                  {customer.company_name} • {customer.contact_person}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSettingsModal(true)}
-                className="text-slate-400 hover:text-white"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-              
-              <Button 
-                onClick={handleRefresh} 
-                disabled={refreshing}
-                variant="secondary"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                Uppdatera
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => signOut()}
-                className="text-slate-400 hover:text-white"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageHeader 
+          title="BeGone Kundportal"
+          showBackButton={false}
+        />
         <div className="space-y-8">
           
           {/* Welcome Section */}
@@ -309,6 +263,7 @@ const CustomerPortal: React.FC = () => {
           }}
         />
       )}
+      </div>
     </div>
   )
 }

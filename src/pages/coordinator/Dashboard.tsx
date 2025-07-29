@@ -10,6 +10,7 @@ import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
 import { CalendarDays, Map, Wand2, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '../../components/shared';
 
 export default function CoordinatorDashboard() {
   // State för att hålla vår data, laddningsstatus och eventuella fel
@@ -200,12 +201,10 @@ export default function CoordinatorDashboard() {
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="max-w-7xl mx-auto p-6 md:p-8">
         
-        <header className="mb-10">
-          <h1 className="text-4xl font-bold tracking-tight text-white">Coordinator Dashboard</h1>
-          <p className="mt-2 text-lg text-slate-400">
-            Samlad översikt för planering, bokning och optimering.
-          </p>
-        </header>
+        <PageHeader 
+          title="Koordinator Dashboard"
+          showBackButton={false}
+        />
 
         {/* --- KPI Sektion med laddning/fel-hantering --- */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
