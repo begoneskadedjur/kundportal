@@ -144,6 +144,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     console.log(`Hittade ${casesWithAddresses.length} ärenden med adresser av ${allCases.length} totala ärenden`);
+    
+    // Extrahera alla skadedjurstyper från ärenden
+    const pestTypes = new Set<string>();
+    casesWithAddresses.forEach(caseItem => {
+      const pestType = getPestTypeFromCase(caseItem);
+      if (pestType) {
+        pestTypes.add(pestType);
+      }
+    });
+    
+    console.log(`[Competency] Hittade följande skadedjurstyper: ${Array.from(pestTypes).join(', ')}`);
+    
+    // Hämta kompetenta tekniker för de aktuella skadedjurstyperna
+    const competentTechnicians = await getCompetentTechniciansForPestTypes(
+      Array.from(pestTypes), 
+      technician_ids
+    );
+    
+    console.log(`[Competency] ${competentTechnicians.length} tekniker har kompetens för de aktuella skadedjurstyperna`);
 
     // Begränsa till max 50 ärenden för att kontrollera API-kostnader
     if (casesWithAddresses.length > 50) {
@@ -155,7 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Beräkna verkliga avstånd med Google Maps Distance Matrix API
     const optimizationResults = await optimizeScheduleWithDistanceMatrix(
       casesWithAddresses, 
-      technicians, 
+      competentTechnicians.length > 0 ? competentTechnicians : technicians, // Använd kompetenta tekniker om tillgängliga
       optimization_type
     );
 
@@ -180,6 +199,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'Internt serverfel vid schemaoptimering',
       details: error.message 
     });
+  }
+}
+
+// Hämta tekniker som har kompetens för specifika skadedjurstyper
+async function getCompetentTechniciansForPestTypes(pestTypes: string[], technicianIds: string[]) {
+  if (pestTypes.length === 0) {
+    console.log('[Competency] Inga skadedjurstyper hittades, returnerar alla tekniker');
+    return [];
+  }
+  
+  try {
+    console.log(`[Competency] Hämtar kompetenta tekniker för: ${pestTypes.join(', ')}`);
+    
+    // Hämta alla kompetenser för de tekniker som är valda och för de aktuella skadedjurstyperna
+    const { data: competencies, error } = await supabase
+      .from('staff_competencies')
+      .select(`
+        staff_id,
+        pest_type,
+        technicians!staff_competencies_staff_id_fkey(id, name, role, is_active)
+      `)
+      .in('staff_id', technicianIds)
+      .in('pest_type', pestTypes)
+      .eq('technicians.is_active', true);
+    
+    if (error) {
+      console.error('[Competency] Fel vid hämtning av kompetenser:', error);
+      return [];
+    }
+    
+    if (!competencies || competencies.length === 0) {
+      console.log('[Competency] Inga kompetenser hittades för de valda kriterierna');
+      return [];
+    }
+    
+    // Skapa en map över vilka tekniker som har vilka kompetenser
+    const technicianCompetencies = new Map<string, Set<string>>();
+    const technicianDetails = new Map<string, any>();
+    
+    competencies.forEach((comp: any) => {
+      const techId = comp.staff_id;
+      
+      if (!technicianCompetencies.has(techId)) {
+        technicianCompetencies.set(techId, new Set());
+        technicianDetails.set(techId, comp.technicians);
+      }
+      
+      technicianCompetencies.get(techId)?.add(comp.pest_type);
+    });
+    
+    // Filtrera tekniker som har kompetens för ALLA skadedjurstyper som behövs
+    const fullyCompetentTechnicians: any[] = [];
+    const pestTypeSet = new Set(pestTypes);
+    
+    technicianCompetencies.forEach((competencies, techId) => {
+      const hasAllCompetencies = pestTypes.every(pestType => competencies.has(pestType));
+      
+      if (hasAllCompetencies) {
+        const technician = technicianDetails.get(techId);
+        if (technician) {
+          fullyCompetentTechnicians.push(technician);
+          console.log(`[Competency] ${technician.name} har full kompetens för alla skadedjurstyper`);
+        }
+      } else {
+        const missingCompetencies = pestTypes.filter(pt => !competencies.has(pt));
+        const techName = technicianDetails.get(techId)?.name || techId;
+        console.log(`[Competency] ${techName} saknar kompetens för: ${missingCompetencies.join(', ')}`);
+      }
+    });
+    
+    console.log(`[Competency] ${fullyCompetentTechnicians.length} tekniker har full kompetens`);
+    return fullyCompetentTechnicians;
+    
+  } catch (error) {
+    console.error('[Competency] Oväntat fel vid kompetenshämtning:', error);
+    return [];
   }
 }
 
@@ -483,6 +578,59 @@ function formatAddress(address: any): string {
   if (!address) return '';
   if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
   return String(address);
+}
+
+// Hjälpfunktion för att extrahera skadedjurstyp från ärende
+function getPestTypeFromCase(caseItem: any): string | null {
+  console.log(`[Pest Type Debug] Checking case ${caseItem.id} for pest type...`);
+  
+  // Kolla direkt fält först
+  if (caseItem.pest_type) {
+    console.log(`[Pest Type Debug] Found pest_type field: ${caseItem.pest_type}`);
+    return caseItem.pest_type;
+  }
+  
+  if (caseItem.skadedjur) {
+    console.log(`[Pest Type Debug] Found skadedjur field: ${caseItem.skadedjur}`);
+    return caseItem.skadedjur;
+  }
+  
+  // För ClickUp-integrerade ärenden kan skadedjurstypen vara i custom_fields
+  if (caseItem.custom_fields) {
+    try {
+      const fields = typeof caseItem.custom_fields === 'string' 
+        ? JSON.parse(caseItem.custom_fields) 
+        : caseItem.custom_fields;
+      
+      if (Array.isArray(fields)) {
+        // Leta efter fält som innehåller skadedjurstyp
+        const pestField = fields.find((field: any) => 
+          field.name && (
+            field.name.toLowerCase().includes('skadedjur') ||
+            field.name.toLowerCase().includes('pest') ||
+            field.name.toLowerCase().includes('typ') ||
+            field.name === 'Typ av skadedjur' // Exakt matchning för ClickUp
+          )
+        );
+        
+        if (pestField && pestField.value) {
+          const pestType = typeof pestField.value === 'string' 
+            ? pestField.value 
+            : pestField.value.name || pestField.value.value;
+          
+          if (pestType && pestType.trim()) {
+            console.log(`[Pest Type Debug] Found pest type in custom_fields '${pestField.name}': ${pestType}`);
+            return pestType.trim();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Kunde inte parsa custom_fields för skadedjurstyp:', caseItem.id, e);
+    }
+  }
+  
+  console.log(`[Pest Type Debug] No pest type found for case ${caseItem.id}`);
+  return null;
 }
 
 // Hjälpfunktion för att extrahera adress från ärende
