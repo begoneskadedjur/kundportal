@@ -1620,7 +1620,15 @@ function generateScheduleAwareSuggestedChanges(cases: any[], technicians: any[],
         const scheduleAwareMatch = findBestTechnicianWithScheduleAwareness(caseItem, currentTech, technicians, scheduleContext);
         
         if (scheduleAwareMatch) {
-          const reason = generateScheduleAwareChangeReason(caseItem, currentTech, scheduleAwareMatch.technician, scheduleAwareMatch.savings, scheduleAwareMatch.scheduleInfo);
+          // Använd den detaljerade versionen med rutt-kontext och schema-information
+          const reasonData = generateDetailedChangeReasonWithContext(
+            caseItem, 
+            currentTech, 
+            scheduleAwareMatch.technician, 
+            scheduleAwareMatch.savings, 
+            cases,
+            scheduleContext
+          );
           
           changes.push({
             case_id: caseItem.id,
@@ -1628,9 +1636,12 @@ function generateScheduleAwareSuggestedChanges(cases: any[], technicians: any[],
             change_type: 'reassign_technician',
             from_technician: currentTech.name,
             to_technician: scheduleAwareMatch.technician.name,
-            reason: reason,
+            reason: reasonData.text, // Fallback text
+            reason_details: reasonData.details, // Strukturerad data för UI
             time_savings_minutes: scheduleAwareMatch.savings.time_savings,
-            distance_savings_km: scheduleAwareMatch.savings.distance_savings
+            distance_savings_km: scheduleAwareMatch.savings.distance_savings,
+            case_start_time: caseItem.start_date, // För hemresa-beräkning
+            home_commute_info: reasonData.home_commute // Hemresa-information
           });
         }
       }
@@ -1806,7 +1817,7 @@ function generateScheduleAwareChangeReason(caseItem: any, fromTech: any, toTech:
 }
 
 // Generera strukturerad data för förändringen med rutt-kontext (ny förbättrad version)
-function generateDetailedChangeReasonWithContext(caseItem: any, fromTech: any, toTech: any, savings: any, allCases: any[]): any {
+function generateDetailedChangeReasonWithContext(caseItem: any, fromTech: any, toTech: any, savings: any, allCases: any[], scheduleContext?: ScheduleOptimizationContext): any {
   const caseAddress = getAddressFromCase(caseItem);
   const fromHomeAddress = fromTech.address && fromTech.address.trim() 
     ? fromTech.address.trim() 
@@ -1822,7 +1833,7 @@ function generateDetailedChangeReasonWithContext(caseItem: any, fromTech: any, t
 
   // Analysera teknikers övriga ärenden samma dag för kontext
   const caseDate = new Date(caseItem.start_date).toISOString().split('T')[0];
-  const routeContext = analyzeRouteContext(toTech, caseItem, allCases, caseDate);
+  const routeContext = analyzeRouteContext(toTech, caseItem, allCases, caseDate, scheduleContext);
 
   // Beräkna hemresa-påverkan
   const homeCommuteImpact = calculateDetailedHomeCommuteImpact(caseItem, fromTech, toTech);
@@ -1862,20 +1873,51 @@ function generateDetailedChangeReasonWithContext(caseItem: any, fromTech: any, t
 }
 
 // Analysera rutt-kontext för en tekniker
-function analyzeRouteContext(technician: any, currentCase: any, allCases: any[], caseDate: string): any {
+function analyzeRouteContext(technician: any, currentCase: any, allCases: any[], caseDate: string, scheduleContext?: ScheduleOptimizationContext): any {
   console.log(`[RouteContext] Analyzing route context for ${technician.name} on ${caseDate}`);
   console.log(`[RouteContext] Total cases to analyze: ${allCases.length}`);
   console.log(`[RouteContext] Current case ID: ${currentCase.id}, start_date: ${currentCase.start_date}`);
   
-  const technicianCases = allCases.filter(c => 
+  // Först, försök hitta ärenden från den aktuella optimeringslistan
+  let technicianCases = allCases.filter(c => 
     (c.primary_assignee_id === technician.id || 
      c.secondary_assignee_id === technician.id || 
      c.tertiary_assignee_id === technician.id) &&
     new Date(c.start_date).toISOString().split('T')[0] === caseDate &&
     c.id !== currentCase.id
-  ).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  );
 
-  console.log(`[RouteContext] Found ${technicianCases.length} other cases for ${technician.name} on ${caseDate}`);
+  console.log(`[RouteContext] Found ${technicianCases.length} cases in optimization list for ${technician.name} on ${caseDate}`);
+  
+  // Om vi har scheduleContext, använd det för att få teknikers fullständiga schema
+  if (scheduleContext && scheduleContext.schedules.has(technician.id)) {
+    console.log(`[RouteContext] Using schedule context to find technician's existing bookings`);
+    const techSchedules = scheduleContext.schedules.get(technician.id);
+    const daySchedule = techSchedules?.find(s => s.date === caseDate);
+    
+    if (daySchedule) {
+      console.log(`[RouteContext] Found ${daySchedule.booked_slots.length} existing bookings for ${technician.name} on ${caseDate}`);
+      
+      // Konvertera booked_slots till case-liknande objekt för analys
+      const existingCases = daySchedule.booked_slots.map(slot => ({
+        id: slot.case_id,
+        title: slot.title,
+        adress: slot.address,
+        start_date: `${caseDate}T${slot.start_time}:00+00:00`,
+        due_date: `${caseDate}T${slot.end_time}:00+00:00`
+      }));
+      
+      // Kombinera med ärenden från optimeringslistan (undvik dubbletter)
+      const existingIds = new Set(technicianCases.map(c => c.id));
+      const additionalCases = existingCases.filter(c => !existingIds.has(c.id) && c.id !== currentCase.id);
+      technicianCases = [...technicianCases, ...additionalCases];
+      
+      console.log(`[RouteContext] Total cases after combining: ${technicianCases.length}`);
+    }
+  }
+  
+  technicianCases = technicianCases.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  console.log(`[RouteContext] Final sorted cases for route context: ${technicianCases.length}`);
 
   const currentCaseTime = new Date(currentCase.start_date);
   let previousCase = null;
