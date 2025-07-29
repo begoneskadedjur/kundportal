@@ -305,14 +305,26 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
     })
   }
 
-  if (caseData.pris) {
+  if (caseData.pris !== null && caseData.pris !== undefined) {
     const priceValue = parseFloat(caseData.pris)
+    console.log(`[ClickUpMapper] Processing pris field:`, {
+      original: caseData.pris,
+      parsed: priceValue,
+      isNaN: isNaN(priceValue),
+      fieldId: CLICKUP_FIELD_IDS.PRIS
+    });
     if (!isNaN(priceValue)) {
       customFields.push({
         id: CLICKUP_FIELD_IDS.PRIS,
         value: priceValue
       })
     }
+  } else {
+    console.log(`[ClickUpMapper] Skipping pris field:`, {
+      pris: caseData.pris,
+      isNull: caseData.pris === null,
+      isUndefined: caseData.pris === undefined
+    });
   }
 
   if (caseData.filer) {
@@ -643,7 +655,7 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     })
   }
 
-  if (caseData.pris) {
+  if (caseData.pris !== null && caseData.pris !== undefined) {
     // Currency/Number field - måste vara ett numeriskt värde enligt ClickUp API
     const priceValue = parseFloat(caseData.pris);
     if (!isNaN(priceValue)) {
