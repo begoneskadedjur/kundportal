@@ -96,8 +96,13 @@ export default function ScheduleOptimizer() {
       
       setAllTechnicians(data || []);
       
-      // Välj alla tekniker som standard
-      const technicianIds = new Set((data || []).map(t => t.id));
+      // Välj alla tekniker som standard, förutom Christian, Peter och Sofia
+      const excludedNames = ['christian', 'peter', 'sofia'];
+      const technicianIds = new Set(
+        (data || [])
+          .filter(t => !excludedNames.includes(t.name.toLowerCase()))
+          .map(t => t.id)
+      );
       setSelectedTechnicianIds(technicianIds);
     } catch (err) {
       console.error('Fel vid hämtning av tekniker:', err);
