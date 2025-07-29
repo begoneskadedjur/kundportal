@@ -235,8 +235,19 @@
 
 /* Förbättra tidskolumner i resource timeline */
 .fc-resource-timeline .fc-timeline-slot {
-  border-right: 1px solid rgba(59, 130, 246, 0.1);
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
   transition: background-color 0.2s ease;
+  min-height: 70px;
+}
+
+/* Markera hela timmar tydligare */
+.fc-resource-timeline .fc-timeline-slot[data-time*=":00:00"] {
+  border-right: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Visa halvtimmar subtilt */
+.fc-resource-timeline .fc-timeline-slot[data-time*=":30:00"] {
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 /* Highlight tidsslots vid hover under drag */

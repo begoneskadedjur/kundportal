@@ -172,10 +172,6 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
     const { event, oldResource, newResource } = dropInfo;
     const caseData = event.extendedProps as BeGoneCaseRow;
     
-    // Förhindra vy-byten under drag & drop
-    const currentApi = calendarRef.current?.getApi();
-    const currentViewType = currentApi?.view.type;
-    
     // Förhindra drag & drop för frånvaro
     if (caseData.type === 'absence') {
       dropInfo.revert();
@@ -248,74 +244,16 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
     if (onUpdate) {
       onUpdate();
     }
-
-    // Återställ vy om den ändrats under drag & drop
-    setTimeout(() => {
-      const api = calendarRef.current?.getApi();
-      if (api && api.view.type !== currentViewType && currentViewType) {
-        api.changeView(currentViewType);
-      }
-    }, 100);
   };
 
   // Visuell feedback när drag startar
-  const handleEventDragStart = (dragInfo: any) => {
+  const handleEventDragStart = () => {
     setIsDragging(true);
-    
-    // Lägg till en tooltip som visar tiden
-    const tooltip = document.createElement('div');
-    tooltip.id = 'drag-time-tooltip';
-    tooltip.style.cssText = `
-      position: fixed;
-      z-index: 10000;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      pointer-events: none;
-      display: none;
-    `;
-    document.body.appendChild(tooltip);
-
-    // Lyssna på mus-rörelser för att uppdatera tooltip
-    const handleMouseMove = (e: MouseEvent) => {
-      const tooltip = document.getElementById('drag-time-tooltip');
-      if (tooltip) {
-        tooltip.style.left = e.clientX + 10 + 'px';
-        tooltip.style.top = e.clientY - 30 + 'px';
-        tooltip.style.display = 'block';
-        
-        // Försök att beräkna tid baserat på mus-position (ungefärlig)
-        // Detta är en förenklad version - FullCalendar hanterar den exakta logiken
-        const currentTime = new Date();
-        tooltip.textContent = `Släpp för att boka: ${currentTime.toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'})}`;
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    
-    // Rensa när drag slutar
-    const cleanup = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      const tooltip = document.getElementById('drag-time-tooltip');
-      if (tooltip) {
-        tooltip.remove();
-      }
-    };
-    document.addEventListener('mouseup', cleanup, { once: true });
   };
 
   // Ta bort visuell feedback när drag slutar
   const handleEventDragStop = () => {
     setIsDragging(false);
-    
-    // Ta bort tooltip om den finns kvar
-    const tooltip = document.getElementById('drag-time-tooltip');
-    if (tooltip) {
-      tooltip.remove();
-    }
   };
 
   // Synkronisera kalendern med vår state
@@ -327,6 +265,32 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
       });
     }
   }, []);
+
+  // Förhindra vy-ändringar under drag
+  useEffect(() => {
+    const api = calendarRef.current?.getApi();
+    if (api && isDragging) {
+      // Spara nuvarande vy
+      const originalView = api.view.type;
+      
+      // Lyssna på vy-ändringar
+      const handleViewChange = () => {
+        if (isDragging && api.view.type !== originalView) {
+          // Återställ vy omedelbart
+          setTimeout(() => {
+            api.changeView(originalView);
+          }, 0);
+        }
+      };
+
+      // Lägg till eventlistener för vy-ändringar
+      api.on('viewDidMount', handleViewChange);
+
+      return () => {
+        api.off('viewDidMount', handleViewChange);
+      };
+    }
+  }, [isDragging]);
 
   const changeView = (viewName: string) => {
     const viewMap: Record<string, 'day' | 'week' | 'month'> = {
@@ -485,9 +449,22 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           slotMinWidth={60}
           nowIndicator={true}
           views={{
-            resourceTimelineDay: { slotDuration: '01:00:00', slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false }, slotLabelInterval: '02:00:00' },
-            resourceTimelineWeek: { slotDuration: { days: 1 }, slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' } },
-            resourceTimelineMonth: { slotDuration: { days: 1 }, slotLabelFormat: { day: 'numeric' } }
+            resourceTimelineDay: { 
+              slotDuration: '00:30:00', 
+              slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false }, 
+              slotLabelInterval: '01:00:00',
+              snapDuration: '00:15:00'
+            },
+            resourceTimelineWeek: { 
+              slotDuration: { days: 1 }, 
+              slotLabelFormat: { weekday: 'short', day: 'numeric', month: 'numeric' },
+              snapDuration: '01:00:00'
+            },
+            resourceTimelineMonth: { 
+              slotDuration: { days: 1 }, 
+              slotLabelFormat: { day: 'numeric' },
+              snapDuration: '01:00:00'
+            }
           }}
           eventContent={renderEventContent}
           slotMinTime="00:00:00"
@@ -501,6 +478,13 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           eventDrop={handleEventDrop}
           eventDragStart={handleEventDragStart}
           eventDragStop={handleEventDragStop}
+          eventAllow={(dropInfo, draggedEvent) => {
+            // Förhindra drop på frånvaro
+            if (draggedEvent?.extendedProps?.type === 'absence') {
+              return false;
+            }
+            return true;
+          }}
           snapDuration="00:15:00"
           eventOverlap={false}
           selectOverlap={false}
