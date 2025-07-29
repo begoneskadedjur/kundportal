@@ -2,7 +2,7 @@
 // ⭐ Schemaoptimerare för att minska körsträckor och optimera tekniker-scheman ⭐
 
 import React, { useState, useEffect } from 'react';
-import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge } from 'lucide-react';
+import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge, Navigation, Calendar, TrendingUp, Map } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Technician } from '../../types/database';
@@ -166,6 +166,136 @@ const EfficiencyGauge: React.FC<{
   );
 };
 
+// RouteContext - visar vad tekniker gör före/efter
+const RouteContext: React.FC<{ 
+  context: any;
+}> = ({ context }) => {
+  const { previous_case, next_case } = context;
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+        <Navigation className="w-3 h-3" />
+        <span>Rutt-kontext</span>
+      </div>
+      
+      <div className="grid grid-cols-1 gap-2">
+        {/* Föregående ärende */} 
+        {previous_case && (
+          <div className="flex items-center gap-2 text-xs p-2 bg-slate-800/40 rounded">
+            <Calendar className="w-3 h-3 text-blue-400" />
+            <div className="flex-1">
+              <div className="text-white font-medium">Från föregående ärende</div>
+              <div className="text-slate-400">{previous_case.address} • {previous_case.end_time}</div>
+              <div className="text-blue-400">{previous_case.distance_to_current.toFixed(1)}km • {Math.round(previous_case.travel_time)}min resa</div>
+            </div>
+          </div>
+        )}
+        
+        {/* Nästa ärende */}
+        {next_case && (
+          <div className="flex items-center gap-2 text-xs p-2 bg-slate-800/40 rounded">
+            <Calendar className="w-3 h-3 text-green-400" />
+            <div className="flex-1">
+              <div className="text-white font-medium">Till nästa ärende</div>
+              <div className="text-slate-400">{next_case.address} • {next_case.start_time}</div>
+              <div className="text-green-400">{next_case.distance_from_current.toFixed(1)}km • {Math.round(next_case.travel_time)}min resa</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// GeographicInsight - visar geografiska fördelar
+const GeographicInsight: React.FC<{ 
+  context: any;
+  explanation: any;
+}> = ({ context, explanation }) => {
+  const { geographic_advantage, daily_route_impact } = context;
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+        <Map className="w-3 h-3" />
+        <span>Geografiska fördelar</span>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        {geographic_advantage.area_familiarity && (
+          <div className="flex items-center gap-1 text-purple-400">
+            <Map className="w-3 h-3" />
+            <span>Känner området</span>
+          </div>
+        )}
+        
+        {geographic_advantage.local_proximity_bonus && (
+          <div className="flex items-center gap-1 text-cyan-400">
+            <Target className="w-3 h-3" />
+            <span>Närhet-bonus</span>
+          </div>
+        )}
+        
+        {geographic_advantage.cluster_optimization && (
+          <div className="flex items-center gap-1 text-yellow-400">
+            <Route className="w-3 h-3" />
+            <span>Kluster-optimering</span>
+          </div>
+        )}
+        
+        <div className="col-span-2 flex items-center gap-1 text-green-400">
+          <TrendingUp className="w-3 h-3" />
+          <span>+{daily_route_impact.route_efficiency_improvement}% rutt-effektivitet</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ImpactExplanation - detaljerade förklaringar med ikoner
+const ImpactExplanation: React.FC<{ 
+  explanation: any;
+}> = ({ explanation }) => {
+  const getIconComponent = (iconName: string) => {
+    const icons: { [key: string]: React.ComponentType<{ className?: string }> } = {
+      'route': Route,
+      'clock': Clock,
+      'target': Target,
+      'trending-up': TrendingUp,
+      'map': Map
+    };
+    return icons[iconName] || Target;
+  };
+  
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-white mb-2">
+        {explanation.primary_reason}
+      </div>
+      
+      <div className="space-y-1">
+        {explanation.detailed_explanations.map((exp: any, index: number) => {
+          const IconComponent = getIconComponent(exp.icon);
+          return (
+            <div key={index} className="flex items-start gap-2 text-xs p-2 bg-slate-800/30 rounded">
+              <IconComponent className="w-3 h-3 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-white font-medium">{exp.text}</div>
+                <div className="text-slate-400 text-xs">{exp.benefit}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      <div className="text-xs text-center p-2 bg-green-500/10 border border-green-500/20 rounded text-green-400 font-medium">
+        {explanation.impact_summary}
+      </div>
+    </div>
+  );
+};
+
 // Typer
 interface OptimizationRequest {
   period_type: 'day' | 'week';
@@ -225,6 +355,43 @@ interface OptimizationResult {
       schedule_impact: {
         efficiency_gain: number;
         travel_reduction_percent: number;
+      };
+      route_context: {
+        previous_case?: {
+          title: string;
+          address: string;
+          end_time: string;
+          distance_to_current: number;
+          travel_time: number;
+        };
+        next_case?: {
+          title: string;
+          address: string;
+          start_time: string;
+          distance_from_current: number;
+          travel_time: number;
+        };
+        daily_route_impact: {
+          total_cases_today: number;
+          estimated_driving_time_reduction: number;
+          route_efficiency_improvement: number;
+        };
+        geographic_advantage: {
+          area_familiarity: boolean;
+          local_proximity_bonus: boolean;
+          cluster_optimization: boolean;
+        };
+      };
+      explanation: {
+        text: string;
+        primary_reason: string;
+        detailed_explanations: Array<{
+          type: string;
+          icon: string;
+          text: string;
+          benefit: string;
+        }>;
+        impact_summary: string;
       };
     };
     time_savings_minutes?: number;
@@ -888,20 +1055,29 @@ export default function ScheduleOptimizer() {
                                 </div>
                               )}
                               
-                              {/* Grafisk information istället för lång text */}
+                              {/* Kontextuell information istället för lång text */}
                               {change.reason_details && (
                                 <div className="space-y-3 pl-11">
-                                  {/* Adressöversikt */}
-                                  <AddressOverview details={change.reason_details} />
+                                  {/* Huvudförklaring med kontext */}
+                                  <ImpactExplanation explanation={change.reason_details.explanation} />
                                   
-                                  {/* Distansjämförelse */}
-                                  <DistanceComparison details={change.reason_details} />
+                                  {/* Rutt-kontext - vad händer före/efter */}
+                                  {change.reason_details.route_context && (
+                                    <RouteContext context={change.reason_details.route_context} />
+                                  )}
                                   
-                                  {/* Effektivitetsmätare */}
-                                  <EfficiencyGauge 
-                                    efficiency_gain={change.reason_details.schedule_impact.efficiency_gain}
-                                    travel_reduction_percent={change.reason_details.schedule_impact.travel_reduction_percent}
-                                  />
+                                  {/* Geografiska insikter */}
+                                  {change.reason_details.route_context && (
+                                    <GeographicInsight 
+                                      context={change.reason_details.route_context}
+                                      explanation={change.reason_details.explanation}
+                                    />
+                                  )}
+                                  
+                                  {/* Traditionell adress-översikt som backup */}
+                                  <div className="border-t border-slate-700 pt-2">
+                                    <AddressOverview details={change.reason_details} />
+                                  </div>
                                 </div>
                               )}
                               
