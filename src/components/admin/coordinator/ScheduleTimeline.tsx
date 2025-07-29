@@ -1,7 +1,7 @@
 // 📁 src/components/admin/coordinator/ScheduleTimeline.tsx
 // ⭐ VERSION 2.9 - FIXAR UI-BUGG FÖR VY-VÄXLARE ⭐
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -77,9 +77,44 @@ const renderEventContent = (eventInfo: EventContentArg) => {
     );
 };
 
+// Hjälpfunktioner för datumformatering
+const formatDateRange = (date: Date, view: 'day' | 'week' | 'month'): string => {
+  const options: Intl.DateTimeFormatOptions = { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  };
+  
+  if (view === 'day') {
+    return date.toLocaleDateString('sv-SE', options);
+  } else if (view === 'week') {
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - date.getDay() + 1); // Måndag
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // Söndag
+    
+    const startStr = weekStart.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+    const endStr = weekEnd.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `Vecka ${getWeekNumber(date)} • ${startStr} - ${endStr}`;
+  } else {
+    return date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long' });
+  }
+};
+
+const getWeekNumber = (date: Date): number => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
+};
+
 export default function ScheduleTimeline({ technicians, cases, absences, onCaseClick }: ScheduleTimelineProps) {
   
   const calendarRef = useRef<FullCalendar>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState<'day' | 'week' | 'month'>('day');
   
   const calendarResources = useMemo(() => technicians.map(tech => ({ id: tech.id, title: tech.name })), [technicians]);
 
@@ -123,40 +158,151 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
     }
   };
 
+  // Synkronisera kalendern med vår state
+  useEffect(() => {
+    const api = calendarRef.current?.getApi();
+    if (api) {
+      api.on('datesSet', (dateInfo) => {
+        setCurrentDate(dateInfo.start);
+      });
+    }
+  }, []);
+
   const changeView = (viewName: string) => {
+    const viewMap: Record<string, 'day' | 'week' | 'month'> = {
+      'resourceTimelineDay': 'day',
+      'resourceTimelineWeek': 'week',
+      'resourceTimelineMonth': 'month'
+    };
+    setCurrentView(viewMap[viewName] || 'day');
     calendarRef.current?.getApi().changeView(viewName);
   };
+  
   const navigateCalendar = (direction: 'prev' | 'next' | 'today') => {
     const api = calendarRef.current?.getApi();
-    if(api) { direction === 'today' ? api.today() : api[direction](); }
+    if(api) { 
+      direction === 'today' ? api.today() : api[direction]();
+    }
   };
 
   return (
     <div className="h-full w-full bg-slate-900 flex flex-col">
-      <div className="p-4 bg-slate-800/50 border-b border-slate-700 flex-shrink-0">
-          <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-semibold text-white">Schema Timeline</h2>
-                  <div className="hidden xl:flex items-center gap-2 text-xs">
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-500 rounded"></div><span className="text-slate-300">Öppen</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded"></div><span className="text-slate-300">Bokat</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded"></div><span className="text-slate-300">Offert</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-500 rounded"></div><span className="text-slate-300">Signerad</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-600 rounded"></div><span className="text-slate-300">Återbesök</span></div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-600 rounded"></div><span className="text-slate-300">Avslutat</span></div>
+      <div className="bg-slate-800/50 border-b border-slate-700 flex-shrink-0">
+          {/* Ny datumvisning inspirerad av modalernas design */}
+          <div className="px-6 py-4 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                      <div className="text-center">
+                          <h2 className="text-3xl font-bold text-white">
+                              {formatDateRange(currentDate, currentView).split('•')[0]}
+                          </h2>
+                          {currentView === 'week' && (
+                              <p className="text-sm text-slate-400 mt-1">
+                                  {formatDateRange(currentDate, currentView).split('•')[1]}
+                              </p>
+                          )}
+                      </div>
+                      
+                      {/* Idag-indikator */}
+                      {currentView === 'day' && new Date().toDateString() === currentDate.toDateString() && (
+                          <span className="px-3 py-1 bg-blue-600/20 text-blue-400 text-sm font-medium rounded-full">
+                              Idag
+                          </span>
+                      )}
+                  </div>
+                  
+                  {/* Navigeringskontroller */}
+                  <div className="flex items-center gap-4">
+                      <div className="flex bg-slate-700/50 rounded-lg p-1">
+                          <button 
+                              onClick={() => changeView('resourceTimelineDay')} 
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                  currentView === 'day' 
+                                      ? 'bg-slate-600 text-white shadow-sm' 
+                                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                              }`}
+                          >
+                              Dag
+                          </button>
+                          <button 
+                              onClick={() => changeView('resourceTimelineWeek')} 
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                  currentView === 'week' 
+                                      ? 'bg-slate-600 text-white shadow-sm' 
+                                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                              }`}
+                          >
+                              Vecka
+                          </button>
+                          <button 
+                              onClick={() => changeView('resourceTimelineMonth')} 
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                  currentView === 'month' 
+                                      ? 'bg-slate-600 text-white shadow-sm' 
+                                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                              }`}
+                          >
+                              Månad
+                          </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                          <button 
+                              onClick={() => navigateCalendar('prev')} 
+                              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
+                              title="Föregående"
+                          >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                          </button>
+                          <button 
+                              onClick={() => navigateCalendar('today')} 
+                              className="px-4 py-2 text-sm font-medium bg-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-600 rounded-lg transition-all"
+                          >
+                              Idag
+                          </button>
+                          <button 
+                              onClick={() => navigateCalendar('next')} 
+                              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all"
+                              title="Nästa"
+                          >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                          </button>
+                      </div>
                   </div>
               </div>
-              <div className="flex items-center gap-4">
-                  {/* ✅ FÖRBÄTTRING: "flex-shrink-0" förhindrar att knapparna trycks ihop på mindre skärmar. */}
-                  <div className="flex bg-slate-700 rounded-lg p-1 flex-shrink-0">
-                      <button onClick={() => changeView('resourceTimelineDay')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Dag</button>
-                      <button onClick={() => changeView('resourceTimelineWeek')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Vecka</button>
-                      <button onClick={() => changeView('resourceTimelineMonth')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-600 rounded-md transition-colors">Månad</button>
+          </div>
+          
+          {/* Statusförklaring */}
+          <div className="px-6 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-slate-400">Schema Timeline</h3>
+              <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-gray-500 rounded-sm"></div>
+                      <span className="text-slate-400">Öppen</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                      <button onClick={() => navigateCalendar('prev')} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Föregående">←</button>
-                      <button onClick={() => navigateCalendar('today')} className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors">Idag</button>
-                      <button onClick={() => navigateCalendar('next')} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Nästa">→</button>
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-sm"></div>
+                      <span className="text-slate-400">Bokat</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-orange-500 rounded-sm"></div>
+                      <span className="text-slate-400">Offert</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-emerald-500 rounded-sm"></div>
+                      <span className="text-slate-400">Signerad</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-blue-600 rounded-sm"></div>
+                      <span className="text-slate-400">Återbesök</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-green-600 rounded-sm"></div>
+                      <span className="text-slate-400">Avslutat</span>
                   </div>
               </div>
           </div>
@@ -168,7 +314,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           locale={svLocale}
-          headerToolbar={{left: '', center: 'title', right: ''}}
+          headerToolbar={{left: '', center: '', right: ''}}
           initialView="resourceTimelineDay"
           resources={calendarResources}
           events={calendarEvents}

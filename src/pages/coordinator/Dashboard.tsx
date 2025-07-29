@@ -9,7 +9,7 @@ import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModa
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Map, Wand2, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 
 export default function CoordinatorDashboard() {
@@ -269,12 +269,6 @@ export default function CoordinatorDashboard() {
               title="Schema & Planering"
               description="Visuell översikt av alla teknikers scheman. Dra och släpp oplanerade ärenden för att boka."
               tag="Kärnfunktion"
-            />
-            <CoordinatorDashboardCard
-              href="/koordinator/ruttplanerare"
-              icon={Map}
-              title="Ruttplanerare"
-              description="Välj en tekniker och ett datum för att se och optimera dagens körrutt med ett klick."
             />
             <CoordinatorDashboardCard
               href="/koordinator/booking-assistant"
