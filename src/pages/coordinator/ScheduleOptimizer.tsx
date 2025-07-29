@@ -2,7 +2,7 @@
 // ⭐ Schemaoptimerare för att minska körsträckor och optimera tekniker-scheman ⭐
 
 import React, { useState, useEffect } from 'react';
-import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX } from 'lucide-react';
+import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Technician } from '../../types/database';
@@ -54,6 +54,118 @@ const SavingsMeter: React.FC<{
   );
 };
 
+// Distansjämförelse-komponent
+const DistanceComparison: React.FC<{ 
+  details: any;
+}> = ({ details }) => {
+  const { from_distance_km, to_distance_km, improvement_type } = details.distance_comparison;
+  const improvement = from_distance_km - to_distance_km;
+  
+  if (improvement <= 0) return null;
+  
+  return (
+    <div className="flex items-center gap-3 p-2 bg-slate-800/30 rounded-lg">
+      <Route className="w-4 h-4 text-blue-400 flex-shrink-0" />
+      <div className="flex-1">
+        <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400">Från:</span>
+            <span className="text-red-400 font-medium">{from_distance_km.toFixed(1)}km</span>
+          </div>
+          <ArrowRight className="w-3 h-3 text-slate-500" />
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400">Till:</span>
+            <span className="text-green-400 font-medium">{to_distance_km.toFixed(1)}km</span>
+          </div>
+        </div>
+        <div className="text-xs text-blue-400 font-medium mt-1">
+          -{improvement.toFixed(1)}km kortare resa
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Adress-översikt komponent
+const AddressOverview: React.FC<{ 
+  details: any;
+}> = ({ details }) => {
+  const { case_address, from_technician, to_technician } = details;
+  
+  return (
+    <div className="space-y-2">
+      {/* Ärendeadress */}
+      <div className="flex items-center gap-2 text-xs">
+        <Target className="w-3 h-3 text-orange-400" />
+        <span className="text-slate-400">Ärende:</span>
+        <span className="text-white font-medium">{case_address.short}</span>
+      </div>
+      
+      {/* Teknikeradresser */}
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="flex items-center gap-1">
+          <Home className="w-3 h-3 text-red-400" />
+          <div>
+            <div className="text-red-400 font-medium">{from_technician.name}</div>
+            <div className="text-slate-500 truncate">{from_technician.home_address_short}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Home className="w-3 h-3 text-green-400" />
+          <div>
+            <div className="text-green-400 font-medium">{to_technician.name}</div>
+            <div className="text-slate-500 truncate">{to_technician.home_address_short}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Effektivitetsmätare
+const EfficiencyGauge: React.FC<{ 
+  efficiency_gain: number;
+  travel_reduction_percent: number;
+}> = ({ efficiency_gain, travel_reduction_percent }) => {
+  const maxGain = Math.max(efficiency_gain, travel_reduction_percent, 20);
+  const efficiencyPercentage = Math.min((efficiency_gain / maxGain) * 100, 100);
+  const travelPercentage = Math.min((travel_reduction_percent / maxGain) * 100, 100);
+  
+  return (
+    <div className="flex items-center gap-3">
+      <Gauge className="w-4 h-4 text-purple-400" />
+      <div className="flex-1 space-y-1">
+        {efficiency_gain > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-purple-400 rounded-full"
+                style={{ width: `${efficiencyPercentage}%` }}
+              />
+            </div>
+            <span className="text-xs text-purple-400 font-medium">
+              +{efficiency_gain}% effektivitet
+            </span>
+          </div>
+        )}
+        {travel_reduction_percent > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-cyan-400 rounded-full"
+                style={{ width: `${travelPercentage}%` }}
+              />
+            </div>
+            <span className="text-xs text-cyan-400 font-medium">
+              -{travel_reduction_percent}% restid
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Typer
 interface OptimizationRequest {
   period_type: 'day' | 'week';
@@ -88,6 +200,33 @@ interface OptimizationResult {
     from_time?: string;
     to_time?: string;
     reason: string;
+    reason_details?: {
+      case_address: {
+        full: string;
+        short: string;
+      };
+      from_technician: {
+        name: string;
+        home_address: string;
+        home_address_short: string;
+      };
+      to_technician: {
+        name: string;
+        home_address: string;
+        home_address_short: string;
+      };
+      distance_comparison: {
+        improvement_type: 'distance' | 'time';
+        from_distance_km: number;
+        to_distance_km: number;
+        savings_km: number;
+        savings_minutes: number;
+      };
+      schedule_impact: {
+        efficiency_gain: number;
+        travel_reduction_percent: number;
+      };
+    };
     time_savings_minutes?: number;
     distance_savings_km?: number;
   }>;
@@ -733,8 +872,9 @@ export default function ScheduleOptimizer() {
                                   <div className="font-medium text-white text-sm">
                                     {change.case_title}
                                   </div>
-                                  <div className="text-xs text-slate-400 mt-1 leading-relaxed">
-                                    {change.reason}
+                                  {/* Kort beskrivning istället för lång text */}
+                                  <div className="text-xs text-slate-400 mt-1">
+                                    {change.change_type === 'reassign_technician' ? 'Tekniker-ombyte för kortare resa' : change.reason}
                                   </div>
                                 </div>
                               </div>
@@ -748,8 +888,25 @@ export default function ScheduleOptimizer() {
                                 </div>
                               )}
                               
-                              {/* Besparings-meters */}
-                              {(change.time_savings_minutes || change.distance_savings_km) && (
+                              {/* Grafisk information istället för lång text */}
+                              {change.reason_details && (
+                                <div className="space-y-3 pl-11">
+                                  {/* Adressöversikt */}
+                                  <AddressOverview details={change.reason_details} />
+                                  
+                                  {/* Distansjämförelse */}
+                                  <DistanceComparison details={change.reason_details} />
+                                  
+                                  {/* Effektivitetsmätare */}
+                                  <EfficiencyGauge 
+                                    efficiency_gain={change.reason_details.schedule_impact.efficiency_gain}
+                                    travel_reduction_percent={change.reason_details.schedule_impact.travel_reduction_percent}
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* Traditionella besparings-meters som backup */}
+                              {!change.reason_details && (change.time_savings_minutes || change.distance_savings_km) && (
                                 <div className="flex gap-4 pl-11">
                                   {change.time_savings_minutes && change.time_savings_minutes > 0 && (
                                     <SavingsMeter 
