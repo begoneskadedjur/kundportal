@@ -189,11 +189,23 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
     })
   }
 
-  if (caseData.rapport) {
+  if (caseData.rapport && String(caseData.rapport).trim()) {
+    const rapportValue = String(caseData.rapport).trim();
+    console.log(`[ClickUpMapper] Adding rapport field:`, {
+      original: caseData.rapport,
+      trimmed: rapportValue,
+      fieldId: CLICKUP_FIELD_IDS.RAPPORT
+    });
     customFields.push({
       id: CLICKUP_FIELD_IDS.RAPPORT,
-      value: String(caseData.rapport)
+      value: rapportValue
     })
+  } else {
+    console.log(`[ClickUpMapper] Skipping rapport field:`, {
+      rapport: caseData.rapport,
+      hasValue: !!caseData.rapport,
+      trimmed: caseData.rapport ? String(caseData.rapport).trim() : null
+    });
   }
 
   if (caseData.status_saneringsrapport) {
@@ -538,11 +550,11 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
     })
   }
 
-  if (caseData.rapport) {
+  if (caseData.rapport && String(caseData.rapport).trim()) {
     // Text field - måste vara sträng enligt ClickUp API
     customFields.push({
       id: CLICKUP_FIELD_IDS.RAPPORT,
-      value: String(caseData.rapport)
+      value: String(caseData.rapport).trim()
     })
   }
 
