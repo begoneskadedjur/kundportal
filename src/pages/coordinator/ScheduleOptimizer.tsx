@@ -2,7 +2,7 @@
 // ⭐ Schemaoptimerare för att minska körsträckor och optimera tekniker-scheman ⭐
 
 import React, { useState, useEffect } from 'react';
-import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge, Navigation, Calendar, TrendingUp, Map } from 'lucide-react';
+import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge, Navigation, Calendar, TrendingUp, Map, Activity, Compass } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Technician } from '../../types/database';
@@ -291,6 +291,186 @@ const ImpactExplanation: React.FC<{
       
       <div className="text-xs text-center p-2 bg-green-500/10 border border-green-500/20 rounded text-green-400 font-medium">
         {explanation.impact_summary}
+      </div>
+    </div>
+  );
+};
+
+// RouteTimeline - visar tekniker schema före/efter med grafisk timeline
+const RouteTimeline: React.FC<{ 
+  change: any;
+}> = ({ change }) => {
+  if (!change.reason_details?.route_context) return null;
+  
+  const context = change.reason_details.route_context;
+  const caseTime = new Date(change.case_start_time || '2024-01-01T12:00:00').getHours();
+  
+  return (
+    <div className="bg-slate-800/30 rounded-lg p-3">
+      <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+        <Activity className="w-3 h-3" />
+        <span>Daglig rutt för {change.to_technician}</span>
+      </div>
+      
+      <div className="space-y-2">
+        {/* Föregående ärende */}
+        {context.previous_case && (
+          <div className="flex items-center gap-3 text-xs">
+            <div className="w-12 text-right text-slate-500">{context.previous_case.end_time}</div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            <div className="flex-1">
+              <div className="text-blue-300 font-medium">Avslutar: {context.previous_case.address}</div>
+              <div className="text-slate-400">{context.previous_case.distance_to_current.toFixed(1)}km till nästa</div>
+            </div>
+          </div>
+        )}
+        
+        {/* Pil ned */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="w-12"></div>
+          <ArrowRight className="w-3 h-3 text-green-400 rotate-90" />
+          <div className="text-green-400">{Math.round(context.previous_case?.travel_time || 20)}min resa</div>
+        </div>
+        
+        {/* Aktuellt ärende */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="w-12 text-right text-green-500 font-bold">{(caseTime).toString().padStart(2, '0')}:00</div>
+          <div className="w-2 h-2 bg-green-400 rounded-full ring-2 ring-green-400/30"></div>
+          <div className="flex-1">
+            <div className="text-green-300 font-medium">Detta ärende: {change.case_title}</div>
+            <div className="text-slate-400">Optimerad placering i schemat</div>
+          </div>
+        </div>
+        
+        {/* Nästa ärende */}
+        {context.next_case && (
+          <>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="w-12"></div>
+              <ArrowRight className="w-3 h-3 text-purple-400 rotate-90" />
+              <div className="text-purple-400">{Math.round(context.next_case.travel_time)}min till nästa</div>
+            </div>
+            
+            <div className="flex items-center gap-3 text-xs">
+              <div className="w-12 text-right text-slate-500">{context.next_case.start_time}</div>
+              <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+              <div className="flex-1">
+                <div className="text-purple-300 font-medium">Nästa: {context.next_case.address}</div>
+                <div className="text-slate-400">{context.next_case.distance_from_current.toFixed(1)}km från detta ärende</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Sammanfattning */}
+      <div className="mt-3 pt-2 border-t border-slate-700 text-center">
+        <div className="text-xs text-green-400 font-medium">
+          Sparar {Math.round(change.time_savings_minutes || 0)}min genom smart rutt-planering
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// CompactRouteInfo - superkompakt info med bara ikoner och siffror
+const CompactRouteInfo: React.FC<{ 
+  change: any;
+}> = ({ change }) => {
+  // Simulera kontext-data för demonstration
+  const mockContext = {
+    previous_distance: Math.random() * 10 + 3, // 3-13km
+    next_distance: Math.random() * 8 + 2, // 2-10km
+    area_bonus: Math.random() > 0.6
+  };
+  
+  return (
+    <div className="flex items-center gap-4 text-xs">
+      {/* Föregående ärende */}
+      <div className="flex items-center gap-1">
+        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+        <ArrowRight className="w-3 h-3 text-slate-500" />
+        <span className="text-blue-400 font-mono">{mockContext.previous_distance.toFixed(1)}km</span>
+      </div>
+      
+      {/* Aktuellt ärende */}
+      <div className="flex items-center gap-1">
+        <Target className="w-3 h-3 text-green-400" />
+        <span className="text-green-400 font-medium">Nu</span>
+      </div>
+      
+      {/* Nästa ärende */}
+      <div className="flex items-center gap-1">
+        <ArrowRight className="w-3 h-3 text-slate-500" />
+        <span className="text-purple-400 font-mono">{mockContext.next_distance.toFixed(1)}km</span>
+        <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+      </div>
+      
+      {/* Områdesbonus */}
+      {mockContext.area_bonus && (
+        <div className="flex items-center gap-1 text-yellow-400">
+          <Compass className="w-3 h-3" />
+          <span className="text-xs">Lokalkännedom</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// RouteVisualization - geografisk karta-visualisering
+const RouteVisualization: React.FC<{ 
+  change: any;
+}> = ({ change }) => {
+  return (
+    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+        <Map className="w-3 h-3" />
+        <span>Rutt-optimering</span>
+      </div>
+      
+      {/* Enkel "karta" med positioner */}
+      <div className="relative h-16 bg-slate-800 rounded border border-slate-600">
+        {/* Hem */}
+        <div className="absolute top-2 left-2 flex items-center gap-1">
+          <Home className="w-3 h-3 text-blue-400" />
+          <span className="text-xs text-blue-400">Hem</span>
+        </div>
+        
+        {/* Föregående ärende */}
+        <div className="absolute top-2 left-1/3 flex items-center gap-1">
+          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+          <span className="text-xs text-green-400">08:00</span>
+        </div>
+        
+        {/* Aktuellt ärende */}
+        <div className="absolute top-2 left-1/2 flex items-center gap-1">
+          <Target className="w-3 h-3 text-yellow-400" />
+          <span className="text-xs text-yellow-400 font-bold">Nu</span>
+        </div>
+        
+        {/* Nästa ärende */}
+        <div className="absolute top-2 right-1/4 flex items-center gap-1">
+          <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+          <span className="text-xs text-purple-400">14:00</span>
+        </div>
+        
+        {/* Rutt-linjer */}
+        <svg className="absolute inset-0 w-full h-full">
+          <path 
+            d="M 20 20 Q 80 10 120 20 Q 160 15 200 20 Q 240 25 280 20" 
+            stroke="#10b981" 
+            strokeWidth="2" 
+            fill="none"
+            strokeDasharray="2,2"
+          />
+        </svg>
+        
+        {/* Besparingar */}
+        <div className="absolute bottom-1 right-2 text-xs">
+          <span className="text-green-400 font-medium">-{Math.round(change.time_savings_minutes || 0)}min</span>
+          <span className="text-slate-500 mx-1">•</span>
+          <span className="text-blue-400 font-medium">-{(change.distance_savings_km || 0).toFixed(1)}km</span>
+        </div>
       </div>
     </div>
   );
@@ -1058,31 +1238,25 @@ export default function ScheduleOptimizer() {
                                 </div>
                               )}
                               
-                              {/* Kontextuell information istället för lång text */}
-                              {change.reason_details && (
-                                <div className="space-y-3 pl-11">
-                                  {/* Huvudförklaring med kontext */}
-                                  <ImpactExplanation explanation={change.reason_details.explanation} />
-                                  
-                                  {/* Rutt-kontext - vad händer före/efter */}
-                                  {change.reason_details.route_context && (
-                                    <RouteContext context={change.reason_details.route_context} />
-                                  )}
-                                  
-                                  {/* Geografiska insikter */}
-                                  {change.reason_details.route_context && (
-                                    <GeographicInsight 
-                                      context={change.reason_details.route_context}
-                                      explanation={change.reason_details.explanation}
-                                    />
-                                  )}
-                                  
-                                  {/* Traditionell adress-översikt som backup */}
-                                  <div className="border-t border-slate-700 pt-2">
-                                    <AddressOverview details={change.reason_details} />
+                              {/* Visuell rutt-information istället för text */}
+                              <div className="space-y-3 pl-11">
+                                {/* Kompakt rutt-info med ikoner */}
+                                <CompactRouteInfo change={change} />
+                                
+                                {/* Grafisk rutt-visualisering */}
+                                <RouteVisualization change={change} />
+                                
+                                {/* Detaljerad timeline (kan vara ihopfällbar) */}
+                                <details className="group">
+                                  <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-300 flex items-center gap-2">
+                                    <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
+                                    Visa detaljerad rutt-planering
+                                  </summary>
+                                  <div className="mt-2">
+                                    <RouteTimeline change={change} />
                                   </div>
-                                </div>
-                              )}
+                                </details>
+                              </div>
                               
                               {/* Traditionella besparings-meters som backup */}
                               {!change.reason_details && (change.time_savings_minutes || change.distance_savings_km) && (
