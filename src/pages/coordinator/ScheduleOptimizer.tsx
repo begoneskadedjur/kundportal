@@ -142,12 +142,19 @@ export default function ScheduleOptimizer() {
     }
   }, [startDate, periodType]);
 
-  // Uppdatera valda tekniker när datum ändras
+  // Uppdatera valda tekniker när datum eller tekniker ändras
   useEffect(() => {
+    console.log('[Tech Selection] Date or technicians changed, updating selection');
+    console.log('[Tech Selection] Current state:', {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      technicianCount: allTechnicians.length
+    });
+    
     if (allTechnicians.length > 0) {
       updateSelectedTechnicians(allTechnicians);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, allTechnicians]);
 
   const fetchTechnicians = async () => {
     try {
@@ -168,10 +175,18 @@ export default function ScheduleOptimizer() {
   };
 
   const updateSelectedTechnicians = async (technicians: Technician[]) => {
+    console.log(`[Tech Selection] === Updating for period ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]} ===`);
+    console.log(`[Tech Selection] Processing ${technicians.length} technicians`);
+    
+    // Rensa gamla val först för att undvika konflikter
+    setSelectedTechnicianIds(new Set());
+    
     try {
       // Hämta frånvaro för den valda perioden
       const periodStartDate = startDate.toISOString().split('T')[0];
       const periodEndDate = endDate.toISOString().split('T')[0];
+      
+      console.log(`[Tech Selection] Fetching absences for period: ${periodStartDate} to ${periodEndDate}`);
       
       const { data: absences, error: absenceError } = await supabase
         .from('technician_absences')
@@ -179,13 +194,25 @@ export default function ScheduleOptimizer() {
         .or(`start_date.lte.${periodEndDate},end_date.gte.${periodStartDate}`);
       
       if (absenceError) {
-        console.error('Fel vid hämtning av frånvaro:', absenceError);
+        console.error('[Tech Selection] Error fetching absences:', absenceError);
       }
+      
+      console.log(`[Tech Selection] Found ${absences?.length || 0} absence records`);
       
       // Skapa set med tekniker som är frånvarande under perioden
       const absentTechnicianIds = new Set(
         (absences || []).map(a => a.technician_id)
       );
+      
+      console.log('[Tech Selection] Absent technician IDs:', Array.from(absentTechnicianIds));
+      
+      // Analysera varje tekniker
+      technicians.forEach(t => {
+        if (t.role === 'Skadedjurstekniker') {
+          const isAbsent = absentTechnicianIds.has(t.id);
+          console.log(`[Tech Selection] ${t.name}: ${isAbsent ? 'ABSENT' : 'AVAILABLE'}`);
+        }
+      });
       
       // Välj bara "Skadedjurstekniker" som standard och som inte är frånvarande
       const technicianIds = new Set(
@@ -197,18 +224,31 @@ export default function ScheduleOptimizer() {
           .map(t => t.id)
       );
       
+      console.log(`[Tech Selection] Selected ${technicianIds.size} technicians out of ${technicians.filter(t => t.role === 'Skadedjurstekniker').length} Skadedjurstekniker`);
+      console.log('[Tech Selection] Selected technician names:', 
+        technicians.filter(t => technicianIds.has(t.id)).map(t => t.name)
+      );
+      
       setSelectedTechnicianIds(technicianIds);
+      
     } catch (err) {
-      console.error('Fel vid uppdatering av valda tekniker:', err);
+      console.error('[Tech Selection] Error in updateSelectedTechnicians:', err);
       
       // Fallback: välj bara Skadedjurstekniker utan frånvaro-kontroll
-      const technicianIds = new Set(
+      const fallbackIds = new Set(
         technicians
           .filter(t => t.role === 'Skadedjurstekniker')
           .map(t => t.id)
       );
-      setSelectedTechnicianIds(technicianIds);
+      
+      console.log('[Tech Selection] Using fallback selection (no absence filtering)');
+      console.log('[Tech Selection] Fallback selected technicians:', 
+        technicians.filter(t => fallbackIds.has(t.id)).map(t => t.name)
+      );
+      setSelectedTechnicianIds(fallbackIds);
     }
+    
+    console.log('[Tech Selection] === End update ===');
   };
 
   const toggleTechnician = (technicianId: string) => {
