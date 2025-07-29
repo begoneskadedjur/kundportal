@@ -178,11 +178,12 @@
 /* ⭐ DRAG & DROP STYLING ⭐ */
 /* När ett event dras */
 .fc-event-dragging {
-  opacity: 0.75 !important;
+  opacity: 0.9 !important;
   cursor: grabbing !important;
   z-index: 9999 !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-  transform: rotate(2deg) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+  transform: rotate(1deg) scale(1.02) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* När hela schemat är i drag-läge */
@@ -226,8 +227,47 @@
 
 /* Drop preview */
 .fc-event-mirror {
-  opacity: 0.3 !important;
+  opacity: 0.4 !important;
   background: #3b82f6 !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4) !important;
+  border: 2px dashed rgba(59, 130, 246, 0.6) !important;
+}
+
+/* Förbättra tidskolumner i resource timeline */
+.fc-resource-timeline .fc-timeline-slot {
+  border-right: 1px solid rgba(59, 130, 246, 0.1);
+  transition: background-color 0.2s ease;
+}
+
+/* Highlight tidsslots vid hover under drag */
+.dragging .fc-resource-timeline .fc-timeline-slot:hover {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}
+
+/* Tydligare tidslabels */
+.fc-resource-timeline .fc-timeline-header-row th {
+  font-weight: 600;
+  color: #cbd5e1;
+  font-size: 11px;
+  border-bottom: 2px solid var(--fc-border-color);
+}
+
+/* Smooth transitions för alla events */
+.fc-resource-timeline .fc-event {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Förbättra now indicator (röda linjen) */
+.fc .fc-timeline-now-indicator-line {
+  border-color: #ef4444;
+  border-width: 2px;
+  z-index: 10;
+}
+
+/* Snap guide lines (visar var ärendet kommer att hamna) */
+.fc-highlight {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.3) !important;
 }
 
 /* --- MOBIL KALENDER TOOLBAR --- */
