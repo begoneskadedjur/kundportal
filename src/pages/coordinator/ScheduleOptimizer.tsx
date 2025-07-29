@@ -2,7 +2,7 @@
 // ⭐ Schemaoptimerare för att minska körsträckor och optimera tekniker-scheman ⭐
 
 import React, { useState, useEffect } from 'react';
-import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Technician } from '../../types/database';
@@ -13,6 +13,46 @@ import sv from 'date-fns/locale/sv';
 import "react-datepicker/dist/react-datepicker.css";
 
 registerLocale('sv', sv);
+
+// Små UI-komponenter för grafisk presentation
+const TechnicianBadge: React.FC<{ name: string; variant: 'from' | 'to' }> = ({ name, variant }) => (
+  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+    variant === 'from' 
+      ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+      : 'bg-green-500/20 text-green-300 border border-green-500/30'
+  }`}>
+    {variant === 'from' ? <UserX className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+    {name.split(' ')[0]}
+  </div>
+);
+
+const SavingsMeter: React.FC<{ 
+  type: 'time' | 'distance'; 
+  value: number; 
+  icon: React.ComponentType<{ className?: string }>;
+}> = ({ type, value, icon: Icon }) => {
+  if (value <= 0) return null;
+  
+  const maxValue = type === 'time' ? 120 : 50; // Max 120min eller 50km för progress bar
+  const percentage = Math.min((value / maxValue) * 100, 100);
+  
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className={`w-3 h-3 ${type === 'time' ? 'text-green-400' : 'text-blue-400'}`} />
+      <div className="flex items-center gap-1">
+        <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+          <div 
+            className={`h-full rounded-full ${type === 'time' ? 'bg-green-400' : 'bg-blue-400'}`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+        <span className={`text-xs font-medium ${type === 'time' ? 'text-green-400' : 'text-blue-400'}`}>
+          -{type === 'time' ? `${Math.round(value)}min` : `${value.toFixed(1)}km`}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 // Typer
 interface OptimizationRequest {
@@ -628,29 +668,61 @@ export default function ScheduleOptimizer() {
                     
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {results.suggested_changes.map((change, index) => (
-                        <div key={index} className={`p-3 rounded-lg border transition-all ${
+                        <div key={index} className={`p-4 rounded-lg border transition-all hover:shadow-lg ${
                           selectedChanges.has(index)
-                            ? 'bg-blue-500/20 border-blue-500/40'
-                            : 'bg-slate-800/50 border-slate-700'
+                            ? 'bg-blue-500/20 border-blue-500/40 shadow-blue-500/20'
+                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
                         }`}>
-                          <label className="flex items-start gap-3">
+                          <label className="flex items-start gap-4 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={selectedChanges.has(index)}
                               onChange={() => toggleChangeSelection(index)}
-                              className="w-4 h-4 mt-0.5 text-blue-500 focus:ring-blue-500 rounded border-slate-600 bg-slate-700"
+                              className="w-4 h-4 mt-1 text-blue-500 focus:ring-blue-500 rounded border-slate-600 bg-slate-700"
                             />
-                            <div className="flex-1">
-                              <div className="font-medium text-white text-sm">
-                                {change.case_title}
+                            
+                            <div className="flex-1 space-y-3">
+                              {/* Huvudrubrik och ikon */}
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 p-2 bg-purple-500/20 rounded-lg">
+                                  <Users className="w-5 h-5 text-purple-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="font-medium text-white text-sm">
+                                    {change.case_title}
+                                  </div>
+                                  <div className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    {change.reason}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-xs text-slate-400 mt-1">
-                                {change.reason}
-                              </div>
+                              
+                              {/* Tekniker-byte visualisering */}
                               {change.change_type === 'reassign_technician' && (
-                                <div className="flex items-center gap-2 text-xs text-blue-300 mt-2">
-                                  <ArrowRight className="w-3 h-3" />
-                                  {change.from_technician} → {change.to_technician}
+                                <div className="flex items-center gap-2 pl-11">
+                                  <TechnicianBadge name={change.from_technician || ''} variant="from" />
+                                  <ArrowRight className="w-3 h-3 text-slate-500" />
+                                  <TechnicianBadge name={change.to_technician || ''} variant="to" />
+                                </div>
+                              )}
+                              
+                              {/* Besparings-meters */}
+                              {(change.time_savings_minutes || change.distance_savings_km) && (
+                                <div className="flex gap-4 pl-11">
+                                  {change.time_savings_minutes && change.time_savings_minutes > 0 && (
+                                    <SavingsMeter 
+                                      type="time" 
+                                      value={change.time_savings_minutes} 
+                                      icon={Clock} 
+                                    />
+                                  )}
+                                  {change.distance_savings_km && change.distance_savings_km > 0 && (
+                                    <SavingsMeter 
+                                      type="distance" 
+                                      value={change.distance_savings_km} 
+                                      icon={MapPin} 
+                                    />
+                                  )}
                                 </div>
                               )}
                             </div>

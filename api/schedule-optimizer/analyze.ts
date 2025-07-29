@@ -291,12 +291,23 @@ async function optimizeScheduleWithDistanceMatrix(cases: any[], technicians: any
   const allAddresses = [...caseAddresses, ...homeAddresses];
   const uniqueAddresses = [...new Set(allAddresses)];
   
-  console.log(`[Optimization] Inkluderar ${homeAddresses.length} hemadresser i beräkningarna`);
+  console.log(`[Optimization] === Address extraction ===`);
+  console.log(`[Optimization] Case addresses (${caseAddresses.length}):`, caseAddresses);
+  console.log(`[Optimization] Home addresses (${homeAddresses.length}):`, homeAddresses);
+  console.log(`[Optimization] All addresses (${allAddresses.length}):`, allAddresses);
+  console.log(`[Optimization] Unique addresses (${uniqueAddresses.length}):`, uniqueAddresses);
+  console.log(`[Optimization] === End address extraction ===`);
   
   console.log(`[Optimization] Beräknar Distance Matrix för ${uniqueAddresses.length} unika adresser`);
   
   // Beräkna avståndsmatrix för alla adresser
   const distanceMatrix = await calculateDistanceMatrix(uniqueAddresses);
+  
+  console.log(`[Optimization] === Distance Matrix Keys ===`);
+  console.log(`[Optimization] Total keys in distanceMatrix: ${distanceMatrix.size}`);
+  const sampleKeys = Array.from(distanceMatrix.keys()).slice(0, 10);
+  console.log(`[Optimization] Sample keys (first 10):`, sampleKeys);
+  console.log(`[Optimization] === End Distance Matrix Keys ===`);
   
   // Analysera nuvarande tilldelningar
   const currentAnalysis = analyzeCurrentAssignments(cases, technicians, distanceMatrix);
@@ -661,6 +672,8 @@ function shortenAddress(address: string): string {
 function calculateChangeImpact(caseItem: any, fromTech: any, toTech: any, distanceMatrix: Map<string, any>) {
   const caseAddress = getAddressFromCase(caseItem);
   
+  console.log(`[Change Impact] === Analyzing case ${caseItem.id}: ${caseItem.title} ===`);
+  
   // Hämta hemadresser
   const fromHomeAddress = fromTech.address && fromTech.address.trim() 
     ? fromTech.address.trim() 
@@ -669,28 +682,50 @@ function calculateChangeImpact(caseItem: any, fromTech: any, toTech: any, distan
     ? toTech.address.trim() 
     : "Stockholm, Sverige";
   
+  console.log(`[Change Impact] From tech: ${fromTech.name} at ${fromHomeAddress}`);
+  console.log(`[Change Impact] To tech: ${toTech.name} at ${toHomeAddress}`);
+  console.log(`[Change Impact] Case address: ${caseAddress}`);
+  
   // Beräkna nuvarande resa (från nuvarande tekniker till ärendet)
   const currentKey = `${fromHomeAddress}|${caseAddress}`;
-  const currentDistance = distanceMatrix.get(currentKey) || { distance_km: 25, duration_minutes: 30 };
+  const currentDistance = distanceMatrix.get(currentKey);
+  const currentDistanceWithFallback = currentDistance || { distance_km: 25, duration_minutes: 30 };
+  
+  console.log(`[Change Impact] Current key: "${currentKey}"`);
+  console.log(`[Change Impact] Current distance data:`, currentDistance ? 'FOUND' : 'NOT FOUND - using fallback');
+  console.log(`[Change Impact] Current values:`, currentDistanceWithFallback);
   
   // Beräkna ny resa (från alternativ tekniker till ärendet) 
   const newKey = `${toHomeAddress}|${caseAddress}`;
-  const newDistance = distanceMatrix.get(newKey) || { distance_km: 25, duration_minutes: 30 };
+  const newDistance = distanceMatrix.get(newKey);
+  const newDistanceWithFallback = newDistance || { distance_km: 25, duration_minutes: 30 };
+  
+  console.log(`[Change Impact] New key: "${newKey}"`);
+  console.log(`[Change Impact] New distance data:`, newDistance ? 'FOUND' : 'NOT FOUND - using fallback');
+  console.log(`[Change Impact] New values:`, newDistanceWithFallback);
   
   // Tur och retur för båda
   const currentTotal = {
-    time: currentDistance.duration_minutes * 2,
-    distance: currentDistance.distance_km * 2
+    time: currentDistanceWithFallback.duration_minutes * 2,
+    distance: currentDistanceWithFallback.distance_km * 2
   };
   
   const newTotal = {
-    time: newDistance.duration_minutes * 2,
-    distance: newDistance.distance_km * 2
+    time: newDistanceWithFallback.duration_minutes * 2,
+    distance: newDistanceWithFallback.distance_km * 2
   };
   
+  const timeSavings = Math.max(0, currentTotal.time - newTotal.time);
+  const distanceSavings = Math.max(0, Math.round((currentTotal.distance - newTotal.distance) * 10) / 10);
+  
+  console.log(`[Change Impact] Current total: ${currentTotal.time}min, ${currentTotal.distance}km`);
+  console.log(`[Change Impact] New total: ${newTotal.time}min, ${newTotal.distance}km`);
+  console.log(`[Change Impact] Savings: ${timeSavings}min, ${distanceSavings}km`);
+  console.log(`[Change Impact] === End analysis ===`);
+  
   return {
-    time_savings: Math.max(0, currentTotal.time - newTotal.time),
-    distance_savings: Math.max(0, Math.round((currentTotal.distance - newTotal.distance) * 10) / 10)
+    time_savings: timeSavings,
+    distance_savings: distanceSavings
   };
 }
 
@@ -724,11 +759,43 @@ function calculateActualSavings(suggestedChanges: any[], technicianDetails: any[
   };
 }
 
-// Hjälpfunktion för att formatera adress (baserat på ruttplanerarens formatAddress)
+// Hjälpfunktion för att formatera adress (förbättrad version från ruttplaneraren)
 function formatAddress(address: any): string {
   if (!address) return '';
-  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
-  return String(address);
+  
+  console.log(`[formatAddress] Input:`, typeof address, address);
+  
+  // ClickUp location object format - direkt objekt
+  if (typeof address === 'object' && address.formatted_address) {
+    console.log(`[formatAddress] Found formatted_address:`, address.formatted_address);
+    return address.formatted_address;
+  }
+  
+  // JSON string med location data (vanligt från ClickUp)
+  if (typeof address === 'string') {
+    try {
+      const parsed = JSON.parse(address);
+      if (parsed.formatted_address) {
+        console.log(`[formatAddress] Parsed formatted_address:`, parsed.formatted_address);
+        return parsed.formatted_address;
+      }
+      if (parsed.location?.lat && parsed.location?.lng) {
+        // Backup: visa koordinater om formatted_address saknas
+        const coordString = `${parsed.location.lat.toFixed(4)}, ${parsed.location.lng.toFixed(4)}`;
+        console.log(`[formatAddress] Using coordinates:`, coordString);
+        return coordString;
+      }
+    } catch (e) {
+      // Vanlig textadress - ingen JSON
+      console.log(`[formatAddress] Plain text address:`, address);
+      return address.trim();
+    }
+  }
+  
+  // Fallback
+  const result = String(address).trim();
+  console.log(`[formatAddress] Fallback result:`, result);
+  return result;
 }
 
 // Hjälpfunktion för att extrahera skadedjurstyp från ärende
