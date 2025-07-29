@@ -2,7 +2,7 @@
 // Hjälpfunktioner för att hantera datum korrekt i svensk tidszon
 
 import { format, parseISO } from 'date-fns'
-import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz'
+import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'
 
 const SWEDEN_TIMEZONE = 'Europe/Stockholm'
 
@@ -11,9 +11,8 @@ const SWEDEN_TIMEZONE = 'Europe/Stockholm'
  * Detta behövs eftersom toISOString() alltid ger UTC-tid
  */
 export function toSwedishISOString(date: Date): string {
-  // Konvertera till svensk tid och formatera som ISO-sträng utan timezone suffix
-  const swedishDate = utcToZonedTime(date, SWEDEN_TIMEZONE)
-  return format(swedishDate, "yyyy-MM-dd'T'HH:mm:ss")
+  // Formatera i svensk tidszon utan timezone suffix (samma som API:erna)
+  return formatInTimeZone(date, SWEDEN_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss")
 }
 
 /**
@@ -24,12 +23,12 @@ export function fromDatabaseDate(isoString: string | null): Date | null {
   if (!isoString) return null
   
   // Om strängen innehåller timezone info (Z eller +/-), parse direkt
-  if (isoString.includes('Z') || isoString.includes('+') || isoString.includes('-')) {
+  if (isoString.includes('Z') || /[+-]\d{2}:\d{2}$/.test(isoString)) {
     return parseISO(isoString)
   }
   
-  // Annars, tolka som svensk lokal tid
-  return zonedTimeToUtc(parseISO(isoString), SWEDEN_TIMEZONE)
+  // Annars, tolka som svensk lokal tid och konvertera till UTC
+  return fromZonedTime(parseISO(isoString), SWEDEN_TIMEZONE)
 }
 
 /**

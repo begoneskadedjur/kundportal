@@ -5,7 +5,6 @@ import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useClickUpSync } from './useClickUpSync'
 import { BeGoneCaseRow } from '../types/database'
-import { toSwedishISOString } from '../utils/dateHelpers'
 import toast from 'react-hot-toast'
 
 interface UpdateResult {
