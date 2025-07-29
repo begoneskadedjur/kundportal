@@ -10,6 +10,13 @@ import { geocodeAddress } from '../../../services/geocoding';
 import { getDistanceMatrix } from '../../../services/distanceMatrix';
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps';
 
+// Kopiera formatAddress från assistant-utils.ts
+const formatAddress = (address: any): string => { 
+  if (!address) return ''; 
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address; 
+  return String(address); 
+};
+
 interface GeographicOverviewProps {
   className?: string;
 }
@@ -30,12 +37,14 @@ interface TechnicianWithLocation extends Technician {
   todaysCases?: CaseWithLocation[];
 }
 
-interface CaseCluster {
+interface TechnicianCluster {
   id: string;
   cases: CaseWithLocation[];
   center: { lat: number; lng: number };
-  area: string;
-  totalTravelTime?: number;
+  technicianName: string;
+  technicianAddress: string;
+  technicianId: string;
+  averageDistance?: number;
 }
 
 const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' }) => {
@@ -46,8 +55,8 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   
   const [todaysCases, setTodaysCases] = useState<CaseWithLocation[]>([]);
   const [technicians, setTechnicians] = useState<TechnicianWithLocation[]>([]);
-  const [clusters, setClusters] = useState<CaseCluster[]>([]);
-  const [selectedCluster, setSelectedCluster] = useState<CaseCluster | null>(null);
+  const [clusters, setClusters] = useState<TechnicianCluster[]>([]);
+  const [selectedCluster, setSelectedCluster] = useState<TechnicianCluster | null>(null);
 
   // Ladda Google Maps API
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
@@ -66,12 +75,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     }
   }, [todaysCases, mapsLoaded]);
 
-  // Uppdatera kluster när ärenden ändras
+  // Uppdatera kluster när ärenden och tekniker finns
   useEffect(() => {
-    if (todaysCases.length > 0) {
-      generateClusters();
+    if (todaysCases.length > 0 && technicians.length > 0) {
+      generateTechnicianClusters();
     }
-  }, [todaysCases]);
+  }, [todaysCases, technicians]);
 
   const fetchTodaysData = async () => {
     try {
@@ -301,56 +310,91 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     return techniciansWithLocations;
   };
 
-  const generateClusters = async () => {
-    console.log('[GeographicOverview] Genererar kluster för', todaysCases.length, 'ärenden');
+  const generateTechnicianClusters = () => {
+    console.log('[GeographicOverview] Genererar tekniker-centrerade kluster för', todaysCases.length, 'ärenden och', technicians.length, 'tekniker');
     
-    const CLUSTER_RADIUS_KM = 15; // Öka till 15km för bättre klustering
-    const clusters: CaseCluster[] = [];
-    const processed = new Set<string>();
+    const MAX_DISTANCE_KM = 25; // Max avstånd från tekniker till ärende
+    const clusters: TechnicianCluster[] = [];
+    const assignedCases = new Set<string>();
 
-    for (const caseData of todaysCases) {
-      if (!caseData.coordinates || processed.has(caseData.id)) continue;
+    // För varje tekniker, hitta närliggande ärenden
+    technicians.forEach(technician => {
+      if (!technician.coordinates) {
+        console.log('[GeographicOverview] Hoppar över tekniker utan koordinater:', technician.name);
+        return;
+      }
 
-      const clusterCases = [caseData];
-      processed.add(caseData.id);
+      const nearbyCases: CaseWithLocation[] = [];
 
-      // Hitta närliggande ärenden
-      todaysCases.forEach(otherCase => {
-        if (otherCase.id === caseData.id || 
-            !otherCase.coordinates || 
-            processed.has(otherCase.id)) return;
+      // Hitta ärenden nära denna tekniker
+      todaysCases.forEach(caseData => {
+        if (!caseData.coordinates || assignedCases.has(caseData.id)) return;
 
         const distance = calculateDistance(
-          caseData.coordinates!,
-          otherCase.coordinates!
+          technician.coordinates!,
+          caseData.coordinates!
         );
 
-        if (distance <= CLUSTER_RADIUS_KM) {
-          clusterCases.push(otherCase);
-          processed.add(otherCase.id);
+        if (distance <= MAX_DISTANCE_KM) {
+          nearbyCases.push(caseData);
         }
       });
 
-      // Beräkna kluster-center
-      const center = calculateClusterCenter(clusterCases);
-      const area = await getAreaName(center);
+      // Om tekniker har närliggande ärenden, skapa kluster
+      if (nearbyCases.length > 0) {
+        // Markera ärenden som tilldelade till denna tekniker
+        nearbyCases.forEach(c => assignedCases.add(c.id));
 
-      console.log('[GeographicOverview] Skapade kluster:', {
-        area,
-        cases: clusterCases.length,
-        center,
-        caseIds: clusterCases.map(c => c.id)
-      });
+        // Beräkna genomsnittligt avstånd
+        const totalDistance = nearbyCases.reduce((sum, c) => {
+          return sum + calculateDistance(technician.coordinates!, c.coordinates!);
+        }, 0);
+        const averageDistance = totalDistance / nearbyCases.length;
 
+        // Beräkna kluster-center (tekniker + ärenden)
+        const allCoordinates = [technician.coordinates, ...nearbyCases.map(c => c.coordinates!)];
+        const center = {
+          lat: allCoordinates.reduce((sum, coord) => sum + coord.lat, 0) / allCoordinates.length,
+          lng: allCoordinates.reduce((sum, coord) => sum + coord.lng, 0) / allCoordinates.length
+        };
+
+        clusters.push({
+          id: `tech-cluster-${technician.id}`,
+          cases: nearbyCases,
+          center,
+          technicianName: technician.name,
+          technicianAddress: formatAddress(technician.address),
+          technicianId: technician.id,
+          averageDistance: Math.round(averageDistance * 10) / 10
+        });
+
+        console.log('[GeographicOverview] Skapade tekniker-kluster:', {
+          technician: technician.name,
+          cases: nearbyCases.length,
+          averageDistance: averageDistance.toFixed(1) + ' km'
+        });
+      }
+    });
+
+    // Hantera ärenden som inte tilldelats någon tekniker (för långt bort)
+    const unassignedCases = todaysCases.filter(c => !assignedCases.has(c.id));
+    if (unassignedCases.length > 0) {
+      console.log('[GeographicOverview] Hittade', unassignedCases.length, 'otilldelade ärenden');
+      
+      // Skapa "Övriga ärenden" kluster
+      const center = calculateClusterCenter(unassignedCases);
       clusters.push({
-        id: `cluster-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Helt unik ID
-        cases: clusterCases,
+        id: 'unassigned-cluster',
+        cases: unassignedCases,
         center,
-        area
+        technicianName: 'Ej tilldelat',
+        technicianAddress: 'Långt från alla tekniker',
+        technicianId: '',
+        averageDistance: undefined
       });
     }
 
-    console.log('[GeographicOverview] Totalt antal kluster:', clusters.length);
+    console.log('[GeographicOverview] Totalt antal tekniker-kluster:', clusters.length);
     setClusters(clusters);
   };
 
@@ -375,44 +419,6 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     };
   };
 
-  const getAreaName = async (coordinates: { lat: number; lng: number }): Promise<string> => {
-    try {
-      // Använd reverse geocoding för att få riktig platsinfo
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinates.lat},${coordinates.lng}&key=${import.meta.env.VITE_GOOGLE_GEOCODING || import.meta.env.GOOGLE_MAPS_API_KEY}&language=sv&region=se`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.results && data.results.length > 0) {
-          // Hitta stad/kommun från adresskomponenter
-          const addressComponents = data.results[0].address_components;
-          
-          // Leta efter locality eller administrative_area_level_2 för staden
-          for (const component of addressComponents) {
-            if (component.types.includes('locality') || 
-                component.types.includes('administrative_area_level_2')) {
-              return component.long_name;
-            }
-          }
-          
-          // Fallback: ta första delen av formatted_address
-          const parts = data.results[0].formatted_address.split(',');
-          if (parts.length > 1) {
-            return parts[parts.length - 2].trim();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[GeographicOverview] Reverse geocoding fel:', error);
-    }
-    
-    // Fallback till enkel koordinat-baserad approximation
-    if (coordinates.lat > 59.4 && coordinates.lng > 17.8) return 'Stockholm';
-    if (coordinates.lat > 57.6 && coordinates.lng > 11.8) return 'Göteborg';  
-    if (coordinates.lat > 55.5 && coordinates.lng > 12.9) return 'Malmö';
-    return 'Övriga Sverige';
-  };
 
   const initializeMap = () => {
     if (!mapRef.current || !window.google || !window.google.maps) {
@@ -423,9 +429,21 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     console.log('[GeographicOverview] Initialiserar Google Maps...');
 
     try {
+      // Beräkna center baserat på tekniker-positioner eller fallback
+      let mapCenter = { lat: 59.3293, lng: 18.0686 }; // Fallback till Stockholm
+      if (technicians.length > 0) {
+        const validCoords = technicians.filter(t => t.coordinates);
+        if (validCoords.length > 0) {
+          mapCenter = {
+            lat: validCoords.reduce((sum, t) => sum + t.coordinates!.lat, 0) / validCoords.length,
+            lng: validCoords.reduce((sum, t) => sum + t.coordinates!.lng, 0) / validCoords.length
+          };
+        }
+      }
+
       const map = new google.maps.Map(mapRef.current, {
         zoom: 8,
-        center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
+        center: mapCenter,
         styles: [
           // Dark mode styling för karta
           { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
@@ -454,30 +472,33 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       technicians: technicians.length
     });
 
-    // Lägg till markers för kluster
+    // Lägg till markers för tekniker-kluster
     clusters.forEach((cluster, index) => {
-      console.log('[GeographicOverview] Skapar marker för kluster:', cluster.area, cluster.center);
+      console.log('[GeographicOverview] Skapar marker för tekniker-kluster:', cluster.technicianName, cluster.center);
       
       const marker = new google.maps.Marker({
         position: cluster.center,
         map: map,
-        title: `${cluster.area}: ${cluster.cases.length} ärenden`,
+        title: `${cluster.technicianName}: ${cluster.cases.length} ärenden${cluster.averageDistance ? ` (⌀ ${cluster.averageDistance} km)` : ''}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="35" height="35" viewBox="0 0 35 35" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="17.5" cy="17.5" r="15" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
-              <text x="17.5" y="22" text-anchor="middle" fill="white" font-size="14" font-weight="bold">
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="18" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+              <text x="20" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">
+                ${cluster.technicianName.split(' ')[0]}
+              </text>
+              <text x="20" y="28" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
                 ${cluster.cases.length}
               </text>
             </svg>
           `),
-          scaledSize: new google.maps.Size(35, 35),
-          anchor: new google.maps.Point(17.5, 17.5)
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 20)
         }
       });
 
       marker.addListener('click', () => {
-        console.log('[GeographicOverview] Kluster klickad:', cluster.area);
+        console.log('[GeographicOverview] Tekniker-kluster klickad:', cluster.technicianName);
         setSelectedCluster(cluster);
       });
     });
@@ -579,7 +600,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           <div className="flex gap-4 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-400">{clusters.length}</div>
-              <div className="text-slate-400">Områden</div>
+              <div className="text-slate-400">Kluster</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-400">{technicians.length}</div>
@@ -614,9 +635,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
             </div>
           </div>
 
-          {/* Kluster-lista */}
+          {/* Tekniker-kluster lista */}
           <div className="space-y-3">
-            <h4 className="font-medium text-slate-300">Områdeskluster</h4>
+            <h4 className="font-medium text-slate-300">Tekniker-kluster</h4>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {clusters.map(cluster => (
                 <div
@@ -628,25 +649,23 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                       : 'bg-slate-800/50 border-slate-700 hover:bg-slate-700/50'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-white">{cluster.area}</div>
-                      <div className="text-sm text-slate-400">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-white">{cluster.technicianName}</div>
+                      <div className="text-sm text-blue-400">
                         {cluster.cases.length} ärenden
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {new Set(
-                          cluster.cases.flatMap(c => [
-                            c.primary_assignee_name,
-                            c.secondary_assignee_name,
-                            c.tertiary_assignee_name
-                          ].filter(Boolean))
-                        ).size} tekniker
-                      </span>
+                    
+                    <div className="text-xs text-slate-400">
+                      📍 {cluster.technicianAddress}
                     </div>
+                    
+                    {cluster.averageDistance && (
+                      <div className="text-xs text-slate-500">
+                        ⌀ {cluster.averageDistance} km avstånd
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -658,9 +677,17 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         {selectedCluster && (
           <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-white">
-                Område: {selectedCluster.area}
-              </h4>
+              <div>
+                <h4 className="font-medium text-white">
+                  {selectedCluster.technicianName}
+                </h4>
+                <p className="text-sm text-slate-400">
+                  📍 {selectedCluster.technicianAddress}
+                  {selectedCluster.averageDistance && (
+                    <span className="ml-2">• ⌀ {selectedCluster.averageDistance} km</span>
+                  )}
+                </p>
+              </div>
               <button
                 onClick={() => setSelectedCluster(null)}
                 className="text-slate-400 hover:text-white"
