@@ -14,6 +14,7 @@ import { customerService } from '../../services/customerService'
 import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/businessTypes'
 import { getContractStatus } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
+import { PageHeader } from '../../components/shared'
 
 interface CustomerDetails {
   id: string

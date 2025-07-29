@@ -16,6 +16,7 @@ import { customerService } from '../../services/customerService'
 import { getBusinessTypeLabel, BUSINESS_TYPES } from '../../constants/businessTypes'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { PageHeader } from '../../components/shared'
 
 interface Customer {
   id: string

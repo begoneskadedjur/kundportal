@@ -12,6 +12,7 @@ import CommissionTechnicianFilter from '../../components/admin/commissions/Commi
 import CommissionChart from '../../components/admin/commissions/CommissionChart'
 import CommissionDetailsTable from '../../components/admin/commissions/CommissionDetailsTable'
 import CommissionExportButtons from '../../components/admin/commissions/CommissionExportButtons'
+import { PageHeader } from '../../components/shared'
 
 // Modal för ärendedetaljer (återanvänd från billing)
 import type { CommissionCaseDetail } from '../../types/commission'

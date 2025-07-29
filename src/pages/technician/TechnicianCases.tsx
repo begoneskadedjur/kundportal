@@ -15,6 +15,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
+import { PageHeader } from '../../components/shared'
 
 // ✅ INTERFACE UTÖKAT MED NYA FÄLT FRÅN DATABASEN
 interface TechnicianCase {
@@ -170,17 +171,11 @@ export default function TechnicianCases() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-500/10 p-2 rounded-lg"><ClipboardList className="w-6 h-6 text-blue-500" /></div>
-              <div><h1 className="text-2xl font-bold text-white">Mina Ärenden</h1><p className="text-sm text-slate-400">Översikt över tilldelade ärenden - {technicianName}</p></div>
-            </div>
-            <Button variant="secondary" onClick={() => navigate('/technician/dashboard')}><ArrowLeft className="w-4 h-4 mr-2"/>Tillbaka</Button>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <PageHeader 
+          title="Mina Ärenden"
+          backPath="/technician/dashboard"
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-slate-400 text-sm">Totalt</p><p className="text-xl font-bold text-white">{stats.total_cases}</p></div><ClipboardList className="w-6 h-6 text-slate-400" /></div></Card>
             <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-green-400 text-sm">Avslutade</p><p className="text-xl font-bold text-white">{stats.completed_cases}</p></div><CheckCircle className="w-6 h-6 text-green-400" /></div></Card>
@@ -269,9 +264,9 @@ export default function TechnicianCases() {
                 </div>
             </div>
         </div>
-      </main>
 
-      <EditCaseModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSuccess={handleUpdateSuccess} caseData={selectedCase} />
+        <EditCaseModal isOpen={isEditModalOpen} onClose={handleCloseEditModal} onSuccess={handleUpdateSuccess} caseData={selectedCase} />
+      </div>
     </div>
   )
 }

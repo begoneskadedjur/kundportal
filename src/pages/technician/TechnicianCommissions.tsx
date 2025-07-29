@@ -10,6 +10,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { PageHeader } from '../../components/shared'
 
 // Interfaces
 interface MonthlyCommission {
@@ -172,32 +173,11 @@ export default function TechnicianCommissions() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={() => navigate('/technician/dashboard')} 
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" /> Tillbaka
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="bg-green-500/10 p-2 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-500" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Mina Provisioner</h1>
-                <p className="text-sm text-slate-400">Översikt över intjänade provisioner</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <PageHeader 
+          title="Mina Provisioner"
+          backPath="/technician/dashboard"
+        />
         {/* 🔍 Success Debug Info */}
         <Card className="p-4 mb-6 bg-green-500/10 border-green-500/30">
           <div className="text-xs text-green-400">
@@ -516,7 +496,7 @@ export default function TechnicianCommissions() {
             </div>
           </div>
         </Card>
-      </main>
+      </div>  
     </div>
   )
 }

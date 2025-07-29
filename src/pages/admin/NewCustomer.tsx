@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase'
 import { BUSINESS_TYPES, getBusinessTypeIcon } from '../../constants/businessTypes'
 import { calculateContractEndDate } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
+import { PageHeader } from '../../components/shared'
 
 type ContractType = {
   id: string
@@ -174,26 +175,13 @@ export default function NewCustomer() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Header (BEHÅLLS OFÖRÄNDRAD) */}
-      <header className="glass border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/admin/customers')}
-              className="mr-4"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Tillbaka
-            </Button>
-            <h1 className="text-xl font-semibold">Lägg till ny kund - Med automatisk slutdatum</h1>
-          </div>
-        </div>
-      </header>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PageHeader 
+          title="Lägg till ny kund"
+          backPath="/admin/customers"
+        />
 
-      {/* Form */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-8">
           
           {/* Företagsinformation (BEHÅLLS OFÖRÄNDRAD) */}
@@ -595,7 +583,7 @@ export default function NewCustomer() {
             </Button>
           </div>
         </form>
-      </main>
+      </div>
     </div>
   )
 }
