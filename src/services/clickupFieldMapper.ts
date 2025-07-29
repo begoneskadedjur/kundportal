@@ -189,7 +189,7 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
     })
   }
 
-  if (caseData.rapport && String(caseData.rapport).trim()) {
+  if (caseData.rapport !== null && caseData.rapport !== undefined) {
     const rapportValue = String(caseData.rapport).trim();
     console.log(`[ClickUpMapper] Adding rapport field:`, {
       original: caseData.rapport,
@@ -203,8 +203,7 @@ async function buildRemainingCustomFields(caseData: any, caseType: 'private' | '
   } else {
     console.log(`[ClickUpMapper] Skipping rapport field:`, {
       rapport: caseData.rapport,
-      hasValue: !!caseData.rapport,
-      trimmed: caseData.rapport ? String(caseData.rapport).trim() : null
+      reason: 'null or undefined'
     });
   }
 
@@ -658,12 +657,23 @@ export function convertSupabaseToClickUp(caseData: any, caseType: 'private' | 'b
   if (caseData.pris !== null && caseData.pris !== undefined) {
     // Currency/Number field - måste vara ett numeriskt värde enligt ClickUp API
     const priceValue = parseFloat(caseData.pris);
+    console.log(`[ClickUpMapper] Processing pris field:`, {
+      original: caseData.pris,
+      parsed: priceValue,
+      isNaN: isNaN(priceValue),
+      fieldId: CLICKUP_FIELD_IDS.PRIS
+    });
     if (!isNaN(priceValue)) {
       customFields.push({
         id: CLICKUP_FIELD_IDS.PRIS,
         value: priceValue
       })
+      console.log(`[ClickUpMapper] Added pris field with value:`, priceValue);
+    } else {
+      console.log(`[ClickUpMapper] Skipping pris field - invalid number:`, caseData.pris);
     }
+  } else {
+    console.log(`[ClickUpMapper] Skipping pris field - null or undefined:`, caseData.pris);
   }
 
   if (caseData.filer) {
