@@ -1863,6 +1863,10 @@ function generateDetailedChangeReasonWithContext(caseItem: any, fromTech: any, t
 
 // Analysera rutt-kontext för en tekniker
 function analyzeRouteContext(technician: any, currentCase: any, allCases: any[], caseDate: string): any {
+  console.log(`[RouteContext] Analyzing route context for ${technician.name} on ${caseDate}`);
+  console.log(`[RouteContext] Total cases to analyze: ${allCases.length}`);
+  console.log(`[RouteContext] Current case ID: ${currentCase.id}, start_date: ${currentCase.start_date}`);
+  
   const technicianCases = allCases.filter(c => 
     (c.primary_assignee_id === technician.id || 
      c.secondary_assignee_id === technician.id || 
@@ -1870,6 +1874,8 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
     new Date(c.start_date).toISOString().split('T')[0] === caseDate &&
     c.id !== currentCase.id
   ).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+
+  console.log(`[RouteContext] Found ${technicianCases.length} other cases for ${technician.name} on ${caseDate}`);
 
   const currentCaseTime = new Date(currentCase.start_date);
   let previousCase = null;
@@ -1894,7 +1900,7 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
     primaryReason = `${technician.name} avslutar föregående ärende på ${prevShortAddress}`;
   }
 
-  return {
+  const result = {
     primary_reason: primaryReason,
     previous_case: previousCase ? {
       title: previousCase.title || 'Föregående ärende',
@@ -1938,6 +1944,16 @@ function analyzeRouteContext(technician: any, currentCase: any, allCases: any[],
       route_efficiency_improvement: calculateRouteEfficiencyImprovement(technician, currentCase, technicianCases)
     }
   };
+  
+  console.log(`[RouteContext] Result for ${technician.name}:`, {
+    primary_reason: result.primary_reason,
+    has_previous_case: !!result.previous_case,
+    has_next_case: !!result.next_case,
+    previous_case_address: result.previous_case?.address,
+    previous_case_distance: result.previous_case?.distance_to_current
+  });
+  
+  return result;
 }
 
 // Beräkna detaljerad hemresa-påverkan
