@@ -437,14 +437,31 @@ async function calculateDistanceMatrix(addresses: string[]) {
   }
   
   const distanceMap = new Map();
-  const batchSize = 25; // Google Maps begränsning
+  
+  // Google Maps Distance Matrix API har en gräns på 100 element per anrop
+  // (origins × destinations ≤ 100)
+  // Vi beräknar optimal batch-storlek baserat på antal adresser
+  const maxElementsPerRequest = 100;
+  const optimalBatchSize = Math.floor(Math.sqrt(maxElementsPerRequest));
+  const batchSize = Math.min(optimalBatchSize, addresses.length);
+  
+  console.log(`[Optimization] Använder batch-storlek: ${batchSize} för ${addresses.length} adresser`);
   
   try {
     // Processa i batches
     for (let i = 0; i < addresses.length; i += batchSize) {
       for (let j = 0; j < addresses.length; j += batchSize) {
-        const originBatch = addresses.slice(i, i + batchSize);
-        const destinationBatch = addresses.slice(j, j + batchSize);
+        const originBatch = addresses.slice(i, Math.min(i + batchSize, addresses.length));
+        const destinationBatch = addresses.slice(j, Math.min(j + batchSize, addresses.length));
+        
+        // Kontrollera att vi inte överskrider gränsen
+        const totalElements = originBatch.length * destinationBatch.length;
+        if (totalElements > maxElementsPerRequest) {
+          console.error(`[Optimization] Batch överskrider gräns: ${totalElements} element`);
+          continue;
+        }
+        
+        console.log(`[Optimization] Hämtar distanser för batch: ${originBatch.length}x${destinationBatch.length} = ${totalElements} element`);
         
         const batchResults = await fetchDistanceMatrixBatch(originBatch, destinationBatch, apiKey);
         
@@ -457,11 +474,12 @@ async function calculateDistanceMatrix(addresses: string[]) {
           });
         });
         
-        // Kort paus mellan batches
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Kort paus mellan batches för att undvika rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
     
+    console.log(`[Optimization] Distance Matrix klar, ${distanceMap.size} element beräknade`);
     return distanceMap;
     
   } catch (error) {
@@ -492,7 +510,8 @@ async function fetchDistanceMatrixBatch(origins: string[], destinations: string[
   const data = await response.json() as any;
 
   if (data.status !== 'OK') {
-    throw new Error(`Distance Matrix API fel: ${data.status}`);
+    const errorMessage = data.error_message ? `${data.status}: ${data.error_message}` : data.status;
+    throw new Error(`Distance Matrix API fel: ${errorMessage}`);
   }
 
   const results: any[] = [];
