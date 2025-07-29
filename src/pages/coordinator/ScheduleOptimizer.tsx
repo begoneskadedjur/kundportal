@@ -187,11 +187,13 @@ export default function ScheduleOptimizer() {
       const periodEndDate = endDate.toISOString().split('T')[0];
       
       console.log(`[Tech Selection] Fetching absences for period: ${periodStartDate} to ${periodEndDate}`);
+      console.log(`[Tech Selection] Using correct interval overlap logic: end_date >= '${periodStartDate}' AND start_date <= '${periodEndDate}'`);
       
       const { data: absences, error: absenceError } = await supabase
         .from('technician_absences')
         .select('technician_id, start_date, end_date')
-        .or(`start_date.lte.${periodEndDate},end_date.gte.${periodStartDate}`);
+        .gte('end_date', periodStartDate)
+        .lte('start_date', periodEndDate);
       
       if (absenceError) {
         console.error('[Tech Selection] Error fetching absences:', absenceError);
