@@ -480,45 +480,27 @@ const RouteVisualization: React.FC<{
 const HomeCommuteInfo: React.FC<{ 
   change: any;
 }> = ({ change }) => {
-  // Simulera att detta ärende är inom 90 minuter från slutet (för demo)
-  const caseDate = new Date(change.case_start_time || '2024-01-01T15:30:00');
-  const caseHour = caseDate.getHours();
+  // Använd riktig hemresa-data från backend om tillgänglig
+  const homeCommuteData = change.home_commute_info;
   
-  // Endast visa för ärenden efter 15:00 (som demonstration)
-  const isNearEndOfDay = caseHour >= 15;
+  if (!homeCommuteData || !homeCommuteData.is_near_end_of_day) {
+    return null;
+  }
   
-  if (!isNearEndOfDay) return null;
-  
-  // Simulera hemresa-data
-  const homeCommuteData = {
-    workEndsAt: '17:00',
-    minutesUntilWorkEnds: Math.max(0, (17 * 60) - (caseHour * 60 + caseDate.getMinutes())),
-    toTechnician: {
-      homeDistance: Math.random() * 15 + 5, // 5-20km
-      homeTravelTime: Math.random() * 25 + 15, // 15-40min
-      estimatedHomeArrival: `${Math.min(18, caseHour + 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`
-    },
-    fromTechnician: {
-      homeDistance: Math.random() * 20 + 10, // 10-30km
-      homeTravelTime: Math.random() * 35 + 20, // 20-55min
-      estimatedHomeArrival: `${Math.min(19, caseHour + 3)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`
-    }
-  };
-  
-  const timeSavedGettingHome = homeCommuteData.fromTechnician.homeTravelTime - homeCommuteData.toTechnician.homeTravelTime;
-  const distanceSavedGettingHome = homeCommuteData.fromTechnician.homeDistance - homeCommuteData.toTechnician.homeDistance;
+  const timeSavedGettingHome = homeCommuteData.time_saved_getting_home_minutes || 0;
+  const distanceSavedGettingHome = homeCommuteData.distance_saved_getting_home_km || 0;
   
   return (
     <div className="mt-2 pt-2 border-t border-slate-600">
       <div className="flex items-center gap-2 text-slate-300 mb-1">
         <Home className="w-3 h-3 text-orange-400" />
         <span className="font-medium">Hemresa-fördel:</span>
-        <span className="text-xs text-slate-500">({homeCommuteData.minutesUntilWorkEnds}min kvar av arbetsdagen)</span>
+        <span className="text-xs text-slate-500">({homeCommuteData.minutes_until_work_ends}min kvar av arbetsdagen)</span>
       </div>
       
       <div className="space-y-1 text-slate-400">
-        <div>• {change.to_technician} hem: <span className="text-green-400">{homeCommuteData.toTechnician.homeTravelTime}min, {homeCommuteData.toTechnician.homeDistance.toFixed(1)}km</span> → hemma {homeCommuteData.toTechnician.estimatedHomeArrival}</div>
-        <div>• {change.from_technician} hem: <span className="text-red-400">{homeCommuteData.fromTechnician.homeTravelTime}min, {homeCommuteData.fromTechnician.homeDistance.toFixed(1)}km</span> → hemma {homeCommuteData.fromTechnician.estimatedHomeArrival}</div>
+        <div>• {change.to_technician} hem: <span className="text-green-400">{Math.round(homeCommuteData.to_technician.home_travel_time_minutes)}min, {homeCommuteData.to_technician.home_distance_km.toFixed(1)}km</span> → hemma {homeCommuteData.to_technician.estimated_home_arrival}</div>
+        <div>• {change.from_technician} hem: <span className="text-red-400">{Math.round(homeCommuteData.from_technician.home_travel_time_minutes)}min, {homeCommuteData.from_technician.home_distance_km.toFixed(1)}km</span> → hemma {homeCommuteData.from_technician.estimated_home_arrival}</div>
       </div>
       
       {(timeSavedGettingHome > 5 || distanceSavedGettingHome > 2) && (
@@ -531,6 +513,18 @@ const HomeCommuteInfo: React.FC<{
     </div>
   );
 };
+
+// Hjälpfunktion för att beräkna uppskattad ankomsttid hem
+function calculateEstimatedArrivalTime(currentHour: number, travelTimeMinutes: number): string {
+  const assumedCaseDuration = 60; // Anta 60min för ärendet
+  const totalMinutesFromNow = assumedCaseDuration + travelTimeMinutes;
+  
+  const arrivalTotalMinutes = (currentHour * 60) + totalMinutesFromNow;
+  const arrivalHour = Math.floor(arrivalTotalMinutes / 60);
+  const arrivalMinute = Math.round(arrivalTotalMinutes % 60);
+  
+  return `${arrivalHour.toString().padStart(2, '0')}:${arrivalMinute.toString().padStart(2, '0')}`;
+}
 
 // Typer
 interface OptimizationRequest {
