@@ -28,7 +28,7 @@ import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 // KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
-import BookingAssistant from './pages/coordinator/BookingAssistant';
+import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard';
@@ -181,7 +181,7 @@ function App() {
               path="/koordinator/booking-assistant" 
               element={
                 <ProtectedRoute requiredRole="koordinator">
-                  <BookingAssistant />
+                  <ScheduleOptimizer />
                 </ProtectedRoute>
               } 
             />

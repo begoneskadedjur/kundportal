@@ -280,9 +280,9 @@ export default function CoordinatorDashboard() {
             <CoordinatorDashboardCard
               href="/koordinator/booking-assistant"
               icon={Wand2}
-              title="Intelligent Bokningsassistent"
-              description="Ange en ny adress och få AI-förslag på den mest effektiva teknikern och tiden att boka."
-              tag="Nytt"
+              title="Schemaoptimerare"
+              description="Optimera befintligt schema för att minska körsträckor och maximera tekniker-effektivitet."
+              tag="Uppdaterad"
             />
           </div>
         </main>
