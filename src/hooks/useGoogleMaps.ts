@@ -23,12 +23,16 @@ export function useGoogleMaps(config: GoogleMapsConfig = {}) {
     // Om redan laddning pågår
     if (isLoading) return;
 
+    // Försök hitta API-nyckel från olika källor
     const apiKey = config.apiKey || 
       import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
       import.meta.env.VITE_GOOGLE_GEOCODING;
 
+    console.log('[useGoogleMaps] API key tillgänglig:', !!apiKey);
+
     if (!apiKey) {
-      setError('Google Maps API key saknas');
+      console.error('[useGoogleMaps] Ingen Google Maps API key hittad');
+      setError('Google Maps API key saknas. Kontrollera miljövariabler.');
       return;
     }
 
@@ -45,13 +49,15 @@ export function useGoogleMaps(config: GoogleMapsConfig = {}) {
 
     // Hantera success
     script.onload = () => {
+      console.log('[useGoogleMaps] Google Maps API laddad framgångsrikt');
       setIsLoaded(true);
       setIsLoading(false);
     };
 
     // Hantera fel
-    script.onerror = () => {
-      setError('Kunde inte ladda Google Maps API');
+    script.onerror = (event) => {
+      console.error('[useGoogleMaps] Fel vid laddning av Google Maps API:', event);
+      setError('Kunde inte ladda Google Maps API. Kontrollera API-nyckel och internet.');
       setIsLoading(false);
     };
 

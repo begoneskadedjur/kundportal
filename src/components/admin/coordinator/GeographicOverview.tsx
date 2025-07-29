@@ -78,9 +78,13 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       setLoading(true);
       setError(null);
 
+      console.log('[GeographicOverview] Hämtar dagens data...');
+
       const today = new Date();
       const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
       const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+      console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd });
 
       // Hämta dagens ärenden
       const [privateCases, businessCases, techniciansData] = await Promise.all([
@@ -109,22 +113,52 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       if (businessCases.error) throw businessCases.error;
       if (techniciansData.error) throw techniciansData.error;
 
+      console.log('[GeographicOverview] Raw data:', {
+        privateCases: privateCases.data?.length,
+        businessCases: businessCases.data?.length,
+        technicians: techniciansData.data?.length
+      });
+
       // Kombinera ärenden
       const allCases = [
         ...(privateCases.data || []).map(c => ({ ...c, case_type: 'private' as const })),
         ...(businessCases.data || []).map(c => ({ ...c, case_type: 'business' as const }))
       ] as BeGoneCaseRow[];
 
+      console.log('[GeographicOverview] Kombinerade ärenden:', allCases.length);
+      console.log('[GeographicOverview] Exempel på ärendeadresser:', 
+        allCases.slice(0, 3).map(c => ({ id: c.id, address: c.adress }))
+      );
+
       // Geocoda adresser
       const casesWithLocations = await geocodeCases(allCases);
       const techniciansWithLocations = await geocodeTechnicians(techniciansData.data || []);
+
+      // Lägg till ärendekopp
+
+      techniciansWithLocations.forEach(tech => {
+        tech.todaysCases = casesWithLocations.filter(c => 
+          c.primary_assignee_id === tech.id ||
+          c.secondary_assignee_id === tech.id ||
+          c.tertiary_assignee_id === tech.id
+        );
+      });
+
+      console.log('[GeographicOverview] Geocodade resultat:', {
+        cases: casesWithLocations.length,
+        technicians: techniciansWithLocations.length,
+        technicianCases: techniciansWithLocations.map(t => ({ 
+          name: t.name, 
+          cases: t.todaysCases?.length || 0 
+        }))
+      });
 
       setTodaysCases(casesWithLocations);
       setTechnicians(techniciansWithLocations);
 
     } catch (err: any) {
-      console.error('Fel vid hämtning av geografisk data:', err);
-      setError('Kunde inte ladda geografisk data');
+      console.error('[GeographicOverview] Fel vid hämtning av geografisk data:', err);
+      setError(`Kunde inte ladda geografisk data: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -133,34 +167,53 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   const geocodeCases = async (cases: BeGoneCaseRow[]): Promise<CaseWithLocation[]> => {
     const casesWithLocations: CaseWithLocation[] = [];
 
+    console.log('[GeographicOverview] Geocodar ärenden:', cases.length);
+
     for (const caseData of cases) {
       let address = '';
+      let coordinates = null;
       
+      console.log('[GeographicOverview] Behandlar ärende:', { 
+        id: caseData.id, 
+        title: caseData.title,
+        adress: caseData.adress 
+      });
+
       // Extrahera adress från olika format
       if (typeof caseData.adress === 'string') {
         try {
+          // Försök parsa som JSON först
           const parsed = JSON.parse(caseData.adress);
           address = parsed.formatted_address || caseData.adress;
+          if (parsed.location?.lat && parsed.location?.lng) {
+            coordinates = { lat: parsed.location.lat, lng: parsed.location.lng };
+          }
         } catch {
+          // Om inte JSON, använd som vanlig sträng
           address = caseData.adress;
         }
-      } else if (caseData.adress?.formatted_address) {
-        address = caseData.adress.formatted_address;
+      } else if (caseData.adress && typeof caseData.adress === 'object') {
+        address = caseData.adress.formatted_address || '';
+        if (caseData.adress.location?.lat && caseData.adress.location?.lng) {
+          coordinates = { lat: caseData.adress.location.lat, lng: caseData.adress.location.lng };
+        }
       }
 
-      if (!address) continue;
+      if (!address) {
+        console.log('[GeographicOverview] Hoppar över ärende utan adress:', caseData.id);
+        continue;
+      }
 
-      // Geocoda om inte redan geocodad
-      if (caseData.adress?.location?.lat && caseData.adress?.location?.lng) {
+      // Använd befintliga koordinater eller geocoda
+      if (coordinates) {
+        console.log('[GeographicOverview] Använder befintliga koordinater för:', address);
         casesWithLocations.push({
           ...caseData,
-          coordinates: {
-            lat: caseData.adress.location.lat,
-            lng: caseData.adress.location.lng
-          },
+          coordinates,
           formatted_address: address
         });
       } else {
+        console.log('[GeographicOverview] Geocodar adress:', address);
         const geocodeResult = await geocodeAddress(address);
         if (geocodeResult.success) {
           casesWithLocations.push({
@@ -171,27 +224,33 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
             },
             formatted_address: geocodeResult.result.formatted_address
           });
+          console.log('[GeographicOverview] Geocoding lyckades:', geocodeResult.result.formatted_address);
+        } else {
+          console.log('[GeographicOverview] Geocoding misslyckades:', geocodeResult.error);
         }
       }
     }
 
+    console.log('[GeographicOverview] Slutligt antal geocodade ärenden:', casesWithLocations.length);
     return casesWithLocations;
   };
 
   const geocodeTechnicians = async (techs: Technician[]): Promise<TechnicianWithLocation[]> => {
     const techniciansWithLocations: TechnicianWithLocation[] = [];
 
+    console.log('[GeographicOverview] Geocodar tekniker:', techs.length);
+
     for (const tech of techs) {
-      if (!tech.address) continue;
+      if (!tech.address) {
+        console.log('[GeographicOverview] Hoppar över tekniker utan adress:', tech.name);
+        continue;
+      }
+
+      console.log('[GeographicOverview] Geocodar tekniker:', tech.name, tech.address);
 
       const geocodeResult = await geocodeAddress(tech.address);
       if (geocodeResult.success) {
-        // Hitta teknikerns dagens ärenden
-        const techCases = todaysCases.filter(c => 
-          c.primary_assignee_id === tech.id ||
-          c.secondary_assignee_id === tech.id ||
-          c.tertiary_assignee_id === tech.id
-        );
+        console.log('[GeographicOverview] Tekniker geocodad:', tech.name);
 
         techniciansWithLocations.push({
           ...tech,
@@ -199,16 +258,21 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
             lat: geocodeResult.result.location.lat,
             lng: geocodeResult.result.location.lng
           },
-          todaysCases: techCases
+          todaysCases: [] // Vi kommer att fylla detta senare
         });
+      } else {
+        console.log('[GeographicOverview] Tekniker geocoding misslyckades:', tech.name, geocodeResult.error);
       }
     }
 
+    console.log('[GeographicOverview] Slutligt antal geocodade tekniker:', techniciansWithLocations.length);
     return techniciansWithLocations;
   };
 
   const generateClusters = () => {
-    const CLUSTER_RADIUS_KM = 5; // Kluster ärenden inom 5km
+    console.log('[GeographicOverview] Genererar kluster för', todaysCases.length, 'ärenden');
+    
+    const CLUSTER_RADIUS_KM = 10; // Öka till 10km för bättre klustering
     const clusters: CaseCluster[] = [];
     const processed = new Set<string>();
 
@@ -239,14 +303,22 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       const center = calculateClusterCenter(clusterCases);
       const area = getAreaName(center);
 
+      console.log('[GeographicOverview] Skapade kluster:', {
+        area,
+        cases: clusterCases.length,
+        center,
+        caseIds: clusterCases.map(c => c.id)
+      });
+
       clusters.push({
-        id: `cluster-${clusters.length}`,
+        id: `cluster-${Date.now()}-${clusters.length}`, // Mer unik ID
         cases: clusterCases,
         center,
         area
       });
     });
 
+    console.log('[GeographicOverview] Totalt antal kluster:', clusters.length);
     setClusters(clusters);
   };
 
@@ -281,46 +353,68 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   };
 
   const initializeMap = () => {
-    if (!mapRef.current || !window.google) return;
+    if (!mapRef.current || !window.google || !window.google.maps) {
+      console.error('[GeographicOverview] Google Maps inte tillgängligt');
+      return;
+    }
 
-    const map = new google.maps.Map(mapRef.current, {
-      zoom: 10,
-      center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
-      styles: [
-        // Dark mode styling för karta
-        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }
-      ]
-    });
+    console.log('[GeographicOverview] Initialiserar Google Maps...');
 
-    googleMapRef.current = map;
+    try {
+      const map = new google.maps.Map(mapRef.current, {
+        zoom: 8,
+        center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
+        styles: [
+          // Dark mode styling för karta
+          { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+          { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+          { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+          { elementType: "water", stylers: [{ color: "#17263c" }] },
+          { elementType: "road", stylers: [{ color: "#3a3b3c" }] }
+        ]
+      });
 
-    // Lägg till markers för ärenden och tekniker
-    addMarkersToMap(map);
+      googleMapRef.current = map;
+      console.log('[GeographicOverview] Google Maps initialiserad');
+
+      // Lägg till markers för ärenden och tekniker
+      addMarkersToMap(map);
+    } catch (error) {
+      console.error('[GeographicOverview] Fel vid initialisering av karta:', error);
+      setError('Kunde inte initialisera kartan');
+    }
   };
 
   const addMarkersToMap = (map: google.maps.Map) => {
+    console.log('[GeographicOverview] Lägger till markers:', {
+      clusters: clusters.length,
+      technicians: technicians.length
+    });
+
     // Lägg till markers för kluster
-    clusters.forEach(cluster => {
+    clusters.forEach((cluster, index) => {
+      console.log('[GeographicOverview] Skapar marker för kluster:', cluster.area, cluster.center);
+      
       const marker = new google.maps.Marker({
         position: cluster.center,
         map: map,
         title: `${cluster.area}: ${cluster.cases.length} ärenden`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="15" cy="15" r="12" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
-              <text x="15" y="19" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
+            <svg width="35" height="35" viewBox="0 0 35 35" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="17.5" cy="17.5" r="15" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+              <text x="17.5" y="22" text-anchor="middle" fill="white" font-size="14" font-weight="bold">
                 ${cluster.cases.length}
               </text>
             </svg>
           `),
-          scaledSize: new google.maps.Size(30, 30)
+          scaledSize: new google.maps.Size(35, 35),
+          anchor: new google.maps.Point(17.5, 17.5)
         }
       });
 
       marker.addListener('click', () => {
+        console.log('[GeographicOverview] Kluster klickad:', cluster.area);
         setSelectedCluster(cluster);
       });
     });
@@ -329,21 +423,41 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     technicians.forEach(tech => {
       if (!tech.coordinates) return;
 
+      console.log('[GeographicOverview] Skapar marker för tekniker:', tech.name, tech.coordinates);
+
       new google.maps.Marker({
         position: tech.coordinates,
         map: map,
         title: `${tech.name} (${tech.todaysCases?.length || 0} ärenden)`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="25" height="25" viewBox="0 0 25 25" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12.5" cy="12.5" r="10" fill="#10b981" stroke="#047857" stroke-width="2"/>
-              <path d="M8 12.5l3 3 6-6" stroke="white" stroke-width="2" fill="none"/>
+            <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="15" cy="15" r="12" fill="#10b981" stroke="#047857" stroke-width="2"/>
+              <path d="M10 15l4 4 8-8" stroke="white" stroke-width="2" fill="none"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(25, 25)
+          scaledSize: new google.maps.Size(30, 30),
+          anchor: new google.maps.Point(15, 15)
         }
       });
     });
+
+    // Anpassa zoom för att visa alla markers
+    if (clusters.length > 0 || technicians.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      
+      clusters.forEach(cluster => {
+        bounds.extend(cluster.center);
+      });
+      
+      technicians.forEach(tech => {
+        if (tech.coordinates) {
+          bounds.extend(tech.coordinates);
+        }
+      });
+
+      map.fitBounds(bounds);
+    }
   };
 
   if (loading) {
