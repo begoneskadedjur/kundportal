@@ -79,7 +79,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   // Uppdatera kluster när ärenden och tekniker finns
   useEffect(() => {
     if (todaysCases.length > 0 && technicians.length > 0) {
-      generateTechnicianClusters();
+      generateActualTechnicianClusters();
     }
   }, [todaysCases, technicians]);
 
@@ -293,7 +293,88 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     return techniciansWithLocations;
   };
 
-  const generateTechnicianClusters = () => {
+  const generateActualTechnicianClusters = () => {
+    console.log('[GeographicOverview] Genererar kluster baserat på faktisk tekniker-tilldelning');
+    
+    const clusters: TechnicianCluster[] = [];
+    
+    // Skapa kluster för varje tekniker som har ärenden tilldelade
+    technicians.forEach(tech => {
+      if (!tech.todaysCases || tech.todaysCases.length === 0) {
+        console.log(`[GeographicOverview] Tekniker ${tech.name} har inga ärenden idag`);
+        return;
+      }
+      
+      // Beräkna genomsnittligt avstånd för teknikerns tilldelade ärenden
+      let totalDistance = 0;
+      let validDistances = 0;
+      
+      tech.todaysCases.forEach(caseData => {
+        if (tech.coordinates && caseData.coordinates) {
+          const distance = calculateDistance(tech.coordinates, caseData.coordinates);
+          totalDistance += distance;
+          validDistances++;
+        }
+      });
+      
+      const averageDistance = validDistances > 0 ? totalDistance / validDistances : undefined;
+      
+      // Beräkna kluster-center (tekniker + ärenden)
+      const allCoordinates = [
+        ...(tech.coordinates ? [tech.coordinates] : []),
+        ...tech.todaysCases.map(c => c.coordinates).filter(Boolean)
+      ] as { lat: number; lng: number }[];
+      
+      const center = allCoordinates.length > 0 ? {
+        lat: allCoordinates.reduce((sum, coord) => sum + coord.lat, 0) / allCoordinates.length,
+        lng: allCoordinates.reduce((sum, coord) => sum + coord.lng, 0) / allCoordinates.length
+      } : tech.coordinates || { lat: 59.3293, lng: 18.0686 };
+      
+      clusters.push({
+        id: `tech-cluster-${tech.id}`,
+        cases: tech.todaysCases,
+        center,
+        technicianName: tech.name,
+        technicianAddress: formatAddress(tech.address),
+        technicianId: tech.id,
+        averageDistance: averageDistance ? Math.round(averageDistance * 10) / 10 : undefined
+      });
+      
+      console.log(`[GeographicOverview] Skapade kluster för ${tech.name}: ${tech.todaysCases.length} ärenden`);
+    });
+    
+    // Hitta ärenden som inte har någon tekniker tilldelad
+    const assignedCaseIds = new Set<string>();
+    clusters.forEach(cluster => {
+      cluster.cases.forEach(c => assignedCaseIds.add(c.id));
+    });
+    
+    const unassignedCases = todaysCases.filter(c => !assignedCaseIds.has(c.id));
+    
+    if (unassignedCases.length > 0) {
+      console.log(`[GeographicOverview] Hittade ${unassignedCases.length} ärenden utan tekniker`);
+      
+      const center = unassignedCases.length > 0 && unassignedCases[0].coordinates
+        ? calculateClusterCenter(unassignedCases)
+        : { lat: 59.3293, lng: 18.0686 };
+      
+      clusters.push({
+        id: 'unassigned-cluster',
+        cases: unassignedCases,
+        center,
+        technicianName: 'Ej tilldelad',
+        technicianAddress: 'Ingen tekniker tilldelad',
+        technicianId: '',
+        averageDistance: undefined
+      });
+    }
+    
+    console.log('[GeographicOverview] Totalt antal kluster:', clusters.length);
+    setClusters(clusters);
+  };
+
+  // Behåll den gamla funktionen för referens men döp om den
+  const generateTechnicianClustersOLD = () => {
     console.log('[GeographicOverview] Genererar tekniker-centrerade kluster för', todaysCases.length, 'ärenden och', technicians.length, 'tekniker');
     
     const MAX_DISTANCE_KM = 25; // Max avstånd från tekniker till ärende
@@ -824,18 +905,24 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                   onClick={() => {
                     clearRoutes();
                     setSelectedCluster(cluster);
-                    showTechnicianRoute(cluster);
+                    if (cluster.technicianId) {
+                      showTechnicianRoute(cluster);
+                    }
                   }}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedCluster?.id === cluster.id
                       ? 'bg-blue-500/20 border-blue-500/40'
+                      : cluster.id === 'unassigned-cluster'
+                      ? 'bg-red-900/20 border-red-500/40 hover:bg-red-900/30'
                       : 'bg-slate-800/50 border-slate-700 hover:bg-slate-700/50'
                   }`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="font-medium text-white">{cluster.technicianName}</div>
-                      <div className="text-sm text-blue-400">
+                      <div className={`font-medium ${cluster.id === 'unassigned-cluster' ? 'text-red-400' : 'text-white'}`}>
+                        {cluster.technicianName}
+                      </div>
+                      <div className={`text-sm ${cluster.id === 'unassigned-cluster' ? 'text-red-400' : 'text-blue-400'}`}>
                         {cluster.cases.length} ärenden
                       </div>
                     </div>
@@ -847,6 +934,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                     {cluster.averageDistance && (
                       <div className="text-xs text-slate-500">
                         ⌀ {cluster.averageDistance} km avstånd
+                      </div>
+                    )}
+                    
+                    {cluster.id === 'unassigned-cluster' && (
+                      <div className="text-xs text-red-400">
+                        ⚠️ Behöver tilldelning
                       </div>
                     )}
                   </div>
