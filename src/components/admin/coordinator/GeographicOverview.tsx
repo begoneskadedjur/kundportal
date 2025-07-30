@@ -101,8 +101,8 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd, weekAgoStart });
 
-      // Hämta ärenden och kompetenta tekniker (samma som ruttplaneraren)
-      const [casesToday, competentTechnicians] = await Promise.all([
+      // Hämta ärenden och aktiva tekniker
+      const [casesToday, activeTechnicians] = await Promise.all([
         supabase
           .from('cases_with_technician_view')
           .select('*')
@@ -111,13 +111,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           .not('adress', 'is', null),
         
         supabase
-          .from('staff_competencies')
-          .select(`
-            technicians!inner (
-              id, name, address, work_schedule
-            )
-          `)
-          .not('technicians.address', 'is', null)
+          .from('technicians')
+          .select('*')
+          .eq('is_active', true)
+          .not('address', 'is', null)
+          .neq('role', 'Koordinator') // Exkludera koordinatorer från kartan
+          .neq('role', 'Admin') // Exkludera admin från kartan
       ]);
 
       let allCasesData = casesToday;
@@ -135,16 +134,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       }
 
       if (allCasesData.error) throw allCasesData.error;
-      if (competentTechnicians.error) throw competentTechnicians.error;
+      if (activeTechnicians.error) throw activeTechnicians.error;
 
-      // Extrahera unika tekniker från staff_competencies
-      const uniqueTechnicianMap = new Map();
-      competentTechnicians.data?.forEach((comp: any) => {
-        if (comp.technicians) {
-          uniqueTechnicianMap.set(comp.technicians.id, comp.technicians);
-        }
-      });
-      const uniqueTechnicians = Array.from(uniqueTechnicianMap.values());
+      const uniqueTechnicians = activeTechnicians.data || [];
 
       console.log('[GeographicOverview] Raw data:', {
         cases: allCasesData.data?.length,
@@ -155,19 +147,25 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       console.log('[GeographicOverview] Kombinerade ärenden:', allCases.length);
       console.log('[GeographicOverview] Exempel på ärendeadresser:', 
-        allCases.slice(0, 3).map(c => ({ id: c.id, address: c.adress }))
+        allCases.slice(0, 3).map(c => ({ 
+          id: c.id, 
+          address: c.adress,
+          primary_assignee_id: c.primary_assignee_id,
+          primary_assignee_name: c.primary_assignee_name
+        }))
       );
 
       // Geocoda adresser
       const casesWithLocations = await geocodeCases(allCases);
       const techniciansWithLocations = await geocodeTechnicians(uniqueTechnicians);
 
-      // Lägg till ärendekopp
+      // Lägg till ärendekopp baserat på primary_assignee_id
 
       techniciansWithLocations.forEach(tech => {
         tech.todaysCases = casesWithLocations.filter(c => 
-          c.technician_id === tech.id // cases_with_technician_view har redan korrekt koppling
+          c.primary_assignee_id === tech.id // Använd primary_assignee_id istället för technician_id
         );
+        console.log(`[GeographicOverview] Tekniker ${tech.name} (${tech.id}) har ${tech.todaysCases.length} ärenden`);
       });
 
       console.log('[GeographicOverview] Geocodade resultat:', {
@@ -636,7 +634,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 📍 ${caseData.formatted_address}
               </p>
               <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-                👤 ${caseData.technician_name || 'Ej tilldelad'}
+                👤 ${caseData.primary_assignee_name || caseData.technician_name || 'Ej tilldelad'}
               </p>
               <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
                 🕐 ${caseData.start_date ? new Date(caseData.start_date).toLocaleString('sv-SE', { 
