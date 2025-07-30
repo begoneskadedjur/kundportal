@@ -101,10 +101,17 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
       console.log('[GeographicOverview] Datumintervall:', { todayStart, todayEnd, weekAgoStart });
 
-      // Hämta ärenden och aktiva tekniker
-      const [casesToday, activeTechnicians] = await Promise.all([
+      // Hämta ärenden och aktiva tekniker (samma som i CoordinatorSchedule)
+      const [privateCasesToday, businessCasesToday, activeTechnicians] = await Promise.all([
         supabase
-          .from('cases_with_technician_view')
+          .from('private_cases')
+          .select('*')
+          .gte('start_date', todayStart)
+          .lte('start_date', todayEnd)
+          .not('adress', 'is', null),
+        
+        supabase
+          .from('business_cases')
           .select('*')
           .gte('start_date', todayStart)
           .lte('start_date', todayEnd)
@@ -119,31 +126,52 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           .neq('role', 'Admin') // Exkludera admin från kartan
       ]);
 
-      let allCasesData = casesToday;
+      // Kombinera private och business cases
+      const combinedCasesToday = [
+        ...(privateCasesToday.data || []).map(c => ({ ...c, case_type: 'private' as const })),
+        ...(businessCasesToday.data || []).map(c => ({ ...c, case_type: 'business' as const }))
+      ];
+
+      let allCasesData = combinedCasesToday;
 
       // Om inga ärenden idag, hämta från senaste veckan
-      if ((casesToday.data?.length || 0) === 0) {
+      if (combinedCasesToday.length === 0) {
         console.log('[GeographicOverview] Inga ärenden idag, hämtar från senaste veckan...');
         
-        allCasesData = await supabase
-          .from('cases_with_technician_view')
-          .select('*')
-          .gte('start_date', weekAgoStart)
-          .not('adress', 'is', null)
-          .limit(20);
+        const [privateCasesWeek, businessCasesWeek] = await Promise.all([
+          supabase
+            .from('private_cases')
+            .select('*')
+            .gte('start_date', weekAgoStart)
+            .not('adress', 'is', null)
+            .limit(10),
+          
+          supabase
+            .from('business_cases')
+            .select('*')
+            .gte('start_date', weekAgoStart)
+            .not('adress', 'is', null)
+            .limit(10)
+        ]);
+        
+        allCasesData = [
+          ...(privateCasesWeek.data || []).map(c => ({ ...c, case_type: 'private' as const })),
+          ...(businessCasesWeek.data || []).map(c => ({ ...c, case_type: 'business' as const }))
+        ];
       }
 
-      if (allCasesData.error) throw allCasesData.error;
+      if (privateCasesToday.error) throw privateCasesToday.error;
+      if (businessCasesToday.error) throw businessCasesToday.error;
       if (activeTechnicians.error) throw activeTechnicians.error;
 
       const uniqueTechnicians = activeTechnicians.data || [];
 
       console.log('[GeographicOverview] Raw data:', {
-        cases: allCasesData.data?.length,
+        cases: allCasesData.length,
         technicians: uniqueTechnicians.length
       });
 
-      const allCases = (allCasesData.data || []) as BeGoneCaseRow[];
+      const allCases = allCasesData as BeGoneCaseRow[];
 
       console.log('[GeographicOverview] Kombinerade ärenden:', allCases.length);
       console.log('[GeographicOverview] Exempel på ärendeadresser:', 
@@ -162,11 +190,24 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       // Lägg till ärendekopp baserat på primary_assignee_id
 
       techniciansWithLocations.forEach(tech => {
-        tech.todaysCases = casesWithLocations.filter(c => 
-          c.primary_assignee_id === tech.id // Använd primary_assignee_id istället för technician_id
-        );
+        tech.todaysCases = casesWithLocations.filter(c => {
+          const matches = c.primary_assignee_id === tech.id;
+          if (matches) {
+            console.log(`[GeographicOverview] Ärende "${c.title}" matchar tekniker ${tech.name}`);
+          }
+          return matches;
+        });
         console.log(`[GeographicOverview] Tekniker ${tech.name} (${tech.id}) har ${tech.todaysCases.length} ärenden`);
       });
+      
+      // Debug: visa några exempel på ärenden och deras primary_assignee_id
+      console.log('[GeographicOverview] Exempel på ärenden med primary_assignee_id:', 
+        casesWithLocations.slice(0, 3).map(c => ({
+          title: c.title,
+          primary_assignee_id: c.primary_assignee_id,
+          primary_assignee_name: c.primary_assignee_name
+        }))
+      );
 
       console.log('[GeographicOverview] Geocodade resultat:', {
         cases: casesWithLocations.length,
