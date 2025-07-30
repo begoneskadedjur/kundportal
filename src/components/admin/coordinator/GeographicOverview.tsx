@@ -687,7 +687,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
     // Hitta och markera närliggande ärenden mellan olika tekniker
     const NEARBY_THRESHOLD_KM = 2; // Ärenden inom 2 km från varandra
-    const nearbyPairs: Array<{ case1: typeof allCasesWithTech[0], case2: typeof allCasesWithTech[0], distance: number }> = [];
+    const nearbyPairs: Array<{ 
+      case1: typeof allCasesWithTech[0], 
+      case2: typeof allCasesWithTech[0], 
+      distance: number,
+      timeOverlap: boolean 
+    }> = [];
 
     for (let i = 0; i < allCasesWithTech.length; i++) {
       for (let j = i + 1; j < allCasesWithTech.length; j++) {
@@ -698,10 +703,23 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           );
           
           if (distance <= NEARBY_THRESHOLD_KM) {
+            // Kontrollera om tiderna överlappar
+            const case1Start = allCasesWithTech[i].case.start_date ? new Date(allCasesWithTech[i].case.start_date) : null;
+            const case1End = allCasesWithTech[i].case.due_date ? new Date(allCasesWithTech[i].case.due_date) : null;
+            const case2Start = allCasesWithTech[j].case.start_date ? new Date(allCasesWithTech[j].case.start_date) : null;
+            const case2End = allCasesWithTech[j].case.due_date ? new Date(allCasesWithTech[j].case.due_date) : null;
+            
+            let timeOverlap = false;
+            if (case1Start && case1End && case2Start && case2End) {
+              // Kontrollera om tidsperioderna överlappar
+              timeOverlap = case1Start <= case2End && case2Start <= case1End;
+            }
+            
             nearbyPairs.push({
               case1: allCasesWithTech[i],
               case2: allCasesWithTech[j],
-              distance
+              distance,
+              timeOverlap
             });
           }
         }
@@ -715,24 +733,42 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         lng: (pair.case1.case.coordinates!.lng + pair.case2.case.coordinates!.lng) / 2
       };
 
+      // Formatera tidsinformation
+      const formatTime = (date: Date | null) => {
+        if (!date) return 'Ingen tid';
+        return date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      };
+      
+      const case1Time = pair.case1.case.start_date && pair.case1.case.due_date ? 
+        `${formatTime(new Date(pair.case1.case.start_date))}-${formatTime(new Date(pair.case1.case.due_date))}` : 
+        'Ingen tid';
+      const case2Time = pair.case2.case.start_date && pair.case2.case.due_date ? 
+        `${formatTime(new Date(pair.case2.case.start_date))}-${formatTime(new Date(pair.case2.case.due_date))}` : 
+        'Ingen tid';
+
+      const markerColor = pair.timeOverlap ? '#ef4444' : '#fbbf24'; // Röd om tidsöverlapp, annars gul
+      const strokeColor = pair.timeOverlap ? '#dc2626' : '#f59e0b';
+      const textColor = pair.timeOverlap ? '#ffffff' : '#7c2d12';
+
       const nearbyMarker = new google.maps.Marker({
         position: midpoint,
         map: googleMapRef.current,
-        title: `Närliggande ärenden (${pair.distance.toFixed(1)} km)\n${pair.case1.technicianName}: ${pair.case1.case.title}\n${pair.case2.technicianName}: ${pair.case2.case.title}`,
+        title: `Närliggande ärenden (${pair.distance.toFixed(1)} km)\n${pair.case1.technicianName}: ${pair.case1.case.title} (${case1Time})\n${pair.case2.technicianName}: ${pair.case2.case.title} (${case2Time})${pair.timeOverlap ? '\n⚠️ TIDSÖVERLAPP!' : ''}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="16" cy="16" r="14" fill="#fbbf24" stroke="#f59e0b" stroke-width="2"/>
-              <text x="16" y="12" text-anchor="middle" fill="#7c2d12" font-size="10" font-weight="bold">
-                ${pair.distance.toFixed(1)}
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="18" fill="${markerColor}" stroke="${strokeColor}" stroke-width="2"/>
+              ${pair.timeOverlap ? '<text x="20" y="13" text-anchor="middle" fill="' + textColor + '" font-size="14" font-weight="bold">⚠️</text>' : ''}
+              <text x="20" y="${pair.timeOverlap ? 24 : 18}" text-anchor="middle" fill="${textColor}" font-size="11" font-weight="bold">
+                ${pair.distance.toFixed(1)}km
               </text>
-              <text x="16" y="22" text-anchor="middle" fill="#7c2d12" font-size="10" font-weight="bold">
-                km
+              <text x="20" y="${pair.timeOverlap ? 34 : 28}" text-anchor="middle" fill="${textColor}" font-size="9">
+                ${case1Time.split('-')[0]}
               </text>
             </svg>
           `),
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 16)
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 20)
         },
         zIndex: 3000
       });
@@ -743,9 +779,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
       const connectionLine = new google.maps.Polyline({
         path: [pair.case1.case.coordinates!, pair.case2.case.coordinates!],
         geodesic: true,
-        strokeColor: '#fbbf24',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
+        strokeColor: pair.timeOverlap ? '#ef4444' : '#fbbf24',
+        strokeOpacity: pair.timeOverlap ? 1 : 0.8,
+        strokeWeight: pair.timeOverlap ? 3 : 2,
         strokeDashSymbol: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
         map: googleMapRef.current
       });
@@ -754,8 +790,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
     setRouteLines(newRouteLines);
     
+    const timeOverlaps = nearbyPairs.filter(p => p.timeOverlap).length;
     console.log(`[GeographicOverview] Visar ${clusters.filter(c => c.technicianId).length} teknikers rutter`);
-    console.log(`[GeographicOverview] Hittade ${nearbyPairs.length} närliggande ärendepar`);
+    console.log(`[GeographicOverview] Hittade ${nearbyPairs.length} närliggande ärendepar (${timeOverlaps} med tidsöverlapp)`);
   };
 
   const showTechnicianRoute = (cluster: TechnicianCluster) => {
@@ -943,12 +980,20 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 👤 ${caseData.primary_assignee_name || caseData.technician_name || 'Ej tilldelad'}
               </p>
               <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-                🕐 ${caseData.start_date ? new Date(caseData.start_date).toLocaleString('sv-SE', { 
-                  month: 'short', 
-                  day: 'numeric', 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                }) : 'Ingen tid'}
+                🕐 ${caseData.start_date && caseData.due_date ? 
+                  `${new Date(caseData.start_date).toLocaleTimeString('sv-SE', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })} - ${new Date(caseData.due_date).toLocaleTimeString('sv-SE', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}` : 
+                  caseData.start_date ? new Date(caseData.start_date).toLocaleString('sv-SE', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  }) : 'Ingen tid'}
               </p>
               ${caseData.skadedjur ? `<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">🐛 ${caseData.skadedjur}</p>` : ''}
             </div>
@@ -1247,10 +1292,19 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 <h5 className="text-sm font-medium text-yellow-400 mb-1">
                   🎯 Närliggande ärenden
                 </h5>
-                <p className="text-xs text-slate-400">
-                  Gula markörer visar ärenden från olika tekniker som ligger inom 2 km från varandra.
-                  Detta kan indikera möjligheter för bättre ruttoptimering.
+                <p className="text-xs text-slate-400 mb-2">
+                  Markörer visar ärenden från olika tekniker som ligger inom 2 km från varandra.
                 </p>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <span className="text-slate-400">Geografiskt nära (olika tider)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span className="text-slate-400">⚠️ Tidsöverlapp - kan optimeras!</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1320,7 +1374,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                     👤 {caseData.primary_assignee_name}
                   </div>
                   <div className="text-xs text-slate-400 mt-1">
-                    🕐 {caseData.start_date ? new Date(caseData.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : 'Ingen tid'}
+                    🕐 {caseData.start_date && caseData.due_date ? 
+                      `${new Date(caseData.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} - ${new Date(caseData.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}` : 
+                      caseData.start_date ? new Date(caseData.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : 'Ingen tid'}
                   </div>
                 </div>
               ))}
