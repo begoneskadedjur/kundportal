@@ -58,6 +58,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
   const [clusters, setClusters] = useState<TechnicianCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<TechnicianCluster | null>(null);
   const [routeLines, setRouteLines] = useState<google.maps.Polyline[]>([]);
+  const [showingAllTechnicians, setShowingAllTechnicians] = useState(false);
 
   // Ladda Google Maps API
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
@@ -576,6 +577,187 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     setRouteLines([]);
   };
 
+  const showAllTechnicianRoutes = () => {
+    if (!googleMapRef.current) return;
+
+    console.log('[GeographicOverview] Visar alla teknikers rutter');
+
+    // Rensa tidigare ruttlinjer
+    clearRoutes();
+
+    const newRouteLines: google.maps.Polyline[] = [];
+    const technicianColors = [
+      '#3b82f6', // blå
+      '#10b981', // grön
+      '#f59e0b', // orange
+      '#ef4444', // röd
+      '#8b5cf6', // lila
+      '#ec4899', // rosa
+      '#14b8a6', // turkos
+      '#f97316', // mörkare orange
+    ];
+
+    // Samla alla ärenden för att hitta närliggande mellan tekniker
+    const allCasesWithTech: Array<{ case: CaseWithLocation, technicianId: string, technicianName: string }> = [];
+    
+    clusters.forEach((cluster, clusterIndex) => {
+      if (!cluster.technicianId) return; // Hoppa över "Ej tilldelad"
+      
+      const technician = technicians.find(t => t.id === cluster.technicianId);
+      if (!technician?.coordinates || cluster.cases.length === 0) return;
+
+      const color = technicianColors[clusterIndex % technicianColors.length];
+      
+      // Samla ärenden för närliggande-analys
+      cluster.cases.forEach(c => {
+        if (c.coordinates) {
+          allCasesWithTech.push({ 
+            case: c, 
+            technicianId: cluster.technicianId, 
+            technicianName: cluster.technicianName 
+          });
+        }
+      });
+
+      // Rita rutt för denna tekniker
+      // Hem till första ärendet
+      if (cluster.cases[0]?.coordinates) {
+        const homeToFirst = new google.maps.Polyline({
+          path: [technician.coordinates, cluster.cases[0].coordinates],
+          geodesic: true,
+          strokeColor: color,
+          strokeOpacity: 0.6,
+          strokeWeight: 2,
+          map: googleMapRef.current
+        });
+        newRouteLines.push(homeToFirst);
+      }
+
+      // Mellan ärenden
+      for (let i = 0; i < cluster.cases.length - 1; i++) {
+        if (cluster.cases[i].coordinates && cluster.cases[i + 1].coordinates) {
+          const betweenCases = new google.maps.Polyline({
+            path: [cluster.cases[i].coordinates!, cluster.cases[i + 1].coordinates!],
+            geodesic: true,
+            strokeColor: color,
+            strokeOpacity: 0.6,
+            strokeWeight: 2,
+            map: googleMapRef.current
+          });
+          newRouteLines.push(betweenCases);
+        }
+      }
+
+      // Sista ärendet till hem
+      const lastCase = cluster.cases[cluster.cases.length - 1];
+      if (lastCase?.coordinates) {
+        const lastToHome = new google.maps.Polyline({
+          path: [lastCase.coordinates, technician.coordinates],
+          geodesic: true,
+          strokeColor: color,
+          strokeOpacity: 0.5,
+          strokeWeight: 2,
+          strokeDashSymbol: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 },
+          map: googleMapRef.current
+        });
+        newRouteLines.push(lastToHome);
+      }
+
+      // Lägg till tekniker-etikett
+      const labelMarker = new google.maps.Marker({
+        position: technician.coordinates,
+        map: googleMapRef.current,
+        title: cluster.technicianName,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="24" height="24" rx="4" fill="${color}" stroke="white" stroke-width="2"/>
+              <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
+                ${cluster.technicianName.charAt(0)}
+              </text>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(24, 24),
+          anchor: new google.maps.Point(12, 12)
+        },
+        zIndex: 2000
+      });
+      newRouteLines.push(labelMarker as any);
+    });
+
+    // Hitta och markera närliggande ärenden mellan olika tekniker
+    const NEARBY_THRESHOLD_KM = 2; // Ärenden inom 2 km från varandra
+    const nearbyPairs: Array<{ case1: typeof allCasesWithTech[0], case2: typeof allCasesWithTech[0], distance: number }> = [];
+
+    for (let i = 0; i < allCasesWithTech.length; i++) {
+      for (let j = i + 1; j < allCasesWithTech.length; j++) {
+        if (allCasesWithTech[i].technicianId !== allCasesWithTech[j].technicianId) {
+          const distance = calculateDistance(
+            allCasesWithTech[i].case.coordinates!,
+            allCasesWithTech[j].case.coordinates!
+          );
+          
+          if (distance <= NEARBY_THRESHOLD_KM) {
+            nearbyPairs.push({
+              case1: allCasesWithTech[i],
+              case2: allCasesWithTech[j],
+              distance
+            });
+          }
+        }
+      }
+    }
+
+    // Markera närliggande ärenden
+    nearbyPairs.forEach(pair => {
+      const midpoint = {
+        lat: (pair.case1.case.coordinates!.lat + pair.case2.case.coordinates!.lat) / 2,
+        lng: (pair.case1.case.coordinates!.lng + pair.case2.case.coordinates!.lng) / 2
+      };
+
+      const nearbyMarker = new google.maps.Marker({
+        position: midpoint,
+        map: googleMapRef.current,
+        title: `Närliggande ärenden (${pair.distance.toFixed(1)} km)\n${pair.case1.technicianName}: ${pair.case1.case.title}\n${pair.case2.technicianName}: ${pair.case2.case.title}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="14" fill="#fbbf24" stroke="#f59e0b" stroke-width="2"/>
+              <text x="16" y="12" text-anchor="middle" fill="#7c2d12" font-size="10" font-weight="bold">
+                ${pair.distance.toFixed(1)}
+              </text>
+              <text x="16" y="22" text-anchor="middle" fill="#7c2d12" font-size="10" font-weight="bold">
+                km
+              </text>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 16)
+        },
+        zIndex: 3000
+      });
+
+      newRouteLines.push(nearbyMarker as any);
+
+      // Rita streckad linje mellan närliggande ärenden
+      const connectionLine = new google.maps.Polyline({
+        path: [pair.case1.case.coordinates!, pair.case2.case.coordinates!],
+        geodesic: true,
+        strokeColor: '#fbbf24',
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        strokeDashSymbol: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+        map: googleMapRef.current
+      });
+      newRouteLines.push(connectionLine);
+    });
+
+    setRouteLines(newRouteLines);
+    
+    console.log(`[GeographicOverview] Visar ${clusters.filter(c => c.technicianId).length} teknikers rutter`);
+    console.log(`[GeographicOverview] Hittade ${nearbyPairs.length} närliggande ärendepar`);
+  };
+
   const showTechnicianRoute = (cluster: TechnicianCluster) => {
     if (!googleMapRef.current) return;
 
@@ -942,12 +1124,40 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           <div className="space-y-3">
             <h4 className="font-medium text-slate-300">Tekniker-kluster</h4>
             <div className="space-y-2 max-h-80 overflow-y-auto">
+              {/* Visa alla tekniker alternativ */}
+              <div
+                onClick={() => {
+                  clearRoutes();
+                  setSelectedCluster(null);
+                  setShowingAllTechnicians(true);
+                  showAllTechnicianRoutes();
+                }}
+                className={`p-3 rounded-lg border cursor-pointer transition-all bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-blue-500/40 hover:from-blue-900/30 hover:to-purple-900/30`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-white flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Visa alla tekniker
+                    </div>
+                    <div className="text-sm text-blue-400">
+                      {clusters.filter(c => c.technicianId).length} tekniker
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    🗺️ Se alla rutter och identifiera överlapp
+                  </div>
+                </div>
+              </div>
+              
+              {/* Individuella tekniker-kluster */}
               {clusters.map(cluster => (
                 <div
                   key={cluster.id}
                   onClick={() => {
                     clearRoutes();
                     setSelectedCluster(cluster);
+                    setShowingAllTechnicians(false);
                     if (cluster.technicianId) {
                       showTechnicianRoute(cluster);
                     }
@@ -992,8 +1202,62 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           </div>
         </div>
 
+        {/* Visa alla tekniker information */}
+        {showingAllTechnicians && (
+          <div className="p-4 bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg border border-blue-500/30">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-medium text-white flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Alla teknikers rutter
+                </h4>
+                <p className="text-sm text-slate-400">
+                  Visar {clusters.filter(c => c.technicianId).length} teknikers rutter samtidigt
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  clearRoutes();
+                  setShowingAllTechnicians(false);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3 bg-slate-800/50 rounded-lg">
+                <h5 className="text-sm font-medium text-slate-300 mb-2">Färgkodning</h5>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {clusters.filter(c => c.technicianId).map((cluster, index) => {
+                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+                    const color = colors[index % colors.length];
+                    return (
+                      <div key={cluster.id} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
+                        <span className="text-slate-400">{cluster.technicianName}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <h5 className="text-sm font-medium text-yellow-400 mb-1">
+                  🎯 Närliggande ärenden
+                </h5>
+                <p className="text-xs text-slate-400">
+                  Gula markörer visar ärenden från olika tekniker som ligger inom 2 km från varandra.
+                  Detta kan indikera möjligheter för bättre ruttoptimering.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Valt kluster detaljer */}
-        {selectedCluster && (
+        {selectedCluster && !showingAllTechnicians && (
           <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -1011,6 +1275,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 onClick={() => {
                   clearRoutes();
                   setSelectedCluster(null);
+                  setShowingAllTechnicians(false);
                 }}
                 className="text-slate-400 hover:text-white"
               >
