@@ -593,14 +593,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
     const newRouteLines: google.maps.Polyline[] = [];
 
-    // Skapa ruttlinjer från tekniker hem till varje ärende
-    cluster.cases.forEach((caseData, index) => {
-      if (!caseData.coordinates) return;
-
-      const routeLine = new google.maps.Polyline({
+    // Om det finns ärenden, skapa rutt från hem till första ärendet
+    if (cluster.cases.length > 0 && cluster.cases[0].coordinates) {
+      const homeToFirst = new google.maps.Polyline({
         path: [
           technician.coordinates!,
-          caseData.coordinates
+          cluster.cases[0].coordinates
         ],
         geodesic: true,
         strokeColor: '#3b82f6',
@@ -608,8 +606,12 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         strokeWeight: 3,
         map: googleMapRef.current
       });
+      newRouteLines.push(homeToFirst);
+    }
 
-      newRouteLines.push(routeLine);
+    // Lägg till numrering på alla ärenden
+    cluster.cases.forEach((caseData, index) => {
+      if (!caseData.coordinates) return;
 
       // Lägg till numrering på ärendena för att visa ordning
       const orderMarker = new google.maps.Marker({
@@ -1023,11 +1025,11 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 <div className="flex flex-wrap gap-4 text-xs text-slate-400">
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-0.5 bg-blue-500"></div>
-                    <span>Hem → Ärenden</span>
+                    <span>Hem → Första</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-0.5 bg-green-500"></div>
-                    <span>Ärende → Ärende</span>
+                    <span>Mellan ärenden</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-0.5 bg-yellow-500" style={{borderTop: '2px dashed'}}></div>
