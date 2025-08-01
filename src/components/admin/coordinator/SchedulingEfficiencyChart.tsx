@@ -173,9 +173,9 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
             <h4 className="font-medium text-blue-300 mb-2">Hur mäts schemaläggningseffektivitet?</h4>
             <div className="text-sm text-slate-300 space-y-1">
               <p>• <strong>Genomsnittlig tid:</strong> Tid från ärendets skapande till schemalagd starttid</p>
-              <p>• <strong>Effektivitetsindex:</strong> Beräknas som 100 - (genomsnittlig tid i timmar / 24 × 100)</p>
-              <p>• <strong>Målsättning:</strong> Alla ärenden ska schemaläggs inom 24 timmar för 80% effektivitet</p>
-              <p>• <strong>Toppklass:</strong> Under 12 timmar ger över 95% effektivitetsindex</p>
+              <p>• <strong>Effektivitetsindex:</strong> 100 poäng för schemaläggning inom 72 timmar, avdrag efter det</p>
+              <p>• <strong>Målsättning:</strong> Alla ärenden ska schemaläggs inom 3 dagar (72 timmar) för 100% effektivitet</p>
+              <p>• <strong>Beräkning:</strong> Varje timme över 72h minskar poängen proportionellt</p>
             </div>
           </div>
         </div>

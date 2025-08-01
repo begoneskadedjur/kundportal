@@ -147,7 +147,7 @@ export const getCoordinatorKpiData = async (
 
     (technicians || []).forEach(tech => {
       if (tech.work_schedule) {
-        const today = new Date().toLocaleDateString('en-US', { weekday: 'monday' }).toLowerCase();
+        const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         const daySchedule = tech.work_schedule[today as keyof typeof tech.work_schedule];
         
         if (daySchedule?.active) {
@@ -280,7 +280,7 @@ export const getSchedulingEfficiencyTrend = async (
       date,
       avg_scheduling_time_hours: data.cases_scheduled > 0 ? data.total_scheduling_time / data.cases_scheduled : 0,
       cases_scheduled: data.cases_scheduled,
-      efficiency_score: Math.max(0, Math.min(100, 100 - (data.total_scheduling_time / data.cases_scheduled / 24 * 100))),
+      efficiency_score: Math.max(0, Math.min(100, 100 - Math.max(0, (data.total_scheduling_time / data.cases_scheduled - 72) / 72 * 100))),
     })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   } catch (error) {

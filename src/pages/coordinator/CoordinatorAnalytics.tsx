@@ -185,6 +185,7 @@ export default function CoordinatorAnalytics() {
                   value={dateRange.startDate}
                   onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
                   className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+                  lang="sv-SE"
                 />
                 <span className="text-slate-400">till</span>
                 <input
@@ -192,6 +193,7 @@ export default function CoordinatorAnalytics() {
                   value={dateRange.endDate}
                   onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
                   className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+                  lang="sv-SE"
                 />
               </div>
               
