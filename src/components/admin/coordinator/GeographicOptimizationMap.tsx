@@ -1146,9 +1146,18 @@ const GoogleMapComponent: React.FC<{
               try {
                 console.log(`[DEBUG] Creating route for technician: ${technician.name}`);
                 
-                // Hämta tekniker-ärenden
-                const cases = await fetchTechnicianCases(technician.id);
-                console.log(`[DEBUG] Fetched ${cases.length} cases for ${technician.name}:`, cases);
+                // Hämta tekniker-ärenden och sortera efter start_date
+                const rawCases = await fetchTechnicianCases(technician.id);
+                const cases = rawCases.sort((a, b) => {
+                  const timeA = new Date(a.start_date).getTime();
+                  const timeB = new Date(b.start_date).getTime();
+                  return timeA - timeB; // Sortera stigande (tidigaste först)
+                });
+                console.log(`[DEBUG] Fetched and sorted ${cases.length} cases for ${technician.name}:`, cases.map(c => ({ 
+                  id: c.id, 
+                  title: c.title || c.skadedjur, 
+                  start_date: c.start_date 
+                })));
                 
                 if (cases.length === 0) {
                   console.log(`[DEBUG] No cases found for ${technician.name}`);
@@ -1206,7 +1215,8 @@ const GoogleMapComponent: React.FC<{
 
                 console.log(`[DEBUG] Created ${waypoints.length} waypoints for route`);
 
-                // Skapa numbered markers för ärenden
+                // Skapa numbered markers för ärenden (räkna bara case-waypoints)
+                let caseNumber = 1;
                 waypoints.forEach((waypoint, index) => {
                   if (waypoint.type === 'case') {
                     const markerElement = document.createElement('div');
@@ -1227,7 +1237,7 @@ const GoogleMapComponent: React.FC<{
                         cursor: pointer;
                         font-family: system-ui, -apple-system, sans-serif;
                       ">
-                        ${index}
+                        ${caseNumber}
                       </div>
                     `;
 
@@ -1238,7 +1248,7 @@ const GoogleMapComponent: React.FC<{
                         caseMarker = new google.maps.marker.AdvancedMarkerElement({
                           position: { lat: waypoint.lat, lng: waypoint.lng },
                           map,
-                          title: `Ärende ${index}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
+                          title: `Ärende ${caseNumber}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
                           content: markerElement,
                           zIndex: 2000
                         });
@@ -1246,7 +1256,7 @@ const GoogleMapComponent: React.FC<{
                         caseMarker = new google.maps.Marker({
                           position: { lat: waypoint.lat, lng: waypoint.lng },
                           map,
-                          title: `Ärende ${index}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
+                          title: `Ärende ${caseNumber}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
                           icon: {
                             path: google.maps.SymbolPath.CIRCLE,
                             scale: 15,
@@ -1257,7 +1267,7 @@ const GoogleMapComponent: React.FC<{
                           },
                           zIndex: 2000,
                           label: {
-                            text: index.toString(),
+                            text: caseNumber.toString(),
                             color: 'white',
                             fontWeight: 'bold',
                             fontSize: '12px'
@@ -1271,15 +1281,23 @@ const GoogleMapComponent: React.FC<{
                         // Info window för ärendet
                         const caseInfoWindow = new google.maps.InfoWindow({
                           content: `
-                            <div style="color: #1e293b; padding: 12px; font-family: system-ui; min-width: 200px;">
-                              <h4 style="margin: 0 0 8px 0; color: #3b82f6;">Ärende ${index}</h4>
+                            <div style="
+                              background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                              color: white; 
+                              padding: 16px; 
+                              font-family: system-ui; 
+                              min-width: 240px;
+                              border-radius: 12px;
+                              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            ">
+                              <h4 style="margin: 0 0 12px 0; color: #3b82f6; font-size: 16px;">Ärende ${caseNumber}</h4>
                               <p style="margin: 4px 0; font-size: 14px; font-weight: 600;">
                                 ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}
                               </p>
-                              <p style="margin: 4px 0; font-size: 12px;">
+                              <p style="margin: 8px 0; font-size: 12px; color: #e2e8f0;">
                                 👤 ${waypoint.data.kontaktperson || 'Okänd kund'}
                               </p>
-                              <p style="margin: 4px 0; font-size: 12px;">
+                              <p style="margin: 8px 0; font-size: 12px; color: #e2e8f0;">
                                 📍 ${waypoint.data.adress ? 
                                       (() => {
                                         try {
@@ -1291,7 +1309,7 @@ const GoogleMapComponent: React.FC<{
                                       })()
                                       : 'Ingen adress'}
                               </p>
-                              <p style="margin: 4px 0; font-size: 12px;">
+                              <p style="margin: 8px 0; font-size: 12px; color: #e2e8f0;">
                                 🕐 ${new Date(waypoint.data.start_date).toLocaleTimeString('sv-SE', { 
                                   hour: '2-digit', 
                                   minute: '2-digit' 
@@ -1301,15 +1319,18 @@ const GoogleMapComponent: React.FC<{
                                 }) : ''}
                               </p>
                               <button onclick="window.editCase && window.editCase('${waypoint.data.id}')" style="
-                                background: #3b82f6;
+                                background: linear-gradient(135deg, #3b82f6, #2563eb);
                                 color: white;
                                 border: none;
-                                padding: 6px 12px;
-                                border-radius: 4px;
-                                font-size: 12px;
+                                padding: 10px 16px;
+                                border-radius: 6px;
+                                font-size: 13px;
+                                font-weight: 600;
                                 cursor: pointer;
-                                margin-top: 8px;
-                              ">
+                                margin-top: 12px;
+                                width: 100%;
+                                transition: transform 0.2s;
+                              " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                 Redigera ärende
                               </button>
                             </div>
@@ -1333,8 +1354,11 @@ const GoogleMapComponent: React.FC<{
                         addCaseClickListener(caseMarker, caseInfoWindow);
                       }
                     } catch (error) {
-                      console.error(`[DEBUG] Error creating case marker ${index}:`, error);
+                      console.error(`[DEBUG] Error creating case marker ${caseNumber}:`, error);
                     }
+                    
+                    // Increment case number for next case
+                    caseNumber++;
                   }
                 });
 
@@ -1374,11 +1398,26 @@ const GoogleMapComponent: React.FC<{
                   }
                 }
 
-                // Sätt upp global editCase funktion för info windows
+                // Sätt upp global editCase funktion för info windows med högre z-index
                 (window as any).editCase = (caseId: string) => {
-                  if (onEditCase) {
-                    onEditCase(caseId);
-                  }
+                  console.log('[DEBUG] editCase called from info window for case:', caseId);
+                  
+                  // Stäng alla öppna info windows
+                  const infoWindows = document.querySelectorAll('.gm-ui-hover-effect');
+                  infoWindows.forEach(window => {
+                    const closeBtn = window.querySelector('[data-value="Close"]');
+                    if (closeBtn) {
+                      (closeBtn as HTMLElement).click();
+                    }
+                  });
+                  
+                  // Small delay to ensure info windows are closed
+                  setTimeout(() => {
+                    if (onEditCase) {
+                      console.log('[DEBUG] Calling onEditCase with caseId:', caseId);
+                      onEditCase(caseId);
+                    }
+                  }, 100);
                 };
 
                 // Centrera kartan på rutten med förbättrad zoom-kontroll
