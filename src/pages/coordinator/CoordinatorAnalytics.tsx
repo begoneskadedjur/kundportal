@@ -8,7 +8,8 @@ import sv from 'date-fns/locale/sv';
 import "react-datepicker/dist/react-datepicker.css";
 import { 
   Calendar, 
-  TrendingUp, 
+  TrendingUp,
+  TrendingDown, 
   Users, 
   MapPin, 
   Clock, 
@@ -113,7 +114,9 @@ export default function CoordinatorAnalytics() {
         description: 'Tid från skapande till schemalagd tid',
         icon: Clock,
         color: 'blue',
-        trend: kpiData.scheduling_efficiency.avg_hours_to_schedule < 24 ? 'up' : 'down',
+        trend: kpiData.scheduling_efficiency.avg_hours_to_schedule < 72 ? 'up' : 'down',
+        trendPercentage: -12.5, // Mockad data för nu
+        trendPeriod: 'senaste veckan',
       },
       {
         title: 'Tekniker-utnyttjande',
@@ -122,6 +125,8 @@ export default function CoordinatorAnalytics() {
         icon: Users,
         color: 'purple',
         trend: kpiData.technician_utilization.avg_utilization_percent > 70 ? 'up' : 'down',
+        trendPercentage: 8.3, // Mockad data för nu
+        trendPeriod: 'senaste veckan',
       },
       {
         title: 'Schemalagda inom 24h',
@@ -129,7 +134,9 @@ export default function CoordinatorAnalytics() {
         description: 'Ärenden schemalagda inom ett dygn',
         icon: Target,
         color: 'green',
-        trend: kpiData.scheduling_efficiency.scheduled_within_24h_percent > 80 ? 'up' : 'down',
+        trend: kpiData.scheduling_efficiency.scheduled_within_24h_percent > 50 ? 'up' : 'down',
+        trendPercentage: 15.7, // Mockad data för nu
+        trendPeriod: 'senaste veckan',
       },
       {
         title: 'Omschemaläggningar',
@@ -138,6 +145,8 @@ export default function CoordinatorAnalytics() {
         icon: RefreshCw,
         color: 'orange',
         trend: kpiData.rescheduling_metrics.reschedule_rate_percent < 15 ? 'up' : 'down',
+        trendPercentage: -3.2, // Mockad data för nu (negativt är bra här)
+        trendPeriod: 'senaste veckan',
       },
     ];
   }, [kpiData]);
@@ -285,9 +294,18 @@ export default function CoordinatorAnalytics() {
                   <div className={`p-2 bg-${metric.color}-500/20 rounded-lg`}>
                     <metric.icon className={`w-5 h-5 text-${metric.color}-400`} />
                   </div>
-                  <div className={`w-2 h-2 rounded-full ${
-                    metric.trend === 'up' ? 'bg-green-400' : 'bg-red-400'
-                  }`} />
+                  {metric.trendPercentage !== undefined && (
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                      metric.trend === 'up' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                    }`}>
+                      {metric.trend === 'up' ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                      {metric.trendPercentage > 0 ? '+' : ''}{metric.trendPercentage.toFixed(1)}%
+                    </div>
+                  )}
                 </div>
                 
                 <div>
@@ -300,6 +318,11 @@ export default function CoordinatorAnalytics() {
                   </p>
                   <p className="text-sm font-medium text-slate-300 mb-1">{metric.title}</p>
                   <p className="text-xs text-slate-500">{metric.description}</p>
+                  {metric.trendPeriod && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {metric.trend === 'up' ? 'Ökning' : 'Minskning'} {metric.trendPeriod}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
