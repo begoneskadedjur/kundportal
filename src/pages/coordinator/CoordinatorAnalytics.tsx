@@ -165,16 +165,38 @@ export default function CoordinatorAnalytics() {
         }
       });
       
+      console.log('[DEBUG] API Response status:', response.status);
+      console.log('[DEBUG] API Response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (response.ok) {
-        const result = await response.json();
-        const caseData = { ...result.case, case_type: result.type };
-        setSelectedCase(caseData);
-        setIsEditModalOpen(true);
-        return;
+        const responseText = await response.text();
+        console.log('[DEBUG] API Response text:', responseText);
+        
+        try {
+          const result = JSON.parse(responseText);
+          const caseData = { ...result.case, case_type: result.type };
+          setSelectedCase(caseData);
+          setIsEditModalOpen(true);
+          return;
+        } catch (parseError) {
+          console.error('[DEBUG] JSON Parse error:', parseError);
+          console.error('[DEBUG] Response text that failed to parse:', responseText);
+          toast.error('Fel vid tolkning av API-svar');
+          return;
+        }
       }
       
-      const errorData = await response.json();
-      console.error('API Error:', errorData);
+      // För fel-responses, försök att läsa som text först
+      const responseText = await response.text();
+      console.error('API Error response text:', responseText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        console.error('Failed to parse error response as JSON:', responseText);
+        errorData = { error: 'Unknown error' };
+      }
       
       if (response.status === 403) {
         toast.error('Du har inte behörighet att redigera detta ärende');
