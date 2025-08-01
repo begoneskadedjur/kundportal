@@ -29,6 +29,7 @@ import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
+import CaseSearch from './pages/coordinator/CaseSearch';
 
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard';
@@ -182,6 +183,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="koordinator">
                   <ScheduleOptimizer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/sok-arenden" 
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <CaseSearch />
                 </ProtectedRoute>
               } 
             />

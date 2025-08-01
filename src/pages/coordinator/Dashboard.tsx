@@ -4,13 +4,12 @@ import { supabase } from '../../lib/supabase'; // Säkerställ att sökvägen ti
 // Importera dina komponenter
 import CoordinatorDashboardCard from '../../components/admin/coordinator/CoordinatorDashboardCard';
 import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKpiCard';
-import CaseSearchCard from '../../components/admin/coordinator/CaseSearchCard';
 import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
 import GeographicOverview from '../../components/admin/coordinator/GeographicOverview';
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 
 export default function CoordinatorDashboard() {
@@ -254,10 +253,6 @@ export default function CoordinatorDashboard() {
           )}
         </section>
 
-        {/* --- Söksektion --- */}
-        <section className="mt-16">
-          <CaseSearchCard />
-        </section>
 
         {/* --- Geografisk översikt --- */}
         <section className="mt-16">
@@ -282,6 +277,13 @@ export default function CoordinatorDashboard() {
               title="Schemaoptimerare"
               description="Optimera befintligt schema för att minska körsträckor och maximera tekniker-effektivitet."
               tag="Uppdaterad"
+            />
+            <CoordinatorDashboardCard
+              href="/koordinator/sok-arenden"
+              icon={FileSearch}
+              title="Sök Ärenden"
+              description="Avancerad sökning bland alla ärenden med filter för status, tekniker, datum och mer."
+              tag="Komplett"
             />
           </div>
         </main>
