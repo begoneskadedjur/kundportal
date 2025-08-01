@@ -115,96 +115,39 @@ export default function CoordinatorAnalytics() {
   const { exportData, exporting } = useAnalyticsExport();
   const { alerts, dismissAlert } = useAnalyticsAlerts();
 
-  // EditCase handler
+  // EditCase handler - samma approach som i CoordinatorSchedule.tsx
   const handleEditCase = async (caseId: string) => {
-    // Kontrollera användarroll från JWT metadata
-    const jwtRole = user?.user_metadata?.role;
-    const technicianId = user?.user_metadata?.technician_id;
-    
-    // Hämta tekniker-info för att få rätt roll
-    let hasPermission = false;
-    
-    if (jwtRole === 'admin') {
-      hasPermission = true;
-    } else if (technicianId) {
-      // Hämta tekniker-data för att kontrollera roll i databas
-      try {
-        const { data: technician } = await supabase
-          .from('technicians')
-          .select('role')
-          .eq('id', technicianId)
-          .single();
-          
-        if (technician?.role === 'Koordinator' || technician?.role === 'Admin') {
-          hasPermission = true;
-        }
-      } catch (error) {
-        console.error('Error fetching technician role:', error);
-      }
-    }
-    
-    if (!hasPermission) {
-      toast.error('Du har inte behörighet att redigera ärenden från analytics-vyn');
-      return;
-    }
-
     try {
-      // Använd API-endpoint för att hämta ärendedata med service role
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      
-      if (!token) {
-        toast.error('Ingen giltig session hittades');
+      // Försök hämta från private_cases först
+      const { data: privateCase, error: privateError } = await supabase
+        .from('private_cases')
+        .select('*')
+        .eq('id', caseId)
+        .maybeSingle();
+        
+      if (privateCase && !privateError) {
+        const caseData = { ...privateCase, case_type: 'private' };
+        setSelectedCase(caseData);
+        setIsEditModalOpen(true);
         return;
       }
       
-      const response = await fetch(`/api/case-by-id?id=${caseId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('[DEBUG] API Response status:', response.status);
-      console.log('[DEBUG] API Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (response.ok) {
-        const responseText = await response.text();
-        console.log('[DEBUG] API Response text:', responseText);
+      // Försök hämta från business_cases om private case inte hittades
+      const { data: businessCase, error: businessError } = await supabase
+        .from('business_cases')
+        .select('*')
+        .eq('id', caseId)
+        .maybeSingle();
         
-        try {
-          const result = JSON.parse(responseText);
-          const caseData = { ...result.case, case_type: result.type };
-          setSelectedCase(caseData);
-          setIsEditModalOpen(true);
-          return;
-        } catch (parseError) {
-          console.error('[DEBUG] JSON Parse error:', parseError);
-          console.error('[DEBUG] Response text that failed to parse:', responseText);
-          toast.error('Fel vid tolkning av API-svar');
-          return;
-        }
+      if (businessCase && !businessError) {
+        const caseData = { ...businessCase, case_type: 'business' };
+        setSelectedCase(caseData);
+        setIsEditModalOpen(true);
+        return;
       }
       
-      // För fel-responses, försök att läsa som text först
-      const responseText = await response.text();
-      console.error('API Error response text:', responseText);
-      
-      let errorData;
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        console.error('Failed to parse error response as JSON:', responseText);
-        errorData = { error: 'Unknown error' };
-      }
-      
-      if (response.status === 403) {
-        toast.error('Du har inte behörighet att redigera detta ärende');
-      } else if (response.status === 404) {
-        toast.error('Ärendet kunde inte hittas');
-      } else {
-        toast.error('Fel vid hämtning av ärendedata');
-      }
+      // Om inget ärende hittades
+      toast.error('Ärendet kunde inte hittas');
       
     } catch (error: any) {
       console.error('Error fetching case data:', error);
