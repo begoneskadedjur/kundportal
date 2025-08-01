@@ -94,7 +94,6 @@ export default function CoordinatorAnalytics() {
   // EditCaseModal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<any>(null);
-  const [technicians, setTechnicians] = useState<any[]>([]);
 
   const {
     kpiData,
@@ -116,32 +115,48 @@ export default function CoordinatorAnalytics() {
   // EditCase handler
   const handleEditCase = async (caseId: string) => {
     try {
-      // Hämta case data från databas
-      const { data: privateCase } = await supabase
+      // Försök hämta från private_cases först
+      const { data: privateCase, error: privateError } = await supabase
         .from('private_cases')
         .select('*')
         .eq('id', caseId)
         .single();
         
-      if (privateCase) {
+      if (privateCase && !privateError) {
         setSelectedCase(privateCase);
         setIsEditModalOpen(true);
         return;
       }
       
-      const { data: businessCase } = await supabase
+      // Försök hämta från business_cases om private case inte hittades
+      const { data: businessCase, error: businessError } = await supabase
         .from('business_cases')
         .select('*')
         .eq('id', caseId)
         .single();
         
-      if (businessCase) {
+      if (businessCase && !businessError) {
         setSelectedCase(businessCase);
         setIsEditModalOpen(true);
         return;
       }
       
-      toast.error('Kunde inte hitta ärendet');
+      // Logga fel för debugging
+      if (privateError) {
+        console.error('Private case error:', privateError);
+      }
+      if (businessError) {
+        console.error('Business case error:', businessError);
+      }
+      
+      // Visa specifikt fel baserat på status
+      if (privateError?.code === 'PGRST116' || businessError?.code === 'PGRST116') {
+        toast.error('Ärendet hittades inte');
+      } else if (privateError?.code === '42501' || businessError?.code === '42501') {
+        toast.error('Du har inte behörighet att redigera detta ärende');
+      } else {
+        toast.error('Kunde inte hämta ärendet');
+      }
     } catch (error) {
       console.error('Error fetching case:', error);
       toast.error('Fel vid hämtning av ärende');
@@ -154,25 +169,6 @@ export default function CoordinatorAnalytics() {
     toast.success('Ärende uppdaterat!');
   };
 
-  // Fetch technicians on component mount
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('technicians')
-          .select('*')
-          .eq('is_active', true)
-          .order('name');
-          
-        if (error) throw error;
-        setTechnicians(data || []);
-      } catch (error) {
-        console.error('Error fetching technicians:', error);
-      }
-    };
-    
-    fetchTechnicians();
-  }, []);
 
   const kpiMetrics = useMemo(() => {
     if (!kpiData) return [];
@@ -507,7 +503,6 @@ export default function CoordinatorAnalytics() {
         onClose={() => setIsEditModalOpen(false)} 
         onSuccess={handleEditSuccess} 
         caseData={selectedCase} 
-        technicians={technicians} 
       />
     </div>
   );
