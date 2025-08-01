@@ -59,7 +59,7 @@ const getStatusColor = (status: string): { bg: string; text: string; border: str
     const ls = status?.toLowerCase() || '';
     if (ls.includes('avslutat')) return { bg: 'bg-green-600', text: 'text-white', border: 'border-green-700' };
     if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' };
-    if (ls.includes('signerad')) return { bg: 'bg-emerald-500', text: 'text-white', border: 'border-emerald-600' };
+    if (ls.includes('signerad')) return { bg: 'bg-[#20c58f]', text: 'text-white', border: 'border-emerald-600' };
     if (ls.includes('offert')) return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' };
     if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
     if (ls.includes('review')) return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
@@ -458,7 +458,7 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
                       <span className="text-slate-400">Offert</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 bg-emerald-500 rounded-sm"></div>
+                      <div className="w-3 h-3 bg-[#20c58f] rounded-sm"></div>
                       <span className="text-slate-400">Signerad</span>
                   </div>
                   <div className="flex items-center gap-1.5">

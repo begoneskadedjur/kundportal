@@ -204,7 +204,7 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
           {/* Header */}
           <div className="flex items-center gap-3">
             <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-lg">
-              <FileSearch className="w-7 h-7 text-emerald-400" />
+              <FileSearch className="w-7 h-7 text-[#20c58f]" />
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Sök Ärenden</h3>
@@ -220,7 +220,7 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
               placeholder="Sök på titel, kund, adress, tekniker, status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white placeholder-slate-500"
+              className="w-full pl-11 pr-10 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-[#20c58f] focus:outline-none text-white placeholder-slate-500"
               disabled={initialLoading}
             />
             {hasSearchQuery && (
@@ -237,7 +237,7 @@ const CaseSearchCard: React.FC<CaseSearchCardProps> = ({ className = '' }) => {
           {initialLoading && (
             <div className="text-center py-4">
               <div className="inline-flex items-center gap-2 text-slate-400">
-                <div className="w-4 h-4 border-2 border-slate-600 border-t-emerald-400 rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-slate-600 border-t-[#20c58f] rounded-full animate-spin"></div>
                 Laddar ärenden...
               </div>
             </div>

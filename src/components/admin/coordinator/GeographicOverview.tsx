@@ -588,9 +588,9 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
     const newRouteLines: google.maps.Polyline[] = [];
     const technicianColors = [
       '#20c58f', // BeGone teal
-      '#10b981', // emerald
+      '#20c58f', // emerald
       '#14b8a6', // cyan
-      '#059669', // mörkare emerald
+      '#1ba876', // mörkare emerald
       '#0891b2', // cyan-600
       '#0e7490', // cyan-700
       '#0d9488', // teal-600
@@ -868,7 +868,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
               nextCase.coordinates
             ],
             geodesic: true,
-            strokeColor: '#10b981',
+            strokeColor: '#20c58f',
             strokeOpacity: 0.6,
             strokeWeight: 2,
             map: googleMapRef.current
@@ -1016,7 +1016,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="8" fill="#10b981" stroke="#047857" stroke-width="1.5"/>
+              <circle cx="10" cy="10" r="8" fill="#20c58f" stroke="#047857" stroke-width="1.5"/>
               <path d="M6 10l2 2 4-4" stroke="white" stroke-width="1.5" fill="none"/>
             </svg>
           `),
@@ -1118,7 +1118,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-lg">
-              <MapPin className="w-7 h-7 text-emerald-400" />
+              <MapPin className="w-7 h-7 text-[#20c58f]" />
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Geografisk Översikt</h3>
@@ -1129,7 +1129,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           {/* Statistik */}
           <div className="flex gap-4 text-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">{clusters.length}</div>
+              <div className="text-2xl font-bold text-[#20c58f]">{clusters.length}</div>
               <div className="text-slate-400">Kluster</div>
             </div>
             <div className="text-center">
@@ -1155,7 +1155,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
               {(mapsLoading || !mapsLoaded) && (
                 <div className="h-full flex items-center justify-center text-slate-400">
                   <div className="text-center">
-                    <MapPin className="w-12 h-12 mx-auto mb-4 text-emerald-400" />
+                    <MapPin className="w-12 h-12 mx-auto mb-4 text-[#20c58f]" />
                     <p>
                       {mapsLoading ? 'Google Maps laddas...' : 
                        mapsError ? `Fel: ${mapsError}` : 
@@ -1188,7 +1188,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                     showAllTechnicianRoutes();
                   }
                 }}
-                className={`p-3 rounded-lg border cursor-pointer transition-all bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border-emerald-500/40 hover:from-emerald-900/30 hover:to-teal-900/30 focus:outline-none focus:ring-2 focus:ring-emerald-500`}
+                className={`p-3 rounded-lg border cursor-pointer transition-all bg-gradient-to-r from-[#047857]/20 to-teal-900/20 border-[#20c58f]/40 hover:from-[#047857]/30 hover:to-teal-900/30 focus:outline-none focus:ring-2 focus:ring-[#20c58f]`}
                 role="button"
                 tabIndex={0}
                 aria-label="Visa alla teknikers rutter på kartan"
@@ -1199,7 +1199,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                       <Users className="w-4 h-4" />
                       Visa alla tekniker
                     </div>
-                    <div className="text-sm text-emerald-400">
+                    <div className="text-sm text-[#20c58f]">
                       {clusters.filter(c => c.technicianId).length} tekniker
                     </div>
                   </div>
@@ -1234,11 +1234,11 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                   }}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedCluster?.id === cluster.id
-                      ? 'bg-emerald-500/20 border-emerald-500/40'
+                      ? 'bg-[#20c58f]/20 border-[#20c58f]/40'
                       : cluster.id === 'unassigned-cluster'
                       ? 'bg-red-900/20 border-red-500/40 hover:bg-red-900/30'
                       : 'bg-slate-800/50 border-slate-700 hover:bg-slate-700/50'
-                  } focus:outline-none focus:ring-2 focus:ring-emerald-500`}
+                  } focus:outline-none focus:ring-2 focus:ring-[#20c58f]`}
                   role="button"
                   tabIndex={0}
                   aria-label={`Visa rutt för ${cluster.technicianName} med ${cluster.cases.length} ärenden`}
@@ -1248,7 +1248,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                       <div className={`font-medium ${cluster.id === 'unassigned-cluster' ? 'text-red-400' : 'text-white'}`}>
                         {cluster.technicianName}
                       </div>
-                      <div className={`text-sm ${cluster.id === 'unassigned-cluster' ? 'text-red-400' : 'text-emerald-400'}`}>
+                      <div className={`text-sm ${cluster.id === 'unassigned-cluster' ? 'text-red-400' : 'text-[#20c58f]'}`}>
                         {cluster.cases.length} ärenden
                       </div>
                     </div>
@@ -1277,7 +1277,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
         {/* Visa alla tekniker information */}
         {showingAllTechnicians && (
-          <div className="p-4 bg-gradient-to-r from-emerald-900/20 to-teal-900/20 rounded-lg border border-emerald-500/30">
+          <div className="p-4 bg-gradient-to-r from-[#047857]/20 to-teal-900/20 rounded-lg border border-[#20c58f]/30">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h4 className="font-medium text-white flex items-center gap-2">
@@ -1304,7 +1304,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
                 <h5 className="text-sm font-medium text-slate-300 mb-2">Färgkodning</h5>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {clusters.filter(c => c.technicianId).map((cluster, index) => {
-                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+                    const colors = ['#3b82f6', '#20c58f', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
                     const color = colors[index % colors.length];
                     return (
                       <div key={cluster.id} className="flex items-center gap-2">
@@ -1367,11 +1367,11 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
 
             {/* Rutt-information */}
             {routeLines.length > 0 && (
-              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                <h5 className="text-sm font-medium text-emerald-400 mb-2">🗺️ Rutt visas på kartan</h5>
+              <div className="mb-4 p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
+                <h5 className="text-sm font-medium text-[#20c58f] mb-2">🗺️ Rutt visas på kartan</h5>
                 <div className="flex flex-wrap gap-4 text-xs text-slate-400">
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-emerald-500"></div>
+                    <div className="w-3 h-0.5 bg-[#20c58f]"></div>
                     <span>Hem → Första</span>
                   </div>
                   <div className="flex items-center gap-1">
