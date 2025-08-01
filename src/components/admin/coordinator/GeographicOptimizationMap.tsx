@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 interface GeographicOptimizationMapProps {
   data: CoordinatorKpiData | null;
   loading: boolean;
+  onEditCase?: (caseId: string) => void;
 }
 
 interface TechnicianLocation {
@@ -301,7 +302,7 @@ const OptimizationInsights: React.FC<{ data: RouteOptimizationData[] }> = ({ dat
   );
 };
 
-const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ data, loading }) => {
+const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ data, loading, onEditCase }) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>();
   const [showInsights, setShowInsights] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'map'>('table');
@@ -1045,6 +1046,16 @@ const GoogleMapComponent: React.FC<{
                         const showRouteBtn = document.getElementById(`show-route-${tech.id}`);
                         const dynamicContent = document.getElementById(`dynamic-content-${tech.id}`);
 
+                        // Sätt upp global editCase funktion
+                        (window as any).editCase = (caseId: string) => {
+                          if (onEditCase) {
+                            onEditCase(caseId);
+                          } else {
+                            console.log('EditCase clicked for case:', caseId);
+                            toast.info('EditCase modal inte tillgänglig ännu');
+                          }
+                        };
+
                         if (showCasesBtn && dynamicContent) {
                           showCasesBtn.addEventListener('click', async () => {
                             dynamicContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="color: #3b82f6;">⏳ Laddar ärenden...</div></div>';
@@ -1054,32 +1065,55 @@ const GoogleMapComponent: React.FC<{
                             if (cases.length === 0) {
                               dynamicContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">📭 Inga ärenden idag</div>';
                             } else {
-                              const casesHtml = cases.map((caseItem, index) => `
-                                <div style="
-                                  background: rgba(59, 130, 246, 0.1);
-                                  border: 1px solid rgba(59, 130, 246, 0.2);
-                                  border-radius: 8px;
-                                  padding: 12px;
-                                  margin-bottom: 8px;
-                                ">
-                                  <div style="display: flex; justify-content: between; align-items: start; gap: 8px;">
-                                    <div style="flex: 1;">
-                                      <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
-                                        ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                              const casesHtml = cases.map((caseItem, index) => {
+                                // Hantera adressformat - extrahera formatted_address om det är JSON
+                                let displayAddress = 'Ingen adress';
+                                if (caseItem.adress) {
+                                  try {
+                                    const addressObj = JSON.parse(caseItem.adress);
+                                    displayAddress = addressObj.formatted_address || addressObj.location?.formatted_address || caseItem.adress;
+                                  } catch {
+                                    displayAddress = caseItem.adress;
+                                  }
+                                }
+
+                                // Formatera tidsintervall
+                                const startTime = new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+                                const endTime = caseItem.due_date ? new Date(caseItem.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : null;
+                                const timeDisplay = endTime ? `${startTime} - ${endTime}` : startTime;
+
+                                return `
+                                  <div style="
+                                    background: rgba(59, 130, 246, 0.1);
+                                    border: 1px solid rgba(59, 130, 246, 0.2);
+                                    border-radius: 8px;
+                                    padding: 12px;
+                                    margin-bottom: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                  " onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.1)'" onclick="window.editCase && window.editCase('${caseItem.id}')">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+                                      <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
+                                          ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                                        </div>
+                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                          👤 ${caseItem.kontaktperson || 'Okänd kund'}
+                                        </div>
+                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                          📍 ${displayAddress}
+                                        </div>
+                                        <div style="font-size: 11px; color: #60a5fa;">
+                                          🕐 ${timeDisplay}
+                                        </div>
                                       </div>
-                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
-                                        👤 ${caseItem.kontaktperson || 'Okänd kund'}
-                                      </div>
-                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
-                                        📍 ${caseItem.adress || 'Ingen adress'}
-                                      </div>
-                                      <div style="font-size: 11px; color: #60a5fa;">
-                                        🕐 ${new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                      <div style="color: #3b82f6; font-size: 16px; opacity: 0.7;">
+                                        ✏️
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              `).join('');
+                                `;
+                              }).join('');
                               
                               dynamicContent.innerHTML = `
                                 <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
@@ -1091,38 +1125,176 @@ const GoogleMapComponent: React.FC<{
                         }
 
                         if (showRouteBtn && dynamicContent) {
-                          showRouteBtn.addEventListener('click', () => {
-                            const routeInfo = `
-                              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
-                                <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                                  🗺️ Rutt-information
+                          showRouteBtn.addEventListener('click', async () => {
+                            dynamicContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="color: #10b981;">⏳ Beräknar rutt...</div></div>';
+                            
+                            try {
+                              // Hämta ärenden för tekniker
+                              const cases = await fetchTechnicianCases(tech.id);
+                              
+                              if (cases.length === 0) {
+                                dynamicContent.innerHTML = `
+                                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px; text-align: center;">
+                                    <div style="color: #10b981; margin-bottom: 8px;">📍 Tekniker-position</div>
+                                    <div style="font-size: 13px; color: #94a3b8;">Inga ärenden att navigera till idag</div>
+                                  </div>
+                                `;
+                                return;
+                              }
+
+                              // Rensa gamla rutter från kartan
+                              routePolylines.forEach(polyline => polyline.setMap(null));
+                              routePolylines = [];
+
+                              // Skapa case markers på kartan
+                              const caseMarkers: google.maps.Marker[] = [];
+                              const waypoints: google.maps.LatLng[] = [];
+                              let totalDistance = 0;
+
+                              // Tekniker startposition
+                              const techPosition = new google.maps.LatLng(tech.lat, tech.lng);
+                              
+                              for (let i = 0; i < cases.length; i++) {
+                                const caseItem = cases[i];
+                                let caseLat, caseLng;
+                                
+                                // Extrahera koordinater från adress-JSON
+                                if (caseItem.adress) {
+                                  try {
+                                    const addressObj = JSON.parse(caseItem.adress);
+                                    if (addressObj.location || addressObj.geometry) {
+                                      const location = addressObj.location || addressObj.geometry.location;
+                                      caseLat = location.lat;
+                                      caseLng = location.lng;
+                                    }
+                                  } catch (error) {
+                                    // Om parsing misslyckas, använd geocoding för adress-strängen
+                                    console.warn('Could not parse address JSON, skipping case:', caseItem.title);
+                                    continue;
+                                  }
+                                }
+                                
+                                if (caseLat && caseLng) {
+                                  const casePosition = new google.maps.LatLng(caseLat, caseLng);
+                                  waypoints.push(casePosition);
+                                  
+                                  // Beräkna avstånd från föregående punkt
+                                  const prevPosition = i === 0 ? techPosition : waypoints[i - 1];
+                                  const distance = google.maps.geometry.spherical.computeDistanceBetween(prevPosition, casePosition);
+                                  totalDistance += distance;
+
+                                  // Skapa case marker
+                                  const caseMarker = new google.maps.Marker({
+                                    position: casePosition,
+                                    map: map,
+                                    title: caseItem.title || caseItem.skadedjur || 'Ärende',
+                                    icon: {
+                                      path: google.maps.SymbolPath.CIRCLE,
+                                      scale: 8,
+                                      fillColor: '#22c55e',
+                                      fillOpacity: 0.8,
+                                      strokeColor: '#ffffff',
+                                      strokeWeight: 2,
+                                    },
+                                    zIndex: 2000,
+                                    label: {
+                                      text: (i + 1).toString(),
+                                      color: 'white',
+                                      fontSize: '12px',
+                                      fontWeight: 'bold'
+                                    }
+                                  });
+                                  
+                                  caseMarkers.push(caseMarker);
+                                }
+                              }
+
+                              // Rita rutter mellan punkterna
+                              if (waypoints.length > 0) {
+                                // Rutt från tekniker till första ärendet
+                                const firstRoute = new google.maps.Polyline({
+                                  path: [techPosition, waypoints[0]],
+                                  geodesic: true,
+                                  strokeColor: '#3b82f6',
+                                  strokeOpacity: 0.8,
+                                  strokeWeight: 4,
+                                  map: map,
+                                });
+                                routePolylines.push(firstRoute);
+
+                                // Rutter mellan ärenden
+                                for (let i = 0; i < waypoints.length - 1; i++) {
+                                  const route = new google.maps.Polyline({
+                                    path: [waypoints[i], waypoints[i + 1]],
+                                    geodesic: true,
+                                    strokeColor: '#10b981',
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 4,
+                                    map: map,
+                                  });
+                                  routePolylines.push(route);
+                                }
+                              }
+
+                              // Uppdatera info-window med rutt-detaljer
+                              const routeInfo = `
+                                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
+                                  <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                    🗺️ Rutt visualiserad på kartan
+                                  </div>
+                                  <div style="space-y: 8px; font-size: 13px;">
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Antal stopp:</span>
+                                      <span style="color: #e2e8f0;">${cases.length} ärenden</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Total sträcka:</span>
+                                      <span style="color: #e2e8f0;">${(totalDistance / 1000).toFixed(1)} km</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Snitt per stopp:</span>
+                                      <span style="color: #e2e8f0;">${cases.length > 0 ? (totalDistance / 1000 / cases.length).toFixed(1) : 0} km</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                      <span style="color: #94a3b8;">Rutt-färger:</span>
+                                      <div style="display: flex; gap: 8px; align-items: center;">
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                          <div style="width: 12px; height: 3px; background: #3b82f6; border-radius: 2px;"></div>
+                                          <span style="color: #94a3b8; font-size: 11px;">Start</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                          <div style="width: 12px; height: 3px; background: #10b981; border-radius: 2px;"></div>
+                                          <span style="color: #94a3b8; font-size: 11px;">Mellan</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <div style="font-size: 11px; color: #64748b; text-align: center;">
+                                      💡 Gröna cirklar (1, 2, 3...) visar ärende-ordning. Blå linje = från tekniker, grön linje = mellan ärenden
+                                    </div>
+                                  </div>
                                 </div>
-                                <div style="space-y: 8px; font-size: 13px;">
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Aktuell position:</span>
-                                    <span style="color: #e2e8f0;">${tech.current_address}</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Hastighet:</span>
-                                    <span style="color: #e2e8f0;">${tech.speed} km/h</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Status:</span>
-                                    <span style="color: #e2e8f0;">${tech.in_movement ? '🚗 I rörelse' : '🏁 Stationär'}</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                                    <span style="color: #94a3b8;">Ärenden kvar:</span>
-                                    <span style="color: #10b981; font-weight: 600;">${tech.cases} st</span>
-                                  </div>
+                              `;
+                              dynamicContent.innerHTML = routeInfo;
+
+                              // Anpassa kart-zoom för att visa hela rutten
+                              if (waypoints.length > 0) {
+                                const bounds = new google.maps.LatLngBounds();
+                                bounds.extend(techPosition);
+                                waypoints.forEach(point => bounds.extend(point));
+                                map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
+                              }
+
+                            } catch (error) {
+                              console.error('Error creating route:', error);
+                              dynamicContent.innerHTML = `
+                                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 16px; text-align: center;">
+                                  <div style="color: #ef4444; margin-bottom: 8px;">❌ Kunde inte skapa rutt</div>
+                                  <div style="font-size: 13px; color: #94a3b8;">Kontrollera att ärenden har giltiga adresser</div>
                                 </div>
-                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
-                                  <div style="font-size: 11px; color: #64748b; text-align: center;">
-                                    💡 Optimerad rutt beräknas automatiskt baserat på tekniker-position och ärenden
-                                  </div>
-                                </div>
-                              </div>
-                            `;
-                            dynamicContent.innerHTML = routeInfo;
+                              `;
+                            }
                           });
                         }
                       }, 100);
@@ -1156,32 +1328,55 @@ const GoogleMapComponent: React.FC<{
                             if (cases.length === 0) {
                               dynamicContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">📭 Inga ärenden idag</div>';
                             } else {
-                              const casesHtml = cases.map((caseItem, index) => `
-                                <div style="
-                                  background: rgba(59, 130, 246, 0.1);
-                                  border: 1px solid rgba(59, 130, 246, 0.2);
-                                  border-radius: 8px;
-                                  padding: 12px;
-                                  margin-bottom: 8px;
-                                ">
-                                  <div style="display: flex; justify-content: between; align-items: start; gap: 8px;">
-                                    <div style="flex: 1;">
-                                      <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
-                                        ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                              const casesHtml = cases.map((caseItem, index) => {
+                                // Hantera adressformat - extrahera formatted_address om det är JSON
+                                let displayAddress = 'Ingen adress';
+                                if (caseItem.adress) {
+                                  try {
+                                    const addressObj = JSON.parse(caseItem.adress);
+                                    displayAddress = addressObj.formatted_address || addressObj.location?.formatted_address || caseItem.adress;
+                                  } catch {
+                                    displayAddress = caseItem.adress;
+                                  }
+                                }
+
+                                // Formatera tidsintervall
+                                const startTime = new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+                                const endTime = caseItem.due_date ? new Date(caseItem.due_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : null;
+                                const timeDisplay = endTime ? `${startTime} - ${endTime}` : startTime;
+
+                                return `
+                                  <div style="
+                                    background: rgba(59, 130, 246, 0.1);
+                                    border: 1px solid rgba(59, 130, 246, 0.2);
+                                    border-radius: 8px;
+                                    padding: 12px;
+                                    margin-bottom: 8px;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                  " onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.1)'" onclick="window.editCase && window.editCase('${caseItem.id}')">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+                                      <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
+                                          ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                                        </div>
+                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                          👤 ${caseItem.kontaktperson || 'Okänd kund'}
+                                        </div>
+                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                          📍 ${displayAddress}
+                                        </div>
+                                        <div style="font-size: 11px; color: #60a5fa;">
+                                          🕐 ${timeDisplay}
+                                        </div>
                                       </div>
-                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
-                                        👤 ${caseItem.kontaktperson || 'Okänd kund'}
-                                      </div>
-                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
-                                        📍 ${caseItem.adress || 'Ingen adress'}
-                                      </div>
-                                      <div style="font-size: 11px; color: #60a5fa;">
-                                        🕐 ${new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                      <div style="color: #3b82f6; font-size: 16px; opacity: 0.7;">
+                                        ✏️
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              `).join('');
+                                `;
+                              }).join('');
                               
                               dynamicContent.innerHTML = `
                                 <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
@@ -1193,38 +1388,176 @@ const GoogleMapComponent: React.FC<{
                         }
 
                         if (showRouteBtn && dynamicContent) {
-                          showRouteBtn.addEventListener('click', () => {
-                            const routeInfo = `
-                              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
-                                <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                                  🗺️ Rutt-information
+                          showRouteBtn.addEventListener('click', async () => {
+                            dynamicContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="color: #10b981;">⏳ Beräknar rutt...</div></div>';
+                            
+                            try {
+                              // Hämta ärenden för tekniker
+                              const cases = await fetchTechnicianCases(tech.id);
+                              
+                              if (cases.length === 0) {
+                                dynamicContent.innerHTML = `
+                                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px; text-align: center;">
+                                    <div style="color: #10b981; margin-bottom: 8px;">📍 Tekniker-position</div>
+                                    <div style="font-size: 13px; color: #94a3b8;">Inga ärenden att navigera till idag</div>
+                                  </div>
+                                `;
+                                return;
+                              }
+
+                              // Rensa gamla rutter från kartan
+                              routePolylines.forEach(polyline => polyline.setMap(null));
+                              routePolylines = [];
+
+                              // Skapa case markers på kartan
+                              const caseMarkers: google.maps.Marker[] = [];
+                              const waypoints: google.maps.LatLng[] = [];
+                              let totalDistance = 0;
+
+                              // Tekniker startposition
+                              const techPosition = new google.maps.LatLng(tech.lat, tech.lng);
+                              
+                              for (let i = 0; i < cases.length; i++) {
+                                const caseItem = cases[i];
+                                let caseLat, caseLng;
+                                
+                                // Extrahera koordinater från adress-JSON
+                                if (caseItem.adress) {
+                                  try {
+                                    const addressObj = JSON.parse(caseItem.adress);
+                                    if (addressObj.location || addressObj.geometry) {
+                                      const location = addressObj.location || addressObj.geometry.location;
+                                      caseLat = location.lat;
+                                      caseLng = location.lng;
+                                    }
+                                  } catch (error) {
+                                    // Om parsing misslyckas, använd geocoding för adress-strängen
+                                    console.warn('Could not parse address JSON, skipping case:', caseItem.title);
+                                    continue;
+                                  }
+                                }
+                                
+                                if (caseLat && caseLng) {
+                                  const casePosition = new google.maps.LatLng(caseLat, caseLng);
+                                  waypoints.push(casePosition);
+                                  
+                                  // Beräkna avstånd från föregående punkt
+                                  const prevPosition = i === 0 ? techPosition : waypoints[i - 1];
+                                  const distance = google.maps.geometry.spherical.computeDistanceBetween(prevPosition, casePosition);
+                                  totalDistance += distance;
+
+                                  // Skapa case marker
+                                  const caseMarker = new google.maps.Marker({
+                                    position: casePosition,
+                                    map: map,
+                                    title: caseItem.title || caseItem.skadedjur || 'Ärende',
+                                    icon: {
+                                      path: google.maps.SymbolPath.CIRCLE,
+                                      scale: 8,
+                                      fillColor: '#22c55e',
+                                      fillOpacity: 0.8,
+                                      strokeColor: '#ffffff',
+                                      strokeWeight: 2,
+                                    },
+                                    zIndex: 2000,
+                                    label: {
+                                      text: (i + 1).toString(),
+                                      color: 'white',
+                                      fontSize: '12px',
+                                      fontWeight: 'bold'
+                                    }
+                                  });
+                                  
+                                  caseMarkers.push(caseMarker);
+                                }
+                              }
+
+                              // Rita rutter mellan punkterna
+                              if (waypoints.length > 0) {
+                                // Rutt från tekniker till första ärendet
+                                const firstRoute = new google.maps.Polyline({
+                                  path: [techPosition, waypoints[0]],
+                                  geodesic: true,
+                                  strokeColor: '#3b82f6',
+                                  strokeOpacity: 0.8,
+                                  strokeWeight: 4,
+                                  map: map,
+                                });
+                                routePolylines.push(firstRoute);
+
+                                // Rutter mellan ärenden
+                                for (let i = 0; i < waypoints.length - 1; i++) {
+                                  const route = new google.maps.Polyline({
+                                    path: [waypoints[i], waypoints[i + 1]],
+                                    geodesic: true,
+                                    strokeColor: '#10b981',
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 4,
+                                    map: map,
+                                  });
+                                  routePolylines.push(route);
+                                }
+                              }
+
+                              // Uppdatera info-window med rutt-detaljer
+                              const routeInfo = `
+                                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
+                                  <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                    🗺️ Rutt visualiserad på kartan
+                                  </div>
+                                  <div style="space-y: 8px; font-size: 13px;">
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Antal stopp:</span>
+                                      <span style="color: #e2e8f0;">${cases.length} ärenden</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Total sträcka:</span>
+                                      <span style="color: #e2e8f0;">${(totalDistance / 1000).toFixed(1)} km</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                      <span style="color: #94a3b8;">Snitt per stopp:</span>
+                                      <span style="color: #e2e8f0;">${cases.length > 0 ? (totalDistance / 1000 / cases.length).toFixed(1) : 0} km</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                      <span style="color: #94a3b8;">Rutt-färger:</span>
+                                      <div style="display: flex; gap: 8px; align-items: center;">
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                          <div style="width: 12px; height: 3px; background: #3b82f6; border-radius: 2px;"></div>
+                                          <span style="color: #94a3b8; font-size: 11px;">Start</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                          <div style="width: 12px; height: 3px; background: #10b981; border-radius: 2px;"></div>
+                                          <span style="color: #94a3b8; font-size: 11px;">Mellan</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <div style="font-size: 11px; color: #64748b; text-align: center;">
+                                      💡 Gröna cirklar (1, 2, 3...) visar ärende-ordning. Blå linje = från tekniker, grön linje = mellan ärenden
+                                    </div>
+                                  </div>
                                 </div>
-                                <div style="space-y: 8px; font-size: 13px;">
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Aktuell position:</span>
-                                    <span style="color: #e2e8f0;">${tech.current_address}</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Hastighet:</span>
-                                    <span style="color: #e2e8f0;">${tech.speed} km/h</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
-                                    <span style="color: #94a3b8;">Status:</span>
-                                    <span style="color: #e2e8f0;">${tech.in_movement ? '🚗 I rörelse' : '🏁 Stationär'}</span>
-                                  </div>
-                                  <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                                    <span style="color: #94a3b8;">Ärenden kvar:</span>
-                                    <span style="color: #10b981; font-weight: 600;">${tech.cases} st</span>
-                                  </div>
+                              `;
+                              dynamicContent.innerHTML = routeInfo;
+
+                              // Anpassa kart-zoom för att visa hela rutten
+                              if (waypoints.length > 0) {
+                                const bounds = new google.maps.LatLngBounds();
+                                bounds.extend(techPosition);
+                                waypoints.forEach(point => bounds.extend(point));
+                                map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
+                              }
+
+                            } catch (error) {
+                              console.error('Error creating route:', error);
+                              dynamicContent.innerHTML = `
+                                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 16px; text-align: center;">
+                                  <div style="color: #ef4444; margin-bottom: 8px;">❌ Kunde inte skapa rutt</div>
+                                  <div style="font-size: 13px; color: #94a3b8;">Kontrollera att ärenden har giltiga adresser</div>
                                 </div>
-                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
-                                  <div style="font-size: 11px; color: #64748b; text-align: center;">
-                                    💡 Optimerad rutt beräknas automatiskt baserat på tekniker-position och ärenden
-                                  </div>
-                                </div>
-                              </div>
-                            `;
-                            dynamicContent.innerHTML = routeInfo;
+                              `;
+                            }
                           });
                         }
                       }, 100);

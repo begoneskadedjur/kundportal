@@ -1,7 +1,7 @@
 // 📁 src/pages/coordinator/CoordinatorAnalytics.tsx
 // 🎯 Koordinator Analytics Dashboard - Deep insights för koordinatorns påverkan
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { registerLocale } from 'react-datepicker';
 import sv from 'date-fns/locale/sv';
@@ -29,10 +29,13 @@ import { PageHeader } from '../../components/shared';
 import Button from '../../components/ui/Button';
 import { useCoordinatorAnalytics, useAnalyticsExport, useAnalyticsAlerts } from '../../hooks/useCoordinatorAnalytics';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
 import SchedulingEfficiencyChart from '../../components/admin/coordinator/SchedulingEfficiencyChart';
 import TechnicianUtilizationGrid from '../../components/admin/coordinator/TechnicianUtilizationGrid';
 import BusinessImpactCards from '../../components/admin/coordinator/BusinessImpactCards';
 import GeographicOptimizationMap from '../../components/admin/coordinator/GeographicOptimizationMap';
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 
 registerLocale('sv', sv);
 
@@ -87,6 +90,11 @@ export default function CoordinatorAnalytics() {
     endDate: new Date(),
   });
 
+  // EditCaseModal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<any>(null);
+  const [technicians, setTechnicians] = useState<any[]>([]);
+
   const {
     kpiData,
     efficiencyTrend,
@@ -103,6 +111,67 @@ export default function CoordinatorAnalytics() {
 
   const { exportData, exporting } = useAnalyticsExport();
   const { alerts, dismissAlert } = useAnalyticsAlerts();
+
+  // EditCase handler
+  const handleEditCase = async (caseId: string) => {
+    try {
+      // Hämta case data från databas
+      const { data: privateCase } = await supabase
+        .from('private_cases')
+        .select('*')
+        .eq('id', caseId)
+        .single();
+        
+      if (privateCase) {
+        setSelectedCase(privateCase);
+        setIsEditModalOpen(true);
+        return;
+      }
+      
+      const { data: businessCase } = await supabase
+        .from('business_cases')
+        .select('*')
+        .eq('id', caseId)
+        .single();
+        
+      if (businessCase) {
+        setSelectedCase(businessCase);
+        setIsEditModalOpen(true);
+        return;
+      }
+      
+      toast.error('Kunde inte hitta ärendet');
+    } catch (error) {
+      console.error('Error fetching case:', error);
+      toast.error('Fel vid hämtning av ärende');
+    }
+  };
+
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false);
+    setSelectedCase(null);
+    toast.success('Ärende uppdaterat!');
+  };
+
+  // Fetch technicians on component mount
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('technicians')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+          
+        if (error) throw error;
+        setTechnicians(data || []);
+      } catch (error) {
+        console.error('Error fetching technicians:', error);
+      }
+    };
+    
+    fetchTechnicians();
+  }, []);
 
   const kpiMetrics = useMemo(() => {
     if (!kpiData) return [];
@@ -351,7 +420,7 @@ export default function CoordinatorAnalytics() {
 
         {/* Geographic Optimization */}
         <section className="mb-12">
-          <GeographicOptimizationMap data={kpiData} loading={loading} />
+          <GeographicOptimizationMap data={kpiData} loading={loading} onEditCase={handleEditCase} />
         </section>
 
         {/* Recommendations */}
@@ -417,5 +486,14 @@ export default function CoordinatorAnalytics() {
 
       </div>
     </div>
+    
+    {/* EditCaseModal */}
+    <EditCaseModal 
+      isOpen={isEditModalOpen} 
+      onClose={() => setIsEditModalOpen(false)} 
+      onSuccess={handleEditSuccess} 
+      caseData={selectedCase} 
+      technicians={technicians} 
+    />
   );
 }
