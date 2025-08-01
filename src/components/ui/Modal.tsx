@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import Button from './Button'
 import Card from './Card'
+import Portal from './Portal'
 
 interface ModalProps {
   isOpen: boolean
@@ -14,6 +15,7 @@ interface ModalProps {
   footer?: React.ReactNode
   preventClose?: boolean
   zIndex?: number
+  usePortal?: boolean
 }
 
 export default function Modal({
@@ -25,7 +27,8 @@ export default function Modal({
   children,
   footer,
   preventClose = false,
-  zIndex = 100
+  zIndex = 100,
+  usePortal = false
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -76,10 +79,13 @@ export default function Modal({
     }
   }
 
-  return (
+  const modalContent = (
     <div 
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-      style={{ zIndex }}
+      style={{ 
+        zIndex: usePortal ? 2147483647 : zIndex,
+        pointerEvents: 'auto' // Återställ pointer events för modalen
+      }}
       onClick={handleBackdropClick}
       ref={modalRef}
       tabIndex={-1}
@@ -120,5 +126,12 @@ export default function Modal({
         )}
       </Card>
     </div>
-  )
+  );
+
+  // Använd Portal om usePortal är true, annars rendera normalt
+  if (usePortal) {
+    return <Portal>{modalContent}</Portal>;
+  }
+
+  return modalContent;
 }
