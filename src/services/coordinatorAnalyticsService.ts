@@ -42,12 +42,14 @@ export interface SchedulingEfficiencyData {
 export interface TechnicianUtilizationData {
   technician_id: string;
   technician_name: string;
-  total_work_hours: number;
+  total_work_hours: number; // Justerad för frånvaro
   scheduled_hours: number;
   utilization_percent: number;
   cases_assigned: number;
   avg_case_value: number;
   efficiency_rating: 'low' | 'optimal' | 'overbooked';
+  absence_hours?: number; // Timmar frånvarande denna vecka
+  original_work_hours?: number; // Ursprunglig arbetstid före frånvaro-justering
 }
 
 export interface GeographicEfficiencyData {
@@ -301,7 +303,7 @@ export const getSchedulingEfficiencyTrend = async (
 };
 
 /**
- * Hämtar tekniker-utnyttjande data
+ * Hämtar tekniker-utnyttjande data med frånvaro-hänsyn
  */
 export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizationData[]> => {
   try {
@@ -311,12 +313,22 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
       .eq('is_active', true)
       .eq('role', 'Skadedjurstekniker');
 
-    const today = new Date().toISOString().split('T')[0];
+    // Hämta aktuella frånvaror för hela veckan
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const { data: absences } = await supabase
+      .from('technician_absences')
+      .select('*')
+      .lte('start_date', weekEnd.toISOString())
+      .gte('end_date', weekStart.toISOString());
     
     const utilizationData: TechnicianUtilizationData[] = [];
 
     for (const tech of technicians || []) {
-      // Beräkna arbetsstunden från work_schedule
+      // Beräkna arbetsstunden från work_schedule (40 timmar per vecka som standard)
       let totalWorkHours = 0;
       if (tech.work_schedule) {
         Object.values(tech.work_schedule).forEach((daySchedule: any) => {
@@ -326,14 +338,31 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
             totalWorkHours += (end.getTime() - start.getTime()) / (1000 * 60 * 60);
           }
         });
+      } else {
+        // Fallback: 40 timmar per vecka (8 timmar per dag, 5 dagar)
+        totalWorkHours = 40;
       }
 
-      // Hämta schemalagda ärenden för denna vecka
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
+      // Beräkna frånvaro-påverkad arbetstid
+      const techAbsences = (absences || []).filter(absence => absence.technician_id === tech.id);
+      let absenceHours = 0;
+      
+      techAbsences.forEach(absence => {
+        const absenceStart = new Date(absence.start_date);
+        const absenceEnd = new Date(absence.end_date);
+        const effectiveStart = new Date(Math.max(absenceStart.getTime(), weekStart.getTime()));
+        const effectiveEnd = new Date(Math.min(absenceEnd.getTime(), weekEnd.getTime()));
+        
+        if (effectiveStart < effectiveEnd) {
+          // Förenklad beräkning: 8 timmar per dag frånvaro
+          const daysDiff = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
+          absenceHours += daysDiff * 8;
+        }
+      });
 
+      const adjustedWorkHours = Math.max(0, totalWorkHours - absenceHours);
+
+      // Hämta schemalagda ärenden för denna vecka
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('start_date, due_date, pris')
@@ -361,23 +390,27 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
         totalCaseValue += caseItem.pris || 0;
       });
 
-      const utilizationPercent = totalWorkHours > 0 ? (scheduledHours / totalWorkHours) * 100 : 0;
+      const utilizationPercent = adjustedWorkHours > 0 ? (scheduledHours / adjustedWorkHours) * 100 : 0;
       
       let efficiencyRating: 'low' | 'optimal' | 'overbooked';
-      if (utilizationPercent < 60) efficiencyRating = 'low';
+      if (adjustedWorkHours === 0) efficiencyRating = 'low'; // Helt frånvarande
+      else if (utilizationPercent < 60) efficiencyRating = 'low';
       else if (utilizationPercent > 95) efficiencyRating = 'overbooked';
       else efficiencyRating = 'optimal';
 
       utilizationData.push({
         technician_id: tech.id,
         technician_name: tech.name,
-        total_work_hours: totalWorkHours,
+        total_work_hours: adjustedWorkHours, // Justerad för frånvaro
         scheduled_hours: scheduledHours,
         utilization_percent: utilizationPercent,
         cases_assigned: allCases.length,
         avg_case_value: allCases.length > 0 ? totalCaseValue / allCases.length : 0,
         efficiency_rating: efficiencyRating,
-      });
+        // Lägg till frånvaro-information
+        absence_hours: absenceHours,
+        original_work_hours: totalWorkHours,
+      } as TechnicianUtilizationData & { absence_hours: number; original_work_hours: number });
     }
 
     return utilizationData.sort((a, b) => b.utilization_percent - a.utilization_percent);

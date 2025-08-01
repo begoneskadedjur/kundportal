@@ -165,6 +165,22 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
         )}
       </div>
 
+      {/* Measurement Info Box */}
+      <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-blue-300 mb-2">Hur mäts schemaläggningseffektivitet?</h4>
+            <div className="text-sm text-slate-300 space-y-1">
+              <p>• <strong>Genomsnittlig tid:</strong> Tid från ärendets skapande till schemalagd starttid</p>
+              <p>• <strong>Effektivitetsindex:</strong> Beräknas som 100 - (genomsnittlig tid i timmar / 24 × 100)</p>
+              <p>• <strong>Målsättning:</strong> Alla ärenden ska schemaläggs inom 24 timmar för 80% effektivitet</p>
+              <p>• <strong>Toppklass:</strong> Under 12 timmar ger över 95% effektivitetsindex</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-3 gap-4 mb-6">

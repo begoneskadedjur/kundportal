@@ -205,16 +205,23 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
     // Revenue per hour insight
     if (data.revenue_per_scheduled_hour > 800) {
       insights.push({
-        title: 'Hög intäktseffektivitet',
-        description: `${formatCurrency(data.revenue_per_scheduled_hour)}/timme är över branschsnittet`,
+        title: 'Utmärkt intäktseffektivitet',
+        description: `${formatCurrency(data.revenue_per_scheduled_hour)}/timme är över vårt interna mål på 800 kr/h`,
         type: 'success' as const,
         actionable: false,
       });
-    } else if (data.revenue_per_scheduled_hour < 400) {
+    } else if (data.revenue_per_scheduled_hour < 600) {
       insights.push({
         title: 'Låg intäktseffektivitet',
-        description: 'Överväg att fokusera på högre värderade ärenden eller optimera schemaläggning',
+        description: `${formatCurrency(data.revenue_per_scheduled_hour)}/timme är under vårt minimummål på 600 kr/h`,
         type: 'warning' as const,
+        actionable: true,
+      });
+    } else {
+      insights.push({
+        title: 'Acceptabel intäktseffektivitet',
+        description: `${formatCurrency(data.revenue_per_scheduled_hour)}/timme närmar sig vårt mål på 800 kr/h`,
+        type: 'info' as const,
         actionable: true,
       });
     }
@@ -313,7 +320,7 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
 
     return [
       {
-        title: 'Total Revenue Managed',
+        title: 'Total Hanterad Omsättning',
         value: data.total_revenue_managed,
         subtitle: 'Totalt hanterad omsättning denna period',
         icon: DollarSign,
@@ -347,7 +354,7 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
         loading,
       },
       {
-        title: 'Revenue per schemalagd timme',
+        title: 'Intäkt per schemalagd timme',
         value: data.revenue_per_scheduled_hour,
         subtitle: 'Intäktseffektivitet per arbetstimme',
         icon: TrendingUp,
@@ -358,8 +365,10 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
           period: 'månaden',
         },
         benchmark: {
-          label: data.revenue_per_scheduled_hour > 600 ? 'Över branschsnitt' : 'Under branschsnitt',
-          comparison: data.revenue_per_scheduled_hour > 600 ? 'above' : 'below',
+          label: data.revenue_per_scheduled_hour > 800 ? 'Över internt mål (800 kr/h)' : 
+                 data.revenue_per_scheduled_hour > 600 ? 'Nära internt mål' : 'Under internt mål',
+          comparison: data.revenue_per_scheduled_hour > 800 ? 'above' : 
+                     data.revenue_per_scheduled_hour > 600 ? 'at' : 'below',
         },
         loading,
       },

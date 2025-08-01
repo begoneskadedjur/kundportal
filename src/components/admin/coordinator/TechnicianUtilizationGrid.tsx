@@ -166,7 +166,14 @@ const TechnicianCard: React.FC<{
                 <Clock className="w-3 h-3 text-blue-400" />
                 <span className="text-slate-400">Arbetstid</span>
               </div>
-              <p className="text-white font-medium">{technician.total_work_hours.toFixed(1)}h/vecka</p>
+              <p className="text-white font-medium">
+                {technician.total_work_hours.toFixed(1)}h/vecka
+                {technician.absence_hours && technician.absence_hours > 0 && (
+                  <span className="text-orange-400 text-xs ml-1">
+                    ({technician.original_work_hours?.toFixed(1)}h före frånvaro)
+                  </span>
+                )}
+              </p>
             </div>
             
             <div>
@@ -194,21 +201,43 @@ const TechnicianCard: React.FC<{
             </div>
           </div>
 
+          {/* Frånvaro-information om tillämpligt */}
+          {technician.absence_hours && technician.absence_hours > 0 && (
+            <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+              <div className="flex items-center gap-2 text-orange-400 text-sm mb-1">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="font-medium">Frånvaro denna vecka</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {technician.absence_hours.toFixed(1)} timmar frånvarande av ursprungliga {technician.original_work_hours?.toFixed(1)}h arbetstid
+              </p>
+            </div>
+          )}
+
           {/* Recommendations */}
           <div className="mt-4 p-3 bg-slate-700/30 rounded-lg">
             <h5 className="text-sm font-medium text-white mb-2">Rekommendationer:</h5>
             <div className="text-xs text-slate-300 space-y-1">
-              {technician.efficiency_rating === 'low' && (
-                <p>• Överväg att tilldela fler ärenden för att öka utnyttjandet</p>
-              )}
-              {technician.efficiency_rating === 'overbooked' && (
-                <p>• Risk för utbrändhet - överväg att omfördela några ärenden</p>
-              )}
-              {technician.efficiency_rating === 'optimal' && (
-                <p>• Perfekt balans - fortsätt med nuvarande nivå</p>
+              {technician.absence_hours && technician.absence_hours > 0 ? (
+                <p>• Tekniker är frånvarande - omfördela ärenden till andra tekniker</p>
+              ) : (
+                <>
+                  {technician.efficiency_rating === 'low' && (
+                    <p>• Överväg att tilldela fler ärenden för att öka utnyttjandet (målsättning: 70-90%)</p>
+                  )}
+                  {technician.efficiency_rating === 'overbooked' && (
+                    <p>• Risk för utbrändhet - omfördela några ärenden för bättre balans</p>
+                  )}
+                  {technician.efficiency_rating === 'optimal' && (
+                    <p>• Perfekt balans - fortsätt med nuvarande nivå (70-90% utnyttjande)</p>
+                  )}
+                </>
               )}
               {technician.avg_case_value < 1000 && technician.avg_case_value > 0 && (
                 <p>• Fokusera på högre värderade ärenden för bättre lönsamhet</p>
+              )}
+              {technician.total_work_hours < 40 && !technician.absence_hours && (
+                <p>• Arbetstid under 40h/vecka - kontrollera work_schedule konfiguration</p>
               )}
             </div>
           </div>
