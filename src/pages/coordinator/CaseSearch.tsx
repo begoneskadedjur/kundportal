@@ -700,12 +700,12 @@ export default function CaseSearch() {
                         <Button 
                           variant="secondary" 
                           size="sm" 
-                          className="p-1.5 h-8 w-8 hover:scale-110 transition-transform hover:border-[#20c58f]"
+                          className="!p-0 h-8 w-8 hover:scale-110 transition-transform hover:border-[#20c58f] flex items-center justify-center"
                           onClick={() => handleEditCase(caseItem)}
                           title="Redigera ärende"
                           aria-label="Redigera ärende"
                         >
-                          <Edit className="w-5 h-5" />
+                          <Edit className="w-5 h-5 text-white" />
                         </Button>
                       </div>
                     </div>
