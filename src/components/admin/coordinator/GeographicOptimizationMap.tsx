@@ -429,6 +429,14 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
     }
   }, [viewMode, fetchTechnicianLocations]);
 
+  // Update routes when selectedTechnician changes
+  useEffect(() => {
+    if (selectedMapTechnician && (window as any).updateMapRoutes) {
+      console.log('[DEBUG] Triggering route update for technician:', selectedMapTechnician.name);
+      (window as any).updateMapRoutes();
+    }
+  }, [selectedMapTechnician]);
+
   // Modal handlers
   const handleTechnicianClick = (technician: TechnicianLocation) => {
     setSelectedTechnicianForModal(technician);
@@ -584,6 +592,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                 </div>
               ) : (
                 <GoogleMapComponent 
+                  key={selectedMapTechnician ? `${selectedMapTechnician.id}-${selectedMapTechnician.cases}` : 'no-selection'}
                   technicians={technicianLocations}
                   loading={loadingLocations}
                   onTechnicianSelect={setSelectedMapTechnician}
@@ -1095,11 +1104,17 @@ const GoogleMapComponent: React.FC<{
               });
             };
 
-            // === ROUTES (Estimated Routes) ===
-            const createRoutes = () => {
+            // === ROUTES (Estimated Routes & Specific Technician Route) ===
+            const createRoutes = async () => {
               // Rensa gamla rutter
               routePolylines.forEach(polyline => polyline.setMap(null));
               routePolylines = [];
+
+              // Om en specifik tekniker är vald, visa deras rutt
+              if (selectedTechnician) {
+                await createTechnicianRoute(selectedTechnician);
+                return;
+              }
 
               if (!showRoutes || technicians.length === 0) return;
 
@@ -1125,6 +1140,259 @@ const GoogleMapComponent: React.FC<{
                   routePolylines.push(route);
                 }
               });
+            };
+
+            // === SPECIFIC TECHNICIAN ROUTE ===
+            const createTechnicianRoute = async (technician: TechnicianLocation) => {
+              try {
+                console.log(`[DEBUG] Creating route for technician: ${technician.name}`);
+                
+                // Hämta tekniker-ärenden
+                const cases = await fetchTechnicianCases(technician.id);
+                console.log(`[DEBUG] Fetched ${cases.length} cases for ${technician.name}:`, cases);
+                
+                if (cases.length === 0) {
+                  console.log(`[DEBUG] No cases found for ${technician.name}`);
+                  return;
+                }
+
+                // Skapa en array med tekniker-position först, sedan ärenden
+                const waypoints = [
+                  { lat: technician.lat, lng: technician.lng, type: 'technician', data: technician }
+                ];
+
+                // Lägg till ärenden som waypoints (behöver geocodas om adresser)
+                for (const caseItem of cases) {
+                  if (caseItem.adress) {
+                    try {
+                      // Försök parsa adress om det är JSON
+                      let address = caseItem.adress;
+                      try {
+                        const parsedAddress = JSON.parse(address);
+                        address = parsedAddress.formatted_address || parsedAddress.location?.formatted_address || address;
+                      } catch {
+                        // Redan formaterad adress
+                      }
+
+                      // Geocoda adressen för att få koordinater
+                      const geocoder = new google.maps.Geocoder();
+                      const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+                        geocoder.geocode({ address: address }, (results, status) => {
+                          if (status === 'OK' && results) {
+                            resolve(results);
+                          } else {
+                            reject(new Error(`Geocoding failed: ${status}`));
+                          }
+                        });
+                      });
+
+                      if (result[0]?.geometry?.location) {
+                        const location = result[0].geometry.location;
+                        waypoints.push({
+                          lat: location.lat(),
+                          lng: location.lng(),
+                          type: 'case',
+                          data: caseItem
+                        });
+                      }
+                    } catch (error) {
+                      console.warn(`[DEBUG] Failed to geocode address for case ${caseItem.id}:`, error);
+                    }
+                  }
+                }
+
+                console.log(`[DEBUG] Created ${waypoints.length} waypoints for route`);
+
+                // Skapa numbered markers för ärenden
+                waypoints.forEach((waypoint, index) => {
+                  if (waypoint.type === 'case') {
+                    const markerElement = document.createElement('div');
+                    markerElement.innerHTML = `
+                      <div style="
+                        width: 30px;
+                        height: 30px;
+                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        color: white;
+                        border: 2px solid white;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 12px;
+                        font-weight: bold;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        cursor: pointer;
+                        font-family: system-ui, -apple-system, sans-serif;
+                      ">
+                        ${index}
+                      </div>
+                    `;
+
+                    // Skapa marker för ärendet
+                    let caseMarker;
+                    try {
+                      if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                        caseMarker = new google.maps.marker.AdvancedMarkerElement({
+                          position: { lat: waypoint.lat, lng: waypoint.lng },
+                          map,
+                          title: `Ärende ${index}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
+                          content: markerElement,
+                          zIndex: 2000
+                        });
+                      } else {
+                        caseMarker = new google.maps.Marker({
+                          position: { lat: waypoint.lat, lng: waypoint.lng },
+                          map,
+                          title: `Ärende ${index}: ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}`,
+                          icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 15,
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.9,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2,
+                          },
+                          zIndex: 2000,
+                          label: {
+                            text: index.toString(),
+                            color: 'white',
+                            fontWeight: 'bold',
+                            fontSize: '12px'
+                          }
+                        });
+                      }
+
+                      if (caseMarker) {
+                        mapMarkers.push(caseMarker);
+
+                        // Info window för ärendet
+                        const caseInfoWindow = new google.maps.InfoWindow({
+                          content: `
+                            <div style="color: #1e293b; padding: 12px; font-family: system-ui; min-width: 200px;">
+                              <h4 style="margin: 0 0 8px 0; color: #3b82f6;">Ärende ${index}</h4>
+                              <p style="margin: 4px 0; font-size: 14px; font-weight: 600;">
+                                ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}
+                              </p>
+                              <p style="margin: 4px 0; font-size: 12px;">
+                                👤 ${waypoint.data.kontaktperson || 'Okänd kund'}
+                              </p>
+                              <p style="margin: 4px 0; font-size: 12px;">
+                                📍 ${waypoint.data.adress ? 
+                                      (() => {
+                                        try {
+                                          const parsed = JSON.parse(waypoint.data.adress);
+                                          return parsed.formatted_address || parsed.location?.formatted_address || waypoint.data.adress;
+                                        } catch {
+                                          return waypoint.data.adress;
+                                        }
+                                      })()
+                                      : 'Ingen adress'}
+                              </p>
+                              <p style="margin: 4px 0; font-size: 12px;">
+                                🕐 ${new Date(waypoint.data.start_date).toLocaleTimeString('sv-SE', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}${waypoint.data.due_date ? ' - ' + new Date(waypoint.data.due_date).toLocaleTimeString('sv-SE', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                }) : ''}
+                              </p>
+                              <button onclick="window.editCase && window.editCase('${waypoint.data.id}')" style="
+                                background: #3b82f6;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                font-size: 12px;
+                                cursor: pointer;
+                                margin-top: 8px;
+                              ">
+                                Redigera ärende
+                              </button>
+                            </div>
+                          `
+                        });
+
+                        // Click listener för case marker
+                        const addCaseClickListener = (marker: any, infoWindow: google.maps.InfoWindow) => {
+                          if (google.maps.marker && google.maps.marker.AdvancedMarkerElement && marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                            marker.addListener('click', () => {
+                              // Stäng andra info windows
+                              infoWindow.open({ anchor: marker, map: map });
+                            });
+                          } else {
+                            marker.addListener('click', () => {
+                              infoWindow.open(map, marker);
+                            });
+                          }
+                        };
+
+                        addCaseClickListener(caseMarker, caseInfoWindow);
+                      }
+                    } catch (error) {
+                      console.error(`[DEBUG] Error creating case marker ${index}:`, error);
+                    }
+                  }
+                });
+
+                // Rita polylines mellan waypoints
+                if (waypoints.length > 1) {
+                  for (let i = 0; i < waypoints.length - 1; i++) {
+                    const polyline = new google.maps.Polyline({
+                      path: [
+                        { lat: waypoints[i].lat, lng: waypoints[i].lng },
+                        { lat: waypoints[i + 1].lat, lng: waypoints[i + 1].lng }
+                      ],
+                      geodesic: true,
+                      strokeColor: '#22c55e',
+                      strokeOpacity: 0.8,
+                      strokeWeight: 4,
+                      map: map,
+                    });
+
+                    routePolylines.push(polyline);
+                  }
+
+                  // Beräkna och visa total sträcka
+                  let totalDistance = 0;
+                  for (let i = 0; i < waypoints.length - 1; i++) {
+                    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                      new google.maps.LatLng(waypoints[i].lat, waypoints[i].lng),
+                      new google.maps.LatLng(waypoints[i + 1].lat, waypoints[i + 1].lng)
+                    );
+                    totalDistance += distance;
+                  }
+
+                  console.log(`[DEBUG] Route created with total distance: ${(totalDistance / 1000).toFixed(1)} km`);
+                  
+                  // Visa route info i en toast
+                  if (window.toast) {
+                    window.toast.success(`Rutt visualiserad för ${technician.name}: ${cases.length} ärenden, ${(totalDistance / 1000).toFixed(1)} km`);
+                  }
+                }
+
+                // Sätt upp global editCase funktion för info windows
+                (window as any).editCase = (caseId: string) => {
+                  if (onEditCase) {
+                    onEditCase(caseId);
+                  }
+                };
+
+                // Centrera kartan på rutten
+                if (waypoints.length > 0) {
+                  const bounds = new google.maps.LatLngBounds();
+                  waypoints.forEach(waypoint => {
+                    bounds.extend(new google.maps.LatLng(waypoint.lat, waypoint.lng));
+                  });
+                  map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+                }
+
+              } catch (error) {
+                console.error(`[DEBUG] Error creating technician route:`, error);
+                if (window.toast) {
+                  window.toast.error('Kunde inte visa rutt för tekniker');
+                }
+              }
             };
 
             // === HEATMAP (Activity Heatmap) ===
@@ -1173,6 +1441,19 @@ const GoogleMapComponent: React.FC<{
 
             // Använd callback för att centrera kartan
             mapRef(map);
+
+            // Re-create routes when selectedTechnician changes
+            const updateRoutes = () => {
+              createRoutes();
+            };
+
+            // Create initial route if technician is selected  
+            if (selectedTechnician) {
+              createTechnicianRoute(selectedTechnician);
+            }
+
+            // Expose updateRoutes for external triggers
+            (window as any).updateMapRoutes = updateRoutes;
           }
         }}
       />

@@ -297,7 +297,12 @@ const TechnicianDetailsModal: React.FC<TechnicianDetailsModalProps> = ({
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => onEditCase?.(caseItem.id)}
+                            onClick={() => {
+                              // Stäng denna modal först för att undvika z-index konflikter
+                              onClose();
+                              // Sedan öppna EditCaseModal
+                              onEditCase?.(caseItem.id);
+                            }}
                             className="flex items-center gap-2"
                           >
                             <Edit className="w-3 h-3" />
@@ -344,7 +349,12 @@ const TechnicianDetailsModal: React.FC<TechnicianDetailsModalProps> = ({
                     Rutt-optimering
                   </h3>
                   <Button
-                    onClick={() => onShowRoute?.(technician.id)}
+                    onClick={() => {
+                      // Stäng modal först
+                      onClose();
+                      // Visa rutt på karta
+                      onShowRoute?.(technician.id);
+                    }}
                     className="flex items-center gap-2"
                   >
                     <MapPin className="w-4 h-4" />
