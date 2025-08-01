@@ -565,6 +565,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                   showZones={showZones}
                   showHeatmap={showHeatmap}
                   fetchTechnicianCases={fetchTechnicianCases}
+                  onEditCase={onEditCase}
                 />
               )}
             </div>
@@ -703,7 +704,8 @@ const GoogleMapComponent: React.FC<{
   showZones: boolean; 
   showHeatmap: boolean;
   fetchTechnicianCases: (technicianId: string) => Promise<any[]>;
-}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician, showRoutes, showZones, showHeatmap, fetchTechnicianCases }) => {
+  onEditCase?: (caseId: string) => void;
+}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician, showRoutes, showZones, showHeatmap, fetchTechnicianCases, onEditCase }) => {
   const mapRef = useCallback((map: google.maps.Map | null) => {
     if (map && technicians.length > 0) {
       // Centrera kartan runt tekniker-positionerna med säkrare zoom-hantering
@@ -868,9 +870,9 @@ const GoogleMapComponent: React.FC<{
                     background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
                     color: white;
                     padding: 0;
-                    min-width: 400px;
-                    max-width: 500px;
-                    min-height: 300px;
+                    min-width: 600px;
+                    max-width: 700px;
+                    min-height: 500px;
                     border-radius: 12px;
                     overflow: hidden;
                     font-family: system-ui, -apple-system, sans-serif;
@@ -1014,8 +1016,8 @@ const GoogleMapComponent: React.FC<{
                       </div>
 
                       <!-- Dynamic Content Area -->
-                      <div id="dynamic-content-${tech.id}" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1); min-height: 100px;">
-                        <div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px 0;">
+                      <div id="dynamic-content-${tech.id}" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1); min-height: 200px;">
+                        <div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 40px 0;">
                           Klicka på en knapp ovan för att visa detaljer
                         </div>
                       </div>
@@ -1116,7 +1118,7 @@ const GoogleMapComponent: React.FC<{
                               }).join('');
                               
                               dynamicContent.innerHTML = `
-                                <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                                <div style="max-height: 300px; overflow-y: auto; padding-right: 8px;">
                                   ${casesHtml}
                                 </div>
                               `;
@@ -1379,7 +1381,7 @@ const GoogleMapComponent: React.FC<{
                               }).join('');
                               
                               dynamicContent.innerHTML = `
-                                <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                                <div style="max-height: 300px; overflow-y: auto; padding-right: 8px;">
                                   ${casesHtml}
                                 </div>
                               `;
