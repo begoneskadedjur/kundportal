@@ -407,187 +407,185 @@ export default function CaseSearch() {
         </Card>
 
         {/* Resultat */}
-        <div className="space-y-3">
+        <Card>
           {paginatedCases.length === 0 ? (
-            <Card>
-              <div className="text-center py-12">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-slate-600" />
-                <h3 className="text-lg font-medium text-slate-300 mb-2">Inga ärenden hittades</h3>
-                <p className="text-slate-500">Prova att justera dina filter eller sökterm</p>
-              </div>
-            </Card>
+            <div className="text-center py-12">
+              <FileText className="w-12 h-12 mx-auto mb-4 text-slate-600" />
+              <h3 className="text-lg font-medium text-slate-300 mb-2">Inga ärenden hittades</h3>
+              <p className="text-slate-500">Prova att justera dina filter eller sökterm</p>
+            </div>
           ) : (
-            paginatedCases.map(caseItem => {
-              const StatusIcon = getStatusIcon(caseItem.status);
-              const price = extractPrice(caseItem.pris);
-              
-              return (
-                <Card key={caseItem.id} className="hover:border-emerald-500/30 transition-colors">
-                  <div className="p-6">
-                    {/* Header med titel och huvudinfo */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-start gap-3 mb-2">
-                          {/* Ärendetyp ikon */}
-                          <div className="flex-shrink-0 mt-1">
-                            {caseItem.case_type === 'private' ? (
-                              <Home className="w-5 h-5 text-emerald-400" />
-                            ) : (
-                              <Building2 className="w-5 h-5 text-blue-400" />
-                            )}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-1">{caseItem.title}</h3>
-                            
-                            {/* Status badge */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className={`flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(caseItem.status)}`}>
-                                <StatusIcon className="w-3 h-3" />
-                                {caseItem.status}
-                              </div>
-                              
-                              {/* Ärendetyp badge */}
-                              <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 text-slate-300 rounded-full text-xs">
-                                <Tag className="w-3 h-3" />
-                                {caseItem.case_type === 'private' ? 'Privat' : 'Företag'}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Pris och åtgärder */}
-                      <div className="flex items-start gap-3">
-                        {price && (
-                          <div className="text-right">
-                            <div className="flex items-center gap-1 text-emerald-400 font-semibold">
-                              <Euro className="w-4 h-4" />
-                              {price} kr
-                            </div>
-                            <div className="text-xs text-slate-500">Pris</div>
+            <div className="overflow-x-auto">
+              {/* Tabellhuvud */}
+              <div className="grid grid-cols-12 gap-4 p-4 bg-slate-800/30 border-b border-slate-700 text-sm font-medium text-slate-300">
+                <div className="col-span-3">Ärende & Kund</div>
+                <div className="col-span-1 text-center">Typ</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-2">Tekniker</div>
+                <div className="col-span-1 text-center">Skadedjur</div>
+                <div className="col-span-1 text-center">Pris</div>
+                <div className="col-span-1 text-center">Datum</div>
+                <div className="col-span-1 text-center">Åtgärd</div>
+              </div>
+
+              {/* Ärendenlista */}
+              <div className="divide-y divide-slate-800">
+                {paginatedCases.map((caseItem, index) => {
+                  const StatusIcon = getStatusIcon(caseItem.status);
+                  const price = extractPrice(caseItem.pris);
+                  
+                  return (
+                    <div
+                      key={caseItem.id}
+                      className={`grid grid-cols-12 gap-4 p-4 hover:bg-slate-800/20 transition-colors ${
+                        index % 2 === 0 ? 'bg-slate-900/20' : ''
+                      }`}
+                    >
+                      {/* Ärende & Kund */}
+                      <div className="col-span-3 space-y-1">
+                        <h3 className="font-medium text-white text-sm truncate" title={caseItem.title}>
+                          {caseItem.title}
+                        </h3>
+                        {caseItem.kontaktperson && (
+                          <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <User className="w-3 h-3" />
+                            <span className="truncate">{caseItem.kontaktperson}</span>
                           </div>
                         )}
-                        
-                        <Button variant="outline" size="sm" className="flex-shrink-0">
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Huvudinformation i rutnät */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-                      {/* Kontaktperson */}
-                      {caseItem.kontaktperson && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-slate-300 font-medium">
-                            <User className="w-4 h-4 text-emerald-400" />
-                            {caseItem.kontaktperson}
-                          </div>
-                          <div className="ml-6 space-y-1">
+                        {(caseItem.kontakt_telefon || caseItem.kontakt_email) && (
+                          <div className="flex items-center gap-2 text-xs">
                             {caseItem.kontakt_telefon && (
-                              <div className="flex items-center gap-2 text-sm text-slate-400 hover:text-emerald-400 cursor-pointer transition-colors">
+                              <a 
+                                href={`tel:${caseItem.kontakt_telefon}`}
+                                className="flex items-center gap-1 text-slate-400 hover:text-emerald-400 transition-colors"
+                                title={caseItem.kontakt_telefon}
+                              >
                                 <Phone className="w-3 h-3" />
-                                <a href={`tel:${caseItem.kontakt_telefon}`}>{caseItem.kontakt_telefon}</a>
-                              </div>
+                              </a>
                             )}
                             {caseItem.kontakt_email && (
-                              <div className="flex items-center gap-2 text-sm text-slate-400 hover:text-emerald-400 cursor-pointer transition-colors">
+                              <a 
+                                href={`mailto:${caseItem.kontakt_email}`}
+                                className="flex items-center gap-1 text-slate-400 hover:text-emerald-400 transition-colors"
+                                title={caseItem.kontakt_email}
+                              >
                                 <Mail className="w-3 h-3" />
-                                <a href={`mailto:${caseItem.kontakt_email}`}>{caseItem.kontakt_email}</a>
-                              </div>
+                              </a>
                             )}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Adress */}
-                      {caseItem.adress && (
-                        <div className="space-y-1">
-                          <div className="flex items-start gap-2 text-slate-300">
-                            <MapPin className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                            <div className="text-sm">
-                              {formatAddress(caseItem.adress)}
-                            </div>
+                        )}
+                        {caseItem.adress && (
+                          <div className="flex items-start gap-1 text-xs text-slate-500" title={formatAddress(caseItem.adress)}>
+                            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                            <span className="truncate">{formatAddress(caseItem.adress)}</span>
                           </div>
+                        )}
+                      </div>
+
+                      {/* Typ */}
+                      <div className="col-span-1 flex justify-center items-start pt-1">
+                        {caseItem.case_type === 'private' ? (
+                          <Home className="w-4 h-4 text-emerald-400" title="Privat" />
+                        ) : (
+                          <Building2 className="w-4 h-4 text-blue-400" title="Företag" />
+                        )}
+                      </div>
+
+                      {/* Status */}
+                      <div className="col-span-2">
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(caseItem.status)}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          <span className="truncate">{caseItem.status}</span>
                         </div>
-                      )}
+                      </div>
 
                       {/* Tekniker */}
-                      {caseItem.primary_assignee_name && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-slate-300 font-medium">
-                            <User className="w-4 h-4 text-blue-400" />
-                            Tekniker
-                          </div>
-                          <div className="ml-6">
-                            <div className="text-sm text-slate-300">{caseItem.primary_assignee_name}</div>
+                      <div className="col-span-2 space-y-1">
+                        {caseItem.primary_assignee_name ? (
+                          <>
+                            <div className="text-sm text-slate-300 truncate" title={caseItem.primary_assignee_name}>
+                              {caseItem.primary_assignee_name}
+                            </div>
                             {(caseItem.secondary_assignee_name || caseItem.tertiary_assignee_name) && (
-                              <div className="text-xs text-slate-500">
+                              <div className="text-xs text-slate-500 truncate">
                                 + {[caseItem.secondary_assignee_name, caseItem.tertiary_assignee_name]
                                   .filter(Boolean)
                                   .join(', ')}
                               </div>
                             )}
-                          </div>
-                        </div>
-                      )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">Ej tilldelad</span>
+                        )}
+                      </div>
 
-                      {/* Datum information */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-slate-300 font-medium">
-                          <Clock className="w-4 h-4 text-emerald-400" />
-                          Datum
-                        </div>
-                        <div className="ml-6 space-y-1">
-                          <div className="text-sm text-slate-400">
-                            <span className="text-slate-500">Skapad:</span> {new Date(caseItem.created_at).toLocaleDateString('sv-SE')}
+                      {/* Skadedjur */}
+                      <div className="col-span-1 flex justify-center items-start pt-1">
+                        {caseItem.skadedjur ? (
+                          <div className="group relative">
+                            <Bug className="w-4 h-4 text-orange-400" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                              {caseItem.skadedjur}
+                            </div>
                           </div>
-                          {caseItem.start_date && (
-                            <div className="text-sm text-slate-400">
-                              <span className="text-slate-500">Start:</span> {new Date(caseItem.start_date).toLocaleDateString('sv-SE')}
-                            </div>
-                          )}
-                          {caseItem.completed_date && (
-                            <div className="text-sm text-emerald-400">
-                              <span className="text-slate-500">Avslutad:</span> {new Date(caseItem.completed_date).toLocaleDateString('sv-SE')}
-                            </div>
-                          )}
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </div>
+
+                      {/* Pris */}
+                      <div className="col-span-1 text-center">
+                        {price ? (
+                          <div className="flex items-center justify-center gap-1 text-emerald-400 text-sm font-medium">
+                            <Euro className="w-3 h-3" />
+                            <span>{price}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </div>
+
+                      {/* Datum */}
+                      <div className="col-span-1 text-center space-y-1">
+                        <div className="text-xs text-slate-400">
+                          {new Date(caseItem.created_at).toLocaleDateString('sv-SE', { 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
                         </div>
+                        {caseItem.completed_date && (
+                          <div className="text-xs text-emerald-400">
+                            ✓ {new Date(caseItem.completed_date).toLocaleDateString('sv-SE', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Åtgärd */}
+                      <div className="col-span-1 flex justify-center items-start pt-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="p-1 h-7 w-7 hover:scale-110 transition-transform"
+                          onClick={() => {
+                            // Öppna ClickUp-länk i ny flik
+                            const clickUpUrl = `https://app.clickup.com/t/${caseItem.id}`;
+                            window.open(clickUpUrl, '_blank');
+                          }}
+                          title="Öppna ärende i ClickUp"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
-
-                    {/* Skadedjur */}
-                    {caseItem.skadedjur && (
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2">
-                          <Bug className="w-4 h-4 text-orange-400" />
-                          <span className="text-slate-400 text-sm">Skadedjur:</span>
-                          <span className="bg-orange-500/10 text-orange-400 px-3 py-1 rounded-full text-sm font-medium border border-orange-500/20">
-                            {caseItem.skadedjur}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Beskrivning */}
-                    {caseItem.beskrivning && (
-                      <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50">
-                        <div className="flex items-start gap-2 mb-2">
-                          <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                          <span className="text-slate-400 text-sm font-medium">Beskrivning</span>
-                        </div>
-                        <p className="text-sm text-slate-300 ml-6 leading-relaxed">
-                          {caseItem.beskrivning}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              );
-            })
+                  );
+                })}
+              </div>
+            </div>
           )}
-        </div>
+        </Card>
 
         {/* Paginering */}
         {totalPages > 1 && (
