@@ -1,7 +1,7 @@
 // 📁 src/components/admin/coordinator/GeographicOptimizationMap.tsx
 // 🗺️ Geografisk optimering med rutt-analys och visualisering
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MapPin, 
   Route, 
@@ -17,13 +17,39 @@ import {
   Info,
   Eye,
   EyeOff,
-  Calendar
+  Calendar,
+  Users
 } from 'lucide-react';
 import { CoordinatorKpiData } from '../../../services/coordinatorAnalyticsService';
+import { supabase } from '../../../lib/supabase';
+import { useGoogleMaps } from '../../../hooks/useGoogleMaps';
+import toast from 'react-hot-toast';
 
 interface GeographicOptimizationMapProps {
   data: CoordinatorKpiData | null;
   loading: boolean;
+}
+
+interface TechnicianLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  cases: number;
+  status: 'active' | 'inactive' | 'break';
+  vehicle_id?: string;
+  current_address?: string;
+  last_updated?: string;
+}
+
+interface CaseLocation {
+  id: string;
+  address: string;
+  lat: number;
+  lng: number;
+  technician_id: string;
+  scheduled_time: string;
+  status: string;
 }
 
 interface RouteOptimizationData {
@@ -307,9 +333,105 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
   const [selectedTechnician, setSelectedTechnician] = useState<string>();
   const [showInsights, setShowInsights] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'map'>('table');
+  const [technicianLocations, setTechnicianLocations] = useState<TechnicianLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [selectedMapTechnician, setSelectedMapTechnician] = useState<TechnicianLocation | null>(null);
+
+  // Google Maps hook
+  const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
+    libraries: ['geometry', 'places']
+  });
 
   // I verkligheten skulle detta komma från data prop
   const routeData = mockRouteData;
+
+  // Hämta tekniker-positioner från Supabase
+  const fetchTechnicianLocations = useCallback(async () => {
+    setLoadingLocations(true);
+    try {
+      // Hämta aktiva tekniker med fordons-ID
+      const { data: technicians, error: techError } = await supabase
+        .from('technicians')
+        .select('id, name, abax_vehicle_id, is_active')
+        .eq('is_active', true)
+        .eq('role', 'Skadedjurstekniker')
+        .not('abax_vehicle_id', 'is', null);
+
+      if (techError) {
+        console.error('Fel vid hämtning av tekniker:', techError);
+        toast.error('Kunde inte hämta tekniker-data');
+        return;
+      }
+
+      if (!technicians || technicians.length === 0) {
+        console.warn('Inga aktiva tekniker med fordons-ID hittades');
+        setTechnicianLocations([]);
+        return;
+      }
+
+      // Hämta dagens ärenden för varje tekniker
+      const today = new Date().toISOString().split('T')[0];
+      const locations: TechnicianLocation[] = [];
+
+      for (const tech of technicians) {
+        // Räkna dagens ärenden
+        const { data: privateCases } = await supabase
+          .from('private_cases')
+          .select('id')
+          .eq('primary_assignee_id', tech.id)
+          .gte('start_date', today + ' 00:00:00')
+          .lte('start_date', today + ' 23:59:59');
+          
+        const { data: businessCases } = await supabase
+          .from('business_cases')
+          .select('id')
+          .eq('primary_assignee_id', tech.id)
+          .gte('start_date', today + ' 00:00:00')
+          .lte('start_date', today + ' 23:59:59');
+
+        const totalCases = (privateCases?.length || 0) + (businessCases?.length || 0);
+
+        // För demo: använd fasta koordinater för Stockholm-området
+        // I verkligheten skulle vi hämta från ABAX API eller cached positioner
+        const demoPositions = [
+          { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
+          { lat: 59.3345, lng: 18.0632 }, // Östermalm
+          { lat: 59.3242, lng: 18.0511 }, // Södermalm
+          { lat: 59.3406, lng: 18.0921 }, // Vasastan
+          { lat: 59.3165, lng: 18.0765 }, // Gamla stan
+        ];
+        
+        const randomPos = demoPositions[Math.floor(Math.random() * demoPositions.length)];
+        
+        locations.push({
+          id: tech.id,
+          name: tech.name,
+          lat: randomPos.lat + (Math.random() - 0.5) * 0.02, // Lägg till lite variation
+          lng: randomPos.lng + (Math.random() - 0.5) * 0.02,
+          cases: totalCases,
+          status: totalCases > 0 ? 'active' : 'inactive',
+          vehicle_id: tech.abax_vehicle_id,
+          current_address: 'Stockholm, Sverige',
+          last_updated: new Date().toISOString(),
+        });
+      }
+
+      setTechnicianLocations(locations);
+      
+    } catch (error) {
+      console.error('Error fetching technician locations:', error);
+      toast.error('Fel vid hämtning av tekniker-positioner');
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
+
+  // Hämta positioner när komponenten laddas
+  useEffect(() => {
+    if (viewMode === 'map') {
+      fetchTechnicianLocations();
+    }
+  }, [viewMode, fetchTechnicianLocations]);
 
   if (loading) {
     return (
@@ -424,19 +546,58 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
             </div>
           </div>
         ) : (
-          <div className="h-96 bg-slate-900/50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-700">
-            <div className="text-center">
-              <MapPin className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-slate-300 mb-2">Interaktiv karta</h4>
-              <p className="text-sm text-slate-500 mb-4">
-                Här visas en interaktiv karta med tekniker-rutter och optimeringsförslag
-              </p>
-              <div className="space-y-2 text-xs text-slate-600">
-                <p>• Tekniker-positioner och dagens rutter</p>
-                <p>• Optimeringsförslag för minskad körsträcka</p>
-                <p>• Geografisk klusteranalys av ärenden</p>
-                <p>• Real-time trafikinformation</p>
+          <div className="space-y-4">
+            {/* Map Container */}
+            <div className="h-96 bg-slate-900/50 rounded-lg overflow-hidden border border-slate-700">
+              {mapsError ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                    <h4 className="text-lg font-medium text-red-300 mb-2">Google Maps fel</h4>
+                    <p className="text-sm text-slate-400">{mapsError}</p>
+                  </div>
+                </div>
+              ) : mapsLoading || !mapsLoaded ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <RefreshCw className="w-8 h-8 text-slate-400 animate-spin mx-auto mb-3" />
+                    <p className="text-sm text-slate-400">Laddar Google Maps...</p>
+                  </div>
+                </div>
+              ) : (
+                <GoogleMapComponent 
+                  technicians={technicianLocations}
+                  loading={loadingLocations}
+                  onTechnicianSelect={setSelectedMapTechnician}
+                  selectedTechnician={selectedMapTechnician}
+                />
+              )}
+            </div>
+
+            {/* Map Legend */}
+            <div className="flex items-center justify-between bg-slate-900/30 rounded-lg p-3">
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-slate-400">Aktiv tekniker</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                  <span className="text-slate-400">Inaktiv tekniker</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="text-slate-400">Paus</span>
+                </div>
               </div>
+              <button
+                onClick={fetchTechnicianLocations}
+                disabled={loadingLocations}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                <RefreshCw className={`w-3 h-3 ${loadingLocations ? 'animate-spin' : ''}`} />
+                Uppdatera positioner
+              </button>
             </div>
           </div>
         )}
@@ -494,6 +655,155 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
           })()}
         </div>
       )}
+    </div>
+  );
+};
+
+// Google Maps komponent
+const GoogleMapComponent: React.FC<{
+  technicians: TechnicianLocation[];
+  loading: boolean;
+  onTechnicianSelect: (technician: TechnicianLocation | null) => void;
+  selectedTechnician: TechnicianLocation | null;
+}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician }) => {
+  const mapRef = useCallback((map: google.maps.Map | null) => {
+    if (map && technicians.length > 0) {
+      // Centrera kartan runt tekniker-positionerna
+      const bounds = new google.maps.LatLngBounds();
+      technicians.forEach(tech => {
+        bounds.extend(new google.maps.LatLng(tech.lat, tech.lng));
+      });
+      map.fitBounds(bounds);
+    }
+  }, [technicians]);
+
+  const mapOptions: google.maps.MapOptions = {
+    center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
+    zoom: 12,
+    styles: [
+      {
+        "featureType": "all",
+        "elementType": "geometry.fill",
+        "stylers": [{ "color": "#1e293b" }]
+      },
+      {
+        "featureType": "all",
+        "elementType": "labels.text.fill",
+        "stylers": [{ "color": "#94a3b8" }]
+      },
+      {
+        "featureType": "water",
+        "elementType": "geometry",
+        "stylers": [{ "color": "#0f172a" }]
+      },
+      {
+        "featureType": "road",
+        "elementType": "geometry",
+        "stylers": [{ "color": "#334155" }]
+      }
+    ],
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    scaleControl: true,
+    streetViewControl: false,
+    rotateControl: false,
+    fullscreenControl: true
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-800">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-slate-400 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Hämtar tekniker-positioner...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full relative">
+      <div 
+        id="google-map" 
+        className="h-full w-full"
+        ref={(divRef) => {
+          if (divRef && window.google && window.google.maps) {
+            const map = new google.maps.Map(divRef, mapOptions);
+            
+            // Lägg till markers för varje tekniker
+            technicians.forEach(tech => {
+              const marker = new google.maps.Marker({
+                position: { lat: tech.lat, lng: tech.lng },
+                map,
+                title: tech.name,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: tech.cases > 0 ? 12 : 8,
+                  fillColor: tech.status === 'active' ? '#22c55e' : 
+                            tech.status === 'break' ? '#f97316' : '#6b7280',
+                  fillOpacity: 0.8,
+                  strokeColor: '#ffffff',
+                  strokeWeight: 2,
+                },
+                zIndex: tech.cases > 0 ? 1000 : 100
+              });
+
+              // Info window för varje tekniker
+              const infoWindow = new google.maps.InfoWindow({
+                content: `
+                  <div style="color: #000; padding: 8px; min-width: 200px;">
+                    <h3 style="margin: 0 0 8px 0; font-weight: bold;">${tech.name}</h3>
+                    <div style="font-size: 12px; line-height: 1.4;">
+                      <p style="margin: 4px 0;"><strong>Status:</strong> ${
+                        tech.status === 'active' ? 'Aktiv' : 
+                        tech.status === 'break' ? 'Paus' : 'Inaktiv'
+                      }</p>
+                      <p style="margin: 4px 0;"><strong>Ärenden idag:</strong> ${tech.cases}</p>
+                      <p style="margin: 4px 0;"><strong>Plats:</strong> ${tech.current_address || 'Okänd'}</p>
+                      <p style="margin: 4px 0;"><strong>Uppdaterad:</strong> ${
+                        tech.last_updated ? new Date(tech.last_updated).toLocaleTimeString('sv-SE') : 'Okänd'
+                      }</p>
+                    </div>
+                  </div>
+                `
+              });
+
+              marker.addListener('click', () => {
+                // Stäng andra info windows
+                technicians.forEach(() => infoWindow.close());
+                
+                // Öppna denna info window
+                infoWindow.open(map, marker);
+                
+                // Notifiera parent component
+                onTechnicianSelect(tech);
+              });
+            });
+
+            // Använd callback för att centrera kartan
+            mapRef(map);
+          }
+        }}
+      />
+      
+      {/* Tekniker-räknare overlay */}
+      <div className="absolute top-4 left-4 bg-slate-800/90 rounded-lg px-3 py-2 text-sm">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-blue-400" />
+          <span className="text-white font-medium">{technicians.length}</span>
+          <span className="text-slate-400">tekniker</span>
+        </div>
+      </div>
+
+      {/* Aktiva ärenden overlay */}
+      <div className="absolute top-4 right-4 bg-slate-800/90 rounded-lg px-3 py-2 text-sm">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-green-400" />
+          <span className="text-white font-medium">{technicians.reduce((sum, t) => sum + t.cases, 0)}</span>
+          <span className="text-slate-400">ärenden idag</span>
+        </div>
+      </div>
     </div>
   );
 };

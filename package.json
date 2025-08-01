@@ -20,6 +20,7 @@
     "@fullcalendar/resource": "^6.1.18",
     "@fullcalendar/resource-timeline": "^6.1.18",
     "@fullcalendar/timegrid": "^6.1.18",
+    "@react-google-maps/api": "^2.20.7",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/cli": "^4.1.10",
     "@types/react-datepicker": "^6.2.0",

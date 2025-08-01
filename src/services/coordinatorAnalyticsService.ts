@@ -194,7 +194,7 @@ export const getCoordinatorKpiData = async (
     const { data: auditData } = await supabase
       .from('billing_audit_log')
       .select('case_id, old_status, new_status, changed_at, notes')
-      .gte('changed_at', startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      .gte('changed_at', startDate ? new Date(startDate).toISOString() : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
     const rescheduleReasons: Record<string, number> = {};
     let totalReschedules = 0;
