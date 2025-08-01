@@ -16,7 +16,7 @@ const CoordinatorKpiCard = ({ title, value, icon: Icon, onClick }: CoordinatorKp
     onClick={onClick}
   >
     <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
-      <Icon className="w-6 h-6 text-slate-400" />
+      <Icon className="w-6 h-6 text-emerald-400" />
     </div>
     <div className="flex-1">
       <div className="text-3xl font-bold text-white">{value}</div>

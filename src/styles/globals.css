@@ -2,7 +2,7 @@
 
 @layer theme {
   :root {
-    --color-begone-green: #22c55e;
+    --color-begone-green: #20c58f;
     --color-begone-dark: #0f172a;
     --color-begone-darker: #020617;
   }
@@ -55,7 +55,7 @@
   }
 
   .begone-gradient {
-    background-image: linear-gradient(to right, #22c55e, #10b981);
+    background-image: linear-gradient(to right, #20c58f, #10b981);
   }
 
   .text-gradient {
