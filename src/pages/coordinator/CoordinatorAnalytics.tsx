@@ -30,6 +30,7 @@ import Button from '../../components/ui/Button';
 import { useCoordinatorAnalytics, useAnalyticsExport, useAnalyticsAlerts } from '../../hooks/useCoordinatorAnalytics';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import SchedulingEfficiencyChart from '../../components/admin/coordinator/SchedulingEfficiencyChart';
 import TechnicianUtilizationGrid from '../../components/admin/coordinator/TechnicianUtilizationGrid';
@@ -83,6 +84,8 @@ const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: str
 };
 
 export default function CoordinatorAnalytics() {
+  const { user } = useAuth();
+  
   const [dateRange, setDateRange] = useState<{
     startDate: Date;
     endDate: Date;
@@ -114,6 +117,37 @@ export default function CoordinatorAnalytics() {
 
   // EditCase handler
   const handleEditCase = async (caseId: string) => {
+    // Kontrollera användarroll från JWT metadata
+    const jwtRole = user?.user_metadata?.role;
+    const technicianId = user?.user_metadata?.technician_id;
+    
+    // Hämta tekniker-info för att få rätt roll
+    let hasPermission = false;
+    
+    if (jwtRole === 'admin') {
+      hasPermission = true;
+    } else if (technicianId) {
+      // Hämta tekniker-data för att kontrollera roll i databas
+      try {
+        const { data: technician } = await supabase
+          .from('technicians')
+          .select('role')
+          .eq('id', technicianId)
+          .single();
+          
+        if (technician?.role === 'Koordinator' || technician?.role === 'Admin') {
+          hasPermission = true;
+        }
+      } catch (error) {
+        console.error('Error fetching technician role:', error);
+      }
+    }
+    
+    if (!hasPermission) {
+      toast.error('Du har inte behörighet att redigera ärenden från analytics-vyn');
+      return;
+    }
+
     try {
       // Försök hämta från private_cases först
       const { data: privateCase, error: privateError } = await supabase
