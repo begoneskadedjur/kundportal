@@ -38,15 +38,20 @@ async function getAbaxToken() {
     return data.access_token;
 }
 
-// Hämta alla fordonspositioner på en gång - mycket effektivare enligt ABAX dokumentation
+// Hämta alla fordonspositioner med POST-request enligt ABAX dokumentation
 async function getAllVehicleLocations(token: string, vehicleIds: string[]) {
-    console.log(`[ABAX] Fetching locations for ${vehicleIds.length} vehicles...`);
+    console.log(`[ABAX] Fetching locations for ${vehicleIds.length} vehicles via POST...`);
     
     const response = await fetch('https://api.abax.cloud/v1/vehicles/locations', {
+        method: 'POST',
         headers: { 
             'Authorization': `Bearer ${token}`,
-            'User-Agent': 'BeGone-Kundportal/1.0'
+            'User-Agent': 'BeGone-Kundportal/1.0',
+            'Content-Type': 'application/json'
         },
+        body: JSON.stringify({
+            ids: vehicleIds
+        })
     });
     
     if (!response.ok) {
@@ -56,39 +61,46 @@ async function getAllVehicleLocations(token: string, vehicleIds: string[]) {
     }
 
     const locationsData = await response.json() as {
-        data: Array<{
-            vehicleId: string;
-            latitude?: number;
-            longitude?: number;
-            address?: string;
-            timestamp?: string;
-            speed?: number;
+        items: Array<{
+            id: string;
+            location: {
+                latitude: number;
+                longitude: number;
+                speed?: number;
+                in_movement?: boolean;
+                course?: number;
+                timestamp: string;
+                signal_source: string;
+            };
         }>;
     };
     
-    console.log(`[ABAX] Received ${locationsData.data?.length || 0} vehicle locations`);
+    console.log(`[ABAX] Received ${locationsData.items?.length || 0} vehicle locations`);
     
     // Skapa en map för snabb lookup
     const locationMap = new Map();
     
-    if (locationsData.data) {
-        for (const location of locationsData.data) {
-            // Filtrera bara våra tekniker-fordon
-            if (vehicleIds.includes(location.vehicleId)) {
-                if (location.latitude !== undefined && location.longitude !== undefined) {
-                    locationMap.set(location.vehicleId, {
-                        lat: location.latitude,
-                        lng: location.longitude,
-                        address: location.address || await reverseGeocode(location.latitude, location.longitude),
-                        lastUpdate: location.timestamp,
-                        speed: location.speed || 0
-                    });
-                }
+    if (locationsData.items) {
+        for (const item of locationsData.items) {
+            const location = item.location;
+            if (location && location.latitude !== undefined && location.longitude !== undefined) {
+                console.log(`[ABAX] Processing location for vehicle ${item.id}:`, location.latitude, location.longitude);
+                
+                locationMap.set(item.id, {
+                    lat: location.latitude,
+                    lng: location.longitude,
+                    address: await reverseGeocode(location.latitude, location.longitude),
+                    lastUpdate: location.timestamp,
+                    speed: location.speed || 0,
+                    in_movement: location.in_movement || false,
+                    course: location.course,
+                    signal_source: location.signal_source
+                });
             }
         }
     }
     
-    console.log(`[ABAX] Mapped ${locationMap.size} valid locations`);
+    console.log(`[ABAX] Successfully mapped ${locationMap.size} valid locations`);
     return locationMap;
 }
 
@@ -173,18 +185,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const abaxLocation = locationMap.get(tech.abax_vehicle_id);
             
             if (abaxLocation) {
+                // Bestäm status baserat på ärenden, rörelse och hastighet
+                let status: 'active' | 'inactive' | 'break' = 'inactive';
+                if (caseCount > 0) {
+                    status = 'active';
+                } else if (abaxLocation.in_movement || abaxLocation.speed > 5) {
+                    status = 'active'; // Fordonet rör sig
+                } else {
+                    status = 'inactive'; // Stationärt utan ärenden
+                }
+                
                 return {
                     id: tech.id,
                     name: tech.name,
                     lat: abaxLocation.lat,
                     lng: abaxLocation.lng,
                     cases: caseCount,
-                    status: caseCount > 0 ? 'active' : (abaxLocation.speed > 5 ? 'active' : 'inactive'),
+                    status,
                     vehicle_id: tech.abax_vehicle_id,
                     current_address: abaxLocation.address,
-                    last_updated: abaxLocation.lastUpdate || new Date().toISOString(),
+                    last_updated: abaxLocation.lastUpdate,
                     data_source: 'abax',
-                    speed: abaxLocation.speed
+                    speed: abaxLocation.speed,
+                    in_movement: abaxLocation.in_movement,
+                    course: abaxLocation.course,
+                    signal_source: abaxLocation.signal_source
                 };
             } else {
                 // Fallback till Stockholm-centrum om ABAX saknar data

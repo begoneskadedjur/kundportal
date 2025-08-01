@@ -644,29 +644,8 @@ const GoogleMapComponent: React.FC<{
   const mapOptions: google.maps.MapOptions = {
     center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
     zoom: 12,
-    mapId: 'begone-geographic-optimization', // Lägg till Map ID för AdvancedMarkers
-    styles: [
-      {
-        "featureType": "all",
-        "elementType": "geometry.fill",
-        "stylers": [{ "color": "#1e293b" }]
-      },
-      {
-        "featureType": "all",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#94a3b8" }]
-      },
-      {
-        "featureType": "water",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#0f172a" }]
-      },
-      {
-        "featureType": "road",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#334155" }]
-      }
-    ],
+    mapId: 'begone-geographic-optimization', // Map ID för AdvancedMarkers - styles hanteras via cloud console
+    // Styles kan inte användas med mapId - hanteras via Google Cloud Console
     disableDefaultUI: false,
     zoomControl: true,
     mapTypeControl: false,

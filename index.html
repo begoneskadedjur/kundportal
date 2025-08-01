@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
     <!-- Cache busting för SPA routing -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -14,6 +14,34 @@
     
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <title>BeGone Kundportal</title>
+    
+    <!-- CSS Reset för zoom-problem -->
+    <style>
+      html, body {
+        zoom: 1 !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        -moz-transform: none !important;
+        -ms-transform: none !important;
+        -o-transform: none !important;
+      }
+      
+      /* Fixa CSS transition-duration fel */
+      * {
+        -webkit-transition-duration: 0s !important;
+        -moz-transition-duration: 0s !important;
+        -o-transition-duration: 0s !important;
+        transition-duration: 0s !important;
+      }
+      
+      /* Återställ Tailwind transitions */
+      .transition-all,
+      .transition-colors,
+      .transition-transform,
+      .transition-opacity {
+        transition-duration: 200ms !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
