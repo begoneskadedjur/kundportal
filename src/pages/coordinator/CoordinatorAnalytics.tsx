@@ -485,15 +485,15 @@ export default function CoordinatorAnalytics() {
         </section>
 
       </div>
+      
+      {/* EditCaseModal */}
+      <EditCaseModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        onSuccess={handleEditSuccess} 
+        caseData={selectedCase} 
+        technicians={technicians} 
+      />
     </div>
-    
-    {/* EditCaseModal */}
-    <EditCaseModal 
-      isOpen={isEditModalOpen} 
-      onClose={() => setIsEditModalOpen(false)} 
-      onSuccess={handleEditSuccess} 
-      caseData={selectedCase} 
-      technicians={technicians} 
-    />
   );
 }
