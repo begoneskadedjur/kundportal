@@ -311,6 +311,10 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
   const [showRoutes, setShowRoutes] = useState(false);
   const [showZones, setShowZones] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [selectedTechnicianDetails, setSelectedTechnicianDetails] = useState<{
+    technician: TechnicianLocation;
+    view: 'cases' | 'route' | null;
+  } | null>(null);
 
   // Google Maps hook
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
@@ -381,6 +385,34 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
       setTechnicianLocations([]);
     } finally {
       setLoadingLocations(false);
+    }
+  }, []);
+
+  // Hämta tekniker-ärenden för vald tekniker
+  const fetchTechnicianCases = useCallback(async (technicianId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data: privateCases } = await supabase
+        .from('private_cases')
+        .select('id, title, kontaktperson, adress, start_date, due_date, status, skadedjur')
+        .eq('primary_assignee_id', technicianId)
+        .gte('start_date', today + ' 00:00:00')
+        .lte('start_date', today + ' 23:59:59')
+        .order('start_date', { ascending: true });
+        
+      const { data: businessCases } = await supabase
+        .from('business_cases')
+        .select('id, title, kontaktperson, adress, start_date, due_date, status, skadedjur')
+        .eq('primary_assignee_id', technicianId)
+        .gte('start_date', today + ' 00:00:00')
+        .lte('start_date', today + ' 23:59:59')
+        .order('start_date', { ascending: true });
+      
+      return [...(privateCases || []), ...(businessCases || [])];
+    } catch (error) {
+      console.error('Error fetching technician cases:', error);
+      return [];
     }
   }, []);
 
@@ -531,6 +563,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                   showRoutes={showRoutes}
                   showZones={showZones}
                   showHeatmap={showHeatmap}
+                  fetchTechnicianCases={fetchTechnicianCases}
                 />
               )}
             </div>
@@ -668,7 +701,8 @@ const GoogleMapComponent: React.FC<{
   showRoutes: boolean;
   showZones: boolean; 
   showHeatmap: boolean;
-}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician, showRoutes, showZones, showHeatmap }) => {
+  fetchTechnicianCases: (technicianId: string) => Promise<any[]>;
+}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician, showRoutes, showZones, showHeatmap, fetchTechnicianCases }) => {
   const mapRef = useCallback((map: google.maps.Map | null) => {
     if (map && technicians.length > 0) {
       // Centrera kartan runt tekniker-positionerna med säkrare zoom-hantering
@@ -833,7 +867,9 @@ const GoogleMapComponent: React.FC<{
                     background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
                     color: white;
                     padding: 0;
-                    min-width: 320px;
+                    min-width: 400px;
+                    max-width: 500px;
+                    min-height: 300px;
                     border-radius: 12px;
                     overflow: hidden;
                     font-family: system-ui, -apple-system, sans-serif;
@@ -946,7 +982,7 @@ const GoogleMapComponent: React.FC<{
 
                       <!-- Action Buttons -->
                       <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1);">
-                        <button style="
+                        <button id="show-cases-${tech.id}" style="
                           flex: 1;
                           background: linear-gradient(135deg, #3b82f6, #2563eb);
                           color: white;
@@ -958,9 +994,9 @@ const GoogleMapComponent: React.FC<{
                           cursor: pointer;
                           transition: transform 0.1s;
                         " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                          📋 Visa Ärenden
+                          📋 Visa Ärenden (${tech.cases})
                         </button>
-                        <button style="
+                        <button id="show-route-${tech.id}" style="
                           flex: 1;
                           background: linear-gradient(135deg, #10b981, #059669);
                           color: white;
@@ -974,6 +1010,13 @@ const GoogleMapComponent: React.FC<{
                         " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                           🗺️ Visa Rutt
                         </button>
+                      </div>
+
+                      <!-- Dynamic Content Area -->
+                      <div id="dynamic-content-${tech.id}" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1); min-height: 100px;">
+                        <div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 20px 0;">
+                          Klicka på en knapp ovan för att visa detaljer
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -995,6 +1038,94 @@ const GoogleMapComponent: React.FC<{
                         anchor: marker,
                         map: map
                       });
+
+                      // Lägg till event listeners för knappar efter att info window öppnats
+                      setTimeout(() => {
+                        const showCasesBtn = document.getElementById(`show-cases-${tech.id}`);
+                        const showRouteBtn = document.getElementById(`show-route-${tech.id}`);
+                        const dynamicContent = document.getElementById(`dynamic-content-${tech.id}`);
+
+                        if (showCasesBtn && dynamicContent) {
+                          showCasesBtn.addEventListener('click', async () => {
+                            dynamicContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="color: #3b82f6;">⏳ Laddar ärenden...</div></div>';
+                            
+                            const cases = await fetchTechnicianCases(tech.id);
+                            
+                            if (cases.length === 0) {
+                              dynamicContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">📭 Inga ärenden idag</div>';
+                            } else {
+                              const casesHtml = cases.map((caseItem, index) => `
+                                <div style="
+                                  background: rgba(59, 130, 246, 0.1);
+                                  border: 1px solid rgba(59, 130, 246, 0.2);
+                                  border-radius: 8px;
+                                  padding: 12px;
+                                  margin-bottom: 8px;
+                                ">
+                                  <div style="display: flex; justify-content: between; align-items: start; gap: 8px;">
+                                    <div style="flex: 1;">
+                                      <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
+                                        ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                        👤 ${caseItem.kontaktperson || 'Okänd kund'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                        📍 ${caseItem.adress || 'Ingen adress'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #60a5fa;">
+                                        🕐 ${new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              `).join('');
+                              
+                              dynamicContent.innerHTML = `
+                                <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                                  ${casesHtml}
+                                </div>
+                              `;
+                            }
+                          });
+                        }
+
+                        if (showRouteBtn && dynamicContent) {
+                          showRouteBtn.addEventListener('click', () => {
+                            const routeInfo = `
+                              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
+                                <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                  🗺️ Rutt-information
+                                </div>
+                                <div style="space-y: 8px; font-size: 13px;">
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Aktuell position:</span>
+                                    <span style="color: #e2e8f0;">${tech.current_address}</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Hastighet:</span>
+                                    <span style="color: #e2e8f0;">${tech.speed} km/h</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Status:</span>
+                                    <span style="color: #e2e8f0;">${tech.in_movement ? '🚗 I rörelse' : '🏁 Stationär'}</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                    <span style="color: #94a3b8;">Ärenden kvar:</span>
+                                    <span style="color: #10b981; font-weight: 600;">${tech.cases} st</span>
+                                  </div>
+                                </div>
+                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
+                                  <div style="font-size: 11px; color: #64748b; text-align: center;">
+                                    💡 Optimerad rutt beräknas automatiskt baserat på tekniker-position och ärenden
+                                  </div>
+                                </div>
+                              </div>
+                            `;
+                            dynamicContent.innerHTML = routeInfo;
+                          });
+                        }
+                      }, 100);
                       
                       // Notifiera parent component
                       onTechnicianSelect(tech);
@@ -1009,6 +1140,94 @@ const GoogleMapComponent: React.FC<{
                       
                       // Öppna denna info window
                       infoWindow.open(map, marker);
+
+                      // Lägg till samma event listeners för fallback
+                      setTimeout(() => {
+                        const showCasesBtn = document.getElementById(`show-cases-${tech.id}`);
+                        const showRouteBtn = document.getElementById(`show-route-${tech.id}`);
+                        const dynamicContent = document.getElementById(`dynamic-content-${tech.id}`);
+
+                        if (showCasesBtn && dynamicContent) {
+                          showCasesBtn.addEventListener('click', async () => {
+                            dynamicContent.innerHTML = '<div style="text-align: center; padding: 20px;"><div style="color: #3b82f6;">⏳ Laddar ärenden...</div></div>';
+                            
+                            const cases = await fetchTechnicianCases(tech.id);
+                            
+                            if (cases.length === 0) {
+                              dynamicContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">📭 Inga ärenden idag</div>';
+                            } else {
+                              const casesHtml = cases.map((caseItem, index) => `
+                                <div style="
+                                  background: rgba(59, 130, 246, 0.1);
+                                  border: 1px solid rgba(59, 130, 246, 0.2);
+                                  border-radius: 8px;
+                                  padding: 12px;
+                                  margin-bottom: 8px;
+                                ">
+                                  <div style="display: flex; justify-content: between; align-items: start; gap: 8px;">
+                                    <div style="flex: 1;">
+                                      <div style="font-weight: 600; font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">
+                                        ${index + 1}. ${caseItem.title || caseItem.skadedjur || 'Okänt ärende'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                        👤 ${caseItem.kontaktperson || 'Okänd kund'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+                                        📍 ${caseItem.adress || 'Ingen adress'}
+                                      </div>
+                                      <div style="font-size: 11px; color: #60a5fa;">
+                                        🕐 ${new Date(caseItem.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              `).join('');
+                              
+                              dynamicContent.innerHTML = `
+                                <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                                  ${casesHtml}
+                                </div>
+                              `;
+                            }
+                          });
+                        }
+
+                        if (showRouteBtn && dynamicContent) {
+                          showRouteBtn.addEventListener('click', () => {
+                            const routeInfo = `
+                              <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px;">
+                                <div style="font-weight: 600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                  🗺️ Rutt-information
+                                </div>
+                                <div style="space-y: 8px; font-size: 13px;">
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Aktuell position:</span>
+                                    <span style="color: #e2e8f0;">${tech.current_address}</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Hastighet:</span>
+                                    <span style="color: #e2e8f0;">${tech.speed} km/h</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                                    <span style="color: #94a3b8;">Status:</span>
+                                    <span style="color: #e2e8f0;">${tech.in_movement ? '🚗 I rörelse' : '🏁 Stationär'}</span>
+                                  </div>
+                                  <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                    <span style="color: #94a3b8;">Ärenden kvar:</span>
+                                    <span style="color: #10b981; font-weight: 600;">${tech.cases} st</span>
+                                  </div>
+                                </div>
+                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.1);">
+                                  <div style="font-size: 11px; color: #64748b; text-align: center;">
+                                    💡 Optimerad rutt beräknas automatiskt baserat på tekniker-position och ärenden
+                                  </div>
+                                </div>
+                              </div>
+                            `;
+                            dynamicContent.innerHTML = routeInfo;
+                          });
+                        }
+                      }, 100);
                       
                       // Notifiera parent component
                       onTechnicianSelect(tech);
