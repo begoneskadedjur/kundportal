@@ -2,6 +2,10 @@
 // 🎯 Koordinator Analytics Dashboard - Deep insights för koordinatorns påverkan
 
 import React, { useState, useMemo } from 'react';
+import DatePicker from 'react-datepicker';
+import { registerLocale } from 'react-datepicker';
+import sv from 'date-fns/locale/sv';
+import "react-datepicker/dist/react-datepicker.css";
 import { 
   Calendar, 
   TrendingUp, 
@@ -28,6 +32,8 @@ import SchedulingEfficiencyChart from '../../components/admin/coordinator/Schedu
 import TechnicianUtilizationGrid from '../../components/admin/coordinator/TechnicianUtilizationGrid';
 import BusinessImpactCards from '../../components/admin/coordinator/BusinessImpactCards';
 import GeographicOptimizationMap from '../../components/admin/coordinator/GeographicOptimizationMap';
+
+registerLocale('sv', sv);
 
 
 const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: string) => void }) => {
@@ -73,11 +79,11 @@ const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: str
 
 export default function CoordinatorAnalytics() {
   const [dateRange, setDateRange] = useState<{
-    startDate: string;
-    endDate: string;
+    startDate: Date;
+    endDate: Date;
   }>({
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    endDate: new Date(),
   });
 
   const {
@@ -89,7 +95,10 @@ export default function CoordinatorAnalytics() {
     error,
     lastRefresh,
     refresh,
-  } = useCoordinatorAnalytics(dateRange.startDate, dateRange.endDate);
+  } = useCoordinatorAnalytics(
+    dateRange.startDate.toISOString().split('T')[0], 
+    dateRange.endDate.toISOString().split('T')[0]
+  );
 
   const { exportData, exporting } = useAnalyticsExport();
   const { alerts, dismissAlert } = useAnalyticsAlerts();
@@ -134,7 +143,11 @@ export default function CoordinatorAnalytics() {
   }, [kpiData]);
 
   const handleExport = async (type: 'kpi' | 'efficiency' | 'utilization' | 'impact') => {
-    await exportData(type, dateRange.startDate, dateRange.endDate);
+    await exportData(
+      type, 
+      dateRange.startDate.toISOString().split('T')[0], 
+      dateRange.endDate.toISOString().split('T')[0]
+    );
   };
 
   if (error) {
@@ -180,20 +193,22 @@ export default function CoordinatorAnalytics() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <input
-                  type="date"
-                  value={dateRange.startDate}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                  className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                  lang="sv-SE"
+                <DatePicker
+                  selected={dateRange.startDate}
+                  onChange={(date) => date && setDateRange(prev => ({ ...prev, startDate: date }))}
+                  locale="sv"
+                  dateFormat="dd/MM/yyyy"
+                  className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholderText="Välj startdatum..."
                 />
                 <span className="text-slate-400">till</span>
-                <input
-                  type="date"
-                  value={dateRange.endDate}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                  className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                  lang="sv-SE"
+                <DatePicker
+                  selected={dateRange.endDate}
+                  onChange={(date) => date && setDateRange(prev => ({ ...prev, endDate: date }))}
+                  locale="sv"
+                  dateFormat="dd/MM/yyyy"
+                  className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholderText="Välj slutdatum..."
                 />
               </div>
               
@@ -306,8 +321,8 @@ export default function CoordinatorAnalytics() {
           <TechnicianUtilizationGrid 
             data={utilizationData} 
             loading={loading}
-            startDate={dateRange.startDate}
-            endDate={dateRange.endDate}
+            startDate={dateRange.startDate.toISOString().split('T')[0]}
+            endDate={dateRange.endDate.toISOString().split('T')[0]}
           />
         </div>
 
