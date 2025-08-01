@@ -28,7 +28,8 @@ import {
   CheckCircle,
   CircleX,
   CircleDot,
-  Edit3
+  Edit,
+  Pencil
 } from 'lucide-react';
 import { formatAddress } from '../../utils/addressFormatter';
 import Card from '../../components/ui/Card';
@@ -655,13 +656,10 @@ export default function CaseSearch() {
                       </div>
 
                       {/* Skadedjur */}
-                      <div className="col-span-1 flex justify-center items-start pt-1">
+                      <div className="col-span-1 text-center">
                         {caseItem.skadedjur ? (
-                          <div className="group relative">
-                            <Bug className="w-4 h-4 text-orange-400" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                              {caseItem.skadedjur}
-                            </div>
+                          <div className="text-xs text-orange-400 font-medium truncate px-1" title={caseItem.skadedjur}>
+                            {caseItem.skadedjur}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
@@ -671,9 +669,8 @@ export default function CaseSearch() {
                       {/* Pris */}
                       <div className="col-span-1 text-center">
                         {price ? (
-                          <div className="flex items-center justify-center gap-1 text-emerald-400 text-sm font-medium">
-                            <Euro className="w-3 h-3" />
-                            <span>{formatPrice(price)}</span>
+                          <div className="text-emerald-400 text-sm font-medium">
+                            {formatPrice(price)}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
@@ -707,7 +704,7 @@ export default function CaseSearch() {
                           onClick={() => handleEditCase(caseItem)}
                           title="Redigera ärende"
                         >
-                          <Edit3 className="w-3 h-3" />
+                          <Edit className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
