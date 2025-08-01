@@ -41,6 +41,21 @@
       .transition-opacity {
         transition-duration: 200ms !important;
       }
+      
+      /* Säkerställ att EditCaseModal alltid är högst */
+      [style*="z-index: 999999"],
+      [style*="zIndex: 999999"] {
+        z-index: 999999 !important;
+        position: fixed !important;
+      }
+      
+      /* Minska z-index för Google Maps element */
+      .gm-style,
+      .gm-style-iw,
+      .gm-ui-hover-effect,
+      [data-version] {
+        z-index: 1 !important;
+      }
     </style>
   </head>
   <body>

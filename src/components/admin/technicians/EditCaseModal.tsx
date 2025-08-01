@@ -458,7 +458,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   
   if (submitted) {
     return (
-      <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true} zIndex={300}>
+      <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true} zIndex={9999999}>
         <div className="p-8 text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3>
@@ -482,7 +482,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} zIndex={200}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} zIndex={999999}>
       <div className="p-6">
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 

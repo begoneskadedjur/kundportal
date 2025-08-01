@@ -1402,22 +1402,46 @@ const GoogleMapComponent: React.FC<{
                 (window as any).editCase = (caseId: string) => {
                   console.log('[DEBUG] editCase called from info window for case:', caseId);
                   
-                  // Stäng alla öppna info windows
-                  const infoWindows = document.querySelectorAll('.gm-ui-hover-effect');
-                  infoWindows.forEach(window => {
-                    const closeBtn = window.querySelector('[data-value="Close"]');
-                    if (closeBtn) {
-                      (closeBtn as HTMLElement).click();
-                    }
-                  });
+                  // Aggressiv stängning av alla Google Maps UI element
+                  try {
+                    // Stäng alla info windows
+                    const infoWindows = document.querySelectorAll('.gm-ui-hover-effect');
+                    infoWindows.forEach(window => {
+                      const closeBtn = window.querySelector('[data-value="Close"]');
+                      if (closeBtn) {
+                        (closeBtn as HTMLElement).click();
+                      }
+                    });
+
+                    // Stäng alla öppna info windows via Google Maps API
+                    const gmInfoWindows = document.querySelectorAll('[data-version][aria-label]');
+                    gmInfoWindows.forEach(window => {
+                      (window as HTMLElement).style.display = 'none';
+                    });
+
+                    // Ta bort Google Maps overlays som kan vara i vägen
+                    const gmOverlays = document.querySelectorAll('.gm-style-iw, .gm-ui-hover-effect, [data-value="Close"]');
+                    gmOverlays.forEach(overlay => {
+                      (overlay as HTMLElement).style.zIndex = '1';
+                    });
+
+                    // Sätt alla Google Maps containers till lägre z-index
+                    const gmContainers = document.querySelectorAll('[data-version], .gm-style');
+                    gmContainers.forEach(container => {
+                      (container as HTMLElement).style.zIndex = '1';
+                    });
+
+                  } catch (error) {
+                    console.warn('[DEBUG] Error closing Google Maps UI elements:', error);
+                  }
                   
-                  // Small delay to ensure info windows are closed
+                  // Längre delay för att säkerställa att allt stängs
                   setTimeout(() => {
                     if (onEditCase) {
                       console.log('[DEBUG] Calling onEditCase with caseId:', caseId);
                       onEditCase(caseId);
                     }
-                  }, 100);
+                  }, 200);
                 };
 
                 // Centrera kartan på rutten med förbättrad zoom-kontroll
