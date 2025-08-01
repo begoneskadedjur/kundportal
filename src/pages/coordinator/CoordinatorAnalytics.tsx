@@ -25,130 +25,10 @@ import Button from '../../components/ui/Button';
 import { useCoordinatorAnalytics, useAnalyticsExport, useAnalyticsAlerts } from '../../hooks/useCoordinatorAnalytics';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import SchedulingEfficiencyChart from '../../components/admin/coordinator/SchedulingEfficiencyChart';
+import TechnicianUtilizationGrid from '../../components/admin/coordinator/TechnicianUtilizationGrid';
+import BusinessImpactCards from '../../components/admin/coordinator/BusinessImpactCards';
+import GeographicOptimizationMap from '../../components/admin/coordinator/GeographicOptimizationMap';
 
-const TechnicianUtilizationGrid = ({ data, loading }: any) => (
-  <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-    <div className="flex items-center gap-3 mb-6">
-      <div className="p-2 bg-purple-500/20 rounded-lg">
-        <Users className="w-5 h-5 text-purple-400" />
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold text-white">Tekniker-utnyttjande</h3>
-        <p className="text-sm text-slate-400">Kapacitetsutnyttjande per tekniker</p>
-      </div>
-    </div>
-    
-    {loading ? (
-      <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-16 bg-slate-900/50 rounded-lg animate-pulse" />
-        ))}
-      </div>
-    ) : (
-      <div className="space-y-3">
-        {data?.slice(0, 6).map((tech: any, index: number) => (
-          <div key={tech.technician_id} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-semibold text-sm">
-                {index + 1}
-              </div>
-              <div>
-                <p className="font-medium text-white">{tech.technician_name}</p>
-                <p className="text-xs text-slate-400">{tech.cases_assigned} ärenden</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  tech.efficiency_rating === 'optimal' ? 'bg-green-400' :
-                  tech.efficiency_rating === 'overbooked' ? 'bg-orange-400' : 'bg-red-400'
-                }`} />
-                <span className="font-semibold text-white">{tech.utilization_percent?.toFixed(1)}%</span>
-              </div>
-              <p className="text-xs text-slate-400">{tech.scheduled_hours?.toFixed(1)}h/{tech.total_work_hours?.toFixed(1)}h</p>
-            </div>
-          </div>
-        )) || (
-          <div className="text-center py-8 text-slate-400">
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>Ingen tekniker-data tillgänglig</p>
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-);
-
-const BusinessImpactCards = ({ data, loading }: any) => {
-  const metrics = [
-    {
-      title: 'Total Revenue Managed',
-      value: data?.total_revenue_managed || 0,
-      format: 'currency',
-      icon: DollarSign,
-      color: 'green',
-      change: '+12%',
-    },
-    {
-      title: 'Avg Completion Time',
-      value: data?.avg_case_completion_days || 0,
-      format: 'days',
-      icon: Clock,
-      color: 'blue',
-      change: '-8%',
-    },
-    {
-      title: 'Revenue per Hour',
-      value: data?.revenue_per_scheduled_hour || 0,
-      format: 'currency',
-      icon: TrendingUp,
-      color: 'purple',
-      change: '+5%',
-    },
-    {
-      title: 'Cases per Day',
-      value: data?.case_throughput_per_day || 0,
-      format: 'number',
-      icon: Activity,
-      color: 'orange',
-      change: '+15%',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-      {metrics.map((metric, index) => (
-        <div key={index} className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className={`p-2 bg-${metric.color}-500/20 rounded-lg`}>
-              <metric.icon className={`w-5 h-5 text-${metric.color}-400`} />
-            </div>
-            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-              metric.change.startsWith('+') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-            }`}>
-              {metric.change}
-            </span>
-          </div>
-          
-          <div>
-            <p className="text-2xl font-bold text-white mb-1">
-              {loading ? (
-                <span className="bg-slate-700 rounded w-16 h-8 inline-block animate-pulse" />
-              ) : (
-                <>
-                  {metric.format === 'currency' ? formatCurrency(metric.value) :
-                   metric.format === 'days' ? `${metric.value.toFixed(1)} dagar` :
-                   metric.format === 'number' ? metric.value.toFixed(1) : metric.value}
-                </>
-              )}
-            </p>
-            <p className="text-sm text-slate-400">{metric.title}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: string) => void }) => {
   if (!alerts.length) return null;
@@ -426,46 +306,7 @@ export default function CoordinatorAnalytics() {
 
         {/* Geographic Optimization */}
         <section className="mb-12">
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <MapPin className="w-5 h-5 text-green-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">Geografisk optimering</h3>
-                <p className="text-sm text-slate-400">Rutt-effektivitet och regionala insikter</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-slate-900/50 rounded-lg">
-                <p className="text-2xl font-bold text-white">
-                  {loading ? '...' : kpiData?.geographic_optimization.avg_distance_between_cases_km.toFixed(1)}
-                </p>
-                <p className="text-sm text-slate-400">km genomsnitt mellan ärenden</p>
-              </div>
-              <div className="text-center p-4 bg-slate-900/50 rounded-lg">
-                <p className="text-2xl font-bold text-white">
-                  {loading ? '...' : kpiData?.geographic_optimization.routing_efficiency_score}
-                </p>
-                <p className="text-sm text-slate-400">rutt-effektivitetsindex</p>
-              </div>
-              <div className="text-center p-4 bg-slate-900/50 rounded-lg">
-                <p className="text-2xl font-bold text-white">
-                  {loading ? '...' : kpiData?.geographic_optimization.cases_with_optimal_routing}
-                </p>
-                <p className="text-sm text-slate-400">optimalt rutterade ärenden</p>
-              </div>
-            </div>
-
-            <div className="mt-6 h-64 bg-slate-900/50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="w-12 h-12 text-slate-500 mx-auto mb-2" />
-                <p className="text-slate-400">Geografisk visualisering</p>
-                <p className="text-xs text-slate-500 mt-1">Karta med rutt-optimering kommer här</p>
-              </div>
-            </div>
-          </div>
+          <GeographicOptimizationMap data={kpiData} loading={loading} />
         </section>
 
         {/* Recommendations */}
