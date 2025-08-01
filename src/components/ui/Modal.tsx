@@ -13,6 +13,7 @@ interface ModalProps {
   children: React.ReactNode
   footer?: React.ReactNode
   preventClose?: boolean
+  zIndex?: number
 }
 
 export default function Modal({
@@ -23,7 +24,8 @@ export default function Modal({
   size = 'lg',
   children,
   footer,
-  preventClose = false
+  preventClose = false,
+  zIndex = 100
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -76,7 +78,8 @@ export default function Modal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      style={{ zIndex }}
       onClick={handleBackdropClick}
       ref={modalRef}
       tabIndex={-1}

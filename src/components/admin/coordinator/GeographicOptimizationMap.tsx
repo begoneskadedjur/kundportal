@@ -429,13 +429,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
     }
   }, [viewMode, fetchTechnicianLocations]);
 
-  // Update routes when selectedTechnician changes
-  useEffect(() => {
-    if (selectedMapTechnician && (window as any).updateMapRoutes) {
-      console.log('[DEBUG] Triggering route update for technician:', selectedMapTechnician.name);
-      (window as any).updateMapRoutes();
-    }
-  }, [selectedMapTechnician]);
+  // Remove automatic route updates to prevent excessive re-rendering
 
   // Modal handlers
   const handleTechnicianClick = (technician: TechnicianLocation) => {
@@ -449,14 +443,20 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
   };
 
   const handleShowRoute = (technicianId: string) => {
-    // Trigger route visualization on map
-    const technician = technicianLocations.find(t => t.id === technicianId);
-    if (technician) {
-      // This will trigger the route visualization in the map
-      setSelectedMapTechnician(technician);
-      // Close modal to show the map
-      handleCloseModal();
-    }
+    console.log('[DEBUG] handleShowRoute called for technician:', technicianId);
+    
+    // Close modal first
+    handleCloseModal();
+    
+    // Trigger route visualization directly
+    setTimeout(() => {
+      if ((window as any).createTechnicianRoute) {
+        console.log('[DEBUG] Calling createTechnicianRoute for:', technicianId);
+        (window as any).createTechnicianRoute(technicianId);
+      } else {
+        console.warn('[DEBUG] createTechnicianRoute not available on window');
+      }
+    }, 100); // Small delay to ensure modal is closed and map is ready
   };
 
   if (loading) {
@@ -592,7 +592,6 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                 </div>
               ) : (
                 <GoogleMapComponent 
-                  key={selectedMapTechnician ? `${selectedMapTechnician.id}-${selectedMapTechnician.cases}` : 'no-selection'}
                   technicians={technicianLocations}
                   loading={loadingLocations}
                   onTechnicianSelect={setSelectedMapTechnician}
@@ -1174,26 +1173,30 @@ const GoogleMapComponent: React.FC<{
                         // Redan formaterad adress
                       }
 
-                      // Geocoda adressen för att få koordinater
-                      const geocoder = new google.maps.Geocoder();
-                      const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-                        geocoder.geocode({ address: address }, (results, status) => {
-                          if (status === 'OK' && results) {
-                            resolve(results);
-                          } else {
-                            reject(new Error(`Geocoding failed: ${status}`));
-                          }
-                        });
-                      });
-
-                      if (result[0]?.geometry?.location) {
-                        const location = result[0].geometry.location;
-                        waypoints.push({
-                          lat: location.lat(),
-                          lng: location.lng(),
-                          type: 'case',
-                          data: caseItem
-                        });
+                      // Geocoda adressen för att få koordinater - använd backend API istället
+                      try {
+                        const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${import.meta.env.VITE_GOOGLE_GEOCODING}&language=sv&region=se`);
+                        
+                        if (!geocodeResponse.ok) {
+                          throw new Error(`Geocoding HTTP error: ${geocodeResponse.status}`);
+                        }
+                        
+                        const geocodeData = await geocodeResponse.json();
+                        
+                        if (geocodeData.status === 'OK' && geocodeData.results?.[0]?.geometry?.location) {
+                          const location = geocodeData.results[0].geometry.location;
+                          waypoints.push({
+                            lat: location.lat,
+                            lng: location.lng,
+                            type: 'case',
+                            data: caseItem
+                          });
+                          console.log(`[DEBUG] Successfully geocoded case ${caseItem.id}: ${location.lat}, ${location.lng}`);
+                        } else {
+                          console.warn(`[DEBUG] Geocoding failed for case ${caseItem.id}: ${geocodeData.status} - ${geocodeData.error_message || 'Unknown error'}`);
+                        }
+                      } catch (geocodeError) {
+                        console.warn(`[DEBUG] Geocoding request failed for case ${caseItem.id}:`, geocodeError);
                       }
                     } catch (error) {
                       console.warn(`[DEBUG] Failed to geocode address for case ${caseItem.id}:`, error);
@@ -1378,13 +1381,26 @@ const GoogleMapComponent: React.FC<{
                   }
                 };
 
-                // Centrera kartan på rutten
+                // Centrera kartan på rutten med förbättrad zoom-kontroll
                 if (waypoints.length > 0) {
                   const bounds = new google.maps.LatLngBounds();
                   waypoints.forEach(waypoint => {
                     bounds.extend(new google.maps.LatLng(waypoint.lat, waypoint.lng));
                   });
-                  map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+                  
+                  // Sätt bounds med padding
+                  map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
+                  
+                  // Begränsa zoom efter bounds har satts
+                  const boundsListener = google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+                    const currentZoom = map.getZoom();
+                    if (currentZoom && currentZoom > 14) {
+                      map.setZoom(14); // Max zoom 14 för rutter
+                    }
+                    if (currentZoom && currentZoom < 10) {
+                      map.setZoom(10); // Min zoom 10 för rutter
+                    }
+                  });
                 }
 
               } catch (error) {
@@ -1442,18 +1458,17 @@ const GoogleMapComponent: React.FC<{
             // Använd callback för att centrera kartan
             mapRef(map);
 
-            // Re-create routes when selectedTechnician changes
-            const updateRoutes = () => {
+            // Expose route creation functions for external triggers
+            (window as any).createTechnicianRoute = (techId: string) => {
+              const tech = technicians.find(t => t.id === techId);
+              if (tech) {
+                createTechnicianRoute(tech);
+              }
+            };
+            
+            (window as any).updateMapRoutes = () => {
               createRoutes();
             };
-
-            // Create initial route if technician is selected  
-            if (selectedTechnician) {
-              createTechnicianRoute(selectedTechnician);
-            }
-
-            // Expose updateRoutes for external triggers
-            (window as any).updateMapRoutes = updateRoutes;
           }
         }}
       />
