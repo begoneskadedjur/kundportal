@@ -311,12 +311,13 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
 
   // Google Maps hook
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
-    libraries: ['geometry', 'places']
+    libraries: ['geometry', 'places', 'marker']
   });
 
   // Konvertera tekniker-positioner till route data
   const routeData: RouteOptimizationData[] = useMemo(() => {
-    return technicianLocations.map(tech => {
+    console.log('[DEBUG] Creating routeData from technicianLocations:', technicianLocations);
+    const result = technicianLocations.map(tech => {
       // Uppskatta körsträcka baserat på antal ärenden (enkel beräkning)
       const estimatedDistance = tech.cases * (8 + Math.random() * 6); // 8-14 km per ärende
       const avgDistance = tech.cases > 0 ? estimatedDistance / tech.cases : 0;
@@ -344,6 +345,8 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
         data_source: tech.data_source || 'unknown'
       };
     });
+    console.log('[DEBUG] Created routeData:', result);
+    return result;
   }, [technicianLocations]);
 
   // Hämta tekniker-positioner från ABAX API
@@ -359,10 +362,13 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
       const data = await response.json();
       
       if (data.technicians) {
+        console.log('[DEBUG] Raw ABAX API response:', data);
         setTechnicianLocations(data.technicians);
         console.log(`Hämtade ${data.total} tekniker-positioner från ABAX`);
+        console.log('[DEBUG] Tekniker-locations state updated:', data.technicians);
       } else {
         console.warn('Ingen tekniker-data i API-svar');
+        console.log('[DEBUG] Full API response:', data);
         setTechnicianLocations([]);
       }
       
@@ -676,23 +682,59 @@ const GoogleMapComponent: React.FC<{
           if (divRef && window.google && window.google.maps) {
             const map = new google.maps.Map(divRef, mapOptions);
             
-            // Lägg till markers för varje tekniker
+            // Lägg till AdvancedMarkerElement för varje tekniker (ersätter deprecated Marker)
             technicians.forEach(tech => {
-              const marker = new google.maps.Marker({
-                position: { lat: tech.lat, lng: tech.lng },
-                map,
-                title: tech.name,
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  scale: tech.cases > 0 ? 12 : 8,
-                  fillColor: tech.status === 'active' ? '#22c55e' : 
-                            tech.status === 'break' ? '#f97316' : '#6b7280',
-                  fillOpacity: 0.8,
-                  strokeColor: '#ffffff',
-                  strokeWeight: 2,
-                },
-                zIndex: tech.cases > 0 ? 1000 : 100
-              });
+              // Skapa en custom marker element
+              const markerElement = document.createElement('div');
+              markerElement.className = 'custom-marker';
+              markerElement.innerHTML = `
+                <div style="
+                  width: ${tech.cases > 0 ? '24px' : '16px'}; 
+                  height: ${tech.cases > 0 ? '24px' : '16px'}; 
+                  background-color: ${tech.status === 'active' ? '#22c55e' : tech.status === 'break' ? '#f97316' : '#6b7280'};
+                  border: 2px solid white;
+                  border-radius: 50%;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 10px;
+                  font-weight: bold;
+                  color: white;
+                  cursor: pointer;
+                ">
+                  ${tech.cases > 0 ? tech.cases : ''}
+                </div>
+              `;
+
+              // Använd AdvancedMarkerElement om tillgängligt, annars fallback till Marker
+              let marker;
+              if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                marker = new google.maps.marker.AdvancedMarkerElement({
+                  position: { lat: tech.lat, lng: tech.lng },
+                  map,
+                  title: tech.name,
+                  content: markerElement,
+                  zIndex: tech.cases > 0 ? 1000 : 100
+                });
+              } else {
+                // Fallback till gamla Marker API
+                marker = new google.maps.Marker({
+                  position: { lat: tech.lat, lng: tech.lng },
+                  map,
+                  title: tech.name,
+                  icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: tech.cases > 0 ? 12 : 8,
+                    fillColor: tech.status === 'active' ? '#22c55e' : 
+                              tech.status === 'break' ? '#f97316' : '#6b7280',
+                    fillOpacity: 0.8,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                  },
+                  zIndex: tech.cases > 0 ? 1000 : 100
+                });
+              }
 
               // Info window för varje tekniker
               const infoWindow = new google.maps.InfoWindow({
@@ -705,7 +747,7 @@ const GoogleMapComponent: React.FC<{
                       };"></div>
                       <h3 style="margin: 0; font-weight: 600; font-size: 16px;">${tech.name}</h3>
                     </div>
-                    <div style="font-size: 13px; line-height: 1.5; space-y: 6px;">
+                    <div style="font-size: 13px; line-height: 1.5;">
                       <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
                         <span style="color: #64748b;"><strong>Status:</strong></span>
                         <span style="color: ${
@@ -752,16 +794,34 @@ const GoogleMapComponent: React.FC<{
                 `
               });
 
-              marker.addListener('click', () => {
-                // Stäng andra info windows
-                technicians.forEach(() => infoWindow.close());
-                
-                // Öppna denna info window
-                infoWindow.open(map, marker);
-                
-                // Notifiera parent component
-                onTechnicianSelect(tech);
-              });
+              // Click event listener (fungerar för både AdvancedMarkerElement och Marker)
+              if (google.maps.marker && google.maps.marker.AdvancedMarkerElement && marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                marker.addListener('click', () => {
+                  // Stäng andra info windows
+                  technicians.forEach(() => infoWindow.close());
+                  
+                  // Öppna denna info window
+                  infoWindow.open({
+                    anchor: marker,
+                    map: map
+                  });
+                  
+                  // Notifiera parent component
+                  onTechnicianSelect(tech);
+                });
+              } else {
+                // Fallback för gamla Marker API
+                marker.addListener('click', () => {
+                  // Stäng andra info windows
+                  technicians.forEach(() => infoWindow.close());
+                  
+                  // Öppna denna info window
+                  infoWindow.open(map, marker);
+                  
+                  // Notifiera parent component
+                  onTechnicianSelect(tech);
+                });
+              }
             });
 
             // Använd callback för att centrera kartan
