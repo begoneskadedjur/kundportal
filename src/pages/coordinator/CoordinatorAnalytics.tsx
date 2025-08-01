@@ -158,7 +158,7 @@ export default function CoordinatorAnalytics() {
         return;
       }
       
-      const response = await fetch(`/api/case/${caseId}`, {
+      const response = await fetch(`/api/case-by-id?id=${caseId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -34,6 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { id } = req.query;
+  
+  // Kontrollera att id finns
+  if (!id || typeof id !== 'string') {
+    console.log('[API] Missing or invalid case ID');
+    return res.status(400).json({ error: 'Case ID is required' });
+  }
   const authHeader = req.headers.authorization;
 
   console.log('[API] Case ID:', id);
