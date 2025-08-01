@@ -190,23 +190,12 @@ export const getCoordinatorKpiData = async (
       routing_efficiency_score: 78,
     };
 
-    // 4. Omschemaläggning - enkel implementation utan billing_audit_log (som orsakar 400-fel)
-    const totalCases = ((await supabase.from('private_cases').select('id', { count: 'exact', head: true })).count || 0) +
-                      ((await supabase.from('business_cases').select('id', { count: 'exact', head: true })).count || 0);
-
-    // Enkel uppskattning av omschemaläggningar baserat på case-data
-    const estimatedReschedules = Math.floor(totalCases * 0.05); // 5% uppskattning
-    
+    // 4. Omschemaläggning - ingen data eftersom billing_audit_log inte är tillgänglig
     const reschedulingData = {
-      total_reschedules: estimatedReschedules,
-      reschedule_rate_percent: totalCases > 0 ? (estimatedReschedules / totalCases) * 100 : 0,
-      avg_reschedules_per_case: totalCases > 0 ? estimatedReschedules / totalCases : 0,
-      top_reschedule_reasons: [
-        { reason: 'Tekniker otillgänglig', count: Math.floor(estimatedReschedules * 0.4) },
-        { reason: 'Kund ombokning', count: Math.floor(estimatedReschedules * 0.3) },
-        { reason: 'Brådskande ärende', count: Math.floor(estimatedReschedules * 0.2) },
-        { reason: 'Väderförhållanden', count: Math.floor(estimatedReschedules * 0.1) },
-      ].filter(r => r.count > 0),
+      total_reschedules: 0,
+      reschedule_rate_percent: 0,
+      avg_reschedules_per_case: 0,
+      top_reschedule_reasons: [],
     };
 
     return {

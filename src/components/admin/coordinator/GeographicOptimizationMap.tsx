@@ -503,7 +503,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
         ) : (
           <div className="space-y-4">
             {/* Map Container */}
-            <div className="h-96 bg-slate-900/50 rounded-lg overflow-hidden border border-slate-700">
+            <div className="h-96 bg-slate-900/50 rounded-lg overflow-hidden border border-slate-700 relative">
               {mapsError ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
@@ -619,18 +619,32 @@ const GoogleMapComponent: React.FC<{
 }> = ({ technicians, loading, onTechnicianSelect, selectedTechnician }) => {
   const mapRef = useCallback((map: google.maps.Map | null) => {
     if (map && technicians.length > 0) {
-      // Centrera kartan runt tekniker-positionerna
+      // Centrera kartan runt tekniker-positionerna med säkrare zoom-hantering
       const bounds = new google.maps.LatLngBounds();
       technicians.forEach(tech => {
         bounds.extend(new google.maps.LatLng(tech.lat, tech.lng));
       });
-      map.fitBounds(bounds);
+      
+      // Sätt bounds med padding och max zoom för att undvika extrema zoom-nivåer
+      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+      
+      // Begränsa zoom-nivå efter bounds har satts
+      const listener = google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+        const currentZoom = map.getZoom();
+        if (currentZoom && currentZoom > 15) {
+          map.setZoom(15); // Max zoom 15 för att undvika för hög inzoomning
+        }
+        if (currentZoom && currentZoom < 8) {
+          map.setZoom(8); // Min zoom 8 för att undvika för låg utzoomning
+        }
+      });
     }
   }, [technicians]);
 
   const mapOptions: google.maps.MapOptions = {
     center: { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
     zoom: 12,
+    mapId: 'begone-geographic-optimization', // Lägg till Map ID för AdvancedMarkers
     styles: [
       {
         "featureType": "all",
@@ -674,66 +688,105 @@ const GoogleMapComponent: React.FC<{
   }
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative" style={{ transform: 'none', zoom: 1 }}>
       <div 
         id="google-map" 
         className="h-full w-full"
+        style={{ transform: 'none', zoom: 1 }}
         ref={(divRef) => {
           if (divRef && window.google && window.google.maps) {
+            console.log('[DEBUG] Google Maps is loaded, creating map with options:', mapOptions);
             const map = new google.maps.Map(divRef, mapOptions);
+            console.log('[DEBUG] Map created successfully:', map);
             
             // Lägg till AdvancedMarkerElement för varje tekniker (ersätter deprecated Marker)
-            technicians.forEach(tech => {
-              // Skapa en custom marker element
+            console.log(`[DEBUG] Creating markers for ${technicians.length} technicians:`, technicians);
+            technicians.forEach((tech, index) => {
+              console.log(`[DEBUG] Creating marker ${index + 1}/${technicians.length} for technician:`, tech);
+              // Skapa en custom marker element med säkra CSS-klasser istället för inline styles
               const markerElement = document.createElement('div');
-              markerElement.className = 'custom-marker';
+              markerElement.className = 'technician-marker';
+              
+              // Använd CSS-klasser för att undvika zoom-problem
+              const markerSize = tech.cases > 0 ? 'large' : 'small';
+              const statusColor = tech.status === 'active' ? 'active' : tech.status === 'break' ? 'break' : 'inactive';
+              
               markerElement.innerHTML = `
-                <div style="
-                  width: ${tech.cases > 0 ? '24px' : '16px'}; 
-                  height: ${tech.cases > 0 ? '24px' : '16px'}; 
-                  background-color: ${tech.status === 'active' ? '#22c55e' : tech.status === 'break' ? '#f97316' : '#6b7280'};
-                  border: 2px solid white;
-                  border-radius: 50%;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-size: 10px;
-                  font-weight: bold;
-                  color: white;
-                  cursor: pointer;
-                ">
+                <div class="marker-${markerSize} marker-${statusColor}">
                   ${tech.cases > 0 ? tech.cases : ''}
                 </div>
               `;
+              
+              // Lägg till CSS direkt i head om det inte finns
+              if (!document.querySelector('#technician-marker-styles')) {
+                const style = document.createElement('style');
+                style.id = 'technician-marker-styles';
+                style.textContent = `
+                  .marker-large {
+                    width: 24px !important;
+                    height: 24px !important;
+                    border: 2px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: white;
+                    cursor: pointer;
+                    font-family: system-ui, -apple-system, sans-serif;
+                  }
+                  .marker-small {
+                    width: 16px !important;
+                    height: 16px !important;
+                    border: 2px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    cursor: pointer;
+                  }
+                  .marker-active { background-color: #22c55e !important; }
+                  .marker-break { background-color: #f97316 !important; }
+                  .marker-inactive { background-color: #6b7280 !important; }
+                `;
+                document.head.appendChild(style);
+              }
 
               // Använd AdvancedMarkerElement om tillgängligt, annars fallback till Marker
               let marker;
-              if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
-                marker = new google.maps.marker.AdvancedMarkerElement({
-                  position: { lat: tech.lat, lng: tech.lng },
-                  map,
-                  title: tech.name,
-                  content: markerElement,
-                  zIndex: tech.cases > 0 ? 1000 : 100
-                });
-              } else {
-                // Fallback till gamla Marker API
-                marker = new google.maps.Marker({
-                  position: { lat: tech.lat, lng: tech.lng },
-                  map,
-                  title: tech.name,
-                  icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: tech.cases > 0 ? 12 : 8,
-                    fillColor: tech.status === 'active' ? '#22c55e' : 
-                              tech.status === 'break' ? '#f97316' : '#6b7280',
-                    fillOpacity: 0.8,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2,
-                  },
-                  zIndex: tech.cases > 0 ? 1000 : 100
-                });
+              try {
+                if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                  console.log(`[DEBUG] Creating AdvancedMarkerElement for ${tech.name} at ${tech.lat}, ${tech.lng}`);
+                  marker = new google.maps.marker.AdvancedMarkerElement({
+                    position: { lat: tech.lat, lng: tech.lng },
+                    map,
+                    title: tech.name,
+                    content: markerElement,
+                    zIndex: tech.cases > 0 ? 1000 : 100
+                  });
+                  console.log(`[DEBUG] AdvancedMarkerElement created successfully for ${tech.name}`);
+                } else {
+                  console.log(`[DEBUG] Creating fallback Marker for ${tech.name} at ${tech.lat}, ${tech.lng}`);
+                  // Fallback till gamla Marker API
+                  marker = new google.maps.Marker({
+                    position: { lat: tech.lat, lng: tech.lng },
+                    map,
+                    title: tech.name,
+                    icon: {
+                      path: google.maps.SymbolPath.CIRCLE,
+                      scale: tech.cases > 0 ? 12 : 8,
+                      fillColor: tech.status === 'active' ? '#22c55e' : 
+                                tech.status === 'break' ? '#f97316' : '#6b7280',
+                      fillOpacity: 0.8,
+                      strokeColor: '#ffffff',
+                      strokeWeight: 2,
+                    },
+                    zIndex: tech.cases > 0 ? 1000 : 100
+                  });
+                  console.log(`[DEBUG] Fallback Marker created successfully for ${tech.name}`);
+                }
+              } catch (error) {
+                console.error(`[DEBUG] Error creating marker for ${tech.name}:`, error);
               }
 
               // Info window för varje tekniker
@@ -795,32 +848,44 @@ const GoogleMapComponent: React.FC<{
               });
 
               // Click event listener (fungerar för både AdvancedMarkerElement och Marker)
-              if (google.maps.marker && google.maps.marker.AdvancedMarkerElement && marker instanceof google.maps.marker.AdvancedMarkerElement) {
-                marker.addListener('click', () => {
-                  // Stäng andra info windows
-                  technicians.forEach(() => infoWindow.close());
-                  
-                  // Öppna denna info window
-                  infoWindow.open({
-                    anchor: marker,
-                    map: map
-                  });
-                  
-                  // Notifiera parent component
-                  onTechnicianSelect(tech);
-                });
+              if (marker) {
+                try {
+                  if (google.maps.marker && google.maps.marker.AdvancedMarkerElement && marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                    console.log(`[DEBUG] Adding AdvancedMarker click listener for ${tech.name}`);
+                    marker.addListener('click', () => {
+                      console.log(`[DEBUG] AdvancedMarker clicked for ${tech.name}`);
+                      // Stäng andra info windows
+                      technicians.forEach(() => infoWindow.close());
+                      
+                      // Öppna denna info window
+                      infoWindow.open({
+                        anchor: marker,
+                        map: map
+                      });
+                      
+                      // Notifiera parent component
+                      onTechnicianSelect(tech);
+                    });
+                  } else {
+                    console.log(`[DEBUG] Adding fallback Marker click listener for ${tech.name}`);
+                    // Fallback för gamla Marker API
+                    marker.addListener('click', () => {
+                      console.log(`[DEBUG] Fallback Marker clicked for ${tech.name}`);
+                      // Stäng andra info windows
+                      technicians.forEach(() => infoWindow.close());
+                      
+                      // Öppna denna info window
+                      infoWindow.open(map, marker);
+                      
+                      // Notifiera parent component
+                      onTechnicianSelect(tech);
+                    });
+                  }
+                } catch (error) {
+                  console.error(`[DEBUG] Error adding click listener for ${tech.name}:`, error);
+                }
               } else {
-                // Fallback för gamla Marker API
-                marker.addListener('click', () => {
-                  // Stäng andra info windows
-                  technicians.forEach(() => infoWindow.close());
-                  
-                  // Öppna denna info window
-                  infoWindow.open(map, marker);
-                  
-                  // Notifiera parent component
-                  onTechnicianSelect(tech);
-                });
+                console.error(`[DEBUG] No marker created for ${tech.name}`);
               }
             });
 
