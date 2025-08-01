@@ -254,15 +254,8 @@ export default function CoordinatorDashboard() {
         </section>
 
 
-        {/* --- Geografisk översikt --- */}
+        {/* --- Verktyg (flyttat ovanför kartan) --- */}
         <section className="mt-16">
-          <GeographicOverview />
-        </section>
-
-        {/* --- Huvudsektion med verktyg (denna del påverkas inte av datahämtningen) --- */}
-        <main className="mt-16">
-          <h2 className="text-2xl font-bold text-white mb-6">Verktyg</h2>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             <CoordinatorDashboardCard
               href="/koordinator/schema"
@@ -286,7 +279,12 @@ export default function CoordinatorDashboard() {
               tag="Komplett"
             />
           </div>
-        </main>
+        </section>
+
+        {/* --- Geografisk översikt --- */}
+        <section className="mt-16">
+          <GeographicOverview />
+        </section>
       </div>
 
       {/* KPI Case List Modal */}
