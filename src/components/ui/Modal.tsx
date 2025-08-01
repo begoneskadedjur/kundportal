@@ -83,7 +83,7 @@ export default function Modal({
     <div 
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       style={{ 
-        zIndex: usePortal ? 2147483647 : zIndex,
+        zIndex: usePortal ? 9999 : zIndex,
         pointerEvents: 'auto' // Återställ pointer events för modalen
       }}
       onClick={handleBackdropClick}
@@ -92,10 +92,15 @@ export default function Modal({
     >
       <Card 
         className={`
-          w-full ${sizeClasses[size]} max-h-[95vh] overflow-hidden flex flex-col 
+          w-full ${sizeClasses[size]} 
+          ${usePortal ? 'min-h-[600px] max-h-[90vh]' : 'max-h-[95vh]'}
+          overflow-hidden flex flex-col 
           bg-slate-900/95 backdrop-blur border-slate-600 shadow-2xl
           animate-in zoom-in-95 duration-200
         `}
+        style={{
+          minHeight: usePortal ? '600px' : 'auto' // Ensure proper minimum height for modals
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

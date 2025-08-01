@@ -481,6 +481,34 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
 
   const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
+  // Fix React-DatePicker z-index conflicts when using Portal
+  useEffect(() => {
+    if (isOpen && currentCase) {
+      const portalStyles = document.createElement('style');
+      portalStyles.id = 'edit-case-modal-portal-styles';
+      portalStyles.textContent = `
+        .react-datepicker-popper {
+          z-index: 10000 !important;
+        }
+        .react-datepicker {
+          z-index: 10000 !important;
+          position: fixed !important;
+        }
+        .react-datepicker__portal {
+          z-index: 10000 !important;
+        }
+      `;
+      document.head.appendChild(portalStyles);
+      
+      return () => {
+        const existingStyles = document.getElementById('edit-case-modal-portal-styles');
+        if (existingStyles && document.head.contains(existingStyles)) {
+          document.head.removeChild(existingStyles);
+        }
+      };
+    }
+  }, [isOpen, currentCase]);
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true}>
       <div className="p-6">

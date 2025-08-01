@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="space-y-1 text-sm">
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Genomsnittlig tid:</span>
-            <span className="text-blue-400 font-medium">
+            <span className="text-teal-400 font-medium">
               {data.avg_scheduling_time_hours.toFixed(1)}h
             </span>
           </div>
@@ -86,8 +86,8 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
     return (
       <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-500/20 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+          <div className="p-2 bg-teal-500/20 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-teal-400" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Schemaläggningseffektivitet</h3>
@@ -106,8 +106,8 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
     return (
       <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-500/20 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+          <div className="p-2 bg-teal-500/20 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-teal-400" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Schemaläggningseffektivitet</h3>
@@ -131,8 +131,8 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/20 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+          <div className="p-2 bg-teal-500/20 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-teal-400" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Schemaläggningseffektivitet</h3>
@@ -166,11 +166,11 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
       </div>
 
       {/* Measurement Info Box */}
-      <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+      <div className="mb-6 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
         <div className="flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <Info className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-medium text-blue-300 mb-2">Hur mäts schemaläggningseffektivitet?</h4>
+            <h4 className="font-medium text-teal-300 mb-2">Hur mäts schemaläggningseffektivitet?</h4>
             <div className="text-sm text-slate-300 space-y-1">
               <p>• <strong>Genomsnittlig tid:</strong> Tid från ärendets skapande till schemalagd starttid</p>
               <p>• <strong>Effektivitetsindex:</strong> 100 poäng för schemaläggning inom 72 timmar, avdrag efter det</p>
@@ -186,7 +186,7 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-slate-900/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center mb-2">
-              <Clock className="w-4 h-4 text-blue-400" />
+              <Clock className="w-4 h-4 text-teal-400" />
             </div>
             <p className="text-xl font-bold text-white">{stats.avgSchedulingTime.toFixed(1)}h</p>
             <p className="text-xs text-slate-400">Genomsnittlig tid</p>
@@ -216,8 +216,8 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
           <AreaChart data={data}>
             <defs>
               <linearGradient id="schedulingTimeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
+                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.0}/>
               </linearGradient>
               <linearGradient id="efficiencyGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -268,7 +268,7 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
               yAxisId="time"
               type="monotone"
               dataKey="avg_scheduling_time_hours"
-              stroke="#3b82f6"
+              stroke="#14b8a6"
               fillOpacity={1}
               fill="url(#schedulingTimeGradient)"
               strokeWidth={2}
@@ -290,7 +290,7 @@ const SchedulingEfficiencyChart: React.FC<SchedulingEfficiencyChartProps> = ({
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 mt-4 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+          <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
           <span className="text-slate-400">Schemaläggnningstid (timmar)</span>
         </div>
         <div className="flex items-center gap-2">

@@ -29,7 +29,7 @@ interface MetricCardProps {
   value: string | number;
   subtitle?: string;
   icon: React.ElementType;
-  color: 'green' | 'blue' | 'purple' | 'orange' | 'red';
+  color: 'green' | 'teal' | 'purple' | 'orange' | 'red';
   trend?: {
     direction: 'up' | 'down';
     percentage: number;
@@ -58,10 +58,10 @@ const MetricCard: React.FC<MetricCardProps> = ({
       icon: 'text-green-400',
       accent: 'border-green-500/40',
     },
-    blue: {
-      bg: 'bg-blue-500/20',
-      icon: 'text-blue-400',
-      accent: 'border-blue-500/40',
+    teal: {
+      bg: 'bg-teal-500/20',
+      icon: 'text-teal-400',
+      accent: 'border-teal-500/40',
     },
     purple: {
       bg: 'bg-purple-500/20',
@@ -165,9 +165,9 @@ const InsightCard: React.FC<{
       iconColor: 'text-orange-400',
     },
     info: {
-      bg: 'bg-blue-500/10 border-blue-500/30',
+      bg: 'bg-teal-500/10 border-teal-500/30',
       icon: Info,
-      iconColor: 'text-blue-400',
+      iconColor: 'text-teal-400',
     },
     critical: {
       bg: 'bg-red-500/10 border-red-500/30',
@@ -296,7 +296,7 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
           value: '0 dagar',
           subtitle: 'Från skapande till avslutat',
           icon: Clock,
-          color: 'blue',
+          color: 'teal',
           loading,
         },
         {
@@ -418,8 +418,8 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
         <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Zap className="w-5 h-5 text-blue-400" />
+              <div className="p-2 bg-teal-500/20 rounded-lg">
+                <Zap className="w-5 h-5 text-teal-400" />
               </div>
               <div>
                 <h4 className="font-semibold text-white">Koordineringseffektivitet</h4>

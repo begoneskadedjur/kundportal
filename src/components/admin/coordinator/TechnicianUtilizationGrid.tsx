@@ -98,7 +98,7 @@ const TechnicianCard: React.FC<{
   
   const getRankColor = (position: number) => {
     if (position <= 3) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40';
-    if (position <= 6) return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+    if (position <= 6) return 'bg-teal-500/20 text-teal-400 border-teal-500/40';
     return 'bg-slate-500/20 text-slate-400 border-slate-500/40';
   };
 
@@ -180,7 +180,7 @@ const TechnicianCard: React.FC<{
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <div className="flex items-center gap-1 mb-1">
-                <Clock className="w-3 h-3 text-blue-400" />
+                <Clock className="w-3 h-3 text-teal-400" />
                 <span className="text-slate-400">Arbetstid</span>
               </div>
               <p className="text-white font-medium">

@@ -56,14 +56,14 @@ const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: str
             {alert.type === 'error' ? <AlertTriangle className="w-4 h-4 text-red-400" /> :
              alert.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-orange-400" /> :
              alert.type === 'success' ? <CheckCircle className="w-4 h-4 text-green-400" /> :
-             <Info className="w-4 h-4 text-blue-400" />}
+             <Info className="w-4 h-4 text-teal-400" />}
           </div>
           <div className="flex-1 min-w-0">
             <h4 className={`font-semibold text-sm ${
               alert.type === 'error' ? 'text-red-300' :
               alert.type === 'warning' ? 'text-orange-300' :
               alert.type === 'success' ? 'text-green-300' :
-              'text-blue-300'
+              'text-teal-300'
             }`}>
               {alert.title}
             </h4>
@@ -71,7 +71,8 @@ const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: str
           </div>
           <button
             onClick={() => onDismiss(alert.id)}
-            className="flex-shrink-0 text-slate-400 hover:text-white transition-colors"
+            className="flex-shrink-0 text-slate-400 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900 rounded p-1"
+            aria-label="Stäng notifiering"
           >
             ×
           </button>
@@ -182,7 +183,7 @@ export default function CoordinatorAnalytics() {
         value: `${kpiData.scheduling_efficiency.avg_hours_to_schedule.toFixed(1)}h`,
         description: 'Tid från skapande till schemalagd tid',
         icon: Clock,
-        color: 'blue',
+        color: 'teal',
         trend: kpiData.scheduling_efficiency.avg_hours_to_schedule < 72 ? 'up' : 'down',
         trendPercentage: -12.5, // Mockad data för nu
         trendPeriod: 'senaste veckan',
@@ -291,47 +292,47 @@ export default function CoordinatorAnalytics() {
               </div>
               
               {lastRefresh && (
-                <p className="text-xs text-slate-500">
+                <p className="text-xs md:text-sm text-slate-500">
                   Senast uppdaterad: {lastRefresh.toLocaleTimeString('sv-SE')}
                 </p>
               )}
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="secondary" onClick={refresh} disabled={loading}>
+              <Button variant="secondary" onClick={refresh} disabled={loading} aria-label="Uppdatera analytics-data">
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Uppdatera
               </Button>
               
               <div className="relative group">
-                <Button variant="secondary" disabled={exporting}>
+                <Button variant="secondary" disabled={exporting} aria-label="Exportera data">
                   <Download className="w-4 h-4 mr-2" />
                   Exportera
                 </Button>
                 
-                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                   <div className="p-2 space-y-1">
                     <button
                       onClick={() => handleExport('kpi')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded"
+                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded transition-colors duration-200"
                     >
                       KPI Data
                     </button>
                     <button
                       onClick={() => handleExport('efficiency')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded"
+                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded transition-colors duration-200"
                     >
                       Schemaläggningseffektivitet
                     </button>
                     <button
                       onClick={() => handleExport('utilization')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded"
+                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded transition-colors duration-200"
                     >
                       Tekniker-utnyttjande
                     </button>
                     <button
                       onClick={() => handleExport('impact')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded"
+                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded transition-colors duration-200"
                     >
                       Affärspåverkan
                     </button>
@@ -355,13 +356,26 @@ export default function CoordinatorAnalytics() {
 
         {/* KPI Overview */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-6">Koordinator Impact Overview</h2>
+          <h1 className="text-3xl font-bold text-white mb-8">Koordinator Analytics</h1>
+          <h2 className="text-2xl font-semibold text-white mb-6">Koordinator Impact Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             {kpiMetrics.map((metric, index) => (
-              <div key={index} className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
+              <div key={index} className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 hover:border-slate-600 transition-colors duration-200">
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`p-2 bg-${metric.color}-500/20 rounded-lg`}>
-                    <metric.icon className={`w-5 h-5 text-${metric.color}-400`} />
+                  <div className={`p-2 rounded-lg ${
+                    metric.color === 'teal' ? 'bg-teal-500/20' :
+                    metric.color === 'purple' ? 'bg-purple-500/20' :
+                    metric.color === 'green' ? 'bg-green-500/20' :
+                    metric.color === 'orange' ? 'bg-orange-500/20' :
+                    'bg-slate-500/20'
+                  }`}>
+                    <metric.icon className={`w-5 h-5 ${
+                      metric.color === 'teal' ? 'text-teal-400' :
+                      metric.color === 'purple' ? 'text-purple-400' :
+                      metric.color === 'green' ? 'text-green-400' :
+                      metric.color === 'orange' ? 'text-orange-400' :
+                      'text-slate-400'
+                    }`} />
                   </div>
                   {metric.trendPercentage !== undefined && (
                     <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
@@ -385,8 +399,8 @@ export default function CoordinatorAnalytics() {
                       metric.value
                     )}
                   </p>
-                  <p className="text-sm font-medium text-slate-300 mb-1">{metric.title}</p>
-                  <p className="text-xs text-slate-500">{metric.description}</p>
+                  <h3 className="text-sm font-medium text-slate-300 mb-1">{metric.title}</h3>
+                  <p className="text-xs md:text-sm text-slate-500">{metric.description}</p>
                   {metric.trendPeriod && (
                     <p className="text-xs text-slate-400 mt-1">
                       {metric.trend === 'up' ? 'Ökning' : 'Minskning'} {metric.trendPeriod}
@@ -399,8 +413,8 @@ export default function CoordinatorAnalytics() {
         </section>
 
         {/* Business Impact Cards */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-6">Affärspåverkan</h2>
+        <section className="mb-12" aria-labelledby="business-impact-heading">
+          <h2 id="business-impact-heading" className="text-2xl font-semibold text-white mb-6">Affärspåverkan</h2>
           <BusinessImpactCards data={businessImpact} loading={loading} />
         </section>
 
@@ -419,13 +433,14 @@ export default function CoordinatorAnalytics() {
         </div>
 
         {/* Geographic Optimization */}
-        <section className="mb-12">
+        <section className="mb-12" aria-labelledby="geographic-optimization-heading">
+          <h2 id="geographic-optimization-heading" className="sr-only">Geografisk optimering</h2>
           <GeographicOptimizationMap data={kpiData} loading={loading} onEditCase={handleEditCase} />
         </section>
 
         {/* Recommendations */}
-        <section>
-          <h2 className="text-2xl font-bold text-white mb-6">Rekommendationer</h2>
+        <section aria-labelledby="recommendations-heading">
+          <h2 id="recommendations-heading" className="text-2xl font-semibold text-white mb-6">Rekommendationer</h2>
           <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
             <div className="space-y-4">
               {kpiData?.scheduling_efficiency.avg_hours_to_schedule > 24 && (
@@ -441,10 +456,10 @@ export default function CoordinatorAnalytics() {
               )}
               
               {kpiData?.technician_utilization.underutilized_technicians > 0 && (
-                <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+                  <Info className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-blue-300">Balansera tekniker-arbetsbörda</h4>
+                    <h4 className="font-semibold text-teal-300">Balansera tekniker-arbetsbörda</h4>
                     <p className="text-sm text-slate-400 mt-1">
                       {kpiData.technician_utilization.underutilized_technicians} tekniker har lågt utnyttjande. 
                       Överväg att omfördela ärenden för bättre balans.

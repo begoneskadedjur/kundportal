@@ -72,7 +72,7 @@ interface RouteOptimizationData {
 const EfficiencyBadge: React.FC<{ efficiency: 'excellent' | 'good' | 'average' | 'poor' }> = ({ efficiency }) => {
   const config = {
     excellent: { color: 'bg-green-500/20 text-green-400 border-green-500/40', text: 'Utmärkt' },
-    good: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/40', text: 'Bra' },
+    good: { color: 'bg-teal-500/20 text-teal-400 border-teal-500/40', text: 'Bra' },
     average: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', text: 'Medel' },
     poor: { color: 'bg-red-500/20 text-red-400 border-red-500/40', text: 'Dålig' },
   };
@@ -89,7 +89,7 @@ const EfficiencyBadge: React.FC<{ efficiency: 'excellent' | 'good' | 'average' |
 const OptimizationScore: React.FC<{ score: number; size?: 'sm' | 'md' | 'lg' }> = ({ score, size = 'md' }) => {
   const getColor = () => {
     if (score >= 80) return 'text-green-400';
-    if (score >= 70) return 'text-blue-400';
+    if (score >= 70) return 'text-teal-400';
     if (score >= 60) return 'text-yellow-400';
     return 'text-red-400';
   };
@@ -137,7 +137,7 @@ const RouteOptimizationTable: React.FC<{
             >
               <td className="py-3 px-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
                   <span className="text-white font-medium">{route.technician_name}</span>
                 </div>
               </td>
@@ -206,7 +206,7 @@ const OptimizationInsights: React.FC<{ data: RouteOptimizationData[] }> = ({ dat
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-900/50 rounded-lg p-3 text-center">
           <div className="flex items-center justify-center mb-2">
-            <Route className="w-4 h-4 text-blue-400" />
+            <Route className="w-4 h-4 text-teal-400" />
           </div>
           <p className="text-lg font-bold text-white">{stats.totalDistance.toFixed(0)} km</p>
           <p className="text-xs text-slate-400">Total körsträcka</p>
@@ -230,7 +230,7 @@ const OptimizationInsights: React.FC<{ data: RouteOptimizationData[] }> = ({ dat
 
         <div className="bg-slate-900/50 rounded-lg p-3 text-center">
           <div className="flex items-center justify-center mb-2">
-            <CheckCircle className="w-4 h-4 text-blue-400" />
+            <CheckCircle className="w-4 h-4 text-teal-400" />
           </div>
           <p className="text-lg font-bold text-white">{stats.abaxDataCount}</p>
           <p className="text-xs text-slate-400">ABAX-positioner</p>
@@ -264,10 +264,10 @@ const OptimizationInsights: React.FC<{ data: RouteOptimizationData[] }> = ({ dat
         )}
 
         {stats.avgDistancePerCase > 12 && (
-          <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <Info className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h5 className="text-sm font-medium text-blue-300">Geografisk spridning</h5>
+              <h5 className="text-sm font-medium text-teal-300">Geografisk spridning</h5>
               <p className="text-xs text-slate-400">
                 Hög genomsnittlig sträcka ({stats.avgDistancePerCase.toFixed(1)} km) - överväg regional uppdelning
               </p>
@@ -496,7 +496,9 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowInsights(!showInsights)}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-1 text-sm text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            aria-label={showInsights ? 'Dölj insights' : 'Visa insights'}
+            aria-expanded={showInsights}
           >
             {showInsights ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             {showInsights ? 'Dölj insights' : 'Visa insights'}
@@ -627,7 +629,8 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                 <button
                   onClick={fetchTechnicianLocations}
                   disabled={loadingLocations}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  aria-label="Uppdatera tekniker-positioner"
                 >
                   <RefreshCw className={`w-3 h-3 ${loadingLocations ? 'animate-spin' : ''}`} />
                   Uppdatera positioner
@@ -640,33 +643,39 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                   <span className="text-xs text-slate-400 font-medium">Visa på karta:</span>
                   <button
                     onClick={() => setShowRoutes(!showRoutes)}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
                       showRoutes 
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' 
+                        ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40' 
                         : 'text-slate-400 hover:text-white'
                     }`}
+                    aria-label={showRoutes ? 'Dölj rutter' : 'Visa rutter'}
+                    aria-pressed={showRoutes}
                   >
                     <Route className="w-3 h-3" />
                     Rutter
                   </button>
                   <button
                     onClick={() => setShowZones(!showZones)}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
                       showZones 
                         ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' 
                         : 'text-slate-400 hover:text-white'
                     }`}
+                    aria-label={showZones ? 'Dölj zoner' : 'Visa zoner'}
+                    aria-pressed={showZones}
                   >
                     <MapPin className="w-3 h-3" />
                     Zoner
                   </button>
                   <button
                     onClick={() => setShowHeatmap(!showHeatmap)}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
                       showHeatmap 
                         ? 'bg-red-500/20 text-red-400 border border-red-500/40' 
                         : 'text-slate-400 hover:text-white'
                     }`}
+                    aria-label={showHeatmap ? 'Dölj heatmap' : 'Visa heatmap'}
+                    aria-pressed={showHeatmap}
                   >
                     <TrendingUp className="w-3 h-3" />
                     Heatmap
@@ -697,7 +706,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
 
       {/* Selected Technician Details */}
       {selectedTechnician && (
-        <div className="mt-6 p-4 bg-slate-900/30 rounded-lg border-l-4 border-blue-500">
+        <div className="mt-6 p-4 bg-slate-900/30 rounded-lg border-l-4 border-teal-500">
           {(() => {
             const tech = routeData.find(r => r.technician_id === selectedTechnician);
             if (!tech) return null;
@@ -965,7 +974,7 @@ const GoogleMapComponent: React.FC<{
                         </div>
                         <button id="open-modal-${tech.id}" style="
                           width: 100%;
-                          background: linear-gradient(135deg, #3b82f6, #2563eb);
+                          background: linear-gradient(135deg, #14b8a6, #0d9488);
                           color: white;
                           border: none;
                           padding: 10px 16px;
@@ -1066,7 +1075,7 @@ const GoogleMapComponent: React.FC<{
               if (!showZones) return;
 
               const zones = [
-                { center: { lat: 59.3293, lng: 18.0686 }, radius: 5000, name: 'Stockholm Centrum', color: '#3b82f6' },
+                { center: { lat: 59.3293, lng: 18.0686 }, radius: 5000, name: 'Stockholm Centrum', color: '#14b8a6' },
                 { center: { lat: 59.3345, lng: 18.0632 }, radius: 3000, name: 'Östermalm', color: '#10b981' },
                 { center: { lat: 59.3242, lng: 18.0511 }, radius: 4000, name: 'Södermalm', color: '#f59e0b' },
                 { center: { lat: 59.3406, lng: 18.0921 }, radius: 3500, name: 'Vasastan', color: '#8b5cf6' },
@@ -1260,7 +1269,7 @@ const GoogleMapComponent: React.FC<{
                           icon: {
                             path: google.maps.SymbolPath.CIRCLE,
                             scale: 15,
-                            fillColor: '#3b82f6',
+                            fillColor: '#14b8a6',
                             fillOpacity: 0.9,
                             strokeColor: '#ffffff',
                             strokeWeight: 2,
@@ -1290,7 +1299,7 @@ const GoogleMapComponent: React.FC<{
                               border-radius: 12px;
                               box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                             ">
-                              <h4 style="margin: 0 0 12px 0; color: #3b82f6; font-size: 16px;">Ärende ${caseNumber}</h4>
+                              <h4 style="margin: 0 0 12px 0; color: #14b8a6; font-size: 16px;">Ärende ${caseNumber}</h4>
                               <p style="margin: 4px 0; font-size: 14px; font-weight: 600;">
                                 ${waypoint.data.title || waypoint.data.skadedjur || 'Okänt ärende'}
                               </p>
@@ -1319,7 +1328,7 @@ const GoogleMapComponent: React.FC<{
                                 }) : ''}
                               </p>
                               <button onclick="window.editCase && window.editCase('${waypoint.data.id}')" style="
-                                background: linear-gradient(135deg, #3b82f6, #2563eb);
+                                background: linear-gradient(135deg, #14b8a6, #0d9488);
                                 color: white;
                                 border: none;
                                 padding: 10px 16px;
@@ -1419,29 +1428,20 @@ const GoogleMapComponent: React.FC<{
                       (window as HTMLElement).style.display = 'none';
                     });
 
-                    // Ta bort Google Maps overlays som kan vara i vägen
-                    const gmOverlays = document.querySelectorAll('.gm-style-iw, .gm-ui-hover-effect, [data-value="Close"]');
-                    gmOverlays.forEach(overlay => {
-                      (overlay as HTMLElement).style.zIndex = '1';
-                    });
-
-                    // Sätt alla Google Maps containers till lägre z-index
-                    const gmContainers = document.querySelectorAll('[data-version], .gm-style');
-                    gmContainers.forEach(container => {
-                      (container as HTMLElement).style.zIndex = '1';
-                    });
-
+                    // Close info windows without z-index manipulation that conflicts with Portal
+                    // REMOVED: Problematic z-index overrides that conflict with Portal modals
+                    
                   } catch (error) {
                     console.warn('[DEBUG] Error closing Google Maps UI elements:', error);
                   }
                   
-                  // Längre delay för att säkerställa att allt stängs
+                  // Reduced delay for better UX - Portal fixes handle z-index properly
                   setTimeout(() => {
                     if (onEditCase) {
                       console.log('[DEBUG] Calling onEditCase with caseId:', caseId);
                       onEditCase(caseId);
                     }
-                  }, 200);
+                  }, 50);
                 };
 
                 // Centrera kartan på rutten med förbättrad zoom-kontroll
@@ -1539,7 +1539,7 @@ const GoogleMapComponent: React.FC<{
       {/* Tekniker-räknare overlay */}
       <div className="absolute top-4 left-4 bg-slate-800/90 rounded-lg px-3 py-2 text-sm">
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-blue-400" />
+          <Users className="w-4 h-4 text-teal-400" />
           <span className="text-white font-medium">{technicians.length}</span>
           <span className="text-slate-400">tekniker</span>
         </div>
