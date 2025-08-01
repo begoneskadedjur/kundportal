@@ -308,10 +308,13 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
   const [technicianLocations, setTechnicianLocations] = useState<TechnicianLocation[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [selectedMapTechnician, setSelectedMapTechnician] = useState<TechnicianLocation | null>(null);
+  const [showRoutes, setShowRoutes] = useState(false);
+  const [showZones, setShowZones] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   // Google Maps hook
   const { isLoaded: mapsLoaded, isLoading: mapsLoading, error: mapsError } = useGoogleMaps({
-    libraries: ['geometry', 'places', 'marker']
+    libraries: ['geometry', 'places', 'marker', 'visualization']
   });
 
   // Konvertera tekniker-positioner till route data
@@ -525,34 +528,80 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
                   loading={loadingLocations}
                   onTechnicianSelect={setSelectedMapTechnician}
                   selectedTechnician={selectedMapTechnician}
+                  showRoutes={showRoutes}
+                  showZones={showZones}
+                  showHeatmap={showHeatmap}
                 />
               )}
             </div>
 
-            {/* Map Legend */}
-            <div className="flex items-center justify-between bg-slate-900/30 rounded-lg p-3">
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-slate-400">Aktiv tekniker</span>
+            {/* Map Controls */}
+            <div className="space-y-3">
+              {/* Legend and Refresh */}
+              <div className="flex items-center justify-between bg-slate-900/30 rounded-lg p-3">
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-slate-400">Aktiv tekniker</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                    <span className="text-slate-400">Inaktiv tekniker</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <span className="text-slate-400">Paus</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-                  <span className="text-slate-400">Inaktiv tekniker</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                  <span className="text-slate-400">Paus</span>
+                <button
+                  onClick={fetchTechnicianLocations}
+                  disabled={loadingLocations}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingLocations ? 'animate-spin' : ''}`} />
+                  Uppdatera positioner
+                </button>
+              </div>
+
+              {/* Map Features Toggle */}
+              <div className="flex items-center justify-between bg-slate-900/30 rounded-lg p-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400 font-medium">Visa på karta:</span>
+                  <button
+                    onClick={() => setShowRoutes(!showRoutes)}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                      showRoutes 
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Route className="w-3 h-3" />
+                    Rutter
+                  </button>
+                  <button
+                    onClick={() => setShowZones(!showZones)}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                      showZones 
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <MapPin className="w-3 h-3" />
+                    Zoner
+                  </button>
+                  <button
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                      showHeatmap 
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/40' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <TrendingUp className="w-3 h-3" />
+                    Heatmap
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={fetchTechnicianLocations}
-                disabled={loadingLocations}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
-              >
-                <RefreshCw className={`w-3 h-3 ${loadingLocations ? 'animate-spin' : ''}`} />
-                Uppdatera positioner
-              </button>
             </div>
           </div>
         )}
@@ -616,7 +665,10 @@ const GoogleMapComponent: React.FC<{
   loading: boolean;
   onTechnicianSelect: (technician: TechnicianLocation | null) => void;
   selectedTechnician: TechnicianLocation | null;
-}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician }) => {
+  showRoutes: boolean;
+  showZones: boolean; 
+  showHeatmap: boolean;
+}> = ({ technicians, loading, onTechnicianSelect, selectedTechnician, showRoutes, showZones, showHeatmap }) => {
   const mapRef = useCallback((map: google.maps.Map | null) => {
     if (map && technicians.length > 0) {
       // Centrera kartan runt tekniker-positionerna med säkrare zoom-hantering
@@ -677,6 +729,12 @@ const GoogleMapComponent: React.FC<{
             console.log('[DEBUG] Google Maps is loaded, creating map with options:', mapOptions);
             const map = new google.maps.Map(divRef, mapOptions);
             console.log('[DEBUG] Map created successfully:', map);
+
+            // Skapa arrays för att hålla koll på map-element
+            let mapMarkers: any[] = [];
+            let routePolylines: google.maps.Polyline[] = [];
+            let zoneCircles: google.maps.Circle[] = [];
+            let heatmapLayer: google.maps.visualization.HeatmapLayer | null = null;
             
             // Lägg till AdvancedMarkerElement för varje tekniker (ersätter deprecated Marker)
             console.log(`[DEBUG] Creating markers for ${technicians.length} technicians:`, technicians);
@@ -768,58 +826,154 @@ const GoogleMapComponent: React.FC<{
                 console.error(`[DEBUG] Error creating marker for ${tech.name}:`, error);
               }
 
-              // Info window för varje tekniker
+              // Info window för varje tekniker med förbättrad design
               const infoWindow = new google.maps.InfoWindow({
                 content: `
-                  <div style="color: #1e293b; padding: 12px; min-width: 240px; font-family: system-ui, -apple-system, sans-serif;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                      <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${
-                        tech.status === 'active' ? '#22c55e' : 
-                        tech.status === 'break' ? '#f97316' : '#6b7280'
-                      };"></div>
-                      <h3 style="margin: 0; font-weight: 600; font-size: 16px;">${tech.name}</h3>
+                  <div style="
+                    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                    color: white;
+                    padding: 0;
+                    min-width: 320px;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    font-family: system-ui, -apple-system, sans-serif;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                  ">
+                    <!-- Header -->
+                    <div style="
+                      background: ${tech.status === 'active' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 
+                                  tech.status === 'break' ? 'linear-gradient(135deg, #f97316, #ea580c)' : 
+                                  'linear-gradient(135deg, #6b7280, #4b5563)'};
+                      padding: 16px;
+                      position: relative;
+                    ">
+                      <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="
+                          width: 48px;
+                          height: 48px;
+                          border-radius: 50%;
+                          background: rgba(255,255,255,0.2);
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 20px;
+                          font-weight: bold;
+                        ">
+                          ${tech.name.split(' ').map(n => n[0]).join('').substring(0,2)}
+                        </div>
+                        <div>
+                          <h3 style="margin: 0; font-weight: 700; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                            ${tech.name}
+                          </h3>
+                          <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; opacity: 0.9;">
+                            <span style="font-size: 14px;">
+                              ${tech.status === 'active' ? '🚀 Aktiv' : 
+                                tech.status === 'break' ? '☕ Paus' : '😴 Inaktiv'}
+                            </span>
+                            ${tech.cases > 0 ? `<span style="
+                              background: rgba(255,255,255,0.2);
+                              padding: 2px 8px;
+                              border-radius: 12px;
+                              font-size: 12px;
+                              font-weight: 600;
+                            ">${tech.cases} ärenden</span>` : ''}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div style="font-size: 13px; line-height: 1.5;">
-                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                        <span style="color: #64748b;"><strong>Status:</strong></span>
-                        <span style="color: ${
-                          tech.status === 'active' ? '#22c55e' : 
-                          tech.status === 'break' ? '#f97316' : '#6b7280'
-                        }; font-weight: 500;">${
-                          tech.status === 'active' ? '🟢 Aktiv' : 
-                          tech.status === 'break' ? '🟠 Paus' : '⚫ Inaktiv'
-                        }</span>
+
+                    <!-- Content -->
+                    <div style="padding: 16px;">
+                      <!-- Stats Grid -->
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                        <div style="
+                          background: rgba(59, 130, 246, 0.1);
+                          border: 1px solid rgba(59, 130, 246, 0.2);
+                          padding: 12px;
+                          border-radius: 8px;
+                          text-align: center;
+                        ">
+                          <div style="color: #60a5fa; font-size: 24px; font-weight: bold;">${tech.cases}</div>
+                          <div style="color: #94a3b8; font-size: 12px;">Ärenden idag</div>
+                        </div>
+                        <div style="
+                          background: rgba(34, 197, 94, 0.1);
+                          border: 1px solid rgba(34, 197, 94, 0.2);
+                          padding: 12px;
+                          border-radius: 8px;
+                          text-align: center;
+                        ">
+                          <div style="color: #4ade80; font-size: 24px; font-weight: bold;">${tech.speed || 0}</div>
+                          <div style="color: #94a3b8; font-size: 12px;">km/h</div>
+                        </div>
                       </div>
-                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                        <span style="color: #64748b;"><strong>Ärenden idag:</strong></span>
-                        <span style="font-weight: 500;">${tech.cases} st</span>
+
+                      <!-- Details -->
+                      <div style="space-y: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
+                          <span style="color: #94a3b8; font-size: 20px;">🚗</span>
+                          <span style="color: #e2e8f0; font-size: 13px; font-family: monospace;">${tech.vehicle_id?.substring(0, 8) || 'N/A'}...</span>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">
+                          <span style="color: #94a3b8; font-size: 16px;">${
+                            tech.data_source === 'abax' ? '🔄' : 
+                            tech.data_source === 'fallback' ? '📍' : '❌'
+                          }</span>
+                          <span style="color: ${
+                            tech.data_source === 'abax' ? '#22c55e' : 
+                            tech.data_source === 'fallback' ? '#f97316' : '#ef4444'
+                          }; font-size: 13px; font-weight: 500;">
+                            ${tech.data_source === 'abax' ? 'ABAX Live' : 
+                              tech.data_source === 'fallback' ? 'Uppskattad' : 'Fel'}
+                          </span>
+                        </div>
+
+                        <div style="display: flex; align-items: flex-start; gap: 8px; padding: 8px 0;">
+                          <span style="color: #94a3b8; font-size: 16px;">📍</span>
+                          <div>
+                            <div style="color: #e2e8f0; font-size: 13px; line-height: 1.4;">
+                              ${tech.current_address || 'Okänd position'}
+                            </div>
+                            <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
+                              Uppdaterad: ${tech.last_updated ? new Date(tech.last_updated).toLocaleString('sv-SE', {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                              }) : 'N/A'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                        <span style="color: #64748b;"><strong>Fordon:</strong></span>
-                        <span style="font-family: monospace; font-size: 11px;">${tech.vehicle_id}</span>
-                      </div>
-                      ${tech.speed !== undefined ? `
-                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                        <span style="color: #64748b;"><strong>Hastighet:</strong></span>
-                        <span style="font-weight: 500; color: ${tech.speed > 10 ? '#f97316' : '#22c55e'};">${tech.speed} km/h</span>
-                      </div>
-                      ` : ''}
-                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                        <span style="color: #64748b;"><strong>Datakälla:</strong></span>
-                        <span style="color: ${
-                          tech.data_source === 'abax' ? '#22c55e' : 
-                          tech.data_source === 'fallback' ? '#f97316' : '#ef4444'
-                        }; font-weight: 500;">${
-                          tech.data_source === 'abax' ? '🔄 ABAX (live)' : 
-                          tech.data_source === 'fallback' ? '📍 Uppskattad' : '❌ Fel'
-                        }</span>
-                      </div>
-                      <div style="padding: 4px 0;">
-                        <span style="color: #64748b;"><strong>Plats:</strong></span>
-                        <div style="color: #475569; font-size: 12px; margin-top: 2px;">${tech.current_address || 'Okänd position'}</div>
-                      </div>
-                      <div style="padding: 4px 0; font-size: 11px; color: #94a3b8;">
-                        Uppdaterad: ${tech.last_updated ? new Date(tech.last_updated).toLocaleString('sv-SE') : 'Okänd tid'}
+
+                      <!-- Action Buttons -->
+                      <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1);">
+                        <button style="
+                          flex: 1;
+                          background: linear-gradient(135deg, #3b82f6, #2563eb);
+                          color: white;
+                          border: none;
+                          padding: 8px 12px;
+                          border-radius: 6px;
+                          font-size: 12px;
+                          font-weight: 600;
+                          cursor: pointer;
+                          transition: transform 0.1s;
+                        " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                          📋 Visa Ärenden
+                        </button>
+                        <button style="
+                          flex: 1;
+                          background: linear-gradient(135deg, #10b981, #059669);
+                          color: white;
+                          border: none;
+                          padding: 8px 12px;
+                          border-radius: 6px;
+                          font-size: 12px;
+                          font-weight: 600;
+                          cursor: pointer;
+                          transition: transform 0.1s;
+                        " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                          🗺️ Visa Rutt
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -866,7 +1020,134 @@ const GoogleMapComponent: React.FC<{
               } else {
                 console.error(`[DEBUG] No marker created for ${tech.name}`);
               }
+
+              // Lägg till marker i array för cleanup
+              if (marker) {
+                mapMarkers.push(marker);
+              }
             });
+
+            // === ZONES (Work Areas) ===
+            const createZones = () => {
+              // Rensa gamla zoner
+              zoneCircles.forEach(circle => circle.setMap(null));
+              zoneCircles = [];
+
+              if (!showZones) return;
+
+              const zones = [
+                { center: { lat: 59.3293, lng: 18.0686 }, radius: 5000, name: 'Stockholm Centrum', color: '#3b82f6' },
+                { center: { lat: 59.3345, lng: 18.0632 }, radius: 3000, name: 'Östermalm', color: '#10b981' },
+                { center: { lat: 59.3242, lng: 18.0511 }, radius: 4000, name: 'Södermalm', color: '#f59e0b' },
+                { center: { lat: 59.3406, lng: 18.0921 }, radius: 3500, name: 'Vasastan', color: '#8b5cf6' },
+              ];
+
+              zones.forEach(zone => {
+                const circle = new google.maps.Circle({
+                  strokeColor: zone.color,
+                  strokeOpacity: 0.6,
+                  strokeWeight: 2,
+                  fillColor: zone.color,
+                  fillOpacity: 0.1,
+                  map: map,
+                  center: zone.center,
+                  radius: zone.radius,
+                });
+
+                // Zone info window
+                const infoWindow = new google.maps.InfoWindow({
+                  content: `
+                    <div style="color: #1e293b; padding: 8px; font-family: system-ui;">
+                      <h4 style="margin: 0 0 8px 0; color: ${zone.color};">${zone.name}</h4>
+                      <p style="margin: 0; font-size: 12px;">Radie: ${(zone.radius / 1000).toFixed(1)} km</p>
+                    </div>
+                  `,
+                });
+
+                circle.addListener('click', (e: any) => {
+                  infoWindow.setPosition(e.latLng);
+                  infoWindow.open(map);
+                });
+
+                zoneCircles.push(circle);
+              });
+            };
+
+            // === ROUTES (Estimated Routes) ===
+            const createRoutes = () => {
+              // Rensa gamla rutter
+              routePolylines.forEach(polyline => polyline.setMap(null));
+              routePolylines = [];
+
+              if (!showRoutes || technicians.length === 0) return;
+
+              // Skapa uppskattade rutter mellan aktiva tekniker
+              const activeTechs = technicians.filter(t => t.cases > 0);
+              
+              activeTechs.forEach((tech, index) => {
+                if (index < activeTechs.length - 1) {
+                  const nextTech = activeTechs[index + 1];
+                  
+                  const route = new google.maps.Polyline({
+                    path: [
+                      { lat: tech.lat, lng: tech.lng },
+                      { lat: nextTech.lat, lng: nextTech.lng }
+                    ],
+                    geodesic: true,
+                    strokeColor: '#f59e0b',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 3,
+                    map: map,
+                  });
+
+                  routePolylines.push(route);
+                }
+              });
+            };
+
+            // === HEATMAP (Activity Heatmap) ===
+            const createHeatmap = () => {
+              if (heatmapLayer) {
+                heatmapLayer.setMap(null);
+                heatmapLayer = null;
+              }
+
+              if (!showHeatmap || !window.google.maps.visualization) return;
+
+              const heatmapData = technicians.map(tech => ({
+                location: new google.maps.LatLng(tech.lat, tech.lng),
+                weight: tech.cases > 0 ? tech.cases * 2 : 1
+              }));
+
+              heatmapLayer = new google.maps.visualization.HeatmapLayer({
+                data: heatmapData,
+                map: showHeatmap ? map : null,
+                radius: 50,
+                opacity: 0.6,
+              });
+
+              heatmapLayer.set('gradient', [
+                'rgba(0, 255, 255, 0)',
+                'rgba(0, 255, 255, 1)',
+                'rgba(0, 191, 255, 1)',
+                'rgba(0, 127, 255, 1)',
+                'rgba(0, 63, 255, 1)',
+                'rgba(0, 0, 255, 1)',
+                'rgba(0, 0, 223, 1)',
+                'rgba(0, 0, 191, 1)',
+                'rgba(0, 0, 159, 1)',
+                'rgba(0, 0, 127, 1)',
+                'rgba(63, 0, 91, 1)',
+                'rgba(127, 0, 63, 1)',
+                'rgba(191, 0, 31, 1)',
+                'rgba(255, 0, 0, 1)'
+              ]);
+            };
+
+            // Skapa initiala element
+            createZones();
+            createRoutes();
+            createHeatmap();
 
             // Använd callback för att centrera kartan
             mapRef(map);
