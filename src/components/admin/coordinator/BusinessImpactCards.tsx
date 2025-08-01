@@ -63,6 +63,11 @@ const MetricCard: React.FC<MetricCardProps> = ({
       icon: 'text-teal-400',
       accent: 'border-teal-500/40',
     },
+    blue: {
+      bg: 'bg-teal-500/20',
+      icon: 'text-teal-400',
+      accent: 'border-teal-500/40',
+    },
     purple: {
       bg: 'bg-purple-500/20',
       icon: 'text-purple-400',
@@ -80,7 +85,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
     },
   };
 
-  const config = colorConfig[color];
+  const config = colorConfig[color] || colorConfig.teal;
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 hover:border-slate-600 transition-all">
@@ -341,7 +346,7 @@ const BusinessImpactCards: React.FC<BusinessImpactCardsProps> = ({ data, loading
         value: `${data.avg_case_completion_days.toFixed(1)} dagar`,
         subtitle: 'Från skapande till avslutat ärende',
         icon: Clock,
-        color: 'blue',
+        color: 'teal',
         trend: {
           direction: data.avg_case_completion_days < 5 ? 'up' : 'down',
           percentage: 8,
