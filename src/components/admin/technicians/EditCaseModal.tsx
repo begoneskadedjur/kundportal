@@ -454,34 +454,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   };
 
-  if (!currentCase) return null;
-  
-  if (submitted) {
-    return (
-      <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true} usePortal={true}>
-        <div className="p-8 text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3>
-          <p className="text-slate-400">Ändringarna har sparats framgångsrikt</p>
-        </div>
-      </Modal>
-    );
-  }
-
-  const footer = (
-    <div className="flex gap-3 p-6 bg-slate-800/50">
-      <Button type="button" variant="secondary" onClick={onClose} disabled={loading || timeTrackingLoading} className="flex-1">
-        Avbryt
-      </Button>
-      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading || timeTrackingLoading} className="flex-1">
-        Spara ändringar
-      </Button>
-    </div>
-  );
-
-  const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
-
   // Fix React-DatePicker z-index conflicts when using Portal
+  // IMPORTANT: All hooks must be called before any conditional returns
   useEffect(() => {
     if (isOpen && currentCase) {
       const portalStyles = document.createElement('style');
@@ -509,6 +483,33 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     }
   }, [isOpen, currentCase]);
 
+  if (!currentCase) return null;
+  
+  if (submitted) {
+    return (
+      <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true} usePortal={true}>
+        <div className="p-8 text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3>
+          <p className="text-slate-400">Ändringarna har sparats framgångsrikt</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  const footer = (
+    <div className="flex gap-3 p-6 bg-slate-800/50">
+      <Button type="button" variant="secondary" onClick={onClose} disabled={loading || timeTrackingLoading} className="flex-1">
+        Avbryt
+      </Button>
+      <Button type="submit" form="edit-case-form" loading={loading} disabled={loading || timeTrackingLoading} className="flex-1">
+        Spara ändringar
+      </Button>
+    </div>
+  );
+
+  const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true}>
       <div className="p-6">
@@ -523,7 +524,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
           )}
           
           <div className="space-y-4">
-            <h3 className="text-lg font-medium text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-400" />Ärendeinformation</h3>
+            <h3 className="text-lg font-medium text-white flex items-center gap-2"><FileText className="w-5 h-5 text-teal-400" />Ärendeinformation</h3>
             <Input label="Titel *" name="title" value={formData.title || ''} onChange={handleChange} required />
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning</label>
