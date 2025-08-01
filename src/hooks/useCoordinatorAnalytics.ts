@@ -45,7 +45,7 @@ export const useCoordinatorAnalytics = (
       const [kpiData, efficiencyTrend, utilizationData, businessImpact] = await Promise.all([
         getCoordinatorKpiData(startDate, endDate),
         getSchedulingEfficiencyTrend(30),
-        getTechnicianUtilizationData(),
+        getTechnicianUtilizationData(startDate, endDate),
         getBusinessImpactMetrics(startDate, endDate),
       ]);
 
@@ -158,7 +158,7 @@ export const useSchedulingEfficiency = (days: number = 30) => {
 /**
  * Hook för tekniker-utnyttjande
  */
-export const useTechnicianUtilization = () => {
+export const useTechnicianUtilization = (startDate?: string, endDate?: string) => {
   const [data, setData] = useState<TechnicianUtilizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +167,7 @@ export const useTechnicianUtilization = () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await getTechnicianUtilizationData();
+      const result = await getTechnicianUtilizationData(startDate, endDate);
       setData(result);
     } catch (err) {
       console.error('Error fetching technician utilization:', err);
@@ -180,7 +180,7 @@ export const useTechnicianUtilization = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [startDate, endDate]);
 
   return { data, loading, error, refresh: fetchData };
 };

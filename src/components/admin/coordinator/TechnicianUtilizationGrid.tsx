@@ -218,8 +218,10 @@ const TechnicianCard: React.FC<{
           <div className="mt-4 p-3 bg-slate-700/30 rounded-lg">
             <h5 className="text-sm font-medium text-white mb-2">Rekommendationer:</h5>
             <div className="text-xs text-slate-300 space-y-1">
-              {technician.absence_hours && technician.absence_hours > 0 ? (
-                <p>• Tekniker är frånvarande - omfördela ärenden till andra tekniker</p>
+              {technician.total_work_hours === 0 ? (
+                <p>• Tekniker är helt frånvarande denna period - ingen kapacitet tillgänglig</p>
+              ) : technician.absence_hours && technician.absence_hours > 0 ? (
+                <p>• Tekniker är delvis frånvarande - mäts mot reducerad arbetstid ({technician.total_work_hours.toFixed(1)}h)</p>
               ) : (
                 <>
                   {technician.efficiency_rating === 'low' && (
@@ -235,9 +237,6 @@ const TechnicianCard: React.FC<{
               )}
               {technician.avg_case_value < 1000 && technician.avg_case_value > 0 && (
                 <p>• Fokusera på högre värderade ärenden för bättre lönsamhet</p>
-              )}
-              {technician.total_work_hours < 40 && !technician.absence_hours && (
-                <p>• Arbetstid under 40h/vecka - kontrollera work_schedule konfiguration</p>
               )}
             </div>
           </div>

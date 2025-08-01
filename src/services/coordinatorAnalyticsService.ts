@@ -292,7 +292,10 @@ export const getSchedulingEfficiencyTrend = async (
 /**
  * Hämtar tekniker-utnyttjande data med frånvaro-hänsyn
  */
-export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizationData[]> => {
+export const getTechnicianUtilizationData = async (
+  startDate?: string,
+  endDate?: string
+): Promise<TechnicianUtilizationData[]> => {
   try {
     const { data: technicians } = await supabase
       .from('technicians')
@@ -300,18 +303,25 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
       .eq('is_active', true)
       .eq('role', 'Skadedjurstekniker');
 
-    // Hämta aktuella frånvaror för hela veckan
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
+    // Använd koordinatorns valda datumperiod eller fallback till aktuell vecka
+    const periodStart = startDate ? new Date(startDate) : (() => {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+      return weekStart;
+    })();
+    
+    const periodEnd = endDate ? new Date(endDate) : (() => {
+      const weekEnd = new Date(periodStart);
+      weekEnd.setDate(periodStart.getDate() + 6);
+      return weekEnd;
+    })();
 
-    // Försök hämta frånvarodata - om tabellen inte existerar så fortsätt utan frånvaro
+    // Försök hämta frånvarodata för vald period
     const { data: absences, error: absenceError } = await supabase
       .from('technician_absences')
       .select('*')
-      .lte('start_date', weekEnd.toISOString())
-      .gte('end_date', weekStart.toISOString());
+      .lte('start_date', periodEnd.toISOString())
+      .gte('end_date', periodStart.toISOString());
 
     if (absenceError) {
       console.warn('technician_absences table not found, continuing without absence data:', absenceError);
@@ -320,54 +330,66 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
     const utilizationData: TechnicianUtilizationData[] = [];
 
     for (const tech of technicians || []) {
-      // Beräkna arbetsstunden från work_schedule (40 timmar per vecka som standard)
-      let totalWorkHours = 0;
-      if (tech.work_schedule) {
-        Object.values(tech.work_schedule).forEach((daySchedule: any) => {
-          if (daySchedule?.active) {
-            const start = new Date(`2024-01-01 ${daySchedule.start}`);
-            const end = new Date(`2024-01-01 ${daySchedule.end}`);
-            totalWorkHours += (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          }
-        });
-      } else {
-        // Fallback: 40 timmar per vecka (8 timmar per dag, 5 dagar)
-        totalWorkHours = 40;
-      }
+      // Alla tekniker arbetar alltid 40 timmar per vecka som standard
+      const standardWorkHours = 40;
+      
+      // Beräkna hur många dagar perioden omfattar
+      const periodDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
+      const periodWeeks = periodDays / 7;
+      const expectedWorkHours = standardWorkHours * periodWeeks;
 
-      // Beräkna frånvaro-påverkad arbetstid
+      // Beräkna frånvaro inom vald period
       const techAbsences = (absences || []).filter(absence => absence.technician_id === tech.id);
       let absenceHours = 0;
       
       techAbsences.forEach(absence => {
         const absenceStart = new Date(absence.start_date);
         const absenceEnd = new Date(absence.end_date);
-        const effectiveStart = new Date(Math.max(absenceStart.getTime(), weekStart.getTime()));
-        const effectiveEnd = new Date(Math.min(absenceEnd.getTime(), weekEnd.getTime()));
+        const effectiveStart = new Date(Math.max(absenceStart.getTime(), periodStart.getTime()));
+        const effectiveEnd = new Date(Math.min(absenceEnd.getTime(), periodEnd.getTime()));
         
         if (effectiveStart < effectiveEnd) {
-          // Förenklad beräkning: 8 timmar per dag frånvaro
+          // Beräkna exakt frånvarotid: 8 timmar per dag
           const daysDiff = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
           absenceHours += daysDiff * 8;
         }
       });
 
-      const adjustedWorkHours = Math.max(0, totalWorkHours - absenceHours);
+      // Beräkna justerad arbetstid (t.ex. 40h - 8h = 32h)
+      const adjustedWorkHours = Math.max(0, expectedWorkHours - absenceHours);
+      
+      // Om tekniker är helt frånvarande (0 timmar kvar), exkludera från utnyttjandegraden
+      if (adjustedWorkHours === 0) {
+        // Lägg till som frånvarande tekniker men fortsätt inte med utnyttjandeberäkning
+        utilizationData.push({
+          technician_id: tech.id,
+          technician_name: tech.name,
+          total_work_hours: 0,
+          scheduled_hours: 0,
+          utilization_percent: 0,
+          cases_assigned: 0,
+          avg_case_value: 0,
+          efficiency_rating: 'low',
+          absence_hours: absenceHours,
+          original_work_hours: expectedWorkHours,
+        } as TechnicianUtilizationData & { absence_hours: number; original_work_hours: number });
+        continue; // Hoppa över resten av beräkningen för denna tekniker
+      }
 
-      // Hämta schemalagda ärenden för denna vecka
+      // Hämta schemalagda ärenden för vald period
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('start_date, due_date, pris')
         .eq('primary_assignee_id', tech.id)
-        .gte('start_date', weekStart.toISOString())
-        .lte('start_date', weekEnd.toISOString());
+        .gte('start_date', periodStart.toISOString())
+        .lte('start_date', periodEnd.toISOString());
 
       const { data: businessCases } = await supabase
         .from('business_cases')
         .select('start_date, due_date, pris')
         .eq('primary_assignee_id', tech.id)
-        .gte('start_date', weekStart.toISOString())
-        .lte('start_date', weekEnd.toISOString());
+        .gte('start_date', periodStart.toISOString())
+        .lte('start_date', periodEnd.toISOString());
 
       const allCases = [...(privateCases || []), ...(businessCases || [])];
       
@@ -401,7 +423,7 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
         efficiency_rating: efficiencyRating,
         // Lägg till frånvaro-information
         absence_hours: absenceHours,
-        original_work_hours: totalWorkHours,
+        original_work_hours: expectedWorkHours, // Använd expectedWorkHours istället för totalWorkHours
       } as TechnicianUtilizationData & { absence_hours: number; original_work_hours: number });
     }
 
@@ -504,7 +526,7 @@ export const exportAnalyticsData = async (
         break;
         
       case 'utilization':
-        const utilizationData = await getTechnicianUtilizationData();
+        const utilizationData = await getTechnicianUtilizationData(startDate, endDate);
         csvData = `Technician,Work Hours,Scheduled Hours,Utilization %,Cases Assigned,Efficiency Rating\n`;
         utilizationData.forEach(item => {
           csvData += `${item.technician_name},${item.total_work_hours},${item.scheduled_hours},${item.utilization_percent},${item.cases_assigned},${item.efficiency_rating}\n`;
