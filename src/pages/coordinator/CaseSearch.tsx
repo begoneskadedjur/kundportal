@@ -19,7 +19,14 @@ import {
   FileText,
   Phone,
   Mail,
-  ExternalLink
+  ExternalLink,
+  Building2,
+  Home,
+  Euro,
+  Bug,
+  CheckCircle,
+  CircleX,
+  CircleDot
 } from 'lucide-react';
 import { formatAddress } from '../../utils/addressFormatter';
 import Card from '../../components/ui/Card';
@@ -53,6 +60,55 @@ const statusOptions = [
 ];
 
 const priorityOptions = ['Låg', 'Normal', 'Hög', 'Akut'];
+
+// Hjälpfunktioner
+const extractPrice = (priceData: any): string | null => {
+  if (!priceData) return null;
+  
+  if (typeof priceData === 'string') {
+    try {
+      const parsed = JSON.parse(priceData);
+      return parsed.value || null;
+    } catch {
+      // Om det inte går att parsa som JSON, försök extrahera nummer från strängen
+      const match = priceData.match(/(\d+[\d\s,]*)/);
+      return match ? match[1].replace(/\s/g, '') : null;
+    }
+  }
+  
+  if (typeof priceData === 'object' && priceData.value) {
+    return priceData.value;
+  }
+  
+  return null;
+};
+
+const getStatusColor = (status: string): string => {
+  const completedStatuses = ['Avslutat', 'Stängt - slasklogg'];
+  const inProgressStatuses = ['Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'];
+  const pendingStatuses = ['Öppen', 'Offert skickad', 'Offert signerad - boka in', 'Privatperson - review'];
+  
+  if (completedStatuses.includes(status)) {
+    return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+  } else if (inProgressStatuses.includes(status)) {
+    return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+  } else if (pendingStatuses.includes(status)) {
+    return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+  }
+  return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+};
+
+const getStatusIcon = (status: string) => {
+  const completedStatuses = ['Avslutat', 'Stängt - slasklogg'];
+  const inProgressStatuses = ['Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'];
+  
+  if (completedStatuses.includes(status)) {
+    return CheckCircle;
+  } else if (inProgressStatuses.includes(status)) {
+    return CircleDot;
+  }
+  return CircleX;
+};
 
 export default function CaseSearch() {
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
@@ -351,7 +407,7 @@ export default function CaseSearch() {
         </Card>
 
         {/* Resultat */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {paginatedCases.length === 0 ? (
             <Card>
               <div className="text-center py-12">
@@ -361,101 +417,175 @@ export default function CaseSearch() {
               </div>
             </Card>
           ) : (
-            paginatedCases.map(caseItem => (
-              <Card key={caseItem.id} className="hover:border-emerald-500/30 transition-colors">
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-white mb-1">{caseItem.title}</h3>
-                      <div className="flex items-center gap-4 text-sm text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Tag className="w-4 h-4" />
-                          {caseItem.case_type === 'private' ? 'Privat' : 'Företag'}
-                        </span>
-                        <span>{caseItem.status}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {new Date(caseItem.created_at).toLocaleDateString('sv-SE')}
-                        </span>
+            paginatedCases.map(caseItem => {
+              const StatusIcon = getStatusIcon(caseItem.status);
+              const price = extractPrice(caseItem.pris);
+              
+              return (
+                <Card key={caseItem.id} className="hover:border-emerald-500/30 transition-colors">
+                  <div className="p-6">
+                    {/* Header med titel och huvudinfo */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3 mb-2">
+                          {/* Ärendetyp ikon */}
+                          <div className="flex-shrink-0 mt-1">
+                            {caseItem.case_type === 'private' ? (
+                              <Home className="w-5 h-5 text-emerald-400" />
+                            ) : (
+                              <Building2 className="w-5 h-5 text-blue-400" />
+                            )}
+                          </div>
+                          
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-white mb-1">{caseItem.title}</h3>
+                            
+                            {/* Status badge */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(caseItem.status)}`}>
+                                <StatusIcon className="w-3 h-3" />
+                                {caseItem.status}
+                              </div>
+                              
+                              {/* Ärendetyp badge */}
+                              <div className="flex items-center gap-1 px-2 py-1 bg-slate-700/50 text-slate-300 rounded-full text-xs">
+                                <Tag className="w-3 h-3" />
+                                {caseItem.case_type === 'private' ? 'Privat' : 'Företag'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Pris och åtgärder */}
+                      <div className="flex items-start gap-3">
+                        {price && (
+                          <div className="text-right">
+                            <div className="flex items-center gap-1 text-emerald-400 font-semibold">
+                              <Euro className="w-4 h-4" />
+                              {price} kr
+                            </div>
+                            <div className="text-xs text-slate-500">Pris</div>
+                          </div>
+                        )}
+                        
+                        <Button variant="outline" size="sm" className="flex-shrink-0">
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+
+                    {/* Huvudinformation i rutnät */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+                      {/* Kontaktperson */}
+                      {caseItem.kontaktperson && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-slate-300 font-medium">
+                            <User className="w-4 h-4 text-emerald-400" />
+                            {caseItem.kontaktperson}
+                          </div>
+                          <div className="ml-6 space-y-1">
+                            {caseItem.kontakt_telefon && (
+                              <div className="flex items-center gap-2 text-sm text-slate-400 hover:text-emerald-400 cursor-pointer transition-colors">
+                                <Phone className="w-3 h-3" />
+                                <a href={`tel:${caseItem.kontakt_telefon}`}>{caseItem.kontakt_telefon}</a>
+                              </div>
+                            )}
+                            {caseItem.kontakt_email && (
+                              <div className="flex items-center gap-2 text-sm text-slate-400 hover:text-emerald-400 cursor-pointer transition-colors">
+                                <Mail className="w-3 h-3" />
+                                <a href={`mailto:${caseItem.kontakt_email}`}>{caseItem.kontakt_email}</a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Adress */}
+                      {caseItem.adress && (
+                        <div className="space-y-1">
+                          <div className="flex items-start gap-2 text-slate-300">
+                            <MapPin className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm">
+                              {formatAddress(caseItem.adress)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tekniker */}
+                      {caseItem.primary_assignee_name && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-slate-300 font-medium">
+                            <User className="w-4 h-4 text-blue-400" />
+                            Tekniker
+                          </div>
+                          <div className="ml-6">
+                            <div className="text-sm text-slate-300">{caseItem.primary_assignee_name}</div>
+                            {(caseItem.secondary_assignee_name || caseItem.tertiary_assignee_name) && (
+                              <div className="text-xs text-slate-500">
+                                + {[caseItem.secondary_assignee_name, caseItem.tertiary_assignee_name]
+                                  .filter(Boolean)
+                                  .join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Datum information */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-slate-300 font-medium">
+                          <Clock className="w-4 h-4 text-emerald-400" />
+                          Datum
+                        </div>
+                        <div className="ml-6 space-y-1">
+                          <div className="text-sm text-slate-400">
+                            <span className="text-slate-500">Skapad:</span> {new Date(caseItem.created_at).toLocaleDateString('sv-SE')}
+                          </div>
+                          {caseItem.start_date && (
+                            <div className="text-sm text-slate-400">
+                              <span className="text-slate-500">Start:</span> {new Date(caseItem.start_date).toLocaleDateString('sv-SE')}
+                            </div>
+                          )}
+                          {caseItem.completed_date && (
+                            <div className="text-sm text-emerald-400">
+                              <span className="text-slate-500">Avslutad:</span> {new Date(caseItem.completed_date).toLocaleDateString('sv-SE')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Skadedjur */}
+                    {caseItem.skadedjur && (
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2">
+                          <Bug className="w-4 h-4 text-orange-400" />
+                          <span className="text-slate-400 text-sm">Skadedjur:</span>
+                          <span className="bg-orange-500/10 text-orange-400 px-3 py-1 rounded-full text-sm font-medium border border-orange-500/20">
+                            {caseItem.skadedjur}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Beskrivning */}
+                    {caseItem.beskrivning && (
+                      <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50">
+                        <div className="flex items-start gap-2 mb-2">
+                          <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-slate-400 text-sm font-medium">Beskrivning</span>
+                        </div>
+                        <p className="text-sm text-slate-300 ml-6 leading-relaxed">
+                          {caseItem.beskrivning}
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Detaljer */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Kontakt */}
-                    {caseItem.kontaktperson && (
-                      <div className="flex items-start gap-2">
-                        <User className="w-4 h-4 text-emerald-400 mt-1 flex-shrink-0" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-300">{caseItem.kontaktperson}</div>
-                          {caseItem.kontakt_telefon && (
-                            <div className="text-xs text-slate-500 flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              {caseItem.kontakt_telefon}
-                            </div>
-                          )}
-                          {caseItem.kontakt_email && (
-                            <div className="text-xs text-slate-500 flex items-center gap-1">
-                              <Mail className="w-3 h-3" />
-                              {caseItem.kontakt_email}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Adress */}
-                    {caseItem.adress && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-emerald-400 mt-1 flex-shrink-0" />
-                        <div className="text-sm text-slate-300">
-                          {formatAddress(caseItem.adress)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tekniker */}
-                    {caseItem.primary_assignee_name && (
-                      <div className="flex items-start gap-2">
-                        <User className="w-4 h-4 text-emerald-400 mt-1 flex-shrink-0" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-300">{caseItem.primary_assignee_name}</div>
-                          {(caseItem.secondary_assignee_name || caseItem.tertiary_assignee_name) && (
-                            <div className="text-xs text-slate-500">
-                              {[caseItem.secondary_assignee_name, caseItem.tertiary_assignee_name]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Beskrivning */}
-                  {caseItem.beskrivning && (
-                    <div className="text-sm text-slate-400 bg-slate-800/30 rounded-lg p-3">
-                      {caseItem.beskrivning}
-                    </div>
-                  )}
-
-                  {/* Skadedjur */}
-                  {caseItem.skadedjur && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-slate-400">Skadedjur:</span>
-                      <span className="bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full text-xs">
-                        {caseItem.skadedjur}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            ))
+                </Card>
+              );
+            })
           )}
         </div>
 
