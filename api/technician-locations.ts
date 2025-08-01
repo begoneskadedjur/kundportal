@@ -9,64 +9,107 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// ABAX API funktioner  
+// ABAX API funktioner enligt officiell dokumentation
 async function getAbaxToken() {
+    console.log('[ABAX] Requesting access token...');
+    
     const response = await fetch('https://identity.abax.cloud/connect/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'BeGone-Kundportal/1.0'
+        },
         body: new URLSearchParams({
             grant_type: 'client_credentials',
             client_id: process.env.ABAX_CLIENT_ID!,
             client_secret: process.env.ABAX_CLIENT_SECRET!,
-            scope: 'open_api open_api.vehicles',
+            scope: 'open_api open_api.vehicles', // Production scopes enligt dokumentation
         }),
     });
     
     if (!response.ok) {
         const errorText = await response.text();
-        console.error("ABAX Token Error:", errorText);
-        throw new Error(`Kunde inte hämta ABAX token: ${response.status}`);
+        console.error('[ABAX] Token Error:', response.status, errorText);
+        throw new Error(`ABAX authentication failed: ${response.status} - ${errorText}`);
     }
     
-    const data = await response.json() as { access_token: string };
+    const data = await response.json() as { access_token: string; expires_in: number; token_type: string };
+    console.log('[ABAX] Token received, expires in:', data.expires_in, 'seconds');
     return data.access_token;
 }
 
-async function getVehicleLocation(token: string, vehicleId: string) {
-    const response = await fetch(`https://api.abax.cloud/v1/vehicles/${vehicleId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+// Hämta alla fordonspositioner på en gång - mycket effektivare enligt ABAX dokumentation
+async function getAllVehicleLocations(token: string, vehicleIds: string[]) {
+    console.log(`[ABAX] Fetching locations for ${vehicleIds.length} vehicles...`);
+    
+    const response = await fetch('https://api.abax.cloud/v1/vehicles/locations', {
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'BeGone-Kundportal/1.0'
+        },
     });
     
     if (!response.ok) {
-        console.error(`ABAX Location Error for vehicle ${vehicleId}:`, response.status);
-        return null; // Returnera null istället för att kasta fel
+        const errorText = await response.text();
+        console.error(`[ABAX] Locations API Error:`, response.status, errorText);
+        return new Map(); // Returnera tom map vid fel
     }
 
-    const vehicleData = await response.json() as { 
-        location?: { 
-            latitude?: number; 
-            longitude?: number; 
+    const locationsData = await response.json() as {
+        data: Array<{
+            vehicleId: string;
+            latitude?: number;
+            longitude?: number;
             address?: string;
-            lastUpdate?: string; 
-        };
-        status?: string;
+            timestamp?: string;
+            speed?: number;
+        }>;
     };
     
-    const lat = vehicleData?.location?.latitude;
-    const lng = vehicleData?.location?.longitude;
-
-    if (lat === undefined || lng === undefined) {
-        console.warn(`Vehicle ${vehicleId} saknar giltig positionsdata`);
-        return null;
+    console.log(`[ABAX] Received ${locationsData.data?.length || 0} vehicle locations`);
+    
+    // Skapa en map för snabb lookup
+    const locationMap = new Map();
+    
+    if (locationsData.data) {
+        for (const location of locationsData.data) {
+            // Filtrera bara våra tekniker-fordon
+            if (vehicleIds.includes(location.vehicleId)) {
+                if (location.latitude !== undefined && location.longitude !== undefined) {
+                    locationMap.set(location.vehicleId, {
+                        lat: location.latitude,
+                        lng: location.longitude,
+                        address: location.address || await reverseGeocode(location.latitude, location.longitude),
+                        lastUpdate: location.timestamp,
+                        speed: location.speed || 0
+                    });
+                }
+            }
+        }
     }
+    
+    console.log(`[ABAX] Mapped ${locationMap.size} valid locations`);
+    return locationMap;
+}
 
-    return {
-        lat,
-        lng,
-        address: vehicleData.location?.address || 'Okänd adress',
-        lastUpdate: vehicleData.location?.lastUpdate,
-        status: vehicleData.status || 'unknown'
-    };
+// Reverse geocoding för att få adresser från koordinater
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+        const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.GOOGLE_MAPS_API_KEY}&language=sv&region=se`
+        );
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                return data.results[0].formatted_address;
+            }
+        }
+    } catch (error) {
+        console.warn('[Geocoding] Failed to reverse geocode:', error);
+    }
+    
+    return 'Stockholm, Sverige'; // Fallback
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -94,8 +137,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // 2. Hämta ABAX token
         const abaxToken = await getAbaxToken();
+        
+        // 3. Hämta alla fordonspositioner på en gång (mycket effektivare)
+        const vehicleIds = technicians.map(t => t.abax_vehicle_id);
+        const locationMap = await getAllVehicleLocations(abaxToken, vehicleIds);
 
-        // 3. Hämta dagens ärenden för alla tekniker i en batch
+        // 4. Hämta dagens ärenden för alla tekniker i en batch
         const today = new Date().toISOString().split('T')[0];
         
         const { data: privateCases } = await supabase
@@ -120,59 +167,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        // 4. Hämta fordonpositioner från ABAX
-        const technicianLocations = await Promise.all(
-            technicians.map(async (tech) => {
-                try {
-                    const location = await getVehicleLocation(abaxToken, tech.abax_vehicle_id);
-                    const caseCount = caseCounts[tech.id] || 0;
-                    
-                    if (!location) {
-                        // Fallback till Stockholm-centrum om ABAX saknar data
-                        return {
-                            id: tech.id,
-                            name: tech.name,
-                            lat: 59.3293 + (Math.random() - 0.5) * 0.02,
-                            lng: 18.0686 + (Math.random() - 0.5) * 0.02,
-                            cases: caseCount,
-                            status: caseCount > 0 ? 'active' : 'inactive',
-                            vehicle_id: tech.abax_vehicle_id,
-                            current_address: 'Stockholm, Sverige (uppskattad)',
-                            last_updated: new Date().toISOString(),
-                            data_source: 'fallback'
-                        };
-                    }
-
-                    return {
-                        id: tech.id,
-                        name: tech.name,
-                        lat: location.lat,
-                        lng: location.lng,
-                        cases: caseCount,
-                        status: caseCount > 0 ? 'active' : 'inactive',
-                        vehicle_id: tech.abax_vehicle_id,
-                        current_address: location.address,
-                        last_updated: location.lastUpdate || new Date().toISOString(),
-                        data_source: 'abax'
-                    };
-                } catch (error) {
-                    console.error(`Fel för tekniker ${tech.name}:`, error);
-                    // Returnera fallback-data vid fel
-                    return {
-                        id: tech.id,
-                        name: tech.name,
-                        lat: 59.3293 + (Math.random() - 0.5) * 0.02,
-                        lng: 18.0686 + (Math.random() - 0.5) * 0.02,
-                        cases: caseCounts[tech.id] || 0,
-                        status: 'inactive',
-                        vehicle_id: tech.abax_vehicle_id,
-                        current_address: 'Position okänd',
-                        last_updated: new Date().toISOString(),
-                        data_source: 'error'
-                    };
-                }
-            })
-        );
+        // 5. Kombinera tekniker-data med ABAX-positioner
+        const technicianLocations = technicians.map((tech) => {
+            const caseCount = caseCounts[tech.id] || 0;
+            const abaxLocation = locationMap.get(tech.abax_vehicle_id);
+            
+            if (abaxLocation) {
+                return {
+                    id: tech.id,
+                    name: tech.name,
+                    lat: abaxLocation.lat,
+                    lng: abaxLocation.lng,
+                    cases: caseCount,
+                    status: caseCount > 0 ? 'active' : (abaxLocation.speed > 5 ? 'active' : 'inactive'),
+                    vehicle_id: tech.abax_vehicle_id,
+                    current_address: abaxLocation.address,
+                    last_updated: abaxLocation.lastUpdate || new Date().toISOString(),
+                    data_source: 'abax',
+                    speed: abaxLocation.speed
+                };
+            } else {
+                // Fallback till Stockholm-centrum om ABAX saknar data
+                const fallbackPositions = [
+                    { lat: 59.3293, lng: 18.0686 }, // Stockholm centrum
+                    { lat: 59.3345, lng: 18.0632 }, // Östermalm
+                    { lat: 59.3242, lng: 18.0511 }, // Södermalm
+                    { lat: 59.3406, lng: 18.0921 }, // Vasastan
+                ];
+                const randomPos = fallbackPositions[Math.floor(Math.random() * fallbackPositions.length)];
+                
+                return {
+                    id: tech.id,
+                    name: tech.name,
+                    lat: randomPos.lat + (Math.random() - 0.5) * 0.01,
+                    lng: randomPos.lng + (Math.random() - 0.5) * 0.01,
+                    cases: caseCount,
+                    status: caseCount > 0 ? 'active' : 'inactive',
+                    vehicle_id: tech.abax_vehicle_id,
+                    current_address: 'Stockholm, Sverige (uppskattad position)',
+                    last_updated: new Date().toISOString(),
+                    data_source: 'fallback',
+                    speed: 0
+                };
+            }
+        });
 
         res.status(200).json({ 
             technicians: technicianLocations,

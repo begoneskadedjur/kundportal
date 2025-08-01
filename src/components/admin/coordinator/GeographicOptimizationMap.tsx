@@ -41,6 +41,7 @@ interface TechnicianLocation {
   current_address?: string;
   last_updated?: string;
   data_source?: 'abax' | 'fallback' | 'error';
+  speed?: number;
 }
 
 interface CaseLocation {
@@ -723,6 +724,12 @@ const GoogleMapComponent: React.FC<{
                         <span style="color: #64748b;"><strong>Fordon:</strong></span>
                         <span style="font-family: monospace; font-size: 11px;">${tech.vehicle_id}</span>
                       </div>
+                      ${tech.speed !== undefined ? `
+                      <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span style="color: #64748b;"><strong>Hastighet:</strong></span>
+                        <span style="font-weight: 500; color: ${tech.speed > 10 ? '#f97316' : '#22c55e'};">${tech.speed} km/h</span>
+                      </div>
+                      ` : ''}
                       <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
                         <span style="color: #64748b;"><strong>Datakälla:</strong></span>
                         <span style="color: ${
