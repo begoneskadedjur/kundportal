@@ -705,7 +705,7 @@ export default function CaseSearch() {
                           title="Redigera ärende"
                           aria-label="Redigera ärende"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit className="w-5 h-5" />
                         </Button>
                       </div>
                     </div>
