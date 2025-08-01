@@ -15,6 +15,7 @@ import {
   Clock,
   AlertCircle,
   ChevronDown,
+  ChevronUp,
   X,
   FileText,
   Phone,
@@ -26,11 +27,13 @@ import {
   Bug,
   CheckCircle,
   CircleX,
-  CircleDot
+  CircleDot,
+  Edit3
 } from 'lucide-react';
 import { formatAddress } from '../../utils/addressFormatter';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 
 interface FilterState {
   searchQuery: string;
@@ -62,25 +65,29 @@ const statusOptions = [
 const priorityOptions = ['Låg', 'Normal', 'Hög', 'Akut'];
 
 // Hjälpfunktioner
-const extractPrice = (priceData: any): string | null => {
-  if (!priceData) return null;
-  
-  if (typeof priceData === 'string') {
-    try {
-      const parsed = JSON.parse(priceData);
-      return parsed.value || null;
-    } catch {
-      // Om det inte går att parsa som JSON, försök extrahera nummer från strängen
-      const match = priceData.match(/(\d+[\d\s,]*)/);
-      return match ? match[1].replace(/\s/g, '') : null;
-    }
+const extractPrice = (caseItem: BeGoneCaseRow): number | null => {
+  // Först försök med det direkta pris-fältet
+  if (caseItem.pris && typeof caseItem.pris === 'number') {
+    return caseItem.pris;
   }
   
-  if (typeof priceData === 'object' && priceData.value) {
-    return priceData.value;
+  // Sedan försök med price-fältet om det finns
+  if ((caseItem as any).price && typeof (caseItem as any).price === 'number') {
+    return (caseItem as any).price;
+  }
+  
+  // Om det är en sträng, försök parsa
+  if (caseItem.pris && typeof caseItem.pris === 'string') {
+    const numericValue = parseFloat(caseItem.pris.replace(/[^\d.-]/g, ''));
+    return isNaN(numericValue) ? null : numericValue;
   }
   
   return null;
+};
+
+const formatPrice = (price: number | null): string => {
+  if (!price) return '';
+  return new Intl.NumberFormat('sv-SE').format(price);
 };
 
 const getStatusColor = (status: string): string => {
@@ -110,6 +117,9 @@ const getStatusIcon = (status: string) => {
   return CircleX;
 };
 
+type SortField = 'title' | 'kontaktperson' | 'status' | 'primary_assignee_name' | 'created_at' | 'completed_date' | 'pris' | 'case_type';
+type SortDirection = 'asc' | 'desc';
+
 export default function CaseSearch() {
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
@@ -119,6 +129,10 @@ export default function CaseSearch() {
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
 
   // Hämta data
   useEffect(() => {
@@ -153,6 +167,24 @@ export default function CaseSearch() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Sorteringsfunktioner
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="w-4 h-4" /> : 
+      <ChevronDown className="w-4 h-4" />;
   };
 
   // Filtrera ärenden
@@ -214,13 +246,62 @@ export default function CaseSearch() {
     });
   }, [allCases, filters]);
 
+  // Sortera ärenden
+  const sortedCases = useMemo(() => {
+    return [...filteredCases].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'title':
+          aValue = a.title || '';
+          bValue = b.title || '';
+          break;
+        case 'kontaktperson':
+          aValue = a.kontaktperson || '';
+          bValue = b.kontaktperson || '';
+          break;
+        case 'status':
+          aValue = a.status || '';
+          bValue = b.status || '';
+          break;
+        case 'primary_assignee_name':
+          aValue = a.primary_assignee_name || '';
+          bValue = b.primary_assignee_name || '';
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        case 'completed_date':
+          aValue = a.completed_date ? new Date(a.completed_date) : new Date(0);
+          bValue = b.completed_date ? new Date(b.completed_date) : new Date(0);
+          break;
+        case 'pris':
+          aValue = extractPrice(a) || 0;
+          bValue = extractPrice(b) || 0;
+          break;
+        case 'case_type':
+          aValue = a.case_type || '';
+          bValue = b.case_type || '';
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredCases, sortField, sortDirection]);
+
   // Paginering
   const paginatedCases = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredCases.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredCases, currentPage, itemsPerPage]);
+    return sortedCases.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedCases, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedCases.length / itemsPerPage);
 
   const updateFilter = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -238,6 +319,24 @@ export default function CaseSearch() {
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
     updateFilter(key, newArray);
+  };
+
+  const handleEditCase = (caseItem: BeGoneCaseRow) => {
+    setSelectedCase(caseItem);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setSelectedCase(null);
+  };
+
+  const handleCaseUpdate = (updatedCase: any) => {
+    // Uppdatera listan med det uppdaterade ärendet
+    setAllCases(prevCases => 
+      prevCases.map(c => c.id === updatedCase.id ? { ...c, ...updatedCase } : c)
+    );
+    handleCloseEditModal();
   };
 
   if (loading) {
@@ -396,7 +495,7 @@ export default function CaseSearch() {
             {/* Resultat-statistik */}
             <div className="flex items-center justify-between text-sm text-slate-400">
               <div>
-                Visar {paginatedCases.length} av {filteredCases.length} ärenden
+                Visar {paginatedCases.length} av {sortedCases.length} ärenden
                 {filters.searchQuery && ` för "${filters.searchQuery}"`}
               </div>
               <div>
@@ -418,13 +517,49 @@ export default function CaseSearch() {
             <div className="overflow-x-auto">
               {/* Tabellhuvud */}
               <div className="grid grid-cols-12 gap-4 p-4 bg-slate-800/30 border-b border-slate-700 text-sm font-medium text-slate-300">
-                <div className="col-span-3">Ärende & Kund</div>
-                <div className="col-span-1 text-center">Typ</div>
-                <div className="col-span-2">Status</div>
-                <div className="col-span-2">Tekniker</div>
+                <button 
+                  className="col-span-3 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('title')}
+                >
+                  Ärende & Kund
+                  {getSortIcon('title')}
+                </button>
+                <button 
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('case_type')}
+                >
+                  Typ
+                  {getSortIcon('case_type')}
+                </button>
+                <button 
+                  className="col-span-2 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('status')}
+                >
+                  Status
+                  {getSortIcon('status')}
+                </button>
+                <button 
+                  className="col-span-2 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('primary_assignee_name')}
+                >
+                  Tekniker
+                  {getSortIcon('primary_assignee_name')}
+                </button>
                 <div className="col-span-1 text-center">Skadedjur</div>
-                <div className="col-span-1 text-center">Pris</div>
-                <div className="col-span-1 text-center">Datum</div>
+                <button 
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('pris')}
+                >
+                  Pris
+                  {getSortIcon('pris')}
+                </button>
+                <button 
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  onClick={() => handleSort('created_at')}
+                >
+                  Datum
+                  {getSortIcon('created_at')}
+                </button>
                 <div className="col-span-1 text-center">Åtgärd</div>
               </div>
 
@@ -432,7 +567,7 @@ export default function CaseSearch() {
               <div className="divide-y divide-slate-800">
                 {paginatedCases.map((caseItem, index) => {
                   const StatusIcon = getStatusIcon(caseItem.status);
-                  const price = extractPrice(caseItem.pris);
+                  const price = extractPrice(caseItem);
                   
                   return (
                     <div
@@ -538,7 +673,7 @@ export default function CaseSearch() {
                         {price ? (
                           <div className="flex items-center justify-center gap-1 text-emerald-400 text-sm font-medium">
                             <Euro className="w-3 h-3" />
-                            <span>{price}</span>
+                            <span>{formatPrice(price)}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
@@ -569,14 +704,10 @@ export default function CaseSearch() {
                           variant="outline" 
                           size="sm" 
                           className="p-1 h-7 w-7 hover:scale-110 transition-transform"
-                          onClick={() => {
-                            // Öppna ClickUp-länk i ny flik
-                            const clickUpUrl = `https://app.clickup.com/t/${caseItem.id}`;
-                            window.open(clickUpUrl, '_blank');
-                          }}
-                          title="Öppna ärende i ClickUp"
+                          onClick={() => handleEditCase(caseItem)}
+                          title="Redigera ärende"
                         >
-                          <ExternalLink className="w-3 h-3" />
+                          <Edit3 className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
@@ -622,6 +753,16 @@ export default function CaseSearch() {
               Nästa
             </Button>
           </div>
+        )}
+
+        {/* EditCaseModal */}
+        {selectedCase && (
+          <EditCaseModal
+            isOpen={editModalOpen}
+            onClose={handleCloseEditModal}
+            onSuccess={handleCaseUpdate}
+            caseData={selectedCase as any} // Konvertera till rätt typ
+          />
         )}
       </div>
     </div>
