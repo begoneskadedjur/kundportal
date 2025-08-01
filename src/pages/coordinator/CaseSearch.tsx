@@ -88,7 +88,7 @@ const extractPrice = (caseItem: BeGoneCaseRow): number | null => {
 
 const formatPrice = (price: number | null): string => {
   if (!price) return '';
-  return new Intl.NumberFormat('sv-SE').format(price);
+  return new Intl.NumberFormat('sv-SE').format(price) + ' kr';
 };
 
 const getStatusColor = (status: string): string => {
@@ -385,7 +385,7 @@ export default function CaseSearch() {
                   placeholder="Sök på titel, kund, adress, tekniker, beskrivning..."
                   value={filters.searchQuery}
                   onChange={(e) => updateFilter('searchQuery', e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-white placeholder-slate-500"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-[#20c58f] focus:outline-none text-white placeholder-slate-500"
                 />
               </div>
               <Button
@@ -412,7 +412,7 @@ export default function CaseSearch() {
                           type="checkbox"
                           checked={filters.status.includes(status)}
                           onChange={() => toggleArrayFilter('status', status)}
-                          className="mr-2 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500"
+                          className="mr-2 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
                         />
                         <span className="text-sm text-slate-400">{status}</span>
                       </label>
@@ -430,7 +430,7 @@ export default function CaseSearch() {
                           type="checkbox"
                           checked={filters.assignedTechnician.includes(tech.id)}
                           onChange={() => toggleArrayFilter('assignedTechnician', tech.id)}
-                          className="mr-2 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500"
+                          className="mr-2 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
                         />
                         <span className="text-sm text-slate-400">{tech.name}</span>
                       </label>
@@ -471,14 +471,14 @@ export default function CaseSearch() {
                       type="date"
                       value={filters.dateRange.start}
                       onChange={(e) => updateFilter('dateRange', { ...filters.dateRange, start: e.target.value })}
-                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
                     />
                     <span className="text-slate-400 flex items-center">till</span>
                     <input
                       type="date"
                       value={filters.dateRange.end}
                       onChange={(e) => updateFilter('dateRange', { ...filters.dateRange, end: e.target.value })}
-                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -519,28 +519,28 @@ export default function CaseSearch() {
               {/* Tabellhuvud */}
               <div className="grid grid-cols-12 gap-4 p-4 bg-slate-800/30 border-b border-slate-700 text-sm font-medium text-slate-300">
                 <button 
-                  className="col-span-3 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  className="col-span-3 text-left flex items-center gap-2 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('title')}
                 >
                   Ärende & Kund
                   {getSortIcon('title')}
                 </button>
                 <button 
-                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('case_type')}
                 >
                   Typ
                   {getSortIcon('case_type')}
                 </button>
                 <button 
-                  className="col-span-2 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  className="col-span-2 text-left flex items-center gap-2 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('status')}
                 >
                   Status
                   {getSortIcon('status')}
                 </button>
                 <button 
-                  className="col-span-2 text-left flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                  className="col-span-2 text-left flex items-center gap-2 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('primary_assignee_name')}
                 >
                   Tekniker
@@ -548,14 +548,14 @@ export default function CaseSearch() {
                 </button>
                 <div className="col-span-1 text-center">Skadedjur</div>
                 <button 
-                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('pris')}
                 >
                   Pris
                   {getSortIcon('pris')}
                 </button>
                 <button 
-                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-emerald-400 transition-colors"
+                  className="col-span-1 text-center flex items-center justify-center gap-1 hover:text-[#20c58f] transition-colors"
                   onClick={() => handleSort('created_at')}
                 >
                   Datum
@@ -593,7 +593,7 @@ export default function CaseSearch() {
                             {caseItem.kontakt_telefon && (
                               <a 
                                 href={`tel:${caseItem.kontakt_telefon}`}
-                                className="flex items-center gap-1 text-slate-400 hover:text-emerald-400 transition-colors"
+                                className="flex items-center gap-1 text-slate-400 hover:text-[#20c58f] transition-colors"
                                 title={caseItem.kontakt_telefon}
                               >
                                 <Phone className="w-3 h-3" />
@@ -602,7 +602,7 @@ export default function CaseSearch() {
                             {caseItem.kontakt_email && (
                               <a 
                                 href={`mailto:${caseItem.kontakt_email}`}
-                                className="flex items-center gap-1 text-slate-400 hover:text-emerald-400 transition-colors"
+                                className="flex items-center gap-1 text-slate-400 hover:text-[#20c58f] transition-colors"
                                 title={caseItem.kontakt_email}
                               >
                                 <Mail className="w-3 h-3" />
@@ -621,7 +621,7 @@ export default function CaseSearch() {
                       {/* Typ */}
                       <div className="col-span-1 flex justify-center items-start pt-1">
                         {caseItem.case_type === 'private' ? (
-                          <Home className="w-4 h-4 text-emerald-400" title="Privat" />
+                          <Home className="w-4 h-4 text-[#20c58f]" title="Privat" />
                         ) : (
                           <Building2 className="w-4 h-4 text-blue-400" title="Företag" />
                         )}
@@ -669,7 +669,7 @@ export default function CaseSearch() {
                       {/* Pris */}
                       <div className="col-span-1 text-center">
                         {price ? (
-                          <div className="text-emerald-400 text-sm font-medium">
+                          <div className="text-[#20c58f] text-sm font-medium">
                             {formatPrice(price)}
                           </div>
                         ) : (
@@ -686,7 +686,7 @@ export default function CaseSearch() {
                           })}
                         </div>
                         {caseItem.completed_date && (
-                          <div className="text-xs text-emerald-400">
+                          <div className="text-xs text-[#20c58f]">
                             ✓ {new Date(caseItem.completed_date).toLocaleDateString('sv-SE', { 
                               month: 'short', 
                               day: 'numeric' 
@@ -698,11 +698,12 @@ export default function CaseSearch() {
                       {/* Åtgärd */}
                       <div className="col-span-1 flex justify-center items-start pt-1">
                         <Button 
-                          variant="outline" 
+                          variant="secondary" 
                           size="sm" 
-                          className="p-1 h-7 w-7 hover:scale-110 transition-transform"
+                          className="p-1.5 h-8 w-8 hover:scale-110 transition-transform hover:border-[#20c58f]"
                           onClick={() => handleEditCase(caseItem)}
                           title="Redigera ärende"
+                          aria-label="Redigera ärende"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
