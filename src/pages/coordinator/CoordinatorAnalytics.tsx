@@ -149,51 +149,44 @@ export default function CoordinatorAnalytics() {
     }
 
     try {
-      // Försök hämta från private_cases först
-      const { data: privateCase, error: privateError } = await supabase
-        .from('private_cases')
-        .select('*')
-        .eq('id', caseId)
-        .single();
-        
-      if (privateCase && !privateError) {
-        setSelectedCase(privateCase);
+      // Använd API-endpoint för att hämta ärendedata med service role
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      
+      if (!token) {
+        toast.error('Ingen giltig session hittades');
+        return;
+      }
+      
+      const response = await fetch(`/api/case/${caseId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        const caseData = { ...result.case, case_type: result.type };
+        setSelectedCase(caseData);
         setIsEditModalOpen(true);
         return;
       }
       
-      // Försök hämta från business_cases om private case inte hittades
-      const { data: businessCase, error: businessError } = await supabase
-        .from('business_cases')
-        .select('*')
-        .eq('id', caseId)
-        .single();
-        
-      if (businessCase && !businessError) {
-        setSelectedCase(businessCase);
-        setIsEditModalOpen(true);
-        return;
-      }
+      const errorData = await response.json();
+      console.error('API Error:', errorData);
       
-      // Logga fel för debugging
-      if (privateError) {
-        console.error('Private case error:', privateError);
-      }
-      if (businessError) {
-        console.error('Business case error:', businessError);
-      }
-      
-      // Visa specifikt fel baserat på status
-      if (privateError?.code === 'PGRST116' || businessError?.code === 'PGRST116') {
-        toast.error('Ärendet hittades inte');
-      } else if (privateError?.code === '42501' || businessError?.code === '42501') {
+      if (response.status === 403) {
         toast.error('Du har inte behörighet att redigera detta ärende');
+      } else if (response.status === 404) {
+        toast.error('Ärendet kunde inte hittas');
       } else {
-        toast.error('Kunde inte hämta ärendet');
+        toast.error('Fel vid hämtning av ärendedata');
       }
-    } catch (error) {
-      console.error('Error fetching case:', error);
-      toast.error('Fel vid hämtning av ärende');
+      
+    } catch (error: any) {
+      console.error('Error fetching case data:', error);
+      toast.error('Fel vid hämtning av ärendedata');
     }
   };
 
