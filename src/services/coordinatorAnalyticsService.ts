@@ -85,14 +85,7 @@ export const getCoordinatorKpiData = async (
       `AND created_at >= '${startDate}' AND created_at <= '${endDate}'` : 
       `AND created_at >= NOW() - INTERVAL '30 days'`;
 
-    // 1. Schemaläggningseffektivitet
-    const { data: schedulingData, error: schedError } = await supabase.rpc('get_scheduling_efficiency', {
-      date_filter: dateFilter
-    });
-
-    if (schedError) {
-      console.error('Error fetching scheduling efficiency:', schedError);
-      // Fallback query
+    // 1. Schemaläggningseffektivitet - använd direkt query
       const { data: privateScheduling } = await supabase
         .from('private_cases')
         .select('created_at, start_date')
@@ -119,20 +112,12 @@ export const getCoordinatorKpiData = async (
       const within72h = schedulingTimes.filter(h => h <= 72).length;
       const total = schedulingTimes.length;
 
-      var schedulingEfficiency = {
-        avg_hours_to_schedule: avgHours,
-        scheduled_within_24h_percent: total > 0 ? (within24h / total) * 100 : 0,
-        scheduled_within_48h_percent: total > 0 ? (within48h / total) * 100 : 0,
-        scheduled_within_72h_percent: total > 0 ? (within72h / total) * 100 : 0,
-      };
-    } else {
-      var schedulingEfficiency = schedulingData[0] || {
-        avg_hours_to_schedule: 0,
-        scheduled_within_24h_percent: 0,
-        scheduled_within_48h_percent: 0,
-        scheduled_within_72h_percent: 0,
-      };
-    }
+    const schedulingEfficiency = {
+      avg_hours_to_schedule: avgHours,
+      scheduled_within_24h_percent: total > 0 ? (within24h / total) * 100 : 0,
+      scheduled_within_48h_percent: total > 0 ? (within48h / total) * 100 : 0,
+      scheduled_within_72h_percent: total > 0 ? (within72h / total) * 100 : 0,
+    };
 
     // 2. Tekniker-utnyttjande
     const { data: technicians } = await supabase
@@ -141,18 +126,20 @@ export const getCoordinatorKpiData = async (
       .eq('is_active', true)
       .eq('role', 'Skadedjurstekniker');
 
-    const { data: todaysCases } = await supabase
+    // Hämta dagens ärenden från båda tabellerna separat
+    const { data: todaysPrivateCases } = await supabase
       .from('private_cases')
       .select('primary_assignee_id, start_date, due_date')
       .gte('start_date', new Date().toISOString().split('T')[0] + ' 00:00:00')
-      .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59')
-      .union(
-        supabase
-          .from('business_cases')
-          .select('primary_assignee_id, start_date, due_date')
-          .gte('start_date', new Date().toISOString().split('T')[0] + ' 00:00:00')
-          .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59')
-      );
+      .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59');
+
+    const { data: todaysBusinessCases } = await supabase
+      .from('business_cases')
+      .select('primary_assignee_id, start_date, due_date')
+      .gte('start_date', new Date().toISOString().split('T')[0] + ' 00:00:00')
+      .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59');
+
+    const todaysCases = [...(todaysPrivateCases || []), ...(todaysBusinessCases || [])];
 
     let totalAvailableHours = 0;
     let totalScheduledHours = 0;
@@ -169,7 +156,7 @@ export const getCoordinatorKpiData = async (
           const availableHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
           totalAvailableHours += availableHours;
 
-          const techCases = (todaysCases || []).filter(c => c.primary_assignee_id === tech.id);
+          const techCases = todaysCases.filter(c => c.primary_assignee_id === tech.id);
           const scheduledHours = techCases.reduce((sum, c) => {
             if (c.start_date && c.due_date) {
               const start = new Date(c.start_date);
@@ -319,11 +306,16 @@ export const getTechnicianUtilizationData = async (): Promise<TechnicianUtilizat
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    const { data: absences } = await supabase
+    // Försök hämta frånvarodata - om tabellen inte existerar så fortsätt utan frånvaro
+    const { data: absences, error: absenceError } = await supabase
       .from('technician_absences')
       .select('*')
       .lte('start_date', weekEnd.toISOString())
       .gte('end_date', weekStart.toISOString());
+
+    if (absenceError) {
+      console.warn('technician_absences table not found, continuing without absence data:', absenceError);
+    }
     
     const utilizationData: TechnicianUtilizationData[] = [];
 

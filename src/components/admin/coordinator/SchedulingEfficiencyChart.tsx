@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { TrendingUp, TrendingDown, Clock, Target, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, Target, RefreshCw, Info } from 'lucide-react';
 import { SchedulingEfficiencyData } from '../../../services/coordinatorAnalyticsService';
 
 interface SchedulingEfficiencyChartProps {
