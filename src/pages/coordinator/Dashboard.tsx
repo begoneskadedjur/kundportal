@@ -17,7 +17,7 @@ export default function CoordinatorDashboard() {
   const [kpiData, setKpiData] = useState({
     unplanned: 0,
     scheduledToday: 0,
-    activeTechnicians: 0,
+    activeTechnicians: '0/0' as string | number,
     completedWeek: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -29,17 +29,20 @@ export default function CoordinatorDashboard() {
     title: string;
     cases: BeGoneCaseRow[];
     technicians?: Technician[];
+    absences?: any[];
     kpiType: 'unplanned' | 'scheduled' | 'completed' | 'technicians';
   }>({
     title: '',
     cases: [],
     technicians: [],
+    absences: [],
     kpiType: 'unplanned'
   });
   
   // State för alla ärenden och tekniker
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
+  const [currentAbsences, setCurrentAbsences] = useState<any[]>([]);
 
   useEffect(() => {
     // Funktion för att hämta all nödvändig data från Supabase
@@ -57,6 +60,9 @@ export default function CoordinatorDashboard() {
         weekAgo.setDate(today.getDate() - 7);
         const weekAgoStart = new Date(weekAgo.setHours(0, 0, 0, 0)).toISOString();
 
+        // Dagens datum för frånvarokontroll
+        const todayDateString = today.toISOString().split('T')[0];
+
         // Statusar som indikerar att ett ärende är oplanerat och behöver en åtgärd
         const unplannedStatuses = ['Öppen', 'Offert signerad - boka in'];
 
@@ -69,6 +75,7 @@ export default function CoordinatorDashboard() {
           completedPrivate,
           completedBusiness,
           techniciansResult,
+          absenceResult,
           allPrivateCases,
           allBusinessCases,
         ] = await Promise.all([
@@ -84,10 +91,15 @@ export default function CoordinatorDashboard() {
           supabase.from('private_cases').select('id', { count: 'exact', head: true }).gte('completed_date', weekAgoStart),
           supabase.from('business_cases').select('id', { count: 'exact', head: true }).gte('completed_date', weekAgoStart),
 
-          // 4. Räkna aktiva tekniker
-          supabase.from('technicians').select('*').eq('is_active', true),
+          // 4. Hämta skadedjurstekniker (filtrera bort admins/koordinatorer)
+          supabase.from('technicians').select('*').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
           
-          // 5. Hämta alla ärenden för modal-visning
+          // 5. Hämta frånvaro för alla tekniker (för dagens datum)
+          supabase.from('technician_absences').select('*')
+            .lte('start_date', todayDateString + ' 23:59:59')
+            .gte('end_date', todayDateString + ' 00:00:00'),
+          
+          // 6. Hämta alla ärenden för modal-visning
           supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
           supabase.from('business_cases').select('*').order('created_at', { ascending: false })
         ]);
@@ -97,7 +109,7 @@ export default function CoordinatorDashboard() {
             unplannedPrivate.error, unplannedBusiness.error,
             scheduledPrivate.error, scheduledBusiness.error,
             completedPrivate.error, completedBusiness.error,
-            techniciansResult.error, allPrivateCases.error, allBusinessCases.error
+            techniciansResult.error, absenceResult.error, allPrivateCases.error, allBusinessCases.error
         ].filter(Boolean);
 
         if (errors.length > 0) {
@@ -112,18 +124,28 @@ export default function CoordinatorDashboard() {
         
         setAllCases(combinedCases as BeGoneCaseRow[]);
         setAllTechnicians(techniciansResult.data || []);
+        setCurrentAbsences(absenceResult.data || []);
 
         // Summera resultaten från de olika tabellerna
         const totalUnplanned = (unplannedPrivate.count ?? 0) + (unplannedBusiness.count ?? 0);
         const totalScheduledToday = (scheduledPrivate.count ?? 0) + (scheduledBusiness.count ?? 0);
         const totalCompletedWeek = (completedPrivate.count ?? 0) + (completedBusiness.count ?? 0);
-        const totalActiveTechnicians = (techniciansResult.data || []).length;
+        
+        // Beräkna tillgängliga tekniker
+        const allSkadedjurstekniker = techniciansResult.data || [];
+        const currentAbsences = absenceResult.data || [];
+        
+        // Hitta vilka tekniker som är frånvarande idag
+        const absentTechnicianIds = currentAbsences.map(absence => absence.technician_id);
+        const availableTechnicians = allSkadedjurstekniker.filter(tech => !absentTechnicianIds.includes(tech.id));
+        
+        const technicianAvailability = `${availableTechnicians.length}/${allSkadedjurstekniker.length}`;
 
         // Uppdatera state med den nya datan
         setKpiData({
           unplanned: totalUnplanned,
           scheduledToday: totalScheduledToday,
-          activeTechnicians: totalActiveTechnicians,
+          activeTechnicians: technicianAvailability,
           completedWeek: totalCompletedWeek,
         });
 
@@ -172,6 +194,7 @@ export default function CoordinatorDashboard() {
     let title = '';
     let cases: BeGoneCaseRow[] = [];
     let technicians: Technician[] | undefined = undefined;
+    let absences: any[] | undefined = undefined;
 
     switch (kpiType) {
       case 'unplanned':
@@ -187,13 +210,14 @@ export default function CoordinatorDashboard() {
         cases = getCompletedWeekCases();
         break;
       case 'technicians':
-        title = 'Aktiva Tekniker';
+        title = 'Tekniker Status';
         cases = [];
         technicians = allTechnicians;
+        absences = currentAbsences;
         break;
     }
 
-    setModalData({ title, cases, technicians, kpiType });
+    setModalData({ title, cases, technicians, absences, kpiType });
     setIsModalOpen(true);
   };
 
@@ -294,6 +318,7 @@ export default function CoordinatorDashboard() {
         title={modalData.title}
         cases={modalData.cases}
         technicians={modalData.technicians}
+        absences={modalData.absences}
         kpiType={modalData.kpiType}
       />
     </div>

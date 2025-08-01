@@ -14,6 +14,7 @@ interface KpiCaseListModalProps {
   title: string;
   cases: BeGoneCaseRow[];
   technicians?: Technician[];
+  absences?: any[];
   kpiType: 'unplanned' | 'scheduled' | 'completed' | 'technicians';
 }
 
@@ -151,8 +152,16 @@ const CaseListItem: React.FC<{
   );
 };
 
-const TechnicianListItem: React.FC<{ technician: Technician }> = ({ technician }) => {
+const TechnicianListItem: React.FC<{ 
+  technician: Technician; 
+  absence?: any;
+}> = ({ technician, absence }) => {
   const { name, role, phone, email, is_active } = technician;
+  
+  const isAbsent = !!absence;
+  const statusText = isAbsent ? 'Frånvarande' : (is_active ? 'Tillgänglig' : 'Inaktiv');
+  const statusColor = isAbsent ? 'bg-orange-500/20 text-orange-400' : 
+                      (is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
 
   return (
     <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
@@ -164,10 +173,8 @@ const TechnicianListItem: React.FC<{ technician: Technician }> = ({ technician }
             <p className="text-xs text-slate-400">{role}</p>
           </div>
         </div>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-        }`}>
-          {is_active ? 'Aktiv' : 'Inaktiv'}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+          {statusText}
         </span>
       </div>
 
@@ -185,6 +192,23 @@ const TechnicianListItem: React.FC<{ technician: Technician }> = ({ technician }
           </div>
         )}
       </div>
+
+      {/* Visa frånvaroinformation om tekniker är frånvarande */}
+      {absence && (
+        <div className="mt-3 pt-3 border-t border-slate-700">
+          <div className="flex items-center gap-2 text-orange-400 text-xs mb-2">
+            <Calendar className="w-3 h-3" />
+            <span className="font-medium">Frånvarande: {absence.reason}</span>
+          </div>
+          <div className="text-xs text-slate-400">
+            <div>Från: {new Date(absence.start_date).toLocaleDateString('sv-SE')} {new Date(absence.start_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div>Till: {new Date(absence.end_date).toLocaleDateString('sv-SE')} {new Date(absence.end_date).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</div>
+            {absence.notes && (
+              <div className="mt-1 text-slate-500">Anteckning: {absence.notes}</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -195,6 +219,7 @@ export default function KpiCaseListModal({
   title, 
   cases, 
   technicians, 
+  absences,
   kpiType 
 }: KpiCaseListModalProps) {
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
@@ -238,7 +263,12 @@ export default function KpiCaseListModal({
               <h3 className="text-xl font-bold text-white">{title}</h3>
               <p className="text-slate-400">
                 {showTechnicians 
-                  ? `${technicians?.length || 0} tekniker` 
+                  ? (() => {
+                      const total = technicians?.length || 0;
+                      const absent = absences?.length || 0;
+                      const available = total - absent;
+                      return `${available} tillgängliga av ${total} tekniker` + (absent > 0 ? ` (${absent} frånvarande)` : '');
+                    })()
                   : `${cases.length} ärenden`
                 }
               </p>
@@ -258,12 +288,18 @@ export default function KpiCaseListModal({
             )}
 
             {showTechnicians && technicians && technicians.length > 0 && (
-              technicians.map(technician => (
-                <TechnicianListItem 
-                  key={technician.id} 
-                  technician={technician} 
-                />
-              ))
+              technicians.map(technician => {
+                // Hitta frånvaro för denna tekniker
+                const technicianAbsence = absences?.find(absence => absence.technician_id === technician.id);
+                
+                return (
+                  <TechnicianListItem 
+                    key={technician.id} 
+                    technician={technician} 
+                    absence={technicianAbsence}
+                  />
+                );
+              })
             )}
 
             {/* Empty state */}

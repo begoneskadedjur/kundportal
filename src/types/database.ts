@@ -320,6 +320,19 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['monthly_marketing_spend']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['monthly_marketing_spend']['Insert']>
       }
+      technician_absences: {
+        Row: {
+          id: string
+          technician_id: string
+          start_date: string // YYYY-MM-DD HH:MM:SS+TZ format
+          end_date: string   // YYYY-MM-DD HH:MM:SS+TZ format
+          reason: string     // 'Föräldraledighet', 'Semester', 'Sjukdom', 'Övrigt', etc.
+          notes: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['technician_absences']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['technician_absences']['Insert']>
+      }
     }
   }
 }
@@ -533,6 +546,11 @@ export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_
 export type BillingAuditLog = Database['public']['Tables']['billing_audit_log']['Row']
 export type BillingAuditLogInsert = Database['public']['Tables']['billing_audit_log']['Insert']
 export type BillingAuditLogUpdate = Database['public']['Tables']['billing_audit_log']['Update']
+
+// ✅ TECHNICIAN ABSENCE TYPE  
+export type TechnicianAbsence = Database['public']['Tables']['technician_absences']['Row']
+export type TechnicianAbsenceInsert = Database['public']['Tables']['technician_absences']['Insert']
+export type TechnicianAbsenceUpdate = Database['public']['Tables']['technician_absences']['Update']
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [
