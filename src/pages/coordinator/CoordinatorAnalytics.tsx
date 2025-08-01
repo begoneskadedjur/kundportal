@@ -301,7 +301,12 @@ export default function CoordinatorAnalytics() {
           <SchedulingEfficiencyChart data={efficiencyTrend} loading={loading} />
           
           {/* Technician Utilization */}
-          <TechnicianUtilizationGrid data={utilizationData} loading={loading} />
+          <TechnicianUtilizationGrid 
+            data={utilizationData} 
+            loading={loading}
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+          />
         </div>
 
         {/* Geographic Optimization */}

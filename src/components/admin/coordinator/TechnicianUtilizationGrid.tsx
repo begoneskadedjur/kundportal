@@ -21,6 +21,8 @@ import { formatCurrency } from '../../../utils/formatters';
 interface TechnicianUtilizationGridProps {
   data: TechnicianUtilizationData[];
   loading: boolean;
+  startDate: string;
+  endDate: string;
 }
 
 const EfficiencyBadge: React.FC<{ rating: 'low' | 'optimal' | 'overbooked' }> = ({ rating }) => {
@@ -91,7 +93,8 @@ const TechnicianCard: React.FC<{
   rank: number;
   expanded: boolean;
   onToggleExpand: () => void;
-}> = ({ technician, rank, expanded, onToggleExpand }) => {
+  periodInfo: { label: string; suffix: string };
+}> = ({ technician, rank, expanded, onToggleExpand, periodInfo }) => {
   
   const getRankColor = (position: number) => {
     if (position <= 3) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40';
@@ -114,9 +117,23 @@ const TechnicianCard: React.FC<{
             <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold ${getRankColor(rank)}`}>
               {rank}
             </div>
-            <div>
-              <h4 className="font-semibold text-white">{technician.technician_name}</h4>
-              <p className="text-xs text-slate-400">{technician.cases_assigned} ärenden denna vecka</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-semibold text-white">{technician.technician_name}</h4>
+                {/* Frånvaro-status badges */}
+                {technician.total_work_hours === 0 ? (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/40">
+                    <AlertTriangle className="w-3 h-3" />
+                    Helt frånvarande
+                  </div>
+                ) : technician.absence_hours && technician.absence_hours > 0 ? (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/40">
+                    <Clock className="w-3 h-3" />
+                    Delvis frånvarande
+                  </div>
+                ) : null}
+              </div>
+              <p className="text-xs text-slate-400">{technician.cases_assigned} ärenden {periodInfo.label}</p>
             </div>
           </div>
           
@@ -167,7 +184,7 @@ const TechnicianCard: React.FC<{
                 <span className="text-slate-400">Arbetstid</span>
               </div>
               <p className="text-white font-medium">
-                {technician.total_work_hours.toFixed(1)}h/vecka
+                {technician.total_work_hours.toFixed(1)}h{periodInfo.suffix}
                 {technician.absence_hours && technician.absence_hours > 0 && (
                   <span className="text-orange-400 text-xs ml-1">
                     ({technician.original_work_hours?.toFixed(1)}h före frånvaro)
@@ -248,10 +265,32 @@ const TechnicianCard: React.FC<{
 
 const TechnicianUtilizationGrid: React.FC<TechnicianUtilizationGridProps> = ({ 
   data, 
-  loading 
+  loading,
+  startDate,
+  endDate
 }) => {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'utilization' | 'cases' | 'value'>('utilization');
+
+  // Beräkna period-information
+  const getPeriodInfo = () => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 7) {
+      return { label: 'denna vecka', suffix: '/vecka' };
+    } else if (diffDays <= 31) {
+      return { label: 'denna månaden', suffix: '/månad' };
+    } else if (diffDays <= 92) {
+      return { label: 'detta kvartal', suffix: '/kvartal' };
+    } else {
+      return { label: 'denna period', suffix: '/period' };
+    }
+  };
+
+  const periodInfo = getPeriodInfo();
 
   const toggleExpand = (technicianId: string) => {
     const newExpanded = new Set(expandedCards);
@@ -355,7 +394,7 @@ const TechnicianUtilizationGrid: React.FC<TechnicianUtilizationGridProps> = ({
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Tekniker-utnyttjande</h3>
-            <p className="text-sm text-slate-400">{data.length} aktiva tekniker denna vecka</p>
+            <p className="text-sm text-slate-400">{data.length} aktiva tekniker {periodInfo.label}</p>
           </div>
         </div>
 
@@ -426,6 +465,7 @@ const TechnicianUtilizationGrid: React.FC<TechnicianUtilizationGridProps> = ({
             rank={index + 1}
             expanded={expandedCards.has(technician.technician_id)}
             onToggleExpand={() => toggleExpand(technician.technician_id)}
+            periodInfo={periodInfo}
           />
         ))}
       </div>
