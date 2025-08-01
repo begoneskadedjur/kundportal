@@ -9,7 +9,7 @@ import GeographicOverview from '../../components/admin/coordinator/GeographicOve
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3 } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 
 export default function CoordinatorDashboard() {
@@ -280,7 +280,7 @@ export default function CoordinatorDashboard() {
 
         {/* --- Verktyg (flyttat ovanför kartan) --- */}
         <section className="mt-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
             <CoordinatorDashboardCard
               href="/koordinator/schema"
               icon={CalendarDays}
@@ -301,6 +301,13 @@ export default function CoordinatorDashboard() {
               title="Sök Ärenden"
               description="Avancerad sökning bland alla ärenden med filter för status, tekniker, datum och mer."
               tag="Komplett"
+            />
+            <CoordinatorDashboardCard
+              href="/koordinator/analytics"
+              icon={BarChart3}
+              title="Analytics & Insights"
+              description="Djup analys av din koordinatorspåverkan på verksamheten och konkreta förbättringsförslag."
+              tag="Ny"
             />
           </div>
         </section>

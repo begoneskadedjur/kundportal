@@ -30,6 +30,7 @@ import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
 import CoordinatorSchedule from './pages/coordinator/CoordinatorSchedule';
 import ScheduleOptimizer from './pages/coordinator/ScheduleOptimizer';
 import CaseSearch from './pages/coordinator/CaseSearch';
+import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
 
 // TEKNIKER PAGES
 import TechnicianDashboard from './pages/technician/TechnicianDashboard';
@@ -191,6 +192,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="koordinator">
                   <CaseSearch />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/analytics" 
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <CoordinatorAnalytics />
                 </ProtectedRoute>
               } 
             />
