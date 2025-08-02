@@ -41,6 +41,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       businessCases,
       legacyCases,
       technicians,
+      technicianAbsences,
       upcomingCases,
       recentPrivateCasesWithPrices,
       recentBusinessCasesWithPrices
@@ -74,6 +75,13 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .from('technicians')
         .select('*')
         .eq('is_active', true),
+
+      // Hämta faktisk frånvaro från technician_absences tabellen
+      supabase
+        .from('technician_absences')
+        .select('*')
+        .gte('end_date', today)
+        .lte('start_date', oneWeekFromNow),
 
       // Kommande schemalagda ärenden med detaljerad info
       supabase
@@ -167,6 +175,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         legacy_cases: legacyCases.data || []
       },
       technicians: technicians.data || [],
+      technician_absences: technicianAbsences.data || [], // LÄGG TILL FAKTISK FRÅNVARO-DATA
       schedule: {
         upcoming_cases: upcomingCases.data || [],
         schedule_gaps: scheduleGaps,

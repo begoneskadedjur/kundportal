@@ -324,12 +324,14 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       })) || [];
       
       // Lägg till sammanfattning för frånvaro-analys FÖRST för att undvika trunkering
-      const absenceAnalysis = analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || []);
+      const absenceAnalysis = analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || [], coordinatorData.technician_absences || []);
       
       // Logga absence analysis för debugging
       console.log('🚨 Absence Analysis Results:');
-      console.log(`- Potentially absent: ${absenceAnalysis.potentially_absent.length}`);
-      console.log('- Absent technicians:', absenceAnalysis.potentially_absent.map(t => `${t.technician_name} (${t.status})`));
+      console.log(`- Actually absent: ${absenceAnalysis.actually_absent.length}`);
+      console.log(`- Available technicians: ${absenceAnalysis.available_technicians.length}`);
+      console.log('- Absent technicians:', absenceAnalysis.actually_absent.map(t => `${t.technician_name} (${t.absence_summary})`));
+      console.log('- Total absence records checked:', coordinatorData.technician_absences?.length || 0);
       
       return {
         ...baseData,
@@ -337,13 +339,19 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
         absence_analysis: absenceAnalysis,
         absence_summary: {
           total_technicians: optimizedTechnicians.length,
-          potentially_absent_count: absenceAnalysis.potentially_absent.length,
-          absent_technicians: absenceAnalysis.potentially_absent.map(t => ({
+          actually_absent_count: absenceAnalysis.actually_absent.length,
+          available_technicians_count: absenceAnalysis.available_technicians.length,
+          absent_technicians: absenceAnalysis.actually_absent.map(t => ({
             name: t.technician_name,
             role: t.role,
             status: t.status,
-            workdays_next_week: t.scheduled_workdays,
-            assigned_days: t.assigned_days
+            absence_summary: t.absence_summary,
+            absence_periods: t.absence_periods
+          })),
+          available_technicians: absenceAnalysis.available_technicians.map(t => ({
+            name: t.technician_name,
+            role: t.role,
+            status: t.status
           }))
         },
         // Kompakt tekniker-data
@@ -1308,56 +1316,75 @@ function getNextWeekWorkdays(workSchedule: any): any[] {
 }
 
 /**
- * Analyserar frånvaromönster baserat på schemalagd arbetstid vs faktiska bokningar
+ * Analyserar frånvaromönster baserat på faktisk frånvaro-data från technician_absences tabellen
  */
-function analyzeAbsencePatterns(technicians: any[], upcomingCases: any[]): any {
+function analyzeAbsencePatterns(technicians: any[], upcomingCases: any[], technicianAbsences: any[]): any {
   const analysis = {
-    potentially_absent: [] as any[],
+    actually_absent: [] as any[],
+    available_technicians: [] as any[],
     analysis_summary: '',
     next_week_schedule_overview: [] as any[]
   };
   
+  // Hitta nästa veckas datum-range
+  const today = new Date();
+  const nextWeekStart = new Date(today);
+  nextWeekStart.setDate(today.getDate() + (7 - today.getDay() + 1)); // Nästa måndag
+  const nextWeekEnd = new Date(nextWeekStart);
+  nextWeekEnd.setDate(nextWeekStart.getDate() + 6); // Nästa söndag
+  
   for (const tech of technicians) {
-    const nextWeekWorkdays = tech.next_week_workdays || [];
-    const techAssignments = tech.upcoming_assignments || [];
+    // Hitta faktiska frånvaro-perioder för denna tekniker nästa vecka
+    const techAbsences = technicianAbsences.filter((absence: any) => {
+      if (absence.technician_id !== tech.id) return false;
+      
+      const absenceStart = new Date(absence.start_date);
+      const absenceEnd = new Date(absence.end_date);
+      
+      // Kontrollera om frånvaron överlappar med nästa vecka
+      return (absenceStart <= nextWeekEnd && absenceEnd >= nextWeekStart);
+    });
     
-    // Räkna arbetsdagar nästa vecka
-    const scheduledWorkdays = nextWeekWorkdays.length;
-    const daysWithAssignments = new Set(
-      techAssignments.map((assignment: any) => assignment.start_date?.split('T')[0])
-    ).size;
-    
-    // Om tekniker har arbetsdagar men inga bokningar, kan det vara frånvaro
-    if (scheduledWorkdays > 0 && daysWithAssignments === 0) {
-      analysis.potentially_absent.push({
+    if (techAbsences.length > 0) {
+      // Tekniker har faktisk frånvaro nästa vecka
+      analysis.actually_absent.push({
         technician_name: tech.name,
         role: tech.role,
-        scheduled_workdays: scheduledWorkdays,
-        assigned_days: daysWithAssignments,
-        next_week_workdays: nextWeekWorkdays,
-        status: 'Möjlig frånvaro - ingen bokad tid nästa vecka'
+        absence_periods: techAbsences.map((absence: any) => ({
+          start_date: absence.start_date,
+          end_date: absence.end_date,
+          reason: absence.reason,
+          notes: absence.notes
+        })),
+        status: 'Frånvarande enligt registrerad frånvaro',
+        absence_summary: techAbsences.map((a: any) => `${a.reason} (${a.start_date.split('T')[0]} - ${a.end_date.split('T')[0]})`).join(', ')
       });
-    } else if (scheduledWorkdays > 0 && daysWithAssignments < scheduledWorkdays) {
-      analysis.potentially_absent.push({
+    } else {
+      // Tekniker är tillgänglig
+      const nextWeekWorkdays = tech.next_week_workdays || [];
+      const techAssignments = tech.upcoming_assignments || [];
+      
+      analysis.available_technicians.push({
         technician_name: tech.name,
         role: tech.role,
-        scheduled_workdays: scheduledWorkdays,
-        assigned_days: daysWithAssignments,
-        next_week_workdays: nextWeekWorkdays,
-        status: 'Delvis tillgänglig - mindre bokningar än vanligt'
+        scheduled_workdays: nextWeekWorkdays.length,
+        assignments_count: techAssignments.length,
+        status: 'Tillgänglig för nästa vecka'
       });
     }
     
+    // Översikt oavsett frånvaro-status
     analysis.next_week_schedule_overview.push({
       technician_name: tech.name,
       role: tech.role,
-      workdays_count: scheduledWorkdays,
-      assignments_count: daysWithAssignments,
-      utilization: scheduledWorkdays > 0 ? Math.round((daysWithAssignments / scheduledWorkdays) * 100) : 0
+      is_absent: techAbsences.length > 0,
+      absence_reason: techAbsences.length > 0 ? techAbsences[0].reason : null,
+      workdays_scheduled: tech.next_week_workdays?.length || 0,
+      assignments_count: tech.upcoming_assignments?.length || 0
     });
   }
   
-  analysis.analysis_summary = `Analyserade ${technicians.length} tekniker för nästa vecka. ${analysis.potentially_absent.length} tekniker kan vara frånvarande eller ha reducerad närvaro.`;
+  analysis.analysis_summary = `Analyserade ${technicians.length} tekniker för nästa vecka. ${analysis.actually_absent.length} tekniker är faktiskt frånvarande enligt registrerad frånvaro. ${analysis.available_technicians.length} tekniker är tillgängliga.`;
   
   return analysis;
 }
