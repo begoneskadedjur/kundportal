@@ -33,10 +33,13 @@ Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste 
 - Basera på FAKTISK arbetsbelastning
 - **GEOGRAFISK NÄRHET**: Matcha tekniker baserat på befintliga bokningar i området
 
-**3. PRISSÄTTNING:**
+**3. INTELLIGENT PRISSÄTTNING:**
 - ENDAST använda priser från FAKTISKA liknande ärenden
 - Beräkna genomsnitt från VERKLIGA case-data
 - ALDRIG hitta på generiska priser
+- **GENOMSNITTSFRÅGOR**: När användaren frågar "genomsnittspris för råttärenden" → analysera ALLA råttärenden med priser
+- **SPECIFIKA FRÅGOR**: När användaren beskriver specifikt jobb → hitta mest liknande ärenden
+- **VISA ALLTID**: Antal ärenden som analysen baseras på
 
 🗺️ **GEOGRAFISK INTELLIGENS:**
 När du föreslår schemaläggning, analysera ALLTID:
@@ -165,8 +168,14 @@ function identifyContext(message: string): string {
     return 'technician';
   }
   
+  // FÖRBÄTTRAD PRICING-DETECTION - inkluderar fler nyckelord
   if (lowerMessage.includes('pris') || lowerMessage.includes('kosta') || lowerMessage.includes('offert') || lowerMessage.includes('prissätt') ||
-      lowerMessage.includes('betalt') || lowerMessage.includes('ta betalt')) {
+      lowerMessage.includes('betalt') || lowerMessage.includes('ta betalt') || lowerMessage.includes('debitera') || 
+      lowerMessage.includes('genomsnitt') || lowerMessage.includes('snitt') || lowerMessage.includes('faktura') ||
+      lowerMessage.includes('avgift') || lowerMessage.includes('timkostnad') || lowerMessage.includes('kostnad') ||
+      (lowerMessage.includes('vad') && (lowerMessage.includes('rått') || lowerMessage.includes('myra') || 
+       lowerMessage.includes('vägglus') || lowerMessage.includes('fågel') || lowerMessage.includes('getingar'))) ||
+      (lowerMessage.includes('hur mycket') && lowerMessage.includes('ärenden'))) {
     return 'pricing';
   }
   
@@ -414,13 +423,24 @@ function analyzePricingForMessage(cases: any[], message: string) {
   else if (lowerMessage.includes('vägglus')) pestType = 'vägglöss';
   else if (lowerMessage.includes('kackerlack')) pestType = 'kackerlackor';
   else if (lowerMessage.includes('getingar')) pestType = 'getingar';
+  else if (lowerMessage.includes('fågelsäkring') || lowerMessage.includes('fågel')) pestType = 'fågelsäkring';
   
   // Extrahera storleksinformation från meddelandet
   const sizeInfo = extractSizeFromMessage(message);
   const complexityInfo = extractComplexityFromMessage(message);
   
-  // Filtrera relevanta ärenden baserat på skadedjur och skadedjur-kolumn
+  // Filtrera relevanta ärenden och exkludera framtida/ofullständiga ärenden
   const relevantCases = cases.filter(c => {
+    // Exkludera ärenden utan pris
+    if (!c.pris || c.pris <= 0) return false;
+    
+    // Exkludera ärenden i framtiden (endast om start_date finns och är i framtiden)
+    if (c.start_date) {
+      const caseDate = new Date(c.start_date);
+      const now = new Date();
+      if (caseDate > now) return false;
+    }
+    
     if (!pestType) return true;
     
     // Prioritera skadedjur-kolumnen
@@ -437,7 +457,7 @@ function analyzePricingForMessage(cases: any[], message: string) {
     return {
       pest_type: pestType || 'allmänt',
       found_cases: 0,
-      message: 'Inga liknande ärenden hittades i databasen för denna skadedjurstyp'
+      message: `Inga ${pestType ? pestType + '-' : ''}ärenden med priser hittades i databasen`
     };
   }
   
