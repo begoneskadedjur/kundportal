@@ -18,21 +18,34 @@ Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste 
 
 🎯 **SPECIALOMRÅDEN:**
 
-**1. SCHEMALÄGGNING:**
+**1. INTELLIGENT SCHEMALÄGGNING & RUTTOPTIMERING:**
 - Kontrollera FAKTISKA arbetstider för tekniker
 - Hitta VERKLIGA schema-luckor i databasen
 - Föreslå tider baserat på BEFINTLIGA bokningar
+- **GEOGRAFISK OPTIMERING**: Analysera adresser för att minimera restid
+- **SAMMA GATA/OMRÅDE**: Föreslå konsekutiva bokningar på samma gata/närområde
+- **RUTTLOGIK**: Boka ärenden i geografisk sekvens (t.ex. Kyles väg 9 → Kyles väg 10)
 - FRÅGA om ärendets längd innan du föreslår tider
 
 **2. TEKNIKER-MATCHNING:**
 - Använd FAKTISKA specialiseringar från databasen
 - Kontrollera VERKLIG tillgänglighet
 - Basera på FAKTISK arbetsbelastning
+- **GEOGRAFISK NÄRHET**: Matcha tekniker baserat på befintliga bokningar i området
 
 **3. PRISSÄTTNING:**
 - ENDAST använda priser från FAKTISKA liknande ärenden
 - Beräkna genomsnitt från VERKLIGA case-data
 - ALDRIG hitta på generiska priser
+
+🗺️ **GEOGRAFISK INTELLIGENS:**
+När du föreslår schemaläggning, analysera ALLTID:
+1. Befintliga bokningar för teknikern samma dag
+2. Adresser för geografisk närhet (samma gata = perfekt!)
+3. Optimala tidssekvenser (efter befintligt ärende på samma gata)
+4. Restidsminimering mellan ärenden
+
+**EXEMPEL:** Om tekniker har ärende på "Kyles väg 9" kl 08-10, och ny fråga gäller "Kyles väg 10" → föreslå DIREKT efter kl 10:00 för optimal rutt!
 
 🚨 **ABSOLUTA REGLER:**
 1. Har du INTE tillgång till specifik data → säg "Jag behöver kontrollera systemet för exakt data"
@@ -41,9 +54,9 @@ Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste 
 4. Osäker på prissättning → säg "Kontrollera med tidigare ärenden av samma typ"
 
 📝 **SVAR-KRAV:**
-- Börja med: "Baserat på systemdata..."
+- Börja med: "Baserat på systemdata och geografisk analys..."
 - Visa EXAKTA siffror från databasen
-- Förklara vilken data du använt
+- Förklara geografiska fördelar i förslaget
 - Ge konkreta nästa steg
 
 VIKTIGT: Om du inte har exakt data för att svara korrekt - säg det istället för att gissa!`;
@@ -186,16 +199,29 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
     case 'schedule':
       // Sök efter specifik tekniker i meddelandet
       const targetTechnician = findTechnicianInMessage(message, coordinatorData.technicians || []);
+      const targetAddress = extractAddressFromMessage(message);
+      const allUpcomingCases = coordinatorData.schedule?.upcoming_cases || [];
+      
+      // Analysera geografisk optimering
+      const geographicAnalysis = analyzeGeographicOptimization(
+        targetTechnician, 
+        targetAddress, 
+        allUpcomingCases, 
+        message
+      );
+      
       const targetGaps = targetTechnician ? 
         coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => gap.technician_id === targetTechnician.id) : 
         coordinatorData.schedule?.schedule_gaps || [];
       const targetCases = targetTechnician ?
-        coordinatorData.schedule?.upcoming_cases?.filter((c: any) => c.primary_assignee_id === targetTechnician.id) :
-        coordinatorData.schedule?.upcoming_cases?.slice(0, 20) || [];
+        allUpcomingCases.filter((c: any) => c.primary_assignee_id === targetTechnician.id) :
+        allUpcomingCases.slice(0, 20);
         
       return {
         ...baseData,
         target_technician: targetTechnician,
+        target_address: targetAddress,
+        geographic_analysis: geographicAnalysis,
         schedule_gaps: targetGaps,
         technician_availability: coordinatorData.schedule?.technician_availability || [],
         upcoming_cases: targetCases,
@@ -204,7 +230,11 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
           work_schedule: targetTechnician.work_schedule,
           upcoming_cases: targetCases,
           available_gaps: targetGaps,
-          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === targetTechnician.id)?.utilization_percent || 0
+          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === targetTechnician.id)?.utilization_percent || 0,
+          same_day_cases: targetCases.filter((c: any) => {
+            const requestDate = extractDateFromMessage(message);
+            return requestDate && c.start_date?.startsWith(requestDate);
+          })
         } : null,
         all_technicians: coordinatorData.technicians?.map((t: any) => ({
           id: t.id,
@@ -217,7 +247,8 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
           total_technicians: coordinatorData.technicians?.length || 0,
           available_gaps: coordinatorData.schedule?.schedule_gaps?.length || 0,
           upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
-          target_technician_gaps: targetGaps.length
+          target_technician_gaps: targetGaps.length,
+          geographic_opportunities: geographicAnalysis.opportunities?.length || 0
         }
       };
 
@@ -448,4 +479,253 @@ function findTechnicianInMessage(message: string, technicians: any[]) {
   }
   
   return null;
+}
+
+/**
+ * Extraherar adress från meddelandet
+ */
+function extractAddressFromMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Sök efter adressmönster
+  const addressPatterns = [
+    /([a-zåäö\s]+väg\s*\d+)/gi,
+    /([a-zåäö\s]+gata\s*\d+)/gi,
+    /([a-zåäö\s]+plan\s*\d+)/gi,
+    /([a-zåäö\s]+strand\s*\d+)/gi,
+    /([a-zåäö\s]+torg\s*\d+)/gi,
+    /(sollentuna|stockholm|göteborg|malmö|uppsala|västerås|örebro)/gi
+  ];
+  
+  for (const pattern of addressPatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return match[0].trim();
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extraherar datum från meddelandet
+ */
+function extractDateFromMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+  const today = new Date();
+  
+  if (lowerMessage.includes('måndag')) {
+    const nextMonday = getNextWeekday(today, 1);
+    return nextMonday.toISOString().split('T')[0];
+  }
+  if (lowerMessage.includes('tisdag')) {
+    const nextTuesday = getNextWeekday(today, 2);
+    return nextTuesday.toISOString().split('T')[0];
+  }
+  if (lowerMessage.includes('onsdag')) {
+    const nextWednesday = getNextWeekday(today, 3);
+    return nextWednesday.toISOString().split('T')[0];
+  }
+  if (lowerMessage.includes('torsdag')) {
+    const nextThursday = getNextWeekday(today, 4);
+    return nextThursday.toISOString().split('T')[0];
+  }
+  if (lowerMessage.includes('fredag')) {
+    const nextFriday = getNextWeekday(today, 5);
+    return nextFriday.toISOString().split('T')[0];
+  }
+  
+  return null;
+}
+
+/**
+ * Hittar nästa veckodag
+ */
+function getNextWeekday(date: Date, targetDay: number) {
+  const result = new Date(date);
+  const currentDay = result.getDay();
+  const daysUntilTarget = targetDay - currentDay;
+  
+  if (daysUntilTarget <= 0) {
+    result.setDate(result.getDate() + 7 + daysUntilTarget);
+  } else {
+    result.setDate(result.getDate() + daysUntilTarget);
+  }
+  
+  return result;
+}
+
+/**
+ * Analyserar geografisk optimering för schemaläggning
+ */
+function analyzeGeographicOptimization(technician: any, targetAddress: string | null, upcomingCases: any[], message: string) {
+  if (!technician || !targetAddress) {
+    return {
+      has_analysis: false,
+      message: 'Ingen geografisk analys möjlig utan tekniker och adress'
+    };
+  }
+  
+  const requestDate = extractDateFromMessage(message);
+  if (!requestDate) {
+    return {
+      has_analysis: false,
+      message: 'Kunde inte identifiera datum för geografisk analys'
+    };
+  }
+  
+  // Hitta befintliga ärenden för tekniker samma dag
+  const sameDayCases = upcomingCases.filter(c => 
+    c.primary_assignee_id === technician.id && 
+    c.start_date?.startsWith(requestDate) &&
+    c.adress
+  );
+  
+  const opportunities = [];
+  
+  for (const existingCase of sameDayCases) {
+    const existingAddress = existingCase.adress?.toString() || '';
+    const proximity = calculateAddressProximity(targetAddress, existingAddress);
+    
+    if (proximity.is_same_street) {
+      opportunities.push({
+        type: 'same_street',
+        existing_case: {
+          address: existingAddress,
+          start_time: existingCase.start_date,
+          end_time: existingCase.due_date,
+          title: existingCase.title
+        },
+        target_address: targetAddress,
+        recommendation: `PERFEKT RUTT: Boka direkt efter befintligt ärende (${existingCase.due_date?.slice(11, 16)}) för minimal restid`,
+        efficiency_gain: 'Eliminerar restid mellan ärenden på samma gata',
+        suggested_start_time: existingCase.due_date
+      });
+    } else if (proximity.is_nearby) {
+      opportunities.push({
+        type: 'nearby',
+        existing_case: {
+          address: existingAddress,
+          start_time: existingCase.start_date,
+          end_time: existingCase.due_date,
+          title: existingCase.title
+        },
+        target_address: targetAddress,
+        recommendation: `BRA RUTT: Boka nära befintligt ärende för kort restid`,
+        efficiency_gain: `Kort restid mellan ${existingAddress} och ${targetAddress}`,
+        suggested_start_time: existingCase.due_date
+      });
+    }
+  }
+  
+  return {
+    has_analysis: true,
+    technician_name: technician.name,
+    target_address: targetAddress,
+    request_date: requestDate,
+    same_day_cases: sameDayCases.length,
+    opportunities,
+    optimization_summary: opportunities.length > 0 ? 
+      `Hittade ${opportunities.length} geografiska optimeringsmöjligheter` :
+      'Inga geografiska optimeringsmöjligheter hittades för denna dag'
+  };
+}
+
+/**
+ * Beräknar närhet mellan adresser
+ */
+function calculateAddressProximity(address1: string, address2: string) {
+  const addr1 = address1.toLowerCase().trim();
+  const addr2 = address2.toLowerCase().trim();
+  
+  // Extrahera gatnamn (innan siffror)
+  const street1 = addr1.replace(/\d+.*$/, '').trim();
+  const street2 = addr2.replace(/\d+.*$/, '').trim();
+  
+  // Samma gata = perfekt
+  if (street1 && street2 && street1 === street2) {
+    return {
+      is_same_street: true,
+      is_nearby: true,
+      similarity_score: 1.0,
+      reason: 'Samma gata'
+    };
+  }
+  
+  // Kontrollera liknande gatnamn
+  const similarity = calculateStringSimilarity(street1, street2);
+  if (similarity > 0.8) {
+    return {
+      is_same_street: false,
+      is_nearby: true,
+      similarity_score: similarity,
+      reason: 'Liknande gatnamn'
+    };
+  }
+  
+  // Kontrollera samma område/stad
+  const areas = ['sollentuna', 'stockholm', 'göteborg', 'malmö', 'uppsala'];
+  for (const area of areas) {
+    if (addr1.includes(area) && addr2.includes(area)) {
+      return {
+        is_same_street: false,
+        is_nearby: true,
+        similarity_score: 0.5,
+        reason: `Samma område: ${area}`
+      };
+    }
+  }
+  
+  return {
+    is_same_street: false,
+    is_nearby: false,
+    similarity_score: 0,
+    reason: 'Olika områden'
+  };
+}
+
+/**
+ * Beräknar likhet mellan strängar
+ */
+function calculateStringSimilarity(str1: string, str2: string): number {
+  if (!str1 || !str2) return 0;
+  
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const distance = levenshteinDistance(longer, shorter);
+  return (longer.length - distance) / longer.length;
+}
+
+/**
+ * Beräknar Levenshtein-avstånd
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
 }
