@@ -74,10 +74,14 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .select('*')
         .eq('is_active', true),
 
-      // Kommande schemalagda ärenden
+      // Kommande schemalagda ärenden med detaljerad info
       supabase
         .from('private_cases')
-        .select('*, technicians(name)')
+        .select(`
+          id, title, description, adress, start_date, due_date, status,
+          primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
+          technicians!primary_assignee_id(id, name, specializations, work_schedule)
+        `)
         .gte('start_date', today)
         .lte('start_date', oneWeekFromNow)
         .not('start_date', 'is', null)
@@ -180,8 +184,10 @@ const analyzeScheduleGaps = async (technicians: any[], startDate: string, endDat
               date: workDay.date,
               start_time: currentTime.toTimeString().slice(0, 5),
               end_time: caseStart.toTimeString().slice(0, 5),
-              duration_hours: gapDuration,
-              gap_type: gapDuration >= 3 ? 'major' : 'minor'
+              duration_hours: Math.round(gapDuration * 10) / 10,
+              gap_type: gapDuration >= 3 ? 'major' : 'minor',
+              day_of_week: new Date(workDay.date).toLocaleDateString('sv-SE', { weekday: 'long' }),
+              suggested_booking_time: `${currentTime.toTimeString().slice(0, 5)} - ${new Date(currentTime.getTime() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}`
             });
           }
         }
@@ -200,8 +206,10 @@ const analyzeScheduleGaps = async (technicians: any[], startDate: string, endDat
             date: workDay.date,
             start_time: currentTime.toTimeString().slice(0, 5),
             end_time: dayEnd.toTimeString().slice(0, 5),
-            duration_hours: gapDuration,
-            gap_type: gapDuration >= 3 ? 'major' : 'minor'
+            duration_hours: Math.round(gapDuration * 10) / 10,
+            gap_type: gapDuration >= 3 ? 'major' : 'minor',
+            day_of_week: new Date(workDay.date).toLocaleDateString('sv-SE', { weekday: 'long' }),
+            suggested_booking_time: `${currentTime.toTimeString().slice(0, 5)} - ${new Date(currentTime.getTime() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}`
           });
         }
       }

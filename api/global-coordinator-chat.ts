@@ -6,62 +6,47 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_MESSAGE = `Du är en avancerad AI-assistent specialiserad på koordinering inom skadedjursbekämpning. Du har tillgång till FULLSTÄNDIG realtidsdata om:
+const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en AI-assistent som ENDAST får svara baserat på FAKTISK DATA från databasen. HITTA PÅ ALDRIG siffror, tider eller priser!
 
-📊 **TILLGÄNGLIG DATA:**
-- Alla ärenden (privata, företag, legacy) med detaljer, status och priser
-- Alla tekniker med specialiseringar, arbetstider och scheman
-- Schema-luckor och tillgänglighet för kommande veckor
-- Prestationsdata och analytics
-- Prissättningsmönster för olika ärendetyper
-- Geografisk data och ruttoptimering
+📊 **DATA-ANVÄNDNING:**
+Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste du:
+- ENDAST använda faktiska siffror från databasen
+- ALDRIG gissa eller hitta på priser, tider eller schema
+- ALLTID kontrollera faktisk tekniker-tillgänglighet 
+- BARA föreslå tider baserat på verkliga schema-luckor
+- ENDAST ge priser baserat på faktiska tidigare ärenden
 
-🎯 **DINA SPECIALOMRÅDEN:**
+🎯 **SPECIALOMRÅDEN:**
 
-**1. SCHEMALÄGGNING & LUCKOR:**
-- Identifiera lediga tider för specifika tekniker
-- Hitta optimala schemaläggningar baserat på geografisk närhet
-- Föreslå omschemalaggningar för bättre effektivitet
-- Analysera överbelastning och underutnyttjande
+**1. SCHEMALÄGGNING:**
+- Kontrollera FAKTISKA arbetstider för tekniker
+- Hitta VERKLIGA schema-luckor i databasen
+- Föreslå tider baserat på BEFINTLIGA bokningar
+- FRÅGA om ärendets längd innan du föreslår tider
 
 **2. TEKNIKER-MATCHNING:**
-- Matcha rätt tekniker till rätt jobb baserat på:
-  * Specialiseringar (gnagare, myror, vägglöss, etc.)
-  * Geografisk närhet till kunden
-  * Aktuell arbetsbelastning
-  * Tidigare prestanda på liknande jobb
-  * Tillgänglighet
+- Använd FAKTISKA specialiseringar från databasen
+- Kontrollera VERKLIG tillgänglighet
+- Basera på FAKTISK arbetsbelastning
 
-**3. INTELLIGENT PRISSÄTTNING:**
-- Analysera liknande ärenden för att föreslå konkurrenskraftiga priser
-- Beakta faktorer som:
-  * Ärendetyp och komplexitet
-  * Geografisk lokalisering
-  * Tidigare prissättning för samma kund
-  * Marknadspriser för liknande tjänster
-  * Tekniker-specialisering som krävs
+**3. PRISSÄTTNING:**
+- ENDAST använda priser från FAKTISKA liknande ärenden
+- Beräkna genomsnitt från VERKLIGA case-data
+- ALDRIG hitta på generiska priser
 
-**4. OPTIMERING & ANALYTICS:**
-- Identifiera förbättringsområden i schemaläggning
-- Föreslå effektivitetsförbättringar
-- Analysera intäktsmöjligheter
-- Upptäcka mönster och trender
+🚨 **ABSOLUTA REGLER:**
+1. Har du INTE tillgång till specifik data → säg "Jag behöver kontrollera systemet för exakt data"
+2. Kan du INTE hitta liknande ärenden → säg "Inga liknande ärenden i databasen"
+3. Saknas schema-data → säg "Behöver mer information om teknikerns schema"
+4. Osäker på prissättning → säg "Kontrollera med tidigare ärenden av samma typ"
 
-🔧 **INSTRUKTIONER:**
-- Svara ALLTID konkret och handlingsorienterat
-- Ge specifika rekommendationer med siffror och tider
-- När du föreslår priser: basera på faktisk data från liknande ärenden
-- När du föreslår tekniker: förklara VARFÖR den teknikern är bäst
-- När du analyserar schema: visa exakta tider och datum
-- Använd svenska och var professionell men vänlig
+📝 **SVAR-KRAV:**
+- Börja med: "Baserat på systemdata..."
+- Visa EXAKTA siffror från databasen
+- Förklara vilken data du använt
+- Ge konkreta nästa steg
 
-📝 **SVARSFORMAT:**
-- Börja alltid med en kort sammanfattning
-- Ge konkreta actionables med tidsramar
-- Inkludera relevanta siffror och procent
-- Avsluta med nästa steg eller uppföljningsfrågor
-
-Kom ihåg: Du har tillgång till LIVE-data, så använd den för att ge exakta, aktuella och värdefulla råd.`;
+VIKTIGT: Om du inte har exakt data för att svara korrekt - säg det istället för att gissa!`;
 
 export default async function handler(
   req: VercelRequest,
@@ -155,7 +140,11 @@ Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
 function identifyContext(message: string): string {
   const lowerMessage = message.toLowerCase();
   
-  if (lowerMessage.includes('schema') || lowerMessage.includes('tid') || lowerMessage.includes('ledig') || lowerMessage.includes('lucka')) {
+  // Specifik schemaläggning (inkluderar teknikernamn + tid/schema-relaterat)
+  if ((lowerMessage.includes('schema') || lowerMessage.includes('tid') || lowerMessage.includes('ledig') || 
+       lowerMessage.includes('lucka') || lowerMessage.includes('boka')) || 
+      (lowerMessage.includes('måndag') || lowerMessage.includes('tisdag') || lowerMessage.includes('onsdag') ||
+       lowerMessage.includes('torsdag') || lowerMessage.includes('fredag'))) {
     return 'schedule';
   }
   
@@ -163,7 +152,8 @@ function identifyContext(message: string): string {
     return 'technician';
   }
   
-  if (lowerMessage.includes('pris') || lowerMessage.includes('kosta') || lowerMessage.includes('offert') || lowerMessage.includes('prissätt')) {
+  if (lowerMessage.includes('pris') || lowerMessage.includes('kosta') || lowerMessage.includes('offert') || lowerMessage.includes('prissätt') ||
+      lowerMessage.includes('betalt') || lowerMessage.includes('ta betalt')) {
     return 'pricing';
   }
   
@@ -194,17 +184,41 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
 
   switch (context) {
     case 'schedule':
+      // Sök efter specifik tekniker i meddelandet
+      const targetTechnician = findTechnicianInMessage(message, coordinatorData.technicians || []);
+      const targetGaps = targetTechnician ? 
+        coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => gap.technician_id === targetTechnician.id) : 
+        coordinatorData.schedule?.schedule_gaps || [];
+      const targetCases = targetTechnician ?
+        coordinatorData.schedule?.upcoming_cases?.filter((c: any) => c.primary_assignee_id === targetTechnician.id) :
+        coordinatorData.schedule?.upcoming_cases?.slice(0, 20) || [];
+        
       return {
         ...baseData,
-        schedule_gaps: coordinatorData.schedule?.schedule_gaps || [],
+        target_technician: targetTechnician,
+        schedule_gaps: targetGaps,
         technician_availability: coordinatorData.schedule?.technician_availability || [],
-        upcoming_cases: coordinatorData.schedule?.upcoming_cases?.slice(0, 20) || [],
-        technicians: coordinatorData.technicians?.map((t: any) => ({
+        upcoming_cases: targetCases,
+        specific_technician_schedule: targetTechnician ? {
+          name: targetTechnician.name,
+          work_schedule: targetTechnician.work_schedule,
+          upcoming_cases: targetCases,
+          available_gaps: targetGaps,
+          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === targetTechnician.id)?.utilization_percent || 0
+        } : null,
+        all_technicians: coordinatorData.technicians?.map((t: any) => ({
           id: t.id,
           name: t.name,
           work_schedule: t.work_schedule,
-          specializations: t.specializations
-        })) || []
+          specializations: t.specializations || [],
+          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0
+        })) || [],
+        current_week_summary: {
+          total_technicians: coordinatorData.technicians?.length || 0,
+          available_gaps: coordinatorData.schedule?.schedule_gaps?.length || 0,
+          upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
+          target_technician_gaps: targetGaps.length
+        }
       };
 
     case 'technician':
@@ -226,11 +240,25 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       };
 
     case 'pricing':
+      const recentCases = coordinatorData.pricing?.recent_cases_with_prices || [];
+      const pricingAnalysis = analyzePricingForMessage(recentCases, message);
+      
       return {
         ...baseData,
         pricing_patterns: coordinatorData.pricing?.pricing_patterns || [],
-        recent_cases_with_prices: coordinatorData.pricing?.recent_cases_with_prices || [],
-        similar_cases: findSimilarCases(coordinatorData.pricing?.recent_cases_with_prices || [], message)
+        recent_cases_with_prices: recentCases.slice(0, 10),
+        similar_cases: findSimilarCases(recentCases, message),
+        pricing_analysis: pricingAnalysis,
+        case_type_prices: getCaseTypePrices(recentCases),
+        statistical_summary: {
+          total_cases_with_prices: recentCases.length,
+          avg_price_last_month: recentCases.length > 0 ? 
+            Math.round(recentCases.reduce((sum: number, c: any) => sum + (c.pris || 0), 0) / recentCases.length) : 0,
+          price_range: recentCases.length > 0 ? {
+            min: Math.min(...recentCases.map((c: any) => c.pris || 0).filter((p: number) => p > 0)),
+            max: Math.max(...recentCases.map((c: any) => c.pris || 0))
+          } : null
+        }
       };
 
     case 'analytics':
@@ -312,4 +340,112 @@ function findSimilarCases(cases: any[], message: string) {
     const caseText = `${caseItem.title || ''} ${caseItem.description || ''}`.toLowerCase();
     return keywords.some(keyword => caseText.includes(keyword));
   }).slice(0, 5);
+}
+
+/**
+ * Analyserar prissättning baserat på meddelandet
+ */
+function analyzePricingForMessage(cases: any[], message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Identifiera ärendetyp från meddelandet
+  let caseType = '';
+  if (lowerMessage.includes('råtta') || lowerMessage.includes('mus')) caseType = 'gnagare';
+  else if (lowerMessage.includes('myra')) caseType = 'myror';
+  else if (lowerMessage.includes('vägglus')) caseType = 'vägglöss';
+  else if (lowerMessage.includes('kackerlack')) caseType = 'kackerlackor';
+  else if (lowerMessage.includes('getingar')) caseType = 'getingar';
+  
+  const relevantCases = cases.filter(c => {
+    if (!caseType) return true;
+    const caseText = `${c.title || ''} ${c.description || ''}`.toLowerCase();
+    return caseText.includes(caseType);
+  });
+  
+  if (relevantCases.length === 0) {
+    return {
+      case_type: caseType || 'allmänt',
+      found_cases: 0,
+      message: 'Inga liknande ärenden hittades i databasen'
+    };
+  }
+  
+  const prices = relevantCases.map(c => c.pris).filter(p => p > 0);
+  
+  return {
+    case_type: caseType || 'allmänt',
+    found_cases: relevantCases.length,
+    cases_with_prices: prices.length,
+    avg_price: prices.length > 0 ? Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length) : null,
+    min_price: prices.length > 0 ? Math.min(...prices) : null,
+    max_price: prices.length > 0 ? Math.max(...prices) : null,
+    recent_examples: relevantCases.slice(0, 3).map(c => ({
+      title: c.title,
+      price: c.pris,
+      created_at: c.created_at
+    }))
+  };
+}
+
+/**
+ * Grupperar priser per ärendetyp
+ */
+function getCaseTypePrices(cases: any[]) {
+  const types = {
+    'gnagare': [],
+    'myror': [],
+    'vägglöss': [],
+    'kackerlackor': [],
+    'getingar': [],
+    'övriga': []
+  } as Record<string, any[]>;
+  
+  for (const caseItem of cases) {
+    const text = `${caseItem.title || ''} ${caseItem.description || ''}`.toLowerCase();
+    let type = 'övriga';
+    
+    if (text.includes('råtta') || text.includes('mus')) type = 'gnagare';
+    else if (text.includes('myra')) type = 'myror';
+    else if (text.includes('vägglus')) type = 'vägglöss';
+    else if (text.includes('kackerlack')) type = 'kackerlackor';
+    else if (text.includes('getingar')) type = 'getingar';
+    
+    if (caseItem.pris > 0) {
+      types[type].push(caseItem.pris);
+    }
+  }
+  
+  const result: Record<string, any> = {};
+  
+  for (const [type, prices] of Object.entries(types)) {
+    if (prices.length > 0) {
+      result[type] = {
+        count: prices.length,
+        avg: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+        min: Math.min(...prices),
+        max: Math.max(...prices)
+      };
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Hittar specifik tekniker i meddelandet
+ */
+function findTechnicianInMessage(message: string, technicians: any[]) {
+  const lowerMessage = message.toLowerCase();
+  
+  for (const tech of technicians) {
+    const techName = tech.name.toLowerCase();
+    // Sök efter första namnet eller hela namnet
+    const firstName = techName.split(' ')[0];
+    
+    if (lowerMessage.includes(techName) || lowerMessage.includes(firstName)) {
+      return tech;
+    }
+  }
+  
+  return null;
 }
