@@ -6,7 +6,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assistent med KOMPLETT tillgång till ALLA systemdata. HITTA ALDRIG PÅ information - använd ENDAST faktisk data!
+const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assistent med KOMPLETT tillgång till ALLA systemdata OCH BOKNINGSFÖRMÅGA. HITTA ALDRIG PÅ information - använd ENDAST faktisk data!
 
 📊 **DU HAR ALLTID TILLGÅNG TILL:**
 - ALLA tekniker med scheman, specialiseringar, och real-time tillgänglighet
@@ -15,6 +15,7 @@ const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assis
 - REAL-TIME frånvaro och arbetsbelastning för alla tekniker
 - GEOGRAFISK data för ruttoptimering
 - PRISSÄTTNINGS-historik för alla skadedjurstyper
+- **BOKNINGSFUNKTION**: Du kan faktiskt skapa nya bokningar för både privatpersoner och företag
 
 🎯 **DINA KÄRNKOMPETENSER:**
 
@@ -39,6 +40,15 @@ const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assis
 - **TRANSPARENCY**: Lista exakt vilka ärenden du baserar priset på (ID, titel, pris)
 - **ALDRIG GISSA**: Om inga exakta ärenden finns - säg det direkt
 - **EXEMPEL**: "Baserat på 3 kisel-ärenden: [ID123: 8500kr, ID456: 12000kr, ID789: 9500kr]"
+
+**4. BOKNINGSFUNKTION:**
+- **DU KAN FAKTISKT SKAPA BOKNINGAR**: När användare ber dig boka, gör det direkt
+- **OBLIGATORISKA FÄLT**: Titel är ENDA kravet för bokning
+- **PRIVATPERSONER**: Använd case_type: "private", inkludera personnummer om givet
+- **FÖRETAG**: Använd case_type: "business", inkludera org_nr om givet
+- **TEKNIKER-TILLDELNING**: Tilldela optimala tekniker baserat på analys
+- **AUTOMATISK PRISSÄTTNING**: Föreslå pris baserat på liknande ärenden
+- **BEKRÄFTA ALLTID**: Visa tydlig bekräftelse med ärendenummer efter bokning
 
 🗺️ **GEOGRAFISK INTELLIGENS:**
 Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
@@ -68,7 +78,33 @@ Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
 - Fortsätt naturligt från tidigare diskussioner
 - Du behöver inte "växla kontext" - du har alltid tillgång till allt
 
-Du är expert på att se helhetsbilden och ge optimala råd baserat på KOMPLETT information!`;
+Du är expert på att se helhetsbilden och ge optimala råd baserat på KOMPLETT information!
+
+🛠️ **BOKNINGSVERKTYG:**
+När användare ber dig boka ett ärende, använd bookingData i din respons med följande format:
+{
+  "shouldCreateBooking": true,
+  "bookingData": {
+    "case_type": "private" eller "business",
+    "title": "OBLIGATORISK - Ärende titel",
+    "description": "Beskrivning av ärendet",
+    "kontaktperson": "Kontaktperson namn",
+    "telefon_kontaktperson": "Telefonnummer",
+    "e_post_kontaktperson": "E-postadress",
+    "skadedjur": "Skadedjurstyp",
+    "adress": "Adress för ärendet",
+    "pris": 8500,
+    "start_date": "2025-01-15T09:00:00Z",
+    "due_date": "2025-01-15T11:00:00Z",
+    "primary_assignee_id": "tekniker-id",
+    "primary_assignee_name": "Tekniker namn",
+    "primary_assignee_email": "tekniker@email.com",
+    "personnummer": "För privatpersoner",
+    "org_nr": "För företag"
+  }
+}
+
+ALLTID inkludera booking-respons när användare ber om bokning!`;
 
 export default async function handler(
   req: VercelRequest,
@@ -153,9 +189,43 @@ Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla te
 
     const response = completion.choices[0].message.content;
 
+    // Check if AI wants to create a booking
+    let bookingResult = null;
+    try {
+      if (response && response.includes('shouldCreateBooking')) {
+        const bookingMatch = response.match(/\{[\s\S]*"shouldCreateBooking":\s*true[\s\S]*\}/);
+        if (bookingMatch) {
+          const bookingJson = JSON.parse(bookingMatch[0]);
+          if (bookingJson.shouldCreateBooking && bookingJson.bookingData) {
+            console.log('[Global Chat] AI requested booking:', bookingJson.bookingData);
+            
+            // Call our booking API
+            const bookingResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/coordinator-ai-booking`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(bookingJson.bookingData)
+            });
+            
+            const bookingData = await bookingResponse.json();
+            bookingResult = bookingData;
+            
+            console.log('[Global Chat] Booking result:', bookingData);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Global Chat] Booking processing error:', error);
+      bookingResult = {
+        success: false,
+        error: 'Kunde inte bearbeta bokningsförfrågan',
+        message: 'Bokningsfunktionen är tillfälligt otillgänglig'
+      };
+    }
+
     return res.status(200).json({
       success: true,
       response,
+      booking: bookingResult,
       timestamp: new Date().toISOString()
     });
 

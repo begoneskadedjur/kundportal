@@ -123,6 +123,19 @@ Vad kan jag hjälpa dig med idag?`,
 
       const data = await response.json();
       
+      // Handle booking if present
+      if (data.booking) {
+        if (data.booking.success) {
+          toast.success(`✅ Bokning skapad! Ärendenummer: ${data.booking.case_number}`, {
+            duration: 5000
+          });
+        } else {
+          toast.error(`❌ Bokning misslyckades: ${data.booking.error || 'Okänt fel'}`, {
+            duration: 5000
+          });
+        }
+      }
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
