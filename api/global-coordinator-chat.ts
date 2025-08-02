@@ -95,8 +95,8 @@ export default async function handler(
       : relevantDataString;
 
     // TEMPORARY: Log vad som skickas till AI för debugging
-    if (context === 'pricing') {
-      console.log('📤 Data being sent to AI for pricing:');
+    if (context === 'pricing' || context === 'technician') {
+      console.log(`📤 Data being sent to AI for ${context}:`);
       console.log(`- Original data length: ${relevantDataString.length} chars`);
       console.log(`- Truncated data length: ${truncatedData.length} chars`);
       console.log(`- Data was truncated: ${relevantDataString.length > 8000}`);
@@ -195,7 +195,8 @@ function identifyContext(message: string): string {
     return 'schedule';
   }
   
-  if (lowerMessage.includes('tekniker') || lowerMessage.includes('vem') || lowerMessage.includes('bäst på') || lowerMessage.includes('specialist')) {
+  if (lowerMessage.includes('tekniker') || lowerMessage.includes('vem') || lowerMessage.includes('bäst på') || lowerMessage.includes('specialist') ||
+      lowerMessage.includes('frånvarande') || lowerMessage.includes('semester') || lowerMessage.includes('ledig') || lowerMessage.includes('borta')) {
     return 'technician';
   }
   
@@ -293,6 +294,15 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       };
 
     case 'technician':
+      // TEMPORARY: Debug logging för technician queries
+      console.log('🔍 Technician Query Analysis:');
+      console.log(`- Message: "${message}"`);
+      console.log(`- Available technicians: ${coordinatorData.technicians?.length || 0}`);
+      console.log(`- Schedule data available: ${!!coordinatorData.schedule}`);
+      console.log(`- Upcoming cases: ${coordinatorData.schedule?.upcoming_cases?.length || 0}`);
+      console.log(`- Schedule gaps: ${coordinatorData.schedule?.schedule_gaps?.length || 0}`);
+      console.log(`- Technician availability: ${coordinatorData.schedule?.technician_availability?.length || 0}`);
+      
       return {
         ...baseData,
         technicians: coordinatorData.technicians?.map((t: any) => ({
@@ -301,9 +311,12 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
           specializations: t.specializations || [],
           work_areas: t.work_areas || [],
           role: t.role,
-          is_active: t.is_active
+          is_active: t.is_active,
+          work_schedule: t.work_schedule // Add work schedule
         })) || [],
         technician_availability: coordinatorData.schedule?.technician_availability || [],
+        upcoming_cases: coordinatorData.schedule?.upcoming_cases || [], // Add upcoming cases
+        schedule_gaps: coordinatorData.schedule?.schedule_gaps || [], // Add schedule gaps
         recent_cases: [
           ...coordinatorData.cases?.private_cases?.slice(0, 10) || [],
           ...coordinatorData.cases?.business_cases?.slice(0, 10) || []
