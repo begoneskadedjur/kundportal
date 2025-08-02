@@ -213,8 +213,10 @@ Vad kan jag hjälpa dig med idag?`,
 
   return (
     <div 
-      className={`fixed bottom-6 right-6 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl transition-all duration-300 z-50 ${
-        isMinimized ? 'w-80 h-16' : 'w-[28rem] max-w-[calc(100vw-3rem)] h-[700px] max-h-[calc(100vh-3rem)]'
+      className={`fixed bottom-6 right-6 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl transition-all duration-300 z-50 flex flex-col ${
+        isMinimized 
+          ? 'w-80 h-16' 
+          : 'w-[28rem] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-4rem)] sm:max-w-[calc(100vw-3rem)] sm:max-h-[calc(100vh-6rem)]'
       }`}
       role="dialog"
       aria-labelledby="chat-title"
@@ -260,14 +262,14 @@ Vad kan jag hjälpa dig med idag?`,
       {!isMinimized && (
         <>
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 h-[calc(100%-12rem)]">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex gap-3 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                <div className={`flex gap-2 sm:gap-3 max-w-[90%] sm:max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
                     message.role === 'user' ? 'bg-teal-600' : 'bg-purple-600'
                   }`}>
                     {message.role === 'user' ? (
@@ -290,8 +292,8 @@ Vad kan jag hjälpa dig med idag?`,
                         {message.context}
                       </div>
                     )}
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs text-slate-400 mt-2">
+                    <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                    <p className="text-xs text-slate-400 mt-1 sm:mt-2">
                       {message.timestamp.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -318,14 +320,14 @@ Vad kan jag hjälpa dig med idag?`,
 
           {/* Quick actions */}
           {messages.length === 1 && (
-            <div className="px-4 pb-3 border-t border-slate-700/50">
-              <p className="text-xs text-slate-400 mb-3">Snabbkommandon:</p>
-              <div className="grid grid-cols-2 gap-2">
-                {suggestions.slice(0, 4).map((suggestion, index) => (
+            <div className="flex-shrink-0 p-3 sm:p-4 border-t border-slate-700/50 max-h-48 overflow-y-auto">
+              <p className="text-xs text-slate-400 mb-2">Snabbkommandon:</p>
+              <div className="space-y-2">
+                {suggestions.slice(0, 6).map((suggestion, index) => (
                   <button
                     key={index}
                     onClick={() => setInput(suggestion)}
-                    className="text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 text-slate-300 px-3 py-2 rounded-md transition-colors text-left"
+                    className="text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 text-slate-300 px-3 py-2 rounded-md transition-colors text-left w-full block"
                   >
                     {suggestion}
                   </button>
@@ -335,8 +337,8 @@ Vad kan jag hjälpa dig med idag?`,
           )}
 
           {/* Input */}
-          <div className="p-4 border-t border-slate-700">
-            <div className="flex gap-2">
+          <div className="flex-shrink-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
+            <div className="flex gap-2 mb-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -344,23 +346,23 @@ Vad kan jag hjälpa dig med idag?`,
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Fråga om schema, tekniker, priser..."
-                className="flex-1 bg-slate-800/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="flex-1 bg-slate-800/80 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm min-w-0"
                 disabled={isLoading}
               />
               <Button
                 variant="primary"
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="px-3"
+                className="px-3 py-2 flex-shrink-0"
               >
                 <Send className="w-4 h-4" />
               </Button>
             </div>
             
             {/* Context indicator */}
-            <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              Ansluten till {currentPage} • {coordinatorData ? 'Data laddad' : 'Laddar data...'}
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+              <span className="truncate">Ansluten till {currentPage} • {coordinatorData ? 'Data laddad' : 'Laddar data...'}</span>
             </div>
           </div>
         </>
