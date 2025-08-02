@@ -380,12 +380,12 @@ export const useAnalyticsAlerts = () => {
       });
     }
 
-    // Kontrollera om omschemaläggningar är höga
+    // Kontrollera om ombokningar är höga
     if (kpiData.rescheduling_metrics.reschedule_rate_percent > 20) {
       newAlerts.push({
         id: 'high-reschedules',
         type: 'error' as const,
-        title: 'Höga omschemaläggningar',
+        title: 'Höga ombokningar',
         message: `${kpiData.rescheduling_metrics.reschedule_rate_percent.toFixed(1)}% av ärenden omschemaläggs`,
         timestamp: new Date(),
       });

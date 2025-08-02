@@ -37,6 +37,8 @@ import TechnicianUtilizationGrid from '../../components/admin/coordinator/Techni
 import BusinessImpactCards from '../../components/admin/coordinator/BusinessImpactCards';
 import GeographicOptimizationMap from '../../components/admin/coordinator/GeographicOptimizationMap';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
+import AIAnalysisSection from '../../components/coordinator/AIAnalysisSection';
+import { aiCoordinatorAnalysisService, AICoordinatorAnalysis } from '../../services/coordinatorAIAnalysisService';
 
 registerLocale('sv', sv);
 
@@ -85,6 +87,8 @@ const AlertsPanel = ({ alerts, onDismiss }: { alerts: any[]; onDismiss: (id: str
 
 export default function CoordinatorAnalytics() {
   const { user } = useAuth();
+  const [aiAnalysis, setAiAnalysis] = useState<AICoordinatorAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   
   const [dateRange, setDateRange] = useState<{
     startDate: Date;
@@ -161,6 +165,45 @@ export default function CoordinatorAnalytics() {
     toast.success('Ärende uppdaterat!');
   };
 
+  // AI Analysis functions
+  const generateAIAnalysis = async () => {
+    if (!kpiData || !efficiencyTrend || !utilizationData || !businessImpact) {
+      toast.error('Väntar på data...');
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const analysis = await aiCoordinatorAnalysisService.generateCoordinatorAnalysis({
+        kpiData,
+        efficiencyTrend,
+        utilizationData,
+        businessImpact,
+        dateRange: {
+          startDate: dateRange.startDate.toISOString().split('T')[0],
+          endDate: dateRange.endDate.toISOString().split('T')[0]
+        }
+      });
+      setAiAnalysis(analysis);
+    } catch (error) {
+      console.error('Failed to generate AI analysis:', error);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Generate AI analysis when data changes
+  useEffect(() => {
+    if (kpiData && efficiencyTrend && utilizationData && businessImpact && !aiAnalysis) {
+      generateAIAnalysis();
+    }
+  }, [kpiData, efficiencyTrend, utilizationData, businessImpact]);
+
+  // Clear AI analysis when date range changes
+  useEffect(() => {
+    setAiAnalysis(null);
+  }, [dateRange]);
+
 
   const kpiMetrics = useMemo(() => {
     if (!kpiData) return [];
@@ -197,7 +240,7 @@ export default function CoordinatorAnalytics() {
         trendPeriod: 'senaste veckan',
       },
       {
-        title: 'Omschemaläggningar',
+        title: 'Ombokningar',
         value: `${kpiData.rescheduling_metrics.reschedule_rate_percent.toFixed(1)}%`,
         description: 'Andel ärenden som omschemaläggs',
         icon: RefreshCw,
@@ -426,66 +469,13 @@ export default function CoordinatorAnalytics() {
           <GeographicOptimizationMap data={kpiData} loading={loading} onEditCase={handleEditCase} />
         </section>
 
-        {/* Recommendations */}
-        <section aria-labelledby="recommendations-heading">
-          <h2 id="recommendations-heading" className="text-2xl font-semibold text-white mb-6">Rekommendationer</h2>
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-            <div className="space-y-4">
-              {kpiData?.scheduling_efficiency.avg_hours_to_schedule > 24 && (
-                <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-orange-300">Förbättra schemaläggningshastighet</h4>
-                    <p className="text-sm text-slate-400 mt-1">
-                      Genomsnittlig schemaläggning tar över 24 timmar. Överväg att automatisera delar av processen eller allokera mer tid för schemaläggning.
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              {kpiData?.technician_utilization.underutilized_technicians > 0 && (
-                <div className="flex items-start gap-3 p-4 bg-teal-500/10 border border-teal-500/30 rounded-lg">
-                  <Info className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-teal-300">Balansera tekniker-arbetsbörda</h4>
-                    <p className="text-sm text-slate-400 mt-1">
-                      {kpiData.technician_utilization.underutilized_technicians} tekniker har lågt utnyttjande. 
-                      Överväg att omfördela ärenden för bättre balans.
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              {kpiData?.rescheduling_metrics.reschedule_rate_percent > 15 && (
-                <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-red-300">Minska omschemaläggningar</h4>
-                    <p className="text-sm text-slate-400 mt-1">
-                      Hög andel omschemaläggningar påverkar effektiviteten. Analysera de vanligaste orsakerna och förbättra initial planering.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Success message when everything looks good */}
-              {kpiData && 
-               kpiData.scheduling_efficiency.avg_hours_to_schedule <= 24 &&
-               kpiData.technician_utilization.underutilized_technicians === 0 &&
-               kpiData.rescheduling_metrics.reschedule_rate_percent <= 15 && (
-                <div className="flex items-start gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-green-300">Utmärkt koordinering!</h4>
-                    <p className="text-sm text-slate-400 mt-1">
-                      Alla nyckeltal ser bra ut. Fortsätt med nuvarande arbetssätt och fokusera på kontinuerlig förbättring.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
+        {/* AI Analysis Section */}
+        <AIAnalysisSection
+          analysis={aiAnalysis}
+          loading={aiLoading}
+          onRefresh={generateAIAnalysis}
+          dateRange={dateRange}
+        />
 
       </div>
       
