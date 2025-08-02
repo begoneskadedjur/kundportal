@@ -95,10 +95,10 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           id, title, description, rapport, pris, skadedjur, 
           start_date, due_date, created_at,
           primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
-          tekniker_kommentar, adress, status
+          adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString())
         .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
         .limit(200), // Öka gränsen för bättre skadedjurs-täckning
 
@@ -109,10 +109,10 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           id, title, description, rapport, pris, skadedjur, 
           start_date, due_date, created_at,
           primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
-          tekniker_kommentar, adress, status
+          adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString())
         .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
         .limit(200) // Öka gränsen för bättre skadedjurs-täckning
     ]);
@@ -122,6 +122,21 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       ...(recentPrivateCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'private' as const })),
       ...(recentBusinessCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'business' as const }))
     ];
+
+    // Debug logging för att spåra dataflöde
+    console.log('📊 Coordinator Chat Data Summary:');
+    console.log(`- Private cases with prices: ${recentPrivateCasesWithPrices.data?.length || 0}`);
+    console.log(`- Business cases with prices: ${recentBusinessCasesWithPrices.data?.length || 0}`);
+    console.log(`- Total cases with prices: ${allCasesWithPrices.length}`);
+    
+    // Log pest types found in data
+    const pestTypes = allCasesWithPrices.map(c => c.skadedjur).filter(Boolean);
+    const uniquePestTypes = [...new Set(pestTypes)];
+    console.log(`- Unique pest types found: ${uniquePestTypes.join(', ')}`);
+    console.log(`- Sample vägglöss cases:`, allCasesWithPrices.filter(c => 
+      c.skadedjur?.toLowerCase().includes('vägglöss') || 
+      c.skadedjur?.toLowerCase().includes('vägglus')
+    ).length);
 
     // Optimera prissättningsdata genom att gruppera efter skadedjur
     const optimizedPricingData = optimizePricingDataByPestType(allCasesWithPrices);

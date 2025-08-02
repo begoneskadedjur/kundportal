@@ -156,37 +156,6 @@ Vad kan jag hjälpa dig med idag?`,
     }
   };
 
-  // Kontext-specifika frågeförslag baserat på aktuell sida
-  const getContextualSuggestions = () => {
-    const baseSuggestions = [
-      'Vilka tekniker har lediga tider imorgon?',
-      'Visa mig ärenden utan schemalagd tid',
-      'Vilket pris ska jag sätta för en råttbekämpning?',
-      'Vilken tekniker är bäst på myrbekämpning?'
-    ];
-
-    const pageSuggestions: Record<string, string[]> = {
-      schedule: [
-        'Hitta luckor i schemat för nästa vecka',
-        'Vilka tekniker är överbelastade?',
-        'Optimera rutten för Stockholm imorgon'
-      ],
-      analytics: [
-        'Analysera prestandan för senaste månaden',
-        'Vilka är våra mest lönsamma ärendetyper?',
-        'Hur kan vi minska schemaläggningstiden?'
-      ],
-      dashboard: [
-        'Sammanfatta dagens viktiga uppgifter',
-        'Visa akuta ärenden som behöver åtgärd',
-        'Vad är veckans prioriteringar?'
-      ]
-    };
-
-    return [...baseSuggestions, ...(pageSuggestions[currentPage] || [])];
-  };
-
-  const suggestions = getContextualSuggestions();
 
   if (!isOpen) {
     return (
@@ -318,23 +287,6 @@ Vad kan jag hjälpa dig med idag?`,
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick actions */}
-          {messages.length === 1 && (
-            <div className="flex-shrink-0 p-3 sm:p-4 border-t border-slate-700/50 max-h-48 overflow-y-auto">
-              <p className="text-xs text-slate-400 mb-2">Snabbkommandon:</p>
-              <div className="space-y-2">
-                {suggestions.slice(0, 6).map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInput(suggestion)}
-                    className="text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50 text-slate-300 px-3 py-2 rounded-md transition-colors text-left w-full block"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Input */}
           <div className="flex-shrink-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">

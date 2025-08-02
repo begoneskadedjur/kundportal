@@ -287,6 +287,17 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       const requestedPestType = identifyPestTypeFromMessage(message);
       const pestSpecificData = requestedPestType ? optimizedPestData[requestedPestType] : null;
       
+      // Debug logging för prissättning
+      console.log('🔍 Pricing Query Analysis:');
+      console.log(`- Message: "${message}"`);
+      console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
+      console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
+      console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
+      if (pestSpecificData) {
+        console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
+        console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
+      }
+      
       // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
       const relevantCases = pestSpecificData ? 
         pestSpecificData.recent_cases : 
@@ -420,7 +431,7 @@ function analyzePricingForMessage(cases: any[], message: string) {
   let pestType = '';
   if (lowerMessage.includes('råtta') || lowerMessage.includes('mus')) pestType = 'gnagare';
   else if (lowerMessage.includes('myra')) pestType = 'myror';
-  else if (lowerMessage.includes('vägglus')) pestType = 'vägglöss';
+  else if (lowerMessage.includes('vägglus') || lowerMessage.includes('vägglöss')) pestType = 'Vägglöss';
   else if (lowerMessage.includes('kackerlack')) pestType = 'kackerlackor';
   else if (lowerMessage.includes('getingar')) pestType = 'getingar';
   else if (lowerMessage.includes('fågelsäkring') || lowerMessage.includes('fågel')) pestType = 'fågelsäkring';
@@ -529,7 +540,7 @@ function getCaseTypePrices(cases: any[]) {
     
     if (text.includes('råtta') || text.includes('mus')) type = 'gnagare';
     else if (text.includes('myra')) type = 'myror';
-    else if (text.includes('vägglus')) type = 'vägglöss';
+    else if (text.includes('vägglus') || text.includes('vägglöss')) type = 'Vägglöss';
     else if (text.includes('kackerlack')) type = 'kackerlackor';
     else if (text.includes('getingar')) type = 'getingar';
     
