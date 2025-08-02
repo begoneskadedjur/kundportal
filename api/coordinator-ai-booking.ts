@@ -221,7 +221,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Prepare insert data based on case type
     console.log('[AI Booking] Preparing insert data for case type:', bookingData.case_type)
     const baseInsertData = {
-      // Note: clickup_task_id will be set by frontend ClickUp sync (like CreateCaseModal)
+      // Use temporary clickup_task_id like CreateCaseModal, then update after ClickUp sync
+      clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       case_number: caseNumber,
       title: bookingData.title,
       description: bookingData.description,
