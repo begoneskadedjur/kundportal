@@ -33,11 +33,12 @@ const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assis
 - Analysera work_schedules för optimal tidsplanering
 
 **3. DATADRIVEN PRISSÄTTNING:**
-- Analysera ALLA liknande ärenden automatiskt
-- Beräkna genomsnitt från VERKLIGA case-data
-- **SKADEDJURS-SPECIFIK**: Använd pest-specific data när tillgänglig
-- **KOMPLEXITETS-ANALYS**: Justera priser baserat på faktiska ärende-egenskaper
-- **VISA ALLTID**: Antal ärenden som analysen baseras på
+- Analysera EXAKT matching ärenden först (samma metod + skadedjur)
+- Om specifika metoder nämns (t.ex. "bara kisel") - visa ENDAST sådana ärenden
+- **METODSPECIFIK**: pricing.method_specific_cases visar filtrerade ärenden per metod
+- **TRANSPARENCY**: Lista exakt vilka ärenden du baserar priset på (ID, titel, pris)
+- **ALDRIG GISSA**: Om inga exakta ärenden finns - säg det direkt
+- **EXEMPEL**: "Baserat på 3 kisel-ärenden: [ID123: 8500kr, ID456: 12000kr, ID789: 9500kr]"
 
 🗺️ **GEOGRAFISK INTELLIGENS:**
 Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
@@ -48,15 +49,18 @@ Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
 
 🚨 **ABSOLUTA REGLER:**
 1. **TEKNIKER-NAMN**: ANVÄND ENDAST namn från technicians.available listan. HITTA ALDRIG PÅ "Anna Svensson", "Erik Lund" etc.
-2. **ENDAST FAKTISK DATA**: Ingen gissning av priser, tider, eller tillgänglighet
-3. **KOMPLETT ANALYS**: Använd hela datasetet för optimala beslut
-4. **TRANSPARENS**: Visa alltid på vilken data dina råd baseras
+2. **ALDRIG GISSA PRISER**: Säg ALDRIG "kan vi anta", "kan antas", "ungefär". Använd ENDAST faktiska priser från cases.recent_with_prices
+3. **VISA FAKTISKA ÄRENDEN**: För prisfrågor - visa exakt vilka ärenden du analyserat med ID, pris, och beskrivning  
+4. **INGEN SPEKULATION**: Om du inte hittar specifika ärenden (t.ex. bara kisel) - säg "inga kisel-specifika ärenden hittades"
+5. **KOMPLETT ANALYS**: Använd hela datasetet för optimala beslut
+6. **TRANSPARENS**: Visa alltid på vilken data dina råd baseras
 
 📝 **SVAR-STRUKTUR:**
 - Börja med: "Baserat på komplett systemanalys..."
-- Ge konkreta, handlingsbara råd
-- Inkludera relevanta siffror och fakta från systemet
-- Förklara WHY ditt förslag är optimalt
+- **FÖR PRISFRÅGOR**: Visa först pricing.method_specific_cases.filtered_cases
+- **LISTA EXAKTA ÄRENDEN**: "Analyserat X ärenden: [ID, titel, pris för varje]"
+- **GE KONKRET PRISINTERVALL**: Baserat på faktiska priser, inte gissningar
+- Förklara WHY ditt förslag är optimalt baserat på FAKTISK data
 
 🔄 **KONVERSATIONS-FLYT:**
 - Behandla alla frågor med samma djupa dataanalys
@@ -290,7 +294,22 @@ function prepareUniversalData(coordinatorData: any, message: string, conversatio
       patterns: coordinatorData.pricing?.pricing_patterns || [],
       pest_specific: requestedPestType ? 
         coordinatorData.pricing?.optimized_by_pest_type?.[requestedPestType] : null,
-      case_type_analysis: getCaseTypePrices(coordinatorData.pricing?.recent_cases_with_prices || [])
+      case_type_analysis: getCaseTypePrices(coordinatorData.pricing?.recent_cases_with_prices || []),
+      
+      // DETALJERAD ANALYS FÖR AKTUELL FÖRFRÅGAN
+      detailed_analysis: analyzePricingForMessage(
+        coordinatorData.pricing?.recent_cases_with_prices || [], 
+        message
+      ),
+      
+      // METODSPECIFIK FILTRERING (kisel, värmetält etc.)
+      method_specific_cases: filterCasesByMethod(
+        coordinatorData.pricing?.recent_cases_with_prices || [], 
+        message
+      ),
+      
+      // ALLA ÄRENDEN FÖR TRANSPARENS  
+      all_cases_with_prices: coordinatorData.pricing?.recent_cases_with_prices || []
     },
 
     // ANALYTICS & PERFORMANCE
@@ -322,6 +341,75 @@ function prepareUniversalData(coordinatorData: any, message: string, conversatio
   };
 }
 
+
+/**
+ * Filtrerar ärenden baserat på specifika metoder i meddelandet (kisel, värmetält etc.)
+ */
+function filterCasesByMethod(cases: any[], message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Identifiera metoder från meddelandet
+  const methods = [];
+  if (lowerMessage.includes('kisel')) methods.push('kisel');
+  if (lowerMessage.includes('värmetält') || lowerMessage.includes('värme tält')) methods.push('värmetält');
+  if (lowerMessage.includes('sanering')) methods.push('sanering');
+  if (lowerMessage.includes('inspektion')) methods.push('inspektion');
+  if (lowerMessage.includes('spray') || lowerMessage.includes('sprayning')) methods.push('spray');
+  
+  // Om inga specifika metoder, returnera alla ärenden
+  if (methods.length === 0) {
+    return {
+      detected_methods: [],
+      filtered_cases: cases.filter(c => c.pris > 0),
+      message: 'Inga specifika metoder detekterade - visar alla ärenden'
+    };
+  }
+  
+  // Filtrera ärenden baserat på detekterade metoder
+  const methodSpecificCases = cases.filter((caseItem: any) => {
+    if (!caseItem.pris || caseItem.pris <= 0) return false;
+    
+    const caseText = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    
+    // Kolla om ärendet innehåller någon av de detekterade metoderna
+    return methods.some(method => {
+      switch (method) {
+        case 'kisel':
+          return caseText.includes('kisel') && !caseText.includes('värmetält');
+        case 'värmetält':
+          return caseText.includes('värmetält') || caseText.includes('värme');
+        case 'sanering':
+          return caseText.includes('sanering') || caseText.includes('sanera');
+        case 'inspektion':
+          return caseText.includes('inspektion') || caseText.includes('inspekterar');
+        case 'spray':
+          return caseText.includes('spray') || caseText.includes('spraing');
+        default:
+          return caseText.includes(method);
+      }
+    });
+  });
+  
+  return {
+    detected_methods: methods,
+    filtered_cases: methodSpecificCases,
+    all_matching_pest_cases: cases.filter(c => c.pris > 0),
+    method_breakdown: methods.map(method => ({
+      method,
+      cases: cases.filter((caseItem: any) => {
+        const caseText = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+        return caseText.includes(method) && caseItem.pris > 0;
+      }),
+      case_count: cases.filter((caseItem: any) => {
+        const caseText = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+        return caseText.includes(method) && caseItem.pris > 0;
+      }).length
+    })),
+    message: methodSpecificCases.length > 0 ? 
+      `Hittade ${methodSpecificCases.length} ärenden med metoderna: ${methods.join(', ')}` :
+      `Inga ärenden hittades för metoderna: ${methods.join(', ')}. Kontrollera stavning eller prova mer generella termer.`
+  };
+}
 
 /**
  * Extraherar nyckelord från meddelandet
