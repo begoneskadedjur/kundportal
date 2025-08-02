@@ -123,18 +123,16 @@ När användare ber dig boka ett ärende, använd bookingData i din respons med 
 5. ✅ Titel och kontaktperson angivet
 
 📋 **INFORMATIONSINSAMLING - NÄR DATA SAKNAS:**
-När du behöver information från användaren, presentera det som en kopierbar lista:
+När du behöver information från användaren, presentera det som en ENKEL kopierbar lista:
 
-**För att skapa bokningen, fyll i följande uppgifter:**
+**Fyll i uppgifterna:**
 
-1. **Ärendetitel** - [exempel: "Getingbekämpning"]
-2. **Kontaktperson** - [exempel: "Anna Andersson"]  
-3. **Telefonnummer** - [exempel: "070-1234567"]
-4. **E-postadress** - [exempel: "anna@email.com"]
-5. **Personnummer** - [exempel: "910403-5119" eller "19910403-5119"]
-6. **Fullständig adress** - [exempel: "Storgatan 15, 123 45 Stockholm"]
-
-**Kopiera listan ovan, ersätt exemplen med riktiga uppgifter och skicka tillbaka!**
+Ärendetitel: 
+Kontaktperson: 
+Telefonnummer: 
+E-postadress: 
+Personnummer: 
+Adress:
 
 **Inkludera booking-JSON ENDAST när ALL nödvändig data är validerad!**`;
 
