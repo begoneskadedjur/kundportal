@@ -90,7 +90,7 @@ export default async function handler(
 
     // Begränsa datastorlek för att undvika API-gränser (större gräns för technician queries)
     const relevantDataString = JSON.stringify(relevantData, null, 2);
-    const sizeLimit = context === 'technician' ? 15000 : 8000; // Större gräns för technician data
+    const sizeLimit = context === 'technician' ? 20000 : 8000; // Ännu större gräns för technician data
     const truncatedData = relevantDataString.length > sizeLimit 
       ? relevantDataString.slice(0, sizeLimit) + '\n...(data truncated due to size)'
       : relevantDataString;
@@ -323,14 +323,47 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
         availability_info: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)
       })) || [];
       
+      // Lägg till sammanfattning för frånvaro-analys FÖRST för att undvika trunkering
+      const absenceAnalysis = analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || []);
+      
+      // Logga absence analysis för debugging
+      console.log('🚨 Absence Analysis Results:');
+      console.log(`- Potentially absent: ${absenceAnalysis.potentially_absent.length}`);
+      console.log('- Absent technicians:', absenceAnalysis.potentially_absent.map(t => `${t.technician_name} (${t.status})`));
+      
       return {
         ...baseData,
-        technicians: optimizedTechnicians,
-        technician_availability: coordinatorData.schedule?.technician_availability || [],
-        upcoming_cases: coordinatorData.schedule?.upcoming_cases || [],
-        schedule_gaps: coordinatorData.schedule?.schedule_gaps || [],
-        // Lägg till sammanfattning för frånvaro-analys
-        absence_analysis: analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || [])
+        // PRIORITERA FRÅNVARO-INFO FÖRST
+        absence_analysis: absenceAnalysis,
+        absence_summary: {
+          total_technicians: optimizedTechnicians.length,
+          potentially_absent_count: absenceAnalysis.potentially_absent.length,
+          absent_technicians: absenceAnalysis.potentially_absent.map(t => ({
+            name: t.technician_name,
+            role: t.role,
+            status: t.status,
+            workdays_next_week: t.scheduled_workdays,
+            assigned_days: t.assigned_days
+          }))
+        },
+        // Kompakt tekniker-data
+        technicians_compact: optimizedTechnicians.map(t => ({
+          name: t.name,
+          role: t.role,
+          is_active: t.is_active,
+          workdays_next_week: t.next_week_workdays?.length || 0,
+          assignments_count: t.upcoming_assignments?.length || 0
+        })),
+        // Bara viktig extra data om plats finns
+        upcoming_cases_summary: {
+          total_cases: coordinatorData.schedule?.upcoming_cases?.length || 0,
+          next_week_cases: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => {
+            const caseDate = new Date(c.start_date);
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            return caseDate >= new Date() && caseDate <= nextWeek;
+          }).length || 0
+        }
       };
 
     case 'pricing':
