@@ -8,6 +8,12 @@ const openai = new OpenAI({
 
 const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en AI-assistent som ENDAST får svara baserat på FAKTISK DATA från databasen. HITTA PÅ ALDRIG siffror, tider eller priser!
 
+🔄 **KONVERSATIONS-KONTINUITET:**
+- När användaren säger korta bekräftelser som "gör det", "ja tack", "fortsätt" - fortsätt med föregående kontext
+- Dessa är INTE nya frågor utan fortsättningar av pågående konversation
+- Använd samma data-kontext som föregående svar
+- Genomför den föreslagna åtgärden om användaren bekräftar
+
 📊 **DATA-ANVÄNDNING:**
 Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste du:
 - ENDAST använda faktiska siffror från databasen
@@ -51,10 +57,12 @@ När du föreslår schemaläggning, analysera ALLTID:
 **EXEMPEL:** Om tekniker har ärende på "Kyles väg 9" kl 08-10, och ny fråga gäller "Kyles väg 10" → föreslå DIREKT efter kl 10:00 för optimal rutt!
 
 🚨 **ABSOLUTA REGLER:**
-1. Har du INTE tillgång till specifik data → säg "Jag behöver kontrollera systemet för exakt data"
-2. Kan du INTE hitta liknande ärenden → säg "Inga liknande ärenden i databasen"
-3. Saknas schema-data → säg "Behöver mer information om teknikerns schema"
-4. Osäker på prissättning → säg "Kontrollera med tidigare ärenden av samma typ"
+1. **TEKNIKER-NAMN**: ANVÄND ENDAST namn från available_technicians listan i data. HITTA ALDRIG PÅ namn som "Anna Svensson", "Erik Lund", "Johan Andersson" etc.
+2. Har du INTE tillgång till specifik data → säg "Jag behöver kontrollera systemet för exakt data"
+3. Kan du INTE hitta liknande ärenden → säg "Inga liknande ärenden i databasen"
+4. Saknas schema-data → säg "Behöver mer information om teknikerns schema"
+5. Osäker på prissättning → säg "Kontrollera med tidigare ärenden av samma typ"
+6. **KRITISKT**: Om du får frågor om tekniker - använd ENDAST de faktiska tekniker-namn som finns i datan!
 
 📝 **SVAR-KRAV:**
 - Börja med: "Baserat på systemdata och geografisk analys..."
@@ -82,8 +90,8 @@ export default async function handler(
       });
     }
 
-    // Identifiera kontext baserat på meddelandet
-    const context = identifyContext(message);
+    // Identifiera kontext baserat på meddelandet och konversationshistorik
+    const context = identifyContext(message, conversationHistory);
 
     // Förbered relevant data baserat på kontext
     const relevantData = prepareRelevantData(coordinatorData, context, message);
@@ -96,11 +104,20 @@ export default async function handler(
       : relevantDataString;
 
     // TEMPORARY: Log vad som skickas till AI för debugging
-    if (context === 'pricing' || context === 'technician') {
+    if (context === 'pricing' || context === 'technician' || context === 'general') {
       console.log(`📤 Data being sent to AI for ${context}:`);
       console.log(`- Original data length: ${relevantDataString.length} chars`);
       console.log(`- Truncated data length: ${truncatedData.length} chars`);
-      console.log(`- Data was truncated: ${relevantDataString.length > 8000}`);
+      console.log(`- Data was truncated: ${relevantDataString.length > sizeLimit}`);
+      
+      // Log tekniker-namn specifikt för debugging
+      if (relevantData.available_technicians) {
+        console.log(`- Available technicians in data:`, relevantData.available_technicians.map((t: any) => t.name));
+      }
+      if (relevantData.available_technician_names_only) {
+        console.log(`- Available technician names only:`, relevantData.available_technician_names_only);
+      }
+      
       console.log(`- Sample of data being sent:`, JSON.stringify(relevantData, null, 2).slice(0, 500) + '...');
     }
 
@@ -113,6 +130,9 @@ export default async function handler(
 Sida: ${currentPage}
 Tidpunkt: ${new Date().toLocaleString('sv-SE')}
 Kontext: ${context}
+
+🚨 KRITISK PÅMINNELSE: ANVÄND ENDAST FAKTISKA TEKNIKER-NAMN FRÅN DATAN NEDAN!
+HITTA ALDRIG PÅ namn som "Anna Svensson", "Erik Lund", "Johan Andersson" etc.
 
 RELEVANT DATA FÖR DENNA FÖRFRÅGAN:
 ${truncatedData}
@@ -183,9 +203,60 @@ Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
 }
 
 /**
- * Identifierar kontext baserat på användarens meddelande
+ * Identifierar kontext baserat på användarens meddelande och konversationshistorik
  */
-function identifyContext(message: string): string {
+function identifyContext(message: string, conversationHistory?: any[]): string {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // KONTEXT-KONTINUITET: Kolla för korta fortsättningsfraser
+  const continuationPhrases = [
+    'gör det', 'ja tack', 'ja', 'ok', 'okej', 'fortsätt', 'kör på', 'absolut', 
+    'det låter bra', 'perfekt', 'bra', 'ja det', 'ja det fungerar', 'det funkar',
+    'implementera det', 'genomför det', 'låt oss göra det', 'sätt igång',
+    // SCHEDULING-SPECIFIKA FORTSÄTTNINGAR
+    'hitta en annan', 'hitta annan', 'föreslå annan', 'annan tekniker', 
+    'vem annan', 'någon annan', 'alternativ', 'andra alternativ',
+    'vilka andra', 'andra tekniker', 'ersättare', 'istället'
+  ];
+  
+  const isShortContinuation = continuationPhrases.some(phrase => 
+    lowerMessage === phrase || lowerMessage.includes(phrase)
+  );
+  
+  // Om det är en kort fortsättningsfras, använd föregående kontext
+  if (isShortContinuation && conversationHistory && conversationHistory.length > 0) {
+    // Hitta senaste AI-svar för att identifiera föregående kontext
+    const lastAssistantMessage = conversationHistory
+      .slice()
+      .reverse()
+      .find((msg: any) => msg.role === 'assistant');
+    
+    if (lastAssistantMessage && lastAssistantMessage.context) {
+      console.log(`🔄 Context Continuity: "${lowerMessage}" continuing previous context: ${lastAssistantMessage.context}`);
+      return lastAssistantMessage.context;
+    }
+    
+    // Fallback: analysera senaste användarmeddelande för kontext-ledtrådar
+    const lastUserMessage = conversationHistory
+      .slice()
+      .reverse()
+      .find((msg: any) => msg.role === 'user' && msg.content !== message);
+    
+    if (lastUserMessage) {
+      const inferredContext = identifyContextFromMessage(lastUserMessage.content);
+      console.log(`🔄 Context Continuity: Inferred context from previous user message: ${inferredContext}`);
+      return inferredContext;
+    }
+  }
+  
+  // Standard kontext-identifiering
+  return identifyContextFromMessage(message);
+}
+
+/**
+ * Identifierar kontext baserat på meddelande-innehåll (utan historik)
+ */
+function identifyContextFromMessage(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   // Specifik schemaläggning (inkluderar teknikernamn + tid/schema-relaterat)
@@ -309,7 +380,13 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
           specializations: t.specializations || [],
           current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0,
           is_absent: checkTechnicianAbsence(t.id, coordinatorData.technician_absences || []),
-          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || [])
+          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || []),
+          upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
+            c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
+          ) || [],
+          schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
+            gap.technician_id === t.id && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+          ) || []
         })) || [],
         current_week_summary: {
           total_technicians: coordinatorData.technicians?.length || 0,
@@ -495,15 +572,63 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       };
 
     default:
+      // KRITISK FIX: Ge AI:n access till faktisk tekniker-data även i general context
+      console.log('⚠️  General context triggered - providing comprehensive data to prevent fake responses');
+      
+      // Använd samma absence-analys som technician context
+      const allTechnicians = coordinatorData.technicians || [];
+      const availableTechnicians = allTechnicians.filter((t: any) => 
+        t.is_active && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+      );
+      
       return {
         ...baseData,
+        CRITICAL_WARNING: "🚨 ANVÄND ENDAST FAKTISKA TEKNIKER-NAMN FRÅN LISTAN NEDAN. HITTA ALDRIG PÅ NAMN!",
+        context_note: "ALLMÄN FÖRFRÅGAN - använd endast faktisk data från systemet, hitta aldrig på namn",
+        // PRIORITERA TEKNIKER-DATA FÖRST
+        available_technicians: availableTechnicians.map((t: any) => ({
+          name: t.name,
+          role: t.role,
+          id: t.id,
+          specializations: t.specializations || [],
+          is_active: t.is_active,
+          work_schedule: t.work_schedule,
+          current_workload: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0,
+          upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
+            c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
+          ) || [],
+          schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
+            gap.technician_id === t.id && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+          ) || []
+        })),
+        available_technician_names_only: availableTechnicians.map((t: any) => t.name),
+        absent_technicians: allTechnicians.filter((t: any) => 
+          checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+        ).map((t: any) => ({
+          name: t.name,
+          role: t.role,
+          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || [])
+        })),
+        schedule_gaps_available: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
+          !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || [])
+        ) || [],
+        upcoming_cases_for_geographic_analysis: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
+          c.adress && c.start_date && !checkTechnicianAbsence(c.primary_assignee_id, coordinatorData.technician_absences || [])
+        ) || [],
         summary: {
           total_cases: (coordinatorData.cases?.private_cases?.length || 0) + 
                      (coordinatorData.cases?.business_cases?.length || 0),
           total_technicians: coordinatorData.technicians?.length || 0,
+          available_technicians_count: availableTechnicians.length,
+          absent_technicians_count: allTechnicians.length - availableTechnicians.length,
           upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
-          schedule_gaps_count: coordinatorData.schedule?.schedule_gaps?.length || 0
-        }
+          available_schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
+            !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || [])
+          )?.length || 0
+        },
+        FINAL_REMINDER: "🔥 TEKNIKER-NAMN SOM DU FÅR ANVÄNDA:",
+        valid_technician_names: availableTechnicians.map((t: any) => `"${t.name}"`).join(", "),
+        FORBIDDEN_NAMES: "❌ HITTA ALDRIG PÅ: Anna Svensson, Erik Lund, Johan Andersson, Maria Persson etc."
       };
   }
 }
