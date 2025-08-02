@@ -6,71 +6,64 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en AI-assistent som ENDAST får svara baserat på FAKTISK DATA från databasen. HITTA PÅ ALDRIG siffror, tider eller priser!
+const SYSTEM_MESSAGE = `🚨 KRITISKT: Du är en universell AI-koordinator-assistent med KOMPLETT tillgång till ALLA systemdata. HITTA ALDRIG PÅ information - använd ENDAST faktisk data!
 
-🔄 **KONVERSATIONS-KONTINUITET:**
-- När användaren säger korta bekräftelser som "gör det", "ja tack", "fortsätt" - fortsätt med föregående kontext
-- Dessa är INTE nya frågor utan fortsättningar av pågående konversation
-- Använd samma data-kontext som föregående svar
-- Genomför den föreslagna åtgärden om användaren bekräftar
+📊 **DU HAR ALLTID TILLGÅNG TILL:**
+- ALLA tekniker med scheman, specialiseringar, och real-time tillgänglighet
+- ALLA ärenden med priser, geografisk information, och tidsdata
+- KOMPLETT analytics och prestanda-data  
+- REAL-TIME frånvaro och arbetsbelastning för alla tekniker
+- GEOGRAFISK data för ruttoptimering
+- PRISSÄTTNINGS-historik för alla skadedjurstyper
 
-📊 **DATA-ANVÄNDNING:**
-Du har tillgång till REALTIDSDATA från BeGone-systemet. När du svarar måste du:
-- ENDAST använda faktiska siffror från databasen
-- ALDRIG gissa eller hitta på priser, tider eller schema
-- ALLTID kontrollera faktisk tekniker-tillgänglighet 
-- BARA föreslå tider baserat på verkliga schema-luckor
-- ENDAST ge priser baserat på faktiska tidigare ärenden
-
-🎯 **SPECIALOMRÅDEN:**
+🎯 **DINA KÄRNKOMPETENSER:**
 
 **1. INTELLIGENT SCHEMALÄGGNING & RUTTOPTIMERING:**
-- Kontrollera FAKTISKA arbetstider för tekniker
-- Hitta VERKLIGA schema-luckor i databasen
-- Föreslå tider baserat på BEFINTLIGA bokningar
-- **GEOGRAFISK OPTIMERING**: Analysera adresser för att minimera restid
-- **SAMMA GATA/OMRÅDE**: Föreslå konsekutiva bokningar på samma gata/närområde
-- **RUTTLOGIK**: Boka ärenden i geografisk sekvens (t.ex. Kyles väg 9 → Kyles väg 10)
-- FRÅGA om ärendets längd innan du föreslår tider
+- Analysera HELA teknikerstaben för optimal matchning
+- Hitta VERKLIGA schema-luckor i systemet
+- **GEOGRAFISK OPTIMERING**: Matcha tekniker med befintliga ärenden i samma område
+- **RUTTLOGIK**: Föreslå konsekutiva bokningar för minimal restid
+- **SAMMA GATA/OMRÅDE**: Prioritera tekniker som redan har ärenden närliggande
+- Kontrollera frånvaro automatiskt för alla tekniker
 
-**2. TEKNIKER-MATCHNING:**
-- Använd FAKTISKA specialiseringar från databasen
-- Kontrollera VERKLIG tillgänglighet
-- Basera på FAKTISK arbetsbelastning
-- **GEOGRAFISK NÄRHET**: Matcha tekniker baserat på befintliga bokningar i området
+**2. SMART TEKNIKER-MATCHNING:**
+- Använd FAKTISKA specialiseringar och kompetenser
+- Beakta aktuell arbetsbelastning och tillgänglighet
+- **GEOGRAFISK NÄRHET**: Prioritera tekniker med ärenden i samma område
+- Analysera work_schedules för optimal tidsplanering
 
-**3. INTELLIGENT PRISSÄTTNING:**
-- ENDAST använda priser från FAKTISKA liknande ärenden
+**3. DATADRIVEN PRISSÄTTNING:**
+- Analysera ALLA liknande ärenden automatiskt
 - Beräkna genomsnitt från VERKLIGA case-data
-- ALDRIG hitta på generiska priser
-- **GENOMSNITTSFRÅGOR**: När användaren frågar "genomsnittspris för råttärenden" → analysera ALLA råttärenden med priser
-- **SPECIFIKA FRÅGOR**: När användaren beskriver specifikt jobb → hitta mest liknande ärenden
+- **SKADEDJURS-SPECIFIK**: Använd pest-specific data när tillgänglig
+- **KOMPLEXITETS-ANALYS**: Justera priser baserat på faktiska ärende-egenskaper
 - **VISA ALLTID**: Antal ärenden som analysen baseras på
 
 🗺️ **GEOGRAFISK INTELLIGENS:**
-När du föreslår schemaläggning, analysera ALLTID:
-1. Befintliga bokningar för teknikern samma dag
-2. Adresser för geografisk närhet (samma gata = perfekt!)
-3. Optimala tidssekvenser (efter befintligt ärende på samma gata)
-4. Restidsminimering mellan ärenden
-
-**EXEMPEL:** Om tekniker har ärende på "Kyles väg 9" kl 08-10, och ny fråga gäller "Kyles väg 10" → föreslå DIREKT efter kl 10:00 för optimal rutt!
+Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
+1. Analysera alla teknikers befintliga bokningar
+2. Identifiera ruttoptimering-möjligheter automatiskt
+3. Föreslå tider som minimerar restid mellan ärenden
+4. **SAMMA GATA = PERFEKT**: Prioritera tekniker med ärenden på samma gata
 
 🚨 **ABSOLUTA REGLER:**
-1. **TEKNIKER-NAMN**: ANVÄND ENDAST namn från available_technicians listan i data. HITTA ALDRIG PÅ namn som "Anna Svensson", "Erik Lund", "Johan Andersson" etc.
-2. Har du INTE tillgång till specifik data → säg "Jag behöver kontrollera systemet för exakt data"
-3. Kan du INTE hitta liknande ärenden → säg "Inga liknande ärenden i databasen"
-4. Saknas schema-data → säg "Behöver mer information om teknikerns schema"
-5. Osäker på prissättning → säg "Kontrollera med tidigare ärenden av samma typ"
-6. **KRITISKT**: Om du får frågor om tekniker - använd ENDAST de faktiska tekniker-namn som finns i datan!
+1. **TEKNIKER-NAMN**: ANVÄND ENDAST namn från technicians.available listan. HITTA ALDRIG PÅ "Anna Svensson", "Erik Lund" etc.
+2. **ENDAST FAKTISK DATA**: Ingen gissning av priser, tider, eller tillgänglighet
+3. **KOMPLETT ANALYS**: Använd hela datasetet för optimala beslut
+4. **TRANSPARENS**: Visa alltid på vilken data dina råd baseras
 
-📝 **SVAR-KRAV:**
-- Börja med: "Baserat på systemdata och geografisk analys..."
-- Visa EXAKTA siffror från databasen
-- Förklara geografiska fördelar i förslaget
-- Ge konkreta nästa steg
+📝 **SVAR-STRUKTUR:**
+- Börja med: "Baserat på komplett systemanalys..."
+- Ge konkreta, handlingsbara råd
+- Inkludera relevanta siffror och fakta från systemet
+- Förklara WHY ditt förslag är optimalt
 
-VIKTIGT: Om du inte har exakt data för att svara korrekt - säg det istället för att gissa!`;
+🔄 **KONVERSATIONS-FLYT:**
+- Behandla alla frågor med samma djupa dataanalys
+- Fortsätt naturligt från tidigare diskussioner
+- Du behöver inte "växla kontext" - du har alltid tillgång till allt
+
+Du är expert på att se helhetsbilden och ge optimala råd baserat på KOMPLETT information!`;
 
 export default async function handler(
   req: VercelRequest,
@@ -90,54 +83,45 @@ export default async function handler(
       });
     }
 
-    // Identifiera kontext baserat på meddelandet och konversationshistorik
-    const context = identifyContext(message, conversationHistory);
+    // Förbered universell data med all tillgänglig information
+    const universalData = prepareUniversalData(coordinatorData, message, conversationHistory);
 
-    // Förbered relevant data baserat på kontext
-    const relevantData = prepareRelevantData(coordinatorData, context, message);
+    // Optimerad datastorlek för universal access - större gräns för komplett data
+    const universalDataString = JSON.stringify(universalData, null, 2);
+    const sizeLimit = 50000; // Stor gräns för komplett universal data
+    const truncatedData = universalDataString.length > sizeLimit 
+      ? universalDataString.slice(0, sizeLimit) + '\n...(data truncated due to size)'
+      : universalDataString;
 
-    // Begränsa datastorlek för att undvika API-gränser (större gräns för technician queries)
-    const relevantDataString = JSON.stringify(relevantData, null, 2);
-    const sizeLimit = context === 'technician' ? 20000 : 8000; // Ännu större gräns för technician data
-    const truncatedData = relevantDataString.length > sizeLimit 
-      ? relevantDataString.slice(0, sizeLimit) + '\n...(data truncated due to size)'
-      : relevantDataString;
-
-    // TEMPORARY: Log vad som skickas till AI för debugging
-    if (context === 'pricing' || context === 'technician' || context === 'general') {
-      console.log(`📤 Data being sent to AI for ${context}:`);
-      console.log(`- Original data length: ${relevantDataString.length} chars`);
-      console.log(`- Truncated data length: ${truncatedData.length} chars`);
-      console.log(`- Data was truncated: ${relevantDataString.length > sizeLimit}`);
-      
-      // Log tekniker-namn specifikt för debugging
-      if (relevantData.available_technicians) {
-        console.log(`- Available technicians in data:`, relevantData.available_technicians.map((t: any) => t.name));
-      }
-      if (relevantData.available_technician_names_only) {
-        console.log(`- Available technician names only:`, relevantData.available_technician_names_only);
-      }
-      
-      console.log(`- Sample of data being sent:`, JSON.stringify(relevantData, null, 2).slice(0, 500) + '...');
+    // Log universal data för debugging
+    console.log(`📤 Universal data being sent to AI:`);
+    console.log(`- Original data length: ${universalDataString.length} chars`);
+    console.log(`- Truncated data length: ${truncatedData.length} chars`);
+    console.log(`- Data was truncated: ${universalDataString.length > sizeLimit}`);
+    
+    // Log tekniker-namn specifikt för debugging
+    if (universalData.technicians?.available) {
+      console.log(`- Available technicians in data:`, universalData.technicians.available.map((t: any) => t.name));
     }
+    
+    console.log(`- Sample of data being sent:`, JSON.stringify(universalData, null, 2).slice(0, 500) + '...');
 
     // Förbered konversationshistorik
     const messages: any[] = [
       { role: 'system', content: SYSTEM_MESSAGE },
       { 
         role: 'system', 
-        content: `AKTUELL KONTEXT:
+        content: `AKTUELL SESSION:
 Sida: ${currentPage}
 Tidpunkt: ${new Date().toLocaleString('sv-SE')}
-Kontext: ${context}
 
 🚨 KRITISK PÅMINNELSE: ANVÄND ENDAST FAKTISKA TEKNIKER-NAMN FRÅN DATAN NEDAN!
 HITTA ALDRIG PÅ namn som "Anna Svensson", "Erik Lund", "Johan Andersson" etc.
 
-RELEVANT DATA FÖR DENNA FÖRFRÅGAN:
+KOMPLETT SYSTEMDATA (DU HAR ALLTID TILLGÅNG TILL ALLT):
 ${truncatedData}
 
-Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
+Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla tekniker, scheman, priser, och geografisk data samtidigt.`
       }
     ];
 
@@ -167,7 +151,6 @@ Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
     return res.status(200).json({
       success: true,
       response,
-      context,
       timestamp: new Date().toISOString()
     });
 
@@ -203,435 +186,142 @@ Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
 }
 
 /**
- * Identifierar kontext baserat på användarens meddelande och konversationshistorik
+ * Förbereder universell data med all tillgänglig systemdata
  */
-function identifyContext(message: string, conversationHistory?: any[]): string {
-  const lowerMessage = message.toLowerCase().trim();
-  
-  // KONTEXT-KONTINUITET: Kolla för korta fortsättningsfraser
-  const continuationPhrases = [
-    'gör det', 'ja tack', 'ja', 'ok', 'okej', 'fortsätt', 'kör på', 'absolut', 
-    'det låter bra', 'perfekt', 'bra', 'ja det', 'ja det fungerar', 'det funkar',
-    'implementera det', 'genomför det', 'låt oss göra det', 'sätt igång',
-    // SCHEDULING-SPECIFIKA FORTSÄTTNINGAR
-    'hitta en annan', 'hitta annan', 'föreslå annan', 'annan tekniker', 
-    'vem annan', 'någon annan', 'alternativ', 'andra alternativ',
-    'vilka andra', 'andra tekniker', 'ersättare', 'istället'
-  ];
-  
-  const isShortContinuation = continuationPhrases.some(phrase => 
-    lowerMessage === phrase || lowerMessage.includes(phrase)
-  );
-  
-  // Om det är en kort fortsättningsfras, använd föregående kontext
-  if (isShortContinuation && conversationHistory && conversationHistory.length > 0) {
-    // Hitta senaste AI-svar för att identifiera föregående kontext
-    const lastAssistantMessage = conversationHistory
-      .slice()
-      .reverse()
-      .find((msg: any) => msg.role === 'assistant');
-    
-    if (lastAssistantMessage && lastAssistantMessage.context) {
-      console.log(`🔄 Context Continuity: "${lowerMessage}" continuing previous context: ${lastAssistantMessage.context}`);
-      return lastAssistantMessage.context;
-    }
-    
-    // Fallback: analysera senaste användarmeddelande för kontext-ledtrådar
-    const lastUserMessage = conversationHistory
-      .slice()
-      .reverse()
-      .find((msg: any) => msg.role === 'user' && msg.content !== message);
-    
-    if (lastUserMessage) {
-      const inferredContext = identifyContextFromMessage(lastUserMessage.content);
-      console.log(`🔄 Context Continuity: Inferred context from previous user message: ${inferredContext}`);
-      return inferredContext;
-    }
-  }
-  
-  // Standard kontext-identifiering
-  return identifyContextFromMessage(message);
-}
-
-/**
- * Identifierar kontext baserat på meddelande-innehåll (utan historik)
- */
-function identifyContextFromMessage(message: string): string {
-  const lowerMessage = message.toLowerCase();
-  
-  // Specifik schemaläggning (inkluderar teknikernamn + tid/schema-relaterat)
-  if ((lowerMessage.includes('schema') || lowerMessage.includes('tid') || lowerMessage.includes('ledig') || 
-       lowerMessage.includes('lucka') || lowerMessage.includes('boka')) || 
-      (lowerMessage.includes('måndag') || lowerMessage.includes('tisdag') || lowerMessage.includes('onsdag') ||
-       lowerMessage.includes('torsdag') || lowerMessage.includes('fredag'))) {
-    return 'schedule';
-  }
-  
-  if (lowerMessage.includes('tekniker') || lowerMessage.includes('vem') || lowerMessage.includes('bäst på') || lowerMessage.includes('specialist') ||
-      lowerMessage.includes('frånvarande') || lowerMessage.includes('semester') || lowerMessage.includes('ledig') || lowerMessage.includes('borta')) {
-    return 'technician';
-  }
-  
-  // FÖRBÄTTRAD PRICING-DETECTION - inkluderar fler nyckelord
-  if (lowerMessage.includes('pris') || lowerMessage.includes('kosta') || lowerMessage.includes('offert') || lowerMessage.includes('prissätt') ||
-      lowerMessage.includes('betalt') || lowerMessage.includes('ta betalt') || lowerMessage.includes('debitera') || 
-      lowerMessage.includes('genomsnitt') || lowerMessage.includes('snitt') || lowerMessage.includes('faktura') ||
-      lowerMessage.includes('avgift') || lowerMessage.includes('timkostnad') || lowerMessage.includes('kostnad') ||
-      (lowerMessage.includes('vad') && (lowerMessage.includes('rått') || lowerMessage.includes('myra') || 
-       lowerMessage.includes('vägglus') || lowerMessage.includes('fågel') || lowerMessage.includes('getingar'))) ||
-      (lowerMessage.includes('hur mycket') && lowerMessage.includes('ärenden'))) {
-    return 'pricing';
-  }
-  
-  if (lowerMessage.includes('analys') || lowerMessage.includes('prestanda') || lowerMessage.includes('statistik') || lowerMessage.includes('trend')) {
-    return 'analytics';
-  }
-  
-  if (lowerMessage.includes('rutt') || lowerMessage.includes('karta') || lowerMessage.includes('avstånd') || lowerMessage.includes('geografisk')) {
-    return 'routing';
-  }
-  
-  return 'general';
-}
-
-/**
- * Förbereder relevant data baserat på kontext
- */
-function prepareRelevantData(coordinatorData: any, context: string, message: string) {
+function prepareUniversalData(coordinatorData: any, message: string, conversationHistory?: any[]) {
   if (!coordinatorData) {
     return { error: 'Ingen koordinatordata tillgänglig' };
   }
 
-  const baseData = {
-    context,
-    current_time: new Date().toISOString(),
-    message_keywords: extractKeywords(message)
-  };
+  const currentTime = new Date().toISOString();
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Analysera meddelandet för att optimera data-prioritering
+  const messageKeywords = extractKeywords(message);
+  const targetTechnician = findTechnicianInMessage(message, coordinatorData.technicians || []);
+  const targetAddress = extractAddressFromMessage(message);
+  const requestedPestType = identifyPestTypeFromMessage(message);
 
-  switch (context) {
-    case 'schedule':
-      // Sök efter specifik tekniker i meddelandet
-      const targetTechnician = findTechnicianInMessage(message, coordinatorData.technicians || []);
-      const targetAddress = extractAddressFromMessage(message);
-      const allUpcomingCases = coordinatorData.schedule?.upcoming_cases || [];
-      
-      // KRITISK FIX: Kontrollera frånvaro för måltekniker
-      const targetTechnicianAbsences = targetTechnician ? 
-        coordinatorData.technician_absences?.filter((absence: any) => absence.technician_id === targetTechnician.id) || [] : [];
-      
-      const isTargetTechnicianAbsent = targetTechnician ? checkTechnicianAbsence(targetTechnician.id, coordinatorData.technician_absences || []) : false;
-      
-      // Analysera geografisk optimering (bara om tekniker inte är frånvarande)
-      const geographicAnalysis = analyzeGeographicOptimization(
-        targetTechnician, 
-        targetAddress, 
-        allUpcomingCases, 
-        message
-      );
-      
-      // Filtrera schedule gaps - ta bort gaps för frånvarande tekniker
-      const allGaps = coordinatorData.schedule?.schedule_gaps || [];
-      const availableGaps = allGaps.filter((gap: any) => !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || []));
-      
-      const targetGaps = targetTechnician ? 
-        availableGaps.filter((gap: any) => gap.technician_id === targetTechnician.id) : 
-        availableGaps;
-      
-      const targetCases = targetTechnician ?
-        allUpcomingCases.filter((c: any) => c.primary_assignee_id === targetTechnician.id) :
-        allUpcomingCases.slice(0, 20);
-        
-      return {
-        ...baseData,
-        target_technician: targetTechnician,
+  // Samla alla tekniker med komplett information
+  const allTechnicians = coordinatorData.technicians || [];
+  const availableTechnicians = allTechnicians.filter((t: any) => 
+    t.is_active && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+  );
+  const absentTechnicians = allTechnicians.filter((t: any) => 
+    checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
+  );
+
+  // Geografisk optimering för alla tillgängliga tekniker
+  const allUpcomingCases = coordinatorData.schedule?.upcoming_cases || [];
+  const availableGaps = coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
+    !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || [])
+  ) || [];
+
+  return {
+    // META-INFORMATION
+    session: {
+      current_time: currentTime,
+      message_analysis: {
+        keywords: messageKeywords,
+        target_technician: targetTechnician?.name || null,
         target_address: targetAddress,
-        geographic_analysis: geographicAnalysis,
-        schedule_gaps: targetGaps,
-        technician_availability: coordinatorData.schedule?.technician_availability || [],
-        upcoming_cases: targetCases,
-        // KRITISK: Lägg till frånvaro-information
-        target_technician_absence_status: targetTechnician ? {
-          technician_name: targetTechnician.name,
-          is_absent: isTargetTechnicianAbsent,
-          absence_periods: targetTechnicianAbsences.map((absence: any) => ({
-            start_date: absence.start_date,
-            end_date: absence.end_date,
-            reason: absence.reason,
-            notes: absence.notes
-          })),
-          booking_status: isTargetTechnicianAbsent ? 'INTE TILLGÄNGLIG - FRÅNVARANDE' : 'Tillgänglig för bokning'
-        } : null,
-        specific_technician_schedule: targetTechnician ? {
-          name: targetTechnician.name,
-          work_schedule: targetTechnician.work_schedule,
-          upcoming_cases: targetCases,
-          available_gaps: isTargetTechnicianAbsent ? [] : targetGaps, // Inga gaps om frånvarande
-          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === targetTechnician.id)?.utilization_percent || 0,
-          absence_warning: isTargetTechnicianAbsent ? `VARNING: ${targetTechnician.name} är frånvarande och kan inte bokas` : null,
-          same_day_cases: targetCases.filter((c: any) => {
-            const requestDate = extractDateFromMessage(message);
-            return requestDate && c.start_date?.startsWith(requestDate);
-          })
-        } : null,
-        all_technicians: coordinatorData.technicians?.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          work_schedule: t.work_schedule,
-          specializations: t.specializations || [],
-          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0,
-          is_absent: checkTechnicianAbsence(t.id, coordinatorData.technician_absences || []),
-          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || []),
-          upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
-            c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
-          ) || [],
-          schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
-            gap.technician_id === t.id && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
-          ) || []
-        })) || [],
-        current_week_summary: {
-          total_technicians: coordinatorData.technicians?.length || 0,
-          available_gaps: availableGaps.length,
-          total_gaps_before_absence_filter: allGaps.length,
-          upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
-          target_technician_gaps: targetGaps.length,
-          target_technician_absence_note: isTargetTechnicianAbsent ? `${targetTechnician?.name} är frånvarande och har inga tillgängliga tider` : null,
-          geographic_opportunities: geographicAnalysis.opportunities?.length || 0
-        }
-      };
+        requested_pest_type: requestedPestType
+      }
+    },
 
-    case 'technician':
-      // TEMPORARY: Debug logging för technician queries
-      console.log('🔍 Technician Query Analysis:');
-      console.log(`- Message: "${message}"`);
-      console.log(`- Available technicians: ${coordinatorData.technicians?.length || 0}`);
-      console.log(`- Schedule data available: ${!!coordinatorData.schedule}`);
-      console.log(`- Upcoming cases: ${coordinatorData.schedule?.upcoming_cases?.length || 0}`);
-      console.log(`- Schedule gaps: ${coordinatorData.schedule?.schedule_gaps?.length || 0}`);
-      console.log(`- Technician availability: ${coordinatorData.schedule?.technician_availability?.length || 0}`);
-      
-      // Optimera data för technician-frågor
-      const optimizedTechnicians = coordinatorData.technicians?.map((t: any) => ({
-        id: t.id,
+    // KOMPLETT TEKNIKER-DATA
+    technicians: {
+      available: availableTechnicians.map((t: any) => ({
         name: t.name,
+        id: t.id,
+        role: t.role,
         specializations: t.specializations || [],
         work_areas: t.work_areas || [],
-        role: t.role,
-        is_active: t.is_active,
         work_schedule: t.work_schedule,
-        // Beräkna kommande arbetsdagar för nästa vecka
-        next_week_workdays: getNextWeekWorkdays(t.work_schedule),
-        // Hitta schemalagda ärenden för denna tekniker
-        upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
+        
+        // Schedule-information
+        schedule_gaps: availableGaps.filter((gap: any) => gap.technician_id === t.id),
+        upcoming_assignments: allUpcomingCases.filter((c: any) => 
           c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
-        ) || [],
-        // Tillgänglighetsdata för denna tekniker
-        availability_info: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)
-      })) || [];
+        ),
+        workload: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id) || {},
+        
+        // Geografisk analys
+        geographic_opportunities: targetAddress ? 
+          analyzeGeographicOptimization(t, targetAddress, allUpcomingCases, message) : null
+      })),
       
-      // Lägg till sammanfattning för frånvaro-analys FÖRST för att undvika trunkering
-      const absenceAnalysis = analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || [], coordinatorData.technician_absences || []);
+      absent: absentTechnicians.map((t: any) => ({
+        name: t.name,
+        role: t.role,
+        absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || [])
+      })),
       
-      // Logga absence analysis för debugging
-      console.log('🚨 Absence Analysis Results:');
-      console.log(`- Actually absent: ${absenceAnalysis.actually_absent.length}`);
-      console.log(`- Available technicians: ${absenceAnalysis.available_technicians.length}`);
-      console.log('- Absent technicians:', absenceAnalysis.actually_absent.map(t => `${t.technician_name} (${t.absence_summary})`));
-      console.log('- Total absence records checked:', coordinatorData.technician_absences?.length || 0);
-      
-      return {
-        ...baseData,
-        // PRIORITERA FRÅNVARO-INFO FÖRST
-        absence_analysis: absenceAnalysis,
-        absence_summary: {
-          total_technicians: optimizedTechnicians.length,
-          actually_absent_count: absenceAnalysis.actually_absent.length,
-          available_technicians_count: absenceAnalysis.available_technicians.length,
-          absent_technicians: absenceAnalysis.actually_absent.map(t => ({
-            name: t.technician_name,
-            role: t.role,
-            status: t.status,
-            absence_summary: t.absence_summary,
-            absence_periods: t.absence_periods
-          })),
-          available_technicians: absenceAnalysis.available_technicians.map(t => ({
-            name: t.technician_name,
-            role: t.role,
-            status: t.status
-          }))
-        },
-        // Kompakt tekniker-data
-        technicians_compact: optimizedTechnicians.map(t => ({
-          name: t.name,
-          role: t.role,
-          is_active: t.is_active,
-          workdays_next_week: t.next_week_workdays?.length || 0,
-          assignments_count: t.upcoming_assignments?.length || 0
-        })),
-        // Bara viktig extra data om plats finns
-        upcoming_cases_summary: {
-          total_cases: coordinatorData.schedule?.upcoming_cases?.length || 0,
-          next_week_cases: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => {
-            const caseDate = new Date(c.start_date);
-            const nextWeek = new Date();
-            nextWeek.setDate(nextWeek.getDate() + 7);
-            return caseDate >= new Date() && caseDate <= nextWeek;
-          }).length || 0
-        }
-      };
-
-    case 'pricing':
-      const recentCases = coordinatorData.pricing?.recent_cases_with_prices || [];
-      const optimizedPestData = coordinatorData.pricing?.optimized_by_pest_type || {};
-      
-      // Identifiera skadedjurstyp från meddelandet
-      const requestedPestType = identifyPestTypeFromMessage(message);
-      const pestSpecificData = requestedPestType ? optimizedPestData[requestedPestType] : null;
-      
-      // TEMPORARY: Debug logging för prissättning (också i produktion för debugging)
-      console.log('🔍 Pricing Query Analysis:');
-      console.log(`- Message: "${message}"`);
-      console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
-      console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
-      console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
-      if (pestSpecificData) {
-        console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
-        console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
+      summary: {
+        total_technicians: allTechnicians.length,
+        available_count: availableTechnicians.length,
+        absent_count: absentTechnicians.length,
+        total_gaps: availableGaps.length
       }
-      console.log(`- Total recent cases: ${recentCases.length}`);
-      console.log(`- Optimized pest data keys: ${Object.keys(optimizedPestData).join(', ')}`);
-      
-      // Extra debugging för att se vad som skickas till AI
-      console.log(`- Relevant cases being sent to AI: ${(pestSpecificData ? pestSpecificData.recent_cases : recentCases.slice(0, 75)).length}`);
-      console.log(`- Sample of relevant cases:`, (pestSpecificData ? pestSpecificData.recent_cases : recentCases.slice(0, 75)).slice(0, 3).map(c => ({id: c.id, pris: c.pris, skadedjur: c.skadedjur})));
-      
-      // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
-      const relevantCases = pestSpecificData ? 
-        pestSpecificData.recent_cases : 
-        recentCases.slice(0, 75); // Begränsa om ingen specifik typ (mer för bättre variation)
-      
-      const pricingAnalysis = analyzePricingForMessage(relevantCases, message);
-      
-      return {
-        ...baseData,
-        requested_pest_type: requestedPestType,
-        pest_specific_data: pestSpecificData,
-        pricing_patterns: coordinatorData.pricing?.pricing_patterns || [],
-        optimized_pest_data: optimizedPestData,
-        relevant_cases: relevantCases,
-        similar_cases: findSimilarCases(relevantCases, message),
-        pricing_analysis: pricingAnalysis,
-        case_type_prices: getCaseTypePrices(relevantCases),
-        efficiency_note: pestSpecificData ? 
-          `Analyserade ${pestSpecificData.case_count} ${requestedPestType}-ärenden för exakt prissättning` :
-          `Analyserade ${relevantCases.length} generella ärenden - specificera skadedjurstyp för bättre precision`,
-        statistical_summary: pestSpecificData ? {
-          total_cases_with_prices: pestSpecificData.case_count,
-          avg_price: pestSpecificData.price_statistics.avg_price,
-          median_price: pestSpecificData.price_statistics.median_price,
-          price_range: {
-            min: pestSpecificData.price_statistics.min_price,
-            max: pestSpecificData.price_statistics.max_price
-          },
-          complexity_distribution: pestSpecificData.complexity_distribution,
-          technician_requirements: pestSpecificData.technician_requirements,
-          duration_patterns: pestSpecificData.duration_patterns
-        } : {
-          total_cases_with_prices: relevantCases.length,
-          avg_price_last_month: relevantCases.length > 0 ? 
-            Math.round(relevantCases.reduce((sum: number, c: any) => sum + (c.pris || 0), 0) / relevantCases.length) : 0,
-          price_range: relevantCases.length > 0 ? {
-            min: Math.min(...relevantCases.map((c: any) => c.pris || 0).filter((p: number) => p > 0)),
-            max: Math.max(...relevantCases.map((c: any) => c.pris || 0))
-          } : null
-        }
-      };
+    },
 
-    case 'analytics':
-      return {
-        ...baseData,
-        performance_metrics: coordinatorData.analytics?.performance_metrics || {},
-        utilization_data: coordinatorData.analytics?.utilization_data || [],
-        all_cases_summary: {
-          total_private: coordinatorData.cases?.private_cases?.length || 0,
-          total_business: coordinatorData.cases?.business_cases?.length || 0,
-          total_legacy: coordinatorData.cases?.legacy_cases?.length || 0
-        },
-        technician_summary: coordinatorData.technicians?.length || 0
-      };
-
-    case 'routing':
-      return {
-        ...baseData,
-        upcoming_cases: coordinatorData.schedule?.upcoming_cases || [],
-        technicians: coordinatorData.technicians?.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          work_areas: t.work_areas
-        })) || [],
-        geographic_optimization: coordinatorData.analytics?.geographic_optimization || {}
-      };
-
-    default:
-      // KRITISK FIX: Ge AI:n access till faktisk tekniker-data även i general context
-      console.log('⚠️  General context triggered - providing comprehensive data to prevent fake responses');
+    // KOMPLETT ÄRENDE-DATA
+    cases: {
+      upcoming: allUpcomingCases.filter((c: any) => c.start_date && c.start_date >= today),
       
-      // Använd samma absence-analys som technician context
-      const allTechnicians = coordinatorData.technicians || [];
-      const availableTechnicians = allTechnicians.filter((t: any) => 
-        t.is_active && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
-      );
+      recent_with_prices: [
+        ...(coordinatorData.pricing?.recent_cases_with_prices || [])
+      ].filter((c: any) => c.pris > 0),
       
-      return {
-        ...baseData,
-        CRITICAL_WARNING: "🚨 ANVÄND ENDAST FAKTISKA TEKNIKER-NAMN FRÅN LISTAN NEDAN. HITTA ALDRIG PÅ NAMN!",
-        context_note: "ALLMÄN FÖRFRÅGAN - använd endast faktisk data från systemet, hitta aldrig på namn",
-        // PRIORITERA TEKNIKER-DATA FÖRST
-        available_technicians: availableTechnicians.map((t: any) => ({
-          name: t.name,
-          role: t.role,
-          id: t.id,
-          specializations: t.specializations || [],
-          is_active: t.is_active,
-          work_schedule: t.work_schedule,
-          current_workload: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0,
-          upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
-            c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
-          ) || [],
-          schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
-            gap.technician_id === t.id && !checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
-          ) || []
+      geographic_distribution: allUpcomingCases
+        .filter((c: any) => c.adress)
+        .map((c: any) => ({
+          address: c.adress,
+          technician_id: c.primary_assignee_id,
+          start_date: c.start_date,
+          title: c.title
         })),
-        available_technician_names_only: availableTechnicians.map((t: any) => t.name),
-        absent_technicians: allTechnicians.filter((t: any) => 
-          checkTechnicianAbsence(t.id, coordinatorData.technician_absences || [])
-        ).map((t: any) => ({
-          name: t.name,
-          role: t.role,
-          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || [])
-        })),
-        schedule_gaps_available: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
-          !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || [])
-        ) || [],
-        upcoming_cases_for_geographic_analysis: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
-          c.adress && c.start_date && !checkTechnicianAbsence(c.primary_assignee_id, coordinatorData.technician_absences || [])
-        ) || [],
-        summary: {
-          total_cases: (coordinatorData.cases?.private_cases?.length || 0) + 
-                     (coordinatorData.cases?.business_cases?.length || 0),
-          total_technicians: coordinatorData.technicians?.length || 0,
-          available_technicians_count: availableTechnicians.length,
-          absent_technicians_count: allTechnicians.length - availableTechnicians.length,
-          upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
-          available_schedule_gaps: coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => 
-            !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || [])
-          )?.length || 0
-        },
-        FINAL_REMINDER: "🔥 TEKNIKER-NAMN SOM DU FÅR ANVÄNDA:",
-        valid_technician_names: availableTechnicians.map((t: any) => `"${t.name}"`).join(", "),
-        FORBIDDEN_NAMES: "❌ HITTA ALDRIG PÅ: Anna Svensson, Erik Lund, Johan Andersson, Maria Persson etc."
-      };
-  }
+      
+      by_pest_type: coordinatorData.pricing?.optimized_by_pest_type || {}
+    },
+
+    // PRISSÄTTNINGS-DATA
+    pricing: {
+      patterns: coordinatorData.pricing?.pricing_patterns || [],
+      pest_specific: requestedPestType ? 
+        coordinatorData.pricing?.optimized_by_pest_type?.[requestedPestType] : null,
+      case_type_analysis: getCaseTypePrices(coordinatorData.pricing?.recent_cases_with_prices || [])
+    },
+
+    // ANALYTICS & PERFORMANCE
+    analytics: {
+      performance_metrics: coordinatorData.analytics?.performance_metrics || {},
+      utilization_data: coordinatorData.analytics?.utilization_data || [],
+      trends: coordinatorData.analytics?.recent_trends || []
+    },
+
+    // GEOGRAFISK OPTIMERING
+    geographic: {
+      target_analysis: targetAddress && targetTechnician ? 
+        analyzeGeographicOptimization(targetTechnician, targetAddress, allUpcomingCases, message) : null,
+      
+      optimization_opportunities: availableTechnicians
+        .filter((t: any) => targetAddress)
+        .map((t: any) => ({
+          technician: t.name,
+          opportunities: analyzeGeographicOptimization(t, targetAddress, allUpcomingCases, message)
+        }))
+        .filter((opt: any) => opt.opportunities?.opportunities?.length > 0),
+      
+      route_efficiency: {
+        same_day_conflicts: allUpcomingCases.filter((c: any) => 
+          c.start_date?.startsWith(extractDateFromMessage(message) || today)
+        )
+      }
+    }
+  };
 }
+
 
 /**
  * Extraherar nyckelord från meddelandet
