@@ -1201,7 +1201,7 @@ function identifyPestTypeFromMessage(message: string): string | null {
   const lowerMessage = message.toLowerCase();
   
   // Exakta matchningar först (mest specifika)
-  if (lowerMessage.includes('vägglus') || lowerMessage.includes('bedbug')) return 'Vägglöss';
+  if (lowerMessage.includes('vägglus') || lowerMessage.includes('vägglöss') || lowerMessage.includes('bedbug')) return 'Vägglöss';
   if (lowerMessage.includes('fågelsäkring')) return 'Fågelsäkring';
   if (lowerMessage.includes('kackerlack') || lowerMessage.includes('cockroach')) return 'Kackerlackor';
   if (lowerMessage.includes('getingar') || lowerMessage.includes('hornets nest')) return 'Getingar';
