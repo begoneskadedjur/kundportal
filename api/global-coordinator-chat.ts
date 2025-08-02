@@ -281,7 +281,7 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
       const relevantCases = pestSpecificData ? 
         pestSpecificData.recent_cases : 
-        recentCases.slice(0, 50); // Begränsa om ingen specifik typ
+        recentCases.slice(0, 75); // Begränsa om ingen specifik typ (mer för bättre variation)
       
       const pricingAnalysis = analyzePricingForMessage(relevantCases, message);
       
@@ -1008,7 +1008,7 @@ function findMostSimilarCases(cases: any[], criteria: any) {
       similarity_score: calculateCaseSimilarity(c, criteria)
     }))
     .sort((a, b) => b.similarity_score - a.similarity_score)
-    .slice(0, 3)
+    .slice(0, 5) // Öka till 5 mest liknande för bättre variation
     .map(c => ({
       id: c.id,
       title: c.title,
@@ -1018,7 +1018,8 @@ function findMostSimilarCases(cases: any[], criteria: any) {
         Math.round(((new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60)) * 10) / 10 : null,
       technician_count: [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean).length,
       similarity_score: c.similarity_score,
-      case_type: c.case_type
+      case_type: c.case_type,
+      created_at: c.created_at
     }));
 }
 

@@ -668,7 +668,7 @@ const optimizePricingDataByPestType = (cases: any[]) => {
           },
           recent_cases: pestCases
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .slice(0, 10), // Top 10 senaste för snabb analys
+            .slice(0, 25), // Top 25 senaste för bättre variation och precision
           complexity_distribution: analyzeComplexityDistribution(pestCases),
           technician_requirements: analyzeTechnicianRequirements(pestCases),
           duration_patterns: analyzeDurationPatterns(pestCases)
