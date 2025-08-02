@@ -57,9 +57,10 @@ Du har tillgång till KOMPLETT geografisk data - använd den ALLTID:
 
 📝 **SVAR-STRUKTUR:**
 - Börja med: "Baserat på komplett systemanalys..."
-- **FÖR PRISFRÅGOR**: Visa först pricing.method_specific_cases.filtered_cases
-- **LISTA EXAKTA ÄRENDEN**: "Analyserat X ärenden: [ID, titel, pris för varje]"
-- **GE KONKRET PRISINTERVALL**: Baserat på faktiska priser, inte gissningar
+- **FÖR SNITT-FRÅGOR**: Använd pricing.case_type_analysis.gnagare.cases för alla råttärenden
+- **FÖR METODFRÅGOR**: Visa pricing.method_specific_cases.filtered_cases först
+- **LISTA EXAKTA ÄRENDEN**: "Analyserat X ärenden: [ID, titel, pris för varje]"  
+- **VISA STATISTIK**: count, avg, median, min, max från case_type_analysis
 - Förklara WHY ditt förslag är optimalt baserat på FAKTISK data
 
 🔄 **KONVERSATIONS-FLYT:**
@@ -369,21 +370,24 @@ function filterCasesByMethod(cases: any[], message: string) {
   const methodSpecificCases = cases.filter((caseItem: any) => {
     if (!caseItem.pris || caseItem.pris <= 0) return false;
     
-    const caseText = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    // FÖRBÄTTRAD SÖKNING: inkludera alla textfält
+    const caseText = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''} ${caseItem.skadedjur || ''}`.toLowerCase();
     
     // Kolla om ärendet innehåller någon av de detekterade metoderna
     return methods.some(method => {
       switch (method) {
         case 'kisel':
-          return caseText.includes('kisel') && !caseText.includes('värmetält');
+          // Mer specifik sökning för kisel - även diatomjord etc.
+          return (caseText.includes('kisel') || caseText.includes('diatomjord')) && 
+                 !caseText.includes('värmetält') && !caseText.includes('värme tält');
         case 'värmetält':
-          return caseText.includes('värmetält') || caseText.includes('värme');
+          return caseText.includes('värmetält') || caseText.includes('värme tält') || caseText.includes('värme');
         case 'sanering':
           return caseText.includes('sanering') || caseText.includes('sanera');
         case 'inspektion':
-          return caseText.includes('inspektion') || caseText.includes('inspekterar');
+          return caseText.includes('inspektion') || caseText.includes('inspekterar') || caseText.includes('inspektion');
         case 'spray':
-          return caseText.includes('spray') || caseText.includes('spraing');
+          return caseText.includes('spray') || caseText.includes('sprayning') || caseText.includes('spraing');
         default:
           return caseText.includes(method);
       }
@@ -563,33 +567,57 @@ function getCaseTypePrices(cases: any[]) {
     'vägglöss': [],
     'kackerlackor': [],
     'getingar': [],
+    'fågelsäkring': [],
     'övriga': []
   } as Record<string, any[]>;
   
   for (const caseItem of cases) {
-    const text = `${caseItem.title || ''} ${caseItem.description || ''}`.toLowerCase();
+    // FÖRBÄTTRAD SÖKNING: Kolla skadedjur-kolumn FÖRST, sedan text
+    const skadedjur = (caseItem.skadedjur || '').toLowerCase();
+    const text = `${caseItem.title || ''} ${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    const allText = `${skadedjur} ${text}`;
+    
     let type = 'övriga';
     
-    if (text.includes('råtta') || text.includes('mus')) type = 'gnagare';
-    else if (text.includes('myra')) type = 'myror';
-    else if (text.includes('vägglus') || text.includes('vägglöss')) type = 'vägglöss';
-    else if (text.includes('kackerlack')) type = 'kackerlackor';
-    else if (text.includes('getingar')) type = 'getingar';
+    // Prioritera skadedjur-kolumnen
+    if (skadedjur.includes('råttor') || skadedjur.includes('möss') || 
+        allText.includes('råtta') || allText.includes('mus') || allText.includes('gnagare')) {
+      type = 'gnagare';
+    } else if (skadedjur.includes('myror') || allText.includes('myra')) {
+      type = 'myror';
+    } else if (skadedjur.includes('vägglöss') || allText.includes('vägglus') || allText.includes('vägglöss')) {
+      type = 'vägglöss';
+    } else if (skadedjur.includes('kackerlackor') || allText.includes('kackerlack')) {
+      type = 'kackerlackor';
+    } else if (skadedjur.includes('getingar') || allText.includes('getingar')) {
+      type = 'getingar';
+    } else if (skadedjur.includes('fågelsäkring') || allText.includes('fågelsäkring') || 
+               allText.includes('bird blocker') || allText.includes('solpanel')) {
+      type = 'fågelsäkring';
+    }
     
     if (caseItem.pris > 0) {
-      types[type].push(caseItem.pris);
+      types[type].push({
+        pris: caseItem.pris,
+        id: caseItem.id,
+        title: caseItem.title,
+        skadedjur: caseItem.skadedjur
+      });
     }
   }
   
   const result: Record<string, any> = {};
   
-  for (const [type, prices] of Object.entries(types)) {
-    if (prices.length > 0) {
+  for (const [type, caseData] of Object.entries(types)) {
+    if (caseData.length > 0) {
+      const prices = caseData.map((c: any) => c.pris);
       result[type] = {
-        count: prices.length,
+        count: caseData.length,
         avg: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
         min: Math.min(...prices),
-        max: Math.max(...prices)
+        max: Math.max(...prices),
+        cases: caseData, // Inkludera faktiska ärenden för transparens
+        median: calculateMedianPrice(prices)
       };
     }
   }
