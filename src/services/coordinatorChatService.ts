@@ -95,7 +95,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .not('start_date', 'is', null)
         .order('start_date', { ascending: true }),
 
-      // Alla ärenden med priser (för skadedjurs-specifik filtrering)
+      // ALLA ärenden med priser - DRAMATISKT UTÖKAD för fullständig databas-access
       supabase
         .from('private_cases')
         .select(`
@@ -105,11 +105,11 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString())
-        .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
-        .limit(200), // Öka gränsen för bättre skadedjurs-täckning
+        .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()) // SENASTE ÅRET
+        .order('created_at', { ascending: false }) // Sortera efter datum för relevans
+        .limit(1000), // MYCKET STÖRRE GRÄNS för fullständig täckning
 
-      // Business cases med komplett prissättningsdata
+      // Business cases med FULLSTÄNDIG prissättningsdata
       supabase
         .from('business_cases')
         .select(`
@@ -119,9 +119,9 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString())
-        .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
-        .limit(200) // Öka gränsen för bättre skadedjurs-täckning
+        .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()) // SENASTE ÅRET
+        .order('created_at', { ascending: false }) // Sortera efter datum för relevans
+        .limit(1000) // MYCKET STÖRRE GRÄNS för fullständig täckning
     ]);
 
     // Kombinera alla ärenden med priser för omfattande prissättningsanalys
@@ -130,20 +130,53 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       ...(recentBusinessCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'business' as const }))
     ];
 
-    // TEMPORARY: Debug logging för att spåra dataflöde (även i produktion för debugging)
-    console.log('📊 Coordinator Chat Data Summary:');
+    // ENHANCED: Debug logging för att spåra fullständig databas-access
+    console.log('📊 FULLSTÄNDIG Coordinator Chat Data Summary:');
     console.log(`- Private cases with prices: ${recentPrivateCasesWithPrices.data?.length || 0}`);
     console.log(`- Business cases with prices: ${recentBusinessCasesWithPrices.data?.length || 0}`);
     console.log(`- Total cases with prices: ${allCasesWithPrices.length}`);
     
-    // Log pest types found in data
+    // DETALJERAD PEST TYPE ANALYS
     const pestTypes = allCasesWithPrices.map(c => c.skadedjur).filter(Boolean);
     const uniquePestTypes = [...new Set(pestTypes)];
-    console.log(`- Unique pest types found: ${uniquePestTypes.join(', ')}`);
-    console.log(`- Sample vägglöss cases:`, allCasesWithPrices.filter(c => 
-      c.skadedjur?.toLowerCase().includes('vägglöss') || 
-      c.skadedjur?.toLowerCase().includes('vägglus')
-    ).length);
+    console.log(`- Unique pest types found (${uniquePestTypes.length}): ${uniquePestTypes.join(', ')}`);
+    
+    // SPECIFIK RÄKNING FÖR VIKTIGA TYPER
+    const pestTypeCounts = {
+      råttor: allCasesWithPrices.filter(c => {
+        const skadedjur = (c.skadedjur || '').toLowerCase();
+        const text = `${c.title || ''} ${c.description || ''} ${c.rapport || ''}`.toLowerCase();
+        return skadedjur.includes('råttor') || skadedjur.includes('möss') || 
+               text.includes('råtta') || text.includes('mus') || text.includes('gnagare');
+      }).length,
+      vägglöss: allCasesWithPrices.filter(c => {
+        const skadedjur = (c.skadedjur || '').toLowerCase();
+        const text = `${c.title || ''} ${c.description || ''} ${c.rapport || ''}`.toLowerCase();
+        return skadedjur.includes('vägglöss') || text.includes('vägglus') || text.includes('vägglöss');
+      }).length,
+      getingar: allCasesWithPrices.filter(c => {
+        const skadedjur = (c.skadedjur || '').toLowerCase();
+        const text = `${c.title || ''} ${c.description || ''} ${c.rapport || ''}`.toLowerCase();
+        return skadedjur.includes('getingar') || text.includes('getingar');
+      }).length,
+      kisel: allCasesWithPrices.filter(c => {
+        const text = `${c.title || ''} ${c.description || ''} ${c.rapport || ''}`.toLowerCase();
+        return text.includes('kisel') || text.includes('diatomjord');
+      }).length
+    };
+    
+    console.log('🐛 PEST TYPE BREAKDOWN:');
+    console.log(`  - Råttor/Gnagare: ${pestTypeCounts.råttor} ärenden`);
+    console.log(`  - Vägglöss: ${pestTypeCounts.vägglöss} ärenden`);
+    console.log(`  - Getingar: ${pestTypeCounts.getingar} ärenden`);
+    console.log(`  - Kisel-metod: ${pestTypeCounts.kisel} ärenden`);
+    
+    // Sample ärenden för debugging
+    const sampleRats = allCasesWithPrices.filter(c => {
+      const skadedjur = (c.skadedjur || '').toLowerCase();
+      return skadedjur.includes('råttor') || skadedjur.includes('möss');
+    }).slice(0, 3);
+    console.log('🐭 Sample råttärenden:', sampleRats.map(c => ({id: c.id.slice(0,8), title: c.title, pris: c.pris, skadedjur: c.skadedjur})));
 
     // Optimera prissättningsdata genom att gruppera efter skadedjur
     const optimizedPricingData = optimizePricingDataByPestType(allCasesWithPrices);
