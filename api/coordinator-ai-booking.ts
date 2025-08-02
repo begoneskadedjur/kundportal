@@ -5,9 +5,10 @@ import { createClient } from '@supabase/supabase-js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Database } from '../src/types/database'
 
+// Use service role key for admin operations (bypasses RLS)
 const supabase = createClient<Database>(
   process.env.VITE_SUPABASE_URL!,
-  process.env.VITE_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 interface BookingRequest {
@@ -100,13 +101,21 @@ function validateBookingData(data: BookingRequest): string[] {
     errors.push('Ärendetyp måste vara "private" eller "business"')
   }
   
-  // Validate specific fields for each case type
-  if (data.case_type === 'private' && data.personnummer && !data.personnummer.match(/^\d{10,12}$/)) {
-    errors.push('Personnummer måste vara 10-12 siffror')
+  // Validate REQUIRED fields for each case type
+  if (data.case_type === 'private') {
+    if (!data.personnummer || !data.personnummer.trim()) {
+      errors.push('Personnummer är obligatoriskt för privatpersoner')
+    } else if (!data.personnummer.match(/^\d{10,12}$/)) {
+      errors.push('Personnummer måste vara 10-12 siffror')
+    }
   }
   
-  if (data.case_type === 'business' && data.org_nr && !data.org_nr.match(/^\d{10}$/)) {
-    errors.push('Organisationsnummer måste vara 10 siffror')
+  if (data.case_type === 'business') {
+    if (!data.org_nr || !data.org_nr.trim()) {
+      errors.push('Organisationsnummer är obligatoriskt för företag')
+    } else if (!data.org_nr.match(/^\d{10}$/)) {
+      errors.push('Organisationsnummer måste vara 10 siffror')
+    }
   }
   
   // Validate dates

@@ -71,11 +71,13 @@ The AI booking functionality has been successfully implemented with the followin
 
 ## Required Fields
 
-### Minimal (only title required):
-- title: string (REQUIRED)
+### OBLIGATORISKA fält:
+- **title**: string (ALLTID KRÄVD)
+- **personnummer**: string för private cases (10-12 siffror, ALLTID KRÄVD)
+- **org_nr**: string för business cases (10 siffror, ALLTID KRÄVD)
 
-### Recommended for complete booking:
-- case_type: "private" | "business"
+### Rekommenderade för komplett bokning:
+- case_type: "private" | "business" 
 - kontaktperson: string
 - telefon_kontaktperson: string
 - skadedjur: string
@@ -85,9 +87,10 @@ The AI booking functionality has been successfully implemented with the followin
 - pris: number
 - primary_assignee_id: string (technician)
 
-### Case Type Specific:
-- **Private**: personnummer
-- **Business**: org_nr
+### Viktiga ändringar:
+- **RLS-problem LÖST**: API använder nu service role key istället för anon key
+- **Validering**: Personnummer/org_nr valideras som obligatoriska fält
+- **AI instruktioner**: AI kommer fråga efter saknade personnummer/org_nr innan bokning
 
 ## Features
 
