@@ -94,6 +94,15 @@ export default async function handler(
       ? relevantDataString.slice(0, 8000) + '\n...(data truncated due to size)'
       : relevantDataString;
 
+    // TEMPORARY: Log vad som skickas till AI för debugging
+    if (context === 'pricing') {
+      console.log('📤 Data being sent to AI for pricing:');
+      console.log(`- Original data length: ${relevantDataString.length} chars`);
+      console.log(`- Truncated data length: ${truncatedData.length} chars`);
+      console.log(`- Data was truncated: ${relevantDataString.length > 8000}`);
+      console.log(`- Sample of data being sent:`, JSON.stringify(relevantData, null, 2).slice(0, 500) + '...');
+    }
+
     // Förbered konversationshistorik
     const messages: any[] = [
       { role: 'system', content: SYSTEM_MESSAGE },
@@ -309,18 +318,22 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       const requestedPestType = identifyPestTypeFromMessage(message);
       const pestSpecificData = requestedPestType ? optimizedPestData[requestedPestType] : null;
       
-      // Debug logging för prissättning (endast i utvecklingsmiljö)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 Pricing Query Analysis:');
-        console.log(`- Message: "${message}"`);
-        console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
-        console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
-        console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
-        if (pestSpecificData) {
-          console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
-          console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
-        }
+      // TEMPORARY: Debug logging för prissättning (också i produktion för debugging)
+      console.log('🔍 Pricing Query Analysis:');
+      console.log(`- Message: "${message}"`);
+      console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
+      console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
+      console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
+      if (pestSpecificData) {
+        console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
+        console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
       }
+      console.log(`- Total recent cases: ${recentCases.length}`);
+      console.log(`- Optimized pest data keys: ${Object.keys(optimizedPestData).join(', ')}`);
+      
+      // Extra debugging för att se vad som skickas till AI
+      console.log(`- Relevant cases being sent to AI: ${(pestSpecificData ? pestSpecificData.recent_cases : recentCases.slice(0, 75)).length}`);
+      console.log(`- Sample of relevant cases:`, (pestSpecificData ? pestSpecificData.recent_cases : recentCases.slice(0, 75)).slice(0, 3).map(c => ({id: c.id, pris: c.pris, skadedjur: c.skadedjur})));
       
       // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
       const relevantCases = pestSpecificData ? 

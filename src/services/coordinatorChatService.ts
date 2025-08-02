@@ -80,8 +80,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .from('private_cases')
         .select(`
           id, title, description, adress, start_date, due_date, status,
-          primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
-          technicians!primary_assignee_id(id, name, specializations, work_schedule)
+          primary_assignee_id, secondary_assignee_id, tertiary_assignee_id
         `)
         .gte('start_date', today)
         .lte('start_date', oneWeekFromNow)
@@ -123,7 +122,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       ...(recentBusinessCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'business' as const }))
     ];
 
-    // Debug logging för att spåra dataflöde
+    // TEMPORARY: Debug logging för att spåra dataflöde (även i produktion för debugging)
     console.log('📊 Coordinator Chat Data Summary:');
     console.log(`- Private cases with prices: ${recentPrivateCasesWithPrices.data?.length || 0}`);
     console.log(`- Business cases with prices: ${recentBusinessCasesWithPrices.data?.length || 0}`);
@@ -140,6 +139,14 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
 
     // Optimera prissättningsdata genom att gruppera efter skadedjur
     const optimizedPricingData = optimizePricingDataByPestType(allCasesWithPrices);
+    
+    // TEMPORARY: Debug optimized pricing data
+    console.log(`📈 Optimized Pricing Data Keys: ${Object.keys(optimizedPricingData).join(', ')}`);
+    if (optimizedPricingData['Vägglöss']) {
+      console.log(`🐛 Vägglöss data found: ${optimizedPricingData['Vägglöss'].case_count} cases, avg price: ${optimizedPricingData['Vägglöss'].price_statistics?.avg_price}`);
+    } else {
+      console.log(`❌ No Vägglöss data in optimized structure`);
+    }
 
     // Analysera schema-luckor
     const scheduleGaps = await analyzeScheduleGaps(technicians.data || [], today, oneWeekFromNow);
