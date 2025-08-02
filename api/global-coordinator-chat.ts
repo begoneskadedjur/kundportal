@@ -120,7 +120,7 @@ När användare ber dig boka ett ärende, använd bookingData i din respons med 
 2. ✅ Fullständig adress angiven
 3. ✅ Tekniker-ID matchar någon från tillgänglig data
 4. ✅ Datum är i framtiden och i korrekt format
-5. ✅ Titel och kontaktperson angivet
+5. ✅ Titel, beskrivning och kontaktperson angivet
 
 📋 **INFORMATIONSINSAMLING - NÄR DATA SAKNAS:**
 När du behöver information från användaren, presentera det som en ENKEL kopierbar lista:
@@ -128,6 +128,7 @@ När du behöver information från användaren, presentera det som en ENKEL kopi
 **Fyll i uppgifterna:**
 
 Ärendetitel: 
+Beskrivning: 
 Kontaktperson: 
 Telefonnummer: 
 E-postadress: 

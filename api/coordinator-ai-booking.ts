@@ -97,6 +97,10 @@ function validateBookingData(data: BookingRequest): string[] {
     errors.push('Titel är obligatorisk')
   }
   
+  if (!data.description?.trim()) {
+    errors.push('Beskrivning är obligatorisk')
+  }
+  
   if (!['private', 'business'].includes(data.case_type)) {
     errors.push('Ärendetyp måste vara "private" eller "business"')
   }
@@ -220,8 +224,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Note: clickup_task_id will be set by frontend ClickUp sync (like CreateCaseModal)
       case_number: caseNumber,
       title: bookingData.title,
-      description: bookingData.description || null,
-      status: bookingData.status || 'Öppen',
+      description: bookingData.description,
+      status: 'Bokat', // AI-skapade ärenden ska alltid ha status "Bokat"
       priority: bookingData.priority || 'Normal',
       
       // Assignees
