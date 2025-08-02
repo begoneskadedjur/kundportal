@@ -244,7 +244,13 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       const targetAddress = extractAddressFromMessage(message);
       const allUpcomingCases = coordinatorData.schedule?.upcoming_cases || [];
       
-      // Analysera geografisk optimering
+      // KRITISK FIX: Kontrollera frånvaro för måltekniker
+      const targetTechnicianAbsences = targetTechnician ? 
+        coordinatorData.technician_absences?.filter((absence: any) => absence.technician_id === targetTechnician.id) || [] : [];
+      
+      const isTargetTechnicianAbsent = targetTechnician ? checkTechnicianAbsence(targetTechnician.id, coordinatorData.technician_absences || []) : false;
+      
+      // Analysera geografisk optimering (bara om tekniker inte är frånvarande)
       const geographicAnalysis = analyzeGeographicOptimization(
         targetTechnician, 
         targetAddress, 
@@ -252,9 +258,14 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
         message
       );
       
+      // Filtrera schedule gaps - ta bort gaps för frånvarande tekniker
+      const allGaps = coordinatorData.schedule?.schedule_gaps || [];
+      const availableGaps = allGaps.filter((gap: any) => !checkTechnicianAbsence(gap.technician_id, coordinatorData.technician_absences || []));
+      
       const targetGaps = targetTechnician ? 
-        coordinatorData.schedule?.schedule_gaps?.filter((gap: any) => gap.technician_id === targetTechnician.id) : 
-        coordinatorData.schedule?.schedule_gaps || [];
+        availableGaps.filter((gap: any) => gap.technician_id === targetTechnician.id) : 
+        availableGaps;
+      
       const targetCases = targetTechnician ?
         allUpcomingCases.filter((c: any) => c.primary_assignee_id === targetTechnician.id) :
         allUpcomingCases.slice(0, 20);
@@ -267,12 +278,25 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
         schedule_gaps: targetGaps,
         technician_availability: coordinatorData.schedule?.technician_availability || [],
         upcoming_cases: targetCases,
+        // KRITISK: Lägg till frånvaro-information
+        target_technician_absence_status: targetTechnician ? {
+          technician_name: targetTechnician.name,
+          is_absent: isTargetTechnicianAbsent,
+          absence_periods: targetTechnicianAbsences.map((absence: any) => ({
+            start_date: absence.start_date,
+            end_date: absence.end_date,
+            reason: absence.reason,
+            notes: absence.notes
+          })),
+          booking_status: isTargetTechnicianAbsent ? 'INTE TILLGÄNGLIG - FRÅNVARANDE' : 'Tillgänglig för bokning'
+        } : null,
         specific_technician_schedule: targetTechnician ? {
           name: targetTechnician.name,
           work_schedule: targetTechnician.work_schedule,
           upcoming_cases: targetCases,
-          available_gaps: targetGaps,
+          available_gaps: isTargetTechnicianAbsent ? [] : targetGaps, // Inga gaps om frånvarande
           current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === targetTechnician.id)?.utilization_percent || 0,
+          absence_warning: isTargetTechnicianAbsent ? `VARNING: ${targetTechnician.name} är frånvarande och kan inte bokas` : null,
           same_day_cases: targetCases.filter((c: any) => {
             const requestDate = extractDateFromMessage(message);
             return requestDate && c.start_date?.startsWith(requestDate);
@@ -283,13 +307,17 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
           name: t.name,
           work_schedule: t.work_schedule,
           specializations: t.specializations || [],
-          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0
+          current_utilization: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)?.utilization_percent || 0,
+          is_absent: checkTechnicianAbsence(t.id, coordinatorData.technician_absences || []),
+          absence_info: getAbsenceInfo(t.id, coordinatorData.technician_absences || [])
         })) || [],
         current_week_summary: {
           total_technicians: coordinatorData.technicians?.length || 0,
-          available_gaps: coordinatorData.schedule?.schedule_gaps?.length || 0,
+          available_gaps: availableGaps.length,
+          total_gaps_before_absence_filter: allGaps.length,
           upcoming_cases_count: coordinatorData.schedule?.upcoming_cases?.length || 0,
           target_technician_gaps: targetGaps.length,
+          target_technician_absence_note: isTargetTechnicianAbsent ? `${targetTechnician?.name} är frånvarande och har inga tillgängliga tider` : null,
           geographic_opportunities: geographicAnalysis.opportunities?.length || 0
         }
       };
@@ -1387,4 +1415,54 @@ function analyzeAbsencePatterns(technicians: any[], upcomingCases: any[], techni
   analysis.analysis_summary = `Analyserade ${technicians.length} tekniker för nästa vecka. ${analysis.actually_absent.length} tekniker är faktiskt frånvarande enligt registrerad frånvaro. ${analysis.available_technicians.length} tekniker är tillgängliga.`;
   
   return analysis;
+}
+
+/**
+ * Kontrollerar om en tekniker är frånvarande under kommande period
+ */
+function checkTechnicianAbsence(technicianId: string, absences: any[]): boolean {
+  const today = new Date();
+  const nextWeekEnd = new Date(today);
+  nextWeekEnd.setDate(today.getDate() + 14); // Kontrollera kommande 2 veckor
+  
+  return absences.some((absence: any) => {
+    if (absence.technician_id !== technicianId) return false;
+    
+    const absenceStart = new Date(absence.start_date);
+    const absenceEnd = new Date(absence.end_date);
+    
+    // Kontrollera om frånvaron överlappar med kommande period
+    return (absenceStart <= nextWeekEnd && absenceEnd >= today);
+  });
+}
+
+/**
+ * Hämtar frånvaro-information för en tekniker
+ */
+function getAbsenceInfo(technicianId: string, absences: any[]): any {
+  const today = new Date();
+  const nextWeekEnd = new Date(today);
+  nextWeekEnd.setDate(today.getDate() + 14);
+  
+  const relevantAbsences = absences.filter((absence: any) => {
+    if (absence.technician_id !== technicianId) return false;
+    
+    const absenceStart = new Date(absence.start_date);
+    const absenceEnd = new Date(absence.end_date);
+    
+    return (absenceStart <= nextWeekEnd && absenceEnd >= today);
+  });
+  
+  if (relevantAbsences.length === 0) return null;
+  
+  return {
+    current_absences: relevantAbsences.map((absence: any) => ({
+      start_date: absence.start_date,
+      end_date: absence.end_date,
+      reason: absence.reason,
+      notes: absence.notes
+    })),
+    primary_reason: relevantAbsences[0].reason,
+    absence_summary: relevantAbsences.map((a: any) => `${a.reason} (${a.start_date.split('T')[0]} - ${a.end_date.split('T')[0]})`).join(', ')
+  };
 }
