@@ -17,7 +17,9 @@ import {
   DollarSign,
   Map,
   Clock,
-  Target
+  Target,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
@@ -41,6 +43,7 @@ export default function GlobalCoordinatorChat({ currentPage = 'dashboard', conte
   const [isMinimized, setIsMinimized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
   const [coordinatorData, setCoordinatorData] = useState<CoordinatorChatData | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -125,15 +128,44 @@ Vad kan jag hjälpa dig med idag?`,
       
       // Handle booking if present
       if (data.booking) {
+        setIsBooking(false);
         if (data.booking.success) {
           toast.success(`✅ Bokning skapad! Ärendenummer: ${data.booking.case_number}`, {
             duration: 5000
           });
+          
+          // Add a system message about the successful booking
+          const bookingConfirmMessage: Message = {
+            id: (Date.now() + 2).toString(),
+            role: 'assistant',
+            content: `🎉 **Bokning bekräftad!**\n\n✅ Ärendenummer: **${data.booking.case_number}**\n✅ Case ID: ${data.booking.case_id}\n\nÄrendet har skapats i systemet och synkroniserats med ClickUp.`,
+            timestamp: new Date(),
+            context: 'booking'
+          };
+          setMessages(prev => [...prev, bookingConfirmMessage]);
         } else {
-          toast.error(`❌ Bokning misslyckades: ${data.booking.error || 'Okänt fel'}`, {
-            duration: 5000
+          const errorDetails = data.booking.validationErrors 
+            ? `\n\nFel: ${data.booking.validationErrors.join(', ')}`
+            : '';
+          
+          toast.error(`❌ Bokning misslyckades: ${data.booking.error || 'Okänt fel'}${errorDetails}`, {
+            duration: 8000
           });
+          
+          // Add error message to chat
+          const errorMessage: Message = {
+            id: (Date.now() + 2).toString(),
+            role: 'assistant',
+            content: `❌ **Bokning misslyckades**\n\nFel: ${data.booking.error || 'Okänt fel'}\n\n${data.booking.message || 'Försök igen eller kontakta administratör.'}${errorDetails}`,
+            timestamp: new Date(),
+            context: 'error'
+          };
+          setMessages(prev => [...prev, errorMessage]);
         }
+      } else if (data.response && data.response.includes('shouldCreateBooking')) {
+        // AI tried to create booking but it's still in the response
+        setIsBooking(true);
+        toast.loading('Skapar bokning...', { duration: 2000 });
       }
       
       const assistantMessage: Message = {
@@ -271,6 +303,8 @@ Vad kan jag hjälpa dig med idag?`,
                         {message.context === 'technician' && <Users className="w-3 h-3" />}
                         {message.context === 'pricing' && <DollarSign className="w-3 h-3" />}
                         {message.context === 'analytics' && <Target className="w-3 h-3" />}
+                        {message.context === 'booking' && <CheckCircle className="w-3 h-3 text-green-400" />}
+                        {message.context === 'error' && <AlertTriangle className="w-3 h-3 text-red-400" />}
                         {message.context}
                       </div>
                     )}
@@ -291,7 +325,7 @@ Vad kan jag hjälpa dig med idag?`,
                   <div className="bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3">
                     <div className="flex items-center gap-2 text-slate-300 text-sm">
                       <Loader className="w-4 h-4 animate-spin" />
-                      Analyserar...
+                      {isBooking ? 'Skapar bokning...' : 'Analyserar...'}
                     </div>
                   </div>
                 </div>

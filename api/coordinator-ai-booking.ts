@@ -132,12 +132,30 @@ function validateBookingData(data: BookingRequest): string[] {
     errors.push('Pris måste vara ett positivt nummer')
   }
   
+  // Validate address - require more than just city name
+  if (data.adress && typeof data.adress === 'string') {
+    const adress = data.adress.trim()
+    if (adress.length < 5) {
+      errors.push('Adress är för kort - ange fullständig adress')
+    } else if (!/\d/.test(adress)) {
+      errors.push('Adress måste innehålla gatnummer')
+    } else if (adress.toLowerCase() === 'sollentuna' || adress.toLowerCase() === 'stockholm') {
+      errors.push('Ange fullständig adress med gata och nummer, inte bara stad')
+    }
+  }
+  
+  // Validate technician ID format (UUID)
+  if (data.primary_assignee_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.primary_assignee_id)) {
+    errors.push('Tekniker-ID har ogiltigt format (måste vara UUID)')
+  }
+  
   return errors
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log('[AI Booking] Invalid method:', req.method)
     return res.status(405).json({ 
       success: false, 
       error: 'Endast POST-förfrågningar tillåtna' 
@@ -145,30 +163,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    console.log('[AI Booking] Starting booking process...')
     const bookingData: BookingRequest = req.body
 
     console.log('[AI Booking] Received booking request:', {
       case_type: bookingData.case_type,
       title: bookingData.title,
       kontaktperson: bookingData.kontaktperson,
+      telefon_kontaktperson: bookingData.telefon_kontaktperson,
+      personnummer: bookingData.personnummer ? '***-***-****' : 'SAKNAS',
+      org_nr: bookingData.org_nr ? '**********' : 'SAKNAS',
+      primary_assignee_id: bookingData.primary_assignee_id,
+      primary_assignee_name: bookingData.primary_assignee_name,
+      start_date: bookingData.start_date,
+      due_date: bookingData.due_date,
       timestamp: new Date().toISOString()
     })
 
+    // Validate environment variables
+    console.log('[AI Booking] Checking environment variables...')
+    if (!process.env.VITE_SUPABASE_URL) {
+      throw new Error('VITE_SUPABASE_URL environment variable is missing')
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is missing')
+    }
+    console.log('[AI Booking] Environment variables OK')
+
     // Validate input data
+    console.log('[AI Booking] Starting validation...')
     const validationErrors = validateBookingData(bookingData)
     if (validationErrors.length > 0) {
+      console.log('[AI Booking] Validation failed:', validationErrors)
       return res.status(400).json({
         success: false,
         error: `Valideringsfel: ${validationErrors.join(', ')}`,
-        message: 'Kunde inte skapa bokning på grund av felaktiga data'
+        message: 'Kunde inte skapa bokning på grund av felaktiga data',
+        validationErrors: validationErrors
       })
     }
+    console.log('[AI Booking] Validation passed')
 
     // Generate case number and prepare data
+    console.log('[AI Booking] Generating case number...')
     const caseNumber = generateCaseNumber(bookingData.case_type)
     const timestamp = new Date().toISOString()
+    console.log('[AI Booking] Generated case number:', caseNumber)
     
     // Prepare insert data based on case type
+    console.log('[AI Booking] Preparing insert data for case type:', bookingData.case_type)
     const baseInsertData = {
       clickup_task_id: '', // Will be set after ClickUp sync
       case_number: caseNumber,
@@ -243,10 +286,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[AI Booking] Inserting case data:', {
       tableName,
       caseNumber,
-      insertDataKeys: Object.keys(insertData)
+      insertDataKeys: Object.keys(insertData),
+      hasTitle: !!insertData.title,
+      hasContactPerson: !!insertData.kontaktperson,
+      hasRequiredField: bookingData.case_type === 'private' ? !!insertData.personnummer : !!insertData.org_nr
     })
 
+    // Test Supabase connection first
+    console.log('[AI Booking] Testing Supabase connection...')
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('technicians')
+        .select('id, name')
+        .limit(1)
+      
+      if (testError) {
+        console.error('[AI Booking] Supabase connection test failed:', testError)
+        throw new Error(`Supabase-anslutning misslyckades: ${testError.message}`)
+      }
+      console.log('[AI Booking] Supabase connection OK, found technicians:', testData?.length)
+    } catch (connError) {
+      console.error('[AI Booking] Supabase connection error:', connError)
+      throw new Error(`Databasanslutning misslyckades: ${connError}`)
+    }
+
     // Insert the case into database
+    console.log('[AI Booking] Attempting database insert...')
     const { data: createdCase, error: insertError } = await supabase
       .from(tableName)
       .insert(insertData)
@@ -254,41 +319,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single()
 
     if (insertError) {
-      console.error('[AI Booking] Database insert error:', insertError)
-      throw new Error(`Databasfel: ${insertError.message}`)
+      console.error('[AI Booking] Database insert error:', {
+        error: insertError,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      })
+      throw new Error(`Databasfel: ${insertError.message} (Kod: ${insertError.code})`)
     }
 
     console.log('[AI Booking] Case created successfully:', {
       id: createdCase.id,
       case_number: createdCase.case_number,
-      title: createdCase.title
+      title: createdCase.title,
+      case_type: bookingData.case_type,
+      tableName: tableName
     })
 
-    // Sync to ClickUp in background
+    // Sync to ClickUp in background (non-blocking)
+    console.log('[AI Booking] Starting ClickUp synchronization...')
     try {
-      console.log('[AI Booking] Starting ClickUp synchronization...')
-      
       // Import and use the ClickUp sync function
       const { syncCaseToClickUp } = await import('../src/services/clickupSync')
+      console.log('[AI Booking] ClickUp sync module imported')
+      
       const syncResult = await syncCaseToClickUp(createdCase.id, bookingData.case_type)
+      console.log('[AI Booking] ClickUp sync result:', syncResult)
       
       if (syncResult.success) {
-        console.log('[AI Booking] ClickUp sync successful:', syncResult.clickup_task_id)
+        console.log('[AI Booking] ClickUp sync successful, updating case with task ID:', syncResult.clickup_task_id)
         
         // Update the case with ClickUp task ID
-        await supabase
+        const { error: updateError } = await supabase
           .from(tableName)
           .update({ clickup_task_id: syncResult.clickup_task_id })
           .eq('id', createdCase.id)
+          
+        if (updateError) {
+          console.warn('[AI Booking] Failed to update case with ClickUp task ID:', updateError)
+        } else {
+          console.log('[AI Booking] Case updated with ClickUp task ID successfully')
+        }
       } else {
         console.warn('[AI Booking] ClickUp sync failed:', syncResult.error)
       }
     } catch (syncError) {
-      console.error('[AI Booking] ClickUp sync error:', syncError)
-      // Don't fail the booking if ClickUp sync fails
+      console.error('[AI Booking] ClickUp sync error:', {
+        error: syncError,
+        message: syncError instanceof Error ? syncError.message : 'Unknown error',
+        stack: syncError instanceof Error ? syncError.stack : undefined
+      })
+      // Don't fail the booking if ClickUp sync fails - this is non-critical
+      console.log('[AI Booking] Continuing with booking despite ClickUp sync failure')
     }
 
     // Prepare success response
+    console.log('[AI Booking] Preparing success response...')
     const response: BookingResponse = {
       success: true,
       case_id: createdCase.id,
@@ -296,15 +383,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: `${bookingData.case_type === 'private' ? 'Privatärende' : 'Företagsärende'} "${createdCase.title}" har skapats med ärendenummer ${createdCase.case_number}`
     }
 
+    console.log('[AI Booking] Booking completed successfully:', {
+      case_id: response.case_id,
+      case_number: response.case_number,
+      case_type: bookingData.case_type,
+      duration: `${Date.now() - new Date(timestamp).getTime()}ms`
+    })
+
     return res.status(200).json(response)
 
   } catch (error: any) {
-    console.error('[AI Booking] Error creating case:', error)
+    console.error('[AI Booking] Error creating case:', {
+      error: error,
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause,
+      timestamp: new Date().toISOString()
+    })
     
-    return res.status(500).json({
+    // Determine appropriate error message and status code
+    let statusCode = 500
+    let errorMessage = error.message || 'Okänt fel uppstod'
+    let userMessage = 'Kunde inte skapa bokning. Försök igen eller kontakta administratör.'
+    
+    if (error.message?.includes('Validation')) {
+      statusCode = 400
+      userMessage = 'Felaktiga data i bokningsförfrågan'
+    } else if (error.message?.includes('Supabase') || error.message?.includes('Database')) {
+      statusCode = 500
+      userMessage = 'Databasfel - kontakta administratör'
+    } else if (error.message?.includes('environment variable')) {
+      statusCode = 500
+      userMessage = 'Serverkonfigurationsfel - kontakta administratör'
+    }
+    
+    return res.status(statusCode).json({
       success: false,
-      error: error.message || 'Okänt fel uppstod',
-      message: 'Kunde inte skapa bokning. Försök igen eller kontakta administratör.'
+      error: errorMessage,
+      message: userMessage,
+      timestamp: new Date().toISOString(),
+      debug: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        cause: error.cause
+      } : undefined
     })
   }
 }

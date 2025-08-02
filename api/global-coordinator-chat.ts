@@ -93,23 +93,35 @@ När användare ber dig boka ett ärende, använd bookingData i din respons med 
     "telefon_kontaktperson": "Telefonnummer",
     "e_post_kontaktperson": "E-postadress",
     "skadedjur": "Skadedjurstyp",
-    "adress": "Adress för ärendet",
+    "adress": "FULLSTÄNDIG adress med gata + nummer + stad",
     "pris": 8500,
-    "start_date": "2025-01-15T09:00:00Z",
-    "due_date": "2025-01-15T11:00:00Z",
-    "primary_assignee_id": "tekniker-id",
-    "primary_assignee_name": "Tekniker namn",
+    "start_date": "2025-08-04T10:00:00Z",
+    "due_date": "2025-08-04T11:00:00Z",
+    "primary_assignee_id": "EXAKT tekniker-ID från data",
+    "primary_assignee_name": "EXAKT tekniker namn från data",
     "primary_assignee_email": "tekniker@email.com",
     "personnummer": "OBLIGATORISK för privatpersoner - 10-12 siffror",
     "org_nr": "OBLIGATORISK för företag - 10 siffror"
   }
 }
 
-🚨 VIKTIGT: 
-- PRIVATPERSONER kräver ALLTID personnummer (10-12 siffror)
-- FÖRETAG kräver ALLTID org_nr (10 siffror)  
-- Om dessa saknas, fråga användaren innan du skapar bokning
-- Inkludera booking-respons ENDAST när du har all nödvändig data`;
+🚨 KRITISKA VALIDERINGS-REGLER: 
+- **PERSONNUMMER/ORG_NR**: ALLTID obligatoriska - fråga om de saknas
+- **TEKNIKER-ID**: Använd ENDAST ID:n från technicians.available data
+- **ADRESS**: Kräv FULLSTÄNDIG adress (ex: "Storgatan 15, 123 45 Stockholm", INTE bara "Sollentuna")
+- **DATUM-FORMAT**: Använd ISO format "YYYY-MM-DDTHH:MM:SSZ"
+- **CASE_TYPE**: Bestäm baserat på om det är privatperson ("private") eller företag ("business")
+- **VALIDERING**: Kontrollera att all nödvändig data finns INNAN du skapar JSON
+- **TEKNIKER-MATCHNING**: Välj tekniker baserat på faktisk data, inte påhittade namn
+
+🔍 **INNAN DU SKAPAR BOKNING - KONTROLLERA:**
+1. ✅ Personnummer (private) ELLER org_nr (business) finns
+2. ✅ Fullständig adress angiven
+3. ✅ Tekniker-ID matchar någon från tillgänglig data
+4. ✅ Datum är i framtiden och i korrekt format
+5. ✅ Titel och kontaktperson angivet
+
+**Inkludera booking-JSON ENDAST när ALL nödvändig data är validerad!**`;
 
 export default async function handler(
   req: VercelRequest,
@@ -196,34 +208,108 @@ Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla te
 
     // Check if AI wants to create a booking
     let bookingResult = null;
+    console.log('[Global Chat] Checking for booking request in response...');
+    
     try {
       if (response && response.includes('shouldCreateBooking')) {
+        console.log('[Global Chat] Found booking request in AI response');
         const bookingMatch = response.match(/\{[\s\S]*"shouldCreateBooking":\s*true[\s\S]*\}/);
+        
         if (bookingMatch) {
+          console.log('[Global Chat] Parsing booking JSON...');
           const bookingJson = JSON.parse(bookingMatch[0]);
+          
           if (bookingJson.shouldCreateBooking && bookingJson.bookingData) {
-            console.log('[Global Chat] AI requested booking:', bookingJson.bookingData);
-            
-            // Call our booking API
-            const bookingResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/coordinator-ai-booking`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(bookingJson.bookingData)
+            console.log('[Global Chat] AI requested booking:', {
+              case_type: bookingJson.bookingData.case_type,
+              title: bookingJson.bookingData.title,
+              kontaktperson: bookingJson.bookingData.kontaktperson,
+              hasPersonnummer: !!bookingJson.bookingData.personnummer,
+              hasOrgNr: !!bookingJson.bookingData.org_nr,
+              primary_assignee_name: bookingJson.bookingData.primary_assignee_name
             });
             
-            const bookingData = await bookingResponse.json();
-            bookingResult = bookingData;
+            // Validate booking data before sending
+            const requiredFields = ['case_type', 'title'];
+            const missingFields = requiredFields.filter(field => !bookingJson.bookingData[field]);
             
-            console.log('[Global Chat] Booking result:', bookingData);
+            if (bookingJson.bookingData.case_type === 'private' && !bookingJson.bookingData.personnummer) {
+              missingFields.push('personnummer');
+            }
+            if (bookingJson.bookingData.case_type === 'business' && !bookingJson.bookingData.org_nr) {
+              missingFields.push('org_nr');
+            }
+            
+            if (missingFields.length > 0) {
+              console.log('[Global Chat] Missing required fields:', missingFields);
+              bookingResult = {
+                success: false,
+                error: `Saknade obligatoriska fält: ${missingFields.join(', ')}`,
+                message: 'AI:n skickade ofullständig bokningsdata'
+              };
+            } else {
+              // Call our booking API
+              console.log('[Global Chat] Calling booking API...');
+              const bookingResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/coordinator-ai-booking`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bookingJson.bookingData)
+              });
+              
+              console.log('[Global Chat] Booking API response status:', bookingResponse.status);
+              
+              if (!bookingResponse.ok) {
+                const errorText = await bookingResponse.text();
+                console.error('[Global Chat] Booking API returned error:', {
+                  status: bookingResponse.status,
+                  statusText: bookingResponse.statusText,
+                  body: errorText
+                });
+                
+                // Try to parse error response
+                let errorData;
+                try {
+                  errorData = JSON.parse(errorText);
+                } catch (e) {
+                  errorData = { error: errorText, message: 'Booking API error' };
+                }
+                
+                bookingResult = {
+                  success: false,
+                  error: errorData.error || `HTTP ${bookingResponse.status}`,
+                  message: errorData.message || 'Booking API fel'
+                };
+              } else {
+                const bookingData = await bookingResponse.json();
+                bookingResult = bookingData;
+                console.log('[Global Chat] Booking result:', {
+                  success: bookingData.success,
+                  case_id: bookingData.case_id,
+                  case_number: bookingData.case_number,
+                  error: bookingData.error
+                });
+              }
+            }
+          } else {
+            console.log('[Global Chat] Invalid booking JSON structure');
           }
+        } else {
+          console.log('[Global Chat] No valid booking JSON found in response');
         }
+      } else {
+        console.log('[Global Chat] No booking request found in AI response');
       }
     } catch (error) {
-      console.error('[Global Chat] Booking processing error:', error);
+      console.error('[Global Chat] Booking processing error:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       bookingResult = {
         success: false,
-        error: 'Kunde inte bearbeta bokningsförfrågan',
-        message: 'Bokningsfunktionen är tillfälligt otillgänglig'
+        error: error instanceof Error ? error.message : 'Okänt fel',
+        message: 'Kunde inte bearbeta bokningsförfrågan från AI'
       };
     }
 
