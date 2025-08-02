@@ -341,42 +341,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tableName: tableName
     })
 
-    // Sync to ClickUp in background (non-blocking)
-    console.log('[AI Booking] Starting ClickUp synchronization...')
-    try {
-      // Import and use the ClickUp sync function
-      const { syncCaseToClickUp } = await import('../src/services/clickupSync')
-      console.log('[AI Booking] ClickUp sync module imported')
-      
-      const syncResult = await syncCaseToClickUp(createdCase.id, bookingData.case_type)
-      console.log('[AI Booking] ClickUp sync result:', syncResult)
-      
-      if (syncResult.success) {
-        console.log('[AI Booking] ClickUp sync successful, updating case with task ID:', syncResult.clickup_task_id)
-        
-        // Update the case with ClickUp task ID
-        const { error: updateError } = await supabase
-          .from(tableName)
-          .update({ clickup_task_id: syncResult.clickup_task_id })
-          .eq('id', createdCase.id)
-          
-        if (updateError) {
-          console.warn('[AI Booking] Failed to update case with ClickUp task ID:', updateError)
-        } else {
-          console.log('[AI Booking] Case updated with ClickUp task ID successfully')
-        }
-      } else {
-        console.warn('[AI Booking] ClickUp sync failed:', syncResult.error)
-      }
-    } catch (syncError) {
-      console.error('[AI Booking] ClickUp sync error:', {
-        error: syncError,
-        message: syncError instanceof Error ? syncError.message : 'Unknown error',
-        stack: syncError instanceof Error ? syncError.stack : undefined
-      })
-      // Don't fail the booking if ClickUp sync fails - this is non-critical
-      console.log('[AI Booking] Continuing with booking despite ClickUp sync failure')
-    }
+    // Note: ClickUp sync will be handled by frontend after successful booking
+    // This matches the pattern used in CreateCaseModal component
+    console.log('[AI Booking] ClickUp sync will be handled by frontend (like CreateCaseModal)')
 
     // Prepare success response
     console.log('[AI Booking] Preparing success response...')

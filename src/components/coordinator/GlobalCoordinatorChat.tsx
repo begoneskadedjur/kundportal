@@ -24,6 +24,7 @@ import {
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 import { getCoordinatorChatData, CoordinatorChatData } from '../../services/coordinatorChatService';
+import { useClickUpSync } from '../../hooks/useClickUpSync';
 
 interface Message {
   id: string;
@@ -65,6 +66,9 @@ Vad kan jag hjälpa dig med idag?`,
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // ClickUp sync hook (same as CreateCaseModal)
+  const { syncAfterCreate } = useClickUpSync();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,11 +138,31 @@ Vad kan jag hjälpa dig med idag?`,
             duration: 5000
           });
           
+          // Sync to ClickUp in background (same as CreateCaseModal)
+          if (data.booking.case_id) {
+            // Extract case type from the JSON that was used for booking
+            let caseType: 'private' | 'business' = 'private';
+            try {
+              if (data.response && data.response.includes('shouldCreateBooking')) {
+                const bookingMatch = data.response.match(/\{[\s\S]*"shouldCreateBooking":\s*true[\s\S]*\}/);
+                if (bookingMatch) {
+                  const bookingJson = JSON.parse(bookingMatch[0]);
+                  caseType = bookingJson.bookingData?.case_type === 'business' ? 'business' : 'private';
+                }
+              }
+            } catch (e) {
+              console.warn('[Chat] Could not determine case type for ClickUp sync, defaulting to private');
+            }
+            
+            console.log('[Chat] Starting ClickUp sync for case:', data.booking.case_id, 'type:', caseType);
+            syncAfterCreate(data.booking.case_id, caseType, false); // Silent sync like CreateCaseModal
+          }
+          
           // Add a system message about the successful booking
           const bookingConfirmMessage: Message = {
             id: (Date.now() + 2).toString(),
             role: 'assistant',
-            content: `🎉 **Bokning bekräftad!**\n\n✅ Ärendenummer: **${data.booking.case_number}**\n✅ Case ID: ${data.booking.case_id}\n\nÄrendet har skapats i systemet och synkroniserats med ClickUp.`,
+            content: `🎉 **Bokning bekräftad!**\n\n✅ Ärendenummer: **${data.booking.case_number}**\n✅ Case ID: ${data.booking.case_id}\n\nÄrendet har skapats i systemet och synkroniseras med ClickUp i bakgrunden.`,
             timestamp: new Date(),
             context: 'booking'
           };
