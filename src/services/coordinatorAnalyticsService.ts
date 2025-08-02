@@ -107,14 +107,12 @@ export const getCoordinatorKpiData = async (
       });
 
       const avgHours = schedulingTimes.reduce((sum, h) => sum + h, 0) / schedulingTimes.length || 0;
-      const within72h = schedulingTimes.filter(h => h <= 72).length;
       const within48h = schedulingTimes.filter(h => h <= 48).length;
       const within72h = schedulingTimes.filter(h => h <= 72).length;
       const total = schedulingTimes.length;
 
     const schedulingEfficiency = {
       avg_hours_to_schedule: avgHours,
-      scheduled_within_72h_percent: total > 0 ? (within72h / total) * 100 : 0,
       scheduled_within_48h_percent: total > 0 ? (within48h / total) * 100 : 0,
       scheduled_within_72h_percent: total > 0 ? (within72h / total) * 100 : 0,
     };
