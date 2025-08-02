@@ -163,30 +163,27 @@ Bokningen ser ut som följande:
 - **Sluttid:** 4 augusti kl 10:00
 - **Tekniker:** Mathias Carlsson
 
-Här är bokningen i JSON-format:
-
-```json
+Här är booking-JSON:
 {
   "shouldCreateBooking": true,
   "bookingData": {
     "case_type": "private",
-    "title": "Christian testar",
+    "title": "Christian testar", 
     "description": "Sanering av getingar under en altan",
     "kontaktperson": "Anna Andersson",
     "telefon_kontaktperson": "0704499297",
-    "e_post_kontaktperson": "annas@mail.se",
+    "e_post_kontaktperson": "annas@mail.se", 
     "personnummer": "910403-5119",
     "adress": "Kyles väg 10, 192 76 Sollentuna",
     "skadedjur": "Getingar",
     "pris": 2495,
     "start_date": "2025-08-04T08:00:00",
     "due_date": "2025-08-04T10:00:00",
-    "primary_assignee_id": "ecaf151a-44b2-4220-b105-998aa0f82d6e",
+    "primary_assignee_id": "ecaf151a-44b2-4220-b105-998aa0f82d6e", 
     "primary_assignee_name": "Mathias Carlsson",
     "primary_assignee_email": "mathias@begone.se"
   }
 }
-```
 
 ✅ Bokningen är nu skapad för den 4 augusti kl 08:00-10:00!"
 
