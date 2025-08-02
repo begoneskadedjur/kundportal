@@ -105,8 +105,12 @@ function validateBookingData(data: BookingRequest): string[] {
   if (data.case_type === 'private') {
     if (!data.personnummer || !data.personnummer.trim()) {
       errors.push('Personnummer är obligatoriskt för privatpersoner')
-    } else if (!data.personnummer.match(/^\d{10,12}$/)) {
-      errors.push('Personnummer måste vara 10-12 siffror')
+    } else {
+      // Remove all non-digit characters for validation
+      const cleanPersonnummer = data.personnummer.replace(/\D/g, '')
+      if (!cleanPersonnummer.match(/^\d{10,12}$/)) {
+        errors.push('Personnummer måste vara 10-12 siffror (med eller utan bindestreck)')
+      }
     }
   }
   
