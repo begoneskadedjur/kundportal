@@ -61,7 +61,7 @@ Vad kan jag hjälpa dig med idag?`,
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -304,21 +304,30 @@ Vad kan jag hjälpa dig med idag?`,
           {/* Input */}
           <div className="flex-shrink-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
             <div className="flex gap-2 mb-2">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Fråga om schema, tekniker, priser..."
-                className="flex-1 bg-slate-800/80 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm min-w-0"
+                onKeyDown={handleKeyPress}
+                placeholder="Fråga om schema, tekniker, priser, eller boka nya ärenden..."
+                className="flex-1 bg-slate-800/80 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm min-w-0 resize-none min-h-[40px] max-h-[120px]"
                 disabled={isLoading}
+                rows={1}
+                style={{
+                  height: 'auto',
+                  minHeight: '40px'
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                }}
               />
               <Button
                 variant="primary"
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="px-3 py-2 flex-shrink-0"
+                className="px-3 py-2 flex-shrink-0 self-end"
               >
                 <Send className="w-4 h-4" />
               </Button>
