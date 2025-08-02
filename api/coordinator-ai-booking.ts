@@ -4,6 +4,24 @@
 import { createClient } from '@supabase/supabase-js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Database } from '../src/types/database'
+import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'
+
+const SWEDEN_TIMEZONE = 'Europe/Stockholm'
+
+/**
+ * Konvertera svensk tid till korrekt format för databas
+ * Hanterar automatiskt sommar-/vintertid
+ */
+function convertSwedishTimeToISO(swedishTimeString: string): string {
+  // Parse incoming time string som svensk lokal tid
+  const localDate = new Date(swedishTimeString)
+  
+  // Konvertera till UTC med korrekt tidszon-hantering
+  const utcDate = fromZonedTime(localDate, SWEDEN_TIMEZONE)
+  
+  // Returnera ISO format med svensk tidszon-suffix
+  return formatInTimeZone(utcDate, SWEDEN_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ssXXX")
+}
 
 // Use service role key for admin operations (bypasses RLS)
 const supabase = createClient<Database>(
@@ -240,9 +258,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tertiary_assignee_name: bookingData.tertiary_assignee_name || null,
       tertiary_assignee_email: bookingData.tertiary_assignee_email || null,
       
-      // Scheduling
-      start_date: bookingData.start_date || null,
-      due_date: bookingData.due_date || null,
+      // Scheduling (konvertera svenska tider korrekt)
+      start_date: bookingData.start_date ? convertSwedishTimeToISO(bookingData.start_date) : null,
+      due_date: bookingData.due_date ? convertSwedishTimeToISO(bookingData.due_date) : null,
       
       // Common custom fields
       adress: bookingData.adress || null,

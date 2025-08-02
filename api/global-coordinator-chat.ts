@@ -99,8 +99,8 @@ När användare ber dig boka ett ärende, använd bookingData i din respons med 
     "skadedjur": "Skadedjurstyp",
     "adress": "FULLSTÄNDIG adress med gata + nummer + stad",
     "pris": 8500,
-    "start_date": "2025-08-04T10:00:00Z",
-    "due_date": "2025-08-04T11:00:00Z",
+    "start_date": "2025-08-04T10:00:00",
+    "due_date": "2025-08-04T11:00:00",
     "primary_assignee_id": "EXAKT tekniker-ID från data",
     "primary_assignee_name": "EXAKT tekniker namn från data",
     "primary_assignee_email": "tekniker@email.com",
@@ -114,7 +114,9 @@ När användare ber dig boka ett ärende, använd bookingData i din respons med 
 - **ORG_NR**: ALLTID obligatorisk för business - 10 siffror
 - **TEKNIKER-ID**: Använd ENDAST ID:n från technicians.available data
 - **ADRESS**: Kräv FULLSTÄNDIG adress (ex: "Storgatan 15, 123 45 Stockholm", INTE bara "Sollentuna")
-- **DATUM-FORMAT**: Använd ISO format "YYYY-MM-DDTHH:MM:SSZ"
+- **🕐 SVENSK TIDSZON**: Använd enkelt format som automatiskt konverteras korrekt
+  - **EXEMPEL**: "2025-08-04T10:00:00" (10:00 svensk tid - systemet hanterar tidszon automatiskt)
+  - **VIKTIGT**: Använd SVENSK lokal tid, inte UTC! Systemet konverterar automatiskt med date-fns-tz
 - **CASE_TYPE**: Bestäm baserat på om det är privatperson ("private") eller företag ("business")
 - **VALIDERING**: Kontrollera att all nödvändig data finns INNAN du skapar JSON
 - **TEKNIKER-MATCHNING**: Välj tekniker baserat på faktisk data, inte påhittade namn
@@ -144,8 +146,26 @@ När användaren svarat med ALL nödvändig data (title, kontaktperson, personnu
 SKAPA OMEDELBART booking-JSON! FRÅGA INTE IGEN - GÖR BOKNINGEN DIREKT!
 
 🚨 **EXEMPEL SVAR NÄR DATA ÄR KOMPLETT:**
-"Perfekt! Jag bokar Mathias Carlsson för getingsanering den 4 augusti kl 08:00-10:00.
+"Tack för informationen! Jag kommer nu att boka in Mathias Carlsson för getingsanering enligt dina uppgifter.
 
+Bokningen ser ut som följande:
+
+- **Ärendetitel:** Christian testar
+- **Beskrivning:** Sanering av getingar under en altan
+- **Kontaktperson:** Anna Andersson
+- **Telefonnummer:** 0704499297
+- **E-postadress:** annas@mail.se
+- **Personnummer:** 910403-5119
+- **Adress:** Kyles väg 10, 192 76 Sollentuna
+- **Skadedjur:** Getingar
+- **Pris:** 2495 kr
+- **Starttid:** 4 augusti kl 08:00
+- **Sluttid:** 4 augusti kl 10:00
+- **Tekniker:** Mathias Carlsson
+
+Här är bokningen i JSON-format:
+
+```json
 {
   "shouldCreateBooking": true,
   "bookingData": {
@@ -159,15 +179,16 @@ SKAPA OMEDELBART booking-JSON! FRÅGA INTE IGEN - GÖR BOKNINGEN DIREKT!
     "adress": "Kyles väg 10, 192 76 Sollentuna",
     "skadedjur": "Getingar",
     "pris": 2495,
-    "start_date": "2025-08-04T08:00:00Z",
-    "due_date": "2025-08-04T10:00:00Z",
-    "primary_assignee_id": "e4db6838-f48d-4d7d-81cc-5ad3774acbf4",
+    "start_date": "2025-08-04T08:00:00",
+    "due_date": "2025-08-04T10:00:00",
+    "primary_assignee_id": "ecaf151a-44b2-4220-b105-998aa0f82d6e",
     "primary_assignee_name": "Mathias Carlsson",
     "primary_assignee_email": "mathias@begone.se"
   }
 }
+```
 
-✅ Bokningen är skapad för 4 augusti kl 08:00-10:00!"
+✅ Bokningen är nu skapad för den 4 augusti kl 08:00-10:00!"
 
 🕐 **VIKTIG REGEL FÖR TIDSFÖRSLAG:**
 INNAN du skapar booking-JSON, FÖRESLÅ alltid EXAKT tid och fråga:
