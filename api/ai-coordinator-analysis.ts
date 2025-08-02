@@ -7,15 +7,17 @@ const openai = new OpenAI({
 });
 
 // Systemmeddelande för AI:n
-const SYSTEM_MESSAGE = `Du är en expert på schemaläggning och koordinering inom skadedjursbekämpning.
+const SYSTEM_MESSAGE = `Du är en datadriven expert på schemaläggning och koordinering inom skadedjursbekämpning.
 Din uppgift är att analysera koordinatorns prestation och ge insiktsfulla rekommendationer.
 
 Fokusera på:
-1. Schemaläggningseffektivitet och responstider
-2. Tekniker-utnyttjande och arbetsbalans
-3. Geografisk optimering och ruttplanering
-4. Affärspåverkan och intäktsmöjligheter
-5. Konkreta förbättringsförslag med mätbara resultat
+1. Schemaläggningseffektivitet och responstider - analysera djupgående mönster och flaskhalsar
+2. Tekniker-utnyttjande och arbetsbalans - identifiera exakt varför vissa tekniker är över/underutnyttjade
+3. Geografisk optimering och ruttplanering - beräkna exakta kostnadsbesparingar
+4. Affärspåverkan och intäktsmöjligheter - kvantifiera förluster och potentiella vinster
+5. Konkreta förbättringsförslag med mätbara resultat och tidsramar
+
+Viktig instruktion: Var EXTREMT specifik och datadriven. Använd exakta siffror, procentuella förändringar, och beräkningar. Undvik generella uttalanden. Varje påstående ska backas upp av specifik data. Analysera trender, avvikelser och mönster i datan.
 
 Svara ALLTID i formatet som definieras i TypeScript-interfacet nedan, på svenska:
 
@@ -88,7 +90,14 @@ interface AICoordinatorAnalysis {
   };
 }
 
-Var konkret och basera dina insikter på datan. Ge alltid praktiska och genomförbara rekommendationer.`;
+KRITISKT: 
+- Använd EXAKTA siffror från datan (inte avrundade)
+- Beräkna procentuella förbättringar och konkreta mål
+- Identifiera specifika tekniker och deras utmaningar
+- Kvantifiera ekonomisk påverkan i kronor
+- Ge tidsramar för varje rekommendation
+- Jämför med branschstandarder (3 dagar för schemaläggning, 75-85% tekniker-utnyttjande)
+- Analysera avvikelser och outliers i datan`;
 
 export default async function handler(
   req: VercelRequest,
@@ -113,7 +122,7 @@ export default async function handler(
       period: dateRange,
       scheduling: {
         avg_hours_to_schedule: kpiData.scheduling_efficiency.avg_hours_to_schedule,
-        scheduled_within_24h_percent: kpiData.scheduling_efficiency.scheduled_within_24h_percent,
+        scheduled_within_72h_percent: kpiData.scheduling_efficiency.scheduled_within_72h_percent,
         total_scheduled: kpiData.scheduling_efficiency.total_scheduled,
       },
       utilization: {

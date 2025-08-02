@@ -243,7 +243,7 @@ class AICoordinatorAnalysisService {
           },
         ],
         long_term_improvements: [],
-        success_metrics: ["Schemaläggning inom 24h", "Ombokningsfrekvens under 10%", "Tekniker-utnyttjande över 75%"],
+        success_metrics: ["Schemaläggning inom 3 dagar", "Ombokningsfrekvens under 10%", "Tekniker-utnyttjande över 75%"],
       },
       metadata: {
         generated_at: new Date().toISOString(),

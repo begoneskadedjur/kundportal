@@ -39,6 +39,7 @@ import GeographicOptimizationMap from '../../components/admin/coordinator/Geogra
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import AIAnalysisSection from '../../components/coordinator/AIAnalysisSection';
 import { aiCoordinatorAnalysisService, AICoordinatorAnalysis } from '../../services/coordinatorAIAnalysisService';
+import AnalyticsChat from '../../components/coordinator/AnalyticsChat';
 
 registerLocale('sv', sv);
 
@@ -192,12 +193,7 @@ export default function CoordinatorAnalytics() {
     }
   };
 
-  // Generate AI analysis when data changes
-  useEffect(() => {
-    if (kpiData && efficiencyTrend && utilizationData && businessImpact && !aiAnalysis) {
-      generateAIAnalysis();
-    }
-  }, [kpiData, efficiencyTrend, utilizationData, businessImpact]);
+  // Removed automatic AI analysis generation - now only triggered by button
 
   // Clear AI analysis when date range changes
   useEffect(() => {
@@ -230,12 +226,12 @@ export default function CoordinatorAnalytics() {
         trendPeriod: 'senaste veckan',
       },
       {
-        title: 'Schemalagda inom 24h',
-        value: `${kpiData.scheduling_efficiency.scheduled_within_24h_percent.toFixed(1)}%`,
-        description: 'Ärenden schemalagda inom ett dygn',
+        title: 'Schemalagda inom 3 dagar',
+        value: `${kpiData.scheduling_efficiency.scheduled_within_72h_percent.toFixed(1)}%`,
+        description: 'Ärenden schemalagda inom tre dagar',
         icon: Target,
         color: 'green',
-        trend: kpiData.scheduling_efficiency.scheduled_within_24h_percent > 50 ? 'up' : 'down',
+        trend: kpiData.scheduling_efficiency.scheduled_within_72h_percent > 80 ? 'up' : 'down',
         trendPercentage: 15.7, // Mockad data för nu
         trendPeriod: 'senaste veckan',
       },
@@ -485,6 +481,20 @@ export default function CoordinatorAnalytics() {
         onClose={() => setIsEditModalOpen(false)} 
         onSuccess={handleEditSuccess} 
         caseData={selectedCase} 
+      />
+      
+      {/* Analytics Chat */}
+      <AnalyticsChat 
+        analyticsData={{
+          kpiData,
+          efficiencyTrend,
+          utilizationData,
+          businessImpact,
+          dateRange: {
+            startDate: dateRange.startDate.toISOString().split('T')[0],
+            endDate: dateRange.endDate.toISOString().split('T')[0]
+          }
+        }}
       />
     </div>
   );
