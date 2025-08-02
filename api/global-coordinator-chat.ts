@@ -374,47 +374,91 @@ function findSimilarCases(cases: any[], message: string) {
 }
 
 /**
- * Analyserar prissättning baserat på meddelandet
+ * Avancerad prissättningsanalys baserat på meddelandet
  */
 function analyzePricingForMessage(cases: any[], message: string) {
   const lowerMessage = message.toLowerCase();
   
-  // Identifiera ärendetyp från meddelandet
-  let caseType = '';
-  if (lowerMessage.includes('råtta') || lowerMessage.includes('mus')) caseType = 'gnagare';
-  else if (lowerMessage.includes('myra')) caseType = 'myror';
-  else if (lowerMessage.includes('vägglus')) caseType = 'vägglöss';
-  else if (lowerMessage.includes('kackerlack')) caseType = 'kackerlackor';
-  else if (lowerMessage.includes('getingar')) caseType = 'getingar';
+  // Identifiera skadedjurstyp från meddelandet
+  let pestType = '';
+  if (lowerMessage.includes('råtta') || lowerMessage.includes('mus')) pestType = 'gnagare';
+  else if (lowerMessage.includes('myra')) pestType = 'myror';
+  else if (lowerMessage.includes('vägglus')) pestType = 'vägglöss';
+  else if (lowerMessage.includes('kackerlack')) pestType = 'kackerlackor';
+  else if (lowerMessage.includes('getingar')) pestType = 'getingar';
   
+  // Extrahera storleksinformation från meddelandet
+  const sizeInfo = extractSizeFromMessage(message);
+  const complexityInfo = extractComplexityFromMessage(message);
+  
+  // Filtrera relevanta ärenden baserat på skadedjur och skadedjur-kolumn
   const relevantCases = cases.filter(c => {
-    if (!caseType) return true;
+    if (!pestType) return true;
+    
+    // Prioritera skadedjur-kolumnen
+    if (c.skadedjur) {
+      return c.skadedjur.toLowerCase().includes(pestType);
+    }
+    
+    // Fallback till textanalys
     const caseText = `${c.title || ''} ${c.description || ''}`.toLowerCase();
-    return caseText.includes(caseType);
+    return caseText.includes(pestType);
   });
   
   if (relevantCases.length === 0) {
     return {
-      case_type: caseType || 'allmänt',
+      pest_type: pestType || 'allmänt',
       found_cases: 0,
-      message: 'Inga liknande ärenden hittades i databasen'
+      message: 'Inga liknande ärenden hittades i databasen för denna skadedjurstyp'
     };
   }
   
-  const prices = relevantCases.map(c => c.pris).filter(p => p > 0);
+  // Avancerad analys av alla faktorer
+  const casesWithPrices = relevantCases.filter(c => c.pris > 0);
+  const prices = casesWithPrices.map(c => c.pris);
+  
+  // Analysera tekniker-påverkan
+  const technicianAnalysis = analyzeTechnicianCountPricing(casesWithPrices);
+  
+  // Analysera komplexitets-påverkan
+  const complexityAnalysis = analyzeComplexityPricing(casesWithPrices);
+  
+  // Analysera duration-påverkan
+  const durationAnalysis = analyzeDurationPricing(casesWithPrices);
+  
+  // Hitta mest liknande ärenden baserat på alla faktorer
+  const similarCases = findMostSimilarCases(casesWithPrices, {
+    pestType,
+    sizeInfo,
+    complexityInfo,
+    message
+  });
   
   return {
-    case_type: caseType || 'allmänt',
+    pest_type: pestType || 'allmänt',
     found_cases: relevantCases.length,
-    cases_with_prices: prices.length,
-    avg_price: prices.length > 0 ? Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length) : null,
-    min_price: prices.length > 0 ? Math.min(...prices) : null,
-    max_price: prices.length > 0 ? Math.max(...prices) : null,
-    recent_examples: relevantCases.slice(0, 3).map(c => ({
-      title: c.title,
-      price: c.pris,
-      created_at: c.created_at
-    }))
+    cases_with_prices: casesWithPrices.length,
+    price_statistics: {
+      avg_price: prices.length > 0 ? Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length) : null,
+      median_price: prices.length > 0 ? calculateMedianPrice(prices) : null,
+      min_price: prices.length > 0 ? Math.min(...prices) : null,
+      max_price: prices.length > 0 ? Math.max(...prices) : null,
+      price_range: prices.length > 0 ? Math.max(...prices) - Math.min(...prices) : 0
+    },
+    technician_impact: technicianAnalysis,
+    complexity_impact: complexityAnalysis,
+    duration_impact: durationAnalysis,
+    most_similar_cases: similarCases,
+    pricing_factors: {
+      size_mentioned: sizeInfo.size || 'ej angiven',
+      complexity_level: complexityInfo.level || 'standard',
+      special_circumstances: extractSpecialCircumstances(message)
+    },
+    pricing_recommendation: generatePricingRecommendation(casesWithPrices, {
+      pestType,
+      sizeInfo,
+      complexityInfo
+    })
   };
 }
 
@@ -728,4 +772,327 @@ function levenshteinDistance(str1: string, str2: string): number {
   }
   
   return matrix[str2.length][str1.length];
+}
+
+/**
+ * Extraherar storleksinformation från meddelandet
+ */
+function extractSizeFromMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Sök efter kvadratmeter
+  const sqmMatch = message.match(/(\d+)\s*kvm|(\d+)\s*m2|(\d+)\s*kvadratmeter/i);
+  if (sqmMatch) {
+    const size = parseInt(sqmMatch[1] || sqmMatch[2] || sqmMatch[3]);
+    return {
+      size: `${size} kvm`,
+      area_sqm: size,
+      size_category: size < 50 ? 'liten' : size < 100 ? 'medel' : 'stor'
+    };
+  }
+  
+  // Sök efter rum/lägenhet storlek
+  if (lowerMessage.includes('rum')) {
+    const roomMatch = message.match(/(\d+)\s*rum/i);
+    if (roomMatch) {
+      return { size: `${roomMatch[1]} rum`, size_category: 'lägenhet' };
+    }
+  }
+  
+  // Generisk storleksbeskrivning
+  if (lowerMessage.includes('liten')) return { size: 'liten', size_category: 'liten' };
+  if (lowerMessage.includes('stor')) return { size: 'stor', size_category: 'stor' };
+  if (lowerMessage.includes('omfattande')) return { size: 'omfattande', size_category: 'stor' };
+  
+  return { size: null, size_category: 'okänd' };
+}
+
+/**
+ * Extraherar komplexitetsinformation från meddelandet
+ */
+function extractComplexityFromMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  let score = 0;
+  const factors = [];
+  
+  // Hög komplexitet
+  if (lowerMessage.includes('sanering')) { score += 3; factors.push('sanering'); }
+  if (lowerMessage.includes('infestation')) { score += 3; factors.push('infestation'); }
+  if (lowerMessage.includes('omfattande')) { score += 2; factors.push('omfattande'); }
+  if (lowerMessage.includes('problem')) { score += 2; factors.push('problem'); }
+  if (lowerMessage.includes('återbesök')) { score += 2; factors.push('återbesök'); }
+  
+  // Medium komplexitet
+  if (lowerMessage.includes('kontroll')) { score += 1; factors.push('kontroll'); }
+  if (lowerMessage.includes('förebyggande')) { score += 1; factors.push('förebyggande'); }
+  
+  let level = 'standard';
+  if (score >= 3) level = 'hög';
+  else if (score >= 1) level = 'medium';
+  else if (lowerMessage.includes('enkel') || lowerMessage.includes('rutinmässig')) level = 'låg';
+  
+  return {
+    level,
+    score,
+    factors,
+    is_complex: score >= 3
+  };
+}
+
+/**
+ * Extraherar speciala omständigheter från meddelandet
+ */
+function extractSpecialCircumstances(message: string) {
+  const lowerMessage = message.toLowerCase();
+  const circumstances = [];
+  
+  if (lowerMessage.includes('akut')) circumstances.push('akut');
+  if (lowerMessage.includes('helg')) circumstances.push('helgarbete');
+  if (lowerMessage.includes('kväll')) circumstances.push('kvällsarbete');
+  if (lowerMessage.includes('natt')) circumstances.push('nattarbete');
+  if (lowerMessage.includes('svårtillgänglig')) circumstances.push('svårtillgänglig');
+  if (lowerMessage.includes('allergi')) circumstances.push('allergihänsyn');
+  
+  return circumstances;
+}
+
+/**
+ * Analyserar tekniker-antal påverkan på prissättning
+ */
+function analyzeTechnicianCountPricing(cases: any[]) {
+  const byTechCount = { 1: [], 2: [], 3: [] } as Record<number, number[]>;
+  
+  for (const caseItem of cases) {
+    let techCount = 0;
+    if (caseItem.primary_assignee_id) techCount++;
+    if (caseItem.secondary_assignee_id) techCount++;
+    if (caseItem.tertiary_assignee_id) techCount++;
+    
+    if (techCount >= 1 && techCount <= 3) {
+      byTechCount[techCount].push(caseItem.pris);
+    }
+  }
+  
+  const result: any = {};
+  
+  for (const [count, prices] of Object.entries(byTechCount)) {
+    if (prices.length > 0) {
+      result[`${count}_tekniker`] = {
+        antal_ärenden: prices.length,
+        genomsnittspris: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+        prisintervall: {
+          min: Math.min(...prices),
+          max: Math.max(...prices)
+        }
+      };
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Analyserar komplexitets påverkan på prissättning
+ */
+function analyzeComplexityPricing(cases: any[]) {
+  const byComplexity = { low: [], medium: [], high: [] } as Record<string, number[]>;
+  
+  for (const caseItem of cases) {
+    const text = `${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    let complexity = 'medium';
+    
+    if (text.includes('sanering') || text.includes('omfattande') || text.includes('komplex')) {
+      complexity = 'high';
+    } else if (text.includes('enkel') || text.includes('rutinmässig')) {
+      complexity = 'low';
+    }
+    
+    byComplexity[complexity].push(caseItem.pris);
+  }
+  
+  const result: any = {};
+  
+  for (const [level, prices] of Object.entries(byComplexity)) {
+    if (prices.length > 0) {
+      result[`${level}_komplexitet`] = {
+        antal_ärenden: prices.length,
+        genomsnittspris: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+        prisintervall: {
+          min: Math.min(...prices),
+          max: Math.max(...prices)
+        }
+      };
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Analyserar duration påverkan på prissättning
+ */
+function analyzeDurationPricing(cases: any[]) {
+  const casesWithDuration = cases.filter(c => c.start_date && c.due_date);
+  
+  if (casesWithDuration.length === 0) {
+    return { message: 'Ingen durationsdata tillgänglig' };
+  }
+  
+  const durationsAndPrices = casesWithDuration.map(c => ({
+    duration: (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60),
+    price: c.pris
+  }));
+  
+  // Gruppera efter duration
+  const shortJobs = durationsAndPrices.filter(d => d.duration <= 2);
+  const mediumJobs = durationsAndPrices.filter(d => d.duration > 2 && d.duration <= 4);
+  const longJobs = durationsAndPrices.filter(d => d.duration > 4);
+  
+  return {
+    kort_jobb: shortJobs.length > 0 ? {
+      antal: shortJobs.length,
+      genomsnittspris: Math.round(shortJobs.reduce((sum, j) => sum + j.price, 0) / shortJobs.length),
+      genomsnittslängd: Math.round((shortJobs.reduce((sum, j) => sum + j.duration, 0) / shortJobs.length) * 10) / 10
+    } : null,
+    
+    medel_jobb: mediumJobs.length > 0 ? {
+      antal: mediumJobs.length,
+      genomsnittspris: Math.round(mediumJobs.reduce((sum, j) => sum + j.price, 0) / mediumJobs.length),
+      genomsnittslängd: Math.round((mediumJobs.reduce((sum, j) => sum + j.duration, 0) / mediumJobs.length) * 10) / 10
+    } : null,
+    
+    långa_jobb: longJobs.length > 0 ? {
+      antal: longJobs.length,
+      genomsnittspris: Math.round(longJobs.reduce((sum, j) => sum + j.price, 0) / longJobs.length),
+      genomsnittslängd: Math.round((longJobs.reduce((sum, j) => sum + j.duration, 0) / longJobs.length) * 10) / 10
+    } : null
+  };
+}
+
+/**
+ * Hittar mest liknande ärenden baserat på alla faktorer
+ */
+function findMostSimilarCases(cases: any[], criteria: any) {
+  return cases
+    .map(c => ({
+      ...c,
+      similarity_score: calculateCaseSimilarity(c, criteria)
+    }))
+    .sort((a, b) => b.similarity_score - a.similarity_score)
+    .slice(0, 3)
+    .map(c => ({
+      id: c.id,
+      title: c.title,
+      price: c.pris,
+      skadedjur: c.skadedjur,
+      duration_hours: c.start_date && c.due_date ? 
+        Math.round(((new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60)) * 10) / 10 : null,
+      technician_count: [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean).length,
+      similarity_score: c.similarity_score,
+      case_type: c.case_type
+    }));
+}
+
+/**
+ * Beräknar likhet mellan ärende och kriterier
+ */
+function calculateCaseSimilarity(caseItem: any, criteria: any): number {
+  let score = 0;
+  
+  // Skadedjur match (viktigast)
+  if (criteria.pestType && caseItem.skadedjur) {
+    if (caseItem.skadedjur.toLowerCase().includes(criteria.pestType)) score += 50;
+  }
+  
+  // Storlek match
+  if (criteria.sizeInfo?.area_sqm) {
+    const caseText = `${caseItem.description || ''} ${caseItem.rapport || ''}`;
+    const caseSizeMatch = caseText.match(/(\d+)\s*kvm/i);
+    if (caseSizeMatch) {
+      const caseSize = parseInt(caseSizeMatch[1]);
+      const sizeDiff = Math.abs(criteria.sizeInfo.area_sqm - caseSize);
+      score += Math.max(0, 20 - sizeDiff / 5); // Minska poäng för stor skillnad
+    }
+  }
+  
+  // Komplexitet match
+  if (criteria.complexityInfo?.level) {
+    const caseText = `${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    const caseComplexity = caseText.includes('sanering') || caseText.includes('omfattande') ? 'hög' :
+                          caseText.includes('enkel') ? 'låg' : 'medium';
+    
+    if (caseComplexity === criteria.complexityInfo.level) score += 20;
+  }
+  
+  // Nyhet (nyare ärenden är mer relevanta)
+  const ageInDays = (Date.now() - new Date(caseItem.created_at).getTime()) / (1000 * 60 * 60 * 24);
+  score += Math.max(0, 10 - ageInDays / 7); // Minska poäng för gamla ärenden
+  
+  return Math.round(score);
+}
+
+/**
+ * Beräknar median för priser
+ */
+function calculateMedianPrice(prices: number[]): number {
+  const sorted = [...prices].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  
+  if (sorted.length % 2 === 0) {
+    return Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  } else {
+    return sorted[middle];
+  }
+}
+
+/**
+ * Genererar prissättningsrekommendation
+ */
+function generatePricingRecommendation(cases: any[], criteria: any) {
+  if (cases.length < 3) {
+    return {
+      confidence: 'låg',
+      message: 'För få liknande ärenden för säker prissättning'
+    };
+  }
+  
+  const prices = cases.map(c => c.pris);
+  const avgPrice = Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length);
+  const medianPrice = calculateMedianPrice(prices);
+  
+  let adjustedPrice = medianPrice;
+  const adjustments = [];
+  
+  // Justera för komplexitet
+  if (criteria.complexityInfo?.level === 'hög') {
+    adjustedPrice *= 1.3;
+    adjustments.push('Komplex sanering: +30%');
+  } else if (criteria.complexityInfo?.level === 'låg') {
+    adjustedPrice *= 0.85;
+    adjustments.push('Enkel åtgärd: -15%');
+  }
+  
+  // Justera för storlek
+  if (criteria.sizeInfo?.area_sqm) {
+    if (criteria.sizeInfo.area_sqm > 100) {
+      adjustedPrice *= 1.2;
+      adjustments.push('Stor yta (>100kvm): +20%');
+    } else if (criteria.sizeInfo.area_sqm < 30) {
+      adjustedPrice *= 0.9;
+      adjustments.push('Liten yta (<30kvm): -10%');
+    }
+  }
+  
+  return {
+    confidence: cases.length >= 10 ? 'hög' : cases.length >= 5 ? 'medel' : 'låg',
+    base_price: medianPrice,
+    recommended_price: Math.round(adjustedPrice),
+    price_range: {
+      min: Math.round(adjustedPrice * 0.9),
+      max: Math.round(adjustedPrice * 1.1)
+    },
+    adjustments,
+    similar_cases_count: cases.length
+  };
 }

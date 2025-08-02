@@ -42,7 +42,8 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       legacyCases,
       technicians,
       upcomingCases,
-      recentCasesWithPrices
+      recentPrivateCasesWithPrices,
+      recentBusinessCasesWithPrices
     ] = await Promise.all([
       // Private cases
       supabase
@@ -87,15 +88,40 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .not('start_date', 'is', null)
         .order('start_date', { ascending: true }),
 
-      // Senaste ärenden med priser för prissättningsanalys
+      // Senaste ärenden med komplett prissättningsdata
       supabase
         .from('private_cases')
-        .select('id, title, description, pris, tekniker_kommentar, created_at, primary_assignee_id')
+        .select(`
+          id, title, description, rapport, pris, skadedjur, 
+          start_date, due_date, created_at,
+          primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
+          tekniker_kommentar, adress, status
+        `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(100),
+
+      // Business cases med komplett prissättningsdata
+      supabase
+        .from('business_cases')
+        .select(`
+          id, title, description, rapport, pris, skadedjur, 
+          start_date, due_date, created_at,
+          primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
+          tekniker_kommentar, adress, status
+        `)
+        .not('pris', 'is', null)
+        .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(100)
     ]);
+
+    // Kombinera alla ärenden med priser för omfattande prissättningsanalys
+    const allCasesWithPrices = [
+      ...(recentPrivateCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'private' as const })),
+      ...(recentBusinessCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'business' as const }))
+    ];
 
     // Analysera schema-luckor
     const scheduleGaps = await analyzeScheduleGaps(technicians.data || [], today, oneWeekFromNow);
@@ -106,8 +132,8 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
     // Beräkna prestationsmått
     const performanceMetrics = await calculatePerformanceMetrics();
 
-    // Analysera prissättningsmönster
-    const pricingPatterns = analyzePricingPatterns(recentCasesWithPrices.data || []);
+    // Analysera avancerade prissättningsmönster
+    const pricingPatterns = analyzePricingPatterns(allCasesWithPrices);
 
     return {
       cases: {
@@ -127,7 +153,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         recent_trends: [] // Kan implementeras senare
       },
       pricing: {
-        recent_cases_with_prices: recentCasesWithPrices.data || [],
+        recent_cases_with_prices: allCasesWithPrices,
         pricing_patterns: pricingPatterns
       }
     };
@@ -296,32 +322,66 @@ const calculatePerformanceMetrics = async () => {
 };
 
 /**
- * Analyserar prissättningsmönster
+ * Analyserar avancerade prissättningsmönster med alla faktorer
  */
 const analyzePricingPatterns = (cases: any[]) => {
   const patterns = [];
   
-  // Gruppera efter typ av ärende baserat på titel/beskrivning
-  const caseTypes = groupCasesByType(cases);
+  // Gruppera efter skadedjurstyp (primärt)
+  const pestTypes = groupCasesByPestType(cases);
   
-  for (const [type, typeCases] of Object.entries(caseTypes)) {
-    const prices = (typeCases as any[]).map(c => c.pris).filter(p => p > 0);
+  for (const [pestType, pestCases] of Object.entries(pestTypes)) {
+    if ((pestCases as any[]).length < 3) continue;
     
-    if (prices.length >= 3) {
-      const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-      
-      patterns.push({
-        case_type: type,
-        case_count: prices.length,
+    const casesWithPrices = (pestCases as any[]).filter(c => c.pris > 0);
+    if (casesWithPrices.length < 3) continue;
+    
+    // Beräkna grundläggande statistik
+    const prices = casesWithPrices.map(c => c.pris);
+    const durations = casesWithPrices
+      .filter(c => c.start_date && c.due_date)
+      .map(c => calculateDurationHours(c.start_date, c.due_date));
+    
+    // Analysera tekniker-påverkan
+    const technicianImpact = analyzeTechnicianCountImpact(casesWithPrices);
+    
+    // Analysera komplexitet baserat på beskrivning och rapport
+    const complexityAnalysis = analyzeComplexityFactors(casesWithPrices);
+    
+    const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const avgDuration = durations.length > 0 ? 
+      durations.reduce((sum, d) => sum + d, 0) / durations.length : 0;
+    
+    patterns.push({
+      pest_type: pestType,
+      case_count: casesWithPrices.length,
+      price_statistics: {
         avg_price: Math.round(avgPrice),
         min_price: minPrice,
         max_price: maxPrice,
         price_variance: Math.round(maxPrice - minPrice),
-        recent_cases: (typeCases as any[]).slice(0, 3)
-      });
-    }
+        median_price: calculateMedian(prices)
+      },
+      duration_statistics: {
+        avg_duration_hours: Math.round(avgDuration * 10) / 10,
+        cases_with_duration: durations.length
+      },
+      technician_impact: technicianImpact,
+      complexity_factors: complexityAnalysis,
+      recent_examples: casesWithPrices.slice(0, 5).map(c => ({
+        id: c.id,
+        title: c.title,
+        price: c.pris,
+        duration_hours: c.start_date && c.due_date ? 
+          calculateDurationHours(c.start_date, c.due_date) : null,
+        technician_count: getTechnicianCount(c),
+        complexity_score: calculateComplexityScore(c),
+        case_type: c.case_type,
+        created_at: c.created_at
+      }))
+    });
   }
   
   return patterns.sort((a, b) => b.case_count - a.case_count);
@@ -366,6 +426,187 @@ const calculateAverageSchedulingTime = (cases: any[]) => {
   }, 0);
   
   return totalHours / scheduledCases.length;
+};
+
+/**
+ * Grupperar ärenden efter skadedjurstyp (primärt från skadedjur-kolumn)
+ */
+const groupCasesByPestType = (cases: any[]) => {
+  const types: Record<string, any[]> = {};
+  
+  for (const caseItem of cases) {
+    let pestType = 'Övrigt';
+    
+    // Använd skadedjur-kolumnen först om den finns
+    if (caseItem.skadedjur) {
+      pestType = caseItem.skadedjur;
+    } else {
+      // Fallback till textanalys av title/description
+      const title = caseItem.title || '';
+      const description = caseItem.description || '';
+      const text = `${title} ${description}`.toLowerCase();
+      
+      if (text.includes('råtta') || text.includes('mus')) pestType = 'Gnagare';
+      else if (text.includes('myra') || text.includes('ant')) pestType = 'Myror';
+      else if (text.includes('kackerlack') || text.includes('cockroach')) pestType = 'Kackerlackor';
+      else if (text.includes('vägglus') || text.includes('bedbug')) pestType = 'Vägglöss';
+      else if (text.includes('getinggap') || text.includes('hornets nest')) pestType = 'Getingar';
+      else if (text.includes('fågel') || text.includes('bird')) pestType = 'Fåglar';
+      else if (text.includes('spindel') || text.includes('spider')) pestType = 'Spindlar';
+    }
+    
+    if (!types[pestType]) types[pestType] = [];
+    types[pestType].push(caseItem);
+  }
+  
+  return types;
+};
+
+/**
+ * Beräknar varaktighet i timmar mellan start och slut
+ */
+const calculateDurationHours = (startDate: string, dueDate: string): number => {
+  const start = new Date(startDate);
+  const end = new Date(dueDate);
+  return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+};
+
+/**
+ * Räknar antal tekniker som arbetat på ärendet
+ */
+const getTechnicianCount = (caseItem: any): number => {
+  let count = 0;
+  if (caseItem.primary_assignee_id) count++;
+  if (caseItem.secondary_assignee_id) count++;
+  if (caseItem.tertiary_assignee_id) count++;
+  return count;
+};
+
+/**
+ * Analyserar påverkan av antal tekniker på prissättning
+ */
+const analyzeTechnicianCountImpact = (cases: any[]) => {
+  const byTechCount = { 1: [], 2: [], 3: [] } as Record<number, number[]>;
+  
+  for (const caseItem of cases) {
+    const techCount = getTechnicianCount(caseItem);
+    if (techCount >= 1 && techCount <= 3 && caseItem.pris > 0) {
+      byTechCount[techCount].push(caseItem.pris);
+    }
+  }
+  
+  const result: any = {};
+  
+  for (const [count, prices] of Object.entries(byTechCount)) {
+    if (prices.length > 0) {
+      result[`${count}_technician`] = {
+        case_count: prices.length,
+        avg_price: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+        min_price: Math.min(...prices),
+        max_price: Math.max(...prices)
+      };
+    }
+  }
+  
+  return result;
+};
+
+/**
+ * Analyserar komplexitetsfaktorer från beskrivning och rapport
+ */
+const analyzeComplexityFactors = (cases: any[]) => {
+  const complexityKeywords = {
+    high: ['omfattande', 'komplex', 'svår', 'återbesök', 'problem', 'infestation', 'stort', 'många'],
+    medium: ['standard', 'normal', 'vanlig', 'kontroll', 'förebyggande'],
+    low: ['enkel', 'liten', 'begränsad', 'snabb', 'rutinmässig']
+  };
+  
+  const complexityCounts = { high: 0, medium: 0, low: 0 };
+  const complexityPrices = { high: [], medium: [], low: [] } as Record<string, number[]>;
+  
+  for (const caseItem of cases) {
+    const text = `${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    let complexity = 'medium'; // default
+    
+    let highScore = 0, mediumScore = 0, lowScore = 0;
+    
+    for (const keyword of complexityKeywords.high) {
+      if (text.includes(keyword)) highScore++;
+    }
+    for (const keyword of complexityKeywords.medium) {
+      if (text.includes(keyword)) mediumScore++;
+    }
+    for (const keyword of complexityKeywords.low) {
+      if (text.includes(keyword)) lowScore++;
+    }
+    
+    if (highScore > mediumScore && highScore > lowScore) complexity = 'high';
+    else if (lowScore > mediumScore && lowScore > highScore) complexity = 'low';
+    
+    complexityCounts[complexity as keyof typeof complexityCounts]++;
+    if (caseItem.pris > 0) {
+      complexityPrices[complexity as keyof typeof complexityPrices].push(caseItem.pris);
+    }
+  }
+  
+  const result: any = {};
+  
+  for (const [level, prices] of Object.entries(complexityPrices)) {
+    if (prices.length > 0) {
+      result[`${level}_complexity`] = {
+        case_count: prices.length,
+        avg_price: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+        price_range: {
+          min: Math.min(...prices),
+          max: Math.max(...prices)
+        }
+      };
+    }
+  }
+  
+  return result;
+};
+
+/**
+ * Beräknar komplexitetspoäng för ett ärende
+ */
+const calculateComplexityScore = (caseItem: any): number => {
+  const text = `${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+  let score = 0;
+  
+  // Faktorer som ökar komplexitet
+  if (text.includes('omfattande')) score += 3;
+  if (text.includes('komplex')) score += 3;
+  if (text.includes('återbesök')) score += 2;
+  if (text.includes('problem')) score += 2;
+  if (text.includes('infestation')) score += 2;
+  if (text.includes('många')) score += 1;
+  if (text.includes('stort')) score += 1;
+  
+  // Faktorer som minskar komplexitet
+  if (text.includes('enkel')) score -= 2;
+  if (text.includes('liten')) score -= 1;
+  if (text.includes('rutinmässig')) score -= 1;
+  
+  // Tekniker-antal påverkar komplexitet
+  const techCount = getTechnicianCount(caseItem);
+  if (techCount > 1) score += techCount - 1;
+  
+  return Math.max(0, score); // Minimum 0
+};
+
+/**
+ * Beräknar median från en array av nummer
+ */
+const calculateMedian = (numbers: number[]): number => {
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  
+  if (sorted.length % 2 === 0) {
+    return Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  } else {
+    return sorted[middle];
+  }
 };
 
 const groupCasesByType = (cases: any[]) => {
