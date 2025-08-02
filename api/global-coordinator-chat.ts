@@ -88,6 +88,12 @@ export default async function handler(
     // Förbered relevant data baserat på kontext
     const relevantData = prepareRelevantData(coordinatorData, context, message);
 
+    // Begränsa datastorlek för att undvika API-gränser
+    const relevantDataString = JSON.stringify(relevantData, null, 2);
+    const truncatedData = relevantDataString.length > 8000 
+      ? relevantDataString.slice(0, 8000) + '\n...(data truncated due to size)'
+      : relevantDataString;
+
     // Förbered konversationshistorik
     const messages: any[] = [
       { role: 'system', content: SYSTEM_MESSAGE },
@@ -99,7 +105,7 @@ Tidpunkt: ${new Date().toLocaleString('sv-SE')}
 Kontext: ${context}
 
 RELEVANT DATA FÖR DENNA FÖRFRÅGAN:
-${JSON.stringify(relevantData, null, 2)}
+${truncatedData}
 
 Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
       }
@@ -138,8 +144,24 @@ Basera ditt svar på denna specifika data och ge konkreta, handlingsbara råd.`
   } catch (error) {
     console.error('Global Coordinator Chat Error:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Okänt fel';
-    const statusCode = errorMessage.includes('API key') ? 401 : 500;
+    // Mer detaljerad felhantering
+    let errorMessage = 'Okänt fel';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // Specifik felhantering för olika fel
+      if (errorMessage.includes('API key')) {
+        statusCode = 401;
+      } else if (errorMessage.includes('JSON')) {
+        statusCode = 400;
+        errorMessage = 'Fel vid databehandling';
+      } else if (errorMessage.includes('timeout')) {
+        statusCode = 408;
+        errorMessage = 'Timeout - för stor datamängd';
+      }
+    }
     
     return res.status(statusCode).json({
       success: false,
@@ -287,15 +309,17 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       const requestedPestType = identifyPestTypeFromMessage(message);
       const pestSpecificData = requestedPestType ? optimizedPestData[requestedPestType] : null;
       
-      // Debug logging för prissättning
-      console.log('🔍 Pricing Query Analysis:');
-      console.log(`- Message: "${message}"`);
-      console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
-      console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
-      console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
-      if (pestSpecificData) {
-        console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
-        console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
+      // Debug logging för prissättning (endast i utvecklingsmiljö)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Pricing Query Analysis:');
+        console.log(`- Message: "${message}"`);
+        console.log(`- Detected pest type: ${requestedPestType || 'None'}`);
+        console.log(`- Available pest types in data:`, Object.keys(optimizedPestData));
+        console.log(`- Pest-specific data found: ${!!pestSpecificData}`);
+        if (pestSpecificData) {
+          console.log(`- Cases for ${requestedPestType}: ${pestSpecificData.case_count}`);
+          console.log(`- Price stats: avg ${pestSpecificData.price_statistics?.avg_price}, range ${pestSpecificData.price_statistics?.min_price}-${pestSpecificData.price_statistics?.max_price}`);
+        }
       }
       
       // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
@@ -540,7 +564,7 @@ function getCaseTypePrices(cases: any[]) {
     
     if (text.includes('råtta') || text.includes('mus')) type = 'gnagare';
     else if (text.includes('myra')) type = 'myror';
-    else if (text.includes('vägglus') || text.includes('vägglöss')) type = 'Vägglöss';
+    else if (text.includes('vägglus') || text.includes('vägglöss')) type = 'vägglöss';
     else if (text.includes('kackerlack')) type = 'kackerlackor';
     else if (text.includes('getingar')) type = 'getingar';
     
