@@ -272,22 +272,50 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
 
     case 'pricing':
       const recentCases = coordinatorData.pricing?.recent_cases_with_prices || [];
-      const pricingAnalysis = analyzePricingForMessage(recentCases, message);
+      const optimizedPestData = coordinatorData.pricing?.optimized_by_pest_type || {};
+      
+      // Identifiera skadedjurstyp från meddelandet
+      const requestedPestType = identifyPestTypeFromMessage(message);
+      const pestSpecificData = requestedPestType ? optimizedPestData[requestedPestType] : null;
+      
+      // Använd skadedjurs-specifik data om tillgänglig, annars generell analys
+      const relevantCases = pestSpecificData ? 
+        pestSpecificData.recent_cases : 
+        recentCases.slice(0, 50); // Begränsa om ingen specifik typ
+      
+      const pricingAnalysis = analyzePricingForMessage(relevantCases, message);
       
       return {
         ...baseData,
+        requested_pest_type: requestedPestType,
+        pest_specific_data: pestSpecificData,
         pricing_patterns: coordinatorData.pricing?.pricing_patterns || [],
-        recent_cases_with_prices: recentCases.slice(0, 10),
-        similar_cases: findSimilarCases(recentCases, message),
+        optimized_pest_data: optimizedPestData,
+        relevant_cases: relevantCases,
+        similar_cases: findSimilarCases(relevantCases, message),
         pricing_analysis: pricingAnalysis,
-        case_type_prices: getCaseTypePrices(recentCases),
-        statistical_summary: {
-          total_cases_with_prices: recentCases.length,
-          avg_price_last_month: recentCases.length > 0 ? 
-            Math.round(recentCases.reduce((sum: number, c: any) => sum + (c.pris || 0), 0) / recentCases.length) : 0,
-          price_range: recentCases.length > 0 ? {
-            min: Math.min(...recentCases.map((c: any) => c.pris || 0).filter((p: number) => p > 0)),
-            max: Math.max(...recentCases.map((c: any) => c.pris || 0))
+        case_type_prices: getCaseTypePrices(relevantCases),
+        efficiency_note: pestSpecificData ? 
+          `Analyserade ${pestSpecificData.case_count} ${requestedPestType}-ärenden för exakt prissättning` :
+          `Analyserade ${relevantCases.length} generella ärenden - specificera skadedjurstyp för bättre precision`,
+        statistical_summary: pestSpecificData ? {
+          total_cases_with_prices: pestSpecificData.case_count,
+          avg_price: pestSpecificData.price_statistics.avg_price,
+          median_price: pestSpecificData.price_statistics.median_price,
+          price_range: {
+            min: pestSpecificData.price_statistics.min_price,
+            max: pestSpecificData.price_statistics.max_price
+          },
+          complexity_distribution: pestSpecificData.complexity_distribution,
+          technician_requirements: pestSpecificData.technician_requirements,
+          duration_patterns: pestSpecificData.duration_patterns
+        } : {
+          total_cases_with_prices: relevantCases.length,
+          avg_price_last_month: relevantCases.length > 0 ? 
+            Math.round(relevantCases.reduce((sum: number, c: any) => sum + (c.pris || 0), 0) / relevantCases.length) : 0,
+          price_range: relevantCases.length > 0 ? {
+            min: Math.min(...relevantCases.map((c: any) => c.pris || 0).filter((p: number) => p > 0)),
+            max: Math.max(...relevantCases.map((c: any) => c.pris || 0))
           } : null
         }
       };
@@ -1095,4 +1123,28 @@ function generatePricingRecommendation(cases: any[], criteria: any) {
     adjustments,
     similar_cases_count: cases.length
   };
+}
+
+/**
+ * Identifierar skadedjurstyp från meddelandet (optimerad version)
+ */
+function identifyPestTypeFromMessage(message: string): string | null {
+  const lowerMessage = message.toLowerCase();
+  
+  // Exakta matchningar först (mest specifika)
+  if (lowerMessage.includes('vägglus') || lowerMessage.includes('bedbug')) return 'Vägglöss';
+  if (lowerMessage.includes('fågelsäkring')) return 'Fågelsäkring';
+  if (lowerMessage.includes('kackerlack') || lowerMessage.includes('cockroach')) return 'Kackerlackor';
+  if (lowerMessage.includes('getingar') || lowerMessage.includes('hornets nest')) return 'Getingar';
+  
+  // Mer generella matchningar
+  if (lowerMessage.includes('råtta') || lowerMessage.includes('mus')) return 'Gnagare';
+  if (lowerMessage.includes('myra')) return 'Myror';
+  if (lowerMessage.includes('fågel') || lowerMessage.includes('bird')) return 'Fåglar';
+  if (lowerMessage.includes('spindel') || lowerMessage.includes('spider')) return 'Spindlar';
+  
+  // Tjänstetyp-matchningar
+  if (lowerMessage.includes('sanering')) return 'Sanering';
+  
+  return null; // Ingen specifik typ identifierad
 }

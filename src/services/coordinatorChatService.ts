@@ -88,7 +88,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
         .not('start_date', 'is', null)
         .order('start_date', { ascending: true }),
 
-      // Senaste ärenden med komplett prissättningsdata
+      // Alla ärenden med priser (för skadedjurs-specifik filtrering)
       supabase
         .from('private_cases')
         .select(`
@@ -98,9 +98,9 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           tekniker_kommentar, adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
-        .limit(100),
+        .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+        .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
+        .limit(200), // Öka gränsen för bättre skadedjurs-täckning
 
       // Business cases med komplett prissättningsdata
       supabase
@@ -112,9 +112,9 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           tekniker_kommentar, adress, status
         `)
         .not('pris', 'is', null)
-        .gte('created_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
-        .limit(100)
+        .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+        .order('pris', { ascending: false }) // Sortera efter pris för bättre analys
+        .limit(200) // Öka gränsen för bättre skadedjurs-täckning
     ]);
 
     // Kombinera alla ärenden med priser för omfattande prissättningsanalys
@@ -122,6 +122,9 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       ...(recentPrivateCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'private' as const })),
       ...(recentBusinessCasesWithPrices.data || []).map(c => ({ ...c, case_type: 'business' as const }))
     ];
+
+    // Optimera prissättningsdata genom att gruppera efter skadedjur
+    const optimizedPricingData = optimizePricingDataByPestType(allCasesWithPrices);
 
     // Analysera schema-luckor
     const scheduleGaps = await analyzeScheduleGaps(technicians.data || [], today, oneWeekFromNow);
@@ -154,7 +157,8 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       },
       pricing: {
         recent_cases_with_prices: allCasesWithPrices,
-        pricing_patterns: pricingPatterns
+        pricing_patterns: pricingPatterns,
+        optimized_by_pest_type: optimizedPricingData
       }
     };
 
@@ -607,6 +611,136 @@ const calculateMedian = (numbers: number[]): number => {
   } else {
     return sorted[middle];
   }
+};
+
+/**
+ * Optimerar prissättningsdata genom att gruppera efter skadedjurstyp
+ */
+const optimizePricingDataByPestType = (cases: any[]) => {
+  const pestTypeGroups: Record<string, any[]> = {};
+  
+  // Gruppera efter skadedjur-kolumn (primär) och textanalys (sekundär)
+  for (const caseItem of cases) {
+    let pestType = 'Övrigt';
+    
+    // Använd skadedjur-kolumnen först
+    if (caseItem.skadedjur && caseItem.skadedjur.trim()) {
+      pestType = caseItem.skadedjur.trim();
+    } else {
+      // Fallback till textanalys
+      const title = caseItem.title || '';
+      const description = caseItem.description || '';
+      const text = `${title} ${description}`.toLowerCase();
+      
+      if (text.includes('råtta') || text.includes('mus')) pestType = 'Gnagare';
+      else if (text.includes('myra')) pestType = 'Myror';
+      else if (text.includes('kackerlack')) pestType = 'Kackerlackor';
+      else if (text.includes('vägglus') || text.includes('bedbug')) pestType = 'Vägglöss';
+      else if (text.includes('getingar') || text.includes('hornets nest')) pestType = 'Getingar';
+      else if (text.includes('fågel') || text.includes('bird')) pestType = 'Fåglar';
+      else if (text.includes('spindel')) pestType = 'Spindlar';
+      else if (text.includes('fågelsäkring')) pestType = 'Fågelsäkring';
+      else if (text.includes('sanering')) pestType = 'Sanering';
+    }
+    
+    if (!pestTypeGroups[pestType]) {
+      pestTypeGroups[pestType] = [];
+    }
+    pestTypeGroups[pestType].push(caseItem);
+  }
+  
+  // Skapa optimerad struktur med statistik för varje skadedjurstyp
+  const optimizedData: Record<string, any> = {};
+  
+  for (const [pestType, pestCases] of Object.entries(pestTypeGroups)) {
+    if (pestCases.length >= 3) { // Endast typer med tillräckligt data
+      const prices = pestCases.map(c => c.pris).filter(p => p > 0);
+      
+      if (prices.length >= 3) {
+        optimizedData[pestType] = {
+          case_count: pestCases.length,
+          price_statistics: {
+            avg_price: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+            median_price: calculateMedian(prices),
+            min_price: Math.min(...prices),
+            max_price: Math.max(...prices),
+            price_variance: Math.max(...prices) - Math.min(...prices)
+          },
+          recent_cases: pestCases
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 10), // Top 10 senaste för snabb analys
+          complexity_distribution: analyzeComplexityDistribution(pestCases),
+          technician_requirements: analyzeTechnicianRequirements(pestCases),
+          duration_patterns: analyzeDurationPatterns(pestCases)
+        };
+      }
+    }
+  }
+  
+  return optimizedData;
+};
+
+/**
+ * Analyserar komplexitetsfördelning för en skadedjurstyp
+ */
+const analyzeComplexityDistribution = (cases: any[]) => {
+  const complexity = { low: 0, medium: 0, high: 0 };
+  
+  for (const caseItem of cases) {
+    const text = `${caseItem.description || ''} ${caseItem.rapport || ''}`.toLowerCase();
+    
+    if (text.includes('sanering') || text.includes('omfattande') || text.includes('komplex')) {
+      complexity.high++;
+    } else if (text.includes('enkel') || text.includes('rutinmässig')) {
+      complexity.low++;
+    } else {
+      complexity.medium++;
+    }
+  }
+  
+  return complexity;
+};
+
+/**
+ * Analyserar tekniker-krav för en skadedjurstyp
+ */
+const analyzeTechnicianRequirements = (cases: any[]) => {
+  const techCounts = { 1: 0, 2: 0, 3: 0 };
+  
+  for (const caseItem of cases) {
+    let count = 0;
+    if (caseItem.primary_assignee_id) count++;
+    if (caseItem.secondary_assignee_id) count++;
+    if (caseItem.tertiary_assignee_id) count++;
+    
+    if (count >= 1 && count <= 3) {
+      techCounts[count as keyof typeof techCounts]++;
+    }
+  }
+  
+  return techCounts;
+};
+
+/**
+ * Analyserar duration-mönster för en skadedjurstyp
+ */
+const analyzeDurationPatterns = (cases: any[]) => {
+  const casesWithDuration = cases.filter(c => c.start_date && c.due_date);
+  
+  if (casesWithDuration.length === 0) {
+    return { message: 'Ingen durationsdata tillgänglig' };
+  }
+  
+  const durations = casesWithDuration.map(c => 
+    (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60)
+  );
+  
+  return {
+    avg_duration: Math.round((durations.reduce((sum, d) => sum + d, 0) / durations.length) * 10) / 10,
+    min_duration: Math.round(Math.min(...durations) * 10) / 10,
+    max_duration: Math.round(Math.max(...durations) * 10) / 10,
+    cases_with_duration: casesWithDuration.length
+  };
 };
 
 const groupCasesByType = (cases: any[]) => {
