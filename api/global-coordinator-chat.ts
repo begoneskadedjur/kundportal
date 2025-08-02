@@ -88,10 +88,11 @@ export default async function handler(
     // Förbered relevant data baserat på kontext
     const relevantData = prepareRelevantData(coordinatorData, context, message);
 
-    // Begränsa datastorlek för att undvika API-gränser
+    // Begränsa datastorlek för att undvika API-gränser (större gräns för technician queries)
     const relevantDataString = JSON.stringify(relevantData, null, 2);
-    const truncatedData = relevantDataString.length > 8000 
-      ? relevantDataString.slice(0, 8000) + '\n...(data truncated due to size)'
+    const sizeLimit = context === 'technician' ? 15000 : 8000; // Större gräns för technician data
+    const truncatedData = relevantDataString.length > sizeLimit 
+      ? relevantDataString.slice(0, sizeLimit) + '\n...(data truncated due to size)'
       : relevantDataString;
 
     // TEMPORARY: Log vad som skickas till AI för debugging
@@ -303,24 +304,33 @@ function prepareRelevantData(coordinatorData: any, context: string, message: str
       console.log(`- Schedule gaps: ${coordinatorData.schedule?.schedule_gaps?.length || 0}`);
       console.log(`- Technician availability: ${coordinatorData.schedule?.technician_availability?.length || 0}`);
       
+      // Optimera data för technician-frågor
+      const optimizedTechnicians = coordinatorData.technicians?.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        specializations: t.specializations || [],
+        work_areas: t.work_areas || [],
+        role: t.role,
+        is_active: t.is_active,
+        work_schedule: t.work_schedule,
+        // Beräkna kommande arbetsdagar för nästa vecka
+        next_week_workdays: getNextWeekWorkdays(t.work_schedule),
+        // Hitta schemalagda ärenden för denna tekniker
+        upcoming_assignments: coordinatorData.schedule?.upcoming_cases?.filter((c: any) => 
+          c.primary_assignee_id === t.id || c.secondary_assignee_id === t.id || c.tertiary_assignee_id === t.id
+        ) || [],
+        // Tillgänglighetsdata för denna tekniker
+        availability_info: coordinatorData.schedule?.technician_availability?.find((ta: any) => ta.technician_id === t.id)
+      })) || [];
+      
       return {
         ...baseData,
-        technicians: coordinatorData.technicians?.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          specializations: t.specializations || [],
-          work_areas: t.work_areas || [],
-          role: t.role,
-          is_active: t.is_active,
-          work_schedule: t.work_schedule // Add work schedule
-        })) || [],
+        technicians: optimizedTechnicians,
         technician_availability: coordinatorData.schedule?.technician_availability || [],
-        upcoming_cases: coordinatorData.schedule?.upcoming_cases || [], // Add upcoming cases
-        schedule_gaps: coordinatorData.schedule?.schedule_gaps || [], // Add schedule gaps
-        recent_cases: [
-          ...coordinatorData.cases?.private_cases?.slice(0, 10) || [],
-          ...coordinatorData.cases?.business_cases?.slice(0, 10) || []
-        ]
+        upcoming_cases: coordinatorData.schedule?.upcoming_cases || [],
+        schedule_gaps: coordinatorData.schedule?.schedule_gaps || [],
+        // Lägg till sammanfattning för frånvaro-analys
+        absence_analysis: analyzeAbsencePatterns(optimizedTechnicians, coordinatorData.schedule?.upcoming_cases || [])
       };
 
     case 'pricing':
@@ -1229,4 +1239,92 @@ function identifyPestTypeFromMessage(message: string): string | null {
   if (lowerMessage.includes('sanering')) return 'Sanering';
   
   return null; // Ingen specifik typ identifierad
+}
+
+/**
+ * Beräknar arbetsdagar för nästa vecka baserat på work_schedule
+ */
+function getNextWeekWorkdays(workSchedule: any): any[] {
+  if (!workSchedule) return [];
+  
+  const today = new Date();
+  const nextWeekStart = new Date(today);
+  nextWeekStart.setDate(today.getDate() + (7 - today.getDay() + 1)); // Nästa måndag
+  
+  const workdays = [];
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(nextWeekStart);
+    day.setDate(nextWeekStart.getDate() + i);
+    const dayName = daysOfWeek[i];
+    const daySchedule = workSchedule[dayName];
+    
+    if (daySchedule?.active) {
+      workdays.push({
+        date: day.toISOString().split('T')[0],
+        day_name: dayName,
+        start_time: daySchedule.start,
+        end_time: daySchedule.end,
+        day_of_week: day.toLocaleDateString('sv-SE', { weekday: 'long' })
+      });
+    }
+  }
+  
+  return workdays;
+}
+
+/**
+ * Analyserar frånvaromönster baserat på schemalagd arbetstid vs faktiska bokningar
+ */
+function analyzeAbsencePatterns(technicians: any[], upcomingCases: any[]): any {
+  const analysis = {
+    potentially_absent: [] as any[],
+    analysis_summary: '',
+    next_week_schedule_overview: [] as any[]
+  };
+  
+  for (const tech of technicians) {
+    const nextWeekWorkdays = tech.next_week_workdays || [];
+    const techAssignments = tech.upcoming_assignments || [];
+    
+    // Räkna arbetsdagar nästa vecka
+    const scheduledWorkdays = nextWeekWorkdays.length;
+    const daysWithAssignments = new Set(
+      techAssignments.map((assignment: any) => assignment.start_date?.split('T')[0])
+    ).size;
+    
+    // Om tekniker har arbetsdagar men inga bokningar, kan det vara frånvaro
+    if (scheduledWorkdays > 0 && daysWithAssignments === 0) {
+      analysis.potentially_absent.push({
+        technician_name: tech.name,
+        role: tech.role,
+        scheduled_workdays: scheduledWorkdays,
+        assigned_days: daysWithAssignments,
+        next_week_workdays: nextWeekWorkdays,
+        status: 'Möjlig frånvaro - ingen bokad tid nästa vecka'
+      });
+    } else if (scheduledWorkdays > 0 && daysWithAssignments < scheduledWorkdays) {
+      analysis.potentially_absent.push({
+        technician_name: tech.name,
+        role: tech.role,
+        scheduled_workdays: scheduledWorkdays,
+        assigned_days: daysWithAssignments,
+        next_week_workdays: nextWeekWorkdays,
+        status: 'Delvis tillgänglig - mindre bokningar än vanligt'
+      });
+    }
+    
+    analysis.next_week_schedule_overview.push({
+      technician_name: tech.name,
+      role: tech.role,
+      workdays_count: scheduledWorkdays,
+      assignments_count: daysWithAssignments,
+      utilization: scheduledWorkdays > 0 ? Math.round((daysWithAssignments / scheduledWorkdays) * 100) : 0
+    });
+  }
+  
+  analysis.analysis_summary = `Analyserade ${technicians.length} tekniker för nästa vecka. ${analysis.potentially_absent.length} tekniker kan vara frånvarande eller ha reducerad närvaro.`;
+  
+  return analysis;
 }
