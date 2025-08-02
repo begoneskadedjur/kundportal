@@ -11,6 +11,7 @@ import { BeGoneCaseRow, Technician } from '../../types/database';
 // Importera ikoner
 import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3 } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
+import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
 export default function CoordinatorDashboard() {
   // State för att hålla vår data, laddningsstatus och eventuella fel
@@ -327,6 +328,15 @@ export default function CoordinatorDashboard() {
         technicians={modalData.technicians}
         absences={modalData.absences}
         kpiType={modalData.kpiType}
+      />
+      
+      {/* Global Coordinator Chat */}
+      <GlobalCoordinatorChat 
+        currentPage="dashboard"
+        contextData={{
+          kpiData,
+          recentCases: modalData.cases
+        }}
       />
     </div>
   );

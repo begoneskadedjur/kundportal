@@ -17,6 +17,7 @@ import { LayoutGrid, Plus, CalendarOff, ArrowLeft, LogOut } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
 export interface Absence {
   id: string;
@@ -201,6 +202,17 @@ export default function CoordinatorSchedule() {
       {/* ✅ Skickar nu med "initialCaseData" till CreateCaseModal */}
       <CreateCaseModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); }} onSuccess={handleCreateSuccess} technicians={technicians} initialCaseData={selectedCase} />
       <CreateAbsenceModal isOpen={isAbsenceModalOpen} onClose={() => setIsAbsenceModalOpen(false)} onSuccess={handleAbsenceCreateSuccess} technicians={technicians} />
+      
+      {/* Global Coordinator Chat */}
+      <GlobalCoordinatorChat 
+        currentPage="schedule"
+        contextData={{
+          technicians,
+          scheduledCases: filteredScheduledCases,
+          actionableCases: actionableCases,
+          absences
+        }}
+      />
     </>
   );
 }

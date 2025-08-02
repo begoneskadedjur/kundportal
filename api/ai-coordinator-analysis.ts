@@ -92,6 +92,8 @@ interface AICoordinatorAnalysis {
 
 KRITISKT: 
 - Använd EXAKTA siffror från datan (inte avrundade)
+- TIDSFORMATERING: Visa alltid tid med MAX 1 decimal (t.ex. 1.0 timme, 17.5 timmar, 104.9 timmar)
+- PROCENTFORMATERING: Visa procent med MAX 1 decimal (t.ex. 67.9%, 96.6%)
 - Beräkna procentuella förbättringar och konkreta mål
 - Identifiera specifika tekniker och deras utmaningar
 - Kvantifiera ekonomisk påverkan i kronor

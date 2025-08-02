@@ -39,7 +39,7 @@ import GeographicOptimizationMap from '../../components/admin/coordinator/Geogra
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import AIAnalysisSection from '../../components/coordinator/AIAnalysisSection';
 import { aiCoordinatorAnalysisService, AICoordinatorAnalysis } from '../../services/coordinatorAIAnalysisService';
-import AnalyticsChat from '../../components/coordinator/AnalyticsChat';
+import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
 registerLocale('sv', sv);
 
@@ -483,9 +483,10 @@ export default function CoordinatorAnalytics() {
         caseData={selectedCase} 
       />
       
-      {/* Analytics Chat */}
-      <AnalyticsChat 
-        analyticsData={{
+      {/* Global Coordinator Chat */}
+      <GlobalCoordinatorChat 
+        currentPage="analytics"
+        contextData={{
           kpiData,
           efficiencyTrend,
           utilizationData,
