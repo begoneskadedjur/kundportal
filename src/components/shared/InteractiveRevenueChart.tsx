@@ -18,12 +18,14 @@ interface InteractiveRevenueChartProps {
   };
   size?: number;
   className?: string;
+  compact?: boolean;
 }
 
 const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
   data,
   size = 120,
-  className = ''
+  className = '',
+  compact = false
 }) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -107,8 +109,8 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
             data={chartData}
             cx="50%"
             cy="50%"
-            innerRadius={size * 0.3}
-            outerRadius={size * 0.45}
+            innerRadius={compact ? size * 0.25 : size * 0.3}
+            outerRadius={compact ? size * 0.4 : size * 0.45}
             paddingAngle={2}
             dataKey="value"
             onMouseEnter={(_, index) => setActiveIndex(index)}
@@ -133,15 +135,17 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
         </PieChart>
       </ResponsiveContainer>
 
-      {/* Center label */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-center">
-          <div className="text-white font-bold text-sm">Total</div>
-          <div className="text-[#20c58f] font-semibold text-xs">
-            {formatCurrency(total)}
+      {/* Center label - hidden in compact mode */}
+      {!compact && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <div className="text-white font-bold text-sm">Total</div>
+            <div className="text-[#20c58f] font-semibold text-xs">
+              {formatCurrency(total)}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Legend */}
       {isHovered && (
