@@ -28,6 +28,9 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { formatCurrency } from '../../utils/formatters'
 import { PageHeader } from '../../components/shared'
+import AdminKpiCard from '../../components/admin/AdminKpiCard'
+import AdminDashboardCard from '../../components/admin/AdminDashboardCard'
+import AdminKpiModal from '../../components/admin/AdminKpiModal'
 
 interface DashboardStats {
   totalCustomers: number
@@ -43,6 +46,16 @@ interface DashboardStats {
     description: string
     timestamp: string
   }>
+  customers?: any[]
+  technicians?: any[]
+  privateCases?: any[]
+  businessCases?: any[]
+  revenueBreakdown?: {
+    contracts: number
+    privateCases: number
+    businessCases: number
+    legacyCases: number
+  }
 }
 
 const AdminDashboard: React.FC = () => {
@@ -51,6 +64,9 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalType, setModalType] = useState<'customers' | 'revenue' | 'cases' | 'technicians'>('customers')
+  const [modalTitle, setModalTitle] = useState('')
 
   useEffect(() => {
     fetchDashboardStats()
@@ -103,7 +119,17 @@ const AdminDashboard: React.FC = () => {
         totalRevenue,
         activeTechnicians: techniciansResult.data?.length || 0,
         pendingCases: activeCasesResult.data?.length || 0,
-        recentActivity: []
+        recentActivity: [],
+        customers: customersResult.data || [],
+        technicians: techniciansResult.data || [],
+        privateCases: privateCasesResult.data || [],
+        businessCases: businessCasesResult.data || [],
+        revenueBreakdown: {
+          contracts: contractRevenue,
+          privateCases: privateRevenue,
+          businessCases: businessRevenue,
+          legacyCases: caseRevenue
+        }
       }
 
       setStats(dashboardStats)
@@ -125,10 +151,59 @@ const AdminDashboard: React.FC = () => {
     }
   }
 
+  const handleKpiClick = (type: 'customers' | 'revenue' | 'cases' | 'technicians', title: string) => {
+    setModalType(type)
+    setModalTitle(title)
+    setModalOpen(true)
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <LoadingSpinner />
+      <div className="min-h-screen bg-slate-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <PageHeader 
+            title="Admin Dashboard" 
+            showBackButton={false}
+          />
+          
+          <div className="space-y-8">
+            {/* Loading skeleton for KPI cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-slate-900 p-5 rounded-xl border border-slate-800 h-[104px] animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-800 rounded-lg"></div>
+                    <div className="flex-1">
+                      <div className="h-8 w-20 bg-slate-800 rounded mb-2"></div>
+                      <div className="h-4 w-32 bg-slate-800 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Loading skeleton for navigation cards */}
+            <div className="space-y-12">
+              {[1, 2].map(section => (
+                <div key={section}>
+                  <div className="h-6 w-48 bg-slate-800 rounded mb-6"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-[180px] animate-pulse">
+                        <div className="h-full flex flex-col">
+                          <div className="w-14 h-14 bg-slate-800 rounded-lg mb-4"></div>
+                          <div className="h-6 w-32 bg-slate-800 rounded mb-2"></div>
+                          <div className="h-4 w-full bg-slate-800 rounded mb-2"></div>
+                          <div className="h-3 w-24 bg-slate-800 rounded mt-auto"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -161,342 +236,282 @@ const AdminDashboard: React.FC = () => {
           
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-400">Avtalskunder</p>
-                  <p className="text-2xl font-bold text-white">{stats?.totalCustomers || 0}</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-400">Total Intäkt</p>
-                  <p className="text-2xl font-bold text-white">{formatCurrency(stats?.totalRevenue || 0)}</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-400">BeGone Ärenden</p>
-                  <p className="text-2xl font-bold text-white">
-                    {(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)}
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                  <Wrench className="w-6 h-6 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-400">Aktiva Tekniker</p>
-                  <p className="text-2xl font-bold text-white">{stats?.activeTechnicians || 0}</p>
-                </div>
-              </div>
-            </Card>
+            <AdminKpiCard
+              title="Avtalskunder"
+              value={stats?.totalCustomers || 0}
+              icon={Users}
+              onClick={() => handleKpiClick('customers', 'Avtalskunder')}
+            />
+            
+            <AdminKpiCard
+              title="Total Intäkt"
+              value={formatCurrency(stats?.totalRevenue || 0)}
+              icon={DollarSign}
+              onClick={() => handleKpiClick('revenue', 'Total Intäkt')}
+            />
+            
+            <AdminKpiCard
+              title="BeGone Ärenden"
+              value={(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)}
+              icon={FileText}
+              onClick={() => handleKpiClick('cases', 'BeGone Ärenden')}
+            />
+            
+            <AdminKpiCard
+              title="Aktiva Tekniker"
+              value={stats?.activeTechnicians || 0}
+              icon={Users}
+              onClick={() => handleKpiClick('technicians', 'Aktiva Tekniker')}
+            />
           </div>
 
-          {/* 📱 Navigation Grid - Sorterade efter funktionalitet som appar */}
-          <div className="space-y-6">
+          {/* Navigation Grid */}
+          <div className="space-y-12">
             
-            {/* 👥 KUNDHANTERING */}
+            {/* Primary Functions */}
             <div>
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-400" />
-                Kundhantering
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="w-8 h-px bg-slate-700 flex-1" />
+                <span className="text-slate-300">Huvudfunktioner</span>
+                <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <AdminDashboardCard
+                  href="/admin/customers"
+                  icon={Users}
+                  title="Hantera Kunder"
+                  description="Avtalskunder & ClickUp-listor"
+                  stats={`${stats?.totalCustomers} aktiva kunder`}
+                  tag="Kärnfunktion"
+                />
                 
-                {/* Hantera Kunder */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/customers')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                      <Users className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-blue-300 transition-colors">Hantera Kunder</h3>
-                      <p className="text-xs text-slate-400">Avtalskunder & ClickUp-listor</p>
-                      <p className="text-xs text-slate-500 mt-1">{stats?.totalCustomers} aktiva kunder</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Försäljningsmöjligheter */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/sales-opportunities')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
-                      <Target className="w-6 h-6 text-purple-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-purple-300 transition-colors">Försäljningsmöjligheter</h3>
-                      <p className="text-xs text-slate-400">Potentiella avtalskunder</p>
-                      <p className="text-xs text-slate-500 mt-1">BeGone → Avtal</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Ny Kund */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/customers/new')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-                      <Building2 className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-green-300 transition-colors">Lägg till Kund</h3>
-                      <p className="text-xs text-slate-400">Skapa ny avtalskund</p>
-                      <p className="text-xs text-slate-500 mt-1">Automatisk ClickUp-lista</p>
-                    </div>
-                  </div>
-                </Card>
+                <AdminDashboardCard
+                  href="/admin/technicians"
+                  icon={BarChart3}
+                  title="Tekniker Statistik"
+                  description="Prestanda & ranking"
+                  stats={`${stats?.activeTechnicians} aktiva tekniker`}
+                  tag="Analytics"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/economics"
+                  icon={TrendingUp}
+                  title="Ekonomisk Översikt"
+                  description="Intäktsanalys & KPI"
+                  stats={formatCurrency(stats?.totalRevenue || 0)}
+                  tag="Rapporter"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/billing"
+                  icon={FileText}
+                  title="Fakturering"
+                  description="BeGone-ärenden"
+                  stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
+                  tag="Finans"
+                />
               </div>
             </div>
 
-            {/* 🔧 TEKNIKER & PERSONAL */}
+            {/* Secondary Functions */}
             <div>
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-orange-400" />
-                Tekniker & Personal
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="w-8 h-px bg-slate-700 flex-1" />
+                <span className="text-slate-300">Administration</span>
+                <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <AdminDashboardCard
+                  href="/admin/sales-opportunities"
+                  icon={Target}
+                  title="Försäljningsmöjligheter"
+                  description="Potentiella avtalskunder"
+                  stats="BeGone → Avtal"
+                  iconColor="text-purple-400"
+                />
                 
-                {/* Tekniker Statistik */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/technicians')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
-                      <BarChart3 className="w-6 h-6 text-orange-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-orange-300 transition-colors">Tekniker Statistik</h3>
-                      <p className="text-xs text-slate-400">Prestanda & ranking</p>
-                      <p className="text-xs text-slate-500 mt-1">{stats?.activeTechnicians} aktiva tekniker</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Hantera Tekniker */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/technician-management')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                      <UserCheck className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-blue-300 transition-colors">Hantera Tekniker</h3>
-                      <p className="text-xs text-slate-400">CRUD & administration</p>
-                      <p className="text-xs text-slate-500 mt-1">Lägg till/redigera personal</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Provisioner */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/commissions')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center group-hover:bg-yellow-500/30 transition-colors">
-                      <Wallet className="w-6 h-6 text-yellow-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-yellow-300 transition-colors">Provisioner</h3>
-                      <p className="text-xs text-slate-400">Beräkna & hantera</p>
-                      <p className="text-xs text-slate-500 mt-1">Tekniker-commissionsystem</p>
-                    </div>
-                  </div>
-                </Card>
+                <AdminDashboardCard
+                  href="/admin/technician-management"
+                  icon={UserCheck}
+                  title="Hantera Tekniker"
+                  description="Lägg till & redigera personal"
+                  tag="Admin"
+                  iconColor="text-blue-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/commissions"
+                  icon={Wallet}
+                  title="Provisioner"
+                  description="Beräkna tekniker-provision"
+                  tag="Löner"
+                  iconColor="text-yellow-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/customers/new"
+                  icon={Building2}
+                  title="Lägg till Kund"
+                  description="Skapa ny avtalskund"
+                  stats="ClickUp-integration"
+                  iconColor="text-green-400"
+                />
               </div>
             </div>
 
-            {/* 🆕 ONEFLOW & AVTAL */}
+            {/* Contract Management */}
             <div>
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-400" />
-                Oneflow & Avtal
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="w-8 h-px bg-slate-700 flex-1" />
+                <span className="text-slate-300">Avtal & Integrationer</span>
+                <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <AdminDashboardCard
+                  href="/admin/oneflow-contract-creator"
+                  icon={FileText}
+                  title="Skapa Kontrakt"
+                  description="Oneflow-avtal för signering"
+                  stats="6 tillgängliga mallar"
+                  tag="Oneflow"
+                  iconColor="text-indigo-400"
+                />
                 
-                {/* Skapa Kontrakt */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/oneflow-contract-creator')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center group-hover:bg-indigo-500/30 transition-colors">
-                      <FileText className="w-6 h-6 text-indigo-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-indigo-300 transition-colors">Skapa Kontrakt</h3>
-                      <p className="text-xs text-slate-400">Oneflow-avtal för signering</p>
-                      <p className="text-xs text-slate-500 mt-1">6 tillgängliga mallar</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Övervaka Avtal */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/oneflow-diagnostics')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
-                      <BarChart3 className="w-6 h-6 text-cyan-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-cyan-300 transition-colors">Övervaka Avtal</h3>
-                      <p className="text-xs text-slate-400">Status & diagnostik</p>
-                      <p className="text-xs text-slate-500 mt-1">Webhook logs & analys</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Avtalsstatus (Kommande) */}
-                <Card className="p-4 bg-slate-800/30 border-dashed border-slate-600">
-                  <div className="flex items-center gap-3 opacity-50">
-                    <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                      <Target className="w-6 h-6 text-purple-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-slate-400">Avtalsstatus</h3>
-                      <p className="text-xs text-slate-500">Signering & uppföljning</p>
-                      <p className="text-xs text-slate-600 mt-1">Under utveckling</p>
-                    </div>
-                  </div>
-                </Card>
+                <AdminDashboardCard
+                  href="/admin/oneflow-diagnostics"
+                  icon={BarChart3}
+                  title="Övervaka Avtal"
+                  description="Status & diagnostik"
+                  stats="Webhook logs"
+                  tag="Diagnostik"
+                  iconColor="text-cyan-400"
+                />
+                
+                <AdminDashboardCard
+                  href="#"
+                  icon={Shield}
+                  title="API Status"
+                  description="Systemövervakning"
+                  stats="Alla system online"
+                  tag="Live"
+                  iconColor="text-green-400"
+                  disabled={false}
+                />
+                
+                <AdminDashboardCard
+                  href="#"
+                  icon={Settings}
+                  title="Inställningar"
+                  description="Systemkonfiguration"
+                  tag="Kommande"
+                  iconColor="text-slate-400"
+                  disabled={true}
+                />
               </div>
             </div>
 
-            {/* 💰 EKONOMI & FAKTURERING */}
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-green-400" />
-                Ekonomi & Fakturering
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                {/* Ekonomisk Översikt */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/economics')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-                      <TrendingUp className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-green-300 transition-colors">Ekonomisk Översikt</h3>
-                      <p className="text-xs text-slate-400">Intäktsanalys & KPI</p>
-                      <p className="text-xs text-slate-500 mt-1">{formatCurrency(stats?.totalRevenue || 0)} total</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Fakturering */}
-                <Card className="p-4 hover:bg-slate-800/50 transition-all duration-200 cursor-pointer group" onClick={() => navigate('/admin/billing')}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center group-hover:bg-yellow-500/30 transition-colors">
-                      <FileText className="w-6 h-6 text-yellow-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-white group-hover:text-yellow-300 transition-colors">Fakturering</h3>
-                      <p className="text-xs text-slate-400">BeGone-ärenden</p>
-                      <p className="text-xs text-slate-500 mt-1">{(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden</p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Placeholder för framtida ekonomifunktioner */}
-                <Card className="p-4 bg-slate-800/30 border-dashed border-slate-600">
-                  <div className="flex items-center gap-3 opacity-50">
-                    <div className="w-12 h-12 bg-slate-500/20 rounded-xl flex items-center justify-center">
-                      <Settings className="w-6 h-6 text-slate-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-slate-400">Kommande funktioner</h3>
-                      <p className="text-xs text-slate-500">Fler ekonomiverktyg</p>
-                      <p className="text-xs text-slate-600 mt-1">Under utveckling</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
+          {/* System Overview */}
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Activity */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-blue-400" />
-                Senaste Aktivitet
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white">System uppdaterat</p>
-                    <p className="text-xs text-slate-400">Senaste synkronisering från ClickUp</p>
-                  </div>
-                  <span className="text-xs text-slate-500">Just nu</span>
+            <div className="lg:col-span-2">
+              <Card className="p-6 h-full">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#20c58f]" />
+                  Senaste Aktivitet
+                </h3>
+                <div className="space-y-3">
+                  {stats?.recentActivity?.length ? (
+                    stats.recentActivity.map((activity, index) => (
+                      <div key={activity.id} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                        <div className={`w-2 h-2 ${index === 0 ? 'bg-green-400' : 'bg-blue-400'} rounded-full`}></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-white">{activity.description}</p>
+                          <p className="text-xs text-slate-400">{activity.type}</p>
+                        </div>
+                        <span className="text-xs text-slate-500">{activity.timestamp}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-white">System uppdaterat</p>
+                          <p className="text-xs text-slate-400">Dashboard laddat med senaste data</p>
+                        </div>
+                        <span className="text-xs text-slate-500">Nu</span>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-white">ClickUp synkroniserad</p>
+                          <p className="text-xs text-slate-400">Alla ärenden är uppdaterade</p>
+                        </div>
+                        <span className="text-xs text-slate-500">2 min sedan</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                
-                <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white">Dashboard laddat</p>
-                    <p className="text-xs text-slate-400">Alla komponenter aktiva</p>
-                  </div>
-                  <span className="text-xs text-slate-500">Nu</span>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
 
-            {/* System Status */}
+            {/* System Health */}
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-green-400" />
+                <Shield className="w-5 h-5 text-[#20c58f]" />
                 System Status
               </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">Database</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-xs text-green-400">Online</span>
-                  </div>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  {[
+                    { name: 'Database', status: 'Online' },
+                    { name: 'ClickUp API', status: 'Ansluten' },
+                    { name: 'Webhooks', status: 'Aktiva' },
+                    { name: 'Oneflow', status: 'Redo' },
+                  ].map((service) => (
+                    <div key={service.name} className="flex items-center justify-between p-2">
+                      <span className="text-sm text-slate-400">{service.name}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-green-400 font-medium">{service.status}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">ClickUp Integration</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-xs text-green-400">Synkroniserad</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">Webhook Status</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-xs text-green-400">Aktiv</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-300">API Endpoints</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-xs text-green-400">Tillgängliga</span>
-                  </div>
+                <div className="pt-3 border-t border-slate-800">
+                  <p className="text-xs text-slate-500">Senaste kontroll: Just nu</p>
+                  <p className="text-xs text-slate-500">Upptid: 99.9%</p>
                 </div>
               </div>
             </Card>
           </div>
         </div>
       </div>
+      
+      {/* KPI Modal */}
+      <AdminKpiModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={modalTitle}
+        kpiType={modalType}
+        data={{
+          customers: stats?.customers,
+          technicians: stats?.technicians,
+          cases: [...(stats?.privateCases || []), ...(stats?.businessCases || [])],
+          revenue: {
+            total: stats?.totalRevenue || 0,
+            breakdown: stats?.revenueBreakdown || {
+              contracts: 0,
+              privateCases: 0,
+              businessCases: 0,
+              legacyCases: 0
+            }
+          }
+        }}
+      />
     </div>
   )
 }
