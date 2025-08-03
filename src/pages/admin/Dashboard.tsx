@@ -85,18 +85,25 @@ const AdminDashboard: React.FC = () => {
       setError(null)
 
       // Hämta parallella queries för bättre prestanda
+      // Get today's date for absence filtering
+      const today = new Date().toISOString().split('T')[0]
+
       const [
         customersResult,
         casesResult,
         privateCasesResult,
         businessCasesResult,
-        techniciansResult
+        techniciansResult,
+        absencesResult
       ] = await Promise.all([
-        supabase.from('customers').select('id, annual_premium').eq('is_active', true),
+        supabase.from('customers').select('id, company_name, annual_premium').eq('is_active', true),
         supabase.from('cases').select('id, price').not('completed_date', 'is', null),
-        supabase.from('private_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('business_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('technicians').select('id, name').eq('is_active', true)
+        supabase.from('private_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('business_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('technicians').select('id, name, role').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
+        supabase.from('technician_absences').select('technician_id')
+          .lte('start_date', today + ' 23:59:59')
+          .gte('end_date', today + ' 00:00:00')
       ])
 
       if (customersResult.error) throw customersResult.error
@@ -104,6 +111,7 @@ const AdminDashboard: React.FC = () => {
       if (privateCasesResult.error) throw privateCasesResult.error
       if (businessCasesResult.error) throw businessCasesResult.error
       if (techniciansResult.error) throw techniciansResult.error
+      if (absencesResult.error) throw absencesResult.error
 
       // Beräkna total revenue
       const contractRevenue = customersResult.data?.reduce((sum, c) => sum + (c.annual_premium || 0), 0) || 0
@@ -118,17 +126,21 @@ const AdminDashboard: React.FC = () => {
         supabase.from('cases').select('id').is('completed_date', null)
       ])
 
+      // Filter out absent technicians
+      const absentTechnicianIds = absencesResult.data?.map(absence => absence.technician_id) || []
+      const availableTechnicians = techniciansResult.data?.filter(tech => !absentTechnicianIds.includes(tech.id)) || []
+
       const dashboardStats: DashboardStats = {
         totalCustomers: customersResult.data?.length || 0,
         totalCases: casesResult.data?.length || 0,
         totalPrivateCases: privateCasesResult.data?.length || 0,
         totalBusinessCases: businessCasesResult.data?.length || 0,
         totalRevenue,
-        activeTechnicians: techniciansResult.data?.length || 0,
+        activeTechnicians: availableTechnicians.length || 0,
         pendingCases: activeCasesResult.data?.length || 0,
         recentActivity: [],
         customers: customersResult.data || [],
-        technicians: techniciansResult.data || [],
+        technicians: availableTechnicians || [],
         privateCases: privateCasesResult.data || [],
         businessCases: businessCasesResult.data || [],
         revenueBreakdown: {

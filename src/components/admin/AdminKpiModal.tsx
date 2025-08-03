@@ -7,7 +7,7 @@ import EditCaseModal from './technicians/EditCaseModal';
 
 interface Customer {
   id: string;
-  name: string;
+  company_name: string;
   annual_premium: number;
   is_active: boolean;
   customer_type: string;
@@ -26,7 +26,7 @@ interface CaseInfo {
   price?: number;
   pris?: number;
   case_type?: string;
-  customer_name?: string;
+  kontaktperson?: string;
   primary_assignee_name?: string;
   created_at?: string;
   completed_date?: string;
@@ -61,15 +61,15 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
     // Transformera data för EditCaseModal
     const transformedCase = {
       id: caseItem.id,
-      case_type: 'private', // Default till private
-      title: 'BeGone Ärende',
+      case_type: caseItem.case_type || 'private',
+      title: caseItem.title || 'BeGone Ärende',
       description: '',
-      status: 'pågående',
+      status: 'Avslutat',
       case_price: caseItem.pris || 0,
-      kontaktperson: 'Okänd kund',
-      primary_assignee_name: '',
-      created_at: new Date().toISOString(),
-      completed_date: null
+      kontaktperson: caseItem.kontaktperson || 'Okänd kund',
+      primary_assignee_name: caseItem.primary_assignee_name || '',
+      created_at: caseItem.created_at || new Date().toISOString(),
+      completed_date: caseItem.completed_date
     };
     setSelectedCase(transformedCase);
     setEditCaseOpen(true);
@@ -87,7 +87,7 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
               {data?.customers?.map((customer) => (
                 <div key={customer.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg mb-2">
                   <div>
-                    <p className="font-medium text-white">Kund #{customer.id?.slice(-6)}</p>
+                    <p className="font-medium text-white">{customer.company_name || `Kund #${customer.id?.slice(-6)}`}</p>
                     <p className="text-sm text-slate-400">
                       <User className="inline w-3 h-3 mr-1" />
                       Avtalskund
@@ -159,12 +159,12 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
                   onClick={() => handleCaseClick(caseItem)}
                 >
                   <div className="flex-1">
-                    <p className="font-medium text-white">BeGone Ärende #{caseItem.id?.slice(-6)}</p>
+                    <p className="font-medium text-white">{caseItem.title || `BeGone Ärende #${caseItem.id?.slice(-6)}`}</p>
                     <p className="text-sm text-slate-400">
-                      Ej tilldelad • Okänd kund
+                      {caseItem.primary_assignee_name || 'Ej tilldelad'} • {caseItem.kontaktperson || 'Okänd kund'}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {caseItem.pris ? 'Ärende' : 'Ärende'}
+                      {caseItem.case_type === 'business' ? 'Företagsärende' : 'Privatärende'}
                     </p>
                   </div>
                   <div className="text-right">
