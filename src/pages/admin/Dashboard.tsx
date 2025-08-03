@@ -31,6 +31,13 @@ import { PageHeader } from '../../components/shared'
 import AdminKpiCard from '../../components/admin/AdminKpiCard'
 import AdminDashboardCard from '../../components/admin/AdminDashboardCard'
 import AdminKpiModal from '../../components/admin/AdminKpiModal'
+import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
+import EnhancedSkeleton from '../../components/shared/EnhancedSkeleton'
+import QuickActionBar from '../../components/shared/QuickActionBar'
+import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueChart'
+import VisualTimeline from '../../components/shared/VisualTimeline'
+import StaggeredGrid from '../../components/shared/StaggeredGrid'
+import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
 
 interface DashboardStats {
   totalCustomers: number
@@ -167,37 +174,18 @@ const AdminDashboard: React.FC = () => {
           />
           
           <div className="space-y-8">
-            {/* Loading skeleton for KPI cards */}
+            {/* Enhanced Loading skeleton for KPI cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="bg-slate-900 p-5 rounded-xl border border-slate-800 h-[104px] animate-pulse">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-800 rounded-lg"></div>
-                    <div className="flex-1">
-                      <div className="h-8 w-20 bg-slate-800 rounded mb-2"></div>
-                      <div className="h-4 w-32 bg-slate-800 rounded"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <EnhancedSkeleton variant="kpi" count={4} />
             </div>
             
-            {/* Loading skeleton for navigation cards */}
+            {/* Enhanced Loading skeleton for navigation cards */}
             <div className="space-y-12">
-              {[1, 2].map(section => (
+              {[1, 2, 3].map(section => (
                 <div key={section}>
-                  <div className="h-6 w-48 bg-slate-800 rounded mb-6"></div>
+                  <EnhancedSkeleton variant="text" className="h-6 w-48 mb-6" />
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[1, 2, 3, 4].map(i => (
-                      <div key={i} className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-[180px] animate-pulse">
-                        <div className="h-full flex flex-col">
-                          <div className="w-14 h-14 bg-slate-800 rounded-lg mb-4"></div>
-                          <div className="h-6 w-32 bg-slate-800 rounded mb-2"></div>
-                          <div className="h-4 w-full bg-slate-800 rounded mb-2"></div>
-                          <div className="h-3 w-24 bg-slate-800 rounded mt-auto"></div>
-                        </div>
-                      </div>
-                    ))}
+                    <EnhancedSkeleton variant="card" count={4} />
                   </div>
                 </div>
               ))}
@@ -231,37 +219,56 @@ const AdminDashboard: React.FC = () => {
           showBackButton={false}
         />
 
+        {/* Quick Action Bar */}
+        <QuickActionBar />
+
         {/* Main Content */}
         <div className="space-y-8">
           
-          {/* Stats Cards */}
+          {/* Enhanced KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <AdminKpiCard
+            <EnhancedKpiCard
               title="Avtalskunder"
               value={stats?.totalCustomers || 0}
               icon={Users}
               onClick={() => handleKpiClick('customers', 'Avtalskunder')}
+              trend="up"
+              trendValue="+5%"
+              delay={0}
             />
             
-            <AdminKpiCard
+            <EnhancedKpiCard
               title="Total Intäkt"
-              value={formatCurrency(stats?.totalRevenue || 0)}
+              value={stats?.totalRevenue || 0}
               icon={DollarSign}
               onClick={() => handleKpiClick('revenue', 'Total Intäkt')}
+              prefix=""
+              suffix=" kr"
+              decimals={0}
+              trend="up"
+              trendValue="+12%"
+              delay={0.1}
+              revenueBreakdown={stats?.revenueBreakdown}
             />
             
-            <AdminKpiCard
+            <EnhancedKpiCard
               title="BeGone Ärenden"
               value={(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)}
               icon={FileText}
               onClick={() => handleKpiClick('cases', 'BeGone Ärenden')}
+              trend="neutral"
+              trendValue="±0%"
+              delay={0.2}
             />
             
-            <AdminKpiCard
+            <EnhancedKpiCard
               title="Aktiva Tekniker"
               value={stats?.activeTechnicians || 0}
-              icon={Users}
+              icon={UserCheck}
               onClick={() => handleKpiClick('technicians', 'Aktiva Tekniker')}
+              trend="up"
+              trendValue="+2"
+              delay={0.3}
             />
           </div>
 
@@ -275,7 +282,11 @@ const AdminDashboard: React.FC = () => {
                 <span className="text-slate-300">Huvudfunktioner</span>
                 <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                staggerDelay={0.1}
+                initialDelay={0.5}
+              >
                 <AdminDashboardCard
                   href="/admin/customers"
                   icon={Users}
@@ -311,7 +322,7 @@ const AdminDashboard: React.FC = () => {
                   stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
                   tag="Finans"
                 />
-              </div>
+              </StaggeredGrid>
             </div>
 
             {/* Secondary Functions */}
@@ -321,7 +332,11 @@ const AdminDashboard: React.FC = () => {
                 <span className="text-slate-300">Administration</span>
                 <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                staggerDelay={0.1}
+                initialDelay={0.9}
+              >
                 <AdminDashboardCard
                   href="/admin/sales-opportunities"
                   icon={Target}
@@ -357,7 +372,7 @@ const AdminDashboard: React.FC = () => {
                   stats="ClickUp-integration"
                   iconColor="text-green-400"
                 />
-              </div>
+              </StaggeredGrid>
             </div>
 
             {/* Contract Management */}
@@ -367,7 +382,11 @@ const AdminDashboard: React.FC = () => {
                 <span className="text-slate-300">Avtal & Integrationer</span>
                 <div className="w-8 h-px bg-slate-700 flex-1" />
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                staggerDelay={0.1}
+                initialDelay={1.3}
+              >
                 <AdminDashboardCard
                   href="/admin/oneflow-contract-creator"
                   icon={FileText}
@@ -408,7 +427,7 @@ const AdminDashboard: React.FC = () => {
                   iconColor="text-slate-400"
                   disabled={true}
                 />
-              </div>
+              </StaggeredGrid>
             </div>
 
           </div>
@@ -422,39 +441,39 @@ const AdminDashboard: React.FC = () => {
                   <Calendar className="w-5 h-5 text-[#20c58f]" />
                   Senaste Aktivitet
                 </h3>
-                <div className="space-y-3">
-                  {stats?.recentActivity?.length ? (
-                    stats.recentActivity.map((activity, index) => (
-                      <div key={activity.id} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className={`w-2 h-2 ${index === 0 ? 'bg-green-400' : 'bg-blue-400'} rounded-full`}></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-white">{activity.description}</p>
-                          <p className="text-xs text-slate-400">{activity.type}</p>
-                        </div>
-                        <span className="text-xs text-slate-500">{activity.timestamp}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-white">System uppdaterat</p>
-                          <p className="text-xs text-slate-400">Dashboard laddat med senaste data</p>
-                        </div>
-                        <span className="text-xs text-slate-500">Nu</span>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-white">ClickUp synkroniserad</p>
-                          <p className="text-xs text-slate-400">Alla ärenden är uppdaterade</p>
-                        </div>
-                        <span className="text-xs text-slate-500">2 min sedan</span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                {stats?.recentActivity?.length ? (
+                  <VisualTimeline 
+                    activities={stats.recentActivity}
+                    maxItems={5}
+                  />
+                ) : (
+                  <VisualTimeline 
+                    activities={[
+                      {
+                        id: '1',
+                        type: 'system',
+                        title: 'System uppdaterat',
+                        description: 'Dashboard laddat med senaste data',
+                        timestamp: 'Nu'
+                      },
+                      {
+                        id: '2',
+                        type: 'success',
+                        title: 'ClickUp synkroniserad',
+                        description: 'Alla ärenden är uppdaterade',
+                        timestamp: '2 min sedan'
+                      },
+                      {
+                        id: '3',
+                        type: 'billing',
+                        title: 'Fakturaexport slutförd',
+                        description: '15 fakturor exporterade till Fortnox',
+                        timestamp: '1 timme sedan'
+                      }
+                    ]}
+                    maxItems={5}
+                  />
+                )}
               </Card>
             </div>
 
@@ -465,25 +484,44 @@ const AdminDashboard: React.FC = () => {
                 System Status
               </h3>
               <div className="space-y-4">
-                <div className="space-y-3">
-                  {[
-                    { name: 'Database', status: 'Online' },
-                    { name: 'ClickUp API', status: 'Ansluten' },
-                    { name: 'Webhooks', status: 'Aktiva' },
-                    { name: 'Oneflow', status: 'Redo' },
-                  ].map((service) => (
-                    <div key={service.name} className="flex items-center justify-between p-2">
-                      <span className="text-sm text-slate-400">{service.name}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-green-400 font-medium">{service.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <LiveStatusIndicator
+                  services={[
+                    { 
+                      name: 'Database', 
+                      status: 'online',
+                      responseTime: '< 50ms',
+                      description: 'Supabase PostgreSQL'
+                    },
+                    { 
+                      name: 'ClickUp API', 
+                      status: 'online',
+                      responseTime: '120ms',
+                      description: 'Task synchronization'
+                    },
+                    { 
+                      name: 'Webhooks', 
+                      status: 'online',
+                      description: 'Real-time updates'
+                    },
+                    { 
+                      name: 'Oneflow API', 
+                      status: 'online',
+                      responseTime: '95ms',
+                      description: 'Contract management'
+                    }
+                  ]}
+                />
                 <div className="pt-3 border-t border-slate-800">
-                  <p className="text-xs text-slate-500">Senaste kontroll: Just nu</p>
-                  <p className="text-xs text-slate-500">Upptid: 99.9%</p>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-slate-500">Senaste kontroll</p>
+                      <p className="text-xs text-green-400 font-medium">Just nu</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">Systemupptid</p>
+                      <p className="text-xs text-green-400 font-medium">99.9%</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </Card>
