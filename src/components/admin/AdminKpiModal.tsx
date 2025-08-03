@@ -61,15 +61,15 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
     // Transformera data för EditCaseModal
     const transformedCase = {
       id: caseItem.id,
-      case_type: caseItem.case_type || 'private',
-      title: caseItem.title || caseItem.name || 'Utan titel',
-      description: caseItem.description || '',
-      status: caseItem.status || 'pågående',
-      case_price: caseItem.price || caseItem.pris || 0,
-      kontaktperson: caseItem.customer_name || '',
-      primary_assignee_name: caseItem.primary_assignee_name || '',
-      created_at: caseItem.created_at,
-      completed_date: caseItem.completed_date
+      case_type: 'private', // Default till private
+      title: 'BeGone Ärende',
+      description: '',
+      status: 'pågående',
+      case_price: caseItem.pris || 0,
+      kontaktperson: 'Okänd kund',
+      primary_assignee_name: '',
+      created_at: new Date().toISOString(),
+      completed_date: null
     };
     setSelectedCase(transformedCase);
     setEditCaseOpen(true);
@@ -87,10 +87,10 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
               {data?.customers?.map((customer) => (
                 <div key={customer.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg mb-2">
                   <div>
-                    <p className="font-medium text-white">{customer.name}</p>
+                    <p className="font-medium text-white">Kund #{customer.id?.slice(-6)}</p>
                     <p className="text-sm text-slate-400">
-                      {customer.customer_type === 'company' ? <Building2 className="inline w-3 h-3 mr-1" /> : <User className="inline w-3 h-3 mr-1" />}
-                      {customer.customer_type}
+                      <User className="inline w-3 h-3 mr-1" />
+                      Avtalskund
                     </p>
                   </div>
                   <p className="text-green-400 font-medium">{formatCurrency(customer.annual_premium || 0)}</p>
@@ -159,19 +159,18 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
                   onClick={() => handleCaseClick(caseItem)}
                 >
                   <div className="flex-1">
-                    <p className="font-medium text-white">{caseItem.title || caseItem.name || 'Utan titel'}</p>
+                    <p className="font-medium text-white">BeGone Ärende #{caseItem.id?.slice(-6)}</p>
                     <p className="text-sm text-slate-400">
-                      {caseItem.primary_assignee_name || 'Ej tilldelad'} • {caseItem.customer_name || caseItem.kundnamn || 'Okänd kund'}
+                      Ej tilldelad • Okänd kund
                     </p>
                     <p className="text-xs text-slate-500">
-                      {caseItem.case_type === 'private' ? 'Privatärende' : 
-                       caseItem.case_type === 'business' ? 'Företagsärende' : 'Ärende'}
+                      {caseItem.pris ? 'Ärende' : 'Ärende'}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-green-400 font-medium">{formatCurrency((caseItem.price || caseItem.pris || 0))}</p>
                     <p className="text-xs text-slate-500">
-                      {caseItem.completed_date ? new Date(caseItem.completed_date).toLocaleDateString('sv-SE') : 'Pågående'}
+                      Avslutat
                     </p>
                   </div>
                 </div>
