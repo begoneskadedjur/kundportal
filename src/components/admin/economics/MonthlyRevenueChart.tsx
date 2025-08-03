@@ -289,31 +289,31 @@ const MonthlyRevenueChart: React.FC = () => {
           }
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-blue-400 font-bold text-lg">
+          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+            <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthTotal) : formatCurrency(totalRevenue)}
             </p>
-            <p className="text-blue-300 text-sm">
+            <p className="text-slate-400 text-sm">
               {selectedPeriod === '1m' ? 'Total intäkt' : `Total intäkt (${selectedPeriod})`}
             </p>
           </div>
-          <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-bold text-lg">
+          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+            <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthContract) : formatCurrency(totalContractRevenue)}
             </p>
-            <p className="text-green-300 text-sm">Kontraktsintäkter</p>
+            <p className="text-slate-400 text-sm">Kontraktsintäkter</p>
           </div>
-          <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <p className="text-yellow-400 font-bold text-lg">
+          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+            <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthCase) : formatCurrency(totalCaseRevenue)}
             </p>
-            <p className="text-yellow-300 text-sm">Merförsäljning Avtal</p>
+            <p className="text-slate-400 text-sm">Merförsäljning Avtal</p>
           </div>
-          <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 font-bold text-lg">
+          <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+            <p className="text-slate-300 font-bold text-lg">
               {selectedPeriod === '1m' ? formatCurrency(selectedMonthEngangsjobb) : formatCurrency(totalEngangsjobb)}
             </p>
-            <p className="text-orange-300 text-sm">Intäkter Engångsjobb</p>
+            <p className="text-slate-400 text-sm">Intäkter Engångsjobb</p>
           </div>
         </div>
       </div>
@@ -358,16 +358,16 @@ const MonthlyRevenueChart: React.FC = () => {
           <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="contractGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                <stop offset="5%" stopColor="#64748b" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#64748b" stopOpacity={0}/>
               </linearGradient>
               <linearGradient id="caseGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
               </linearGradient>
               <linearGradient id="engangsjobGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                <stop offset="5%" stopColor="#475569" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#475569" stopOpacity={0}/>
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -389,7 +389,7 @@ const MonthlyRevenueChart: React.FC = () => {
                 type="monotone"
                 dataKey="Kontraktsintäkter"
                 stackId="1"
-                stroke="#10b981"
+                stroke="#64748b"
                 fill="url(#contractGradient)"
                 strokeWidth={2}
               />
@@ -400,7 +400,7 @@ const MonthlyRevenueChart: React.FC = () => {
                 type="monotone"
                 dataKey="Merförsäljning Avtal"
                 stackId="1"
-                stroke="#f59e0b"
+                stroke="#94a3b8"
                 fill="url(#caseGradient)"
                 strokeWidth={2}
               />
@@ -411,7 +411,7 @@ const MonthlyRevenueChart: React.FC = () => {
                 type="monotone"
                 dataKey="Intäkter Engångsjobb"
                 stackId="1"
-                stroke="#f97316"
+                stroke="#475569"
                 fill="url(#engangsjobGradient)"
                 strokeWidth={2}
               />

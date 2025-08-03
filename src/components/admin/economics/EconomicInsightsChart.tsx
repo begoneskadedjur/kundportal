@@ -102,7 +102,7 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                isBusiness ? 'bg-blue-500/20' : 'bg-purple-500/20'
+                isBusiness ? 'bg-slate-500/20' : 'bg-slate-600/20'
               }`}>
                 {isBusiness ? <Building2 className="w-5 h-5 text-blue-400" /> : <User className="w-5 h-5 text-purple-400" />}
               </div>
@@ -122,7 +122,7 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ case_, isOpen, onCl
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-4">
           {/* Pricing */}
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+          <div className="bg-slate-500/10 border border-slate-500/20 rounded-lg p-4">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-slate-400">Ärendets värde</p>
@@ -547,15 +547,15 @@ const EconomicInsightsChart: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-amber-600' :
+                        index === 0 ? 'bg-slate-500' :
+                        index === 1 ? 'bg-slate-600' :
+                        index === 2 ? 'bg-slate-700' :
                         'bg-slate-600'
                       }`}>
                         {index + 1}
                       </div>
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        case_.type === 'business' ? 'bg-blue-500/20' : 'bg-purple-500/20'
+                        case_.type === 'business' ? 'bg-slate-500/20' : 'bg-slate-600/20'
                       }`}>
                         {case_.type === 'business' ? 
                           <Building2 className="w-4 h-4 text-blue-400" /> : 
@@ -622,14 +622,14 @@ const EconomicInsightsChart: React.FC = () => {
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${
-                      index === 0 ? 'bg-yellow-500' :
-                      index === 1 ? 'bg-gray-400' :
-                      index === 2 ? 'bg-amber-600' :
+                      index === 0 ? 'bg-slate-500' :
+                      index === 1 ? 'bg-slate-600' :
+                      index === 2 ? 'bg-slate-700' :
                       'bg-slate-600'
                     }`}>
                       {index + 1}
                     </div>
-                    <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-slate-500/20 rounded-lg flex items-center justify-center">
                       <Bug className="w-4 h-4 text-red-400" />
                     </div>
                     <div>

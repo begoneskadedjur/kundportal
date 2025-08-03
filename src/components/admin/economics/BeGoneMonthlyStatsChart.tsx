@@ -1,12 +1,12 @@
 // 📁 src/components/admin/economics/BeGoneMonthlyStatsChart.tsx - MODERNISERAD VERSION
 import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, PieChart, Pie, Cell } from 'recharts'
-import { Briefcase, TrendingUp, Users, Calendar, DollarSign, Bug, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Briefcase, TrendingUp, Users, Calendar, DollarSign, Bug, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../utils/formatters'
 
-// Nya moderna komponenter
-import ModernCard from '../../ui/ModernCard'
+// Standard komponenter
+import Card from '../../ui/Card'
 import { CombinedNavigation } from '../../ui/ModernNavigation'
 
 // 🎯 Interface structure
@@ -374,22 +374,18 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <ModernCard gradient="orange" glowing>
-        <ModernCard.Header
-          icon={Briefcase}
-          iconColor="text-orange-500"
-          title="Intäkter Engångsjobb"
-          subtitle="Laddar data..."
-        />
-        <ModernCard.Content>
-          <div className="h-80 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
-              <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
-            </div>
+      <Card>
+        <div className="flex items-center mb-6">
+          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
+          <h3 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h3>
+        </div>
+        <div className="h-80 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+            <p className="text-slate-400 text-sm">Laddar engångsjobb statistik...</p>
           </div>
-        </ModernCard.Content>
-      </ModernCard>
+        </div>
+      </Card>
     )
   }
 
@@ -461,8 +457,8 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
     isSelected: item.month === selectedMonth
   }))
 
-  // Colors
-  const COLORS = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+  // BeGone muted color palette
+  const COLORS = ['#94a3b8', '#64748b', '#475569', '#334155', '#1e293b', '#0f172a', '#cbd5e1', '#e2e8f0']
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length > 0) {
@@ -523,16 +519,14 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Huvudkort med modern design */}
-      <ModernCard gradient="orange" glowing>
+      <Card>
         <div className="p-6">
           <div className="flex flex-col gap-4 mb-6">
             {/* Titel rad */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-orange-500" />
-              </div>
+              <BarChart3 className="w-5 h-5 text-purple-400" />
               <div>
-                <h2 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h2>
+                <h3 className="text-lg font-semibold text-white">Intäkter Engångsjobb</h3>
                 <p className="text-sm text-slate-400">Endast avslutade ärenden</p>
               </div>
             </div>
@@ -586,45 +580,45 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
               }
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="text-center p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                <p className="text-orange-400 font-bold text-sm">
+              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+                <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.total_cases || 0)
                     : getFilteredData.reduce((sum, item) => sum + item.total_cases, 0)
                   }
                 </p>
-                <p className="text-orange-300 text-xs">Totala ärenden</p>
+                <p className="text-slate-400 text-xs">Totala ärenden</p>
               </div>
-              <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                <p className="text-purple-400 font-bold text-sm">
+              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+                <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.private_cases || 0)
                     : getFilteredData.reduce((sum, item) => sum + item.private_cases, 0)
                   }
                 </p>
-                <p className="text-purple-300 text-xs">Privatpersoner</p>
+                <p className="text-slate-400 text-xs">Privatpersoner</p>
               </div>
-              <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-blue-400 font-bold text-sm">
+              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+                <p className="text-slate-300 font-bold text-sm">
                   {selectedPeriod === '1m' 
                     ? (selectedMonthData?.business_cases || 0)
                     : getFilteredData.reduce((sum, item) => sum + item.business_cases, 0)
                   }
                 </p>
-                <p className="text-blue-300 text-xs">Företag</p>
+                <p className="text-slate-400 text-xs">Företag</p>
               </div>
-              <div className="text-center p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <p className="text-green-400 font-bold text-sm">
+              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+                <p className="text-slate-300 font-bold text-sm">
                   {formatCurrency(
                     selectedPeriod === '1m' 
                       ? (selectedMonthData?.total_revenue || 0)
                       : getFilteredData.reduce((sum, item) => sum + item.total_revenue, 0)
                   )}
                 </p>
-                <p className="text-green-300 text-xs">Total intäkt</p>
+                <p className="text-slate-400 text-xs">Total intäkt</p>
               </div>
-              <div className="text-center p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <p className="text-yellow-400 font-bold text-sm">
+              <div className="text-center p-3 bg-slate-500/10 border border-slate-500/20 rounded-lg">
+                <p className="text-slate-300 font-bold text-sm">
                   {formatCurrency(
                     selectedPeriod === '1m' 
                       ? (selectedMonthData?.avg_case_value || 0)
@@ -635,7 +629,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                         })()
                   )}
                 </p>
-                <p className="text-yellow-300 text-xs">Snitt per ärende</p>
+                <p className="text-slate-400 text-xs">Snitt per ärende</p>
               </div>
             </div>
           </div>
@@ -651,8 +645,8 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                   <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                  <Bar yAxisId="left" dataKey="Totala Ärenden" fill="#f97316" name="Antal ärenden" />
-                  <Line yAxisId="right" type="monotone" dataKey="Total Intäkt" stroke="#10b981" strokeWidth={3} name="Total intäkt" dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }} />
+                  <Bar yAxisId="left" dataKey="Totala Ärenden" fill="#64748b" name="Antal ärenden" />
+                  <Line yAxisId="right" type="monotone" dataKey="Total Intäkt" stroke="#94a3b8" strokeWidth={3} name="Total intäkt" dot={{ fill: '#94a3b8', strokeWidth: 2, r: 4 }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -694,7 +688,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} angle={-45} textAnchor="end" height={60} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(value) => `${value / 1000}k`} />
                     <Tooltip content={<RevenueTooltip />} />
-                    <Bar dataKey="revenue" fill="#3b82f6" />
+                    <Bar dataKey="revenue" fill="#64748b" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -713,7 +707,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                       labelLine={false}
                       label={({ type, percentage }) => `${type}: ${percentage.toFixed(1)}%`}
                       outerRadius={80}
-                      fill="#8884d8"
+                      fill="#64748b"
                       dataKey="revenue"
                     >
                       {getFilteredAnalysisData.skadedjurData.slice(0, 6).map((entry, index) => (
@@ -786,7 +780,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             </div>
           )}
         </div>
-      </ModernCard>
+      </Card>
     </div>
   )
 }
