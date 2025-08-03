@@ -260,7 +260,6 @@ const AdminDashboard: React.FC = () => {
               trend="up"
               trendValue="+12%"
               delay={0.1}
-              revenueBreakdown={stats?.revenueBreakdown}
             />
             
             <EnhancedKpiCard
