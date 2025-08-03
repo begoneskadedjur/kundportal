@@ -57,6 +57,7 @@ interface DashboardStats {
   technicians?: any[]
   privateCases?: any[]
   businessCases?: any[]
+  allCases?: any[]
   revenueBreakdown?: {
     contracts: number
     privateCases: number
@@ -92,11 +93,11 @@ const AdminDashboard: React.FC = () => {
         businessCasesResult,
         techniciansResult
       ] = await Promise.all([
-        supabase.from('customers').select('id, annual_premium').eq('is_active', true),
-        supabase.from('cases').select('id, price').not('completed_date', 'is', null),
-        supabase.from('private_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('business_cases').select('id, pris').eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('technicians').select('id, name').eq('is_active', true)
+        supabase.from('customers').select('id, name, annual_premium, customer_type').eq('is_active', true),
+        supabase.from('cases').select('id, price, title, customer_name, primary_assignee_name, completed_date').not('completed_date', 'is', null),
+        supabase.from('private_cases').select('id, pris, name, kundnamn, primary_assignee_name, completed_date').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('business_cases').select('id, pris, name, kundnamn, primary_assignee_name, completed_date').eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('technicians').select('id, name, role, is_active, absence_start, absence_end').eq('is_active', true)
       ])
 
       if (customersResult.error) throw customersResult.error
@@ -118,19 +119,45 @@ const AdminDashboard: React.FC = () => {
         supabase.from('cases').select('id').is('completed_date', null)
       ])
 
+      // Filtrera tekniker som inte är frånvarande
+      const today = new Date().toISOString().split('T')[0]
+      const availableTechnicians = techniciansResult.data?.filter(tech => {
+        if (!tech.absence_start || !tech.absence_end) return true
+        return today < tech.absence_start || today > tech.absence_end
+      }) || []
+
+      // Kombinera alla ärenden för modal
+      const allCases = [
+        ...(privateCasesResult.data?.map(c => ({
+          ...c,
+          title: c.name,
+          customer_name: c.kundnamn,
+          price: c.pris,
+          case_type: 'private'
+        })) || []),
+        ...(businessCasesResult.data?.map(c => ({
+          ...c,
+          title: c.name,
+          customer_name: c.kundnamn,
+          price: c.pris,
+          case_type: 'business'
+        })) || [])
+      ]
+
       const dashboardStats: DashboardStats = {
         totalCustomers: customersResult.data?.length || 0,
         totalCases: casesResult.data?.length || 0,
         totalPrivateCases: privateCasesResult.data?.length || 0,
         totalBusinessCases: businessCasesResult.data?.length || 0,
         totalRevenue,
-        activeTechnicians: techniciansResult.data?.length || 0,
+        activeTechnicians: availableTechnicians.length,
         pendingCases: activeCasesResult.data?.length || 0,
         recentActivity: [],
         customers: customersResult.data || [],
-        technicians: techniciansResult.data || [],
+        technicians: availableTechnicians || [],
         privateCases: privateCasesResult.data || [],
         businessCases: businessCasesResult.data || [],
+        allCases: allCases,
         revenueBreakdown: {
           contracts: contractRevenue,
           privateCases: privateRevenue,
@@ -256,8 +283,8 @@ const AdminDashboard: React.FC = () => {
               value={(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)}
               icon={FileText}
               onClick={() => handleKpiClick('cases', 'BeGone Ärenden')}
-              trend="neutral"
-              trendValue="±0%"
+              trend="up"
+              trendValue="+3"
               delay={0.2}
             />
             
@@ -343,7 +370,7 @@ const AdminDashboard: React.FC = () => {
                   title="Försäljningsmöjligheter"
                   description="Potentiella avtalskunder"
                   stats="BeGone → Avtal"
-                  iconColor="text-purple-400"
+                  iconColor="text-emerald-400"
                 />
                 
                 <AdminDashboardCard
@@ -352,7 +379,7 @@ const AdminDashboard: React.FC = () => {
                   title="Hantera Tekniker"
                   description="Lägg till & redigera personal"
                   tag="Admin"
-                  iconColor="text-blue-400"
+                  iconColor="text-teal-400"
                 />
                 
                 <AdminDashboardCard
@@ -361,7 +388,7 @@ const AdminDashboard: React.FC = () => {
                   title="Provisioner"
                   description="Beräkna tekniker-provision"
                   tag="Löner"
-                  iconColor="text-yellow-400"
+                  iconColor="text-green-400"
                 />
                 
                 <AdminDashboardCard
@@ -370,7 +397,7 @@ const AdminDashboard: React.FC = () => {
                   title="Lägg till Kund"
                   description="Skapa ny avtalskund"
                   stats="ClickUp-integration"
-                  iconColor="text-green-400"
+                  iconColor="text-[#20c58f]"
                 />
               </StaggeredGrid>
             </div>
@@ -394,7 +421,7 @@ const AdminDashboard: React.FC = () => {
                   description="Oneflow-avtal för signering"
                   stats="6 tillgängliga mallar"
                   tag="Oneflow"
-                  iconColor="text-indigo-400"
+                  iconColor="text-emerald-500"
                 />
                 
                 <AdminDashboardCard
@@ -404,7 +431,7 @@ const AdminDashboard: React.FC = () => {
                   description="Status & diagnostik"
                   stats="Webhook logs"
                   tag="Diagnostik"
-                  iconColor="text-cyan-400"
+                  iconColor="text-teal-500"
                 />
                 
                 <AdminDashboardCard
@@ -414,7 +441,7 @@ const AdminDashboard: React.FC = () => {
                   description="Systemövervakning"
                   stats="Alla system online"
                   tag="Live"
-                  iconColor="text-green-400"
+                  iconColor="text-green-500"
                   disabled={false}
                 />
                 
@@ -538,7 +565,7 @@ const AdminDashboard: React.FC = () => {
         data={{
           customers: stats?.customers,
           technicians: stats?.technicians,
-          cases: [...(stats?.privateCases || []), ...(stats?.businessCases || [])],
+          cases: stats?.allCases || [],
           revenue: {
             total: stats?.totalRevenue || 0,
             breakdown: stats?.revenueBreakdown || {

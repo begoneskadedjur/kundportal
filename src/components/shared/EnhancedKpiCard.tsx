@@ -76,10 +76,10 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
           <Icon className="w-6 h-6 text-[#20c58f]" />
         </motion.div>
         
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="text-3xl font-bold text-white">
+            <div className="flex-1 min-w-0 mr-3">
+              <div className="text-2xl font-bold text-white break-words">
                 {isNumeric && typeof value === 'number' ? (
                   <AnimatedNumber
                     value={numericValue}
@@ -89,11 +89,11 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
                     decimals={decimals}
                   />
                 ) : (
-                  value
+                  <span className="break-words">{value}</span>
                 )}
               </div>
               
-              <div className="text-sm text-slate-500 mb-1">{title}</div>
+              <div className="text-sm text-slate-500 mb-1 truncate">{title}</div>
               
               {trend && trendValue && (
                 <TrendIndicator
@@ -107,10 +107,10 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
             </div>
             
             {revenueBreakdown && (
-              <div className="ml-4">
+              <div className="flex-shrink-0">
                 <InteractiveRevenueChart
                   data={revenueBreakdown}
-                  size={80}
+                  size={70}
                 />
               </div>
             )}

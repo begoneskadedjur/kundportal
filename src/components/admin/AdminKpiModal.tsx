@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from '../ui/Modal';
 import { Users, DollarSign, FileText, Wrench, Building2, User, TrendingUp, Calendar } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 import Button from '../ui/Button';
+import EditCaseModal from './technicians/EditCaseModal';
 
 interface Customer {
   id: string;
@@ -53,6 +54,26 @@ interface AdminKpiModalProps {
 }
 
 export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }: AdminKpiModalProps) {
+  const [editCaseOpen, setEditCaseOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<any>(null);
+
+  const handleCaseClick = (caseItem: any) => {
+    // Transformera data för EditCaseModal
+    const transformedCase = {
+      id: caseItem.id,
+      case_type: caseItem.case_type || 'private',
+      title: caseItem.title || caseItem.name || 'Utan titel',
+      description: caseItem.description || '',
+      status: caseItem.status || 'pågående',
+      case_price: caseItem.price || caseItem.pris || 0,
+      kontaktperson: caseItem.customer_name || '',
+      primary_assignee_name: caseItem.primary_assignee_name || '',
+      created_at: caseItem.created_at,
+      completed_date: caseItem.completed_date
+    };
+    setSelectedCase(transformedCase);
+    setEditCaseOpen(true);
+  };
   const renderContent = () => {
     switch (kpiType) {
       case 'customers':
@@ -132,11 +153,19 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
             </div>
             <div className="max-h-96 overflow-y-auto">
               {data?.cases?.map((caseItem) => (
-                <div key={caseItem.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg mb-2">
+                <div 
+                  key={caseItem.id} 
+                  className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg mb-2 hover:bg-slate-700/50 cursor-pointer transition-colors"
+                  onClick={() => handleCaseClick(caseItem)}
+                >
                   <div className="flex-1">
-                    <p className="font-medium text-white">{caseItem.title || 'Inget namn'}</p>
+                    <p className="font-medium text-white">{caseItem.title || caseItem.name || 'Utan titel'}</p>
                     <p className="text-sm text-slate-400">
-                      {caseItem.primary_assignee_name || 'Ej tilldelad'} • {caseItem.customer_name || 'Okänd kund'}
+                      {caseItem.primary_assignee_name || 'Ej tilldelad'} • {caseItem.customer_name || caseItem.kundnamn || 'Okänd kund'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {caseItem.case_type === 'private' ? 'Privatärende' : 
+                       caseItem.case_type === 'business' ? 'Företagsärende' : 'Ärende'}
                     </p>
                   </div>
                   <div className="text-right">
@@ -180,13 +209,32 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <div className="p-6">
-        {renderContent()}
-      </div>
-      <div className="flex justify-end gap-3 p-6 border-t border-slate-800">
-        <Button variant="secondary" onClick={onClose}>Stäng</Button>
-      </div>
-    </Modal>
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
+        <div className="p-6">
+          {renderContent()}
+        </div>
+        <div className="flex justify-end gap-3 p-6 border-t border-slate-800">
+          <Button variant="secondary" onClick={onClose}>Stäng</Button>
+        </div>
+      </Modal>
+
+      {/* EditCaseModal för att redigera ärenden */}
+      {selectedCase && (
+        <EditCaseModal
+          isOpen={editCaseOpen}
+          onClose={() => {
+            setEditCaseOpen(false);
+            setSelectedCase(null);
+          }}
+          case={selectedCase}
+          onSave={() => {
+            setEditCaseOpen(false);
+            setSelectedCase(null);
+            // Optionally refresh data here
+          }}
+        />
+      )}
+    </>
   );
 }

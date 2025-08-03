@@ -94,7 +94,7 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
   return (
     <motion.div
       className={`relative ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, zIndex: 1 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       initial={{ opacity: 0, scale: 0.8 }}
@@ -107,8 +107,8 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
             data={chartData}
             cx="50%"
             cy="50%"
-            innerRadius={size * 0.25}
-            outerRadius={size * 0.4}
+            innerRadius={size * 0.3}
+            outerRadius={size * 0.45}
             paddingAngle={2}
             dataKey="value"
             onMouseEnter={(_, index) => setActiveIndex(index)}
@@ -149,7 +149,7 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
-          className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 translate-y-full"
+          className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 translate-y-full z-50"
         >
           <div className="bg-slate-800 p-2 rounded-lg border border-slate-700 shadow-xl min-w-max">
             <div className="grid grid-cols-2 gap-2 text-xs">
