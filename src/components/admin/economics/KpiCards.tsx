@@ -1,7 +1,6 @@
 // 📁 src/components/admin/economics/KpiCards.tsx - MODERNA KPI CARDS
 import React from 'react'
 import { TrendingUp, DollarSign, Users, BarChart3, AlertTriangle, Briefcase, ArrowUp, ArrowDown, Minus } from 'lucide-react'
-import ModernCard from '../../ui/ModernCard'
 import { useKpiData } from '../../../hooks/useEconomicsDashboard'
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -11,7 +10,7 @@ interface KpiCardData {
   value: string
   description: string
   icon: React.ComponentType<any>
-  gradient: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'yellow'
+  color: string
   trend?: {
     value: string
     direction: 'up' | 'down' | 'neutral'
@@ -28,13 +27,11 @@ const KpiCards: React.FC = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {[...Array(6)].map((_, i) => (
-          <ModernCard key={i} className="animate-pulse">
-            <div className="p-6">
-              <div className="h-4 bg-slate-700 rounded mb-3"></div>
-              <div className="h-8 bg-slate-700 rounded mb-2"></div>
-              <div className="h-3 bg-slate-700 rounded"></div>
-            </div>
-          </ModernCard>
+          <div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 animate-pulse">
+            <div className="h-4 bg-slate-700 rounded mb-3"></div>
+            <div className="h-8 bg-slate-700 rounded mb-2"></div>
+            <div className="h-3 bg-slate-700 rounded"></div>
+          </div>
         ))}
       </div>
     )
@@ -42,18 +39,18 @@ const KpiCards: React.FC = () => {
 
   if (error) {
     return (
-      <ModernCard gradient="red" glowing className="p-6">
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
         <div className="flex items-center text-red-400">
           <AlertTriangle className="w-5 h-5 mr-2" />
           <span>Fel vid laddning av KPI data: {error}</span>
         </div>
-      </ModernCard>
+      </div>
     )
   }
 
   if (!kpiData) return null
 
-  // Skapa KPI kort data med moderna properties
+  // Skapa KPI kort data med BeGone design standards
   const kpiCards: KpiCardData[] = [
     {
       id: 'arr',
@@ -61,7 +58,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.total_arr),
       description: 'Årlig återkommande intäkt',
       icon: TrendingUp,
-      gradient: 'green',
+      color: 'green',
       trend: {
         value: '8.2%',
         direction: 'up',
@@ -75,7 +72,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.monthly_recurring_revenue),
       description: 'Återkommande månatlig intäkt',
       icon: DollarSign,
-      gradient: 'blue',
+      color: 'yellow',
       trend: {
         value: '5.4%',
         direction: 'up',
@@ -89,7 +86,7 @@ const KpiCards: React.FC = () => {
       value: kpiData.active_customers.toString(),
       description: 'Kunder med aktiva avtal',
       icon: Users,
-      gradient: 'purple',
+      color: 'green',
       trend: {
         value: '3 nya',
         direction: 'up',
@@ -102,7 +99,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.total_case_revenue_ytd),
       description: 'Extra intäkter från avtalskunder',
       icon: BarChart3,
-      gradient: 'yellow',
+      color: 'purple',
       trend: {
         value: '12.1%',
         direction: 'up',
@@ -116,7 +113,7 @@ const KpiCards: React.FC = () => {
       value: formatCurrency(kpiData.total_begone_revenue_ytd),
       description: 'Intäkter från engångskunder',
       icon: Briefcase,
-      gradient: 'orange',
+      color: 'purple',
       trend: {
         value: `${((kpiData.total_begone_revenue_ytd / Math.max(kpiData.total_case_revenue_ytd, 1)) * 100).toFixed(1)}%`,
         direction: kpiData.total_begone_revenue_ytd > kpiData.total_case_revenue_ytd ? 'up' : 'down',
@@ -130,7 +127,7 @@ const KpiCards: React.FC = () => {
       value: kpiData.churn_risk_customers.toString(),
       description: 'Kunder med utgående avtal inom 90 dagar',
       icon: AlertTriangle,
-      gradient: kpiData.churn_risk_customers > 5 ? 'red' : 'yellow',
+      color: kpiData.churn_risk_customers > 5 ? 'red' : 'yellow',
       trend: {
         value: kpiData.churn_risk_customers > 0 ? 'Kräver åtgärd' : 'Inga risker',
         direction: kpiData.churn_risk_customers > 5 ? 'up' : 'neutral',
@@ -143,19 +140,19 @@ const KpiCards: React.FC = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {kpiCards.map((card) => (
-        <ModernKpiCard key={card.id} {...card} />
+        <BeGoneKpiCard key={card.id} {...card} />
       ))}
     </div>
   )
 }
 
-// Modern KPI Card Component
-const ModernKpiCard: React.FC<KpiCardData> = ({
+// BeGone Standard KPI Card Component
+const BeGoneKpiCard: React.FC<KpiCardData> = ({
   title,
   value,
   description,
   icon: IconComponent,
-  gradient,
+  color,
   trend,
   badge,
   warning
@@ -165,9 +162,9 @@ const ModernKpiCard: React.FC<KpiCardData> = ({
     
     switch (trend.direction) {
       case 'up':
-        return <ArrowUp className="w-3 h-3" />
+        return <TrendingUp className="w-3 h-3" />
       case 'down':
-        return <ArrowDown className="w-3 h-3" />
+        return <TrendingUp className="w-3 h-3 rotate-180" />
       default:
         return <Minus className="w-3 h-3" />
     }
@@ -185,76 +182,81 @@ const ModernKpiCard: React.FC<KpiCardData> = ({
     }
   }
 
+  const getIconColor = () => {
+    switch (color) {
+      case 'green':
+        return 'text-green-400'
+      case 'yellow':
+        return 'text-yellow-400'
+      case 'purple':
+        return 'text-purple-400'
+      case 'blue':
+        return 'text-blue-400'
+      case 'red':
+        return 'text-red-400'
+      default:
+        return 'text-slate-400'
+    }
+  }
+
+  const getIconBackground = () => {
+    switch (color) {
+      case 'green':
+        return 'bg-green-500/20'
+      case 'yellow':
+        return 'bg-yellow-500/20'
+      case 'purple':
+        return 'bg-purple-500/20'
+      case 'blue':
+        return 'bg-blue-500/20'
+      case 'red':
+        return 'bg-red-500/20'
+      default:
+        return 'bg-slate-500/20'
+    }
+  }
+
   return (
-    <ModernCard 
-      gradient={gradient} 
-      glowing 
-      hoverable
-      className="group relative overflow-hidden"
-    >
-      <div className="p-4">
-        {/* Header with icon and badge */}
-        <div className="flex items-center justify-between mb-3">
-          <div className={`
-            w-10 h-10 rounded-xl flex items-center justify-center
-            bg-gradient-to-r ${
-              gradient === 'green' ? 'from-green-500 to-emerald-500' :
-              gradient === 'blue' ? 'from-blue-500 to-cyan-500' :
-              gradient === 'purple' ? 'from-purple-500 to-violet-500' :
-              gradient === 'yellow' ? 'from-yellow-500 to-amber-500' :
-              gradient === 'orange' ? 'from-orange-500 to-red-500' :
-              'from-red-500 to-pink-500'
-            }
-            shadow-lg group-hover:scale-110 transition-transform duration-300
-          `}>
-            <IconComponent className="w-5 h-5 text-white" />
-          </div>
-          
-          {badge && (
-            <span className="px-2 py-1 bg-white/10 backdrop-blur-sm rounded-full text-xs font-medium text-white">
-              {badge}
-            </span>
-          )}
-          
-          {warning && (
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          )}
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 hover:border-slate-600 transition-colors duration-200">
+      {/* Header with icon and badge */}
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg ${getIconBackground()}`}>
+          <IconComponent className={`w-5 h-5 ${getIconColor()}`} />
         </div>
-
-        {/* Main value */}
-        <div className="mb-2">
-          <h3 className="text-2xl font-bold text-white group-hover:scale-105 transition-transform duration-300">
-            {value}
-          </h3>
-        </div>
-
-        {/* Title and description */}
-        <div className="mb-3">
-          <h4 className="text-sm font-semibold text-white/90 mb-1">
-            {title}
-          </h4>
-          <p className="text-xs text-white/70 leading-relaxed">
-            {description}
-          </p>
-        </div>
-
-        {/* Trend indicator */}
+        
+        {badge && (
+          <span className="px-2 py-1 bg-slate-700 text-slate-300 rounded-full text-xs font-medium">
+            {badge}
+          </span>
+        )}
+        
+        {warning && (
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+        )}
+        
         {trend && (
-          <div className={`flex items-center gap-1 text-xs font-medium ${getTrendColor()}`}>
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+            trend.positive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+          }`}>
             {getTrendIcon()}
-            <span>{trend.value}</span>
+            {trend.value.includes('%') ? (trend.value.includes('-') ? '' : '+') : ''}{trend.value}
           </div>
         )}
       </div>
 
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-      
-      {/* Warning pulse effect */}
-      {warning && (
-        <div className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none" />
-      )}
-    </ModernCard>
+      {/* Main value */}
+      <div className="mb-2">
+        <p className="text-2xl font-bold text-white">
+          {value}
+        </p>
+      </div>
+
+      {/* Title and description */}
+      <div>
+        <h3 className="text-sm font-medium text-slate-300 mb-1">{title}</h3>
+        <p className="text-xs text-slate-500">{description}</p>
+      </div>
+    </div>
   )
 }
 

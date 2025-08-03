@@ -533,8 +533,8 @@ const EconomicInsightsChart: React.FC = () => {
       {selectedView === 'cases' && (
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <Award className="w-5 h-5 text-yellow-500" />
-            <h2 className="text-lg font-semibold text-white">Topp Ärenden</h2>
+            <Award className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-white">Topp Ärenden</h3>
           </div>
           {filteredData.topCases.length > 0 ? (
             <div className="space-y-3">
@@ -610,8 +610,8 @@ const EconomicInsightsChart: React.FC = () => {
       {selectedView === 'skadedjur' && (
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <Bug className="w-5 h-5 text-red-500" />
-            <h2 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h2>
+            <Bug className="w-5 h-5 text-red-400" />
+            <h3 className="text-lg font-semibold text-white">Mest Lönsamma Skadedjur</h3>
           </div>
           {filteredData.topSkadedjur.length > 0 ? (
             <div className="space-y-3">

@@ -1,7 +1,7 @@
 // src/components/admin/economics/MonthlyRevenueChart.tsx - MED 1 MÅNAD + MÅNAD-FÖR-MÅNAD NAVIGATION
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { TrendingUp, Calendar, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, Calendar, Filter, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
 import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import { useMonthlyRevenue } from '../../../hooks/useEconomicsDashboard'
@@ -82,11 +82,11 @@ const MonthlyRevenueChart: React.FC = () => {
     return (
       <Card>
         <div className="flex items-center mb-6">
-          <TrendingUp className="w-5 h-5 text-blue-500 mr-2" />
+          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
         </div>
       </Card>
     )
@@ -96,7 +96,7 @@ const MonthlyRevenueChart: React.FC = () => {
     return (
       <Card>
         <div className="flex items-center mb-6">
-          <TrendingUp className="w-5 h-5 text-red-500 mr-2" />
+          <BarChart3 className="w-5 h-5 text-red-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-red-400">
@@ -113,7 +113,7 @@ const MonthlyRevenueChart: React.FC = () => {
     return (
       <Card>
         <div className="flex items-center mb-6">
-          <TrendingUp className="w-5 h-5 text-slate-500 mr-2" />
+          <BarChart3 className="w-5 h-5 text-slate-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         <div className="h-80 flex items-center justify-center text-slate-400">
@@ -218,7 +218,7 @@ const MonthlyRevenueChart: React.FC = () => {
       {/* Header med månadnavigation */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <TrendingUp className="w-5 h-5 text-blue-500 mr-2" />
+          <BarChart3 className="w-5 h-5 text-purple-400 mr-2" />
           <h2 className="text-lg font-semibold text-white">Månadsvis Intäktsflöde</h2>
         </div>
         
