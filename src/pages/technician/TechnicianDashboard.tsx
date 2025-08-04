@@ -286,7 +286,7 @@ export default function TechnicianDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <PageHeader 
           title="Tekniker Dashboard"
-          subtitle={`${displayName} • ${data.stats.pending_cases} pågående ärenden • ${formatDate(new Date())}`}
+          subtitle={`${displayName} • ${data.stats.pending_cases} pågående ärenden`}
           icon={Briefcase}
           iconColor="text-purple-400"
           showBackButton={false}
