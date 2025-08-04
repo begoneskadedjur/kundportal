@@ -22,6 +22,13 @@ interface TechnicianCase {
   clickup_task_id?: string;
   assignee_name?: string;
   assignee_email?: string;
+  // Tekniker-tilldelningar
+  primary_assignee_id?: string | null;
+  primary_assignee_name?: string | null;
+  secondary_assignee_id?: string | null;
+  secondary_assignee_name?: string | null;
+  tertiary_assignee_id?: string | null;
+  tertiary_assignee_name?: string | null;
   created_date: string;
   rapport?: string;
 }
@@ -131,7 +138,28 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
 
   // Skicka rapport till ansvarig tekniker
   const sendToTechnician = async () => {
-    if (!caseData.assignee_email) {
+    // Hämta tekniker-email från primary_assignee_id om assignee_email inte finns
+    let technicianEmail = caseData.assignee_email
+    let technicianName = caseData.assignee_name
+
+    if (!technicianEmail && caseData.primary_assignee_id) {
+      try {
+        const { data: technician, error } = await supabase
+          .from('technicians')
+          .select('email, name')
+          .eq('id', caseData.primary_assignee_id)
+          .single()
+
+        if (!error && technician) {
+          technicianEmail = technician.email
+          technicianName = technician.name
+        }
+      } catch (error) {
+        console.error('Error fetching technician:', error)
+      }
+    }
+
+    if (!technicianEmail) {
       toast.error('Ingen tekniker tilldelad detta ärende')
       return
     }
@@ -150,8 +178,8 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           taskDetails,
           customerInfo,
           recipientType: 'technician',
-          recipientEmail: caseData.assignee_email,
-          recipientName: caseData.assignee_name
+          recipientEmail: technicianEmail,
+          recipientName: technicianName
         })
       })
 
@@ -159,7 +187,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
         throw new Error('Kunde inte skicka rapport')
       }
 
-      toast.success(`Rapport skickad till ${caseData.assignee_name || 'tekniker'}!`)
+      toast.success(`Rapport skickad till ${technicianName || 'tekniker'}!`)
     } catch (error) {
       console.error('Error sending report to technician:', error)
       toast.error('Kunde inte skicka rapport till tekniker')
@@ -221,9 +249,9 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     sendToContact,
     isGenerating,
     canGenerateReport: canGenerateReport(),
-    hasTechnicianEmail: !!caseData.assignee_email,
+    hasTechnicianEmail: !!(caseData.assignee_email || caseData.primary_assignee_id),
     hasContactEmail: !!caseData.e_post_kontaktperson,
-    technicianName: caseData.assignee_name,
+    technicianName: caseData.assignee_name || caseData.primary_assignee_name,
     contactName: caseData.kontaktperson
   }
 }

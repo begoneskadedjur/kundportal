@@ -20,6 +20,9 @@ import "react-datepicker/dist/react-datepicker.css"
 import WorkReportDropdown from '../../shared/WorkReportDropdown'
 import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 
+// Tekniker-dropdown
+import TechnicianDropdown from '../TechnicianDropdown'
+
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
 interface TechnicianCase {
@@ -42,6 +45,13 @@ interface TechnicianCase {
   due_date?: string | null;
   // Adress (JSONB eller string)
   adress?: any;
+  // Tekniker-tilldelningar (upp till 3 tekniker per ärende)
+  primary_assignee_id?: string | null;
+  primary_assignee_name?: string | null;
+  secondary_assignee_id?: string | null;
+  secondary_assignee_name?: string | null;
+  tertiary_assignee_id?: string | null;
+  tertiary_assignee_name?: string | null;
   // ROT/RUT fält
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
@@ -318,8 +328,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const reportGeneration = useWorkReportGeneration(currentCase ? {
     ...currentCase,
     clickup_task_id: currentCase.id,
-    assignee_email: undefined, // EditCaseModal saknar assignee info just nu
-    assignee_name: undefined,
+    assignee_email: currentCase.primary_assignee_id ? undefined : undefined, // Kommer att hämtas från tekniker-ID
+    assignee_name: currentCase.primary_assignee_name,
     foretag: currentCase.case_type === 'business' ? 'Företag' : undefined
   } : {
     id: '',
@@ -343,6 +353,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         skadedjur: caseData.skadedjur || '',
         org_nr: caseData.org_nr || '',
         personnummer: caseData.personnummer || '',
+        // Tekniker-tilldelningar
+        primary_assignee_id: caseData.primary_assignee_id || '',
+        secondary_assignee_id: caseData.secondary_assignee_id || '',
+        tertiary_assignee_id: caseData.tertiary_assignee_id || '',
         material_cost: caseData.material_cost || 0,
         start_date: caseData.start_date,
         due_date: caseData.due_date,
@@ -684,6 +698,37 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
               {showTimeTracking && (
                 <Input label="Skadedjur" name="skadedjur" value={formData.skadedjur || ''} onChange={handleChange} placeholder="T.ex. Råttor, Kackerlackor..." />
               )}
+            </div>
+
+            {/* Tekniker-tilldelningar */}
+            <div className="space-y-4 pt-6 border-t border-slate-700">
+              <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-orange-400" />
+                Tekniker-tilldelningar
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                <TechnicianDropdown
+                  label="Primär tekniker"
+                  value={formData.primary_assignee_id || ''}
+                  onChange={(value) => setFormData(prev => ({ ...prev, primary_assignee_id: value }))}
+                  placeholder="Välj primär tekniker..."
+                  includeUnassigned={true}
+                />
+                <TechnicianDropdown
+                  label="Sekundär tekniker (valfritt)"
+                  value={formData.secondary_assignee_id || ''}
+                  onChange={(value) => setFormData(prev => ({ ...prev, secondary_assignee_id: value }))}
+                  placeholder="Välj sekundär tekniker..."
+                  includeUnassigned={true}
+                />
+                <TechnicianDropdown
+                  label="Tertiär tekniker (valfritt)"
+                  value={formData.tertiary_assignee_id || ''}
+                  onChange={(value) => setFormData(prev => ({ ...prev, tertiary_assignee_id: value }))}
+                  placeholder="Välj tertiär tekniker..."
+                  includeUnassigned={true}
+                />
+              </div>
             </div>
           </div>
 

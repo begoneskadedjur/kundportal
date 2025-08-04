@@ -62,8 +62,8 @@ export default function TechnicianDropdown({
     }
   }
 
-  const getTechnicianByEmail = (email: string) => {
-    return technicians.find(t => t.email === email)
+  const getTechnicianById = (id: string) => {
+    return technicians.find(t => t.id === id)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -95,7 +95,7 @@ export default function TechnicianDropdown({
             )}
             
             {technicians.map(technician => (
-              <option key={technician.id} value={technician.email}>
+              <option key={technician.id} value={technician.id}>
                 {technician.name} - {technician.role}
               </option>
             ))}
@@ -106,7 +106,7 @@ export default function TechnicianDropdown({
       {value && !loading && (
         <div className="mt-1 text-xs text-slate-400">
           {(() => {
-            const tech = getTechnicianByEmail(value)
+            const tech = getTechnicianById(value)
             return tech ? `${tech.role} • ${tech.email}` : 'Tekniker hittades inte'
           })()}
         </div>
