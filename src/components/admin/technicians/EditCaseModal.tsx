@@ -65,16 +65,18 @@ interface BackupData {
 
 const statusOrder = [ 'Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
 
-// Utility-funktion för att extrahera adress som string från JSONB eller string
-const getAddressString = (addressData: any): string => {
-  if (!addressData) return '';
-  
-  if (typeof addressData === 'string') {
-    return addressData;
-  } else if (addressData && addressData.formatted_address) {
-    return addressData.formatted_address;
+// Utility-funktion för att formatera adress (samma logik som TechnicianCases.tsx)
+const formatAddress = (address: any): string => {
+  if (!address) return '';
+  if (typeof address === 'object' && address.formatted_address) return address.formatted_address;
+  if (typeof address === 'string') { 
+    try { 
+      const p = JSON.parse(address); 
+      return p.formatted_address || address; 
+    } catch (e) { 
+      return address; 
+    } 
   }
-  
   return '';
 };
 
@@ -94,7 +96,7 @@ const openInMaps = (addressData: any) => {
       window.location.href = `https://maps.google.com/maps?q=${lat},${lng}`;
     } else {
       // Fallback till adress om inga koordinater
-      const address = getAddressString(addressData);
+      const address = formatAddress(addressData);
       if (address) {
         const encodedAddress = encodeURIComponent(address);
         window.location.href = `https://maps.google.com/maps?q=${encodedAddress}`;
@@ -107,7 +109,7 @@ const openInMaps = (addressData: any) => {
       const lng = addressData.location.lng;
       window.open(`https://maps.google.com/maps?q=${lat},${lng}`, '_blank');
     } else {
-      const address = getAddressString(addressData);
+      const address = formatAddress(addressData);
       if (address) {
         const encodedAddress = encodeURIComponent(address);
         window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
@@ -696,12 +698,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                     <input
                       type="text"
                       name="adress"
-                      value={getAddressString(formData.adress)}
+                      value={formatAddress(formData.adress)}
                       onChange={handleAddressChange}
                       placeholder="Ange fullständig adress..."
                       className="w-full px-3 py-2 pr-12 bg-slate-800/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200"
                     />
-                    {getAddressString(formData.adress) && (
+                    {formatAddress(formData.adress) && (
                       <button
                         type="button"
                         onClick={() => openInMaps(formData.adress)}
