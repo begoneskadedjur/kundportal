@@ -1,11 +1,10 @@
 // 📁 src/utils/formatters.ts - UPPDATERAD med nya intäktslabels
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount)
+  // Custom formatting with space separator for Swedish standard
+  const rounded = Math.round(amount)
+  const formatted = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const sign = rounded < 0 ? '-' : ''
+  return `${sign}${formatted} kr`
 }
 
 export const formatNumber = (number: number): string => {

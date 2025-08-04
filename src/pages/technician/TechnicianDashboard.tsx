@@ -20,6 +20,7 @@ import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import EnhancedSkeleton from '../../components/shared/EnhancedSkeleton'
 import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueChart'
 import VisualTimeline from '../../components/shared/VisualTimeline'
+import RecentCasesList from '../../components/technician/RecentCasesList'
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -294,7 +295,7 @@ export default function TechnicianDashboard() {
           />
           
           <EnhancedKpiCard
-            title="Denna månad"
+            title="Provision denna månad"
             value={data.stats.current_month_commission}
             icon={Calendar}
             prefix=""
@@ -303,12 +304,12 @@ export default function TechnicianDashboard() {
             trend={data.stats.current_month_commission > (data.stats.total_commission_ytd / 12) ? "up" : "down"}
             trendValue={data.stats.current_month_commission > (data.stats.total_commission_ytd / 12) ? "+8%" : "-5%"}
             customContent={
-              <p className="text-blue-300 text-xs">{data.stats.completed_cases_this_month} avslutade</p>
+              <p className="text-blue-300 text-xs">{data.stats.completed_cases_this_month} avslutade ärenden</p>
             }
           />
 
           <EnhancedKpiCard
-            title="Snitt per ärende"
+            title="Snitt provision per ärende"
             value={data.stats.avg_commission_per_case}
             icon={TrendingUp}
             prefix=""
@@ -462,23 +463,24 @@ export default function TechnicianDashboard() {
               <h2 className="text-xl font-semibold text-white flex items-center gap-2"><ClipboardList className="w-5 h-5 text-blue-500" />Senaste ärenden</h2>
               <Button variant="outline" size="sm" onClick={() => navigate('/technician/cases')} className="flex items-center gap-2"><Eye className="w-4 h-4" />Visa alla</Button>
             </div>
-            {data.recent_cases.length > 0 ? (
-              <VisualTimeline
-                activities={data.recent_cases.slice(0, 5).map((case_) => ({
-                  id: case_.id,
-                  type: case_.status?.toLowerCase().includes('avslutat') ? 'success' : 'info',
-                  title: case_.title,
-                  description: `${case_.case_type === 'private' ? 'Privat' : 'Företag'}${case_.commission_amount ? ` • ${formatCurrency(case_.commission_amount)}` : ''}`,
-                  timestamp: case_.completed_date ? formatDate(case_.completed_date) : 'Pågående'
-                }))}
-                maxItems={5}
-              />
-            ) : (
-              <div className="text-center py-8">
-                <ClipboardList className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-400">Inga ärenden att visa</p>
-              </div>
-            )}
+            <RecentCasesList
+              cases={data.recent_cases.slice(0, 5).map((case_) => ({
+                id: case_.id,
+                title: case_.title,
+                status: case_.status,
+                case_type: case_.case_type,
+                commission_amount: case_.commission_amount,
+                completed_date: case_.completed_date
+              }))}
+              onCaseClick={(caseItem) => {
+                // Transform to TechnicianCase format for EditCaseModal
+                const fullCase = data.recent_cases.find(c => c.id === caseItem.id);
+                if (fullCase) {
+                  handleOpenCase(fullCase);
+                }
+              }}
+              maxItems={5}
+            />
           </Card>
         </div>
 

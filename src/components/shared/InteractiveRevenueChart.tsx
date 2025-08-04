@@ -74,7 +74,8 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl"
+          className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50 relative"
+          style={{ zIndex: 9999 }}
         >
           <div className="text-white font-semibold">{data.name}</div>
           <div className="text-[#20c58f]">{formatCurrency(data.value)}</div>
@@ -96,7 +97,7 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
   return (
     <motion.div
       className={`relative ${className}`}
-      style={{ width: size, height: size, zIndex: 1 }}
+      style={{ width: size, height: size, zIndex: 10 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       initial={{ opacity: 0, scale: 0.8 }}
