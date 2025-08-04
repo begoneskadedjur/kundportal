@@ -21,6 +21,8 @@ import EnhancedSkeleton from '../../components/shared/EnhancedSkeleton'
 import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueChart'
 import VisualTimeline from '../../components/shared/VisualTimeline'
 import RecentCasesList from '../../components/technician/RecentCasesList'
+import MonthlyOverviewList from '../../components/technician/MonthlyOverviewList'
+import MonthlyCommissionModal from '../../components/technician/MonthlyCommissionModal'
 
 const formatAddress = (address: any): string => {
   if (!address) return 'Saknas';
@@ -128,6 +130,8 @@ export default function TechnicianDashboard() {
   const [showPendingCases, setShowPendingCases] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<TechnicianCase | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<any | null>(null)
+  const [showMonthlyModal, setShowMonthlyModal] = useState(false)
 
   // ✅ FIXAD: Använd profile data istället för technician prop
   const technicianId = profile?.technician_id
@@ -156,6 +160,16 @@ export default function TechnicianDashboard() {
   const handleUpdateSuccess = () => {
     // Refetch dashboard data efter uppdatering
     fetchDashboardData()
+  }
+
+  const handleMonthClick = (month: any) => {
+    setSelectedMonth(month);
+    setShowMonthlyModal(true);
+  }
+
+  const handleCloseMonthlyModal = () => {
+    setShowMonthlyModal(false);
+    setSelectedMonth(null);
   }
 
   const handleOpenCase = (pendingCase: any) => {
@@ -287,8 +301,36 @@ export default function TechnicianDashboard() {
             prefix=""
             suffix=" kr"
             decimals={0}
-            trend="up"
-            trendValue="+15%"
+            trend={(() => {
+              const currentYearTotal = data.stats.total_commission_ytd;
+              const monthsInYear = new Date().getMonth() + 1; // Current month number
+              const averageMonthly = data.monthly_data.length > 0 ? 
+                data.monthly_data.reduce((sum, month) => sum + month.total_commission, 0) / data.monthly_data.length : 0;
+              return currentYearTotal > (averageMonthly * monthsInYear * 0.8) ? "up" : "down";
+            })()}
+            trendValue={(() => {
+              const monthsInYear = new Date().getMonth() + 1;
+              const expectedTotal = data.monthly_data.length > 0 ? 
+                (data.monthly_data.reduce((sum, month) => sum + month.total_commission, 0) / data.monthly_data.length) * monthsInYear : 0;
+              if (expectedTotal === 0) return "→";
+              const change = ((data.stats.total_commission_ytd - expectedTotal) / expectedTotal) * 100;
+              return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+            })()}
+            trendExplanation={(() => {
+              const monthsInYear = new Date().getMonth() + 1;
+              const avgMonthly = data.monthly_data.length > 0 ? 
+                data.monthly_data.reduce((sum, month) => sum + month.total_commission, 0) / data.monthly_data.length : 0;
+              const expectedTotal = avgMonthly * monthsInYear;
+              
+              return {
+                currentMonth: "Aktuell total",
+                currentValue: data.stats.total_commission_ytd,
+                previousMonth: "Förväntad total",
+                previousValue: expectedTotal,
+                suffix: " kr"
+              };
+            })()}
+            trendExplanationMode="hover"
             customContent={
               <p className="text-green-300 text-xs">{data.stats.total_cases_ytd} ärenden</p>
             }
@@ -301,8 +343,42 @@ export default function TechnicianDashboard() {
             prefix=""
             suffix=" kr"
             decimals={0}
-            trend={data.stats.current_month_commission > (data.stats.total_commission_ytd / 12) ? "up" : "down"}
-            trendValue={data.stats.current_month_commission > (data.stats.total_commission_ytd / 12) ? "+8%" : "-5%"}
+            trend={(() => {
+              const currentMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
+              
+              if (!currentMonth || !previousMonth || previousMonth.total_commission === 0) {
+                return "neutral";
+              }
+              
+              return currentMonth.total_commission > previousMonth.total_commission ? "up" : "down";
+            })()}
+            trendValue={(() => {
+              const currentMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
+              
+              if (!currentMonth || !previousMonth || previousMonth.total_commission === 0) {
+                return "→";
+              }
+              
+              const change = ((currentMonth.total_commission - previousMonth.total_commission) / previousMonth.total_commission) * 100;
+              return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+            })()}
+            trendExplanation={(() => {
+              const currentMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
+              
+              if (!currentMonth || !previousMonth) return undefined;
+              
+              return {
+                currentMonth: currentMonth.month_display,
+                currentValue: currentMonth.total_commission,
+                previousMonth: previousMonth.month_display,
+                previousValue: previousMonth.total_commission,
+                suffix: " kr"
+              };
+            })()}
+            trendExplanationMode="hover"
             customContent={
               <p className="text-blue-300 text-xs">{data.stats.completed_cases_this_month} avslutade ärenden</p>
             }
@@ -452,47 +528,11 @@ export default function TechnicianDashboard() {
               <h2 className="text-xl font-semibold text-white flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-500" />Månadsöversikt</h2>
               <Button variant="outline" size="sm" onClick={() => navigate('/technician/commissions')} className="flex items-center gap-2"><Eye className="w-4 h-4" />Visa alla</Button>
             </div>
-            {data.monthly_data.length > 0 ? (
-              <div className="space-y-4">
-                {/* Interactive chart for commission visualization */}
-                {data.monthly_data.length >= 3 && (
-                  <div className="mb-4 flex justify-center">
-                    <InteractiveRevenueChart
-                      data={{
-                        contracts: 0,
-                        privateCases: data.monthly_data[0]?.total_commission || 0,
-                        businessCases: data.monthly_data[1]?.total_commission || 0,
-                        legacyCases: data.monthly_data[2]?.total_commission || 0
-                      }}
-                      size={100}
-                    />
-                  </div>
-                )}
-                {data.monthly_data.slice(0, 3).map((month, index) => (
-                  <motion.div
-                    key={month.month}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg hover:bg-slate-800/70 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-white">{month.month_display}</p>
-                      <p className="text-sm text-slate-400">{month.case_count} ärenden</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-green-400">{formatCurrency(month.total_commission)}</p>
-                      <p className="text-xs text-slate-400">{formatCurrency(month.avg_commission_per_case)}/ärende</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Clock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-400">Ingen månadsdata tillgänglig ännu</p>
-              </div>
-            )}
+            <MonthlyOverviewList
+              months={data.monthly_data}
+              onMonthClick={handleMonthClick}
+              maxItems={3}
+            />
           </Card>
           
           <Card className="p-6">
@@ -601,11 +641,26 @@ export default function TechnicianDashboard() {
         </Card>
 
         <EditCaseModal 
-        isOpen={isEditModalOpen} 
-        onClose={handleCloseEditModal} 
-        onSuccess={handleUpdateSuccess} 
-        caseData={selectedCase} 
-      />
+          isOpen={isEditModalOpen} 
+          onClose={handleCloseEditModal} 
+          onSuccess={handleUpdateSuccess} 
+          caseData={selectedCase} 
+        />
+
+        <MonthlyCommissionModal
+          isOpen={showMonthlyModal}
+          onClose={handleCloseMonthlyModal}
+          month={selectedMonth}
+          technicianId={technicianId || ''}
+          onCaseClick={(caseItem) => {
+            // Convert case to TechnicianCase format if needed
+            const fullCase = data?.recent_cases.find(c => c.id === caseItem.id);
+            if (fullCase) {
+              handleOpenCase(fullCase);
+            }
+            handleCloseMonthlyModal();
+          }}
+        />
       </div>
     </div>
   )
