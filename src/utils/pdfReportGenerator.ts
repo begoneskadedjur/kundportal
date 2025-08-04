@@ -382,7 +382,7 @@ export const generatePDFReport = async (
     const isCompany = customerTypeField?.value === 'business' || false
     
     // Professional kunduppgifter card med dynamisk layout
-    const customerCardHeight = isCompany ? 80 : 70 // Justerad höjd för korrekt spacing
+    const customerCardHeight = isCompany ? 65 : 55 // Minskad höjd för mindre tom yta
     drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, customerCardHeight, {
       backgroundColor: 'white',
       shadow: true
@@ -488,7 +488,7 @@ export const generatePDFReport = async (
     // === LEVERANTÖRSUPPGIFTER SEKTION ===
     // Kontrollera om vi behöver sidbrytning för hela leverantörssektionen
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 105 : 90 // Justerad höjd för korrekt spacing
+    const supplierCardHeight = hasAssignee ? 85 : 70 // Minskad höjd för mindre tom yta
     const supplierSectionHeight = 22 + spacing.sm + supplierCardHeight // Section header + card
     
     if (yPosition + supplierSectionHeight > pageHeight - 40) {
@@ -571,7 +571,7 @@ export const generatePDFReport = async (
     // === ARBETSINFORMATION SEKTION ===
     yPosition = drawSectionHeader(pdf, 'ARBETSINFORMATION', margins.left, yPosition, contentWidth, 'accent')
 
-    const workCardHeight = 95 // Mer plats för utökad information
+    const workCardHeight = 70 // Minskad höjd för mindre tom yta
     drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, workCardHeight, {
       backgroundColor: 'light',
       shadow: true
@@ -660,7 +660,7 @@ export const generatePDFReport = async (
       yPosition = drawSectionHeader(pdf, 'DETALJERAD SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'accent')
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.sm * 2)) // Använd nästan full bredd
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - spacing.xs) // Använd ännu mer av sidans bredd
       
       const lineHeight = 5.5
       const reportPadding = spacing.sm // Minimal padding för maximal textbredd
@@ -694,7 +694,7 @@ export const generatePDFReport = async (
           })
         }
         
-        pdf.text(line, margins.left + spacing.sm, textY) // Minimal vänstermarginal för full bredd
+        pdf.text(line, margins.left + spacing.xs, textY) // Minimal vänstermarginal för maximal bredd
         textY += lineHeight
       })
       

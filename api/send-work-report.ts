@@ -315,7 +315,7 @@ async function generatePDFReportBuffer(
     )
     const isCompany = caseTypeField?.value === 'business' || false
     
-    const customerCardHeight = isCompany ? 80 : 70 // Justerad höjd för korrekt spacing
+    const customerCardHeight = isCompany ? 65 : 55 // Minskad höjd för mindre tom yta
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
     
     const leftCol = margins.left + spacing.md
@@ -421,7 +421,7 @@ async function generatePDFReportBuffer(
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
     
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 105 : 90 // Justerad höjd för korrekt spacing
+    const supplierCardHeight = hasAssignee ? 85 : 70 // Minskad höjd för mindre tom yta
     drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
     
     cardY = yPosition + spacing.md
@@ -528,7 +528,7 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.sm * 2)) // Använd nästan full bredd
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - spacing.xs) // Använd ännu mer av sidans bredd
       const lineHeight = 5.5
       const reportPadding = spacing.sm // Minimal padding för maximal textbredd
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
@@ -545,7 +545,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, margins.left + spacing.sm, textY) // Minimal vänstermarginal för full bredd
+        pdf.text(line, margins.left + spacing.xs, textY) // Minimal vänstermarginal för maximal bredd
         textY += lineHeight
       })
       
