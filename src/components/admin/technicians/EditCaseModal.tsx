@@ -314,14 +314,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   // ClickUp sync hook
   const { syncAfterUpdate } = useClickUpSync();
 
-  // Rapport generation hook
-  const reportGeneration = currentCase ? useWorkReportGeneration({
+  // Rapport generation hook - använd alltid, men med fallback-data
+  const reportGeneration = useWorkReportGeneration(currentCase ? {
     ...currentCase,
     clickup_task_id: currentCase.id,
     assignee_email: undefined, // EditCaseModal saknar assignee info just nu
     assignee_name: undefined,
     foretag: currentCase.case_type === 'business' ? 'Företag' : undefined
-  }) : null;
+  } : {
+    id: '',
+    case_type: 'private' as const,
+    title: '',
+    status: '',
+    created_date: new Date().toISOString()
+  });
 
   useEffect(() => {
     if (caseData) {
@@ -604,7 +610,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth">
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {/* Custom header with report functionality */}
-        {reportGeneration && reportGeneration.canGenerateReport && (
+        {currentCase && reportGeneration.canGenerateReport && (
           <div className="mb-6 -mt-6 -mx-6 px-6 py-3 bg-slate-800/30 border-b border-slate-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

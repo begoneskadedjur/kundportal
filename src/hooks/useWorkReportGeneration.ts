@@ -212,7 +212,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
   // Kontrollera om rapporten kan genereras
   const canGenerateReport = () => {
     // Kräver ClickUp task ID och grundläggande case data
-    return !!(caseData.clickup_task_id || caseData.id) && caseData.title
+    return !!(caseData.clickup_task_id || caseData.id) && caseData.title && caseData.title.length > 0
   }
 
   return {
