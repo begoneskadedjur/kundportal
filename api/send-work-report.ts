@@ -308,57 +308,16 @@ async function generatePDFReportBuffer(
     // Kunduppgifter sektion
     yPosition = drawSectionHeader('KUNDUPPGIFTER', yPosition)
     
-    const customerCardHeight = 85 // Öka höjden för fler fält
+    // Avgör om det är privatperson eller företag
+    const orgNumber = customerInfo.org_number || ''
+    const isCompany = orgNumber.length > 10 || orgNumber.includes('-') // Org nr format: XXXXXX-XXXX
+    
+    const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
     
     const leftCol = margins.left + spacing.md
     const rightCol = margins.left + (contentWidth/2) + spacing.sm
     let cardY = yPosition + spacing.md
-
-    // Row 1: Kund och kontaktperson
-    pdf.setTextColor(100, 100, 100) // Grå för labels
-    pdf.setFontSize(8)
-    pdf.setFont(undefined, 'bold')
-    
-    pdf.text('UPPDRAGSGIVARE', leftCol, cardY)
-    pdf.text('KONTAKTPERSON', rightCol, cardY)
-    
-    // Mörk text för värden
-    pdf.setTextColor(20, 20, 20) // Nästan svart för bästa kontrast
-    pdf.setFontSize(typography.body.size)
-    pdf.setFont(undefined, 'normal')
-    
-    pdf.text(customerInfo.company_name || '[Företagsnamn saknas]', leftCol, cardY + spacing.sm)
-    pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
-    
-    // Row 2: Ärende ID och identifieringsnummer
-    cardY += spacing.lg
-    pdf.setTextColor(100, 100, 100)
-    pdf.setFontSize(8)
-    pdf.setFont(undefined, 'bold')
-    
-    pdf.text('ÄRENDE ID', leftCol, cardY)
-    
-    // Dynamisk text baserat på om det är företag eller privatperson
-    const orgNumber = customerInfo.org_number || ''
-    const isCompany = orgNumber.length > 10 || orgNumber.includes('-')
-    const identityLabel = isCompany ? 'ORG NR' : 'PERSONNUMMER'
-    
-    pdf.text(identityLabel, rightCol, cardY)
-    
-    // Värden för rad 2
-    pdf.setTextColor(20, 20, 20)
-    pdf.setFontSize(typography.body.size)
-    pdf.setFont(undefined, 'normal')
-    
-    pdf.text(taskDetails.task_id, leftCol, cardY + spacing.sm)
-    pdf.text(orgNumber || (isCompany ? '[Org.nr saknas]' : '[Personnummer saknas]'), rightCol, cardY + spacing.sm)
-
-    // Row 3: Telefon och email
-    cardY += spacing.lg
-    pdf.setTextColor(100, 100, 100)
-    pdf.setFontSize(8)
-    pdf.setFont(undefined, 'bold')
     
     // Hämta telefon och email från custom fields
     const phoneField = taskDetails.custom_fields.find(f => 
@@ -367,21 +326,93 @@ async function generatePDFReportBuffer(
     const emailField = taskDetails.custom_fields.find(f => 
       (f.name.toLowerCase() === 'email' || f.name.toLowerCase() === 'e_post_kontaktperson') && f.has_value
     )
-    
-    pdf.text('TELEFON', leftCol, cardY)
-    pdf.text('EMAIL', rightCol, cardY)
+    const phoneText = phoneField ? phoneField.value : '[Telefon ej angiven]'
+    const emailText = emailField ? emailField.value : '[Email ej angiven]'
+
+    if (isCompany) {
+      // FÖRETAGSLAYOUT
+      // Row 1: Företag och kontaktperson
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('UPPDRAGSGIVARE', leftCol, cardY)
+      pdf.text('KONTAKTPERSON', rightCol, cardY)
+      
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(customerInfo.company_name || '[Företagsnamn saknas]', leftCol, cardY + spacing.sm)
+      pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
+
+      // Row 2: Org nr och telefon
+      cardY += spacing.md
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('ORG NR', leftCol, cardY)
+      pdf.text('TELEFON', rightCol, cardY)
+      
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(orgNumber || '[Org.nr saknas]', leftCol, cardY + spacing.sm)
+      pdf.text(phoneText, rightCol, cardY + spacing.sm)
+
+      // Row 3: Email
+      cardY += spacing.md
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('EMAIL', leftCol, cardY)
+      
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(emailText, leftCol, cardY + spacing.sm)
+      
+    } else {
+      // PRIVATPERSONLAYOUT  
+      // Row 1: Namn och personnummer
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('UPPDRAGSGIVARE', leftCol, cardY)
+      pdf.text('PERSONNUMMER', rightCol, cardY)
+      
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(customerInfo.contact_person || '[Namn saknas]', leftCol, cardY + spacing.sm)
+      pdf.text(orgNumber || '[Personnummer saknas]', rightCol, cardY + spacing.sm)
+
+      // Row 2: Telefon och email
+      cardY += spacing.md
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('TELEFON', leftCol, cardY)
+      pdf.text('EMAIL', rightCol, cardY)
+      
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text(phoneText, leftCol, cardY + spacing.sm)
+      pdf.text(emailText, rightCol, cardY + spacing.sm)
+    }
+
+    // Row sist: Ärende ID (ensam rad)
+    cardY += spacing.md
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    pdf.text('ÄRENDE ID', leftCol, cardY)
     
     pdf.setTextColor(20, 20, 20)
     pdf.setFontSize(typography.body.size)
     pdf.setFont(undefined, 'normal')
-    
-    const phoneText = phoneField ? phoneField.value : '[Telefon ej angiven]'
-    const emailText = emailField ? emailField.value : '[Email ej angiven]'
-    
-    pdf.text(phoneText, leftCol, cardY + spacing.sm)
-    pdf.text(emailText, rightCol, cardY + spacing.sm)
+    pdf.text(taskDetails.task_id, leftCol, cardY + spacing.sm)
 
-    yPosition += customerCardHeight + spacing.section
+    yPosition += customerCardHeight + spacing.md // Minska section-avstånd
 
     // Leverantörsuppgifter sektion
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
@@ -450,7 +481,7 @@ async function generatePDFReportBuffer(
       pdf.text(taskDetails.assignees[0].email, rightCol, cardY + spacing.sm)
     }
 
-    yPosition += supplierCardHeight + spacing.section
+    yPosition += supplierCardHeight + spacing.md // Minska section-avstånd
 
     // Arbetsinformation
     yPosition = drawSectionHeader('ARBETSINFORMATION', yPosition)
@@ -502,7 +533,7 @@ async function generatePDFReportBuffer(
     const addressLines = pdf.splitTextToSize(workAddress, (contentWidth/2) - spacing.lg)
     pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
 
-    yPosition += workCardHeight + spacing.section
+    yPosition += workCardHeight + spacing.md // Minska section-avstånd
 
     // Saneringsrapport sektion (om det finns rapport-data)
     const reportField = taskDetails.custom_fields.find(f => 
@@ -539,7 +570,7 @@ async function generatePDFReportBuffer(
         textY += lineHeight
       })
       
-      yPosition += reportBoxHeight + spacing.section
+      yPosition += reportBoxHeight + spacing.md // Minska section-avstånd
     }
 
     // Footer - bara på sista sidan med säkra färger
