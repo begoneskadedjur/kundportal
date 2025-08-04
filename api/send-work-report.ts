@@ -528,16 +528,15 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      // Använd nästan hela sidbredden för rapporttext (pageWidth - 10px total marginal)
-      const maxTextWidth = pageWidth - 10
+      // Använd contentWidth för box men maximal textbredd inom boxen
+      const maxTextWidth = contentWidth - 10 // Bara 5px marginal på varje sida inom boxen
       const textLines = pdf.splitTextToSize(reportText, maxTextWidth)
       const lineHeight = 5.5
-      const reportPadding = 10 // Padding som matchar textposition
+      const reportPadding = 5 // Minimal padding för maximal textbredd inom box
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
-      // Rita card som sträcker sig nästan över hela sidan för maximal textbredd
-      const cardWidth = pageWidth - 10 // Samma som textbredd
-      drawCard(5, yPosition, cardWidth, reportBoxHeight)
+      // Rita card med samma bredd som andra sektioner
+      drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
       
       pdf.setFontSize(typography.body.size)
       pdf.setFont(undefined, 'normal')
@@ -549,7 +548,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, 10, textY) // Text 10px från vänsterkant (5px card + 5px padding)
+        pdf.text(line, margins.left + 5, textY) // Text 5px från boxens vänsterkant
         textY += lineHeight
       })
       

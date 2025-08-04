@@ -660,17 +660,16 @@ export const generatePDFReport = async (
       yPosition = drawSectionHeader(pdf, 'DETALJERAD SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'accent')
       
       const reportText = reportField.value.toString()
-      // Använd nästan hela sidbredden för rapporttext (pageWidth - 10px total marginal)
-      const maxTextWidth = pageWidth - 10
+      // Använd contentWidth för box men maximal textbredd inom boxen
+      const maxTextWidth = contentWidth - 10 // Bara 5px marginal på varje sida inom boxen
       const textLines = pdf.splitTextToSize(reportText, maxTextWidth)
       
       const lineHeight = 5.5
-      const reportPadding = 10 // Padding som matchar textposition
+      const reportPadding = 5 // Minimal padding för maximal textbredd inom box
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
-      // Rita card som sträcker sig nästan över hela sidan för maximal textbredd
-      const cardWidth = pageWidth - 10 // Samma som textbredd
-      drawProfessionalCard(pdf, 5, yPosition, cardWidth, reportBoxHeight, {
+      // Rita card med samma bredd som andra sektioner
+      drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, reportBoxHeight, {
         backgroundColor: 'white',
         shadow: true,
         borderWeight: 1.2
@@ -688,18 +687,17 @@ export const generatePDFReport = async (
           pdf.addPage()
           textY = spacing.xl
           
-          // Rita ny card på ny sida som matchar textbredden
+          // Rita ny card på ny sida med samma bredd som andra sektioner
           const remainingLines = textLines.slice(textLines.indexOf(line))
           const remainingHeight = Math.max(40, remainingLines.length * lineHeight + reportPadding)
-          const cardWidth = pageWidth - 10 // Samma som textbredd
-          drawProfessionalCard(pdf, 5, textY - reportPadding, cardWidth, remainingHeight, {
+          drawProfessionalCard(pdf, margins.left, textY - reportPadding, contentWidth, remainingHeight, {
             backgroundColor: 'white',
             shadow: true,
             borderWeight: 1.2
           })
         }
         
-        pdf.text(line, 10, textY) // Text 10px från vänsterkant (5px card + 5px padding)
+        pdf.text(line, margins.left + 5, textY) // Text 5px från boxens vänsterkant
         textY += lineHeight
       })
       
