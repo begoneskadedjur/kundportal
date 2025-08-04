@@ -46,11 +46,11 @@ interface CustomerInfo {
 
 // Optimerad hjälpfunktion för textbredd-beräkning som kompenserar för jsPDF:s konservativa mätningar
 const calculateOptimalTextWidth = (pdf: any, availableWidth: number, fontSize: number): number => {
-  // Finkalibrera för optimal radbrytning - texten ska brytas efter 'källarutrymmen och'
-  const compensationFactor = fontSize <= 10 ? 1.06 : fontSize <= 12 ? 1.04 : 1.02
+  // Mycket konservativ för att undvika utstickande text
+  const compensationFactor = fontSize <= 10 ? 1.02 : fontSize <= 12 ? 1.01 : 1.005
   
-  // Minimal svensk tecken-bonus
-  const swedishCharBonus = 1.005
+  // Ingen bonus för svenska tecken - håll det säkert
+  const swedishCharBonus = 1.0
   
   return availableWidth * compensationFactor * swedishCharBonus
 }
@@ -541,10 +541,10 @@ async function generatePDFReportBuffer(
       const reportText = reportField.value.toString()
       
       // OPTIMERAD TEXTBREDD-UTNYTTJANDE:
-      // Problem: jsPDF.splitTextToSize() beräknar konservativt och underutnyttjar tillgänglig bredd
-      // Lösning: Kompensera med matematisk justering baserad på fontstorlek och svenska tecken
-      const reportPadding = 8 // Balanserad padding för läsbarhet vs maximal textbredd
-      const effectiveTextWidth = contentWidth - (reportPadding * 2) // Fullt utnyttjande av contentWidth
+      // Problem: Balansera vänstermarginal med textbredd för centrerad layout
+      // Lösning: Mindre padding men ännu mer konservativ textbredd
+      const reportPadding = 5 // Mindre vänstermarginal
+      const effectiveTextWidth = contentWidth - (reportPadding * 3) // Mer konservativ textbredd (5px vänster, 10px höger)
       
       // Sätt font först för korrekta mätningar
       pdf.setFontSize(typography.body.size)
