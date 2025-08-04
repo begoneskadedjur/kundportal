@@ -126,23 +126,32 @@ const formatAddress = (addressValue: any): string => {
   // Om det är ett JSON-objekt med formatted_address
   if (typeof addressValue === 'object') {
     if (addressValue.formatted_address) {
-      return addressValue.formatted_address
+      // Ta bort ", Sverige" från slutet om det finns
+      let address = addressValue.formatted_address
+      if (typeof address === 'string') {
+        return address.replace(/, Sverige$/, '').trim()
+      }
+      return address
     }
     // Om det är ett objekt men utan formatted_address, försök extrahera värde
     if (addressValue.address || addressValue.street) {
-      return addressValue.address || addressValue.street
+      const addr = addressValue.address || addressValue.street
+      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
     }
-    // Fallback för andra objektstrukturer
-    return JSON.stringify(addressValue).replace(/[{}",]/g, ' ').trim() || '[Adress ej angiven]'
+    // Om objektet innehåller koordinater men ingen formatted_address, returnera tom
+    if (addressValue.location && (addressValue.lat || addressValue.lng)) {
+      return '[Adress ej angiven]'
+    }
   }
   
-  // Om det är en string, returnera direkt
+  // Om det är en string, returnera direkt (ta bort Sverige)
   if (typeof addressValue === 'string' && addressValue.trim()) {
-    return addressValue.trim()
+    return addressValue.replace(/, Sverige$/, '').trim()
   }
   
   // Fallback
-  return addressValue?.toString()?.trim() || '[Adress ej angiven]'
+  const fallback = addressValue?.toString()?.trim() || '[Adress ej angiven]'
+  return typeof fallback === 'string' ? fallback.replace(/, Sverige$/, '') : fallback
 }
 
 // Professional card system med subtle shadows och borders
@@ -240,7 +249,7 @@ export const generatePDFReport = async (
     const pageHeight = pdf.internal.pageSize.height
     const margins = { left: spacing.lg, right: spacing.lg, top: spacing.xl, bottom: spacing.xl }
     const contentWidth = pageWidth - (margins.left + margins.right)
-    let yPosition = 90 // Öka för större header
+    let yPosition = 50 // Minska för mindre header (40px + lite utrymme)
 
     // Hämta alla relevanta custom fields för saneringsrapport
     const addressField = getFieldValue(taskDetails, 'adress')
@@ -253,9 +262,7 @@ export const generatePDFReport = async (
     const followUpField = getFieldValue(taskDetails, 'uppföljning')
     const startDateField = getFieldValue(taskDetails, 'start_date')
 
-    // === PROFESSIONAL HEADER MED SANERINGSRAPPORT TITEL ===
-    drawProfessionalHeader(pdf, pageWidth, 'SANERINGSRAPPORT')
-    
+    // === PROFESSIONAL HEADER - bara bild, ingen text ===
     let headerSuccessful = false
     
     // Försök ladda BeGone header-logotype
@@ -275,13 +282,11 @@ export const generatePDFReport = async (
             
             const dataURL = canvas.toDataURL('image/png')
             
-            // Fullbredd header-bild
-            const headerImageHeight = 60 // Nästan full header höjd
-            const aspectRatio = img.width / img.height
-            const headerImageWidth = pageWidth // Full bredd
+            // Header-bild från toppen, full bredd, korrekt höjd
+            const headerImageHeight = 40 // Minska höjden för att inte sträcka bilden
             
-            // Positionera logotype från kant till kant
-            pdf.addImage(dataURL, 'PNG', 0, 10, headerImageWidth, headerImageHeight)
+            // Positionera från absolut topp, full bredd
+            pdf.addImage(dataURL, 'PNG', 0, 0, pageWidth, headerImageHeight)
             headerSuccessful = true
             resolve(true)
           } catch (error) {
@@ -294,29 +299,22 @@ export const generatePDFReport = async (
       })
       
     } catch (error) {
-      console.warn('Header image failed, using professional text fallback')
+      console.warn('Header image failed, using minimal background')
       headerSuccessful = false
     }
     
-    // Professional text fallback som matchar BeGone:s branding
+    // Om bilden inte laddades, skapa bara en minimal bakgrund
     if (!headerSuccessful) {
-      // Huvudlogotype
-      pdf.setTextColor(...beGoneColors.white)
-      pdf.setFontSize(typography.title.size)
-      pdf.setFont(undefined, typography.title.weight)
-      pdf.text('BeGone', pageWidth/2, 25, { align: 'center' })
+      // Minimal header bakgrund
+      pdf.setFillColor(...beGoneColors.primary)
+      pdf.rect(0, 0, pageWidth, 40, 'F')
       
-      // Undertitel
-      pdf.setFontSize(typography.caption.size)
-      pdf.setFont(undefined, 'normal')
-      pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 32, { align: 'center' })
+      // BeGone text som fallback
+      pdf.setTextColor(...beGoneColors.white)
+      pdf.setFontSize(16)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('BeGone Skadedjur & Sanering', pageWidth/2, 25, { align: 'center' })
     }
-    
-    // SANERINGSRAPPORT titel alltid synlig
-    pdf.setTextColor(...beGoneColors.white)
-    pdf.setFontSize(typography.sectionHeader.size)
-    pdf.setFont(undefined, typography.sectionHeader.weight)
-    pdf.text('SANERINGSRAPPORT', pageWidth/2, 48, { align: 'center' })
 
     // === RAPPORT METADATA (datum, ärendenummer etc.) ===
     yPosition += spacing.sm
@@ -439,7 +437,10 @@ export const generatePDFReport = async (
     pdf.setTextColor(...beGoneColors.darkGray)
     pdf.setFontSize(typography.body.size)
     pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
-    pdf.text('010 280 44 10 • info@begone.se', rightCol, cardY + spacing.sm)
+    
+    // Telefon och email på separata rader
+    pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
+    pdf.text('info@begone.se', rightCol, cardY + spacing.sm + spacing.sm)
 
     // Ansvarig tekniker (om tilldelad)
     if (hasAssignee) {

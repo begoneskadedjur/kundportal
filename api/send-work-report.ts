@@ -51,23 +51,32 @@ const formatAddress = (addressValue: any): string => {
   // Om det är ett JSON-objekt med formatted_address
   if (typeof addressValue === 'object') {
     if (addressValue.formatted_address) {
-      return addressValue.formatted_address
+      // Ta bort ", Sverige" från slutet om det finns
+      let address = addressValue.formatted_address
+      if (typeof address === 'string') {
+        return address.replace(/, Sverige$/, '').trim()
+      }
+      return address
     }
     // Om det är ett objekt men utan formatted_address, försök extrahera värde
     if (addressValue.address || addressValue.street) {
-      return addressValue.address || addressValue.street
+      const addr = addressValue.address || addressValue.street
+      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
     }
-    // Fallback för andra objektstrukturer
-    return JSON.stringify(addressValue).replace(/[{}",]/g, ' ').trim() || '[Adress ej angiven]'
+    // Om objektet innehåller koordinater men ingen formatted_address, returnera tom
+    if (addressValue.location && (addressValue.lat || addressValue.lng)) {
+      return '[Adress ej angiven]'
+    }
   }
   
-  // Om det är en string, returnera direkt
+  // Om det är en string, returnera direkt (ta bort Sverige)
   if (typeof addressValue === 'string' && addressValue.trim()) {
-    return addressValue.trim()
+    return addressValue.replace(/, Sverige$/, '').trim()
   }
   
   // Fallback
-  return addressValue?.toString()?.trim() || '[Adress ej angiven]'
+  const fallback = addressValue?.toString()?.trim() || '[Adress ej angiven]'
+  return typeof fallback === 'string' ? fallback.replace(/, Sverige$/, '') : fallback
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -185,23 +194,9 @@ async function generatePDFReportBuffer(
     
     const margins = { left: spacing.lg, right: spacing.lg, top: spacing.xl, bottom: spacing.xl }
     const contentWidth = pageWidth - (margins.left + margins.right)
-    let yPosition = 90 // Öka för större header som matchar huvud-PDF:en
+    let yPosition = 50 // Minska för mindre header (40px + lite utrymme)
 
-    // Header med gradient effect
-    const headerHeight = 80 // Öka för att matcha huvud-PDF:en
-    const gradientSteps = 5
-    for (let i = 0; i < gradientSteps; i++) {
-      const stepHeight = headerHeight / gradientSteps
-      const [r, g, b] = beGoneColors.primary
-      pdf.setFillColor(r + (i * 5), g + (i * 3), b + (i * 8))
-      pdf.rect(0, i * stepHeight, pageWidth, stepHeight, 'F')
-    }
-    
-    // Accent line
-    pdf.setFillColor(...beGoneColors.accent)
-    pdf.rect(0, headerHeight - 4, pageWidth, 4, 'F')
-    
-    // Försök ladda BeGone header-bild
+    // === HEADER - bara bild, ingen text ===
     let headerSuccessful = false
     try {
       // Försök läsa header-bilden från public/images
@@ -211,33 +206,30 @@ async function generatePDFReportBuffer(
         const base64Image = imageBuffer.toString('base64')
         const dataURL = `data:image/png;base64,${base64Image}`
         
-        // Fullbredd header-bild
-        const headerImageHeight = 60
-        pdf.addImage(dataURL, 'PNG', 0, 10, pageWidth, headerImageHeight)
+        // Header-bild från toppen, full bredd, korrekt höjd
+        const headerImageHeight = 40 // Minska höjden för att inte sträcka bilden
+        
+        // Positionera från absolut topp, full bredd
+        pdf.addImage(dataURL, 'PNG', 0, 0, pageWidth, headerImageHeight)
         headerSuccessful = true
         console.log('Header image loaded successfully for email PDF')
       }
     } catch (error) {
-      console.warn('Failed to load header image for email PDF, using text fallback:', error)
+      console.warn('Failed to load header image for email PDF, using minimal background:', error)
     }
     
-    // Text fallback om bilden inte laddades
+    // Om bilden inte laddades, skapa bara en minimal bakgrund
     if (!headerSuccessful) {
-      pdf.setTextColor(...beGoneColors.white)
-      pdf.setFontSize(typography.title.size)
-      pdf.setFont(undefined, typography.title.weight)
-      pdf.text('BeGone', pageWidth/2, 25, { align: 'center' })
+      // Minimal header bakgrund
+      pdf.setFillColor(...beGoneColors.primary)
+      pdf.rect(0, 0, pageWidth, 40, 'F')
       
-      pdf.setFontSize(typography.caption.size)
-      pdf.setFont(undefined, 'normal')
-      pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 32, { align: 'center' })
+      // BeGone text som fallback
+      pdf.setTextColor(...beGoneColors.white)
+      pdf.setFontSize(16)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('BeGone Skadedjur & Sanering', pageWidth/2, 25, { align: 'center' })
     }
-    
-    // SANERINGSRAPPORT titel alltid synlig
-    pdf.setTextColor(...beGoneColors.white)
-    pdf.setFontSize(typography.sectionHeader.size)
-    pdf.setFont(undefined, typography.sectionHeader.weight)
-    pdf.text('SANERINGSRAPPORT', pageWidth/2, 48, { align: 'center' })
 
     // Metadata
     pdf.setTextColor(...beGoneColors.darkGray)
@@ -374,7 +366,10 @@ async function generatePDFReportBuffer(
     pdf.setFont(undefined, 'normal')
     
     pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
-    pdf.text('010 280 44 10 • info@begone.se', rightCol, cardY + spacing.sm)
+    
+    // Telefon och email på separata rader
+    pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
+    pdf.text('info@begone.se', rightCol, cardY + spacing.sm + spacing.sm)
 
     // Ansvarig tekniker
     if (hasAssignee) {
