@@ -104,11 +104,11 @@ const getDropdownText = (field: any): string => {
 
 // Optimerad hjälpfunktion för textbredd-beräkning som kompenserar för jsPDF:s konservativa mätningar
 const calculateOptimalTextWidth = (pdf: jsPDF, availableWidth: number, fontSize: number): number => {
-  // Basera kompensationsfaktorn på fontstorlek för bättre precision
-  const compensationFactor = fontSize <= 10 ? 1.15 : fontSize <= 12 ? 1.12 : 1.10
+  // Minska kompensationsfaktorn för att förhindra att text sticker ut utanför boxen
+  const compensationFactor = fontSize <= 10 ? 1.08 : fontSize <= 12 ? 1.06 : 1.04
   
-  // Justera för svenska tecken som kan vara bredare
-  const swedishCharBonus = 1.02
+  // Minska svensk tecken-bonus
+  const swedishCharBonus = 1.01
   
   return availableWidth * compensationFactor * swedishCharBonus
 }
