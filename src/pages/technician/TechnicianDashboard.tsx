@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   DollarSign, FileText, ClipboardList, Calendar, 
   TrendingUp, Award, Clock, AlertCircle,
-  Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info
+  Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info, Briefcase
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Card from '../../components/ui/Card'
@@ -285,8 +285,17 @@ export default function TechnicianDashboard() {
     <div className="min-h-screen bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <PageHeader 
-          title={`Välkommen, ${displayName}! 👷‍♂️`}
+          title="Tekniker Dashboard"
+          subtitle={`${displayName} • ${data.stats.pending_cases} pågående ärenden • ${formatDate(new Date())}`}
+          icon={Briefcase}
+          iconColor="text-purple-400"
           showBackButton={false}
+          rightContent={
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <Clock className="w-4 h-4" />
+              <span>{new Date().toLocaleDateString('sv-SE')}</span>
+            </div>
+          }
         />
 
         <StaggeredGrid 
