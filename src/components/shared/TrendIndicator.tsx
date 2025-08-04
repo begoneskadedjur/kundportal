@@ -23,7 +23,7 @@ interface TrendIndicatorProps {
   showChart?: boolean;
   showIcon?: boolean;
   explanation?: TrendExplanation;
-  explanationMode?: 'hover' | 'expandable' | 'popover';
+  explanationMode?: 'hover' | 'expandable' | 'popover' | 'mobile-friendly';
 }
 
 const TrendIndicator: React.FC<TrendIndicatorProps> = ({
@@ -34,10 +34,11 @@ const TrendIndicator: React.FC<TrendIndicatorProps> = ({
   showChart = true,
   showIcon = true,
   explanation,
-  explanationMode = 'hover'
+  explanationMode = 'mobile-friendly'
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
+  const [showMobileTooltip, setShowMobileTooltip] = useState(false);
 
   const trendColors = {
     up: '#10b981', // green-500
@@ -155,11 +156,26 @@ const TrendIndicator: React.FC<TrendIndicatorProps> = ({
       
       {percentage && (
         <span 
-          className="text-sm font-medium"
+          className={`text-sm font-medium ${
+            explanation && explanationMode === 'mobile-friendly' 
+              ? 'cursor-pointer touch-manipulation' 
+              : ''
+          }`}
           style={{ color: trendColor }}
+          onClick={explanationMode === 'mobile-friendly' ? () => setShowMobileTooltip(!showMobileTooltip) : undefined}
         >
           {percentage}
         </span>
+      )}
+
+      {explanation && explanationMode === 'mobile-friendly' && (
+        <button
+          onClick={() => setShowMobileTooltip(!showMobileTooltip)}
+          className="text-slate-400 hover:text-slate-300 transition-colors p-1 -m-1 touch-manipulation"
+          aria-label="Visa trendberäkning"
+        >
+          <Info className="w-3 h-3" />
+        </button>
       )}
 
       {explanation && explanationMode === 'expandable' && (
@@ -203,6 +219,36 @@ const TrendIndicator: React.FC<TrendIndicatorProps> = ({
       </AnimatePresence>
     </div>
   );
+
+  // Mobile-friendly approach: combines hover with click for better accessibility
+  if (explanationMode === 'mobile-friendly' && explanation) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className="group">
+          <TrendContent />
+          
+          {/* Hover tooltip for desktop */}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 hidden md:block">
+            {renderTooltipContent()}
+          </div>
+          
+          {/* Click tooltip for mobile */}
+          <AnimatePresence>
+            {showMobileTooltip && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 md:hidden"
+              >
+                {renderTooltipContent()}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   if (!explanation || explanationMode !== 'hover') {
     return (

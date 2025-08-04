@@ -26,7 +26,7 @@ interface EnhancedKpiCardProps {
   trendValue?: string;
   trendData?: TrendData[];
   trendExplanation?: TrendExplanation;
-  trendExplanationMode?: 'hover' | 'expandable' | 'popover';
+  trendExplanationMode?: 'hover' | 'expandable' | 'popover' | 'mobile-friendly';
   prefix?: string;
   suffix?: string;
   decimals?: number;
@@ -51,7 +51,7 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
   trendValue,
   trendData = [],
   trendExplanation,
-  trendExplanationMode = 'hover',
+  trendExplanationMode = 'mobile-friendly',
   prefix = '',
   suffix = '',
   decimals = 0,

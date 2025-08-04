@@ -330,7 +330,7 @@ export default function TechnicianDashboard() {
                 suffix: " kr"
               };
             })()}
-            trendExplanationMode="hover"
+            trendExplanationMode="mobile-friendly"
             customContent={
               <p className="text-green-300 text-xs">{data.stats.total_cases_ytd} ärenden</p>
             }
@@ -378,7 +378,7 @@ export default function TechnicianDashboard() {
                 suffix: " kr"
               };
             })()}
-            trendExplanationMode="hover"
+            trendExplanationMode="mobile-friendly"
             customContent={
               <p className="text-blue-300 text-xs">{data.stats.completed_cases_this_month} avslutade ärenden</p>
             }
@@ -428,7 +428,7 @@ export default function TechnicianDashboard() {
                 suffix: ' kr'
               };
             })()}
-            trendExplanationMode="hover"
+            trendExplanationMode="mobile-friendly"
             customContent={
               <p className="text-purple-300 text-xs">Genomsnittlig provision</p>
             }
