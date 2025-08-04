@@ -88,7 +88,10 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOp
     const [currentWorkTime, setCurrentWorkTime] = useState<number>(0);
     
     useEffect(() => {
+        console.log('Timer effect triggered:', { work_started_at, time_spent_minutes });
+        
         if (!work_started_at) {
+            console.log('No active timer, setting currentWorkTime to:', time_spent_minutes || 0);
             setCurrentWorkTime(time_spent_minutes || 0);
             return;
         }
@@ -97,7 +100,9 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOp
             const startTime = new Date(work_started_at).getTime();
             const now = Date.now();
             const sessionMinutes = (now - startTime) / (1000 * 60);
-            setCurrentWorkTime((time_spent_minutes || 0) + sessionMinutes);
+            const total = (time_spent_minutes || 0) + sessionMinutes;
+            console.log('Active timer update:', { sessionMinutes, time_spent_minutes, total });
+            setCurrentWorkTime(total);
         };
         
         updateTimer();
@@ -114,6 +119,16 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOp
         return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
     
+    // Debug logging
+    console.log('AgendaCaseItem render:', { 
+        title: title?.substring(0, 20), 
+        work_started_at, 
+        time_spent_minutes, 
+        currentWorkTime,
+        showActiveTimer: !!work_started_at,
+        showTotalTime: !work_started_at && currentWorkTime > 0
+    });
+
     return (
         <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.2 } }} className={`bg-slate-900 border ${colors.border} rounded-xl overflow-hidden shadow-lg hover:shadow-blue-500/10 transition-shadow`}><div className={`px-4 py-3 flex items-center justify-between border-b ${colors.border} ${colors.bg}`}><div className="flex items-center gap-3"><span className="font-mono text-base font-bold text-white tracking-wider">{timeSpan}</span>{work_started_at ? (<div className="flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-700/50 rounded-md"><Clock className="w-3 h-3 text-green-400" /><span className="font-mono text-xs text-green-300">Pågående: {formatWorkTime(currentWorkTime)}</span></div>) : currentWorkTime > 0 && (<div className="flex items-center gap-1 px-2 py-1 bg-slate-700/30 border border-slate-600/50 rounded-md"><Clock className="w-3 h-3 text-slate-400" /><span className="font-mono text-xs text-slate-300">Arbetat: {formatWorkTime(currentWorkTime)}</span></div>)}<span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${colors.border} bg-slate-950/50 ${colors.text}`}>{status}</span></div>{getCaseTypeIcon(case_type)}</div><div className="p-4 space-y-3"><h3 className="text-lg font-bold text-white leading-tight">{title}</h3><div className="text-sm space-y-2 text-slate-300"><div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-500" /><span>{kontaktperson || "Okänd kund"}</span>{secondary_assignee_name && (<span className="flex items-center gap-1.5 ml-auto text-xs bg-green-900/50 text-green-300 px-2 py-0.5 rounded-full"><Users className="w-3 h-3"/> Med: {secondary_assignee_name.split(' ')[0]}</span>)}</div>{fullAddress && (<div className="flex items-start gap-2"><MapPin className="w-4 h-4 text-slate-500 mt-0.5" /><span>{fullAddress}</span></div>)}{skadedjur && (<div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-slate-500" /><span><span className="font-medium text-slate-400">Ärende:</span> {skadedjur}</span></div>)}</div></div><div className="px-4 py-3 bg-slate-900/50 border-t border-slate-800/50 flex items-center justify-between"><div className="flex items-center gap-2">{telefon_kontaktperson && (<a href={`tel:${telefon_kontaktperson}`} onClick={e => e.stopPropagation()} className="p-2 bg-blue-500/10 text-blue-400 rounded-full hover:bg-blue-500/20"><Phone className="w-5 h-5" /></a>)}{fullAddress && (<button onClick={(e) => { e.stopPropagation(); openInMaps(adress); }} className="p-2 bg-green-500/10 text-green-400 rounded-full hover:bg-green-500/20"><Navigation className="w-5 h-5" /></button>)}</div><Button size="sm" variant="primary" onClick={() => onOpen(caseData)}>Öppna ärende <ChevronRight className="w-4 h-4 ml-1" /></Button></div></motion.div>
     );
