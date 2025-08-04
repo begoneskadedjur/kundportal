@@ -72,45 +72,110 @@ interface TaskDetails {
 export const useWorkReportGeneration = (caseData: TechnicianCase) => {
   const [isGenerating, setIsGenerating] = useState(false)
 
-  // Hämta ClickUp task details och customer info
-  const fetchReportData = async () => {
-    const clickupTaskId = caseData.clickup_task_id || caseData.id
-    
-    // Hämta task details från ClickUp
-    const taskResponse = await fetch(`/api/test-clickup?task_id=${clickupTaskId}`)
-    if (!taskResponse.ok) {
-      throw new Error('Kunde inte hämta ärendedetaljer från ClickUp')
+  // Skapa rapport-data från befintlig case-data (ingen ClickUp API-anrop)
+  const createReportData = async () => {
+    // Skapa TaskDetails från befintlig case-data
+    const taskDetails: TaskDetails = {
+      task_id: caseData.id,
+      task_info: {
+        name: caseData.title,
+        status: caseData.status,
+        description: caseData.description || '',
+        created: new Date(caseData.created_date).getTime().toString(),
+        updated: new Date().getTime().toString()
+      },
+      assignees: [],
+      custom_fields: [
+        // Rapport-fält
+        {
+          id: 'rapport',
+          name: 'rapport',
+          type: 'text',
+          value: caseData.rapport || '',
+          has_value: !!(caseData.rapport)
+        },
+        // Skadedjur-fält
+        {
+          id: 'skadedjur',
+          name: 'skadedjur',
+          type: 'text',
+          value: caseData.skadedjur || '',
+          has_value: !!(caseData.skadedjur)
+        },
+        // Adress-fält
+        {
+          id: 'adress',
+          name: 'adress',
+          type: 'text',
+          value: caseData.adress || '',
+          has_value: !!(caseData.adress)
+        },
+        // Pris-fält
+        {
+          id: 'pris',
+          name: 'pris',
+          type: 'number',
+          value: caseData.case_price || 0,
+          has_value: !!(caseData.case_price)
+        }
+      ]
     }
-    const taskDetails: TaskDetails = await taskResponse.json()
 
-    // Hämta customer information från databasen
-    let customerInfo: CustomerInfo | undefined
+    // Lägg till tekniker om tilldelad
+    if (caseData.primary_assignee_id && caseData.primary_assignee_name) {
+      // Hämta tekniker-email om vi behöver det
+      try {
+        const { data: technician } = await supabase
+          .from('technicians')
+          .select('email')
+          .eq('id', caseData.primary_assignee_id)
+          .single()
+
+        if (technician) {
+          taskDetails.assignees.push({
+            name: caseData.primary_assignee_name,
+            email: technician.email
+          })
+        }
+      } catch (error) {
+        // Fallback utan email
+        taskDetails.assignees.push({
+          name: caseData.primary_assignee_name,
+          email: ''
+        })
+      }
+    }
+
+    // Skapa customer info från case-data
+    let customerInfo: CustomerInfo
 
     if (caseData.case_type === 'business' && caseData.foretag) {
-      // För företagskunder, hämta från customers tabellen
-      const { data: customer, error } = await supabase
-        .from('customers')
-        .select('company_name, org_number, contact_person')
-        .eq('company_name', caseData.foretag)
-        .single()
+      // För företagskunder, försök hämta från customers tabellen först
+      try {
+        const { data: customer, error } = await supabase
+          .from('customers')
+          .select('company_name, org_number, contact_person')
+          .eq('company_name', caseData.foretag)
+          .single()
 
-      if (!error && customer) {
-        customerInfo = customer
+        if (!error && customer) {
+          customerInfo = customer
+        } else {
+          throw new Error('Customer not found')
+        }
+      } catch (error) {
+        // Fallback till case-data
+        customerInfo = {
+          company_name: caseData.foretag || 'Företag',
+          org_number: caseData.org_nr || '',
+          contact_person: caseData.kontaktperson || ''
+        }
       }
-    } else if (caseData.case_type === 'private') {
-      // För privatpersoner, skapa customer info från case data
+    } else {
+      // För privatpersoner eller fallback
       customerInfo = {
         company_name: caseData.kontaktperson || 'Privatperson',
-        org_number: caseData.personnummer || '',
-        contact_person: caseData.kontaktperson || ''
-      }
-    }
-
-    // Om vi inte har customer info från databasen, skapa från case data
-    if (!customerInfo) {
-      customerInfo = {
-        company_name: caseData.foretag || caseData.kontaktperson || 'Okänd kund',
-        org_number: caseData.org_nr || caseData.personnummer || '',
+        org_number: caseData.personnummer || caseData.org_nr || '',
         contact_person: caseData.kontaktperson || ''
       }
     }
@@ -123,7 +188,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     try {
       setIsGenerating(true)
       
-      const { taskDetails, customerInfo } = await fetchReportData()
+      const { taskDetails, customerInfo } = await createReportData()
       await generatePDFReport(taskDetails, customerInfo)
       
       toast.success('Rapport nedladdad!')
@@ -167,7 +232,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     try {
       setIsGenerating(true)
       
-      const { taskDetails, customerInfo } = await fetchReportData()
+      const { taskDetails, customerInfo } = await createReportData()
       
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
@@ -207,7 +272,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     try {
       setIsGenerating(true)
       
-      const { taskDetails, customerInfo } = await fetchReportData()
+      const { taskDetails, customerInfo } = await createReportData()
       
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
