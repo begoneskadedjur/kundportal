@@ -71,16 +71,11 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50 relative"
-          style={{ zIndex: 9999 }}
-        >
+        <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl pointer-events-none">
           <div className="text-white font-semibold">{data.name}</div>
           <div className="text-[#20c58f]">{formatCurrency(data.value)}</div>
           <div className="text-slate-400 text-sm">{data.percentage}% av total</div>
-        </motion.div>
+        </div>
       );
     }
     return null;
@@ -132,7 +127,12 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
               />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip 
+            content={<CustomTooltip />}
+            cursor={false}
+            wrapperStyle={{ outline: 'none' }}
+            allowEscapeViewBox={{ x: false, y: false }}
+          />
         </PieChart>
       </ResponsiveContainer>
 

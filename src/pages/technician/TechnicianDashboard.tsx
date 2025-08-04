@@ -315,8 +315,29 @@ export default function TechnicianDashboard() {
             prefix=""
             suffix=" kr"
             decimals={0}
-            trend="neutral"
-            trendValue="→"
+            trend={(() => {
+              // Calculate trend based on current vs last month average
+              const currentMonth = data.monthly_data.find(m => m.month === new Date().toISOString().slice(0, 7));
+              const lastMonth = data.monthly_data.length > 1 ? data.monthly_data[1] : null;
+              
+              if (!currentMonth || !lastMonth || lastMonth.avg_commission_per_case === 0) {
+                return "neutral";
+              }
+              
+              return currentMonth.avg_commission_per_case > lastMonth.avg_commission_per_case ? "up" : "down";
+            })()}
+            trendValue={(() => {
+              // Calculate percentage change
+              const currentMonth = data.monthly_data.find(m => m.month === new Date().toISOString().slice(0, 7));
+              const lastMonth = data.monthly_data.length > 1 ? data.monthly_data[1] : null;
+              
+              if (!currentMonth || !lastMonth || lastMonth.avg_commission_per_case === 0) {
+                return "→";
+              }
+              
+              const change = ((currentMonth.avg_commission_per_case - lastMonth.avg_commission_per_case) / lastMonth.avg_commission_per_case) * 100;
+              return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+            })()}
             customContent={
               <p className="text-purple-300 text-xs">Genomsnittlig provision</p>
             }
