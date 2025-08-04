@@ -226,22 +226,45 @@ async function generatePDFReportBuffer(
     const rightCol = margins.left + (contentWidth/2) + spacing.sm
     let cardY = yPosition + spacing.md
 
-    pdf.setTextColor(...beGoneColors.darkGray)
+    // Använd säkrare färger för email-kompatibilitet
+    pdf.setTextColor(100, 100, 100) // Grå för labels
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    
+    pdf.text('UPPDRAGSGIVARE', leftCol, cardY)
+    pdf.text('KONTAKTPERSON', rightCol, cardY)
+    
+    // Mörk text för värden
+    pdf.setTextColor(20, 20, 20) // Nästan svart för bästa kontrast
     pdf.setFontSize(typography.body.size)
     pdf.setFont(undefined, 'normal')
     
-    pdf.text('UPPDRAGSGIVARE:', leftCol, cardY)
-    pdf.text(customerInfo.company_name, leftCol, cardY + spacing.sm)
-    
-    pdf.text('ÄRENDE ID:', rightCol, cardY)
-    pdf.text(taskDetails.task_id, rightCol, cardY + spacing.sm)
+    pdf.text(customerInfo.company_name || '[Företagsnamn saknas]', leftCol, cardY + spacing.sm)
+    pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
     
     cardY += spacing.lg
-    pdf.text('KONTAKTPERSON:', leftCol, cardY)
-    pdf.text(customerInfo.contact_person, leftCol, cardY + spacing.sm)
     
-    pdf.text('ORG.NUMMER:', rightCol, cardY)
-    pdf.text(customerInfo.org_number, rightCol, cardY + spacing.sm)
+    // Labels för rad 2
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    
+    pdf.text('ÄRENDE ID', leftCol, cardY)
+    
+    // Dynamisk text baserat på om det är företag eller privatperson
+    const orgNumber = customerInfo.org_number || ''
+    const isCompany = orgNumber.length > 10 || orgNumber.includes('-')
+    const identityLabel = isCompany ? 'ORG NR' : 'PERSONNUMMER'
+    
+    pdf.text(identityLabel, rightCol, cardY)
+    
+    // Värden för rad 2
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    pdf.text(taskDetails.task_id, leftCol, cardY + spacing.sm)
+    pdf.text(orgNumber || (isCompany ? '[Org.nr saknas]' : '[Personnummer saknas]'), rightCol, cardY + spacing.sm)
 
     yPosition += customerCardHeight + spacing.section
 
@@ -254,26 +277,58 @@ async function generatePDFReportBuffer(
     
     cardY = yPosition + spacing.md
     
-    pdf.text('FÖRETAG:', leftCol, cardY)
-    pdf.text('BeGone Skadedjur & Sanering AB', leftCol, cardY + spacing.sm)
+    // Använd säkrare färger för email-kompatibilitet
+    pdf.setTextColor(100, 100, 100) // Grå för labels
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
     
-    pdf.text('ORG.NUMMER:', rightCol, cardY)
+    pdf.text('FÖRETAG', leftCol, cardY)
+    pdf.text('ORG.NUMMER', rightCol, cardY)
+    
+    // Mörk text för värden
+    pdf.setTextColor(20, 20, 20) // Nästan svart för bästa kontrast
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    pdf.text('BeGone Skadedjur & Sanering AB', leftCol, cardY + spacing.sm)
     pdf.text('559378-9208', rightCol, cardY + spacing.sm)
     
     cardY += spacing.lg
-    pdf.text('ADRESS:', leftCol, cardY)
-    pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
     
-    pdf.text('KONTAKT:', rightCol, cardY)
-    pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
+    // Labels igen
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    
+    pdf.text('BESÖKSADRESS', leftCol, cardY)
+    pdf.text('KONTAKT', rightCol, cardY)
+    
+    // Värden
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
+    pdf.text('010 280 44 10 • info@begone.se', rightCol, cardY + spacing.sm)
 
     // Ansvarig tekniker
     if (hasAssignee) {
       cardY += spacing.lg
-      pdf.text('ANSVARIG TEKNIKER:', leftCol, cardY)
-      pdf.text(taskDetails.assignees[0].name, leftCol, cardY + spacing.sm)
       
-      pdf.text('EMAIL:', rightCol, cardY)
+      // Labels för tekniker
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(8)
+      pdf.setFont(undefined, 'bold')
+      
+      pdf.text('ANSVARIG TEKNIKER', leftCol, cardY)
+      pdf.text('TEKNIKER KONTAKT', rightCol, cardY)
+      
+      // Tekniker värden
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'normal')
+      
+      pdf.text(taskDetails.assignees[0].name, leftCol, cardY + spacing.sm)
       pdf.text(taskDetails.assignees[0].email, rightCol, cardY + spacing.sm)
     }
 
@@ -287,19 +342,43 @@ async function generatePDFReportBuffer(
     
     cardY = yPosition + spacing.md
     
-    pdf.text('ÄRENDETITEL:', leftCol, cardY)
-    pdf.text(taskDetails.task_info.name, leftCol, cardY + spacing.sm)
+    // Labels för arbetsinformation
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
     
-    pdf.text('STATUS:', rightCol, cardY)
+    pdf.text('ÄRENDETITEL', leftCol, cardY)
+    pdf.text('STATUS', rightCol, cardY)
+    
+    // Värden för arbetsinformation
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    pdf.text(taskDetails.task_info.name, leftCol, cardY + spacing.sm)
     pdf.text(taskDetails.task_info.status, rightCol, cardY + spacing.sm)
     
     cardY += spacing.lg
+    
+    // Labels för rad 2
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    
+    pdf.text('DATUM FÖR UTFÖRANDE', leftCol, cardY)
+    if (taskDetails.task_info.description) {
+      pdf.text('BESKRIVNING', rightCol, cardY)
+    }
+    
+    // Värden för rad 2
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
     const createdDate = new Date(parseInt(taskDetails.task_info.created)).toLocaleDateString('sv-SE')
-    pdf.text('SKAPAD:', leftCol, cardY)
     pdf.text(createdDate, leftCol, cardY + spacing.sm)
 
     if (taskDetails.task_info.description) {
-      pdf.text('BESKRIVNING:', rightCol, cardY)
       const descLines = pdf.splitTextToSize(taskDetails.task_info.description, (contentWidth/2) - spacing.lg)
       pdf.text(descLines.slice(0, 2), rightCol, cardY + spacing.sm)
     }
@@ -329,7 +408,7 @@ async function generatePDFReportBuffer(
       
       pdf.setFontSize(typography.body.size)
       pdf.setFont(undefined, 'normal')
-      pdf.setTextColor(...beGoneColors.darkGray)
+      pdf.setTextColor(20, 20, 20) // Säker mörk färg för email
       
       let textY = yPosition + reportPadding
       textLines.forEach((line: string) => {
@@ -344,18 +423,37 @@ async function generatePDFReportBuffer(
       yPosition += reportBoxHeight + spacing.section
     }
 
-    // Footer
+    // Footer - bara på sista sidan med säkra färger
+    const pageCount = pdf.internal.getNumberOfPages()
     const currentDate = new Date().toLocaleDateString('sv-SE', {
       year: 'numeric', month: '2-digit', day: '2-digit'
     })
     
-    pdf.setTextColor(...beGoneColors.darkGray)
+    // Footer bara på sista sidan
+    pdf.setPage(pageCount)
+    
+    // Footer separator
+    pdf.setDrawColor(200, 200, 200)
+    pdf.setLineWidth(0.8)
+    pdf.line(margins.left, pageHeight - 28, pageWidth - margins.right, pageHeight - 28)
+    
+    // Footer content med säkra färger
+    pdf.setTextColor(100, 100, 100) // Grå text för bättre email-kompatibilitet
     pdf.setFontSize(typography.caption.size)
     pdf.setFont(undefined, 'normal')
     
-    const footerY = pageHeight - 20
-    pdf.text('BeGone Skadedjur & Sanering AB', margins.left, footerY)
-    pdf.text(currentDate, pageWidth - margins.right, footerY, { align: 'right' })
+    // Vänster sida: Företagsinfo
+    pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
+    pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
+    
+    // Mitten: Kontaktinfo
+    const centerX = pageWidth / 2
+    pdf.text('010 280 44 10', centerX, pageHeight - 18, { align: 'center' })
+    pdf.text('info@begone.se', centerX, pageHeight - 12, { align: 'center' })
+    
+    // Höger sida: Datum och sidnummer
+    pdf.text(`Genererad: ${currentDate}`, pageWidth - margins.right, pageHeight - 18, { align: 'right' })
+    pdf.text(`Sida ${pageCount} av ${pageCount}`, pageWidth - margins.right, pageHeight - 12, { align: 'right' })
 
     // Konvertera PDF till buffer
     const pdfArrayBuffer = pdf.output('arraybuffer')
