@@ -44,6 +44,17 @@ interface CustomerInfo {
   contact_person: string;
 }
 
+// Optimerad hjälpfunktion för textbredd-beräkning som kompenserar för jsPDF:s konservativa mätningar
+const calculateOptimalTextWidth = (pdf: any, availableWidth: number, fontSize: number): number => {
+  // Basera kompensationsfaktorn på fontstorlek för bättre precision
+  const compensationFactor = fontSize <= 10 ? 1.15 : fontSize <= 12 ? 1.12 : 1.10
+  
+  // Justera för svenska tecken som kan vara bredare
+  const swedishCharBonus = 1.02
+  
+  return availableWidth * compensationFactor * swedishCharBonus
+}
+
 // Hjälpfunktion för att formatera adresser till snyggt format
 const formatAddress = (addressValue: any): string => {
   if (!addressValue) return '[Adress ej angiven]'
@@ -528,18 +539,28 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      // Använd contentWidth för box men maximal textbredd inom boxen
-      const maxTextWidth = contentWidth - 10 // Bara 5px marginal på varje sida inom boxen
-      const textLines = pdf.splitTextToSize(reportText, maxTextWidth)
-      const lineHeight = 5.5
-      const reportPadding = 5 // Minimal padding för maximal textbredd inom box
+      
+      // OPTIMERAD TEXTBREDD-UTNYTTJANDE:
+      // Problem: jsPDF.splitTextToSize() beräknar konservativt och underutnyttjar tillgänglig bredd
+      // Lösning: Kompensera med matematisk justering baserad på fontstorlek och svenska tecken
+      const reportPadding = 8 // Balanserad padding för läsbarhet vs maximal textbredd
+      const effectiveTextWidth = contentWidth - (reportPadding * 2) // Fullt utnyttjande av contentWidth
+      
+      // Sätt font först för korrekta mätningar
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, typography.body.weight)
+      
+      // Använd optimerad textbredd-beräkning
+      const adjustedTextWidth = calculateOptimalTextWidth(pdf, effectiveTextWidth, typography.body.size)
+      const textLines = pdf.splitTextToSize(reportText, adjustedTextWidth)
+      const lineHeight = 5.8 // Något ökat radavstånd för bättre läsbarhet
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
       // Rita card med samma bredd som andra sektioner
+      // Rita card med samma bredd som andra sektioner
       drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
       
-      pdf.setFontSize(typography.body.size)
-      pdf.setFont(undefined, 'normal')
+      // Rapport innehåll med professionell formatering (font redan satt)
       pdf.setTextColor(20, 20, 20) // Säker mörk färg för email
       
       let textY = yPosition + reportPadding
@@ -548,7 +569,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, margins.left + 5, textY) // Text 5px från boxens vänsterkant
+        pdf.text(line, margins.left + reportPadding, textY) // Text med korrekt padding från boxkant
         textY += lineHeight
       })
       
