@@ -14,7 +14,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction'
 import svLocale from '@fullcalendar/core/locales/sv'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X, BarChart, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Users, Clock, AlertCircle, Navigation, Search, Filter, X, BarChart, RefreshCw } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
@@ -137,7 +137,6 @@ export default function TechnicianSchedule() {
   const [mobileView, setMobileView] = useState<'agenda' | 'month'>('agenda');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [showAllCasesForDay, setShowAllCasesForDay] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
@@ -179,20 +178,11 @@ export default function TechnicianSchedule() {
   const filteredCases = useMemo(() => cases.filter(c => { const matchesStatus = activeStatuses.has(c.status); const query = searchQuery.toLowerCase(); const matchesSearch = !query || c.title.toLowerCase().includes(query) || (c.kontaktperson && c.kontaktperson.toLowerCase().includes(query)) || formatAddress(c.adress).toLowerCase().includes(query); return matchesStatus && matchesSearch; }), [cases, activeStatuses, searchQuery]);
   
   const casesForSelectedDay = useMemo(() => {
-    const casesForDay = cases.filter(c => c.start_date && c.start_date.startsWith(selectedDate));
-    
-    if (showAllCasesForDay) {
-      // Visa alla ärenden för dagen (ignorera status-filter)
-      const query = searchQuery.toLowerCase();
-      return casesForDay.filter(c => {
-        const matchesSearch = !query || c.title.toLowerCase().includes(query) || (c.kontaktperson && c.kontaktperson.toLowerCase().includes(query)) || formatAddress(c.adress).toLowerCase().includes(query);
-        return matchesSearch;
-      }).sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
-    } else {
-      // Använd vanlig filtrering (bara pågående ärenden)
-      return filteredCases.filter(c => c.start_date && c.start_date.startsWith(selectedDate)).sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
-    }
-  }, [cases, filteredCases, selectedDate, showAllCasesForDay, searchQuery]);
+    // Använd alltid filteredCases som redan respekterar activeStatuses
+    return filteredCases
+      .filter(c => c.start_date && c.start_date.startsWith(selectedDate))
+      .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
+  }, [filteredCases, selectedDate]);
   
   const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.split('T')[0]; if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
 
@@ -288,23 +278,6 @@ export default function TechnicianSchedule() {
                   <header className="flex items-center justify-between mb-4">
                     <div className="flex-1">
                       <h2 className="text-xl font-bold">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-                      <div className="flex items-center gap-2 mt-1">
-                        <button
-                          onClick={() => setShowAllCasesForDay(!showAllCasesForDay)}
-                          className="flex items-center gap-2 px-3 py-1 text-xs bg-slate-800/50 border border-slate-600 rounded-full transition-all duration-200 hover:bg-slate-700/50 min-h-[44px] sm:min-h-auto"
-                          style={{ minHeight: '44px' }}
-                        >
-                          {showAllCasesForDay ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                          <span className="text-slate-300">
-                            {showAllCasesForDay ? 'Bara pågående' : 'Visa alla ärenden'}
-                          </span>
-                        </button>
-                        {showAllCasesForDay && (
-                          <span className="text-xs text-slate-500 px-2 py-1 bg-slate-800/30 rounded-full">
-                            Inkl. avslutade
-                          </span>
-                        )}
-                      </div>
                     </div>
                     <div className="flex items-center gap-1"><Button variant="secondary" size="icon" onClick={() => handleDayChange(-1)}><ChevronLeft className="w-5 h-5"/></Button><Button variant="secondary" size="sm" onClick={() => setSelectedDate(toDateString(new Date()))}>Idag</Button><Button variant="secondary" size="icon" onClick={() => handleDayChange(1)}><ChevronRight className="w-5 h-5"/></Button></div>
                   </header>
