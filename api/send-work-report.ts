@@ -958,23 +958,23 @@ function getTechnicianEmailTemplate(
               <div style="background-color: white; padding: 20px; border-radius: 6px; border: 1px solid #e2e8f0;">
                 <div style="display: grid; gap: 12px;">
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Ärende:</span>
+                    <span style="font-weight: 500; color: #64748b;">Ärende: </span>
                     <span style="color: #1e293b; text-align: right; max-width: 300px;">${taskDetails.task_info.name}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Ärende ID:</span>
+                    <span style="font-weight: 500; color: #64748b;">Ärende ID: </span>
                     <span style="color: #1e293b; font-family: monospace;">${taskDetails.task_id}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Kund:</span>
+                    <span style="font-weight: 500; color: #64748b;">Kund: </span>
                     <span style="color: #1e293b; text-align: right; max-width: 300px;">${customerInfo.company_name}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Kontaktperson:</span>
+                    <span style="font-weight: 500; color: #64748b;">Kontaktperson: </span>
                     <span style="color: #1e293b; text-align: right; max-width: 300px;">${customerInfo.contact_person}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                    <span style="font-weight: 500; color: #64748b;">Status:</span>
+                    <span style="font-weight: 500; color: #64748b;">Status: </span>
                     <span style="color: #20c58f; font-weight: 500;">${taskDetails.task_info.status}</span>
                   </div>
                 </div>
@@ -1046,7 +1046,7 @@ function getContactEmailTemplate(
             <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Bästa ${contactName},</h2>
             
             <p style="margin: 0 0 24px 0; color: #475569; font-size: 16px;">
-              Vi bekräftar härmed att BeGone Skadedjur & Sanering AB har slutfört professionell sanering enligt uppdrag för <strong>${customerInfo.company_name}</strong>. 
+              Vi bekräftar härmed att BeGone Skadedjur & Sanering AB har slutfört ärendet för <strong>${customerInfo.company_name}</strong>. 
               Bifogad saneringsrapport utgör fullständig dokumentation av det utförda arbetet.
             </p>
 
@@ -1060,23 +1060,23 @@ function getContactEmailTemplate(
               <div style="background-color: white; padding: 20px; border-radius: 6px; border: 1px solid #e2e8f0;">
                 <div style="display: grid; gap: 12px;">
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Ärende:</span>
+                    <span style="font-weight: 500; color: #64748b;">Ärende: </span>
                     <span style="color: #1e293b; text-align: right; max-width: 350px;">${taskDetails.task_info.name}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Referensnummer:</span>
+                    <span style="font-weight: 500; color: #64748b;">Referensnummer: </span>
                     <span style="color: #1e293b; font-family: monospace; font-size: 14px;">${taskDetails.task_id}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Kund:</span>
+                    <span style="font-weight: 500; color: #64748b;">Kund: </span>
                     <span style="color: #1e293b; text-align: right; max-width: 350px;">${customerInfo.company_name}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                    <span style="font-weight: 500; color: #64748b;">Organisationsnummer:</span>
+                    <span style="font-weight: 500; color: #64748b;">${taskDetails.custom_fields.find(f => f.name.toLowerCase() === 'case_type')?.value === 'private' ? 'Personnummer: ' : 'Organisationsnummer: '}</span>
                     <span style="color: #1e293b; font-family: monospace;">${customerInfo.org_number}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                    <span style="font-weight: 500; color: #64748b;">Status:</span>
+                    <span style="font-weight: 500; color: #64748b;">Status: </span>
                     <span style="color: #20c58f; font-weight: 500;">${taskDetails.task_info.status}</span>
                   </div>
                 </div>
@@ -1089,15 +1089,15 @@ function getContactEmailTemplate(
               <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Ansvarig tekniker</h3>
               <div style="display: grid; gap: 12px;">
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                  <span style="font-weight: 500; color: #64748b;">Tekniker:</span>
+                  <span style="font-weight: 500; color: #64748b;">Tekniker: </span>
                   <span style="color: #1e293b; font-weight: 500;">${assignedTechnician.name}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                  <span style="font-weight: 500; color: #64748b;">Certifiering:</span>
+                  <span style="font-weight: 500; color: #64748b;">Certifiering: </span>
                   <span style="color: #1e293b;">Auktoriserad skadedjurstekniker</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                  <span style="font-weight: 500; color: #64748b;">Kontakt:</span>
+                  <span style="font-weight: 500; color: #64748b;">Kontakt: </span>
                   <a href="mailto:${assignedTechnician.email}" style="color: #20c58f; text-decoration: none; font-weight: 500;">${assignedTechnician.email}</a>
                 </div>
               </div>
