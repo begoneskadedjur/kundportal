@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calendar, DollarSign, FileText } from 'lucide-react';
+import { ArrowRight, Calendar, FileText } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 interface MonthData {
@@ -72,7 +72,6 @@ const MonthlyOverviewList: React.FC<MonthlyOverviewListProps> = ({
               
               <div className="flex items-center gap-4 text-slate-400 text-xs">
                 <span className="flex items-center gap-1 text-green-400 font-medium">
-                  <DollarSign className="w-3 h-3" />
                   {formatCurrency(month.total_commission)}
                 </span>
                 

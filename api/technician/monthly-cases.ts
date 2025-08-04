@@ -1,12 +1,17 @@
 // API endpoint to get all cases with commission for technician for specific month
-import { createClient } from '@supabase/supabase-js';
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 
-export default async function handler(req, res) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -22,7 +27,7 @@ export default async function handler(req, res) {
 
     // Validate month format (YYYY-MM)
     const monthRegex = /^\d{4}-\d{2}$/;
-    if (!monthRegex.test(month)) {
+    if (!monthRegex.test(month as string)) {
       return res.status(400).json({ 
         error: 'Invalid month format. Use YYYY-MM format' 
       });
@@ -100,7 +105,7 @@ export default async function handler(req, res) {
     ];
 
     // Sort by completed_date descending
-    allCases.sort((a, b) => new Date(b.completed_date) - new Date(a.completed_date));
+    allCases.sort((a, b) => new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime());
 
     // Calculate summary stats
     const totalCommission = allCases.reduce((sum, case_) => sum + (case_.commission_amount || 0), 0);
@@ -129,7 +134,7 @@ export default async function handler(req, res) {
     console.error('Error in monthly-cases API:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }
