@@ -559,13 +559,13 @@ async function generatePDFReportBuffer(
     cardY = yPosition + spacing.md
 
     // Hämta relevanta fält
-    const addressField = taskDetails.custom_fields.find(f => 
+    const workAddressField = taskDetails.custom_fields.find(f => 
       f.name.toLowerCase() === 'adress' && f.has_value
     )
     const pestField = taskDetails.custom_fields.find(f => 
       f.name.toLowerCase() === 'skadedjur' && f.has_value
     )
-    const caseTypeField = taskDetails.custom_fields.find(f => 
+    const workCaseTypeField = taskDetails.custom_fields.find(f => 
       f.name.toLowerCase() === 'ärende' && f.has_value
     )
     const startDateField = taskDetails.custom_fields.find(f => 
@@ -610,7 +610,7 @@ async function generatePDFReportBuffer(
     pdf.text(workDate, leftCol, cardY + spacing.sm)
     
     // Använd formatAddress för konsistent adresshantering
-    const addressText = addressField ? formatAddress(addressField.value) : '[Adress ej angiven]'
+    const addressText = workAddressField ? formatAddress(workAddressField.value) : '[Adress ej angiven]'
     
     const maxAddressWidth = (contentWidth/2) - spacing.lg
     const addressLines = pdf.splitTextToSize(addressText, maxAddressWidth)
@@ -622,7 +622,7 @@ async function generatePDFReportBuffer(
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
     pdf.text('ÄRENDET AVSER', leftCol, cardY)
-    if (caseTypeField) {
+    if (workCaseTypeField) {
       pdf.text('TYP AV INSATS', rightCol, cardY)
     }
     
@@ -646,8 +646,8 @@ async function generatePDFReportBuffer(
     }
     
     pdf.text(pestField ? getDropdownText(pestField) : 'Ej specificerat', leftCol, cardY + spacing.sm)
-    if (caseTypeField) {
-      pdf.text(getDropdownText(caseTypeField), rightCol, cardY + spacing.sm)
+    if (workCaseTypeField) {
+      pdf.text(getDropdownText(workCaseTypeField), rightCol, cardY + spacing.sm)
     }
 
     // Rad 3: Status och prioritet  
