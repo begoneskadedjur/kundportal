@@ -30,6 +30,7 @@ interface TechnicianCase {
   tertiary_assignee_id?: string | null;
   tertiary_assignee_name?: string | null;
   created_date: string;
+  start_date?: string;
   rapport?: string;
 }
 
@@ -117,6 +118,14 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           type: 'number',
           value: caseData.case_price || 0,
           has_value: !!(caseData.case_price)
+        },
+        // Start datum-fält
+        {
+          id: 'start_date',
+          name: 'start_date',
+          type: 'date',
+          value: caseData.start_date || '',
+          has_value: !!(caseData.start_date)
         }
       ]
     }

@@ -152,11 +152,11 @@ const drawProfessionalCard = (
   pdf.roundedRect(x, y, width, height, radius, radius, 'S')
 }
 
-// Professional header med BeGone branding
+// Professional header med BeGone branding - fullbredd
 const drawProfessionalHeader = (pdf: jsPDF, pageWidth: number, reportType: string = 'SANERINGSRAPPORT') => {
-  const headerHeight = 60
+  const headerHeight = 80 // Öka för fullbredd-layout
   
-  // Gradient background effect simulering med multiple rektanglar
+  // Gradient background effect simulering med multiple rektanglar - fullbredd
   const gradientSteps = 5
   for (let i = 0; i < gradientSteps; i++) {
     const alpha = 1 - (i * 0.1)
@@ -166,9 +166,9 @@ const drawProfessionalHeader = (pdf: jsPDF, pageWidth: number, reportType: strin
     pdf.rect(0, i * stepHeight, pageWidth, stepHeight, 'F')
   }
   
-  // Accent line för visuell separation
+  // Accent line för visuell separation - fullbredd
   pdf.setFillColor(...beGoneColors.accent)
-  pdf.rect(0, headerHeight - 3, pageWidth, 3, 'F')
+  pdf.rect(0, headerHeight - 4, pageWidth, 4, 'F')
 }
 
 // Förbättrad section header funktion
@@ -214,7 +214,7 @@ export const generatePDFReport = async (
     const pageHeight = pdf.internal.pageSize.height
     const margins = { left: spacing.lg, right: spacing.lg, top: spacing.xl, bottom: spacing.xl }
     const contentWidth = pageWidth - (margins.left + margins.right)
-    let yPosition = 70
+    let yPosition = 90 // Öka för större header
 
     // Hämta alla relevanta custom fields för saneringsrapport
     const addressField = getFieldValue(taskDetails, 'adress')
@@ -225,6 +225,7 @@ export const generatePDFReport = async (
     const priorityField = getFieldValue(taskDetails, 'prioritet')
     const treatmentMethodField = getFieldValue(taskDetails, 'behandlingsmetod')
     const followUpField = getFieldValue(taskDetails, 'uppföljning')
+    const startDateField = getFieldValue(taskDetails, 'start_date')
 
     // === PROFESSIONAL HEADER MED SANERINGSRAPPORT TITEL ===
     drawProfessionalHeader(pdf, pageWidth, 'SANERINGSRAPPORT')
@@ -248,16 +249,13 @@ export const generatePDFReport = async (
             
             const dataURL = canvas.toDataURL('image/png')
             
-            // Optimal storlek för professional header
-            const maxHeaderHeight = 28
+            // Fullbredd header-bild
+            const headerImageHeight = 60 // Nästan full header höjd
             const aspectRatio = img.width / img.height
-            const headerWidth = maxHeaderHeight * aspectRatio
+            const headerImageWidth = pageWidth // Full bredd
             
-            // Positionera logotype i header
-            const centerX = (pageWidth - headerWidth) / 2
-            const centerY = spacing.md
-            
-            pdf.addImage(dataURL, 'PNG', centerX, centerY, headerWidth, maxHeaderHeight)
+            // Positionera logotype från kant till kant
+            pdf.addImage(dataURL, 'PNG', 0, 10, headerImageWidth, headerImageHeight)
             headerSuccessful = true
             resolve(true)
           } catch (error) {
@@ -345,28 +343,41 @@ export const generatePDFReport = async (
     pdf.text(customerInfo?.company_name || '[Företagsnamn saknas]', leftCol, cardY + spacing.sm)
     pdf.text(customerInfo?.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
 
-    // Row 2: Ärende ID och org nummer
+    // Row 2: Ärende ID och identifieringsnummer (org nr eller personnummer)
     cardY += spacing.lg
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
     pdf.text('ÄRENDE ID', leftCol, cardY)
-    pdf.text('ORGANISATIONSNUMMER', rightCol, cardY)
+    
+    // Dynamisk text beroende på kundtyp - kolla om org_number ser ut som org nr eller personnummer
+    const orgNumber = customerInfo?.org_number || ''
+    const isCompany = orgNumber.length > 10 || orgNumber.includes('-') // Org nr format: XXXXXX-XXXX
+    const identityLabel = isCompany ? 'ORG NR' : 'PERSONNUMMER'
+    const identityValue = orgNumber || (isCompany ? '[Org.nr saknas]' : '[Personnummer saknas]')
+    
+    pdf.text(identityLabel, rightCol, cardY)
     
     pdf.setFont(undefined, typography.body.weight)
     pdf.setTextColor(...beGoneColors.darkGray)
     pdf.setFontSize(typography.body.size)
     pdf.text(taskDetails.task_id, leftCol, cardY + spacing.sm)
-    pdf.text(customerInfo?.org_number || '[Org.nr saknas]', rightCol, cardY + spacing.sm)
+    pdf.text(identityValue, rightCol, cardY + spacing.sm)
 
     yPosition += customerCardHeight + spacing.section
 
     // === LEVERANTÖRSUPPGIFTER SEKTION ===
-    yPosition = drawSectionHeader(pdf, 'LEVERANTÖRSUPPGIFTER', margins.left, yPosition, contentWidth, 'primary')
-
-    // Dynamisk höjd baserat på om tekniker finns
+    // Kontrollera om vi behöver sidbrytning för hela leverantörssektionen
     const hasAssignee = taskDetails.assignees.length > 0
     const supplierCardHeight = hasAssignee ? 75 : 55
+    const supplierSectionHeight = 22 + spacing.sm + supplierCardHeight // Section header + card
+    
+    if (yPosition + supplierSectionHeight > pageHeight - 40) {
+      pdf.addPage()
+      yPosition = spacing.xl
+    }
+    
+    yPosition = drawSectionHeader(pdf, 'LEVERANTÖRSUPPGIFTER', margins.left, yPosition, contentWidth, 'primary')
     
     drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, supplierCardHeight, {
       backgroundColor: 'white',
@@ -448,17 +459,40 @@ export const generatePDFReport = async (
     pdf.setTextColor(...beGoneColors.darkGray)
     pdf.setFontSize(typography.body.size)
     
-    const workDate = formatDate(taskDetails.task_info.created)
+    // Använd start_date om tillgängligt, annars created datum
+    let workDate = 'Ej angivet'
+    if (startDateField && startDateField.value) {
+      const startDate = new Date(startDateField.value)
+      if (!isNaN(startDate.getTime())) {
+        workDate = startDate.toLocaleDateString('sv-SE', {
+          year: 'numeric',
+          month: '2-digit', 
+          day: '2-digit'
+        })
+      }
+    } else {
+      workDate = formatDate(taskDetails.task_info.created)
+    }
     pdf.text(workDate, leftCol, cardY + spacing.sm)
     
-    if (addressField) {
-      const addressText = addressField.value.formatted_address
-      const maxAddressWidth = (contentWidth/2) - spacing.lg
-      const addressLines = pdf.splitTextToSize(addressText, maxAddressWidth)
-      pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
-    } else {
-      pdf.text('[Adress ej angiven]', rightCol, cardY + spacing.sm)
+    // Hantera adress från database (kan vara JSONB eller string)
+    let addressText = '[Adress ej angiven]'
+    if (addressField && addressField.value) {
+      if (typeof addressField.value === 'object' && addressField.value.formatted_address) {
+        // JSONB format med formatted_address
+        addressText = addressField.value.formatted_address
+      } else if (typeof addressField.value === 'string') {
+        // String format
+        addressText = addressField.value
+      } else if (addressField.value.toString) {
+        // Fallback till string
+        addressText = addressField.value.toString()
+      }
     }
+    
+    const maxAddressWidth = (contentWidth/2) - spacing.lg
+    const addressLines = pdf.splitTextToSize(addressText, maxAddressWidth)
+    pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
 
     // Rad 2: Skadedjur och ärendetyp
     cardY += spacing.lg
@@ -500,11 +534,9 @@ export const generatePDFReport = async (
 
     // === DETALJERAD SANERINGSRAPPORT SEKTION ===
     if (reportField && reportField.value) {
-      // Sidbrytning om nödvändigt för rapport
-      if (yPosition > pageHeight - 100) {
-        pdf.addPage()
-        yPosition = spacing.xl
-      }
+      // Alltid ny sida för detaljerad rapport
+      pdf.addPage()
+      yPosition = spacing.xl
 
       yPosition = drawSectionHeader(pdf, 'DETALJERAD SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'accent')
       
@@ -641,7 +673,7 @@ export const generatePDFReport = async (
       yPosition += costCardHeight + spacing.section
     }
 
-    // === PROFESSIONAL FOOTER ===
+    // === PROFESSIONAL FOOTER - endast på sista sidan ===
     const pageCount = pdf.internal.getNumberOfPages()
     const currentDate = new Date().toLocaleDateString('sv-SE', {
       year: 'numeric',
@@ -649,32 +681,31 @@ export const generatePDFReport = async (
       day: '2-digit'
     })
     
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i)
-      
-      // Professional footer separator
-      pdf.setDrawColor(...beGoneColors.divider)
-      pdf.setLineWidth(0.8)
-      pdf.line(margins.left, pageHeight - 28, pageWidth - margins.right, pageHeight - 28)
-      
-      // Footer content med BeGone branding
-      pdf.setTextColor(...beGoneColors.mediumGray)
-      pdf.setFontSize(typography.caption.size)
-      pdf.setFont(undefined, 'normal')
-      
-      // Vänster sida: Företagsinfo
-      pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
-      pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
-      
-      // Mitten: Kontaktinfo
-      const centerX = pageWidth / 2
-      pdf.text('010 280 44 10', centerX, pageHeight - 18, { align: 'center' })
-      pdf.text('info@begone.se', centerX, pageHeight - 12, { align: 'center' })
-      
-      // Höger sida: Datum och sidnummer
-      pdf.text(`Genererad: ${currentDate}`, pageWidth - margins.right, pageHeight - 18, { align: 'right' })
-      pdf.text(`Sida ${i} av ${pageCount}`, pageWidth - margins.right, pageHeight - 12, { align: 'right' })
-    }
+    // Footer bara på sista sidan
+    pdf.setPage(pageCount)
+    
+    // Professional footer separator
+    pdf.setDrawColor(...beGoneColors.divider)
+    pdf.setLineWidth(0.8)
+    pdf.line(margins.left, pageHeight - 28, pageWidth - margins.right, pageHeight - 28)
+    
+    // Footer content med BeGone branding
+    pdf.setTextColor(...beGoneColors.mediumGray)
+    pdf.setFontSize(typography.caption.size)
+    pdf.setFont(undefined, 'normal')
+    
+    // Vänster sida: Företagsinfo
+    pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
+    pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
+    
+    // Mitten: Kontaktinfo
+    const centerX = pageWidth / 2
+    pdf.text('010 280 44 10', centerX, pageHeight - 18, { align: 'center' })
+    pdf.text('info@begone.se', centerX, pageHeight - 12, { align: 'center' })
+    
+    // Höger sida: Datum och sidnummer
+    pdf.text(`Genererad: ${currentDate}`, pageWidth - margins.right, pageHeight - 18, { align: 'right' })
+    pdf.text(`Sida ${pageCount} av ${pageCount}`, pageWidth - margins.right, pageHeight - 12, { align: 'right' })
 
     // Professional filnamn för SANERINGSRAPPORT
     const customerName = customerInfo?.company_name || 'Okänd_kund'
