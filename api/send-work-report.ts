@@ -528,7 +528,7 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - spacing.xs) // Använd ännu mer av sidans bredd
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - 2) // Maximal textbredd - bara 2px marginal
       const lineHeight = 5.5
       const reportPadding = spacing.sm // Minimal padding för maximal textbredd
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
@@ -545,7 +545,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, margins.left + spacing.xs, textY) // Minimal vänstermarginal för maximal bredd
+        pdf.text(line, margins.left + 2, textY) // Maximal bredd - bara 2px från vänsterkant
         textY += lineHeight
       })
       
