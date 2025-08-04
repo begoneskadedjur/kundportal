@@ -665,10 +665,12 @@ export const generatePDFReport = async (
       const textLines = pdf.splitTextToSize(reportText, maxTextWidth)
       
       const lineHeight = 5.5
-      const reportPadding = spacing.sm // Minimal padding för maximal textbredd
+      const reportPadding = 10 // Padding som matchar textposition
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
-      drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, reportBoxHeight, {
+      // Rita card som sträcker sig nästan över hela sidan för maximal textbredd
+      const cardWidth = pageWidth - 10 // Samma som textbredd
+      drawProfessionalCard(pdf, 5, yPosition, cardWidth, reportBoxHeight, {
         backgroundColor: 'white',
         shadow: true,
         borderWeight: 1.2
@@ -686,17 +688,18 @@ export const generatePDFReport = async (
           pdf.addPage()
           textY = spacing.xl
           
-          // Rita ny card på ny sida om nödvändigt
+          // Rita ny card på ny sida som matchar textbredden
           const remainingLines = textLines.slice(textLines.indexOf(line))
           const remainingHeight = Math.max(40, remainingLines.length * lineHeight + reportPadding)
-          drawProfessionalCard(pdf, margins.left, textY - reportPadding, contentWidth, remainingHeight, {
+          const cardWidth = pageWidth - 10 // Samma som textbredd
+          drawProfessionalCard(pdf, 5, textY - reportPadding, cardWidth, remainingHeight, {
             backgroundColor: 'white',
             shadow: true,
             borderWeight: 1.2
           })
         }
         
-        pdf.text(line, 5, textY) // Verklig maximal bredd - 5px från vänsterkant av sidan
+        pdf.text(line, 10, textY) // Text 10px från vänsterkant (5px card + 5px padding)
         textY += lineHeight
       })
       

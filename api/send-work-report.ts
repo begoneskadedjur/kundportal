@@ -532,10 +532,12 @@ async function generatePDFReportBuffer(
       const maxTextWidth = pageWidth - 10
       const textLines = pdf.splitTextToSize(reportText, maxTextWidth)
       const lineHeight = 5.5
-      const reportPadding = spacing.sm // Minimal padding för maximal textbredd
+      const reportPadding = 10 // Padding som matchar textposition
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
-      drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
+      // Rita card som sträcker sig nästan över hela sidan för maximal textbredd
+      const cardWidth = pageWidth - 10 // Samma som textbredd
+      drawCard(5, yPosition, cardWidth, reportBoxHeight)
       
       pdf.setFontSize(typography.body.size)
       pdf.setFont(undefined, 'normal')
@@ -547,7 +549,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, 5, textY) // Verklig maximal bredd - 5px från vänsterkant av sidan
+        pdf.text(line, 10, textY) // Text 10px från vänsterkant (5px card + 5px padding)
         textY += lineHeight
       })
       
