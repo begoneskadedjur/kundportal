@@ -52,10 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status,
         completed_date,
         commission_amount,
-        case_type,
         billing_status
       `)
-      .eq('assigned_technician_id', technician_id)
+      .eq('primary_assignee_id', technician_id)
       .gte('completed_date', startDate)
       .lt('completed_date', endDateStr)
       .not('commission_amount', 'is', null)
@@ -77,10 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status,
         completed_date,
         commission_amount,
-        case_type,
         billing_status
       `)
-      .eq('assigned_technician_id', technician_id)
+      .eq('primary_assignee_id', technician_id)
       .gte('completed_date', startDate)
       .lt('completed_date', endDateStr)
       .not('commission_amount', 'is', null)
