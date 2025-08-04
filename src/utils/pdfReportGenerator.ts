@@ -375,9 +375,11 @@ export const generatePDFReport = async (
     // === KUNDUPPGIFTER SEKTION ===
     yPosition = drawSectionHeader(pdf, 'KUNDUPPGIFTER', margins.left, yPosition, contentWidth, 'primary')
 
-    // Avgör om det är privatperson eller företag
+    // Avgör om det är privatperson eller företag baserat på case_type
     const orgNumber = customerInfo?.org_number || ''
-    const isCompany = orgNumber.length > 10 || orgNumber.includes('-') // Org nr format: XXXXXX-XXXX
+    // Använd case_type från taskDetails för att avgöra kundtyp
+    const caseTypeField = getFieldValue(taskDetails, 'case_type') 
+    const isCompany = caseTypeField?.value === 'business' || caseTypeField?.value === 'contract' || false
     
     // Professional kunduppgifter card med dynamisk layout
     const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner (ingen kontaktperson-rad)
@@ -658,10 +660,10 @@ export const generatePDFReport = async (
       yPosition = drawSectionHeader(pdf, 'DETALJERAD SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'accent')
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.lg * 2))
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.md * 2)) // Minska marginaler för mer bredd
       
       const lineHeight = 5.5
-      const reportPadding = spacing.lg
+      const reportPadding = spacing.md // Minska padding för mer textutrymme
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
       drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, reportBoxHeight, {
@@ -692,7 +694,7 @@ export const generatePDFReport = async (
           })
         }
         
-        pdf.text(line, margins.left + spacing.md, textY)
+        pdf.text(line, margins.left + spacing.sm, textY) // Minska vänstermarginal
         textY += lineHeight
       })
       

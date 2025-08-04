@@ -308,9 +308,12 @@ async function generatePDFReportBuffer(
     // Kunduppgifter sektion
     yPosition = drawSectionHeader('KUNDUPPGIFTER', yPosition)
     
-    // Avgör om det är privatperson eller företag
+    // Avgör om det är privatperson eller företag baserat på case_type
     const orgNumber = customerInfo.org_number || ''
-    const isCompany = orgNumber.length > 10 || orgNumber.includes('-') // Org nr format: XXXXXX-XXXX
+    const caseTypeField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'case_type' && f.has_value
+    )
+    const isCompany = caseTypeField?.value === 'business' || caseTypeField?.value === 'contract' || false
     
     const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
@@ -418,7 +421,7 @@ async function generatePDFReportBuffer(
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
     
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 95 : 75 // Öka höjden för separata telefon/email-rader
+    const supplierCardHeight = hasAssignee ? 115 : 95 // Öka höjden för separata telefon/email-rader + arbetsinformation
     drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
     
     cardY = yPosition + spacing.md
@@ -490,59 +493,26 @@ async function generatePDFReportBuffer(
       pdf.text(taskDetails.assignees[0].email, rightCol, cardY + spacing.sm)
     }
 
-    yPosition += supplierCardHeight + spacing.md // Minska section-avstånd
-
-    // Arbetsinformation
-    yPosition = drawSectionHeader('ARBETSINFORMATION', yPosition)
+    // Lägg till arbetsinformation direkt i leverantörsuppgifter-kortet (kortare version)
+    if (hasAssignee) {
+      cardY += spacing.md
+    }
     
-    const workCardHeight = 75
-    drawCard(margins.left, yPosition, contentWidth, workCardHeight)
-    
-    cardY = yPosition + spacing.md
-    
-    // Labels för arbetsinformation
+    // Arbetsinformation som tillägg i leverantörskortet
+    cardY += spacing.md
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
-    
-    pdf.text('ÄRENDETITEL', leftCol, cardY)
+    pdf.text('ÄRENDE', leftCol, cardY)
     pdf.text('STATUS', rightCol, cardY)
     
-    // Värden för arbetsinformation
     pdf.setTextColor(20, 20, 20)
     pdf.setFontSize(typography.body.size)
     pdf.setFont(undefined, 'normal')
-    
     pdf.text(taskDetails.task_info.name, leftCol, cardY + spacing.sm)
     pdf.text(taskDetails.task_info.status, rightCol, cardY + spacing.sm)
-    
-    cardY += spacing.lg
-    
-    // Labels för rad 2
-    pdf.setTextColor(100, 100, 100)
-    pdf.setFontSize(8)
-    pdf.setFont(undefined, 'bold')
-    
-    pdf.text('DATUM FÖR UTFÖRANDE', leftCol, cardY)
-    pdf.text('ARBETSPLATS', rightCol, cardY)
-    
-    // Värden för rad 2
-    pdf.setTextColor(20, 20, 20)
-    pdf.setFontSize(typography.body.size)
-    pdf.setFont(undefined, 'normal')
-    
-    const createdDate = new Date(parseInt(taskDetails.task_info.created)).toLocaleDateString('sv-SE')
-    pdf.text(createdDate, leftCol, cardY + spacing.sm)
 
-    // Hämta och formatera adress för arbetsplats
-    const workAddressField = taskDetails.custom_fields.find(f => 
-      f.name.toLowerCase() === 'adress' && f.has_value
-    )
-    const workAddress = workAddressField ? formatAddress(workAddressField.value) : '[Adress ej angiven]'
-    const addressLines = pdf.splitTextToSize(workAddress, (contentWidth/2) - spacing.lg)
-    pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
-
-    yPosition += workCardHeight + spacing.md // Minska section-avstånd
+    yPosition += supplierCardHeight + spacing.md + 20 // Extra plats för arbetsinformation
 
     // Saneringsrapport sektion (om det finns rapport-data)
     const reportField = taskDetails.custom_fields.find(f => 
@@ -558,9 +528,9 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.lg * 2))
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.md * 2)) // Minska marginaler för mer bredd
       const lineHeight = 5.5
-      const reportPadding = spacing.lg
+      const reportPadding = spacing.md // Minska padding för mer textutrymme
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
       drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
@@ -575,7 +545,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, margins.left + spacing.md, textY)
+        pdf.text(line, margins.left + spacing.sm, textY) // Minska vänstermarginal
         textY += lineHeight
       })
       

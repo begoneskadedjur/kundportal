@@ -142,6 +142,14 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           type: 'email',
           value: caseData.e_post_kontaktperson || '',
           has_value: !!(caseData.e_post_kontaktperson)
+        },
+        // Case type för att avgöra privatperson vs företag
+        {
+          id: 'case_type',
+          name: 'case_type',
+          type: 'text',
+          value: caseData.case_type || 'private',
+          has_value: !!(caseData.case_type)
         }
       ]
     }
