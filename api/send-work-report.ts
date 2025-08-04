@@ -2,6 +2,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import nodemailer from 'nodemailer'
 import { jsPDF } from 'jspdf'
+import * as fs from 'fs'
+import * as path from 'path'
 
 // Environment variables
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
@@ -40,6 +42,32 @@ interface CustomerInfo {
   company_name: string;
   org_number: string;
   contact_person: string;
+}
+
+// Hjälpfunktion för att formatera adresser till snyggt format
+const formatAddress = (addressValue: any): string => {
+  if (!addressValue) return '[Adress ej angiven]'
+  
+  // Om det är ett JSON-objekt med formatted_address
+  if (typeof addressValue === 'object') {
+    if (addressValue.formatted_address) {
+      return addressValue.formatted_address
+    }
+    // Om det är ett objekt men utan formatted_address, försök extrahera värde
+    if (addressValue.address || addressValue.street) {
+      return addressValue.address || addressValue.street
+    }
+    // Fallback för andra objektstrukturer
+    return JSON.stringify(addressValue).replace(/[{}",]/g, ' ').trim() || '[Adress ej angiven]'
+  }
+  
+  // Om det är en string, returnera direkt
+  if (typeof addressValue === 'string' && addressValue.trim()) {
+    return addressValue.trim()
+  }
+  
+  // Fallback
+  return addressValue?.toString()?.trim() || '[Adress ej angiven]'
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -157,28 +185,56 @@ async function generatePDFReportBuffer(
     
     const margins = { left: spacing.lg, right: spacing.lg, top: spacing.xl, bottom: spacing.xl }
     const contentWidth = pageWidth - (margins.left + margins.right)
-    let yPosition = 70
+    let yPosition = 90 // Öka för större header som matchar huvud-PDF:en
 
-    // Header
-    const headerHeight = 60
-    pdf.setFillColor(...beGoneColors.primary)
-    pdf.rect(0, 0, pageWidth, headerHeight, 'F')
+    // Header med gradient effect
+    const headerHeight = 80 // Öka för att matcha huvud-PDF:en
+    const gradientSteps = 5
+    for (let i = 0; i < gradientSteps; i++) {
+      const stepHeight = headerHeight / gradientSteps
+      const [r, g, b] = beGoneColors.primary
+      pdf.setFillColor(r + (i * 5), g + (i * 3), b + (i * 8))
+      pdf.rect(0, i * stepHeight, pageWidth, stepHeight, 'F')
+    }
     
     // Accent line
     pdf.setFillColor(...beGoneColors.accent)
-    pdf.rect(0, headerHeight - 3, pageWidth, 3, 'F')
+    pdf.rect(0, headerHeight - 4, pageWidth, 4, 'F')
     
-    // BeGone logotype (text fallback)
+    // Försök ladda BeGone header-bild
+    let headerSuccessful = false
+    try {
+      // Försök läsa header-bilden från public/images
+      const imagePath = path.join(process.cwd(), 'public', 'images', 'begone-header.png')
+      if (fs.existsSync(imagePath)) {
+        const imageBuffer = fs.readFileSync(imagePath)
+        const base64Image = imageBuffer.toString('base64')
+        const dataURL = `data:image/png;base64,${base64Image}`
+        
+        // Fullbredd header-bild
+        const headerImageHeight = 60
+        pdf.addImage(dataURL, 'PNG', 0, 10, pageWidth, headerImageHeight)
+        headerSuccessful = true
+        console.log('Header image loaded successfully for email PDF')
+      }
+    } catch (error) {
+      console.warn('Failed to load header image for email PDF, using text fallback:', error)
+    }
+    
+    // Text fallback om bilden inte laddades
+    if (!headerSuccessful) {
+      pdf.setTextColor(...beGoneColors.white)
+      pdf.setFontSize(typography.title.size)
+      pdf.setFont(undefined, typography.title.weight)
+      pdf.text('BeGone', pageWidth/2, 25, { align: 'center' })
+      
+      pdf.setFontSize(typography.caption.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 32, { align: 'center' })
+    }
+    
+    // SANERINGSRAPPORT titel alltid synlig
     pdf.setTextColor(...beGoneColors.white)
-    pdf.setFontSize(typography.title.size)
-    pdf.setFont(undefined, typography.title.weight)
-    pdf.text('BeGone', pageWidth/2, 25, { align: 'center' })
-    
-    pdf.setFontSize(typography.caption.size)
-    pdf.setFont(undefined, 'normal')
-    pdf.text('SKADEDJUR & SANERING AB', pageWidth/2, 32, { align: 'center' })
-    
-    // SANERINGSRAPPORT titel
     pdf.setFontSize(typography.sectionHeader.size)
     pdf.setFont(undefined, typography.sectionHeader.weight)
     pdf.text('SANERINGSRAPPORT', pageWidth/2, 48, { align: 'center' })
@@ -193,6 +249,15 @@ async function generatePDFReportBuffer(
     })
     pdf.text(`Rapport genererad: ${reportDate}`, pageWidth/2, yPosition, { align: 'center' })
     pdf.text(`Ärende ID: ${taskDetails.task_id}`, pageWidth/2, yPosition + spacing.sm, { align: 'center' })
+    
+    // Lägg till adress i metadata (hämta från custom fields)
+    const addressField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'adress' && f.has_value
+    )
+    if (addressField) {
+      const formattedAddress = formatAddress(addressField.value)
+      pdf.text(`Adress: ${formattedAddress}`, pageWidth/2, yPosition + spacing.md, { align: 'center' })
+    }
     
     yPosition += spacing.section
 
@@ -366,9 +431,7 @@ async function generatePDFReportBuffer(
     pdf.setFont(undefined, 'bold')
     
     pdf.text('DATUM FÖR UTFÖRANDE', leftCol, cardY)
-    if (taskDetails.task_info.description) {
-      pdf.text('BESKRIVNING', rightCol, cardY)
-    }
+    pdf.text('ARBETSPLATS', rightCol, cardY)
     
     // Värden för rad 2
     pdf.setTextColor(20, 20, 20)
@@ -378,10 +441,13 @@ async function generatePDFReportBuffer(
     const createdDate = new Date(parseInt(taskDetails.task_info.created)).toLocaleDateString('sv-SE')
     pdf.text(createdDate, leftCol, cardY + spacing.sm)
 
-    if (taskDetails.task_info.description) {
-      const descLines = pdf.splitTextToSize(taskDetails.task_info.description, (contentWidth/2) - spacing.lg)
-      pdf.text(descLines.slice(0, 2), rightCol, cardY + spacing.sm)
-    }
+    // Hämta och formatera adress för arbetsplats
+    const workAddressField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'adress' && f.has_value
+    )
+    const workAddress = workAddressField ? formatAddress(workAddressField.value) : '[Adress ej angiven]'
+    const addressLines = pdf.splitTextToSize(workAddress, (contentWidth/2) - spacing.lg)
+    pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
 
     yPosition += workCardHeight + spacing.section
 

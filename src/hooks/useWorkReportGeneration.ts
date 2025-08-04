@@ -103,12 +103,12 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           value: caseData.skadedjur || '',
           has_value: !!(caseData.skadedjur)
         },
-        // Adress-fält
+        // Adress-fält - säkerställ att vi passar rätt adressdata
         {
           id: 'adress',
           name: 'adress',
-          type: 'text',
-          value: caseData.adress || '',
+          type: 'address',
+          value: caseData.adress || null,
           has_value: !!(caseData.adress)
         },
         // Pris-fält

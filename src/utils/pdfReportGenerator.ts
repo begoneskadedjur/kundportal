@@ -119,6 +119,32 @@ const getFieldValue = (taskDetails: TaskDetails, fieldName: string) => {
   )
 }
 
+// Hjälpfunktion för att formatera adresser till snyggt format
+const formatAddress = (addressValue: any): string => {
+  if (!addressValue) return '[Adress ej angiven]'
+  
+  // Om det är ett JSON-objekt med formatted_address
+  if (typeof addressValue === 'object') {
+    if (addressValue.formatted_address) {
+      return addressValue.formatted_address
+    }
+    // Om det är ett objekt men utan formatted_address, försök extrahera värde
+    if (addressValue.address || addressValue.street) {
+      return addressValue.address || addressValue.street
+    }
+    // Fallback för andra objektstrukturer
+    return JSON.stringify(addressValue).replace(/[{}",]/g, ' ').trim() || '[Adress ej angiven]'
+  }
+  
+  // Om det är en string, returnera direkt
+  if (typeof addressValue === 'string' && addressValue.trim()) {
+    return addressValue.trim()
+  }
+  
+  // Fallback
+  return addressValue?.toString()?.trim() || '[Adress ej angiven]'
+}
+
 // Professional card system med subtle shadows och borders
 const drawProfessionalCard = (
   pdf: jsPDF, 
@@ -308,8 +334,10 @@ export const generatePDFReport = async (
     pdf.text(`Rapport genererad: ${reportDate}`, pageWidth/2, yPosition, { align: 'center' })
     pdf.text(`Ärende ID: ${taskDetails.task_id}`, pageWidth/2, yPosition + spacing.sm, { align: 'center' })
     
+    // Använd formatAddress för korrekt adressvisning
     if (addressField) {
-      pdf.text(`Adress: ${addressField.value.formatted_address}`, pageWidth/2, yPosition + spacing.md, { align: 'center' })
+      const formattedAddress = formatAddress(addressField.value)
+      pdf.text(`Adress: ${formattedAddress}`, pageWidth/2, yPosition + spacing.md, { align: 'center' })
     }
     
     yPosition += spacing.section
@@ -475,20 +503,8 @@ export const generatePDFReport = async (
     }
     pdf.text(workDate, leftCol, cardY + spacing.sm)
     
-    // Hantera adress från database (kan vara JSONB eller string)
-    let addressText = '[Adress ej angiven]'
-    if (addressField && addressField.value) {
-      if (typeof addressField.value === 'object' && addressField.value.formatted_address) {
-        // JSONB format med formatted_address
-        addressText = addressField.value.formatted_address
-      } else if (typeof addressField.value === 'string') {
-        // String format
-        addressText = addressField.value
-      } else if (addressField.value.toString) {
-        // Fallback till string
-        addressText = addressField.value.toString()
-      }
-    }
+    // Använd formatAddress för konsistent adresshantering
+    const addressText = addressField ? formatAddress(addressField.value) : '[Adress ej angiven]'
     
     const maxAddressWidth = (contentWidth/2) - spacing.lg
     const addressLines = pdf.splitTextToSize(addressText, maxAddressWidth)
