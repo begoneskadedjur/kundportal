@@ -935,37 +935,80 @@ function getTechnicianEmailTemplate(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Saneringsrapport - ${taskDetails.task_info.name}</title>
       </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">📋 Saneringsrapport klar</h1>
-          <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">BeGone Skadedjur & Sanering</p>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #f97316; margin-top: 0;">Hej ${technicianName}!</h2>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
           
-          <p>Här är saneringsrapporten för ditt genomförda arbete. Rapporten är genererad automatiskt och kan användas av kunden som intyg för försäkringsbolag eller arbetsgivare.</p>
-
-          <div style="background-color: #fed7aa; border: 1px solid #f97316; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <h3 style="color: #f97316; margin: 0 0 15px 0;">📝 Ärendedetaljer</h3>
-            <div style="background-color: white; padding: 15px; border-radius: 8px;">
-              <p style="margin: 5px 0;"><strong>Ärende:</strong> ${taskDetails.task_info.name}</p>
-              <p style="margin: 5px 0;"><strong>Ärende ID:</strong> ${taskDetails.task_id}</p>
-              <p style="margin: 5px 0;"><strong>Kund:</strong> ${customerInfo.company_name}</p>
-              <p style="margin: 5px 0;"><strong>Kontakt:</strong> ${customerInfo.contact_person}</p>
-              <p style="margin: 5px 0;"><strong>Status:</strong> ${taskDetails.task_info.status}</p>
-            </div>
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #0a1328, #1e293b); color: white; padding: 32px 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.025em;">Saneringsrapport klar</h1>
+            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">BeGone Skadedjur & Sanering AB</p>
           </div>
 
-          <p>Saneringsrapporten är bifogad som PDF-fil och innehåller alla detaljer om det utförda arbetet enligt BeGone:s professionella standard.</p>
-
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p><strong>Frågor om rapporten?</strong> Kontakta koordinatorn eller ring huvudkontoret.</p>
-            <p>📧 <a href="mailto:teknik@begone.se" style="color: #f97316;">teknik@begone.se</a> | 📞 <a href="tel:010-280-44-10" style="color: #f97316;">010 280 44 10</a></p>
-            <p style="margin-top: 20px;">
-              Med vänliga hälsningar,<br>
-              <strong>BeGone Koordination</strong> 🐛🚫
+          <!-- Content -->
+          <div style="padding: 32px 30px;">
+            <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Bästa ${technicianName},</h2>
+            
+            <p style="margin: 0 0 24px 0; color: #475569; font-size: 16px;">
+              Vi bekräftar härmed att saneringsrapporten för ditt genomförda uppdrag har genererats och är redo för leverans till kunden. Rapporten följer våra professionella standarder och innehåller all nödvändig dokumentation.
             </p>
+
+            <!-- Case Details Card -->
+            <div style="background-color: #f1f5f9; border-left: 4px solid #20c58f; padding: 24px; margin: 24px 0; border-radius: 8px;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Ärendesammanfattning</h3>
+              <div style="background-color: white; padding: 20px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="display: grid; gap: 12px;">
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Ärende:</span>
+                    <span style="color: #1e293b; text-align: right; max-width: 300px;">${taskDetails.task_info.name}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Ärende ID:</span>
+                    <span style="color: #1e293b; font-family: monospace;">${taskDetails.task_id}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Kund:</span>
+                    <span style="color: #1e293b; text-align: right; max-width: 300px;">${customerInfo.company_name}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Kontaktperson:</span>
+                    <span style="color: #1e293b; text-align: right; max-width: 300px;">${customerInfo.contact_person}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                    <span style="font-weight: 500; color: #64748b;">Status:</span>
+                    <span style="color: #20c58f; font-weight: 500;">${taskDetails.task_info.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p style="margin: 24px 0; color: #475569; font-size: 16px;">
+              Den bifogade PDF-rapporten innehåller all teknisk dokumentation och kan överlämnas direkt till kunden. Rapporten uppfyller branschstandarder för professionell skadedjursbekämpning och sanering.
+            </p>
+
+            <!-- Support Section -->
+            <div style="background-color: #f8fafc; padding: 24px; border-radius: 8px; margin: 32px 0; border: 1px solid #e2e8f0;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Support och kontakt</h3>
+              <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px;">
+                För frågor om rapporten eller teknisk support, kontakta vårt koordinationsteam.
+              </p>
+              <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                <a href="mailto:teknik@begone.se" style="color: #20c58f; text-decoration: none; font-weight: 500; font-size: 14px;">
+                  ✉ teknik@begone.se
+                </a>
+                <a href="tel:010-280-44-10" style="color: #20c58f; text-decoration: none; font-weight: 500; font-size: 14px;">
+                  ✆ 010 280 44 10
+                </a>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; margin-top: 32px;">
+              <p style="margin: 0; color: #64748b; font-size: 14px;">
+                Med vänliga hälsningar,<br>
+                <strong style="color: #1e293b;">BeGone Koordinationsteam</strong><br>
+                <span style="font-size: 13px; color: #94a3b8;">BeGone Skadedjur & Sanering AB</span>
+              </p>
+            </div>
           </div>
         </div>
       </body>
@@ -978,6 +1021,9 @@ function getContactEmailTemplate(
   taskDetails: TaskDetails, 
   customerInfo: CustomerInfo
 ): string {
+  // Hämta ansvarig tekniker
+  const assignedTechnician = taskDetails.assignees.length > 0 ? taskDetails.assignees[0] : null
+  
   return `
     <!DOCTYPE html>
     <html>
@@ -986,46 +1032,120 @@ function getContactEmailTemplate(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Saneringsrapport för ${customerInfo.company_name}</title>
       </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">📋 Saneringsrapport</h1>
-          <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">BeGone Skadedjur & Sanering</p>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #8b5cf6; margin-top: 0;">Hej ${contactName}!</h2>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
           
-          <p>BeGone har genomfört sanering/skadedjursbekämpning för <strong>${customerInfo.company_name}</strong>. Bifogad saneringsrapport kan användas som intyg för försäkringsbolag, myndigheter eller andra som behöver dokumentation av det utförda arbetet.</p>
-
-          <div style="background-color: #ede9fe; border: 1px solid #8b5cf6; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <h3 style="color: #8b5cf6; margin: 0 0 15px 0;">📋 Sammanfattning</h3>
-            <div style="background-color: white; padding: 15px; border-radius: 8px;">
-              <p style="margin: 5px 0;"><strong>Ärende:</strong> ${taskDetails.task_info.name}</p>
-              <p style="margin: 5px 0;"><strong>Ärende ID:</strong> ${taskDetails.task_id}</p>
-              <p style="margin: 5px 0;"><strong>Företag:</strong> ${customerInfo.company_name}</p>
-              <p style="margin: 5px 0;"><strong>Org.nummer:</strong> ${customerInfo.org_number}</p>
-              <p style="margin: 5px 0;"><strong>Status:</strong> ${taskDetails.task_info.status}</p>
-            </div>
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #0a1328, #1e293b); color: white; padding: 32px 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.025em;">Saneringsrapport</h1>
+            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">BeGone Skadedjur & Sanering AB</p>
           </div>
 
-          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #0ea5e9; margin: 0 0 10px 0;">📄 Om saneringsrapporten</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #64748b;">
-              <li>Professionell dokumentation av utfört arbete</li>
-              <li>Kan användas för försäkringsärenden</li>
-              <li>Godkänd som intyg för myndigheter</li>
-              <li>Innehåller alla relevanta tekniska detaljer</li>
-              <li>Signerad av ansvarig tekniker</li>
-            </ul>
-          </div>
-
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p><strong>Frågor om rapporten eller behöver du ytterligare dokumentation?</strong></p>
-            <p>📧 <a href="mailto:info@begone.se" style="color: #8b5cf6;">info@begone.se</a> | 📞 <a href="tel:010-280-44-10" style="color: #8b5cf6;">010 280 44 10</a></p>
-            <p style="margin-top: 20px;">
-              Tack för förtroendet!<br>
-              <strong>BeGone Skadedjur & Sanering AB</strong> 🐛🚫
+          <!-- Content -->
+          <div style="padding: 32px 30px;">
+            <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Bästa ${contactName},</h2>
+            
+            <p style="margin: 0 0 24px 0; color: #475569; font-size: 16px;">
+              Vi bekräftar härmed att BeGone Skadedjur & Sanering AB har slutfört professionell sanering enligt uppdrag för <strong>${customerInfo.company_name}</strong>. 
+              Bifogad saneringsrapport utgör fullständig dokumentation av det utförda arbetet.
             </p>
+
+            <p style="margin: 0 0 32px 0; color: #475569; font-size: 16px;">
+              Vi tackar för möjligheten att få utföra denna tjänst åt er och hoppas att resultatet motsvarar era förväntningar.
+            </p>
+
+            <!-- Case Summary Card -->
+            <div style="background-color: #f1f5f9; border-left: 4px solid #20c58f; padding: 24px; margin: 24px 0; border-radius: 8px;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Uppdragssammanfattning</h3>
+              <div style="background-color: white; padding: 20px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="display: grid; gap: 12px;">
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Ärende:</span>
+                    <span style="color: #1e293b; text-align: right; max-width: 350px;">${taskDetails.task_info.name}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Referensnummer:</span>
+                    <span style="color: #1e293b; font-family: monospace; font-size: 14px;">${taskDetails.task_id}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Kund:</span>
+                    <span style="color: #1e293b; text-align: right; max-width: 350px;">${customerInfo.company_name}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-weight: 500; color: #64748b;">Organisationsnummer:</span>
+                    <span style="color: #1e293b; font-family: monospace;">${customerInfo.org_number}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                    <span style="font-weight: 500; color: #64748b;">Status:</span>
+                    <span style="color: #20c58f; font-weight: 500;">${taskDetails.task_info.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            ${assignedTechnician ? `
+            <!-- Technician Information -->
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; margin: 24px 0; border-radius: 8px;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Ansvarig tekniker</h3>
+              <div style="display: grid; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                  <span style="font-weight: 500; color: #64748b;">Tekniker:</span>
+                  <span style="color: #1e293b; font-weight: 500;">${assignedTechnician.name}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                  <span style="font-weight: 500; color: #64748b;">Certifiering:</span>
+                  <span style="color: #1e293b;">Auktoriserad skadedjurstekniker</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                  <span style="font-weight: 500; color: #64748b;">Kontakt:</span>
+                  <a href="mailto:${assignedTechnician.email}" style="color: #20c58f; text-decoration: none; font-weight: 500;">${assignedTechnician.email}</a>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+
+            <!-- Report Information -->
+            <div style="background-color: #f0f9ff; border: 1px solid #e0f2fe; padding: 24px; border-radius: 8px; margin: 24px 0;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Om rapporten</h3>
+              <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px;">
+                Den bifogade rapporten innehåller fullständig dokumentation av det utförda arbetet enligt branschstandarder för professionell skadedjursbekämpning och sanering.
+              </p>
+              <ul style="margin: 0; padding-left: 20px; color: #64748b; font-size: 14px;">
+                <li style="margin: 6px 0;">Teknisk dokumentation av genomförda åtgärder</li>
+                <li style="margin: 6px 0;">Detaljerad beskrivning av behandlingsmetoder</li>
+                <li style="margin: 6px 0;">Professionell kvalitetssäkring och signering</li>
+                <li style="margin: 6px 0;">Uppfyller branschkrav för dokumentation</li>
+              </ul>
+            </div>
+
+            <!-- Contact Information -->
+            <div style="background-color: #f8fafc; padding: 24px; border-radius: 8px; margin: 32px 0; border: 1px solid #e2e8f0;">
+              <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Kontakt och support</h3>
+              <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px;">
+                För frågor om rapporten eller framtida tjänster, tveka inte att kontakta oss.
+              </p>
+              <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                <a href="mailto:info@begone.se" style="color: #20c58f; text-decoration: none; font-weight: 500; font-size: 14px;">
+                  ✉ info@begone.se
+                </a>
+                <a href="tel:010-280-44-10" style="color: #20c58f; text-decoration: none; font-weight: 500; font-size: 14px;">
+                  ✆ 010 280 44 10
+                </a>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; margin-top: 32px; text-align: center;">
+              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">
+                Vi tackar för förtroendet och står till er tjänst för framtida behov.
+              </p>
+              <p style="margin: 0; color: #1e293b; font-weight: 600; font-size: 16px;">
+                BeGone Skadedjur & Sanering AB
+              </p>
+              <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">
+                Org.nr: 559378-9208 | Bläcksvampsvägen 17, 141 60 Huddinge
+              </p>
+            </div>
           </div>
         </div>
       </body>
