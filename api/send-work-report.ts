@@ -315,7 +315,7 @@ async function generatePDFReportBuffer(
     )
     const isCompany = caseTypeField?.value === 'business' || false
     
-    const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner
+    const customerCardHeight = isCompany ? 70 : 60 // Kompakt höjd för email-version
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
     
     const leftCol = margins.left + spacing.md
@@ -348,7 +348,7 @@ async function generatePDFReportBuffer(
       pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Org nr och telefon
-      cardY += spacing.md
+      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -362,7 +362,7 @@ async function generatePDFReportBuffer(
       pdf.text(phoneText, rightCol, cardY + spacing.sm)
 
       // Row 3: Email
-      cardY += spacing.md
+      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -389,7 +389,7 @@ async function generatePDFReportBuffer(
       pdf.text(orgNumber || '[Personnummer saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Telefon och email
-      cardY += spacing.md
+      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -404,7 +404,7 @@ async function generatePDFReportBuffer(
     }
 
     // Row sist: Ärende ID (ensam rad)
-    cardY += spacing.md
+    cardY += spacing.sm // Ännu mindre avstånd för kompakthet
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -421,7 +421,7 @@ async function generatePDFReportBuffer(
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
     
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 115 : 95 // Öka höjden för separata telefon/email-rader + arbetsinformation
+    const supplierCardHeight = hasAssignee ? 95 : 80 // Kompakt höjd för email-version
     drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
     
     cardY = yPosition + spacing.md
@@ -461,7 +461,7 @@ async function generatePDFReportBuffer(
     pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
     
     // Email på nästa rad
-    cardY += spacing.md
+    cardY += spacing.sm // Kompaktare avstånd
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -474,7 +474,7 @@ async function generatePDFReportBuffer(
 
     // Ansvarig tekniker
     if (hasAssignee) {
-      cardY += spacing.md // Minska avstånd från lg till md
+      cardY += spacing.sm // Kompaktare avstånd
       
       // Labels för tekniker
       pdf.setTextColor(100, 100, 100)
@@ -528,9 +528,9 @@ async function generatePDFReportBuffer(
       yPosition = drawSectionHeader('DETALJERAD SANERINGSRAPPORT', yPosition)
       
       const reportText = reportField.value.toString()
-      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.md * 2)) // Minska marginaler för mer bredd
+      const textLines = pdf.splitTextToSize(reportText, contentWidth - (spacing.sm * 2)) // Använd nästan full bredd
       const lineHeight = 5.5
-      const reportPadding = spacing.md // Minska padding för mer textutrymme
+      const reportPadding = spacing.sm // Minimal padding för maximal textbredd
       const reportBoxHeight = Math.max(60, textLines.length * lineHeight + reportPadding * 2)
       
       drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
@@ -545,7 +545,7 @@ async function generatePDFReportBuffer(
           pdf.addPage()
           textY = spacing.xl
         }
-        pdf.text(line, margins.left + spacing.sm, textY) // Minska vänstermarginal
+        pdf.text(line, margins.left + spacing.sm, textY) // Minimal vänstermarginal för full bredd
         textY += lineHeight
       })
       
