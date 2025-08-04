@@ -382,7 +382,7 @@ export const generatePDFReport = async (
     const isCompany = customerTypeField?.value === 'business' || false
     
     // Professional kunduppgifter card med dynamisk layout
-    const customerCardHeight = isCompany ? 70 : 60 // Kompakt höjd för bättre layout
+    const customerCardHeight = isCompany ? 80 : 70 // Justerad höjd för korrekt spacing
     drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, customerCardHeight, {
       backgroundColor: 'white',
       shadow: true
@@ -416,7 +416,7 @@ export const generatePDFReport = async (
       pdf.text(customerInfo?.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Org nr och telefon
-      cardY += spacing.sm // Kompakt avstånd för email-version
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setFont(undefined, typography.label.weight)
       pdf.setTextColor(...beGoneColors.mediumGray)
       pdf.setFontSize(typography.label.size)
@@ -430,7 +430,7 @@ export const generatePDFReport = async (
       pdf.text(phoneText, rightCol, cardY + spacing.sm)
 
       // Row 3: Email
-      cardY += spacing.sm // Kompakt avstånd för email-version
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setFont(undefined, typography.label.weight)
       pdf.setTextColor(...beGoneColors.mediumGray)
       pdf.setFontSize(typography.label.size)
@@ -457,7 +457,7 @@ export const generatePDFReport = async (
       pdf.text(orgNumber || '[Personnummer saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Telefon och email
-      cardY += spacing.sm // Kompakt avstånd för email-version
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setFont(undefined, typography.label.weight)
       pdf.setTextColor(...beGoneColors.mediumGray)
       pdf.setFontSize(typography.label.size)
@@ -472,7 +472,7 @@ export const generatePDFReport = async (
     }
 
     // Row sist: Ärende ID (ensam rad)
-    cardY += spacing.sm // Kompakt avstånd för email-version
+    cardY += spacing.md // Korrekt avstånd mellan rader
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
@@ -488,7 +488,7 @@ export const generatePDFReport = async (
     // === LEVERANTÖRSUPPGIFTER SEKTION ===
     // Kontrollera om vi behöver sidbrytning för hela leverantörssektionen
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 95 : 80 // Kompakt höjd för bättre layout
+    const supplierCardHeight = hasAssignee ? 105 : 90 // Justerad höjd för korrekt spacing
     const supplierSectionHeight = 22 + spacing.sm + supplierCardHeight // Section header + card
     
     if (yPosition + supplierSectionHeight > pageHeight - 40) {
@@ -519,7 +519,7 @@ export const generatePDFReport = async (
     pdf.text('559378-9208', rightCol, cardY + spacing.sm)
 
     // Kontaktinformation - separera telefon och email
-    cardY += spacing.sm // Kompakt avstånd för email-version
+    cardY += spacing.md // Korrekt avstånd mellan rader
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
@@ -533,7 +533,7 @@ export const generatePDFReport = async (
     pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
     
     // Email på nästa rad
-    cardY += spacing.sm // Kompakt avstånd för email-version
+    cardY += spacing.md // Korrekt avstånd mellan rader
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
@@ -546,7 +546,7 @@ export const generatePDFReport = async (
 
     // Ansvarig tekniker (om tilldelad)
     if (hasAssignee) {
-      cardY += spacing.sm // Kompakt avstånd för email-version
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setFont(undefined, typography.label.weight)
       pdf.setTextColor(...beGoneColors.mediumGray)
       pdf.setFontSize(typography.label.size)

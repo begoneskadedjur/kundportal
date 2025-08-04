@@ -315,7 +315,7 @@ async function generatePDFReportBuffer(
     )
     const isCompany = caseTypeField?.value === 'business' || false
     
-    const customerCardHeight = isCompany ? 70 : 60 // Kompakt höjd för email-version
+    const customerCardHeight = isCompany ? 80 : 70 // Justerad höjd för korrekt spacing
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
     
     const leftCol = margins.left + spacing.md
@@ -348,7 +348,7 @@ async function generatePDFReportBuffer(
       pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Org nr och telefon
-      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -362,7 +362,7 @@ async function generatePDFReportBuffer(
       pdf.text(phoneText, rightCol, cardY + spacing.sm)
 
       // Row 3: Email
-      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -389,7 +389,7 @@ async function generatePDFReportBuffer(
       pdf.text(orgNumber || '[Personnummer saknas]', rightCol, cardY + spacing.sm)
 
       // Row 2: Telefon och email
-      cardY += spacing.sm // Ännu mindre avstånd för kompakthet
+      cardY += spacing.md // Korrekt avstånd mellan rader
       pdf.setTextColor(100, 100, 100)
       pdf.setFontSize(8)
       pdf.setFont(undefined, 'bold')
@@ -404,7 +404,7 @@ async function generatePDFReportBuffer(
     }
 
     // Row sist: Ärende ID (ensam rad)
-    cardY += spacing.sm // Ännu mindre avstånd för kompakthet
+    cardY += spacing.md // Korrekt avstånd mellan rader
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -421,7 +421,7 @@ async function generatePDFReportBuffer(
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
     
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 95 : 80 // Kompakt höjd för email-version
+    const supplierCardHeight = hasAssignee ? 105 : 90 // Justerad höjd för korrekt spacing
     drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
     
     cardY = yPosition + spacing.md
@@ -461,7 +461,7 @@ async function generatePDFReportBuffer(
     pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
     
     // Email på nästa rad
-    cardY += spacing.sm // Kompaktare avstånd
+    cardY += spacing.md // Korrekt avstånd mellan rader
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -474,7 +474,7 @@ async function generatePDFReportBuffer(
 
     // Ansvarig tekniker
     if (hasAssignee) {
-      cardY += spacing.sm // Kompaktare avstånd
+      cardY += spacing.md // Korrekt avstånd mellan rader
       
       // Labels för tekniker
       pdf.setTextColor(100, 100, 100)
