@@ -127,12 +127,7 @@ const InteractiveRevenueChart: React.FC<InteractiveRevenueChartProps> = ({
               />
             ))}
           </Pie>
-          <Tooltip 
-            content={<CustomTooltip />}
-            cursor={false}
-            wrapperStyle={{ outline: 'none' }}
-            allowEscapeViewBox={{ x: false, y: false }}
-          />
+          {/* Disable tooltip for pie chart to avoid center text overlap */}
         </PieChart>
       </ResponsiveContainer>
 

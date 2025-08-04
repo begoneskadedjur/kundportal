@@ -316,26 +316,26 @@ export default function TechnicianDashboard() {
             suffix=" kr"
             decimals={0}
             trend={(() => {
-              // Calculate trend based on current vs last month average
-              const currentMonth = data.monthly_data.find(m => m.month === new Date().toISOString().slice(0, 7));
-              const lastMonth = data.monthly_data.length > 1 ? data.monthly_data[1] : null;
+              // Use first two months from monthly_data (already sorted by date desc)
+              const latestMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
               
-              if (!currentMonth || !lastMonth || lastMonth.avg_commission_per_case === 0) {
+              if (!latestMonth || !previousMonth || previousMonth.avg_commission_per_case === 0) {
                 return "neutral";
               }
               
-              return currentMonth.avg_commission_per_case > lastMonth.avg_commission_per_case ? "up" : "down";
+              return latestMonth.avg_commission_per_case > previousMonth.avg_commission_per_case ? "up" : "down";
             })()}
             trendValue={(() => {
-              // Calculate percentage change
-              const currentMonth = data.monthly_data.find(m => m.month === new Date().toISOString().slice(0, 7));
-              const lastMonth = data.monthly_data.length > 1 ? data.monthly_data[1] : null;
+              // Calculate percentage change using first two months
+              const latestMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
               
-              if (!currentMonth || !lastMonth || lastMonth.avg_commission_per_case === 0) {
+              if (!latestMonth || !previousMonth || previousMonth.avg_commission_per_case === 0) {
                 return "→";
               }
               
-              const change = ((currentMonth.avg_commission_per_case - lastMonth.avg_commission_per_case) / lastMonth.avg_commission_per_case) * 100;
+              const change = ((latestMonth.avg_commission_per_case - previousMonth.avg_commission_per_case) / previousMonth.avg_commission_per_case) * 100;
               return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
             })()}
             customContent={
