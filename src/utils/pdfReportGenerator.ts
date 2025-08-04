@@ -486,7 +486,7 @@ export const generatePDFReport = async (
     // === LEVERANTÖRSUPPGIFTER SEKTION ===
     // Kontrollera om vi behöver sidbrytning för hela leverantörssektionen
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 75 : 55
+    const supplierCardHeight = hasAssignee ? 95 : 75 // Öka höjden för separata telefon/email-rader
     const supplierSectionHeight = 22 + spacing.sm + supplierCardHeight // Section header + card
     
     if (yPosition + supplierSectionHeight > pageHeight - 40) {
@@ -516,22 +516,31 @@ export const generatePDFReport = async (
     pdf.text('BeGone Skadedjur & Sanering AB', leftCol, cardY + spacing.sm)
     pdf.text('559378-9208', rightCol, cardY + spacing.sm)
 
-    // Kontaktinformation
+    // Kontaktinformation - separera telefon och email
     cardY += spacing.md // Minska avstånd från lg till md
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
     pdf.text('BESÖKSADRESS', leftCol, cardY)
-    pdf.text('KONTAKT', rightCol, cardY)
+    pdf.text('TELEFON', rightCol, cardY)
     
     pdf.setFont(undefined, typography.body.weight)
     pdf.setTextColor(...beGoneColors.darkGray)
     pdf.setFontSize(typography.body.size)
     pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
-    
-    // Telefon och email på separata rader
     pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
-    pdf.text('info@begone.se', rightCol, cardY + spacing.sm + spacing.sm)
+    
+    // Email på nästa rad
+    cardY += spacing.md
+    pdf.setFont(undefined, typography.label.weight)
+    pdf.setTextColor(...beGoneColors.mediumGray)
+    pdf.setFontSize(typography.label.size)
+    pdf.text('EMAIL', leftCol, cardY)
+    
+    pdf.setFont(undefined, typography.body.weight)
+    pdf.setTextColor(...beGoneColors.darkGray)
+    pdf.setFontSize(typography.body.size)
+    pdf.text('info@begone.se', leftCol, cardY + spacing.sm)
 
     // Ansvarig tekniker (om tilldelad)
     if (hasAssignee) {
@@ -607,7 +616,7 @@ export const generatePDFReport = async (
     pdf.setFont(undefined, typography.label.weight)
     pdf.setTextColor(...beGoneColors.mediumGray)
     pdf.setFontSize(typography.label.size)
-    pdf.text('IDENTIFIERAT SKADEDJUR', leftCol, cardY)
+    pdf.text('ÄRENDET AVSER', leftCol, cardY)
     if (caseTypeField) {
       pdf.text('TYP AV INSATS', rightCol, cardY)
     }

@@ -418,7 +418,7 @@ async function generatePDFReportBuffer(
     yPosition = drawSectionHeader('LEVERANTÖRSUPPGIFTER', yPosition)
     
     const hasAssignee = taskDetails.assignees.length > 0
-    const supplierCardHeight = hasAssignee ? 75 : 55
+    const supplierCardHeight = hasAssignee ? 95 : 75 // Öka höjden för separata telefon/email-rader
     drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
     
     cardY = yPosition + spacing.md
@@ -447,7 +447,7 @@ async function generatePDFReportBuffer(
     pdf.setFont(undefined, 'bold')
     
     pdf.text('BESÖKSADRESS', leftCol, cardY)
-    pdf.text('KONTAKT', rightCol, cardY)
+    pdf.text('TELEFON', rightCol, cardY)
     
     // Värden
     pdf.setTextColor(20, 20, 20)
@@ -455,14 +455,23 @@ async function generatePDFReportBuffer(
     pdf.setFont(undefined, 'normal')
     
     pdf.text('Bläcksvampsvägen 17, 141 60 Huddinge', leftCol, cardY + spacing.sm)
-    
-    // Telefon och email på separata rader
     pdf.text('010 280 44 10', rightCol, cardY + spacing.sm)
-    pdf.text('info@begone.se', rightCol, cardY + spacing.sm + spacing.sm)
+    
+    // Email på nästa rad
+    cardY += spacing.md
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    pdf.text('EMAIL', leftCol, cardY)
+    
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    pdf.text('info@begone.se', leftCol, cardY + spacing.sm)
 
     // Ansvarig tekniker
     if (hasAssignee) {
-      cardY += spacing.lg
+      cardY += spacing.md // Minska avstånd från lg till md
       
       // Labels för tekniker
       pdf.setTextColor(100, 100, 100)
