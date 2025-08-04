@@ -63,7 +63,7 @@ export default function AbsenceDetailsModal({ isOpen, onClose, absence, technici
   };
 
   const footer = (
-    <div className="flex justify-end pt-4 border-t border-slate-800">
+    <div className="flex justify-end p-4">
       <Button onClick={onClose} variant="secondary">
         Stäng
       </Button>
