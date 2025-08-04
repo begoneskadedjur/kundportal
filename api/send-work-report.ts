@@ -297,26 +297,14 @@ async function generatePDFReportBuffer(
     yPosition += spacing.section
 
     // Helper function för section headers
-    const drawSectionHeader = (text: string, x: number, y: number, width: number, style: 'primary' | 'accent' = 'primary') => {
-      const headerHeight = 22
-      
-      if (style === 'accent') {
-        // Accent header med BeGone green
-        pdf.setFillColor(...beGoneColors.accent)
-        pdf.roundedRect(x, y, width, headerHeight, 4, 4, 'F')
-        pdf.setTextColor(...beGoneColors.white)
-      } else {
-        // Primary header med subtle background
-        pdf.setFillColor(...beGoneColors.charcoal)
-        pdf.roundedRect(x, y, width, headerHeight, 4, 4, 'F')
-        pdf.setTextColor(...beGoneColors.white)
-      }
-      
+    const drawSectionHeader = (text: string, y: number) => {
+      pdf.setFillColor(...beGoneColors.charcoal)
+      pdf.roundedRect(margins.left, y, contentWidth, 22, 4, 4, 'F')
+      pdf.setTextColor(...beGoneColors.white)
       pdf.setFontSize(typography.sectionHeader.size)
-      pdf.setFont(undefined, 'bold')
-      pdf.text(text, x + width/2, y + headerHeight/2 + 2, { align: 'center' })
-      
-      return y + headerHeight + spacing.sm
+      pdf.setFont(undefined, typography.sectionHeader.weight)
+      pdf.text(text, pageWidth/2, y + 14, { align: 'center' })
+      return y + 22 + spacing.sm
     }
 
     // Professional card system med subtle shadows och borders
@@ -548,7 +536,7 @@ async function generatePDFReportBuffer(
     }
 
     // === ARBETSINFORMATION SEKTION ===
-    yPosition = drawSectionHeader('ARBETSINFORMATION', margins.left, yPosition, contentWidth)
+    yPosition = drawSectionHeader('ARBETSINFORMATION', yPosition)
 
     const workCardHeight = 70 // Minskad höjd för mindre tom yta
     drawCard(margins.left, yPosition, contentWidth, workCardHeight, {
@@ -725,7 +713,7 @@ async function generatePDFReportBuffer(
       yPosition += reportBoxHeight + spacing.md
     } else {
       // Placeholder om ingen rapport finns
-      yPosition = drawSectionHeader('SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'primary')
+      yPosition = drawSectionHeader('SANERINGSRAPPORT', yPosition)
       
       drawCard(margins.left, yPosition, contentWidth, 40, {
         backgroundColor: 'light',
@@ -755,7 +743,7 @@ async function generatePDFReportBuffer(
         yPosition = spacing.xl
       }
 
-      yPosition = drawSectionHeader('BEHANDLINGSMETODER & ÅTGÄRDER', margins.left, yPosition, contentWidth, 'primary')
+      yPosition = drawSectionHeader('BEHANDLINGSMETODER & ÅTGÄRDER', yPosition)
       
       const treatmentCardHeight = 50
       drawCard(margins.left, yPosition, contentWidth, treatmentCardHeight, {
@@ -804,7 +792,7 @@ async function generatePDFReportBuffer(
         yPosition = spacing.xl
       }
       
-      yPosition = drawSectionHeader('EKONOMISK SAMMANFATTNING', margins.left, yPosition, contentWidth, 'accent')
+      yPosition = drawSectionHeader('EKONOMISK SAMMANFATTNING', yPosition)
       
       const costCardHeight = 35
       drawCard(margins.left, yPosition, contentWidth, costCardHeight, {
