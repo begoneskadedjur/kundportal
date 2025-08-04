@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   DollarSign, FileText, ClipboardList, Calendar, 
   TrendingUp, Award, Clock, AlertCircle,
-  Plus, Eye, ArrowRight, ChevronDown, ChevronUp
+  Plus, Eye, ArrowRight, ChevronDown, ChevronUp, Info
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Card from '../../components/ui/Card'
@@ -338,6 +338,21 @@ export default function TechnicianDashboard() {
               const change = ((latestMonth.avg_commission_per_case - previousMonth.avg_commission_per_case) / previousMonth.avg_commission_per_case) * 100;
               return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
             })()}
+            trendExplanation={(() => {
+              const latestMonth = data.monthly_data[0];
+              const previousMonth = data.monthly_data[1];
+              
+              if (!latestMonth || !previousMonth) return undefined;
+              
+              return {
+                currentMonth: latestMonth.month_display,
+                currentValue: latestMonth.avg_commission_per_case,
+                previousMonth: previousMonth.month_display,
+                previousValue: previousMonth.avg_commission_per_case,
+                suffix: ' kr'
+              };
+            })()}
+            trendExplanationMode="hover"
             customContent={
               <p className="text-purple-300 text-xs">Genomsnittlig provision</p>
             }
@@ -362,6 +377,7 @@ export default function TechnicianDashboard() {
             }
           />
         </StaggeredGrid>
+
 
         <AnimatePresence>
           {showPendingCases && data.pending_cases && data.pending_cases.length > 0 && (

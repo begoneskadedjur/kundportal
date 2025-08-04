@@ -9,6 +9,14 @@ interface TrendData {
   value: number;
 }
 
+interface TrendExplanation {
+  currentMonth: string;
+  currentValue: number;
+  previousMonth: string;
+  previousValue: number;
+  suffix?: string;
+}
+
 interface EnhancedKpiCardProps {
   title: string;
   value: number | string;
@@ -17,6 +25,8 @@ interface EnhancedKpiCardProps {
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   trendData?: TrendData[];
+  trendExplanation?: TrendExplanation;
+  trendExplanationMode?: 'hover' | 'expandable' | 'popover';
   prefix?: string;
   suffix?: string;
   decimals?: number;
@@ -40,6 +50,8 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
   trend,
   trendValue,
   trendData = [],
+  trendExplanation,
+  trendExplanationMode = 'hover',
   prefix = '',
   suffix = '',
   decimals = 0,
@@ -106,6 +118,8 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
                     trend={trend}
                     percentage={trendValue}
                     showChart={trendData.length > 0}
+                    explanation={trendExplanation}
+                    explanationMode={trendExplanationMode}
                     className="mt-1"
                   />
                 )}
@@ -145,6 +159,8 @@ const EnhancedKpiCard: React.FC<EnhancedKpiCardProps> = ({
                     trend={trend}
                     percentage={trendValue}
                     showChart={trendData.length > 0}
+                    explanation={trendExplanation}
+                    explanationMode={trendExplanationMode}
                     className="mt-1"
                   />
                 )}
