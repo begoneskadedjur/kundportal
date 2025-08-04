@@ -13,7 +13,7 @@ import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
 import Button from '../../components/ui/Button';
 
-import { LayoutGrid, Plus, CalendarOff, ArrowLeft, LogOut } from 'lucide-react';
+import { LayoutGrid, Plus, CalendarOff, ArrowLeft, LogOut, FileText } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -153,8 +153,8 @@ export default function CoordinatorSchedule() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-                <Button onClick={() => { setSelectedCase(null); setIsCreateModalOpen(true); }} variant="primary"><Plus className="w-4 h-4 mr-2" />Skapa Nytt Ärende</Button>
-                <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary" title="Registrera frånvaro"><CalendarOff className="w-4 h-4" /></Button>
+                <Button onClick={() => { setSelectedCase(null); setIsCreateModalOpen(true); }} variant="primary"><FileText className="w-4 h-4 mr-2" />+ Nytt ärende</Button>
+                <Button onClick={() => setIsAbsenceModalOpen(true)} variant="secondary"><CalendarOff className="w-4 h-4 mr-2" />+ Frånvaro</Button>
                 <Button
                   variant="ghost"
                   size="sm"

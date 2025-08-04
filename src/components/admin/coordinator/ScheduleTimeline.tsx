@@ -71,10 +71,18 @@ const renderEventContent = (eventInfo: EventContentArg) => {
     const props = eventInfo.event.extendedProps;
 
     if (props.type === 'absence') {
+        // Special styling for "Admin" absence type (work from home)
+        const isAdminAbsence = props.reason === 'Admin';
+        const bgColor = isAdminAbsence ? 'bg-indigo-700/80' : 'bg-slate-700/80';
+        const borderColor = isAdminAbsence ? 'border-indigo-500' : 'border-slate-600';
+        const tooltipText = isAdminAbsence 
+            ? `${props.reason} - Hemarbete med offerter/admin (${new Date(props.start_date).toLocaleDateString('sv-SE')} - ${new Date(props.end_date).toLocaleDateString('sv-SE')})`
+            : `${props.reason} (${new Date(props.start_date).toLocaleDateString('sv-SE')} - ${new Date(props.end_date).toLocaleDateString('sv-SE')})`;
+        
         return (
-             <div className="w-full h-full p-2 flex items-center justify-start overflow-hidden bg-slate-700/80 border-l-4 border-slate-600 rounded-sm cursor-not-allowed"
+             <div className={`w-full h-full p-2 flex items-center justify-start overflow-hidden ${bgColor} border-l-4 ${borderColor} rounded-sm cursor-not-allowed`}
                 style={{ backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)' }}
-                title={`${props.reason} (${new Date(props.start_date).toLocaleDateString('sv-SE')} - ${new Date(props.end_date).toLocaleDateString('sv-SE')})`}>
+                title={tooltipText}>
                 <p className="font-bold text-sm text-white truncate">{props.reason}</p>
             </div>
         );

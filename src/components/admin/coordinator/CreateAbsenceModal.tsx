@@ -11,6 +11,13 @@ import Button from '../../ui/Button';
 import Input from '../../ui/Input';
 import toast from 'react-hot-toast';
 
+import DatePicker from 'react-datepicker';
+import { registerLocale } from 'react-datepicker';
+import sv from 'date-fns/locale/sv';
+import "react-datepicker/dist/react-datepicker.css";
+
+registerLocale('sv', sv);
+
 // De vanligaste anledningarna till frånvaro
 const ABSENCE_REASONS = [
   'Semester',
@@ -18,7 +25,8 @@ const ABSENCE_REASONS = [
   'Vård av barn (VAB)',
   'Utbildning',
   'Tjänstledighet',
-  'Föräldraledighet', // ✅ NYTT
+  'Föräldraledighet',
+  'Admin', // ✅ NYTT - För hemarbete med offerter/admin-uppgifter
   'Övrigt'
 ];
 
@@ -32,8 +40,8 @@ interface CreateAbsenceModalProps {
 export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technicians }: CreateAbsenceModalProps) {
   const [formData, setFormData] = useState({
     technician_id: '',
-    start_date: '',
-    end_date: '',
+    start_date: null as Date | null,
+    end_date: null as Date | null,
     reason: ABSENCE_REASONS[0],
     notes: ''
   });
@@ -44,8 +52,8 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
     if (isOpen) {
       setFormData({
         technician_id: '',
-        start_date: '',
-        end_date: '',
+        start_date: null,
+        end_date: null,
         reason: ABSENCE_REASONS[0],
         notes: ''
       });
@@ -59,6 +67,10 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleDateChange = (date: Date | null, field: 'start_date' | 'end_date') => {
+    setFormData(prev => ({ ...prev, [field]: date }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { technician_id, start_date, end_date, reason } = formData;
@@ -68,7 +80,7 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
       return;
     }
 
-    if (new Date(start_date) >= new Date(end_date)) {
+    if (start_date >= end_date) {
         toast.error('Slutdatum måste vara efter startdatum.');
         return;
     }
@@ -81,8 +93,8 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
         .from('technician_absences')
         .insert([{ 
             technician_id, 
-            start_date, 
-            end_date, 
+            start_date: start_date.toISOString(), 
+            end_date: end_date.toISOString(), 
             reason,
             notes: formData.notes || null
         }]);
@@ -138,22 +150,40 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input 
-            type="datetime-local" 
-            label="Frånvaro startar *" 
-            name="start_date" 
-            value={formData.start_date} 
-            onChange={handleChange} 
-            required 
-          />
-          <Input 
-            type="datetime-local" 
-            label="Frånvaro slutar *" 
-            name="end_date" 
-            value={formData.end_date} 
-            onChange={handleChange} 
-            required 
-          />
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Frånvaro startar *</label>
+            <DatePicker
+              selected={formData.start_date}
+              onChange={(date) => handleDateChange(date, 'start_date')}
+              locale="sv"
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd HH:mm"
+              timeCaption="Tid"
+              timeInputLabel="Tid:"
+              placeholderText="Välj startdatum och tid..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Frånvaro slutar *</label>
+            <DatePicker
+              selected={formData.end_date}
+              onChange={(date) => handleDateChange(date, 'end_date')}
+              locale="sv"
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd HH:mm"
+              timeCaption="Tid"
+              timeInputLabel="Tid:"
+              placeholderText="Välj slutdatum och tid..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+              required
+            />
+          </div>
         </div>
 
         <div>
