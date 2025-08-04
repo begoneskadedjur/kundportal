@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal';
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
+import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal';
 import Button from '../../components/ui/Button';
 
 import { LayoutGrid, Plus, CalendarOff, ArrowLeft, LogOut, FileText } from 'lucide-react';
@@ -25,6 +26,7 @@ export interface Absence {
   start_date: string;
   end_date: string;
   reason: string;
+  notes?: string;
 }
 
 const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
@@ -46,6 +48,8 @@ export default function CoordinatorSchedule() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
+  const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
+  const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -192,6 +196,10 @@ export default function CoordinatorSchedule() {
               cases={filteredScheduledCases}
               absences={absences}
               onCaseClick={handleOpenCaseModal}
+              onAbsenceClick={(absence) => {
+                setSelectedAbsence(absence);
+                setIsAbsenceDetailsModalOpen(true);
+              }}
               onUpdate={fetchData}
             />
           </main>
@@ -202,6 +210,15 @@ export default function CoordinatorSchedule() {
       {/* ✅ Skickar nu med "initialCaseData" till CreateCaseModal */}
       <CreateCaseModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); }} onSuccess={handleCreateSuccess} technicians={technicians} initialCaseData={selectedCase} />
       <CreateAbsenceModal isOpen={isAbsenceModalOpen} onClose={() => setIsAbsenceModalOpen(false)} onSuccess={handleAbsenceCreateSuccess} technicians={technicians} />
+      <AbsenceDetailsModal 
+        isOpen={isAbsenceDetailsModalOpen} 
+        onClose={() => {
+          setIsAbsenceDetailsModalOpen(false);
+          setSelectedAbsence(null);
+        }} 
+        absence={selectedAbsence}
+        technicianName={selectedAbsence ? technicians.find(t => t.id === selectedAbsence.technician_id)?.name : undefined}
+      />
       
       {/* Global Coordinator Chat */}
       <GlobalCoordinatorChat 

@@ -52,6 +52,7 @@ interface ScheduleTimelineProps {
   cases: BeGoneCaseRow[];
   absences: Absence[];
   onCaseClick: (caseData: BeGoneCaseRow) => void;
+  onAbsenceClick?: (absence: Absence) => void;
   onUpdate?: () => void;
 }
 
@@ -75,15 +76,24 @@ const renderEventContent = (eventInfo: EventContentArg) => {
         const isAdminAbsence = props.reason === 'Admin';
         const bgColor = isAdminAbsence ? 'bg-indigo-700/80' : 'bg-slate-700/80';
         const borderColor = isAdminAbsence ? 'border-indigo-500' : 'border-slate-600';
+        
+        // Format times
+        const startTime = eventInfo.event.start ? eventInfo.event.start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+        const endTime = eventInfo.event.end ? eventInfo.event.end.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+        const timeSpan = startTime && endTime ? `${startTime} - ${endTime}` : '';
+        
         const tooltipText = isAdminAbsence 
-            ? `${props.reason} - Hemarbete med offerter/admin (${new Date(props.start_date).toLocaleDateString('sv-SE')} - ${new Date(props.end_date).toLocaleDateString('sv-SE')})`
-            : `${props.reason} (${new Date(props.start_date).toLocaleDateString('sv-SE')} - ${new Date(props.end_date).toLocaleDateString('sv-SE')})`;
+            ? `${props.reason} - Hemarbete med offerter/admin\n${timeSpan}`
+            : `${props.reason}\n${timeSpan}`;
         
         return (
-             <div className={`w-full h-full p-2 flex items-center justify-start overflow-hidden ${bgColor} border-l-4 ${borderColor} rounded-sm cursor-not-allowed`}
+             <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${bgColor} border-l-4 ${borderColor} rounded-sm cursor-pointer hover:opacity-90 transition-all`}
                 style={{ backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)' }}
                 title={tooltipText}>
-                <p className="font-bold text-sm text-white truncate">{props.reason}</p>
+                <p className="font-bold text-xs text-white truncate">{props.reason}</p>
+                {timeSpan && (
+                    <p className="text-xs text-white/80 mt-0.5">{timeSpan}</p>
+                )}
             </div>
         );
     }
@@ -163,7 +173,7 @@ const getWeekNumber = (date: Date): number => {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
 };
 
-export default function ScheduleTimeline({ technicians, cases, absences, onCaseClick, onUpdate }: ScheduleTimelineProps) {
+export default function ScheduleTimeline({ technicians, cases, absences, onCaseClick, onAbsenceClick, onUpdate }: ScheduleTimelineProps) {
   
   const calendarRef = useRef<FullCalendar>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -213,6 +223,8 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
   const handleEventClick = (clickInfo: EventClickArg) => {
     if (clickInfo.event.extendedProps.type === 'case') {
       onCaseClick(clickInfo.event.extendedProps as BeGoneCaseRow);
+    } else if (clickInfo.event.extendedProps.type === 'absence' && onAbsenceClick) {
+      onAbsenceClick(clickInfo.event.extendedProps as Absence);
     }
   };
 
