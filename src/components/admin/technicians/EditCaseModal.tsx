@@ -80,27 +80,39 @@ const getAddressString = (addressData: any): string => {
 
 // Utility-funktion för att öppna Maps med smart mobil/desktop-hantering
 const openInMaps = (addressData: any) => {
-  const address = getAddressString(addressData);
-  if (!address) return;
-  
-  const encodedAddress = encodeURIComponent(address);
+  if (!addressData) return;
   
   // Detect if mobile device
   const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
   if (isMobile) {
-    // Try to open native maps app first
-    const mapsUrl = `maps:?q=${encodedAddress}`;
-    const googleMapsUrl = `https://maps.google.com/maps?q=${encodedAddress}`;
-    
-    // Fallback to web if native app fails
-    window.location.href = mapsUrl;
-    setTimeout(() => {
-      window.open(googleMapsUrl, '_blank');
-    }, 500);
+    // För mobil: använd koordinater om tillgängliga, annars adress
+    if (addressData && addressData.location && addressData.location.lat && addressData.location.lng) {
+      // Öppna Google Maps-appen med koordinater för exakt position
+      const lat = addressData.location.lat;
+      const lng = addressData.location.lng;
+      window.location.href = `https://maps.google.com/maps?q=${lat},${lng}`;
+    } else {
+      // Fallback till adress om inga koordinater
+      const address = getAddressString(addressData);
+      if (address) {
+        const encodedAddress = encodeURIComponent(address);
+        window.location.href = `https://maps.google.com/maps?q=${encodedAddress}`;
+      }
+    }
   } else {
-    // Desktop - open Google Maps in new tab
-    window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+    // Desktop - öppna Google Maps i ny flik
+    if (addressData && addressData.location && addressData.location.lat && addressData.location.lng) {
+      const lat = addressData.location.lat;
+      const lng = addressData.location.lng;
+      window.open(`https://maps.google.com/maps?q=${lat},${lng}`, '_blank');
+    } else {
+      const address = getAddressString(addressData);
+      if (address) {
+        const encodedAddress = encodeURIComponent(address);
+        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+      }
+    }
   }
 };
 
@@ -483,10 +495,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   }
 
-  // Specialhanterare för adressfältet som uppdaterar som string
+  // Specialhanterare för adressfältet som bevarar JSON-struktur men uppdaterar formatted_address
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
-    setFormData(prev => ({ ...prev, adress: value || null }));
+    
+    // Om nuvarande adress är ett JSON-objekt, behåll strukturen men uppdatera formatted_address
+    if (formData.adress && typeof formData.adress === 'object' && formData.adress.location) {
+      setFormData(prev => ({ 
+        ...prev, 
+        adress: {
+          ...formData.adress,
+          formatted_address: value || null
+        }
+      }));
+    } else {
+      // Om det är en string eller null, sätt som string
+      setFormData(prev => ({ ...prev, adress: value || null }));
+    }
   }
   
   // ✅ NY HANTERARE FÖR DEN ANPASSADE DATUMVÄLJAREN
