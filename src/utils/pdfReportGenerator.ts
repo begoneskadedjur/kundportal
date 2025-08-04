@@ -378,8 +378,8 @@ export const generatePDFReport = async (
     // Avgör om det är privatperson eller företag baserat på case_type
     const orgNumber = customerInfo?.org_number || ''
     // Använd case_type från taskDetails för att avgöra kundtyp
-    const caseTypeField = getFieldValue(taskDetails, 'case_type') 
-    const isCompany = caseTypeField?.value === 'business' || caseTypeField?.value === 'contract' || false
+    const customerTypeField = getFieldValue(taskDetails, 'case_type') 
+    const isCompany = customerTypeField?.value === 'business' || false
     
     // Professional kunduppgifter card med dynamisk layout
     const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner (ingen kontaktperson-rad)

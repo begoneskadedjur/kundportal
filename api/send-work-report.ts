@@ -313,7 +313,7 @@ async function generatePDFReportBuffer(
     const caseTypeField = taskDetails.custom_fields.find(f => 
       f.name.toLowerCase() === 'case_type' && f.has_value
     )
-    const isCompany = caseTypeField?.value === 'business' || caseTypeField?.value === 'contract' || false
+    const isCompany = caseTypeField?.value === 'business' || false
     
     const customerCardHeight = isCompany ? 85 : 75 // Mindre höjd för privatpersoner
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
