@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -36,6 +36,8 @@ interface TechnicianCase {
   work_started_at?: string | null;
   start_date?: string | null;
   due_date?: string | null;
+  // Adress (JSONB eller string)
+  adress?: any;
   // ROT/RUT fält
   r_rot_rut?: string;
   r_fastighetsbeteckning?: string;
@@ -62,6 +64,45 @@ interface BackupData {
 }
 
 const statusOrder = [ 'Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat' ];
+
+// Utility-funktion för att extrahera adress som string från JSONB eller string
+const getAddressString = (addressData: any): string => {
+  if (!addressData) return '';
+  
+  if (typeof addressData === 'string') {
+    return addressData;
+  } else if (addressData && addressData.formatted_address) {
+    return addressData.formatted_address;
+  }
+  
+  return '';
+};
+
+// Utility-funktion för att öppna Maps med smart mobil/desktop-hantering
+const openInMaps = (addressData: any) => {
+  const address = getAddressString(addressData);
+  if (!address) return;
+  
+  const encodedAddress = encodeURIComponent(address);
+  
+  // Detect if mobile device
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // Try to open native maps app first
+    const mapsUrl = `maps:?q=${encodedAddress}`;
+    const googleMapsUrl = `https://maps.google.com/maps?q=${encodedAddress}`;
+    
+    // Fallback to web if native app fails
+    window.location.href = mapsUrl;
+    setTimeout(() => {
+      window.open(googleMapsUrl, '_blank');
+    }, 500);
+  } else {
+    // Desktop - open Google Maps in new tab
+    window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+  }
+};
 
 const safeRoundMinutes = (minutes: number): number => {
   return Math.round(Math.max(0, minutes));
@@ -272,6 +313,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         material_cost: caseData.material_cost || 0,
         start_date: caseData.start_date,
         due_date: caseData.due_date,
+        // Adress (JSONB eller string)
+        adress: caseData.adress || null,
         // ClickUp-synkade fält
         rapport: caseData.rapport || '',
         // ROT/RUT-fält för privatpersoner
@@ -319,6 +362,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
         updateData.rapport = formData.rapport; // Synkas till ClickUp
+        updateData.adress = formData.adress || null; // Adress (JSONB eller string)
         
         // Lokala fält (synkas INTE till ClickUp)
         updateData.material_cost = formData.material_cost || null;
@@ -438,6 +482,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     const finalValue = type === 'number' ? (value === '' ? null : parseFloat(value)) : value;
     setFormData(prev => ({ ...prev, [name]: finalValue }));
   }
+
+  // Specialhanterare för adressfältet som uppdaterar som string
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({ ...prev, adress: value || null }));
+  }
   
   // ✅ NY HANTERARE FÖR DEN ANPASSADE DATUMVÄLJAREN
   const handleDateChange = (date: Date | null, fieldName: 'start_date' | 'due_date') => {
@@ -511,8 +561,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const showTimeTracking = (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true}>
-      <div className="p-6">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth">
+      <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
@@ -528,13 +578,33 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
             <Input label="Titel *" name="title" value={formData.title || ''} onChange={handleChange} required />
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Beskrivning</label>
-              <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={4} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="Beskrivning av ärendet..." />
+              <textarea 
+                name="description" 
+                value={formData.description || ''} 
+                onChange={handleChange} 
+                rows={4} 
+                className="w-full px-4 py-3 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed resize-vertical min-h-[100px]" 
+                placeholder="Beskriv ärendet i detalj..."
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
-                <select name="status" value={formData.status || ''} onChange={handleChange} className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
-                  {statusOrder.map(s => <option key={s} value={s}>{s}</option>)}
+                <select 
+                  name="status" 
+                  value={formData.status || ''} 
+                  onChange={handleChange} 
+                  className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 appearance-none cursor-pointer"
+                  style={{ 
+                    maxHeight: '200px',
+                    overflowY: 'auto' as const
+                  }}
+                >
+                  {statusOrder.map(s => (
+                    <option key={s} value={s} className="py-2 px-3 bg-slate-800 text-white hover:bg-slate-700">
+                      {s}
+                    </option>
+                  ))}
                 </select>
               </div>
               {showTimeTracking && (
@@ -592,6 +662,31 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input label="Telefon" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} />
                   <Input label="E-post" name="e_post_kontaktperson" type="email" value={formData.e_post_kontaktperson || ''} onChange={handleChange} />
+                </div>
+                <div className="col-span-full">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Adress
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      name="adress"
+                      value={getAddressString(formData.adress)}
+                      onChange={handleAddressChange}
+                      placeholder="Ange fullständig adress..."
+                      className="w-full px-3 py-2 pr-12 bg-slate-800/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200"
+                    />
+                    {getAddressString(formData.adress) && (
+                      <button
+                        type="button"
+                        onClick={() => openInMaps(formData.adress)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-teal-400 hover:text-teal-300 transition-colors rounded-md hover:bg-slate-700/50"
+                        title="Öppna i Maps"
+                      >
+                        <MapPin className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
