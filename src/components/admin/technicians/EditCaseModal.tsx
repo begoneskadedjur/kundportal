@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -15,6 +15,10 @@ import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import "react-datepicker/dist/react-datepicker.css"
+
+// Rapport funktionalitet
+import WorkReportDropdown from '../../shared/WorkReportDropdown'
+import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -310,6 +314,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   // ClickUp sync hook
   const { syncAfterUpdate } = useClickUpSync();
 
+  // Rapport generation hook
+  const reportGeneration = currentCase ? useWorkReportGeneration({
+    ...currentCase,
+    clickup_task_id: currentCase.id,
+    assignee_email: undefined, // EditCaseModal saknar assignee info just nu
+    assignee_name: undefined,
+    foretag: currentCase.case_type === 'business' ? 'Företag' : undefined
+  }) : null;
+
   useEffect(() => {
     if (caseData) {
       setCurrentCase(caseData);
@@ -590,6 +603,34 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth">
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+        {/* Custom header with report functionality */}
+        {reportGeneration && reportGeneration.canGenerateReport && (
+          <div className="mb-6 -mt-6 -mx-6 px-6 py-3 bg-slate-800/30 border-b border-slate-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileCheck className="w-5 h-5 text-blue-400" />
+                <span className="text-sm text-slate-300">
+                  Generera saneringsrapport för detta ärende
+                </span>
+              </div>
+              <WorkReportDropdown
+                onDownload={reportGeneration.downloadReport}
+                onSendToTechnician={reportGeneration.sendToTechnician}
+                onSendToContact={reportGeneration.sendToContact}
+                disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
+                technicianName={reportGeneration.technicianName}
+                contactName={reportGeneration.contactName}
+              />
+            </div>
+            {(!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail) && (
+              <div className="mt-2 text-xs text-amber-400">
+                {!reportGeneration.hasTechnicianEmail && '⚠️ Ingen tekniker-email tillgänglig. '}
+                {!reportGeneration.hasContactEmail && '⚠️ Ingen kontaktperson-email tillgänglig.'}
+              </div>
+            )}
+          </div>
+        )}
+        
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
         <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-6">
