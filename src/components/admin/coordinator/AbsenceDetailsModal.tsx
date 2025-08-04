@@ -62,21 +62,12 @@ export default function AbsenceDetailsModal({ isOpen, onClose, absence, technici
     }
   };
 
-  const footer = (
-    <div className="flex justify-end p-4">
-      <Button onClick={onClose} variant="secondary">
-        Stäng
-      </Button>
-    </div>
-  );
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Frånvarodetaljer"
       size="md"
-      footer={footer}
     >
       <div className="p-6 space-y-4">
         {/* Header med frånvarotyp */}
@@ -163,6 +154,13 @@ export default function AbsenceDetailsModal({ isOpen, onClose, absence, technici
             </div>
           </div>
         )}
+
+        {/* Stäng knapp - utan footer wrapper */}
+        <div className="flex justify-end pt-4">
+          <Button onClick={onClose} variant="secondary">
+            Stäng
+          </Button>
+        </div>
       </div>
     </Modal>
   );
