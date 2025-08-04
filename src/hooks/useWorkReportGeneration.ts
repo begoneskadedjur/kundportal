@@ -126,6 +126,22 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           type: 'date',
           value: caseData.start_date || '',
           has_value: !!(caseData.start_date)
+        },
+        // Telefon-fält
+        {
+          id: 'telefon_kontaktperson',
+          name: 'telefon_kontaktperson',
+          type: 'text',
+          value: caseData.telefon_kontaktperson || '',
+          has_value: !!(caseData.telefon_kontaktperson)
+        },
+        // Email-fält
+        {
+          id: 'e_post_kontaktperson',
+          name: 'e_post_kontaktperson',
+          type: 'email',
+          value: caseData.e_post_kontaktperson || '',
+          has_value: !!(caseData.e_post_kontaktperson)
         }
       ]
     }

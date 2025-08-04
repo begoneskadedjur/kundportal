@@ -48,34 +48,66 @@ interface CustomerInfo {
 const formatAddress = (addressValue: any): string => {
   if (!addressValue) return '[Adress ej angiven]'
   
-  // Om det är ett JSON-objekt med formatted_address
-  if (typeof addressValue === 'object') {
-    if (addressValue.formatted_address) {
-      // Ta bort ", Sverige" från slutet om det finns
-      let address = addressValue.formatted_address
-      if (typeof address === 'string') {
-        return address.replace(/, Sverige$/, '').trim()
+  console.log('formatAddress input:', addressValue, typeof addressValue)
+  
+  // Om det är en string som ser ut som JSON, försök parsa den
+  if (typeof addressValue === 'string') {
+    // Kolla om det är en JSON-string
+    if (addressValue.startsWith('{') && addressValue.includes('formatted_address')) {
+      try {
+        const parsed = JSON.parse(addressValue)
+        if (parsed.formatted_address) {
+          return parsed.formatted_address.replace(/, Sverige$/, '').trim()
+        }
+      } catch (e) {
+        console.warn('Failed to parse address JSON string:', e)
       }
-      return address
     }
-    // Om det är ett objekt men utan formatted_address, försök extrahera värde
-    if (addressValue.address || addressValue.street) {
-      const addr = addressValue.address || addressValue.street
-      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
-    }
-    // Om objektet innehåller koordinater men ingen formatted_address, returnera tom
-    if (addressValue.location && (addressValue.lat || addressValue.lng)) {
-      return '[Adress ej angiven]'
-    }
+    // Annars, vanlig string-adress
+    return addressValue.replace(/, Sverige$/, '').trim()
   }
   
-  // Om det är en string, returnera direkt (ta bort Sverige)
-  if (typeof addressValue === 'string' && addressValue.trim()) {
-    return addressValue.replace(/, Sverige$/, '').trim()
+  // Om det är ett objekt
+  if (typeof addressValue === 'object' && addressValue !== null) {
+    // Direkt tillgång till formatted_address
+    if (addressValue.formatted_address) {
+      const addr = addressValue.formatted_address
+      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
+    }
+    
+    // Alternativa fält
+    if (addressValue.address) {
+      const addr = addressValue.address
+      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
+    }
+    
+    if (addressValue.street) {
+      const addr = addressValue.street
+      return typeof addr === 'string' ? addr.replace(/, Sverige$/, '').trim() : addr
+    }
+    
+    // Om objektet bara innehåller koordinater utan adress
+    if (addressValue.location && !addressValue.formatted_address) {
+      return '[Adress ej angiven]'
+    }
+    
+    // Sista utväg - försök konvertera hela objektet
+    try {
+      const objStr = JSON.stringify(addressValue)
+      if (objStr.includes('formatted_address')) {
+        const match = objStr.match(/"formatted_address":"([^"]+)"/)
+        if (match && match[1]) {
+          return match[1].replace(/, Sverige$/, '').trim()
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to extract address from object:', e)
+    }
   }
   
   // Fallback
   const fallback = addressValue?.toString()?.trim() || '[Adress ej angiven]'
+  console.log('formatAddress fallback:', fallback)
   return typeof fallback === 'string' ? fallback.replace(/, Sverige$/, '') : fallback
 }
 
@@ -276,14 +308,14 @@ async function generatePDFReportBuffer(
     // Kunduppgifter sektion
     yPosition = drawSectionHeader('KUNDUPPGIFTER', yPosition)
     
-    const customerCardHeight = 55
+    const customerCardHeight = 85 // Öka höjden för fler fält
     drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
     
     const leftCol = margins.left + spacing.md
     const rightCol = margins.left + (contentWidth/2) + spacing.sm
     let cardY = yPosition + spacing.md
 
-    // Använd säkrare färger för email-kompatibilitet
+    // Row 1: Kund och kontaktperson
     pdf.setTextColor(100, 100, 100) // Grå för labels
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -299,9 +331,8 @@ async function generatePDFReportBuffer(
     pdf.text(customerInfo.company_name || '[Företagsnamn saknas]', leftCol, cardY + spacing.sm)
     pdf.text(customerInfo.contact_person || '[Kontaktperson saknas]', rightCol, cardY + spacing.sm)
     
+    // Row 2: Ärende ID och identifieringsnummer
     cardY += spacing.lg
-    
-    // Labels för rad 2
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
@@ -322,6 +353,33 @@ async function generatePDFReportBuffer(
     
     pdf.text(taskDetails.task_id, leftCol, cardY + spacing.sm)
     pdf.text(orgNumber || (isCompany ? '[Org.nr saknas]' : '[Personnummer saknas]'), rightCol, cardY + spacing.sm)
+
+    // Row 3: Telefon och email
+    cardY += spacing.lg
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    
+    // Hämta telefon och email från custom fields
+    const phoneField = taskDetails.custom_fields.find(f => 
+      (f.name.toLowerCase() === 'telefon' || f.name.toLowerCase() === 'telefon_kontaktperson') && f.has_value
+    )
+    const emailField = taskDetails.custom_fields.find(f => 
+      (f.name.toLowerCase() === 'email' || f.name.toLowerCase() === 'e_post_kontaktperson') && f.has_value
+    )
+    
+    pdf.text('TELEFON', leftCol, cardY)
+    pdf.text('EMAIL', rightCol, cardY)
+    
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    const phoneText = phoneField ? phoneField.value : '[Telefon ej angiven]'
+    const emailText = emailField ? emailField.value : '[Email ej angiven]'
+    
+    pdf.text(phoneText, leftCol, cardY + spacing.sm)
+    pdf.text(emailText, rightCol, cardY + spacing.sm)
 
     yPosition += customerCardHeight + spacing.section
 
