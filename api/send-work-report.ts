@@ -297,23 +297,52 @@ async function generatePDFReportBuffer(
     yPosition += spacing.section
 
     // Helper function för section headers
-    const drawSectionHeader = (text: string, y: number) => {
-      pdf.setFillColor(...beGoneColors.charcoal)
-      pdf.roundedRect(margins.left, y, contentWidth, 22, 4, 4, 'F')
-      pdf.setTextColor(...beGoneColors.white)
+    const drawSectionHeader = (text: string, x: number, y: number, width: number, style: 'primary' | 'accent' = 'primary') => {
+      const headerHeight = 22
+      
+      if (style === 'accent') {
+        // Accent header med BeGone green
+        pdf.setFillColor(...beGoneColors.accent)
+        pdf.roundedRect(x, y, width, headerHeight, 4, 4, 'F')
+        pdf.setTextColor(...beGoneColors.white)
+      } else {
+        // Primary header med subtle background
+        pdf.setFillColor(...beGoneColors.charcoal)
+        pdf.roundedRect(x, y, width, headerHeight, 4, 4, 'F')
+        pdf.setTextColor(...beGoneColors.white)
+      }
+      
       pdf.setFontSize(typography.sectionHeader.size)
-      pdf.setFont(undefined, typography.sectionHeader.weight)
-      pdf.text(text, pageWidth/2, y + 14, { align: 'center' })
-      return y + 22 + spacing.sm
+      pdf.setFont(undefined, 'bold')
+      pdf.text(text, x + width/2, y + headerHeight/2 + 2, { align: 'center' })
+      
+      return y + headerHeight + spacing.sm
     }
 
-    // Helper function för cards
-    const drawCard = (x: number, y: number, width: number, height: number) => {
-      pdf.setFillColor(...beGoneColors.white)
-      pdf.roundedRect(x, y, width, height, 6, 6, 'F')
-      pdf.setDrawColor(...beGoneColors.lightGray)
-      pdf.setLineWidth(0.8)
-      pdf.roundedRect(x, y, width, height, 6, 6, 'S')
+    // Professional card system med subtle shadows och borders
+    const drawCard = (x: number, y: number, width: number, height: number, options: {
+      radius?: number
+      shadow?: boolean
+      borderWeight?: number
+      backgroundColor?: 'light' | 'white'
+    } = {}) => {
+      const { radius = 6, shadow = true, borderWeight = 0.8, backgroundColor = 'white' } = options
+      
+      // Subtle drop shadow för depth
+      if (shadow) {
+        pdf.setFillColor(0, 0, 0, 0.08)
+        pdf.roundedRect(x + 1.5, y + 1.5, width, height, radius, radius, 'F')
+      }
+      
+      // Main card background
+      const bgColor = backgroundColor === 'white' ? beGoneColors.white : [248, 250, 252] // lightestGray
+      pdf.setFillColor(...bgColor)
+      pdf.roundedRect(x, y, width, height, radius, radius, 'F')
+      
+      // Professional border
+      pdf.setDrawColor(203, 213, 225) // border color
+      pdf.setLineWidth(borderWeight)
+      pdf.roundedRect(x, y, width, height, radius, radius, 'S')
     }
 
     // Kunduppgifter sektion
@@ -327,7 +356,10 @@ async function generatePDFReportBuffer(
     const isCompany = caseTypeField?.value === 'business' || false
     
     const customerCardHeight = isCompany ? 65 : 55 // Minskad höjd för mindre tom yta
-    drawCard(margins.left, yPosition, contentWidth, customerCardHeight)
+    drawCard(margins.left, yPosition, contentWidth, customerCardHeight, {
+      backgroundColor: 'white',
+      shadow: true
+    })
     
     const leftCol = margins.left + spacing.md
     const rightCol = margins.left + (contentWidth/2) + spacing.sm
@@ -433,7 +465,10 @@ async function generatePDFReportBuffer(
     
     const hasAssignee = taskDetails.assignees.length > 0
     const supplierCardHeight = hasAssignee ? 85 : 70 // Minskad höjd för mindre tom yta
-    drawCard(margins.left, yPosition, contentWidth, supplierCardHeight)
+    drawCard(margins.left, yPosition, contentWidth, supplierCardHeight, {
+      backgroundColor: 'white',
+      shadow: true
+    })
     
     cardY = yPosition + spacing.md
     
@@ -504,26 +539,136 @@ async function generatePDFReportBuffer(
       pdf.text(taskDetails.assignees[0].email, rightCol, cardY + spacing.sm)
     }
 
-    // Lägg till arbetsinformation direkt i leverantörsuppgifter-kortet (kortare version)
-    if (hasAssignee) {
-      cardY += spacing.md
+    yPosition += supplierCardHeight + spacing.md
+
+    // Sidbrytning om nödvändigt
+    if (yPosition > pageHeight - 140) {
+      pdf.addPage()
+      yPosition = spacing.xl
     }
-    
-    // Arbetsinformation som tillägg i leverantörskortet
-    cardY += spacing.md
+
+    // === ARBETSINFORMATION SEKTION ===
+    yPosition = drawSectionHeader('ARBETSINFORMATION', margins.left, yPosition, contentWidth)
+
+    const workCardHeight = 70 // Minskad höjd för mindre tom yta
+    drawCard(margins.left, yPosition, contentWidth, workCardHeight, {
+      backgroundColor: 'light',
+      shadow: true
+    })
+
+    cardY = yPosition + spacing.md
+
+    // Hämta relevanta fält
+    const addressField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'adress' && f.has_value
+    )
+    const pestField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'skadedjur' && f.has_value
+    )
+    const caseTypeField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'ärende' && f.has_value
+    )
+    const startDateField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'start_date' && f.has_value
+    )
+    const priorityField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'prioritet' && f.has_value
+    )
+
+    // Rad 1: Datum och adress
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(8)
     pdf.setFont(undefined, 'bold')
-    pdf.text('ÄRENDE', leftCol, cardY)
-    pdf.text('STATUS', rightCol, cardY)
+    pdf.text('DATUM FÖR UTFÖRANDE', leftCol, cardY)
+    pdf.text('ARBETSPLATS', rightCol, cardY)
     
     pdf.setTextColor(20, 20, 20)
     pdf.setFontSize(typography.body.size)
     pdf.setFont(undefined, 'normal')
-    pdf.text(taskDetails.task_info.name, leftCol, cardY + spacing.sm)
-    pdf.text(taskDetails.task_info.status, rightCol, cardY + spacing.sm)
+    
+    // Använd start_date om tillgängligt, annars created datum
+    let workDate = 'Ej angivet'
+    if (startDateField && startDateField.value) {
+      const startDate = new Date(startDateField.value)
+      if (!isNaN(startDate.getTime())) {
+        workDate = startDate.toLocaleDateString('sv-SE', {
+          year: 'numeric',
+          month: '2-digit', 
+          day: '2-digit'
+        })
+      }
+    } else {
+      const createdDate = new Date(parseInt(taskDetails.task_info.created))
+      if (!isNaN(createdDate.getTime())) {
+        workDate = createdDate.toLocaleDateString('sv-SE', {
+          year: 'numeric',
+          month: '2-digit', 
+          day: '2-digit'
+        })
+      }
+    }
+    pdf.text(workDate, leftCol, cardY + spacing.sm)
+    
+    // Använd formatAddress för konsistent adresshantering
+    const addressText = addressField ? formatAddress(addressField.value) : '[Adress ej angiven]'
+    
+    const maxAddressWidth = (contentWidth/2) - spacing.lg
+    const addressLines = pdf.splitTextToSize(addressText, maxAddressWidth)
+    pdf.text(addressLines.slice(0, 2), rightCol, cardY + spacing.sm)
 
-    yPosition += supplierCardHeight + spacing.md + 20 // Extra plats för arbetsinformation
+    // Rad 2: Skadedjur och ärendetyp
+    cardY += spacing.md
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    pdf.text('ÄRENDET AVSER', leftCol, cardY)
+    if (caseTypeField) {
+      pdf.text('TYP AV INSATS', rightCol, cardY)
+    }
+    
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    
+    const getDropdownText = (field: any): string => {
+      if (!field || !field.has_value) return 'Ej specificerat'
+      
+      if (field.type_config?.options && Array.isArray(field.type_config.options)) {
+        const selectedOption = field.type_config.options.find((option: any) => 
+          option.orderindex === field.value
+        )
+        if (selectedOption) {
+          return selectedOption.name
+        }
+      }
+      
+      return field.value?.toString() || 'Ej specificerat'
+    }
+    
+    pdf.text(pestField ? getDropdownText(pestField) : 'Ej specificerat', leftCol, cardY + spacing.sm)
+    if (caseTypeField) {
+      pdf.text(getDropdownText(caseTypeField), rightCol, cardY + spacing.sm)
+    }
+
+    // Rad 3: Status och prioritet  
+    cardY += spacing.md
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.setFont(undefined, 'bold')
+    pdf.text('ARBETSSTATUS', leftCol, cardY)
+    if (priorityField) {
+      pdf.text('PRIORITETSNIVÅ', rightCol, cardY)
+    }
+    
+    pdf.setTextColor(20, 20, 20)
+    pdf.setFontSize(typography.body.size)
+    pdf.setFont(undefined, 'normal')
+    pdf.text(taskDetails.task_info.status || 'Okänd status', leftCol, cardY + spacing.sm)
+    if (priorityField) {
+      pdf.text(getDropdownText(priorityField), rightCol, cardY + spacing.sm)
+    }
+
+    yPosition += workCardHeight + spacing.md
 
     // Saneringsrapport sektion (om det finns rapport-data)
     const reportField = taskDetails.custom_fields.find(f => 
@@ -558,7 +703,11 @@ async function generatePDFReportBuffer(
       
       // Rita card med samma bredd som andra sektioner
       // Rita card med samma bredd som andra sektioner
-      drawCard(margins.left, yPosition, contentWidth, reportBoxHeight)
+      drawCard(margins.left, yPosition, contentWidth, reportBoxHeight, {
+        backgroundColor: 'white',
+        shadow: true,
+        borderWeight: 1.2
+      })
       
       // Rapport innehåll med professionell formatering (font redan satt)
       pdf.setTextColor(20, 20, 20) // Säker mörk färg för email
@@ -573,7 +722,109 @@ async function generatePDFReportBuffer(
         textY += lineHeight
       })
       
-      yPosition += reportBoxHeight + spacing.md // Minska section-avstånd
+      yPosition += reportBoxHeight + spacing.md
+    } else {
+      // Placeholder om ingen rapport finns
+      yPosition = drawSectionHeader('SANERINGSRAPPORT', margins.left, yPosition, contentWidth, 'primary')
+      
+      drawCard(margins.left, yPosition, contentWidth, 40, {
+        backgroundColor: 'light',
+        shadow: false
+      })
+      
+      pdf.setFontSize(typography.body.size)
+      pdf.setFont(undefined, 'italic')
+      pdf.setTextColor(100, 100, 100) // mediumGray
+      pdf.text('Ingen detaljerad rapport registrerad för detta ärende.', margins.left + spacing.md, yPosition + spacing.lg)
+      
+      yPosition += 40 + spacing.md
+    }
+
+    // === BEHANDLINGSMETODER OCH ÅTGÄRDER ===
+    const treatmentMethodField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'behandlingsmetod' && f.has_value
+    )
+    const followUpField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'uppföljning' && f.has_value
+    )
+    
+    if (treatmentMethodField || followUpField) {
+      // Sidbrytning om nödvändigt
+      if (yPosition > pageHeight - 80) {
+        pdf.addPage()
+        yPosition = spacing.xl
+      }
+
+      yPosition = drawSectionHeader('BEHANDLINGSMETODER & ÅTGÄRDER', margins.left, yPosition, contentWidth, 'primary')
+      
+      const treatmentCardHeight = 50
+      drawCard(margins.left, yPosition, contentWidth, treatmentCardHeight, {
+        backgroundColor: 'light',
+        shadow: true
+      })
+
+      cardY = yPosition + spacing.md
+
+      if (treatmentMethodField) {
+        pdf.setTextColor(100, 100, 100)
+        pdf.setFontSize(8)
+        pdf.setFont(undefined, 'bold')
+        pdf.text('BEHANDLINGSMETOD', leftCol, cardY)
+        
+        pdf.setTextColor(20, 20, 20)
+        pdf.setFontSize(typography.body.size)
+        pdf.setFont(undefined, 'normal')
+        pdf.text(getDropdownText(treatmentMethodField), leftCol, cardY + spacing.sm)
+      }
+
+      if (followUpField) {
+        pdf.setTextColor(100, 100, 100)
+        pdf.setFontSize(8)
+        pdf.setFont(undefined, 'bold')
+        pdf.text('UPPFÖLJNING', rightCol, cardY)
+        
+        pdf.setTextColor(20, 20, 20)
+        pdf.setFontSize(typography.body.size)
+        pdf.setFont(undefined, 'normal')
+        pdf.text(getDropdownText(followUpField), rightCol, cardY + spacing.sm)
+      }
+
+      yPosition += treatmentCardHeight + spacing.md
+    }
+
+    // === EKONOMISK SAMMANFATTNING ===
+    const priceField = taskDetails.custom_fields.find(f => 
+      f.name.toLowerCase() === 'pris' && f.has_value
+    )
+    
+    if (priceField && priceField.has_value) {
+      // Sidbrytning om nödvändigt
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage()
+        yPosition = spacing.xl
+      }
+      
+      yPosition = drawSectionHeader('EKONOMISK SAMMANFATTNING', margins.left, yPosition, contentWidth, 'accent')
+      
+      const costCardHeight = 35
+      drawCard(margins.left, yPosition, contentWidth, costCardHeight, {
+        backgroundColor: 'white',
+        shadow: true,
+        borderWeight: 1.5
+      })
+      
+      // Professional kostnadspresentation
+      pdf.setTextColor(20, 20, 20)
+      pdf.setFontSize(12)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Totalkostnad för utförd sanering:', margins.left + spacing.md, yPosition + spacing.md)
+      
+      pdf.setTextColor(...beGoneColors.accent)
+      pdf.setFontSize(18)
+      pdf.setFont(undefined, 'bold')
+      pdf.text(`${priceField.value} SEK`, contentWidth - margins.right, yPosition + spacing.lg, { align: 'right' })
+      
+      yPosition += costCardHeight + spacing.md
     }
 
     // Footer - bara på sista sidan med säkra färger
