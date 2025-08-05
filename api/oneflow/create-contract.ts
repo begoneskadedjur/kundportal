@@ -329,8 +329,7 @@ export default async function handler(
           const productGroupPayload = {
             products: oneflowProducts,
             configuration: {
-              hide_price_summation: false,
-              allow_quantity_change: false
+              hide_price_summation: false
             }
           }
           
