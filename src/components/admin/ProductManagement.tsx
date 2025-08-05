@@ -69,6 +69,64 @@ interface ProductFormData {
   requiresConsultation?: boolean
 }
 
+// Utility-funktioner för variant-hantering
+const normalizeVariantSortOrder = (variants: PriceVariant[]): PriceVariant[] => {
+  return variants
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    .map((variant, index) => ({
+      ...variant,
+      sortOrder: index
+    }))
+}
+
+const moveVariantUp = (variants: PriceVariant[], variantId: string): PriceVariant[] => {
+  try {
+    if (!variants.length || !variantId) return variants
+    
+    const normalizedVariants = normalizeVariantSortOrder(variants)
+    const currentIndex = normalizedVariants.findIndex(v => v.id === variantId)
+    
+    // Validering
+    if (currentIndex <= 0) return variants // Kan inte flytta första uppåt eller variant hittades inte
+    
+    // Byt plats med föregående
+    const newVariants = [...normalizedVariants]
+    const temp = newVariants[currentIndex]
+    newVariants[currentIndex] = newVariants[currentIndex - 1]
+    newVariants[currentIndex - 1] = temp
+    
+    // Normalisera sortOrder igen
+    return normalizeVariantSortOrder(newVariants)
+  } catch (error) {
+    console.error('Error moving variant up:', error)
+    return variants // Return original array on error
+  }
+}
+
+const moveVariantDown = (variants: PriceVariant[], variantId: string): PriceVariant[] => {
+  try {
+    if (!variants.length || !variantId) return variants
+    
+    const normalizedVariants = normalizeVariantSortOrder(variants)
+    const currentIndex = normalizedVariants.findIndex(v => v.id === variantId)
+    
+    // Validering
+    if (currentIndex < 0 || currentIndex >= normalizedVariants.length - 1) return variants // Kan inte flytta sista nedåt eller variant hittades inte
+    
+    // Byt plats med nästa
+    const newVariants = [...normalizedVariants]
+    const temp = newVariants[currentIndex]
+    newVariants[currentIndex] = newVariants[currentIndex + 1]
+    newVariants[currentIndex + 1] = temp
+    
+    // Normalisera sortOrder igen
+    return normalizeVariantSortOrder(newVariants)
+  } catch (error) {
+    console.error('Error moving variant down:', error)
+    return variants // Return original array on error
+  }
+}
+
 // Kategori-ikon mapping
 const getCategoryIcon = (category: ProductCategory): string => {
   switch (category) {
@@ -585,6 +643,7 @@ interface ProductModalProps {
 }
 
 const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose }) => {
+  const [sortingVariantId, setSortingVariantId] = useState<string | null>(null)
   const [formData, setFormData] = useState<ProductFormData>(() => {
     if (product) {
       return {
@@ -604,7 +663,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
             discountPercent: product.pricing.individual.discountPercent || 0
           }
         },
-        priceVariants: product.priceVariants || [],
+        priceVariants: normalizeVariantSortOrder(product.priceVariants || []),
         quantityType: product.quantityType,
         oneflowCompatible: product.oneflowCompatible,
         defaultQuantity: product.defaultQuantity,
@@ -856,20 +915,22 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                   description: '',
                   pricing: {
                     company: {
-                      basePrice: 0, // Börja med tomt pris istället för att kopiera baspris
+                      basePrice: 0,
                       vatRate: formData.pricing.company.vatRate,
                       discountPercent: 0
                     },
                     individual: {
-                      basePrice: 0, // Börja med tomt pris istället för att kopiera baspris
+                      basePrice: 0,
                       taxDeduction: formData.pricing.individual.taxDeduction,
                       discountPercent: 0
                     }
                   },
                   isDefault: formData.priceVariants.length === 0,
-                  sortOrder: formData.priceVariants.length
+                  sortOrder: formData.priceVariants.length // Tillfällig sortOrder, kommer normaliseras
                 }
-                updateFormData('priceVariants', [...formData.priceVariants, newVariant])
+                // Lägg till variant och normalisera sortOrder
+                const newVariants = normalizeVariantSortOrder([...formData.priceVariants, newVariant])
+                updateFormData('priceVariants', newVariants)
               }}
               className="flex items-center gap-1"
             >
@@ -916,62 +977,61 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            if (sortedIndex === 0) return // Kan inte flytta första uppåt
-                            const sortedVariants = [...formData.priceVariants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                            // Hitta aktuell variant och den ovanför i sorterad lista
-                            const currentVariant = sortedVariants[sortedIndex]
-                            const aboveVariant = sortedVariants[sortedIndex - 1]
-                            
-                            // Byt sortOrder mellan varianterna
-                            const variants = formData.priceVariants.map(variant => {
-                              if (variant.id === currentVariant.id) {
-                                return { ...variant, sortOrder: aboveVariant.sortOrder }
+                          onClick={async () => {
+                            setSortingVariantId(variant.id)
+                            try {
+                              const newVariants = moveVariantUp(formData.priceVariants, variant.id)
+                              if (newVariants !== formData.priceVariants) {
+                                updateFormData('priceVariants', newVariants)
                               }
-                              if (variant.id === aboveVariant.id) {
-                                return { ...variant, sortOrder: currentVariant.sortOrder }
-                              }
-                              return variant
-                            })
-                            
-                            updateFormData('priceVariants', variants)
+                              // Kort delay för att visa feedback
+                              await new Promise(resolve => setTimeout(resolve, 150))
+                            } catch (error) {
+                              console.error('Failed to move variant up:', error)
+                              toast.error('Kunde inte flytta variant uppåt')
+                            } finally {
+                              setSortingVariantId(null)
+                            }
                           }}
-                          disabled={sortedIndex === 0}
+                          disabled={sortedIndex === 0 || sortingVariantId === variant.id}
                           className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 py-1 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Flytta upp"
                         >
-                          <ChevronUp className="w-3 h-3" />
+                          {sortingVariantId === variant.id ? (
+                            <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <ChevronUp className="w-3 h-3" />
+                          )}
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            const sortedVariants = [...formData.priceVariants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                            if (sortedIndex === sortedVariants.length - 1) return // Kan inte flytta sista nedåt
-                            
-                            // Hitta aktuell variant och den nedanför i sorterad lista
-                            const currentVariant = sortedVariants[sortedIndex]
-                            const belowVariant = sortedVariants[sortedIndex + 1]
-                            
-                            // Byt sortOrder mellan varianterna
-                            const variants = formData.priceVariants.map(variant => {
-                              if (variant.id === currentVariant.id) {
-                                return { ...variant, sortOrder: belowVariant.sortOrder }
+                          onClick={async () => {
+                            setSortingVariantId(variant.id)
+                            try {
+                              const newVariants = moveVariantDown(formData.priceVariants, variant.id)
+                              if (newVariants !== formData.priceVariants) {
+                                updateFormData('priceVariants', newVariants)
                               }
-                              if (variant.id === belowVariant.id) {
-                                return { ...variant, sortOrder: currentVariant.sortOrder }
-                              }
-                              return variant
-                            })
-                            
-                            updateFormData('priceVariants', variants)
+                              // Kort delay för att visa feedback
+                              await new Promise(resolve => setTimeout(resolve, 150))
+                            } catch (error) {
+                              console.error('Failed to move variant down:', error)
+                              toast.error('Kunde inte flytta variant nedåt')
+                            } finally {
+                              setSortingVariantId(null)
+                            }
                           }}
-                          disabled={sortedIndex === formData.priceVariants.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).length - 1}
+                          disabled={sortedIndex === normalizeVariantSortOrder(formData.priceVariants).length - 1 || sortingVariantId === variant.id}
                           className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 py-1 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Flytta ned"
                         >
-                          <ChevronDown className="w-3 h-3" />
+                          {sortingVariantId === variant.id ? (
+                            <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
                         </Button>
                       </div>
                       
@@ -1000,7 +1060,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== originalIndex))
+                          // Ta bort variant och normalisera sortOrder
+                          const filteredVariants = formData.priceVariants.filter((_, i) => i !== originalIndex)
+                          const normalizedVariants = normalizeVariantSortOrder(filteredVariants)
+                          updateFormData('priceVariants', normalizedVariants)
                         }}
                         className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-all duration-200"
                         title="Ta bort variant"
