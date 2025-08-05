@@ -886,21 +886,22 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                   <p className="text-xs">Klicka "Lägg till variant" för att skapa alternativ</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-6">
                   {formData.priceVariants.map((variant, index) => (
-                    <div key={variant.id} className="bg-slate-700/50 p-4 rounded-lg border border-slate-600/30">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs bg-slate-600 text-slate-300 px-2 py-1 rounded">
-                            #{index + 1}
+                    <div key={variant.id} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm bg-slate-600/60 text-slate-200 px-3 py-1.5 rounded-lg font-medium">
+                            Variant #{index + 1}
                           </span>
                           {variant.isDefault && (
-                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                            <span className="text-sm bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                              <Star className="w-3 h-3 fill-current" />
                               Standard
                             </span>
                           )}
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                           <Button
                             type="button"
                             variant="ghost"
@@ -916,10 +917,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                               }
                               updateFormData('priceVariants', variants)
                             }}
-                            className="text-green-400 hover:text-green-300 px-2"
+                            className="text-green-400 hover:text-green-300 hover:bg-green-500/10 px-3 py-2 rounded-lg transition-all duration-200"
                             title={variant.isDefault ? "Ta bort som standard" : "Sätt som standard"}
                           >
-                            <Star className={`w-3 h-3 ${variant.isDefault ? 'fill-current' : ''}`} />
+                            <Star className={`w-4 h-4 ${variant.isDefault ? 'fill-current' : ''}`} />
                           </Button>
                           <Button
                             type="button"
@@ -928,91 +929,115 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             onClick={() => {
                               updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== index))
                             }}
-                            className="text-red-400 hover:text-red-300 px-2"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-all duration-200"
                             title="Ta bort variant"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <Input
-                            label="Variantnamn *"
-                            value={variant.name}
-                            onChange={(e) => {
-                              const variants = [...formData.priceVariants]
-                              variants[index] = { ...variants[index], name: e.target.value }
-                              updateFormData('priceVariants', variants)
-                            }}
-                            placeholder="t.ex. 2 sovrum + vardagsrum"
-                            className="text-sm"
-                          />
-                          <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Beskrivning
-                            </label>
-                            <textarea
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-sm"
-                              rows={2}
-                              value={variant.description || ''}
+                      <div className="space-y-4">
+                        <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600/20">
+                          <h5 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                            <Info className="w-4 h-4 text-purple-400" />
+                            Variantinformation
+                          </h5>
+                          <div className="space-y-4">
+                            <Input
+                              label="Variantnamn *"
+                              value={variant.name}
                               onChange={(e) => {
                                 const variants = [...formData.priceVariants]
-                                variants[index] = { ...variants[index], description: e.target.value }
+                                variants[index] = { ...variants[index], name: e.target.value }
                                 updateFormData('priceVariants', variants)
                               }}
-                              placeholder="Detaljerad beskrivning..."
+                              placeholder="t.ex. 2 sovrum + vardagsrum"
+                              helperText="Kort beskrivande namn för denna variant"
+                              className="text-base"
                             />
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Detaljerad beskrivning
+                              </label>
+                              <textarea
+                                className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-base leading-relaxed"
+                                rows={3}
+                                value={variant.description || ''}
+                                onChange={(e) => {
+                                  const variants = [...formData.priceVariants]
+                                  variants[index] = { ...variants[index], description: e.target.value }
+                                  updateFormData('priceVariants', variants)
+                                }}
+                                placeholder="Detaljerad beskrivning av vad som ingår i denna variant..."
+                              />
+                              <p className="text-xs text-slate-500 mt-1">
+                                Beskriv vad som ingår och skiljer denna variant från andra
+                              </p>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input
-                              label="Företag (exkl. moms)"
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={variant.pricing.company.basePrice}
-                              onChange={(e) => {
-                                const variants = [...formData.priceVariants]
-                                variants[index] = {
-                                  ...variants[index],
-                                  pricing: {
-                                    ...variants[index].pricing,
-                                    company: {
-                                      ...variants[index].pricing.company,
-                                      basePrice: Number(e.target.value)
+                        <div className="space-y-4">
+                          <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-600/20">
+                            <h5 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                              <DollarSign className="w-4 h-4 text-blue-400" />
+                              Prissättning för variant
+                            </h5>
+                            <div className="space-y-4">
+                              <div>
+                                <Input
+                                  label="Företagspris (exkl. moms) *"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={variant.pricing.company.basePrice}
+                                  onChange={(e) => {
+                                    const variants = [...formData.priceVariants]
+                                    variants[index] = {
+                                      ...variants[index],
+                                      pricing: {
+                                        ...variants[index].pricing,
+                                        company: {
+                                          ...variants[index].pricing.company,
+                                          basePrice: Number(e.target.value)
+                                        }
+                                      }
                                     }
-                                  }
-                                }
-                                updateFormData('priceVariants', variants)
-                              }}
-                              className="text-sm"
-                            />
-                            <Input
-                              label="Privatperson (inkl. moms)"
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={variant.pricing.individual.basePrice}
-                              onChange={(e) => {
-                                const variants = [...formData.priceVariants]
-                                variants[index] = {
-                                  ...variants[index],
-                                  pricing: {
-                                    ...variants[index].pricing,
-                                    individual: {
-                                      ...variants[index].pricing.individual,
-                                      basePrice: Number(e.target.value)
+                                    updateFormData('priceVariants', variants)
+                                  }}
+                                  placeholder="2490"
+                                  helperText="Pris i hela kronor exklusive moms"
+                                  className="text-base"
+                                />
+                              </div>
+                              <div>
+                                <Input
+                                  label="Privatpris (inkl. moms) *"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={variant.pricing.individual.basePrice}
+                                  onChange={(e) => {
+                                    const variants = [...formData.priceVariants]
+                                    variants[index] = {
+                                      ...variants[index],
+                                      pricing: {
+                                        ...variants[index].pricing,
+                                        individual: {
+                                          ...variants[index].pricing.individual,
+                                          basePrice: Number(e.target.value)
+                                        }
+                                      }
                                     }
-                                  }
-                                }
-                                updateFormData('priceVariants', variants)
-                              }}
-                              className="text-sm"
-                            />
+                                    updateFormData('priceVariants', variants)
+                                  }}
+                                  placeholder="3490"
+                                  helperText="Pris i hela kronor inklusive moms"
+                                  className="text-base"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

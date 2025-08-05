@@ -226,7 +226,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <div className="text-right">
               <div className="text-sm text-slate-400">Totalt:</div>
               <div className="font-semibold text-green-400">
-                {formatPrice(calculateProductPrice({ product, quantity }, customerType))}
+                {formatPrice(calculateProductPrice({ 
+                  product, 
+                  quantity, 
+                  selectedVariant 
+                }, customerType))}
               </div>
             </div>
           )}
