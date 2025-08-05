@@ -14,9 +14,63 @@ interface ContractRequestBody {
   }
   sendForSigning: boolean
   partyType: 'company' | 'individual'
+  documentType: 'offer' | 'contract'
   // 🆕 NYTT: Dynamisk användare från frontend
   senderEmail?: string
   senderName?: string
+}
+
+// 🆕 FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
+const FIELD_MAPPING = {
+  // Avtal → Offert mappning
+  contract_to_offer: {
+    'anstalld': 'vr-kontaktperson',
+    'e-post-anstlld': 'vr-kontakt-mail',
+    'Kontaktperson': 'kontaktperson',
+    'e-post-kontaktperson': 'kontaktperson-e-post',
+    'telefonnummer-kontaktperson': 'tel-nr',
+    'utforande-adress': 'utfrande-adress',
+    'org-nr': 'per--org-nr',
+    'foretag': 'kund',
+    'begynnelsedag': 'utfrande-datum',
+    'dokument-skapat': 'offert-skapad',
+    'stycke-1': 'arbetsbeskrivning',
+    'stycke-2': '' // Inte använd i offerter
+  }
+}
+
+// 🆕 BYGG DATAFÄLT BASERAT PÅ DOKUMENTTYP
+function buildDataFieldsForDocument(
+  contractData: Record<string, string>, 
+  documentType: 'offer' | 'contract'
+): Array<{ custom_id: string; value: string }> {
+  if (documentType === 'contract') {
+    // För avtal, använd befintlig struktur
+    return Object.entries(contractData).map(([custom_id, value]) => ({ custom_id, value }))
+  }
+  
+  // För offerter, mappa fält till offertspecifika namn
+  const mappedFields: Array<{ custom_id: string; value: string }> = []
+  const mapping = FIELD_MAPPING.contract_to_offer
+  
+  Object.entries(contractData).forEach(([contractField, value]) => {
+    const offerField = mapping[contractField as keyof typeof mapping]
+    
+    if (offerField && offerField !== '' && value) {
+      mappedFields.push({ custom_id: offerField, value })
+    }
+  })
+  
+  // Lägg till offertspecifika fält med standardvärden
+  const currentDate = new Date().toISOString().split('T')[0]
+  mappedFields.push(
+    { custom_id: 'offert-skapad', value: currentDate },
+    { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' },
+    { custom_id: 'faktura-referens', value: `Offert-${Date.now()}` },
+    { custom_id: 'mrkning-av-faktura', value: 'BeGone Offert' }
+  )
+  
+  return mappedFields
 }
 
 // 🆕 VALIDERA ANVÄNDARRÄTTIGHETER
@@ -74,6 +128,7 @@ export default async function handler(
     recipient,
     sendForSigning,
     partyType,
+    documentType,
     senderEmail,
     senderName
   } = req.body as ContractRequestBody
@@ -105,11 +160,11 @@ export default async function handler(
     return res.status(500).json({ message: 'Server configuration error.' })
   }
 
-  console.log(`🔧 Skapar kontrakt med avsändare: ${userName} (${userEmail})`)
+  const documentTypeText = documentType === 'offer' ? 'offert' : 'kontrakt'
+  console.log(`🔧 Skapar ${documentTypeText} med avsändare: ${userName} (${userEmail})`)
 
-  const data_fields = Object.entries(contractData).map(
-    ([custom_id, value]) => ({ custom_id, value })
-  )
+  // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
+  const data_fields = buildDataFieldsForDocument(contractData, documentType)
 
   const parties = []
 
@@ -180,15 +235,16 @@ export default async function handler(
       return res.status(createResponse.status).json(createdContract)
     }
 
-    console.log('✅ Kontrakt skapat framgångsrikt:', createdContract.id)
+    console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat framgångsrikt:`, createdContract.id)
 
     if (sendForSigning) {
       console.log('🚀 Publicerar kontrakt för signering...')
       
-      // 🆕 PERSONALISERAT MEDDELANDE FRÅN AKTUELL ANVÄNDARE
+      // 🆕 PERSONALISERAT MEDDELANDE BASERAT PÅ DOKUMENTTYP
+      const isOffer = documentType === 'offer'
       const publishPayload = {
-        subject: `Avtal från BeGone Skadedjur & Sanering AB`,
-        message: `Hej ${recipient.name}!\n\nBifogat finner du vårt avtal för signering.\n\nMed vänliga hälsningar,\n${userName}\nBeGone Skadedjur & Sanering AB`
+        subject: `${isOffer ? 'Offert' : 'Avtal'} från BeGone Skadedjur & Sanering AB`,
+        message: `Hej ${recipient.name}!\n\nBifogat finner du vår${isOffer ? 't offertförslag' : 't avtal'} för ${isOffer ? 'granskning' : 'signering'}.\n\nMed vänliga hälsningar,\n${userName}\nBeGone Skadedjur & Sanering AB`
       }
 
       const publishResponse = await fetch(
@@ -207,16 +263,16 @@ export default async function handler(
 
       if (!publishResponse.ok) {
         const publishError = await publishResponse.json()
-        console.error('⚠️ Kontrakt skapat men kunde inte publiceras:', JSON.stringify(publishError, null, 2))
+        console.error(`⚠️ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat men kunde inte publiceras:`, JSON.stringify(publishError, null, 2))
         
         return res.status(200).json({ 
           contract: createdContract,
-          warning: 'Kontrakt skapat men kunde inte skickas för signering automatiskt',
+          warning: `${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat men kunde inte skickas ${isOffer ? 'för granskning' : 'för signering'} automatiskt`,
           publishError: publishError
         })
       }
 
-      console.log('✅ Kontrakt publicerat och skickat för signering')
+      console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} publicerat och skickat för ${isOffer ? 'granskning' : 'signering'}`)
     }
 
     return res.status(200).json({ 
