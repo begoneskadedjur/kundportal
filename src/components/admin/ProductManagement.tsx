@@ -255,13 +255,16 @@ export default function ProductManagement({ className = '' }: ProductManagementP
       sortOrder: variant.sortOrder
     })) || []
 
-    // Skapa duplicerad produkt med nytt ID och modifierat namn
+    // Skapa duplicerad produkt UTAN ID så att den behandlas som ny
     const duplicatedProduct: ProductItem = {
       ...product,
-      id: `duplicate-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      // Inget ID sätts så att handleSaveProduct skapar en ny produkt
       name: `${product.name} (Kopia)`,
       priceVariants: duplicatedVariants.length > 0 ? duplicatedVariants : undefined
     }
+
+    // Ta bort ID från objektet för att säkerställa att det behandlas som ny
+    delete (duplicatedProduct as any).id
 
     // Öppna modal för redigering av den duplicerade produkten
     setEditingProduct(duplicatedProduct)
