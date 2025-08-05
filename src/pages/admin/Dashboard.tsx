@@ -20,7 +20,8 @@ import {
   Target,
   UserCheck,
   Wallet,
-  Settings
+  Settings,
+  Package
 } from 'lucide-react'
 
 import Card from '../../components/ui/Card'
@@ -416,6 +417,16 @@ const AdminDashboard: React.FC = () => {
                   stats="Webhook logs"
                   tag="Diagnostik"
                   iconColor="text-teal-500"
+                />
+
+                <AdminDashboardCard
+                  href="/admin/product-management"
+                  icon={Package}
+                  title="Produkthantering"
+                  description="Skapa & redigera tjänster"
+                  stats="Dynamisk prissättning"
+                  tag="Katalog"
+                  iconColor="text-blue-500"
                 />
                 
                 <AdminDashboardCard

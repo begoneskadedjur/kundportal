@@ -20,6 +20,7 @@ import Technicians from './pages/admin/Technicians';
 import TechnicianManagement from './pages/admin/TechnicianManagement';
 import TechnicianCommissions from './pages/admin/TechnicianCommissions';
 import SalesOpportunities from './pages/admin/SalesOpportunities';
+import ProductManagementPage from './pages/admin/ProductManagement';
 
 // ONEFLOW ROUTES
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
@@ -138,6 +139,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <SalesOpportunities />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/product-management" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <ProductManagementPage />
                 </ProtectedRoute>
               } 
             />
