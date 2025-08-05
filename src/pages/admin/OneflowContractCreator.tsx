@@ -2,6 +2,8 @@
 // KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
 import React, { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Confetti from 'react-confetti'
 import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
@@ -11,6 +13,7 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ProductSelector from '../../components/admin/ProductSelector'
 import ProductSummary from '../../components/admin/ProductSummary'
+import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType } from '../../types/products'
 import { calculatePriceSummary, generateContractDescription, validateOneflowCompatibility } from '../../utils/pricingCalculator'
 import toast from 'react-hot-toast'
@@ -114,7 +117,9 @@ export default function OneflowContractCreator() {
   const { user, profile } = useAuth() // 🆕 HÄMTA ANVÄNDARINFO
   const [currentStep, setCurrentStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
+  const [creationStep, setCreationStep] = useState('')
   const [createdContract, setCreatedContract] = useState<any>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
   
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -234,7 +239,10 @@ export default function OneflowContractCreator() {
     }
 
     setIsCreating(true)
+    setCreationStep('Förbereder data...')
+    
     try {
+      setCreationStep('Ansluter till Oneflow...')
       const response = await fetch('/api/oneflow/create-contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,14 +266,22 @@ export default function OneflowContractCreator() {
         throw new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
       }
       
+      setCreationStep('Skapar dokument...')
       const result = await response.json()
+      
+      setCreationStep('Slutför...')
       setCreatedContract(result.contract)
-      toast.success('✅ Kontrakt skapat framgångsrikt!')
+      setShowConfetti(true)
+      toast.success('✅ Kontrakt skapat framgångslikt!')
+      
+      // Stäng av confetti efter 5 sekunder
+      setTimeout(() => setShowConfetti(false), 5000)
       
     } catch (err: any) {
       toast.error(`❌ Fel: ${err.message}`)
     } finally {
       setIsCreating(false)
+      setCreationStep('')
     }
   }
 
@@ -299,13 +315,22 @@ export default function OneflowContractCreator() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              <div
+              <motion.div
                 onClick={() => updateWizardData('documentType', 'offer')}
-                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
+                className={`p-8 rounded-xl border-2 cursor-pointer relative overflow-hidden ${
                   wizardData.documentType === 'offer'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
+                    : 'border-slate-700 bg-slate-800/50'
                 }`}
+                whileHover={{ 
+                  scale: 1.02, 
+                  boxShadow: wizardData.documentType === 'offer' 
+                    ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
+                    : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
+                  borderColor: wizardData.documentType === 'offer' ? '#22c55e' : '#64748b'
+                }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
               >
                 <div className="text-center">
                   <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -321,18 +346,33 @@ export default function OneflowContractCreator() {
                     <div>• ROT/RUT-avdrag</div>
                   </div>
                   {wizardData.documentType === 'offer' && (
-                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                    >
+                      <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                    </motion.div>
                   )}
                 </div>
-              </div>
+              </motion.div>
 
-              <div
+              <motion.div
                 onClick={() => updateWizardData('documentType', 'contract')}
-                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
+                className={`p-8 rounded-xl border-2 cursor-pointer relative overflow-hidden ${
                   wizardData.documentType === 'contract'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
+                    : 'border-slate-700 bg-slate-800/50'
                 }`}
+                whileHover={{ 
+                  scale: 1.02, 
+                  boxShadow: wizardData.documentType === 'contract' 
+                    ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
+                    : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
+                  borderColor: wizardData.documentType === 'contract' ? '#22c55e' : '#64748b'
+                }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
               >
                 <div className="text-center">
                   <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -348,10 +388,16 @@ export default function OneflowContractCreator() {
                     <div>• Speciallösningar</div>
                   </div>
                   {wizardData.documentType === 'contract' && (
-                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                    >
+                      <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                    </motion.div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         )
@@ -369,15 +415,26 @@ export default function OneflowContractCreator() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {availableTemplates.map(template => (
-                <div
+              {availableTemplates.map((template, index) => (
+                <motion.div
                   key={template.id}
                   onClick={() => updateWizardData('selectedTemplate', template.id)}
-                  className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
+                  className={`relative p-6 rounded-xl border-2 cursor-pointer overflow-hidden ${
                     wizardData.selectedTemplate === template.id
-                      ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
-                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                      ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
+                      : 'border-slate-700 bg-slate-800/50'
                   }`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ 
+                    scale: 1.02, 
+                    boxShadow: wizardData.selectedTemplate === template.id 
+                      ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
+                      : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
+                    borderColor: wizardData.selectedTemplate === template.id ? '#22c55e' : '#64748b'
+                  }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   {template.popular && (
                     <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
@@ -395,12 +452,17 @@ export default function OneflowContractCreator() {
                     <h3 className="text-lg font-semibold text-white mb-2">{template.name}</h3>
                     
                     {wizardData.selectedTemplate === template.id && (
-                      <div className="flex items-center justify-center mt-4">
+                      <motion.div 
+                        className="flex items-center justify-center mt-4"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                      >
                         <CheckCircle className="w-6 h-6 text-green-500" />
-                      </div>
+                      </motion.div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -857,10 +919,14 @@ export default function OneflowContractCreator() {
                 size="lg"
               >
                 {isCreating ? (
-                  <>
+                  <motion.div 
+                    className="flex items-center gap-2"
+                    animate={{ opacity: [1, 0.7, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
                     <LoadingSpinner size="sm" />
-                    Skapar kontrakt...
-                  </>
+                    {creationStep || 'Skapar kontrakt...'}
+                  </motion.div>
                 ) : (
                   <>
                     <CheckCircle className="w-5 h-5 mr-2" />
@@ -955,6 +1021,16 @@ export default function OneflowContractCreator() {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      {/* Success Confetti */}
+      {showConfetti && (
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}  
+          recycle={false}
+          numberOfPieces={200}
+          gravity={0.3}
+        />
+      )}
       {/* Header */}
       <header className="bg-slate-900/50 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -980,69 +1056,32 @@ export default function OneflowContractCreator() {
         </div>
       </header>
 
-      {/* Progress Steps */}
-      <div className="bg-slate-900/30 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            {STEPS.map((step, index) => {
-              const Icon = step.icon
-              const isActive = currentStep === step.id
-              const isCompleted = currentStep > step.id
-              const isClickable = currentStep > step.id || currentStep === step.id
-              
-              // Dölj steg 3 (avtalspart) för offerter eftersom det väljs automatiskt
-              const shouldSkip = step.id === 3 && wizardData.documentType === 'offer' && wizardData.selectedTemplate
-              if (shouldSkip) return null
-              
-              return (
-                <div key={step.id} className="flex items-center">
-                  <div 
-                    className={`flex items-center gap-3 ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
-                    onClick={() => isClickable && setCurrentStep(step.id)}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                      isCompleted 
-                        ? 'border-green-500 bg-green-500 text-white' 
-                        : isActive 
-                          ? 'border-blue-500 bg-blue-500 text-white' 
-                          : 'border-slate-600 bg-slate-800 text-slate-400'
-                    }`}>
-                      {isCompleted ? (
-                        <CheckCircle className="w-5 h-5" />
-                      ) : (
-                        <Icon className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="hidden md:block">
-                      <p className={`text-sm font-medium ${
-                        isActive ? 'text-blue-400' : isCompleted ? 'text-green-400' : 'text-slate-400'
-                      }`}>
-                        Steg {step.id}
-                      </p>
-                      <p className={`text-xs ${
-                        isActive ? 'text-white' : isCompleted ? 'text-slate-300' : 'text-slate-500'
-                      }`}>
-                        {step.title}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {index < STEPS.length - 1 && (
-                    <div className={`w-8 md:w-16 h-0.5 mx-2 md:mx-4 ${
-                      currentStep > step.id ? 'bg-green-500' : 'bg-slate-700'
-                    }`} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Enhanced Progress Steps */}
+      <AnimatedProgressBar
+        steps={STEPS}
+        currentStep={currentStep}
+        onStepClick={setCurrentStep}
+        documentType={wizardData.documentType}
+        selectedTemplate={wizardData.selectedTemplate}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="min-h-[600px]">
-          {renderStepContent()}
+        <div className="min-h-[600px] overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{
+                duration: 0.4,
+                ease: "easeInOut"
+              }}
+            >
+              {renderStepContent()}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Navigation Buttons */}
