@@ -129,6 +129,8 @@ function convertProductsToOneflow(
       let basePrice = customPrice || pricing?.basePrice || 0
       let discountAmount = 0
       
+      let originalPrice = basePrice
+      
       // Beräkna rabatt om tillgänglig
       if (pricing?.discountPercent && !customPrice) {
         discountAmount = basePrice * (pricing.discountPercent / 100)
@@ -143,24 +145,26 @@ function convertProductsToOneflow(
         oneflowQuantityType = 'multiple_choice'
       }
       
-      const finalPrice = Math.round(basePrice * 100).toString()
-      const finalDiscountAmount = discountAmount > 0 ? Math.round(discountAmount * 100).toString() : "0"
+      // Sätt korrekt prisstruktur för Oneflow
+      const baseAmountString = Math.round(originalPrice * 100).toString()
+      const discountAmountString = discountAmount > 0 ? Math.round(discountAmount * 100).toString() : "0"
+      const finalAmountString = Math.round(basePrice * 100).toString() // Detta är det faktiska priset som ska visas
+      const discountPercentString = discountAmount > 0 ? ((discountAmount / originalPrice) * 100).toFixed(3) : "0.000"
       
       return {
         name: product.name,
         description: product.description,
         price_1: {
-          base_amount: { amount: finalPrice },
-          discount_amount: { amount: finalDiscountAmount },
-          // Lägg till amount och discount_percent för full kompatibilitet
-          amount: { amount: Math.round((basePrice - discountAmount) * 100).toString() },
-          discount_percent: discountAmount > 0 ? ((discountAmount / basePrice) * 100).toFixed(3) : "0.000"
+          base_amount: { amount: baseAmountString },
+          discount_amount: { amount: discountAmountString },
+          amount: { amount: finalAmountString },
+          discount_percent: discountPercentString
         },
         price_2: {
-          base_amount: { amount: finalPrice },
-          discount_amount: { amount: finalDiscountAmount },
-          amount: { amount: Math.round((basePrice - discountAmount) * 100).toString() },
-          discount_percent: discountAmount > 0 ? ((discountAmount / basePrice) * 100).toFixed(3) : "0.000"
+          base_amount: { amount: baseAmountString },
+          discount_amount: { amount: discountAmountString },
+          amount: { amount: finalAmountString },
+          discount_percent: discountPercentString
         },
         quantity: {
           type: oneflowQuantityType,
