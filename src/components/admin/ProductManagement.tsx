@@ -13,7 +13,8 @@ import {
   X,
   Package,
   DollarSign,
-  Info
+  Info,
+  ArrowLeft
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -179,14 +180,24 @@ export default function ProductManagement({ className = '' }: ProductManagementP
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Package className="w-8 h-8 text-green-400" />
-            Produkthantering
-          </h1>
-          <p className="text-slate-400 mt-1">
-            Hantera produkter och tjänster för avtal och offerter
-          </p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => window.history.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Tillbaka
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <Package className="w-8 h-8 text-green-400" />
+              Produkthantering
+            </h1>
+            <p className="text-slate-400 mt-1">
+              Hantera produkter och tjänster för avtal och offerter
+            </p>
+          </div>
         </div>
         
         <Button

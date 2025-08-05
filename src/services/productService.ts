@@ -286,7 +286,7 @@ export function useProducts() {
     try {
       const newProduct = await ProductService.createProduct(product)
       setProducts(prev => [...prev, newProduct])
-      toast.success('Produkten skapades framgångsrikt')
+      // Toast hanteras av komponenten
       return newProduct
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Kunde inte skapa produkten'
@@ -302,7 +302,7 @@ export function useProducts() {
       setProducts(prev => 
         prev.map(p => p.id === product.id ? updatedProduct : p)
       )
-      toast.success('Produkten uppdaterades framgångsrikt')
+      // Toast hanteras av komponenten
       return updatedProduct
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Kunde inte uppdatera produkten'
@@ -316,7 +316,7 @@ export function useProducts() {
     try {
       await ProductService.deleteProduct(productId)
       setProducts(prev => prev.filter(p => p.id !== productId))
-      toast.success('Produkten togs bort framgångsrikt')
+      // Toast hanteras av komponenten
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Kunde inte ta bort produkten'
       toast.error(errorMessage)

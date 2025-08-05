@@ -398,6 +398,37 @@ export default function ProductSelector({
   // Ladda produkter från databas
   const { products: allProducts, loading, error } = useProducts()
 
+  // Helper-funktioner för kategorier (flytta före useMemo)
+  const getCategoryName = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Skadedjursbekämpning'
+      case 'preventive': return 'Preventiva lösningar'
+      case 'specialty': return 'Specialtjänster'
+      case 'additional': return 'Tillvalstjänster'
+      default: return category
+    }
+  }
+
+  const getCategoryDescription = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Aktiv bekämpning av skadedjur'
+      case 'preventive': return 'Förebyggande åtgärder och kontinuerlig övervakning'
+      case 'specialty': return 'Sanering, desinfektion och specialbehandlingar'
+      case 'additional': return 'Tillval och tilläggstjänster'
+      default: return ''
+    }
+  }
+
+  const getCategoryOrder = (category: ProductCategory): number => {
+    switch (category) {
+      case 'pest_control': return 1
+      case 'preventive': return 2
+      case 'specialty': return 3
+      case 'additional': return 4
+      default: return 5
+    }
+  }
+
   // Filtrerade produkter organiserade per kategori
   const filteredGroups = useMemo(() => {
     // Filtrera produkter baserat på sök och kategori
@@ -429,37 +460,6 @@ export default function ProductSelector({
       displayOrder: getCategoryOrder(category as ProductCategory)
     })).sort((a, b) => a.displayOrder - b.displayOrder)
   }, [allProducts, searchTerm, selectedCategory])
-
-  // Helper-funktioner för kategorier
-  const getCategoryName = (category: ProductCategory): string => {
-    switch (category) {
-      case 'pest_control': return 'Skadedjursbekämpning'
-      case 'preventive': return 'Preventiva lösningar'
-      case 'specialty': return 'Specialtjänster'
-      case 'additional': return 'Tillvalstjänster'
-      default: return category
-    }
-  }
-
-  const getCategoryDescription = (category: ProductCategory): string => {
-    switch (category) {
-      case 'pest_control': return 'Aktiv bekämpning av skadedjur'
-      case 'preventive': return 'Förebyggande åtgärder och kontinuerlig övervakning'
-      case 'specialty': return 'Sanering, desinfektion och specialbehandlingar'
-      case 'additional': return 'Tillval och tilläggstjänster'
-      default: return ''
-    }
-  }
-
-  const getCategoryOrder = (category: ProductCategory): number => {
-    switch (category) {
-      case 'pest_control': return 1
-      case 'preventive': return 2
-      case 'specialty': return 3
-      case 'additional': return 4
-      default: return 5
-    }
-  }
 
   // Hantera kvantitetsändringar
   const handleQuantityChange = (productId: string, newQuantity: number) => {
