@@ -100,7 +100,15 @@ function convertProductsToOneflow(
   description: string
   price_1: {
     base_amount: { amount: string }
-    discount_amount?: { amount: string }
+    discount_amount: { amount: string }
+    amount: { amount: string }
+    discount_percent: string
+  }
+  price_2: {
+    base_amount: { amount: string }
+    discount_amount: { amount: string }
+    amount: { amount: string }
+    discount_percent: string
   }
   quantity: {
     type: string
@@ -135,12 +143,24 @@ function convertProductsToOneflow(
         oneflowQuantityType = 'multiple_choice'
       }
       
+      const finalPrice = Math.round(basePrice * 100).toString()
+      const finalDiscountAmount = discountAmount > 0 ? Math.round(discountAmount * 100).toString() : "0"
+      
       return {
         name: product.name,
         description: product.description,
         price_1: {
-          base_amount: { amount: Math.round(basePrice * 100).toString() }, // Oneflow kräver objekt med string
-          ...(discountAmount > 0 && { discount_amount: { amount: Math.round(discountAmount * 100).toString() } })
+          base_amount: { amount: finalPrice },
+          discount_amount: { amount: finalDiscountAmount },
+          // Lägg till amount och discount_percent för full kompatibilitet
+          amount: { amount: Math.round((basePrice - discountAmount) * 100).toString() },
+          discount_percent: discountAmount > 0 ? ((discountAmount / basePrice) * 100).toFixed(3) : "0.000"
+        },
+        price_2: {
+          base_amount: { amount: finalPrice },
+          discount_amount: { amount: finalDiscountAmount },
+          amount: { amount: Math.round((basePrice - discountAmount) * 100).toString() },
+          discount_percent: discountAmount > 0 ? ((discountAmount / basePrice) * 100).toFixed(3) : "0.000"
         },
         quantity: {
           type: oneflowQuantityType,
