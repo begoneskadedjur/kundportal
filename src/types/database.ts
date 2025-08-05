@@ -275,6 +275,48 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['billing_audit_log']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['billing_audit_log']['Insert']>
       }
+      products: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          category: 'pest_control' | 'preventive' | 'specialty' | 'additional'
+          
+          // Företagspriser (i hela kronor)
+          company_base_price: number
+          company_vat_rate: number
+          company_discount_percent: number
+          
+          // Privatpriser (i hela kronor)
+          individual_base_price: number
+          individual_tax_deduction: 'rot' | 'rut' | null
+          individual_discount_percent: number
+          
+          // Kvantitetsinställningar
+          quantity_type: 'quantity' | 'single_choice' | 'multiple_choice'
+          default_quantity: number
+          max_quantity: number
+          
+          // Egenskaper
+          oneflow_compatible: boolean
+          is_popular: boolean
+          rot_eligible: boolean
+          rut_eligible: boolean
+          seasonal_available: boolean
+          requires_consultation: boolean
+          
+          // Kontraktsbeskrivning
+          contract_description: string
+          
+          // Metadata
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          is_active: boolean
+        }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['products']['Insert']>
+      }
       visits: {
         Row: {
           id: string
