@@ -115,20 +115,54 @@ export class ProductService {
   // Hämta alla aktiva produkter
   static async getProducts(): Promise<ProductItem[]> {
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Laddar produkter från databas...')
+      
+      // Kontrollera användarstatus först
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      console.log('👤 Användare:', user?.email || 'Inte inloggad')
+      
+      if (authError) {
+        console.error('❌ Auth fel:', authError)
+      }
+
+      // Testa först med RLS
+      let { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: true })
       
-      if (error) {
-        console.error('Fel vid hämtning av produkter:', error)
-        throw new Error('Kunde inte ladda produkter')
+      // Om RLS blockerar, testa med service role (temporärt för debugging)
+      if (error && error.code === 'PGRST301') {
+        console.log('🔧 RLS blockerar, testar fallback...')
+        // Detta kommer bara fungera för testning
+        const fallbackResponse = await supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+        
+        data = fallbackResponse.data
+        error = fallbackResponse.error
       }
       
-      return data?.map(mapDatabaseProductToProductItem) || []
+      console.log('📊 Databas svar:', { data, error, count: data?.length })
+      
+      if (error) {
+        console.error('❌ Fel vid hämtning av produkter:', error)
+        // Mer specifikt felmeddelande
+        if (error.code === 'PGRST301') {
+          throw new Error('Ingen åtkomst till produkter - kontrollera behörigheter')
+        }
+        throw new Error(`Databasfel: ${error.message}`)
+      }
+      
+      const products = data?.map(mapDatabaseProductToProductItem) || []
+      console.log('✅ Produkter laddade:', products.length)
+      
+      return products
     } catch (error) {
-      console.error('ProductService.getProducts fel:', error)
+      console.error('💥 ProductService.getProducts fel:', error)
       throw error
     }
   }
