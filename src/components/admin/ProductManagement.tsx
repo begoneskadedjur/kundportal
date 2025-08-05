@@ -1,6 +1,6 @@
 // src/components/admin/ProductManagement.tsx - Admin produkthantering
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { 
   Plus, 
   Edit2, 
@@ -25,8 +25,8 @@ import {
   ProductCategory, 
   CustomerType 
 } from '../../types/products'
-import { BEGONE_PRODUCT_GROUPS } from '../../data/begoneProducts'
 import { formatPrice } from '../../utils/pricingCalculator'
+import { useProducts } from '../../services/productService'
 import toast from 'react-hot-toast'
 
 interface ProductManagementProps {
@@ -86,18 +86,20 @@ const getCategoryName = (category: ProductCategory): string => {
 
 export default function ProductManagement({ className = '' }: ProductManagementProps) {
   // State
-  const [products, setProducts] = useState<ProductItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
 
-  // Ladda produkter från den befintliga datan (senare från databas)
-  useEffect(() => {
-    const allProducts = BEGONE_PRODUCT_GROUPS.flatMap(group => group.products)
-    setProducts(allProducts)
-  }, [])
+  // Använd produkthook för databas-integration
+  const { 
+    products, 
+    loading: isLoading, 
+    error,
+    createProduct, 
+    updateProduct, 
+    deleteProduct 
+  } = useProducts()
 
   // Filtrerade produkter
   const filteredProducts = products.filter(product => {
@@ -128,22 +130,16 @@ export default function ProductManagement({ className = '' }: ProductManagementP
       return
     }
 
-    setIsLoading(true)
     try {
-      // TODO: Implementera databas-borttagning
-      setProducts(prev => prev.filter(p => p.id !== productId))
-      toast.success('Produkten har tagits bort')
+      await deleteProduct(productId)
     } catch (error) {
       console.error('Fel vid borttagning:', error)
-      toast.error('Kunde inte ta bora produkten')
-    } finally {
-      setIsLoading(false)
+      // Felmeddelande hanteras redan i useProducts hook
     }
   }
 
-  // Hantera spara produkt
+  // Hantera spara produkt  
   const handleSaveProduct = async (productData: ProductFormData) => {
-    setIsLoading(true)
     try {
       const newProduct: ProductItem = {
         id: productData.id || `custom-${Date.now()}`,
@@ -165,24 +161,17 @@ export default function ProductManagement({ className = '' }: ProductManagementP
 
       if (productData.id) {
         // Uppdatera befintlig produkt
-        setProducts(prev => 
-          prev.map(p => p.id === productData.id ? newProduct : p)
-        )
-        toast.success('Produkten har uppdaterats')
+        await updateProduct(newProduct)
       } else {
         // Skapa ny produkt
-        setProducts(prev => [...prev, newProduct])
-        toast.success('Ny produkt har skapats')
+        await createProduct(newProduct)
       }
 
       setIsModalOpen(false)
-      // TODO: Implementera databas-spara
     } catch (error) {
       console.error('Fel vid sparande:', error)
-      toast.error('Kunde inte spara produkten')
+      // Felmeddelande hanteras redan i useProducts hook
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -209,6 +198,15 @@ export default function ProductManagement({ className = '' }: ProductManagementP
           Ny produkt
         </Button>
       </div>
+
+      {/* Felmeddelande */}
+      {error && (
+        <Card className="p-4 bg-red-500/10 border-red-500/20">
+          <div className="text-red-400">
+            <strong>Fel:</strong> {error}
+          </div>
+        </Card>
+      )}
 
       {/* Sök och filter */}
       <Card className="p-6">

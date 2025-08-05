@@ -12,7 +12,7 @@ import {
   CustomerType,
   ProductCategory 
 } from '../../types/products'
-import { BEGONE_PRODUCT_GROUPS } from '../../data/begoneProducts'
+import { useProducts } from '../../services/productService'
 import { calculateProductPrice, formatPrice } from '../../utils/pricingCalculator'
 
 interface ProductSelectorProps {
@@ -395,19 +395,71 @@ export default function ProductSelector({
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all')
   const [customProducts, setCustomProducts] = useState<CustomProduct[]>([])
 
-  // Filtrerade produktgrupper
+  // Ladda produkter från databas
+  const { products: allProducts, loading, error } = useProducts()
+
+  // Filtrerade produkter organiserade per kategori
   const filteredGroups = useMemo(() => {
-    return BEGONE_PRODUCT_GROUPS
-      .filter(group => selectedCategory === 'all' || group.category === selectedCategory)
-      .map(group => ({
-        ...group,
-        products: group.products.filter(product =>
-          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.description.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      }))
-      .filter(group => group.products.length > 0)
-  }, [searchTerm, selectedCategory])
+    // Filtrera produkter baserat på sök och kategori
+    const filtered = allProducts.filter(product => {
+      const matchesSearch = 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+      return matchesSearch && matchesCategory
+    })
+
+    // Gruppera per kategori
+    const groupedByCategory = filtered.reduce((groups, product) => {
+      if (!groups[product.category]) {
+        groups[product.category] = []
+      }
+      groups[product.category].push(product)
+      return groups
+    }, {} as Record<ProductCategory, ProductItem[]>)
+
+    // Skapa ProductGroup-strukturer
+    return Object.entries(groupedByCategory).map(([category, products]) => ({
+      id: `${category}-group`,
+      name: getCategoryName(category as ProductCategory),
+      description: getCategoryDescription(category as ProductCategory),
+      category: category as ProductCategory,
+      icon: getCategoryIcon(category as ProductCategory),
+      products,
+      displayOrder: getCategoryOrder(category as ProductCategory)
+    })).sort((a, b) => a.displayOrder - b.displayOrder)
+  }, [allProducts, searchTerm, selectedCategory])
+
+  // Helper-funktioner för kategorier
+  const getCategoryName = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Skadedjursbekämpning'
+      case 'preventive': return 'Preventiva lösningar'
+      case 'specialty': return 'Specialtjänster'
+      case 'additional': return 'Tillvalstjänster'
+      default: return category
+    }
+  }
+
+  const getCategoryDescription = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Aktiv bekämpning av skadedjur'
+      case 'preventive': return 'Förebyggande åtgärder och kontinuerlig övervakning'
+      case 'specialty': return 'Sanering, desinfektion och specialbehandlingar'
+      case 'additional': return 'Tillval och tilläggstjänster'
+      default: return ''
+    }
+  }
+
+  const getCategoryOrder = (category: ProductCategory): number => {
+    switch (category) {
+      case 'pest_control': return 1
+      case 'preventive': return 2
+      case 'specialty': return 3
+      case 'additional': return 4
+      default: return 5
+    }
+  }
 
   // Hantera kvantitetsändringar
   const handleQuantityChange = (productId: string, newQuantity: number) => {
@@ -417,7 +469,6 @@ export default function ProductSelector({
       onSelectionChange(updatedProducts)
     } else {
       // Hitta produkten
-      const allProducts = BEGONE_PRODUCT_GROUPS.flatMap(g => g.products)
       const product = allProducts.find(p => p.id === productId)
       if (!product) return
 
@@ -504,28 +555,52 @@ export default function ProductSelector({
             size="sm"
             onClick={() => setSelectedCategory('all')}
           >
-            Alla kategorier
+            Alla kategorier ({allProducts.length})
           </Button>
-          {BEGONE_PRODUCT_GROUPS.map(group => (
-            <Button
-              key={group.id}
-              variant={selectedCategory === group.category ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory(group.category)}
-              className="flex items-center gap-2"
-            >
-              <span>{getCategoryIcon(group.category)}</span>
-              {group.name}
-            </Button>
-          ))}
+          {(['pest_control', 'preventive', 'specialty', 'additional'] as ProductCategory[]).map(category => {
+            const count = allProducts.filter(p => p.category === category).length
+            if (count === 0) return null
+            
+            return (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+                className="flex items-center gap-2"
+              >
+                <span>{getCategoryIcon(category)}</span>
+                {getCategoryName(category)} ({count})
+              </Button>
+            )
+          })}
         </div>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">Laddar produkter...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <Card className="p-6 bg-red-500/10 border-red-500/20">
+          <div className="text-red-400 text-center">
+            <strong>Fel:</strong> {error}
+          </div>
+        </Card>
+      )}
+
       {/* Anpassad produkt kort */}
-      <CustomProductCard
-        customerType={customerType}
-        onAddCustomProduct={handleAddCustomProduct}
-      />
+      {!loading && !error && (
+        <CustomProductCard
+          customerType={customerType}
+          onAddCustomProduct={handleAddCustomProduct}
+        />
+      )}
 
       {/* Valda anpassade produkter */}
       {customProducts.length > 0 && (
@@ -583,34 +658,36 @@ export default function ProductSelector({
       )}
 
       {/* Produktgrupper och produkter */}
-      <div className="space-y-8">
-        {filteredGroups.map(group => (
-          <div key={group.id}>
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span className="text-2xl">{group.icon}</span>
-                {group.name}
-              </h2>
-              <p className="text-slate-400 text-sm mt-1">{group.description}</p>
+      {!loading && !error && (
+        <div className="space-y-8">
+          {filteredGroups.map(group => (
+            <div key={group.id}>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="text-2xl">{group.icon}</span>
+                  {group.name}
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">{group.description}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.products.map(product => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    selectedProduct={getSelectedProduct(product.id)}
+                    customerType={customerType}
+                    onQuantityChange={handleQuantityChange}
+                  />
+                ))}
+              </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {group.products.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  selectedProduct={getSelectedProduct(product.id)}
-                  customerType={customerType}
-                  onQuantityChange={handleQuantityChange}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Ingen träff */}
-      {filteredGroups.length === 0 && (
+      {!loading && !error && filteredGroups.length === 0 && allProducts.length > 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🔍</div>
           <h3 className="text-xl font-semibold text-white mb-2">Inga produkter hittades</h3>
