@@ -33,13 +33,24 @@ export interface PricingTier {
   }
 }
 
+// Prisvariant för produkter med olika prissättningsalternativ
+export interface PriceVariant {
+  id: string                 // Unik identifierare för varianten
+  name: string              // Namn på varianten (t.ex. "2 sovrum + vardagsrum")
+  description?: string      // Detaljerad beskrivning av varianten
+  pricing: PricingTier      // Priser för denna variant
+  isDefault?: boolean       // Om detta är standardvarianten
+  sortOrder?: number        // Sorteringsordning i UI
+}
+
 // Produktdefinition
 export interface ProductItem {
   id: string
   name: string
   description: string
   category: ProductCategory
-  pricing: PricingTier
+  pricing: PricingTier          // Baspris (används om inga prisvarianter finns)
+  priceVariants?: PriceVariant[] // Optionella prisvarianter
   quantityType: QuantityType
   
   // Oneflow-specifika fält
@@ -75,6 +86,7 @@ export interface ProductGroup {
 export interface SelectedProduct {
   product: ProductItem
   quantity: number
+  selectedVariant?: PriceVariant  // Vald prisvariant (om produkten har varianter)
   customPrice?: number
   notes?: string
 }

@@ -1,7 +1,7 @@
 // src/services/productService.ts - Supabase service för produkthantering
 
 import { supabase } from '../lib/supabase'
-import { ProductItem } from '../types/products'
+import { ProductItem, PriceVariant } from '../types/products'
 import toast from 'react-hot-toast'
 
 // Databas-typ som matchar products tabellen
@@ -11,15 +11,18 @@ export interface DatabaseProduct {
   description: string
   category: 'pest_control' | 'preventive' | 'specialty' | 'additional'
   
-  // Företagspriser
+  // Företagspriser (baspris)
   company_base_price: number
   company_vat_rate: number
   company_discount_percent: number
   
-  // Privatpriser
+  // Privatpriser (baspris)
   individual_base_price: number
   individual_tax_deduction: 'rot' | 'rut' | null
   individual_discount_percent: number
+  
+  // Prisvarianter (JSON-fält)
+  price_variants: any[] | null  // JSON array med prisvarianter
   
   // Kvantitet
   quantity_type: 'quantity' | 'single_choice' | 'multiple_choice'
@@ -46,6 +49,19 @@ export interface DatabaseProduct {
 
 // Konvertera från databas-format till ProductItem
 export function mapDatabaseProductToProductItem(dbProduct: DatabaseProduct): ProductItem {
+  // Hantera prisvarianter (JSON-fält från databas)
+  let priceVariants: PriceVariant[] | undefined = undefined
+  if (dbProduct.price_variants && Array.isArray(dbProduct.price_variants)) {
+    priceVariants = dbProduct.price_variants.map((variant: any) => ({
+      id: variant.id,
+      name: variant.name,
+      description: variant.description,
+      pricing: variant.pricing,
+      isDefault: variant.isDefault || false,
+      sortOrder: variant.sortOrder || 0
+    }))
+  }
+
   return {
     id: dbProduct.id,
     name: dbProduct.name,
@@ -63,6 +79,7 @@ export function mapDatabaseProductToProductItem(dbProduct: DatabaseProduct): Pro
         discountPercent: dbProduct.individual_discount_percent > 0 ? dbProduct.individual_discount_percent : undefined
       }
     },
+    priceVariants,
     quantityType: dbProduct.quantity_type,
     defaultQuantity: dbProduct.default_quantity,
     maxQuantity: dbProduct.max_quantity,
@@ -78,6 +95,16 @@ export function mapDatabaseProductToProductItem(dbProduct: DatabaseProduct): Pro
 
 // Konvertera från ProductItem till databas-format
 export function mapProductItemToDatabaseProduct(product: ProductItem, userId?: string): Omit<DatabaseProduct, 'created_at' | 'updated_at'> {
+  // Konvertera prisvarianter till JSON för databas
+  const priceVariants = product.priceVariants ? product.priceVariants.map(variant => ({
+    id: variant.id,
+    name: variant.name,
+    description: variant.description,
+    pricing: variant.pricing,
+    isDefault: variant.isDefault || false,
+    sortOrder: variant.sortOrder || 0
+  })) : null
+
   return {
     id: product.id,
     name: product.name,
@@ -91,6 +118,8 @@ export function mapProductItemToDatabaseProduct(product: ProductItem, userId?: s
     individual_base_price: product.pricing.individual.basePrice,
     individual_tax_deduction: product.pricing.individual.taxDeduction || null,
     individual_discount_percent: product.pricing.individual.discountPercent || 0,
+    
+    price_variants: priceVariants,
     
     quantity_type: product.quantityType,
     default_quantity: product.defaultQuantity,
@@ -107,6 +136,32 @@ export function mapProductItemToDatabaseProduct(product: ProductItem, userId?: s
     created_by: userId || null,
     is_active: true
   }
+}
+
+// Hjälpfunktion för att få rätt pris från produkt/variant
+export function getProductPrice(product: ProductItem, variantId?: string, customerType: 'company' | 'individual' = 'company') {
+  // Om variant specificeras, använd den
+  if (variantId && product.priceVariants) {
+    const variant = product.priceVariants.find(v => v.id === variantId)
+    if (variant) {
+      return variant.pricing[customerType].basePrice
+    }
+  }
+  
+  // Annars använd baspris
+  return product.pricing[customerType].basePrice
+}
+
+// Hjälpfunktion för att få standardvariant eller baspris
+export function getDefaultProductVariant(product: ProductItem): PriceVariant | null {
+  if (!product.priceVariants?.length) return null
+  
+  // Hitta default variant
+  const defaultVariant = product.priceVariants.find(v => v.isDefault)
+  if (defaultVariant) return defaultVariant
+  
+  // Annars första varianten (sorterad)
+  return [...product.priceVariants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))[0]
 }
 
 // Service-klass för produkthantering

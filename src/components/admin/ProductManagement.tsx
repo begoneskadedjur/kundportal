@@ -24,7 +24,8 @@ import {
   ProductItem, 
   ProductGroup, 
   ProductCategory, 
-  CustomerType 
+  CustomerType,
+  PriceVariant 
 } from '../../types/products'
 import { formatPrice } from '../../utils/pricingCalculator'
 import { useProducts } from '../../services/productService'
@@ -51,6 +52,7 @@ interface ProductFormData {
       discountPercent?: number
     }
   }
+  priceVariants: PriceVariant[]  // Prisvarianter
   quantityType: 'quantity' | 'single_choice' | 'multiple_choice'
   oneflowCompatible: boolean
   defaultQuantity: number
@@ -179,6 +181,7 @@ export default function ProductManagement({ className = '' }: ProductManagementP
         description: productData.description,
         category: productData.category,
         pricing: productData.pricing,
+        priceVariants: productData.priceVariants.length > 0 ? productData.priceVariants : undefined,
         quantityType: productData.quantityType,
         oneflowCompatible: productData.oneflowCompatible,
         defaultQuantity: productData.defaultQuantity,
@@ -555,6 +558,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
             discountPercent: product.pricing.individual.discountPercent || 0
           }
         },
+        priceVariants: product.priceVariants || [],
         quantityType: product.quantityType,
         oneflowCompatible: product.oneflowCompatible,
         defaultQuantity: product.defaultQuantity,
@@ -582,6 +586,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
             discountPercent: 0
           }
         },
+        priceVariants: [],
         quantityType: 'quantity',
         oneflowCompatible: true,
         defaultQuantity: 1,
