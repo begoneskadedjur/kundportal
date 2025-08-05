@@ -7,7 +7,9 @@ import {
   Trash2, 
   Search, 
   ShieldCheck, 
-  Leaf, 
+  Leaf,
+  ChevronUp,
+  ChevronDown, 
   Star,
   Save,
   X,
@@ -888,12 +890,17 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
             </div>
           ) : (
             <div className="space-y-6">
-              {formData.priceVariants.map((variant, index) => (
+              {formData.priceVariants
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                .map((variant, sortedIndex) => {
+                  // Hitta rätt index i ursprungliga arrayen för uppdateringar
+                  const originalIndex = formData.priceVariants.findIndex(v => v.id === variant.id)
+                  return (
                 <div key={variant.id} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <span className="text-sm bg-slate-600/60 text-slate-200 px-3 py-1.5 rounded-lg font-medium">
-                        Variant #{index + 1}
+                        Variant #{sortedIndex + 1}
                       </span>
                       {variant.isDefault && (
                         <span className="text-sm bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
@@ -903,17 +910,76 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                       )}
                     </div>
                     <div className="flex gap-2">
+                      {/* Flytta upp/ned pilar */}
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (sortedIndex === 0) return // Kan inte flytta första uppåt
+                            const sortedVariants = [...formData.priceVariants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                            // Hitta aktuell variant och den ovanför i sorterad lista
+                            const currentVariant = sortedVariants[sortedIndex]
+                            const aboveVariant = sortedVariants[sortedIndex - 1]
+                            
+                            // Byt sortOrder mellan varianterna
+                            const variants = [...formData.priceVariants]
+                            const currentIdx = variants.findIndex(v => v.id === currentVariant.id)
+                            const aboveIdx = variants.findIndex(v => v.id === aboveVariant.id)
+                            
+                            variants[currentIdx].sortOrder = aboveVariant.sortOrder
+                            variants[aboveIdx].sortOrder = currentVariant.sortOrder
+                            
+                            updateFormData('priceVariants', variants)
+                          }}
+                          disabled={sortedIndex === 0}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 py-1 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Flytta upp"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const sortedVariants = [...formData.priceVariants].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                            if (sortedIndex === sortedVariants.length - 1) return // Kan inte flytta sista nedåt
+                            
+                            // Hitta aktuell variant och den nedanför i sorterad lista
+                            const currentVariant = sortedVariants[sortedIndex]
+                            const belowVariant = sortedVariants[sortedIndex + 1]
+                            
+                            // Byt sortOrder mellan varianterna
+                            const variants = [...formData.priceVariants]
+                            const currentIdx = variants.findIndex(v => v.id === currentVariant.id)
+                            const belowIdx = variants.findIndex(v => v.id === belowVariant.id)
+                            
+                            variants[currentIdx].sortOrder = belowVariant.sortOrder
+                            variants[belowIdx].sortOrder = currentVariant.sortOrder
+                            
+                            updateFormData('priceVariants', variants)
+                          }}
+                          disabled={sortedIndex === formData.priceVariants.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).length - 1}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 py-1 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Flytta ned"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => {
                           const variants = [...formData.priceVariants]
-                          variants[index] = { ...variants[index], isDefault: !variants[index].isDefault }
+                          variants[originalIndex] = { ...variants[originalIndex], isDefault: !variants[originalIndex].isDefault }
                           // Ta bort default från andra
-                          if (variants[index].isDefault) {
+                          if (variants[originalIndex].isDefault) {
                             variants.forEach((v, i) => {
-                              if (i !== index) v.isDefault = false
+                              if (i !== originalIndex) v.isDefault = false
                             })
                           }
                           updateFormData('priceVariants', variants)
@@ -928,7 +994,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== index))
+                          updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== originalIndex))
                         }}
                         className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-all duration-200"
                         title="Ta bort variant"
@@ -952,7 +1018,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             value={variant.name}
                             onChange={(e) => {
                               const variants = [...formData.priceVariants]
-                              variants[index] = { ...variants[index], name: e.target.value }
+                              variants[originalIndex] = { ...variants[originalIndex], name: e.target.value }
                               updateFormData('priceVariants', variants)
                             }}
                             placeholder="t.ex. 2 sovrum + vardagsrum"
@@ -969,7 +1035,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                               value={variant.description || ''}
                               onChange={(e) => {
                                 const variants = [...formData.priceVariants]
-                                variants[index] = { ...variants[index], description: e.target.value }
+                                variants[originalIndex] = { ...variants[originalIndex], description: e.target.value }
                                 updateFormData('priceVariants', variants)
                               }}
                               placeholder="Detaljerad beskrivning av vad som ingår i denna variant..."
@@ -998,12 +1064,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             value={variant.pricing.company.basePrice}
                             onChange={(e) => {
                               const variants = [...formData.priceVariants]
-                              variants[index] = {
-                                ...variants[index],
+                              variants[originalIndex] = {
+                                ...variants[originalIndex],
                                 pricing: {
-                                  ...variants[index].pricing,
+                                  ...variants[originalIndex].pricing,
                                   company: {
-                                    ...variants[index].pricing.company,
+                                    ...variants[originalIndex].pricing.company,
                                     basePrice: Number(e.target.value)
                                   }
                                 }
@@ -1022,12 +1088,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             value={variant.pricing.individual.basePrice}
                             onChange={(e) => {
                               const variants = [...formData.priceVariants]
-                              variants[index] = {
-                                ...variants[index],
+                              variants[originalIndex] = {
+                                ...variants[originalIndex],
                                 pricing: {
-                                  ...variants[index].pricing,
+                                  ...variants[originalIndex].pricing,
                                   individual: {
-                                    ...variants[index].pricing.individual,
+                                    ...variants[originalIndex].pricing.individual,
                                     basePrice: Number(e.target.value)
                                   }
                                 }
@@ -1043,8 +1109,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                  )
+                })}
           )}
         </div>
 

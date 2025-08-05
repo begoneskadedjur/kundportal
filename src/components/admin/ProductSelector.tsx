@@ -144,7 +144,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
               onChange={(e) => onVariantChange(product.id, e.target.value || undefined)}
             >
               <option value="">Välj variant...</option>
-              {product.priceVariants?.map(variant => (
+              {product.priceVariants
+                ?.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                .map(variant => (
                 <option key={variant.id} value={variant.id}>
                   {variant.name} - {formatPrice(variant.pricing[customerType].basePrice)}
                 </option>
