@@ -145,9 +145,9 @@ function convertProductsToOneflow(
         oneflowQuantityType = 'multiple_choice'
       }
       
-      // Sätt korrekt prisstruktur för Oneflow - ENKEL VERSION SOM FUNGERAR
-      const finalPriceString = Math.round(basePrice * 100).toString() // Slutpris efter rabatt
-      const discountAmountString = discountAmount > 0 ? Math.round(discountAmount * 100).toString() : "0"
+      // Sätt korrekt prisstruktur för Oneflow - KORREKT PRISFORMAT
+      const finalPriceString = Math.round(basePrice).toString() // Slutpris efter rabatt i SEK
+      const discountAmountString = discountAmount > 0 ? Math.round(discountAmount).toString() : "0"
       
       return {
         name: product.name,
