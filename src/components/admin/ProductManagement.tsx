@@ -951,13 +951,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
             </div>
           ) : (
             <div className="space-y-6">
-              {formData.priceVariants
-                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                .map((variant, sortedIndex) => {
-                  // Hitta rätt index i ursprungliga arrayen för uppdateringar
-                  const originalIndex = formData.priceVariants.findIndex(v => v.id === variant.id)
+              {formData.priceVariants.map((variant, sortedIndex) => {
+                  // Varianter är redan sorterade från utility-funktionerna
+                  const originalIndex = sortedIndex
                   return (
-                <div key={variant.id} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
+                <div key={`${variant.id}-${variant.sortOrder}`} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <span className="text-sm bg-slate-600/60 text-slate-200 px-3 py-1.5 rounded-lg font-medium">
@@ -977,20 +975,25 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={async () => {
+                          onClick={() => {
+                            console.log('🔼 Moving variant up:', variant.name, 'from index:', sortedIndex)
+                            console.log('📊 Current variants before move:', formData.priceVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
+                            
                             setSortingVariantId(variant.id)
                             try {
                               const newVariants = moveVariantUp(formData.priceVariants, variant.id)
                               if (newVariants !== formData.priceVariants) {
+                                console.log('✅ Variants after move:', newVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
                                 updateFormData('priceVariants', newVariants)
+                              } else {
+                                console.log('⚠️ No changes made to variants array')
                               }
-                              // Kort delay för att visa feedback
-                              await new Promise(resolve => setTimeout(resolve, 150))
                             } catch (error) {
                               console.error('Failed to move variant up:', error)
                               toast.error('Kunde inte flytta variant uppåt')
                             } finally {
-                              setSortingVariantId(null)
+                              // Ta bort loading efter kort tid för att visa visuell feedback
+                              setTimeout(() => setSortingVariantId(null), 100)
                             }
                           }}
                           disabled={sortedIndex === 0 || sortingVariantId === variant.id}
@@ -1007,23 +1010,28 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={async () => {
+                          onClick={() => {
+                            console.log('🔽 Moving variant down:', variant.name, 'from index:', sortedIndex)
+                            console.log('📊 Current variants before move:', formData.priceVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
+                            
                             setSortingVariantId(variant.id)
                             try {
                               const newVariants = moveVariantDown(formData.priceVariants, variant.id)
                               if (newVariants !== formData.priceVariants) {
+                                console.log('✅ Variants after move:', newVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
                                 updateFormData('priceVariants', newVariants)
+                              } else {
+                                console.log('⚠️ No changes made to variants array')
                               }
-                              // Kort delay för att visa feedback
-                              await new Promise(resolve => setTimeout(resolve, 150))
                             } catch (error) {
                               console.error('Failed to move variant down:', error)
                               toast.error('Kunde inte flytta variant nedåt')
                             } finally {
-                              setSortingVariantId(null)
+                              // Ta bort loading efter kort tid för att visa visuell feedback
+                              setTimeout(() => setSortingVariantId(null), 100)
                             }
                           }}
-                          disabled={sortedIndex === normalizeVariantSortOrder(formData.priceVariants).length - 1 || sortingVariantId === variant.id}
+                          disabled={sortedIndex === formData.priceVariants.length - 1 || sortingVariantId === variant.id}
                           className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 py-1 rounded transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Flytta ned"
                         >
