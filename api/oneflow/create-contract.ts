@@ -90,6 +90,46 @@ function buildDataFieldsForDocument(
   return mappedFields
 }
 
+// 🆕 HÄMTA TEMPLATE INFORMATION OCH PRODUKTGRUPP ID
+async function getTemplateProductGroupId(
+  templateId: string,
+  token: string,
+  userEmail: string
+): Promise<number | null> {
+  try {
+    const response = await fetch(
+      `https://api.oneflow.com/v1/templates/${templateId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-oneflow-api-token': token,
+          'x-oneflow-user-email': userEmail,
+          Accept: 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      console.error('Kunde inte hämta template information:', response.status)
+      return null
+    }
+
+    const templateData = await response.json()
+    
+    // Hitta första produktgruppen
+    if (templateData.product_groups && templateData.product_groups.length > 0) {
+      return templateData.product_groups[0].id
+    }
+    
+    console.warn('Ingen produktgrupp hittades i template')
+    return null
+  } catch (error) {
+    console.error('Fel vid hämtning av template information:', error)
+    return null
+  }
+}
+
 // 🆕 KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
 function convertProductsToOneflow(
   selectedProducts: ContractRequestBody['selectedProducts'],
@@ -98,9 +138,8 @@ function convertProductsToOneflow(
   name: string
   description: string
   price_1: {
-    base_amount: number
-    discount_amount?: number
-    currency: string
+    base_amount: { amount: string }
+    discount_amount?: { amount: string }
   }
   quantity: {
     type: string
@@ -139,8 +178,8 @@ function convertProductsToOneflow(
         name: product.name,
         description: product.description,
         price_1: {
-          base_amount: Math.round(basePrice * 100), // Oneflow använder ören/cent
-          ...(discountAmount > 0 && { discount_amount: Math.round(discountAmount * 100) })
+          base_amount: { amount: Math.round(basePrice * 100).toString() }, // Oneflow kräver objekt med string
+          ...(discountAmount > 0 && { discount_amount: { amount: Math.round(discountAmount * 100).toString() } })
         },
         quantity: {
           type: oneflowQuantityType,
@@ -321,15 +360,26 @@ export default async function handler(
       console.log(`🛒 Lägger till ${selectedProducts.length} produkter till kontraktet...`)
       
       try {
+        // Hämta produktgrupp ID från template
+        const productGroupId = await getTemplateProductGroupId(templateId, token, userEmail)
+        
         const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
         
         if (oneflowProducts.length > 0) {
           // Skapa en produktgrupp och lägg till produkter
-          const productGroupPayload = {
+          const productGroupPayload: any = {
             products: oneflowProducts,
             configuration: {
               hide_price_summation: false
             }
+          }
+          
+          // Lägg till ID om vi fick det från template
+          if (productGroupId) {
+            productGroupPayload.id = productGroupId
+            console.log(`📋 Använder produktgrupp ID: ${productGroupId}`)
+          } else {
+            console.log('⚠️ Kunde inte hämta produktgrupp ID, försöker utan ID')
           }
           
           const addProductsResponse = await fetch(
