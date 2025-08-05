@@ -18,7 +18,8 @@ import {
   Info,
   ArrowLeft,
   Copy,
-  Minus
+  Minus,
+  Files
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -245,6 +246,28 @@ export default function ProductManagement({ className = '' }: ProductManagementP
     }
   }
 
+  // Hantera duplicering
+  const handleDuplicateProduct = (product: ProductItem) => {
+    // Skapa duplicerade prisvarianter med nya ID:n
+    const duplicatedVariants = product.priceVariants?.map(variant => ({
+      ...variant,
+      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      sortOrder: variant.sortOrder
+    })) || []
+
+    // Skapa duplicerad produkt med nytt ID och modifierat namn
+    const duplicatedProduct: ProductItem = {
+      ...product,
+      id: `duplicate-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: `${product.name} (Kopia)`,
+      priceVariants: duplicatedVariants.length > 0 ? duplicatedVariants : undefined
+    }
+
+    // Öppna modal för redigering av den duplicerade produkten
+    setEditingProduct(duplicatedProduct)
+    setIsModalOpen(true)
+  }
+
   // Hantera spara produkt  
   const handleSaveProduct = async (productData: ProductFormData) => {
     try {
@@ -441,6 +464,7 @@ export default function ProductManagement({ className = '' }: ProductManagementP
               key={product.id}
               product={product}
               onEdit={() => handleEditProduct(product)}
+              onDuplicate={() => handleDuplicateProduct(product)}
               onDelete={() => handleDeleteProduct(product.id)}
               isLoading={isLoading}
             />
@@ -478,6 +502,7 @@ interface ProductCardProps {
   product: ProductItem
   onEdit: () => void
   onDelete: () => void
+  onDuplicate: () => void
   isLoading: boolean
 }
 
@@ -485,6 +510,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   product, 
   onEdit, 
   onDelete, 
+  onDuplicate,
   isLoading 
 }) => {
   return (
@@ -629,6 +655,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
           >
             <Edit2 className="w-4 h-4 group-hover/edit:scale-110 transition-transform duration-200" />
             Redigera
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDuplicate}
+            disabled={isLoading}
+            className="px-3 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all duration-200 group/duplicate"
+            title="Duplicera produkt"
+          >
+            <Files className="w-4 h-4 group-hover/duplicate:scale-110 transition-transform duration-200" />
           </Button>
           <Button
             variant="ghost"
