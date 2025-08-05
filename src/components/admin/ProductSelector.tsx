@@ -10,7 +10,8 @@ import {
   ProductItem,
   SelectedProduct,
   CustomerType,
-  ProductCategory 
+  ProductCategory,
+  PriceVariant 
 } from '../../types/products'
 import { useProducts } from '../../services/productService'
 import { calculateProductPrice, formatPrice } from '../../utils/pricingCalculator'
@@ -36,6 +37,7 @@ interface ProductCardProps {
   selectedProduct?: SelectedProduct
   customerType: CustomerType
   onQuantityChange: (productId: string, quantity: number) => void
+  onVariantChange: (productId: string, variantId?: string) => void
 }
 
 // Ikon för produktkategorier
@@ -54,12 +56,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
   product,
   selectedProduct,
   customerType,
-  onQuantityChange
+  onQuantityChange,
+  onVariantChange
 }) => {
   const quantity = selectedProduct?.quantity || 0
   const isSelected = quantity > 0
   
-  const pricing = product.pricing[customerType]
+  // Hitta vald variant eller använd standard/baspris
+  const selectedVariant = selectedProduct?.selectedVariant
+  const hasVariants = product.priceVariants && product.priceVariants.length > 0
+  
+  const pricing = selectedVariant 
+    ? selectedVariant.pricing[customerType]
+    : product.pricing[customerType]
   const basePrice = pricing.basePrice
   const discountedPrice = pricing.discountPercent 
     ? basePrice * (1 - pricing.discountPercent / 100)
@@ -122,6 +131,27 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </span>
           )}
         </div>
+
+        {/* Prisvariant väljare */}
+        {hasVariants && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-300">
+              Välj variant:
+            </label>
+            <select
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              value={selectedVariant?.id || ''}
+              onChange={(e) => onVariantChange(product.id, e.target.value || undefined)}
+            >
+              <option value="">Välj variant...</option>
+              {product.priceVariants?.map(variant => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name} - {formatPrice(variant.pricing[customerType].basePrice)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Pris */}
         <div className="space-y-1">
@@ -489,6 +519,36 @@ export default function ProductSelector({
     }
   }
 
+  // Hantera variant-ändringar
+  const handleVariantChange = (productId: string, variantId?: string) => {
+    const product = allProducts.find(p => p.id === productId)
+    if (!product) return
+
+    const selectedVariant = variantId 
+      ? product.priceVariants?.find(v => v.id === variantId)
+      : undefined
+
+    const existingIndex = selectedProducts.findIndex(sp => sp.product.id === productId)
+    const updatedProducts = [...selectedProducts]
+    
+    if (existingIndex >= 0) {
+      // Uppdatera befintlig produkt med ny variant
+      updatedProducts[existingIndex] = {
+        ...updatedProducts[existingIndex],
+        selectedVariant
+      }
+    } else {
+      // Lägg till produkt med vald variant (kvantitet = 1)
+      updatedProducts.push({
+        product,
+        quantity: 1,
+        selectedVariant
+      })
+    }
+    
+    onSelectionChange(updatedProducts)
+  }
+
   // Hantera anpassade produkter
   const handleAddCustomProduct = (customProduct: CustomProduct) => {
     // Konvertera anpassad produkt till ProductItem format
@@ -640,6 +700,7 @@ export default function ProductSelector({
                     selectedProduct={getSelectedProduct(customProduct.id)}
                     customerType={customerType}
                     onQuantityChange={handleQuantityChange}
+                    onVariantChange={handleVariantChange}
                   />
                   <Button
                     variant="ghost"
@@ -678,6 +739,7 @@ export default function ProductSelector({
                     selectedProduct={getSelectedProduct(product.id)}
                     customerType={customerType}
                     onQuantityChange={handleQuantityChange}
+                    onVariantChange={handleVariantChange}
                   />
                 ))}
               </div>

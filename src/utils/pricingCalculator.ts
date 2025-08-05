@@ -16,14 +16,17 @@ export function calculateProductPrice(
   selectedProduct: SelectedProduct,
   customerType: CustomerType
 ): number {
-  const { product, quantity, customPrice } = selectedProduct
+  const { product, quantity, customPrice, selectedVariant } = selectedProduct
   
   // Använd anpassat pris om tillgängligt
   if (customPrice !== undefined) {
     return customPrice * quantity
   }
   
-  const pricing = product.pricing[customerType]
+  // Använd vald variant eller fallback till baspris
+  const pricing = selectedVariant 
+    ? selectedVariant.pricing[customerType]
+    : product.pricing[customerType]
   let basePrice = pricing.basePrice
   
   // Applicera rabatt om tillgänglig
