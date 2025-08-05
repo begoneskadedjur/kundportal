@@ -1111,6 +1111,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                 </div>
                   )
                 })}
+            </div>
           )}
         </div>
 
