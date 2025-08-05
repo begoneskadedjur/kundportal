@@ -1,6 +1,6 @@
 // src/components/admin/ProductManagement.tsx - Admin produkthantering
 
-import React, { useState } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { 
   Plus, 
   Edit2, 
@@ -88,9 +88,19 @@ const getCategoryName = (category: ProductCategory): string => {
 export default function ProductManagement({ className = '' }: ProductManagementProps) {
   // State
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null)
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   // Använd produkthook för databas-integration
   const { 
@@ -102,16 +112,37 @@ export default function ProductManagement({ className = '' }: ProductManagementP
     deleteProduct 
   } = useProducts()
 
-  // Filtrerade produkter
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtrerade produkter med memoization
+  const filteredProducts = useMemo(() => {
+    if (!products.length) return []
     
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+    return products.filter(product => {
+      const matchesSearch = !debouncedSearchTerm || 
+        product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+      
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+      
+      return matchesSearch && matchesCategory
+    })
+  }, [products, debouncedSearchTerm, selectedCategory])
+
+  // Kategori-räknare
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      all: products.length,
+      pest_control: 0,
+      preventive: 0,
+      specialty: 0,
+      additional: 0
+    }
     
-    return matchesSearch && matchesCategory
-  })
+    products.forEach(product => {
+      counts[product.category]++
+    })
+    
+    return counts
+  }, [products])
 
   // Hantera ny produkt
   const handleNewProduct = () => {
@@ -222,33 +253,80 @@ export default function ProductManagement({ className = '' }: ProductManagementP
       {/* Sök och filter */}
       <Card className="p-6">
         <div className="space-y-4">
-          <Input
-            placeholder="Sök produkter..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
+          <div className="relative">
+            <Input
+              placeholder="Sök produkter efter namn eller beskrivning..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              icon={<Search className="w-4 h-4" />}
+              className="pr-20"
+            />
+            {(searchTerm !== debouncedSearchTerm) && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
+          
+          {debouncedSearchTerm && (
+            <div className="flex items-center justify-between text-sm text-slate-400">
+              <span>
+                Visar {filteredProducts.length} av {products.length} produkter
+                {debouncedSearchTerm && (
+                  <span> för "<span className="text-white font-medium">{debouncedSearchTerm}</span>"</span>
+                )}
+              </span>
+              {debouncedSearchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('')}
+                  className="text-slate-400 hover:text-white"
+                >
+                  Rensa
+                </Button>
+              )}
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2">
             <Button
               variant={selectedCategory === 'all' ? 'primary' : 'outline'}
               size="sm"
               onClick={() => setSelectedCategory('all')}
+              className="relative"
             >
-              Alla kategorier ({products.length})
+              Alla kategorier 
+              <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                selectedCategory === 'all' 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-slate-700 text-slate-300'
+              }`}>
+                {categoryCounts.all}
+              </span>
             </Button>
             {['pest_control', 'preventive', 'specialty', 'additional'].map(category => {
-              const count = products.filter(p => p.category === category).length
+              const count = categoryCounts[category as keyof typeof categoryCounts]
               return (
                 <Button
                   key={category}
                   variant={selectedCategory === category ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(category as ProductCategory)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 relative"
+                  disabled={count === 0}
                 >
                   <span>{getCategoryIcon(category as ProductCategory)}</span>
-                  {getCategoryName(category as ProductCategory)} ({count})
+                  {getCategoryName(category as ProductCategory)}
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    selectedCategory === category 
+                      ? 'bg-white/20 text-white' 
+                      : count === 0 
+                        ? 'bg-slate-800 text-slate-500'
+                        : 'bg-slate-700 text-slate-300'
+                  }`}>
+                    {count}
+                  </span>
                 </Button>
               )
             })}
@@ -257,17 +335,42 @@ export default function ProductManagement({ className = '' }: ProductManagementP
       </Card>
 
       {/* Produktlista */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredProducts.map(product => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            onEdit={() => handleEditProduct(product)}
-            onDelete={() => handleDeleteProduct(product.id)}
-            isLoading={isLoading}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="p-6 animate-pulse">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-slate-700 rounded"></div>
+                  <div className="h-5 bg-slate-700 rounded w-32"></div>
+                </div>
+                <div className="h-4 bg-slate-700 rounded w-full"></div>
+                <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+                <div className="flex justify-between">
+                  <div className="h-4 bg-slate-700 rounded w-20"></div>
+                  <div className="h-4 bg-slate-700 rounded w-24"></div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <div className="h-8 bg-slate-700 rounded flex-1"></div>
+                  <div className="h-8 w-8 bg-slate-700 rounded"></div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredProducts.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onEdit={() => handleEditProduct(product)}
+              onDelete={() => handleDeleteProduct(product.id)}
+              isLoading={isLoading}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Ingen träff */}
       {filteredProducts.length === 0 && (
@@ -309,19 +412,30 @@ const ProductCard: React.FC<ProductCardProps> = ({
   isLoading 
 }) => {
   return (
-    <Card className="p-6 hover:border-slate-600 transition-colors">
+    <Card className="p-6 hover:border-slate-600 hover:shadow-lg hover:shadow-slate-900/20 transition-all duration-200 group">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-lg">{getCategoryIcon(product.category)}</span>
-              <h3 className="font-semibold text-white">{product.name}</h3>
-              {product.isPopular && (
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              )}
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-slate-700 transition-colors">
+                <span className="text-lg">{getCategoryIcon(product.category)}</span>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
+                    {product.name}
+                  </h3>
+                  {product.isPopular && (
+                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 capitalize">
+                  {getCategoryName(product.category)}
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-400 leading-relaxed line-clamp-2">
               {product.description}
             </p>
           </div>
@@ -355,32 +469,47 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Priser */}
-        <div className="space-y-2">
+        <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-400">Företag:</span>
-            <span className="text-white font-medium">
-              {formatPrice(product.pricing.company.basePrice)}
-              <span className="text-xs text-slate-400 ml-1">+ moms</span>
+            <span className="text-sm text-slate-400 flex items-center gap-1">
+              <DollarSign className="w-3 h-3" />
+              Företag
             </span>
+            <div className="text-right">
+              <span className="text-white font-semibold">
+                {formatPrice(product.pricing.company.basePrice)}
+              </span>
+              <span className="text-xs text-slate-400 block">+ moms</span>
+            </div>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-400">Privatperson:</span>
-            <span className="text-white font-medium">
-              {formatPrice(product.pricing.individual.basePrice)}
+            <span className="text-sm text-slate-400 flex items-center gap-1">
+              <DollarSign className="w-3 h-3" />
+              Privatperson
             </span>
+            <div className="text-right">
+              <span className="text-white font-semibold">
+                {formatPrice(product.pricing.individual.basePrice)}
+              </span>
+              {product.pricing.individual.taxDeduction && (
+                <span className="text-xs text-green-400 block uppercase">
+                  {product.pricing.individual.taxDeduction}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Åtgärder */}
-        <div className="flex gap-2 pt-2 border-t border-slate-700">
+        <div className="flex gap-3 pt-4 border-t border-slate-700/50">
           <Button
             variant="outline"
             size="sm"
             onClick={onEdit}
             disabled={isLoading}
-            className="flex-1 flex items-center justify-center gap-2"
+            className="flex-1 flex items-center justify-center gap-2 hover:border-green-500/50 hover:text-green-400 transition-all duration-200 group/edit"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-4 h-4 group-hover/edit:scale-110 transition-transform duration-200" />
             Redigera
           </Button>
           <Button
@@ -388,10 +517,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
             size="sm"
             onClick={onDelete}
             disabled={isLoading}
-            className="px-3 text-red-400 hover:text-red-300"
+            className="px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-200 group/delete"
             title="Ta bort produkt"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 group-hover/delete:scale-110 transition-transform duration-200" />
           </Button>
         </div>
       </div>
@@ -508,11 +637,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
       isOpen={true}
       onClose={onClose}
       title={product ? 'Redigera produkt' : 'Ny produkt'}
-      className="max-w-6xl max-h-[90vh] overflow-y-auto"
+      className="max-w-4xl max-h-[90vh] overflow-y-auto"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         {/* Grundinformation */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
               <Package className="w-5 h-5 text-green-400" />
@@ -558,9 +687,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
               </select>
             </div>
 
-            <div>
+            <div className="border-t border-slate-700 pt-6">
+              <h4 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <Info className="w-5 h-5 text-green-400" />
+                Kontraktsbeskrivning
+              </h4>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Kontraktsbeskrivning *
+                Beskrivning *
               </label>
               <textarea
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
@@ -574,9 +707,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
           </div>
 
           {/* Prissättning */}
-          <div className="space-y-4">
+          <div className="space-y-4 border-t border-slate-700 pt-6">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-green-400" />
+              <DollarSign className="w-5 h-5 text-blue-400" />
               Prissättning
             </h3>
 
@@ -588,10 +721,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                   label="Grundpris (exkl. moms) *"
                   type="number"
                   min="0"
-                  step="100"
+                  step="1"
                   value={formData.pricing.company.basePrice}
                   onChange={(e) => updateFormData('pricing.company.basePrice', Number(e.target.value))}
-                  placeholder="2400"
+                  placeholder="2490"
+                  helperText="Ange pris i hela kronor"
                   required
                 />
                 
@@ -616,10 +750,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                   label="Grundpris (inkl. moms) *"
                   type="number"
                   min="0"
-                  step="100"
+                  step="1"
                   value={formData.pricing.individual.basePrice}
                   onChange={(e) => updateFormData('pricing.individual.basePrice', Number(e.target.value))}
-                  placeholder="3000"
+                  placeholder="3490"
+                  helperText="Ange pris i hela kronor"
                   required
                 />
                 
@@ -658,44 +793,51 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">Kvantitet</h3>
             
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Kvantitetstyp
-              </label>
-              <select
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                value={formData.quantityType}
-                onChange={(e) => updateFormData('quantityType', e.target.value)}
-              >
-                <option value="quantity">Kvantitet (kan ändras)</option>
-                <option value="single_choice">Ja/Nej val</option>
-                <option value="multiple_choice">Flera val</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Standardantal"
-                type="number"
-                min="1"
-                max="999"
-                value={formData.defaultQuantity}
-                onChange={(e) => updateFormData('defaultQuantity', Number(e.target.value))}
-              />
+            <div className="bg-slate-800/50 p-4 rounded-lg space-y-4">
+              <h4 className="font-medium text-white">Kvantitetsinställningar</h4>
               
-              <Input
-                label="Max antal"
-                type="number"
-                min="1"
-                max="999"
-                value={formData.maxQuantity}
-                onChange={(e) => updateFormData('maxQuantity', Number(e.target.value))}
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Kvantitetstyp
+                </label>
+                <select
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={formData.quantityType}
+                  onChange={(e) => updateFormData('quantityType', e.target.value)}
+                >
+                  <option value="quantity">Kvantitet (kan ändras)</option>
+                  <option value="single_choice">Ja/Nej val</option>
+                  <option value="multiple_choice">Flera val</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Standardantal"
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={formData.defaultQuantity}
+                  onChange={(e) => updateFormData('defaultQuantity', Number(e.target.value))}
+                />
+                
+                <Input
+                  label="Max antal"
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={formData.maxQuantity}
+                  onChange={(e) => updateFormData('maxQuantity', Number(e.target.value))}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Egenskaper</h3>
+          <div className="space-y-4 border-t border-slate-700 pt-6">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-purple-400" />
+              Egenskaper
+            </h3>
             
             <div className="space-y-3">
               <label className="flex items-center space-x-3">
