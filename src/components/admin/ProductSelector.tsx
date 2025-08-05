@@ -1,7 +1,7 @@
 // src/components/admin/ProductSelector.tsx - Produktväljare för Oneflow
 
 import React, { useState, useMemo } from 'react'
-import { Search, Plus, Minus, Info, Star, Leaf, ShieldCheck } from 'lucide-react'
+import { Search, Plus, Minus, Info, Star, Leaf, ShieldCheck, Sparkles } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Input from '../ui/Input'
@@ -20,6 +20,15 @@ interface ProductSelectorProps {
   onSelectionChange: (products: SelectedProduct[]) => void
   customerType: CustomerType
   className?: string
+}
+
+interface CustomProduct {
+  id: string
+  name: string
+  description: string
+  price: number
+  quantity: number
+  quantityType: 'quantity' | 'single_choice'
 }
 
 interface ProductCardProps {
@@ -221,6 +230,160 @@ const ProductCard: React.FC<ProductCardProps> = ({
   )
 }
 
+// Anpassat produktkort-komponent
+const CustomProductCard: React.FC<{
+  customerType: CustomerType
+  onAddCustomProduct: (product: CustomProduct) => void
+}> = ({ customerType, onAddCustomProduct }) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [customProduct, setCustomProduct] = useState<Partial<CustomProduct>>({
+    name: '',
+    description: '',
+    price: '',
+    quantity: 1,
+    quantityType: 'quantity'
+  })
+
+  const handleAddProduct = () => {
+    if (!customProduct.name || !customProduct.description || !customProduct.price) {
+      return
+    }
+
+    const newProduct: CustomProduct = {
+      id: `custom-${Date.now()}`,
+      name: customProduct.name!,
+      description: customProduct.description!,
+      price: Number(customProduct.price),
+      quantity: customProduct.quantity || 1,
+      quantityType: customProduct.quantityType || 'quantity'
+    }
+
+    onAddCustomProduct(newProduct)
+
+    // Återställ formuläret
+    setCustomProduct({
+      name: '',
+      description: '',
+      price: '',
+      quantity: 1,
+      quantityType: 'quantity'
+    })
+    setIsExpanded(false)
+  }
+
+  const isValid = customProduct.name && customProduct.description && customProduct.price && Number(customProduct.price) > 0
+
+  return (
+    <Card className="p-4 border-2 border-dashed border-blue-500/50 bg-blue-500/5">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-400" />
+            <h3 className="font-semibold text-white">Anpassad produkt</h3>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-blue-400 border-blue-500/50"
+          >
+            {isExpanded ? 'Stäng' : 'Lägg till'}
+          </Button>
+        </div>
+
+        {!isExpanded && (
+          <p className="text-sm text-slate-400">
+            Skapa anpassade produkter och tjänster för specifika kundkrav
+          </p>
+        )}
+
+        {isExpanded && (
+          <div className="space-y-4 pt-3 border-t border-blue-500/20">
+            <Input
+              label="Produktnamn"
+              placeholder="T.ex. Specialrengöring"
+              value={customProduct.name || ''}
+              onChange={(e) => setCustomProduct(prev => ({ ...prev, name: e.target.value }))}
+              required
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Beskrivning
+              </label>
+              <textarea
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                placeholder="Detaljerad beskrivning av tjänsten..."
+                rows={3}
+                value={customProduct.description || ''}
+                onChange={(e) => setCustomProduct(prev => ({ ...prev, description: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label={`Pris (${customerType === 'company' ? 'exkl. moms' : 'inkl. moms'})`}
+                type="number"
+                placeholder="0"
+                min="0"
+                step="100"
+                value={customProduct.price || ''}
+                onChange={(e) => setCustomProduct(prev => ({ ...prev, price: e.target.value }))}
+                required
+              />
+
+              <Input
+                label="Antal"
+                type="number"
+                placeholder="1"
+                min="1"
+                max="99"
+                value={customProduct.quantity || 1}
+                onChange={(e) => setCustomProduct(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Typ
+              </label>
+              <select
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={customProduct.quantityType || 'quantity'}
+                onChange={(e) => setCustomProduct(prev => ({ ...prev, quantityType: e.target.value as 'quantity' | 'single_choice' }))}
+              >
+                <option value="quantity">Kvantitet (kan ändras)</option>
+                <option value="single_choice">Ja/Nej val</option>
+              </select>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleAddProduct}
+                disabled={!isValid}
+                className="flex-1"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Lägg till produkt
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(false)}
+              >
+                Avbryt
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 // Huvudkomponent
 export default function ProductSelector({
   selectedProducts,
@@ -230,6 +393,7 @@ export default function ProductSelector({
 }: ProductSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all')
+  const [customProducts, setCustomProducts] = useState<CustomProduct[]>([])
 
   // Filtrerade produktgrupper
   const filteredGroups = useMemo(() => {
@@ -274,6 +438,50 @@ export default function ProductSelector({
     }
   }
 
+  // Hantera anpassade produkter
+  const handleAddCustomProduct = (customProduct: CustomProduct) => {
+    // Konvertera anpassad produkt till ProductItem format
+    const productItem: ProductItem = {
+      id: customProduct.id,
+      name: customProduct.name,
+      description: customProduct.description,
+      category: 'additional' as ProductCategory,
+      pricing: {
+        company: { basePrice: customProduct.price, vatRate: 0.25 },
+        individual: { basePrice: customProduct.price }
+      },
+      quantityType: customProduct.quantityType,
+      oneflowCompatible: true,
+      contractDescription: `${customProduct.name} - ${customProduct.description}`,
+      defaultQuantity: customProduct.quantity,
+      maxQuantity: 99,
+      rotEligible: false,
+      rutEligible: false,
+      isPopular: false,
+      seasonalAvailable: false,
+      requiresConsultation: false
+    }
+
+    // Lägg till i anpassade produkter listan
+    setCustomProducts(prev => [...prev, customProduct])
+
+    // Lägg till produkten direkt i valda produkter
+    const selectedProduct: SelectedProduct = {
+      product: productItem,
+      quantity: customProduct.quantity
+    }
+
+    const updatedProducts = [...selectedProducts, selectedProduct]
+    onSelectionChange(updatedProducts)
+  }
+
+  // Ta bort anpassad produkt
+  const handleRemoveCustomProduct = (customProductId: string) => {
+    setCustomProducts(prev => prev.filter(cp => cp.id !== customProductId))
+    const updatedProducts = selectedProducts.filter(sp => sp.product.id !== customProductId)
+    onSelectionChange(updatedProducts)
+  }
+
   // Få vald produkt för ett produktID
   const getSelectedProduct = (productId: string): SelectedProduct | undefined => {
     return selectedProducts.find(sp => sp.product.id === productId)
@@ -312,6 +520,67 @@ export default function ProductSelector({
           ))}
         </div>
       </div>
+
+      {/* Anpassad produkt kort */}
+      <CustomProductCard
+        customerType={customerType}
+        onAddCustomProduct={handleAddCustomProduct}
+      />
+
+      {/* Valda anpassade produkter */}
+      {customProducts.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-400" />
+            Dina anpassade produkter ({customProducts.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {customProducts.map(customProduct => {
+              // Skapa en temporär ProductItem för att använda befintlig ProductCard
+              const productItem: ProductItem = {
+                id: customProduct.id,
+                name: customProduct.name,
+                description: customProduct.description,
+                category: 'additional' as ProductCategory,
+                pricing: {
+                  company: { basePrice: customProduct.price, vatRate: 0.25 },
+                  individual: { basePrice: customProduct.price }
+                },
+                quantityType: customProduct.quantityType,
+                oneflowCompatible: true,
+                contractDescription: `${customProduct.name} - ${customProduct.description}`,
+                defaultQuantity: customProduct.quantity,
+                maxQuantity: 99,
+                rotEligible: false,
+                rutEligible: false,
+                isPopular: false,
+                seasonalAvailable: false,
+                requiresConsultation: false
+              }
+
+              return (
+                <div key={customProduct.id} className="relative">
+                  <ProductCard
+                    product={productItem}
+                    selectedProduct={getSelectedProduct(customProduct.id)}
+                    customerType={customerType}
+                    onQuantityChange={handleQuantityChange}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveCustomProduct(customProduct.id)}
+                    className="absolute top-2 right-2 text-red-400 hover:text-red-300 bg-slate-800/80"
+                    title="Ta bort anpassad produkt"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Produktgrupper och produkter */}
       <div className="space-y-8">
