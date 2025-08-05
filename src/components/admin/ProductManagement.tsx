@@ -81,13 +81,25 @@ const normalizeVariantSortOrder = (variants: PriceVariant[]): PriceVariant[] => 
 
 const moveVariantUp = (variants: PriceVariant[], variantId: string): PriceVariant[] => {
   try {
-    if (!variants.length || !variantId) return variants
+    console.log('🔧 moveVariantUp called with variantId:', variantId)
+    if (!variants.length || !variantId) {
+      console.log('❌ Early return: empty variants or no variantId')
+      return variants
+    }
     
     const normalizedVariants = normalizeVariantSortOrder(variants)
+    console.log('🔧 Normalized variants:', normalizedVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
+    
     const currentIndex = normalizedVariants.findIndex(v => v.id === variantId)
+    console.log('🔧 Found variant at currentIndex:', currentIndex)
     
     // Validering
-    if (currentIndex <= 0) return variants // Kan inte flytta första uppåt eller variant hittades inte
+    if (currentIndex <= 0) {
+      console.log('❌ Cannot move up: currentIndex <= 0')
+      return variants // Kan inte flytta första uppåt eller variant hittades inte
+    }
+    
+    console.log('✅ Moving variant from index', currentIndex, 'to index', currentIndex - 1)
     
     // Byt plats med föregående
     const newVariants = [...normalizedVariants]
@@ -95,8 +107,12 @@ const moveVariantUp = (variants: PriceVariant[], variantId: string): PriceVarian
     newVariants[currentIndex] = newVariants[currentIndex - 1]
     newVariants[currentIndex - 1] = temp
     
+    console.log('🔧 After swapping:', newVariants.map((v, i) => `${i}: ${v.name}`))
+    
     // Normalisera sortOrder igen
-    return normalizeVariantSortOrder(newVariants)
+    const finalVariants = normalizeVariantSortOrder(newVariants)
+    console.log('🔧 Final normalized:', finalVariants.map((v, i) => `${i}: ${v.name} (sortOrder: ${v.sortOrder})`))
+    return finalVariants
   } catch (error) {
     console.error('Error moving variant up:', error)
     return variants // Return original array on error
