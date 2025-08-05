@@ -924,12 +924,15 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             const aboveVariant = sortedVariants[sortedIndex - 1]
                             
                             // Byt sortOrder mellan varianterna
-                            const variants = [...formData.priceVariants]
-                            const currentIdx = variants.findIndex(v => v.id === currentVariant.id)
-                            const aboveIdx = variants.findIndex(v => v.id === aboveVariant.id)
-                            
-                            variants[currentIdx].sortOrder = aboveVariant.sortOrder
-                            variants[aboveIdx].sortOrder = currentVariant.sortOrder
+                            const variants = formData.priceVariants.map(variant => {
+                              if (variant.id === currentVariant.id) {
+                                return { ...variant, sortOrder: aboveVariant.sortOrder }
+                              }
+                              if (variant.id === aboveVariant.id) {
+                                return { ...variant, sortOrder: currentVariant.sortOrder }
+                              }
+                              return variant
+                            })
                             
                             updateFormData('priceVariants', variants)
                           }}
@@ -952,12 +955,15 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                             const belowVariant = sortedVariants[sortedIndex + 1]
                             
                             // Byt sortOrder mellan varianterna
-                            const variants = [...formData.priceVariants]
-                            const currentIdx = variants.findIndex(v => v.id === currentVariant.id)
-                            const belowIdx = variants.findIndex(v => v.id === belowVariant.id)
-                            
-                            variants[currentIdx].sortOrder = belowVariant.sortOrder
-                            variants[belowIdx].sortOrder = currentVariant.sortOrder
+                            const variants = formData.priceVariants.map(variant => {
+                              if (variant.id === currentVariant.id) {
+                                return { ...variant, sortOrder: belowVariant.sortOrder }
+                              }
+                              if (variant.id === belowVariant.id) {
+                                return { ...variant, sortOrder: currentVariant.sortOrder }
+                              }
+                              return variant
+                            })
                             
                             updateFormData('priceVariants', variants)
                           }}
