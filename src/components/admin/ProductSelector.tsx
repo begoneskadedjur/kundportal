@@ -67,7 +67,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   
   const handleQuantityChange = (delta: number) => {
     const newQuantity = Math.max(0, quantity + delta)
-    const maxQty = product.maxQuantity || 99
+    const maxQty = product.maxQuantity || 999
     
     if (newQuantity <= maxQty) {
       onQuantityChange(product.id, newQuantity)
@@ -185,7 +185,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               variant="outline"
               size="sm"
               onClick={() => handleQuantityChange(1)}
-              disabled={quantity >= (product.maxQuantity || 99)}
+              disabled={quantity >= (product.maxQuantity || 999)}
               className="w-8 h-8 p-0"
             >
               <Plus className="w-4 h-4" />
@@ -338,7 +338,7 @@ const CustomProductCard: React.FC<{
                 type="number"
                 placeholder="1"
                 min="1"
-                max="99"
+                max="999"
                 value={customProduct.quantity || 1}
                 onChange={(e) => setCustomProduct(prev => ({ ...prev, quantity: Number(e.target.value) }))}
               />
@@ -454,7 +454,7 @@ export default function ProductSelector({
       oneflowCompatible: true,
       contractDescription: `${customProduct.name} - ${customProduct.description}`,
       defaultQuantity: customProduct.quantity,
-      maxQuantity: 99,
+      maxQuantity: 999,
       rotEligible: false,
       rutEligible: false,
       isPopular: false,
@@ -550,7 +550,7 @@ export default function ProductSelector({
                 oneflowCompatible: true,
                 contractDescription: `${customProduct.name} - ${customProduct.description}`,
                 defaultQuantity: customProduct.quantity,
-                maxQuantity: 99,
+                maxQuantity: 999,
                 rotEligible: false,
                 rutEligible: false,
                 isPopular: false,
