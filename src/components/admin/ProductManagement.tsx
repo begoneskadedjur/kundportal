@@ -14,7 +14,9 @@ import {
   Package,
   DollarSign,
   Info,
-  ArrowLeft
+  ArrowLeft,
+  Copy,
+  Minus
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -469,38 +471,80 @@ const ProductCard: React.FC<ProductCardProps> = ({
               Ej Oneflow
             </span>
           )}
+          {product.priceVariants && product.priceVariants.length > 0 && (
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
+              <Copy className="w-3 h-3" />
+              {product.priceVariants.length} varianter
+            </span>
+          )}
         </div>
 
         {/* Priser */}
         <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-400 flex items-center gap-1">
-              <DollarSign className="w-3 h-3" />
-              Företag
-            </span>
-            <div className="text-right">
-              <span className="text-white font-semibold">
-                {formatPrice(product.pricing.company.basePrice)}
-              </span>
-              <span className="text-xs text-slate-400 block">+ moms</span>
-            </div>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-400 flex items-center gap-1">
-              <DollarSign className="w-3 h-3" />
-              Privatperson
-            </span>
-            <div className="text-right">
-              <span className="text-white font-semibold">
-                {formatPrice(product.pricing.individual.basePrice)}
-              </span>
-              {product.pricing.individual.taxDeduction && (
-                <span className="text-xs text-green-400 block uppercase">
-                  {product.pricing.individual.taxDeduction}
+          {product.priceVariants && product.priceVariants.length > 0 ? (
+            <>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-slate-500 flex items-center gap-1">
+                  <Copy className="w-3 h-3" />
+                  Prisintervall ({product.priceVariants.length} varianter)
                 </span>
-              )}
-            </div>
-          </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-400 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" />
+                  Företag
+                </span>
+                <div className="text-right">
+                  <span className="text-white font-semibold">
+                    {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.company.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.company.basePrice)))}
+                  </span>
+                  <span className="text-xs text-slate-400 block">+ moms</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-400 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" />
+                  Privatperson
+                </span>
+                <div className="text-right">
+                  <span className="text-white font-semibold">
+                    {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.individual.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.individual.basePrice)))}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-400 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" />
+                  Företag
+                </span>
+                <div className="text-right">
+                  <span className="text-white font-semibold">
+                    {formatPrice(product.pricing.company.basePrice)}
+                  </span>
+                  <span className="text-xs text-slate-400 block">+ moms</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-400 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" />
+                  Privatperson
+                </span>
+                <div className="text-right">
+                  <span className="text-white font-semibold">
+                    {formatPrice(product.pricing.individual.basePrice)}
+                  </span>
+                  {product.pricing.individual.taxDeduction && (
+                    <span className="text-xs text-green-400 block uppercase">
+                      {product.pricing.individual.taxDeduction}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Åtgärder */}
@@ -789,6 +833,193 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                   placeholder="0"
                 />
               </div>
+            </div>
+
+            {/* Prisvarianter */}
+            <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-600/50">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-white flex items-center gap-2">
+                  <Copy className="w-4 h-4 text-green-400" />
+                  Prisvarianter
+                </h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newVariant: PriceVariant = {
+                      id: `variant-${Date.now()}`,
+                      name: '',
+                      description: '',
+                      pricing: {
+                        company: {
+                          basePrice: formData.pricing.company.basePrice,
+                          vatRate: formData.pricing.company.vatRate,
+                          discountPercent: formData.pricing.company.discountPercent || 0
+                        },
+                        individual: {
+                          basePrice: formData.pricing.individual.basePrice,
+                          taxDeduction: formData.pricing.individual.taxDeduction,
+                          discountPercent: formData.pricing.individual.discountPercent || 0
+                        }
+                      },
+                      isDefault: formData.priceVariants.length === 0,
+                      sortOrder: formData.priceVariants.length
+                    }
+                    updateFormData('priceVariants', [...formData.priceVariants, newVariant])
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  Lägg till variant
+                </Button>
+              </div>
+              
+              <p className="text-xs text-slate-400 mb-4">
+                Skapa olika prisalternativ för samma produkt (t.ex. olika storlekar, arbetstider, eller omfattning)
+              </p>
+
+              {formData.priceVariants.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Copy className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>Inga prisvarianter ännu</p>
+                  <p className="text-xs">Klicka "Lägg till variant" för att skapa alternativ</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {formData.priceVariants.map((variant, index) => (
+                    <div key={variant.id} className="bg-slate-700/50 p-4 rounded-lg border border-slate-600/30">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-slate-600 text-slate-300 px-2 py-1 rounded">
+                            #{index + 1}
+                          </span>
+                          {variant.isDefault && (
+                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                              Standard
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const variants = [...formData.priceVariants]
+                              variants[index] = { ...variants[index], isDefault: !variants[index].isDefault }
+                              // Ta bort default från andra
+                              if (variants[index].isDefault) {
+                                variants.forEach((v, i) => {
+                                  if (i !== index) v.isDefault = false
+                                })
+                              }
+                              updateFormData('priceVariants', variants)
+                            }}
+                            className="text-green-400 hover:text-green-300 px-2"
+                            title={variant.isDefault ? "Ta bort som standard" : "Sätt som standard"}
+                          >
+                            <Star className={`w-3 h-3 ${variant.isDefault ? 'fill-current' : ''}`} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== index))
+                            }}
+                            className="text-red-400 hover:text-red-300 px-2"
+                            title="Ta bort variant"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <Input
+                            label="Variantnamn *"
+                            value={variant.name}
+                            onChange={(e) => {
+                              const variants = [...formData.priceVariants]
+                              variants[index] = { ...variants[index], name: e.target.value }
+                              updateFormData('priceVariants', variants)
+                            }}
+                            placeholder="t.ex. 2 sovrum + vardagsrum"
+                            className="text-sm"
+                          />
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Beskrivning
+                            </label>
+                            <textarea
+                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-sm"
+                              rows={2}
+                              value={variant.description || ''}
+                              onChange={(e) => {
+                                const variants = [...formData.priceVariants]
+                                variants[index] = { ...variants[index], description: e.target.value }
+                                updateFormData('priceVariants', variants)
+                              }}
+                              placeholder="Detaljerad beskrivning..."
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              label="Företag (exkl. moms)"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={variant.pricing.company.basePrice}
+                              onChange={(e) => {
+                                const variants = [...formData.priceVariants]
+                                variants[index] = {
+                                  ...variants[index],
+                                  pricing: {
+                                    ...variants[index].pricing,
+                                    company: {
+                                      ...variants[index].pricing.company,
+                                      basePrice: Number(e.target.value)
+                                    }
+                                  }
+                                }
+                                updateFormData('priceVariants', variants)
+                              }}
+                              className="text-sm"
+                            />
+                            <Input
+                              label="Privatperson (inkl. moms)"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={variant.pricing.individual.basePrice}
+                              onChange={(e) => {
+                                const variants = [...formData.priceVariants]
+                                variants[index] = {
+                                  ...variants[index],
+                                  pricing: {
+                                    ...variants[index].pricing,
+                                    individual: {
+                                      ...variants[index].pricing.individual,
+                                      basePrice: Number(e.target.value)
+                                    }
+                                  }
+                                }
+                                updateFormData('priceVariants', variants)
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
