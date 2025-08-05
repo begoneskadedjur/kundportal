@@ -140,8 +140,7 @@ function convertProductsToOneflow(
         description: product.description,
         price_1: {
           base_amount: Math.round(basePrice * 100), // Oneflow använder ören/cent
-          ...(discountAmount > 0 && { discount_amount: Math.round(discountAmount * 100) }),
-          currency: 'SEK'
+          ...(discountAmount > 0 && { discount_amount: Math.round(discountAmount * 100) })
         },
         quantity: {
           type: oneflowQuantityType,
