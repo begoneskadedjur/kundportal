@@ -132,90 +132,45 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        {/* Förbättrad prisvariant väljare */}
+        {/* Kompakt prisvariant väljare */}
         {hasVariants && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-300">
-              Välj variant:
+              Varianter ({product.priceVariants?.length || 0}):
             </label>
-            <div className="space-y-2">
-              {/* Visa alla varianter som knappar för bättre UX */}
+            <select
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              value={selectedVariant?.id || ''}
+              onChange={(e) => onVariantChange(product.id, e.target.value || undefined)}
+            >
+              <option value="">Grundalternativ - {formatPrice(product.pricing[customerType].basePrice)}</option>
               {product.priceVariants
                 ?.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                .map(variant => {
-                  const isSelected = selectedVariant?.id === variant.id
-                  const variantPrice = variant.pricing[customerType].basePrice
-                  const isDefault = variant.isDefault
-                  
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() => onVariantChange(product.id, variant.id)}
-                      className={`w-full p-3 rounded-lg border-2 text-left transition-all duration-200 ${
-                        isSelected
-                          ? 'border-green-500 bg-green-500/10 shadow-md'
-                          : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-white">
-                              {variant.name}
-                            </span>
-                            {isDefault && (
-                              <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                                <Star className="w-3 h-3 fill-current" />
-                                Populärast
-                              </span>
-                            )}
-                          </div>
-                          {variant.description && (
-                            <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                              {variant.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-white">
-                            {formatPrice(variantPrice)}
-                          </div>
-                          {customerType === 'company' && (
-                            <div className="text-xs text-slate-400">+ moms</div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Visa prisförändring jämfört med grundpris */}
-                      {product.pricing[customerType].basePrice !== variantPrice && (
-                        <div className="mt-2 text-xs">
-                          {variantPrice > product.pricing[customerType].basePrice ? (
-                            <span className="text-orange-400">
-                              +{formatPrice(variantPrice - product.pricing[customerType].basePrice)} från grundpris
-                            </span>
-                          ) : (
-                            <span className="text-green-400">
-                              -{formatPrice(product.pricing[customerType].basePrice - variantPrice)} från grundpris
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              
-              {/* Återgå till grundalternativ */}
-              {selectedVariant && (
-                <button
-                  type="button"
-                  onClick={() => onVariantChange(product.id, undefined)}
-                  className="w-full p-2 rounded-lg border border-slate-600 bg-slate-800/30 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200 text-center text-sm"
-                >
-                  ← Tillbaka till grundalternativ
-                </button>
-              )}
-            </div>
+                .map(variant => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name} - {formatPrice(variant.pricing[customerType].basePrice)}
+                  {variant.description ? ` (${variant.description.substring(0, 30)}...)` : ''}
+                </option>
+              ))}
+            </select>
+            
+            {/* Visa vald variant info */}
+            {selectedVariant && (
+              <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <div className="text-sm">
+                  <div className="font-medium text-green-400">{selectedVariant.name}</div>
+                  {selectedVariant.description && (
+                    <div className="text-xs text-slate-400 mt-1">
+                      {selectedVariant.description}
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-300 mt-1">
+                    Pris: {formatPrice(selectedVariant.pricing[customerType].basePrice)}
+                    {customerType === 'company' && ' + moms'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

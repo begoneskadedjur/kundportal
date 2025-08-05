@@ -184,22 +184,17 @@ const ProductSectionLayout: React.FC<ProductSectionLayoutProps> = ({
   const INITIAL_PRODUCTS_PER_CATEGORY = 6
   const POPULAR_PRODUCTS_LIMIT = 4
 
-  // Gruppera produkter efter kategori och popularitet
+  // Gruppera produkter efter kategori
   const organizedProducts = React.useMemo(() => {
-    const popularProducts = products.filter(p => p.isPopular).slice(0, POPULAR_PRODUCTS_LIMIT)
     const categorizedProducts = products.reduce((acc, product) => {
       if (!acc[product.category]) {
         acc[product.category] = []
       }
-      // Lägg inte till populära produkter i kategorierna igen
-      if (!product.isPopular) {
-        acc[product.category].push(product)
-      }
+      acc[product.category].push(product)
       return acc
     }, {} as Record<ProductCategory, ProductItem[]>)
 
     return {
-      popular: popularProducts,
       categorized: categorizedProducts
     }
   }, [products])
@@ -245,37 +240,7 @@ const ProductSectionLayout: React.FC<ProductSectionLayoutProps> = ({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Populära produkter sektion */}
-      {organizedProducts.popular.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex items-center gap-2">
-              <Star className="w-6 h-6 text-yellow-400 fill-current" />
-              <h2 className="text-2xl font-bold text-white">Populära tjänster</h2>
-              <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full text-sm font-medium">
-                {organizedProducts.popular.length}
-              </span>
-            </div>
-          </div>
-          <p className="text-slate-400 mb-6">Mest använda produkter och tjänster</p>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {organizedProducts.popular.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                size="large"
-                onEdit={() => onEdit(product)}
-                onDuplicate={() => onDuplicate(product)}
-                onDelete={() => onDelete(product.id)}
-                isLoading={isLoading}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-6">
       {/* Kategorisektioner */}
       {Object.entries(organizedProducts.categorized)
         .filter(([_, products]) => products.length > 0)
@@ -335,15 +300,12 @@ const ProductSectionLayout: React.FC<ProductSectionLayoutProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {categoryProducts
                       .slice(0, expandedSections.has(category) ? undefined : INITIAL_PRODUCTS_PER_CATEGORY)
-                      .map((product, index) => {
-                        // Första 3 produkterna är normala, resten kompakta för att spara plats
-                        const size = index < 3 ? 'normal' : 'compact'
-                        
+                      .map((product) => {
                         return (
                           <ProductCard
                             key={product.id}
                             product={product}
-                            size={size}
+                            size="normal"
                             onEdit={() => onEdit(product)}
                             onDuplicate={() => onDuplicate(product)}
                             onDelete={() => onDelete(product.id)}
@@ -437,7 +399,6 @@ export default function ProductManagement({ className = '' }: ProductManagementP
         // Sök efter egenskaper
         (debouncedSearchTerm.toLowerCase().includes('rot') && product.rotEligible) ||
         (debouncedSearchTerm.toLowerCase().includes('rut') && product.rutEligible) ||
-        (debouncedSearchTerm.toLowerCase().includes('populär') && product.isPopular) ||
         (debouncedSearchTerm.toLowerCase().includes('konsult') && product.requiresConsultation) ||
         (debouncedSearchTerm.toLowerCase().includes('oneflow') && !product.oneflowCompatible) ||
         // Sök i kategorier
@@ -620,7 +581,7 @@ export default function ProductManagement({ className = '' }: ProductManagementP
             {!searchTerm && (
               <div className="mt-2 flex flex-wrap gap-1">
                 <span className="text-xs text-slate-500">Försök med:</span>
-                {['ROT', 'RUT', 'populär', 'bekämpning', 'konsult'].map(suggestion => (
+                {['ROT', 'RUT', 'bekämpning', 'konsult', 'oneflow'].map(suggestion => (
                   <button
                     key={suggestion}
                     onClick={() => setSearchTerm(suggestion)}
@@ -654,22 +615,13 @@ export default function ProductManagement({ className = '' }: ProductManagementP
             </div>
           )}
           
-          {/* Quick filters */}
+          {/* Quick filters för intern användning */}
           {!debouncedSearchTerm && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <span>Snabbfilter:</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSearchTerm('populär')}
-                  className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 border border-yellow-500/20"
-                >
-                  <Star className="w-3 h-3 mr-1" />
-                  Populära
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -696,6 +648,15 @@ export default function ProductManagement({ className = '' }: ProductManagementP
                 >
                   <Info className="w-3 h-3 mr-1" />
                   Kräver konsultation
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('oneflow')}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Ej Oneflow
                 </Button>
               </div>
             </div>
@@ -879,12 +840,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <h3 className="font-semibold text-white truncate group-hover:text-green-400 transition-colors">
               {product.name}
             </h3>
-            {product.isPopular && (
-              <Star className="w-4 h-4 text-yellow-400 fill-current flex-shrink-0" />
-            )}
           </div>
           
-          {size !== 'compact' && (
+          {/* Visa alltid beskrivning om den finns */}
+          {product.description && size !== 'compact' && (
             <p className="text-sm text-slate-400 line-clamp-1 mb-2">
               {product.description}
             </p>
@@ -956,18 +915,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
                   {product.name}
                 </h3>
-                {product.isPopular && (
-                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                )}
               </div>
               <p className="text-xs text-slate-500 capitalize">
                 {getCategoryName(product.category)}
               </p>
             </div>
           </div>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            {product.description}
-          </p>
+          {/* Visa alltid beskrivning om den finns */}
+          {product.description && (
+            <p className="text-sm text-slate-400 leading-relaxed">
+              {product.description}
+            </p>
+          )}
         </div>
       </div>
 
