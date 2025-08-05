@@ -161,6 +161,242 @@ const getCategoryName = (category: ProductCategory): string => {
   }
 }
 
+// Sektionsbaserad layout-komponent
+interface ProductSectionLayoutProps {
+  products: ProductItem[]
+  onEdit: (product: ProductItem) => void
+  onDuplicate: (product: ProductItem) => void
+  onDelete: (productId: string) => void
+  isLoading: boolean
+}
+
+const ProductSectionLayout: React.FC<ProductSectionLayoutProps> = ({
+  products,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  isLoading
+}) => {
+  const [collapsedSections, setCollapsedSections] = React.useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set())
+  
+  // Konstanter för performance
+  const INITIAL_PRODUCTS_PER_CATEGORY = 6
+  const POPULAR_PRODUCTS_LIMIT = 4
+
+  // Gruppera produkter efter kategori och popularitet
+  const organizedProducts = React.useMemo(() => {
+    const popularProducts = products.filter(p => p.isPopular).slice(0, POPULAR_PRODUCTS_LIMIT)
+    const categorizedProducts = products.reduce((acc, product) => {
+      if (!acc[product.category]) {
+        acc[product.category] = []
+      }
+      // Lägg inte till populära produkter i kategorierna igen
+      if (!product.isPopular) {
+        acc[product.category].push(product)
+      }
+      return acc
+    }, {} as Record<ProductCategory, ProductItem[]>)
+
+    return {
+      popular: popularProducts,
+      categorized: categorizedProducts
+    }
+  }, [products])
+
+  const toggleSection = (sectionId: string) => {
+    const newCollapsed = new Set(collapsedSections)
+    if (newCollapsed.has(sectionId)) {
+      newCollapsed.delete(sectionId)
+    } else {
+      newCollapsed.add(sectionId)
+    }
+    setCollapsedSections(newCollapsed)
+  }
+
+  const toggleExpandSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections)
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId)
+    } else {
+      newExpanded.add(sectionId)
+    }
+    setExpandedSections(newExpanded)
+  }
+
+  const getSectionTitle = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Skadedjursbekämpning'
+      case 'preventive': return 'Förebyggande lösningar'
+      case 'specialty': return 'Specialtjänster'
+      case 'additional': return 'Tilläggstjänster'
+      default: return 'Övriga produkter'
+    }
+  }
+
+  const getSectionDescription = (category: ProductCategory): string => {
+    switch (category) {
+      case 'pest_control': return 'Aktiv bekämpning av skadedjur och ohyra'
+      case 'preventive': return 'Förebyggande åtgärder och kontinuerlig övervakning'
+      case 'specialty': return 'Sanering, desinfektion och specialbehandlingar'
+      case 'additional': return 'Tillvalstjänster och konsultationer'
+      default: return 'Andra produkter och tjänster'
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Populära produkter sektion */}
+      {organizedProducts.popular.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <Star className="w-6 h-6 text-yellow-400 fill-current" />
+              <h2 className="text-2xl font-bold text-white">Populära tjänster</h2>
+              <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full text-sm font-medium">
+                {organizedProducts.popular.length}
+              </span>
+            </div>
+          </div>
+          <p className="text-slate-400 mb-6">Mest använda produkter och tjänster</p>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {organizedProducts.popular.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                size="large"
+                onEdit={() => onEdit(product)}
+                onDuplicate={() => onDuplicate(product)}
+                onDelete={() => onDelete(product.id)}
+                isLoading={isLoading}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Kategorisektioner */}
+      {Object.entries(organizedProducts.categorized)
+        .filter(([_, products]) => products.length > 0)
+        .sort(([a], [b]) => {
+          // Sortera kategorier enligt prioritet
+          const priority = { pest_control: 1, preventive: 2, specialty: 3, additional: 4 }
+          return (priority[a as ProductCategory] || 99) - (priority[b as ProductCategory] || 99)
+        })
+        .map(([category, categoryProducts]) => {
+          const isCollapsed = collapsedSections.has(category)
+          const productCategory = category as ProductCategory
+          
+          return (
+            <div key={category}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{getCategoryIcon(productCategory)}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-white">
+                        {getSectionTitle(productCategory)}
+                      </h2>
+                      <span className="bg-slate-700 text-slate-300 px-2 py-1 rounded-full text-sm font-medium">
+                        {categoryProducts.length}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm mt-1">
+                      {getSectionDescription(productCategory)}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Kollaps/expandera knapp */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleSection(category)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  {isCollapsed ? (
+                    <>
+                      <ChevronDown className="w-4 h-4 mr-1" />
+                      Visa
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="w-4 h-4 mr-1" />
+                      Dölj
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Produkter i kategorin */}
+              {!isCollapsed && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {categoryProducts
+                      .slice(0, expandedSections.has(category) ? undefined : INITIAL_PRODUCTS_PER_CATEGORY)
+                      .map((product, index) => {
+                        // Första 3 produkterna är normala, resten kompakta för att spara plats
+                        const size = index < 3 ? 'normal' : 'compact'
+                        
+                        return (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            size={size}
+                            onEdit={() => onEdit(product)}
+                            onDuplicate={() => onDuplicate(product)}
+                            onDelete={() => onDelete(product.id)}
+                            isLoading={isLoading}
+                          />
+                        )
+                      })}
+                  </div>
+                  
+                  {/* Visa fler knapp */}
+                  {categoryProducts.length > INITIAL_PRODUCTS_PER_CATEGORY && (
+                    <div className="text-center mt-6">
+                      <Button
+                        variant="outline"
+                        onClick={() => toggleExpandSection(category)}
+                        className="text-slate-400 hover:text-white border-slate-600 hover:border-slate-500"
+                      >
+                        {expandedSections.has(category) ? (
+                          <>
+                            Visa färre produkter
+                            <ChevronUp className="w-4 h-4 ml-1" />
+                          </>
+                        ) : (
+                          <>
+                            Visa {categoryProducts.length - INITIAL_PRODUCTS_PER_CATEGORY} produkter till
+                            <ChevronDown className="w-4 h-4 ml-1" />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Visa fler knapp för kollapsade sektioner */}
+              {isCollapsed && (
+                <div className="text-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => toggleSection(category)}
+                    className="text-slate-400 hover:text-white border-slate-600"
+                  >
+                    Visa {categoryProducts.length} produkter
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
 export default function ProductManagement({ className = '' }: ProductManagementProps) {
   // State
   const [searchTerm, setSearchTerm] = useState('')
@@ -188,14 +424,24 @@ export default function ProductManagement({ className = '' }: ProductManagementP
     deleteProduct 
   } = useProducts()
 
-  // Filtrerade produkter med memoization
+  // Förbättrade filtrerade produkter med memoization och smart sökning
   const filteredProducts = useMemo(() => {
     if (!products.length) return []
     
     return products.filter(product => {
+      // Smart sökning med stöd för egenskaper
       const matchesSearch = !debouncedSearchTerm || 
         product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+        product.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        product.contractDescription?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        // Sök efter egenskaper
+        (debouncedSearchTerm.toLowerCase().includes('rot') && product.rotEligible) ||
+        (debouncedSearchTerm.toLowerCase().includes('rut') && product.rutEligible) ||
+        (debouncedSearchTerm.toLowerCase().includes('populär') && product.isPopular) ||
+        (debouncedSearchTerm.toLowerCase().includes('konsult') && product.requiresConsultation) ||
+        (debouncedSearchTerm.toLowerCase().includes('oneflow') && !product.oneflowCompatible) ||
+        // Sök i kategorier
+        getCategoryName(product.category).toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
       
@@ -352,12 +598,13 @@ export default function ProductManagement({ className = '' }: ProductManagementP
         </Card>
       )}
 
-      {/* Sök och filter */}
+      {/* Förbättrad sök och filter */}
       <Card className="p-6">
         <div className="space-y-4">
+          {/* Smart sök med förslag */}
           <div className="relative">
             <Input
-              placeholder="Sök produkter efter namn eller beskrivning..."
+              placeholder="Sök produkter efter namn, beskrivning eller egenskaper..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               icon={<Search className="w-4 h-4" />}
@@ -368,111 +615,194 @@ export default function ProductManagement({ className = '' }: ProductManagementP
                 <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
             )}
+            
+            {/* Sök-förslag */}
+            {!searchTerm && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                <span className="text-xs text-slate-500">Försök med:</span>
+                {['ROT', 'RUT', 'populär', 'bekämpning', 'konsult'].map(suggestion => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setSearchTerm(suggestion)}
+                    className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
+          {/* Sökresultat info */}
           {debouncedSearchTerm && (
-            <div className="flex items-center justify-between text-sm text-slate-400">
+            <div className="flex items-center justify-between text-sm text-slate-400 bg-slate-800/30 rounded-lg px-3 py-2">
               <span>
+                <Search className="w-4 h-4 inline mr-2" />
                 Visar {filteredProducts.length} av {products.length} produkter
                 {debouncedSearchTerm && (
                   <span> för "<span className="text-white font-medium">{debouncedSearchTerm}</span>"</span>
                 )}
               </span>
-              {debouncedSearchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSearchTerm('')}
-                  className="text-slate-400 hover:text-white"
-                >
-                  Rensa
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchTerm('')}
+                className="text-slate-400 hover:text-white text-xs"
+              >
+                ✕ Rensa
+              </Button>
             </div>
           )}
           
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedCategory === 'all' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory('all')}
-              className="relative"
-            >
-              Alla kategorier 
-              <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-                selectedCategory === 'all' 
-                  ? 'bg-white/20 text-white' 
-                  : 'bg-slate-700 text-slate-300'
-              }`}>
-                {categoryCounts.all}
-              </span>
-            </Button>
-            {['pest_control', 'preventive', 'specialty', 'additional'].map(category => {
-              const count = categoryCounts[category as keyof typeof categoryCounts]
-              return (
+          {/* Quick filters */}
+          {!debouncedSearchTerm && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <span>Snabbfilter:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  key={category}
-                  variant={selectedCategory === category ? 'primary' : 'outline'}
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedCategory(category as ProductCategory)}
-                  className="flex items-center gap-2 relative"
-                  disabled={count === 0}
+                  onClick={() => setSearchTerm('populär')}
+                  className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 border border-yellow-500/20"
                 >
-                  <span>{getCategoryIcon(category as ProductCategory)}</span>
-                  {getCategoryName(category as ProductCategory)}
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    selectedCategory === category 
-                      ? 'bg-white/20 text-white' 
-                      : count === 0 
-                        ? 'bg-slate-800 text-slate-500'
-                        : 'bg-slate-700 text-slate-300'
-                  }`}>
-                    {count}
-                  </span>
+                  <Star className="w-3 h-3 mr-1" />
+                  Populära
                 </Button>
-              )
-            })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('ROT')}
+                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border border-blue-500/20"
+                >
+                  <ShieldCheck className="w-3 h-3 mr-1" />
+                  ROT-berättigade
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('RUT')}
+                  className="text-green-400 hover:text-green-300 hover:bg-green-500/10 border border-green-500/20"
+                >
+                  <Leaf className="w-3 h-3 mr-1" />
+                  RUT-berättigade
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('konsult')}
+                  className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                >
+                  <Info className="w-3 h-3 mr-1" />
+                  Kräver konsultation
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Kategorier */}
+          <div className="border-t border-slate-700 pt-4">
+            <div className="flex items-center gap-2 text-sm text-slate-400 mb-3">
+              <span>Kategorier:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedCategory === 'all' ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory('all')}
+                className="relative"
+              >
+                Alla kategorier 
+                <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                  selectedCategory === 'all' 
+                    ? 'bg-white/20 text-white' 
+                    : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {categoryCounts.all}
+                </span>
+              </Button>
+              {['pest_control', 'preventive', 'specialty', 'additional'].map(category => {
+                const count = categoryCounts[category as keyof typeof categoryCounts]
+                return (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedCategory(category as ProductCategory)}
+                    className="flex items-center gap-2 relative"
+                    disabled={count === 0}
+                  >
+                    <span>{getCategoryIcon(category as ProductCategory)}</span>
+                    {getCategoryName(category as ProductCategory)}
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      selectedCategory === category 
+                        ? 'bg-white/20 text-white' 
+                        : count === 0 
+                          ? 'bg-slate-800 text-slate-500'
+                          : 'bg-slate-700 text-slate-300'
+                    }`}>
+                      {count}
+                    </span>
+                  </Button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </Card>
 
-      {/* Produktlista */}
+      {/* Produktlista med sektionsbaserad layout */}
       {isLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-slate-700 rounded"></div>
-                  <div className="h-5 bg-slate-700 rounded w-32"></div>
-                </div>
-                <div className="h-4 bg-slate-700 rounded w-full"></div>
-                <div className="h-4 bg-slate-700 rounded w-3/4"></div>
-                <div className="flex justify-between">
-                  <div className="h-4 bg-slate-700 rounded w-20"></div>
-                  <div className="h-4 bg-slate-700 rounded w-24"></div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <div className="h-8 bg-slate-700 rounded flex-1"></div>
-                  <div className="h-8 w-8 bg-slate-700 rounded"></div>
-                </div>
+        <div className="space-y-8">
+          {/* Loading för populära produkter */}
+          <div>
+            <div className="h-6 bg-slate-700 rounded w-48 mb-4 animate-pulse"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[...Array(2)].map((_, i) => (
+                <Card key={i} className="p-6 animate-pulse col-span-1">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-slate-700 rounded"></div>
+                      <div className="h-5 bg-slate-700 rounded w-32"></div>
+                    </div>
+                    <div className="h-4 bg-slate-700 rounded w-full"></div>
+                    <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+          
+          {/* Loading för andra kategorier */}
+          {[...Array(3)].map((_, catIndex) => (
+            <div key={catIndex}>
+              <div className="h-6 bg-slate-700 rounded w-40 mb-4 animate-pulse"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4 animate-pulse">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 bg-slate-700 rounded"></div>
+                        <div className="h-4 bg-slate-700 rounded w-24"></div>
+                      </div>
+                      <div className="h-3 bg-slate-700 rounded w-full"></div>
+                      <div className="h-4 bg-slate-700 rounded w-20"></div>
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProducts.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onEdit={() => handleEditProduct(product)}
-              onDuplicate={() => handleDuplicateProduct(product)}
-              onDelete={() => handleDeleteProduct(product.id)}
-              isLoading={isLoading}
-            />
-          ))}
-        </div>
+        <ProductSectionLayout
+          products={filteredProducts}
+          onEdit={handleEditProduct}
+          onDuplicate={handleDuplicateProduct}
+          onDelete={handleDeleteProduct}
+          isLoading={isLoading}
+        />
       )}
 
       {/* Ingen träff */}
@@ -500,13 +830,14 @@ export default function ProductManagement({ className = '' }: ProductManagementP
   )
 }
 
-// Produktkort komponent
+// Produktkort komponent med kompakt/expanderad design
 interface ProductCardProps {
   product: ProductItem
   onEdit: () => void
   onDelete: () => void
   onDuplicate: () => void
   isLoading: boolean
+  size?: 'compact' | 'normal' | 'large'
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -514,173 +845,279 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onEdit, 
   onDelete, 
   onDuplicate,
-  isLoading 
+  isLoading,
+  size = 'normal'
 }) => {
-  return (
-    <Card className="p-6 hover:border-slate-600 hover:shadow-lg hover:shadow-slate-900/20 transition-all duration-200 group">
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-slate-700 transition-colors">
-                <span className="text-lg">{getCategoryIcon(product.category)}</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
-                    {product.name}
-                  </h3>
-                  {product.isPopular && (
-                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 capitalize">
-                  {getCategoryName(product.category)}
-                </p>
-              </div>
+  const [isExpanded, setIsExpanded] = React.useState(false)
+  
+  // Bestäm kortstorlek och layout
+  const getCardSize = () => {
+    if (size === 'large') return 'col-span-2' // Dubbel bredd för populära
+    if (size === 'compact') return 'h-32' // Kompakt höjd för mindre viktiga
+    return '' // Normal storlek
+  }
+
+  // Enkel prisvisning för kompakt vy
+  const getSimplePrice = () => {
+    if (product.priceVariants && product.priceVariants.length > 0) {
+      const minPrice = Math.min(...product.priceVariants.map(v => v.pricing.company.basePrice))
+      return `Från ${formatPrice(minPrice)}`
+    }
+    return formatPrice(product.pricing.company.basePrice)
+  }
+
+  // Kompakt vy (standard)
+  const renderCompactView = () => (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-6 h-6 rounded-md bg-slate-700 flex items-center justify-center flex-shrink-0">
+              <span className="text-sm">{getCategoryIcon(product.category)}</span>
             </div>
-            <p className="text-sm text-slate-400 leading-relaxed line-clamp-2">
+            <h3 className="font-semibold text-white truncate group-hover:text-green-400 transition-colors">
+              {product.name}
+            </h3>
+            {product.isPopular && (
+              <Star className="w-4 h-4 text-yellow-400 fill-current flex-shrink-0" />
+            )}
+          </div>
+          
+          {size !== 'compact' && (
+            <p className="text-sm text-slate-400 line-clamp-1 mb-2">
               {product.description}
             </p>
+          )}
+          
+          {/* Kompakt prisinformation */}
+          <div className="flex items-center justify-between">
+            <span className="text-white font-medium">{getSimplePrice()}</span>
+            <div className="flex items-center gap-1">
+              {product.rotEligible && <span className="text-blue-400 text-xs">ROT</span>}
+              {product.rotEligible && product.rutEligible && <span className="text-slate-600">•</span>}
+              {product.rutEligible && <span className="text-green-400 text-xs">RUT</span>}
+              {product.priceVariants && product.priceVariants.length > 0 && (
+                <span className="text-blue-400 text-xs ml-2">{product.priceVariants.length}×</span>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Badges */}
-        <div className="flex flex-wrap gap-2">
-          {product.rotEligible && (
-            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" />
-              ROT
-            </span>
-          )}
-          {product.rutEligible && (
-            <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
-              <Leaf className="w-3 h-3" />
-              RUT
-            </span>
-          )}
-          {product.requiresConsultation && (
-            <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full flex items-center gap-1">
-              <Info className="w-3 h-3" />
-              Konsult
-            </span>
-          )}
-          {!product.oneflowCompatible && (
-            <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">
-              Ej Oneflow
-            </span>
-          )}
-          {product.priceVariants && product.priceVariants.length > 0 && (
-            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
-              <Copy className="w-3 h-3" />
-              {product.priceVariants.length} varianter
-            </span>
-          )}
-        </div>
+      {/* Snabb-åtgärder för kompakt vy */}
+      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          disabled={isLoading}
+          className="flex-1 text-xs py-1.5 hover:bg-green-500/10 hover:text-green-400"
+        >
+          <Edit2 className="w-3 h-3 mr-1" />
+          Redigera
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDuplicate}
+          disabled={isLoading}
+          className="px-2 text-blue-400 hover:bg-blue-500/10"
+          title="Duplicera"
+        >
+          <Files className="w-3 h-3" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          disabled={isLoading}
+          className="px-2 text-red-400 hover:bg-red-500/10"
+          title="Ta bort"
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  )
 
-        {/* Priser */}
-        <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
-          {product.priceVariants && product.priceVariants.length > 0 ? (
-            <>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-slate-500 flex items-center gap-1">
-                  <Copy className="w-3 h-3" />
-                  Prisintervall ({product.priceVariants.length} varianter)
-                </span>
+  // Expanderad detaljvy
+  const renderExpandedView = () => (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-slate-700 transition-colors">
+              <span className="text-lg">{getCategoryIcon(product.category)}</span>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
+                  {product.name}
+                </h3>
+                {product.isPopular && (
+                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                )}
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400 flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" />
-                  Företag
-                </span>
-                <div className="text-right">
-                  <span className="text-white font-semibold">
-                    {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.company.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.company.basePrice)))}
-                  </span>
-                  <span className="text-xs text-slate-400 block">+ moms</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400 flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" />
-                  Privatperson
-                </span>
-                <div className="text-right">
-                  <span className="text-white font-semibold">
-                    {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.individual.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.individual.basePrice)))}
-                  </span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400 flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" />
-                  Företag
-                </span>
-                <div className="text-right">
-                  <span className="text-white font-semibold">
-                    {formatPrice(product.pricing.company.basePrice)}
-                  </span>
-                  <span className="text-xs text-slate-400 block">+ moms</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400 flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" />
-                  Privatperson
-                </span>
-                <div className="text-right">
-                  <span className="text-white font-semibold">
-                    {formatPrice(product.pricing.individual.basePrice)}
-                  </span>
-                  {product.pricing.individual.taxDeduction && (
-                    <span className="text-xs text-green-400 block uppercase">
-                      {product.pricing.individual.taxDeduction}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Åtgärder */}
-        <div className="flex gap-3 pt-4 border-t border-slate-700/50">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEdit}
-            disabled={isLoading}
-            className="flex-1 flex items-center justify-center gap-2 hover:border-green-500/50 hover:text-green-400 transition-all duration-200 group/edit"
-          >
-            <Edit2 className="w-4 h-4 group-hover/edit:scale-110 transition-transform duration-200" />
-            Redigera
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDuplicate}
-            disabled={isLoading}
-            className="px-3 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all duration-200 group/duplicate"
-            title="Duplicera produkt"
-          >
-            <Files className="w-4 h-4 group-hover/duplicate:scale-110 transition-transform duration-200" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            disabled={isLoading}
-            className="px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-200 group/delete"
-            title="Ta bort produkt"
-          >
-            <Trash2 className="w-4 h-4 group-hover/delete:scale-110 transition-transform duration-200" />
-          </Button>
+              <p className="text-xs text-slate-500 capitalize">
+                {getCategoryName(product.category)}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            {product.description}
+          </p>
         </div>
       </div>
+
+      {/* Badges */}
+      <div className="flex flex-wrap gap-2">
+        {product.rotEligible && (
+          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3" />
+            ROT-berättigad
+          </span>
+        )}
+        {product.rutEligible && (
+          <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
+            <Leaf className="w-3 h-3" />
+            RUT-berättigad
+          </span>
+        )}
+        {product.requiresConsultation && (
+          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full flex items-center gap-1">
+            <Info className="w-3 h-3" />
+            Konsultation
+          </span>
+        )}
+        {!product.oneflowCompatible && (
+          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">
+            Ej Oneflow
+          </span>
+        )}
+        {product.priceVariants && product.priceVariants.length > 0 && (
+          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
+            <Copy className="w-3 h-3" />
+            {product.priceVariants.length} varianter
+          </span>
+        )}
+      </div>
+
+      {/* Detaljerad prisinformation */}
+      <div className="bg-slate-800/50 rounded-lg p-3 space-y-2">
+        {product.priceVariants && product.priceVariants.length > 0 ? (
+          <>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-slate-500 flex items-center gap-1">
+                <Copy className="w-3 h-3" />
+                Prisalternativ ({product.priceVariants.length} st)
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-400">Företag:</span>
+              <div className="text-right">
+                <span className="text-white font-semibold">
+                  {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.company.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.company.basePrice)))}
+                </span>
+                <span className="text-xs text-slate-400 block">+ moms</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-400">Privatperson:</span>
+              <div className="text-right">
+                <span className="text-white font-semibold">
+                  {formatPrice(Math.min(...product.priceVariants.map(v => v.pricing.individual.basePrice)))} - {formatPrice(Math.max(...product.priceVariants.map(v => v.pricing.individual.basePrice)))}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-400">Företag:</span>
+              <div className="text-right">
+                <span className="text-white font-semibold">
+                  {formatPrice(product.pricing.company.basePrice)}
+                </span>
+                <span className="text-xs text-slate-400 block">+ moms</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-400">Privatperson:</span>
+              <div className="text-right">
+                <span className="text-white font-semibold">
+                  {formatPrice(product.pricing.individual.basePrice)}
+                </span>
+                {product.pricing.individual.taxDeduction && (
+                  <span className="text-xs text-green-400 block uppercase">
+                    {product.pricing.individual.taxDeduction}-avdrag
+                  </span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Åtgärder */}
+      <div className="flex gap-3 pt-2 border-t border-slate-700/50">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+          disabled={isLoading}
+          className="flex-1 flex items-center justify-center gap-2 hover:border-green-500/50 hover:text-green-400 transition-all duration-200 group/edit"
+        >
+          <Edit2 className="w-4 h-4 group-hover/edit:scale-110 transition-transform duration-200" />
+          Redigera
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDuplicate}
+          disabled={isLoading}
+          className="px-3 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all duration-200 group/duplicate"
+          title="Duplicera produkt"
+        >
+          <Files className="w-4 h-4 group-hover/duplicate:scale-110 transition-transform duration-200" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          disabled={isLoading}
+          className="px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-200 group/delete"
+          title="Ta bort produkt"
+        >
+          <Trash2 className="w-4 h-4 group-hover/delete:scale-110 transition-transform duration-200" />
+        </Button>
+      </div>
+    </div>
+  )
+
+  // Bestäm vilken vy som ska visas
+  const shouldShowExpanded = isExpanded || size === 'large'
+
+  return (
+    <Card 
+      className={`p-4 hover:border-slate-600 hover:shadow-lg hover:shadow-slate-900/20 transition-all duration-200 cursor-pointer group ${getCardSize()} ${
+        size === 'large' ? 'bg-gradient-to-br from-green-500/5 to-blue-500/5 border-green-500/20' : ''
+      } ${
+        size === 'compact' ? 'p-3' : ''
+      }`}
+      onClick={() => setIsExpanded(!isExpanded)}
+    >
+      {shouldShowExpanded ? renderExpandedView() : renderCompactView()}
+      
+      {/* Expandera/komprimera indikator */}
+      {size === 'normal' && (
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-50 transition-opacity duration-200">
+          <div className="text-slate-400 text-xs">
+            {isExpanded ? '−' : '+'}
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
