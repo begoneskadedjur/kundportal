@@ -33,6 +33,14 @@ interface ContractRequestBody {
     }
     quantity: number
     customPrice?: number
+    selectedVariant?: {
+      id: string
+      name: string
+      pricing: {
+        company?: { basePrice: number; vatRate?: number; discountPercent?: number }
+        individual?: { basePrice: number; taxDeduction?: string; discountPercent?: number }
+      }
+    }
     notes?: string
   }>
 }
@@ -123,8 +131,18 @@ function convertProductsToOneflow(
   return selectedProducts
     .filter(sp => sp.product.oneflowCompatible)
     .map(selectedProduct => {
-      const { product, quantity, customPrice } = selectedProduct
-      const pricing = product.pricing[partyType]
+      const { product, quantity, customPrice, selectedVariant } = selectedProduct
+      
+      // Bestäm vilken prissättning som ska användas
+      // 1. Anpassat pris (högsta prioritet)
+      // 2. Vald variant 
+      // 3. Fallback till baspris
+      let pricing
+      if (selectedVariant) {
+        pricing = selectedVariant.pricing[partyType]
+      } else {
+        pricing = product.pricing[partyType]
+      }
       
       let basePrice = customPrice || pricing?.basePrice || 0
       let discountAmount = 0
