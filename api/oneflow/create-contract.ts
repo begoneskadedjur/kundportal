@@ -18,6 +18,23 @@ interface ContractRequestBody {
   // 🆕 NYTT: Dynamisk användare från frontend
   senderEmail?: string
   senderName?: string
+  // 🆕 NYTT: Produkter
+  selectedProducts?: Array<{
+    product: {
+      id: string
+      name: string
+      description: string
+      pricing: {
+        company?: { basePrice: number; vatRate?: number; discountPercent?: number }
+        individual?: { basePrice: number; taxDeduction?: string; discountPercent?: number }
+      }
+      quantityType: string
+      oneflowCompatible: boolean
+    }
+    quantity: number
+    customPrice?: number
+    notes?: string
+  }>
 }
 
 // 🆕 FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
@@ -71,6 +88,68 @@ function buildDataFieldsForDocument(
   )
   
   return mappedFields
+}
+
+// 🆕 KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
+function convertProductsToOneflow(
+  selectedProducts: ContractRequestBody['selectedProducts'],
+  partyType: 'company' | 'individual'
+): Array<{
+  name: string
+  description: string
+  price_1: {
+    base_amount: number
+    discount_amount?: number
+    currency: string
+  }
+  quantity: {
+    type: string
+    amount: number
+  }
+  counterparty_lock: boolean
+}> {
+  if (!selectedProducts || selectedProducts.length === 0) {
+    return []
+  }
+
+  return selectedProducts
+    .filter(sp => sp.product.oneflowCompatible)
+    .map(selectedProduct => {
+      const { product, quantity, customPrice } = selectedProduct
+      const pricing = product.pricing[partyType]
+      
+      let basePrice = customPrice || pricing?.basePrice || 0
+      let discountAmount = 0
+      
+      // Beräkna rabatt om tillgänglig
+      if (pricing?.discountPercent && !customPrice) {
+        discountAmount = basePrice * (pricing.discountPercent / 100)
+        basePrice = basePrice - discountAmount
+      }
+      
+      // Konvertera kvantitetstyp
+      let oneflowQuantityType = 'quantity'
+      if (product.quantityType === 'single_choice') {
+        oneflowQuantityType = 'single_choice'
+      } else if (product.quantityType === 'multiple_choice') {
+        oneflowQuantityType = 'multiple_choice'
+      }
+      
+      return {
+        name: product.name,
+        description: product.description,
+        price_1: {
+          base_amount: Math.round(basePrice * 100), // Oneflow använder ören/cent
+          ...(discountAmount > 0 && { discount_amount: Math.round(discountAmount * 100) }),
+          currency: 'SEK'
+        },
+        quantity: {
+          type: oneflowQuantityType,
+          amount: quantity
+        },
+        counterparty_lock: false // Kunderna kan inte redigera produkter
+      }
+    })
 }
 
 // 🆕 VALIDERA ANVÄNDARRÄTTIGHETER
@@ -130,7 +209,8 @@ export default async function handler(
     partyType,
     documentType,
     senderEmail,
-    senderName
+    senderName,
+    selectedProducts
   } = req.body as ContractRequestBody
 
   // 🆕 VALIDERA ANVÄNDAREN FÖRST
@@ -236,6 +316,50 @@ export default async function handler(
     }
 
     console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat framgångsrikt:`, createdContract.id)
+
+    // 🆕 LÄGG TILL PRODUKTER OM TILLGÄNGLIGA
+    if (selectedProducts && selectedProducts.length > 0) {
+      console.log(`🛒 Lägger till ${selectedProducts.length} produkter till kontraktet...`)
+      
+      try {
+        const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
+        
+        if (oneflowProducts.length > 0) {
+          // Skapa en produktgrupp och lägg till produkter
+          const productGroupPayload = {
+            products: oneflowProducts,
+            configuration: {
+              hide_price_summation: false,
+              allow_quantity_change: false
+            }
+          }
+          
+          const addProductsResponse = await fetch(
+            `https://api.oneflow.com/v1/contracts/${createdContract.id}/product_groups`,
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-oneflow-api-token': token,
+                'x-oneflow-user-email': userEmail,
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({ product_groups: [productGroupPayload] }),
+            }
+          )
+          
+          if (!addProductsResponse.ok) {
+            const productError = await addProductsResponse.json()
+            console.error('⚠️ Kunde inte lägga till produkter:', JSON.stringify(productError, null, 2))
+          } else {
+            console.log(`✅ ${oneflowProducts.length} produkter tillagda framgångsrikt`)
+          }
+        }
+      } catch (productError) {
+        console.error('❌ Fel vid tillägg av produkter:', productError)
+        // Fortsätt ändå med kontraktet
+      }
+    }
 
     if (sendForSigning) {
       console.log('🚀 Publicerar kontrakt för signering...')

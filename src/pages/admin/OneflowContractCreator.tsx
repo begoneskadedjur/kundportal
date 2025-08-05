@@ -2,13 +2,17 @@
 // KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
 import React, { useState } from 'react'
-import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import ProductSelector from '../../components/admin/ProductSelector'
+import ProductSummary from '../../components/admin/ProductSummary'
+import { SelectedProduct, CustomerType } from '../../types/products'
+import { calculatePriceSummary, generateContractDescription, validateOneflowCompatibility } from '../../utils/pricingCalculator'
 import toast from 'react-hot-toast'
 
 // Oneflow mallar för offertförslag
@@ -84,10 +88,13 @@ interface WizardData {
   foretag: string
   'org-nr': string
   
-  // Steg 6 - Avtalsobjekt
+  // Steg 6 - Produkter (🆕 NYTT STEG)
+  selectedProducts: SelectedProduct[]
+  
+  // Steg 7 - Avtalsobjekt
   agreementText: string
   
-  // Steg 7 - Slutsteg
+  // Steg 8 - Slutsteg
   sendForSigning: boolean
 }
 
@@ -97,8 +104,9 @@ const STEPS = [
   { id: 3, title: 'Avtalspart', icon: User },
   { id: 4, title: 'BeGone Info', icon: Building2 },
   { id: 5, title: 'Motpart', icon: Mail },
-  { id: 6, title: 'Avtalsobjekt', icon: FileText },
-  { id: 7, title: 'Granska & Skicka', icon: Send }
+  { id: 6, title: 'Produkter', icon: ShoppingCart }, // 🆕 NYTT STEG
+  { id: 7, title: 'Avtalsobjekt', icon: FileText },
+  { id: 8, title: 'Granska & Skicka', icon: Send }
 ]
 
 export default function OneflowContractCreator() {
@@ -124,6 +132,7 @@ export default function OneflowContractCreator() {
     'utforande-adress': '',
     foretag: '',
     'org-nr': '',
+    selectedProducts: [], // 🆕 PRODUKTER
     agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
     sendForSigning: true
   })
@@ -184,8 +193,9 @@ export default function OneflowContractCreator() {
       case 3: return true // Partytype har default
       case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && wizardData.avtalslngd
       case 5: return wizardData.Kontaktperson && wizardData['e-post-kontaktperson']
-      case 6: return wizardData.agreementText.length > 0
-      case 7: return true
+      case 6: return wizardData.selectedProducts.length >= 0 // Produkter (kan vara tom för enkla avtal)
+      case 7: return wizardData.agreementText.length > 0
+      case 8: return true
       default: return false
     }
   }
@@ -237,7 +247,9 @@ export default function OneflowContractCreator() {
           documentType: wizardData.documentType,
           // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
           senderEmail: user?.email,
-          senderName: wizardData.anstalld
+          senderName: wizardData.anstalld,
+          // 🆕 SKICKA PRODUKTER
+          selectedProducts: wizardData.selectedProducts
         })
       })
       
@@ -620,6 +632,41 @@ export default function OneflowContractCreator() {
 
       case 6:
         return (
+          <div className="space-y-6 max-w-6xl mx-auto">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <ShoppingCart className="w-6 h-6 text-green-400" />
+                Produkter & Tjänster
+              </h3>
+              <p className="text-slate-400">
+                Välj vilka produkter och tjänster som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <ProductSelector
+                  selectedProducts={wizardData.selectedProducts}
+                  onSelectionChange={(products) => updateWizardData('selectedProducts', products)}
+                  customerType={wizardData.partyType as CustomerType}
+                />
+              </div>
+              
+              <div className="lg:col-span-1">
+                <div className="sticky top-4">
+                  <ProductSummary
+                    selectedProducts={wizardData.selectedProducts}
+                    customerType={wizardData.partyType as CustomerType}
+                    showDetailedBreakdown={true}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 7:
+        return (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
@@ -658,12 +705,29 @@ export default function OneflowContractCreator() {
                     </span>
                   )}
                 </div>
+                
+                {wizardData.selectedProducts.length > 0 && (
+                  <div className="pt-4 border-t border-slate-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const generatedText = generateContractDescription(wizardData.selectedProducts)
+                        updateWizardData('agreementText', generatedText)
+                        toast.success('Beskrivning genererad från valda produkter!')
+                      }}
+                      className="w-full"
+                    >
+                      ⚡ Generera beskrivning från valda produkter
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
         )
 
-      case 7:
+      case 8:
         return (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="text-center mb-8">
@@ -746,6 +810,15 @@ export default function OneflowContractCreator() {
                 </div>
               </Card>
             </div>
+
+            {/* Produktsammanfattning */}
+            {wizardData.selectedProducts.length > 0 && (
+              <ProductSummary
+                selectedProducts={wizardData.selectedProducts}
+                customerType={wizardData.partyType as CustomerType}
+                showDetailedBreakdown={false}
+              />
+            )}
 
             {/* Signering */}
             <Card className="p-6">
