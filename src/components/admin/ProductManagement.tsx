@@ -686,7 +686,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
       isOpen={true}
       onClose={onClose}
       title={product ? 'Redigera produkt' : 'Ny produkt'}
-      className="max-w-4xl max-h-[90vh] overflow-y-auto"
+      className="max-w-6xl max-h-[90vh] overflow-y-auto"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         {/* Grundinformation */}
@@ -707,15 +707,14 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Beskrivning *
+                Beskrivning
               </label>
               <textarea
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                 rows={3}
                 value={formData.description}
                 onChange={(e) => updateFormData('description', e.target.value)}
-                placeholder="Detaljerad beskrivning av tjänsten..."
-                required
+                placeholder="Detaljerad beskrivning av tjänsten (valfritt)..."
               />
             </div>
 
@@ -742,15 +741,14 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
                 Kontraktsbeskrivning
               </h4>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Beskrivning *
+                Beskrivning
               </label>
               <textarea
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                 rows={4}
                 value={formData.contractDescription}
                 onChange={(e) => updateFormData('contractDescription', e.target.value)}
-                placeholder="Beskrivning som visas i kontrakt..."
-                required
+                placeholder="Beskrivning som visas i kontrakt (valfritt)..."
               />
             </div>
           </div>
@@ -835,218 +833,219 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onSave, onClose })
               </div>
             </div>
 
-            {/* Prisvarianter */}
-            <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-600/50">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium text-white flex items-center gap-2">
-                  <Copy className="w-4 h-4 text-green-400" />
-                  Prisvarianter
-                </h4>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newVariant: PriceVariant = {
-                      id: `variant-${Date.now()}`,
-                      name: '',
-                      description: '',
-                      pricing: {
-                        company: {
-                          basePrice: formData.pricing.company.basePrice,
-                          vatRate: formData.pricing.company.vatRate,
-                          discountPercent: formData.pricing.company.discountPercent || 0
-                        },
-                        individual: {
-                          basePrice: formData.pricing.individual.basePrice,
-                          taxDeduction: formData.pricing.individual.taxDeduction,
-                          discountPercent: formData.pricing.individual.discountPercent || 0
-                        }
-                      },
-                      isDefault: formData.priceVariants.length === 0,
-                      sortOrder: formData.priceVariants.length
-                    }
-                    updateFormData('priceVariants', [...formData.priceVariants, newVariant])
-                  }}
-                  className="flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  Lägg till variant
-                </Button>
-              </div>
-              
-              <p className="text-xs text-slate-400 mb-4">
-                Skapa olika prisalternativ för samma produkt (t.ex. olika storlekar, arbetstider, eller omfattning)
-              </p>
+          </div>
+        </div>
 
-              {formData.priceVariants.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <Copy className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>Inga prisvarianter ännu</p>
-                  <p className="text-xs">Klicka "Lägg till variant" för att skapa alternativ</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {formData.priceVariants.map((variant, index) => (
-                    <div key={variant.id} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm bg-slate-600/60 text-slate-200 px-3 py-1.5 rounded-lg font-medium">
-                            Variant #{index + 1}
-                          </span>
-                          {variant.isDefault && (
-                            <span className="text-sm bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                              <Star className="w-3 h-3 fill-current" />
-                              Standard
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
+        {/* Prisvarianter - Full bredd för bättre användbarhet */}
+        <div className="bg-slate-800/30 p-6 rounded-lg border border-slate-600/50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Copy className="w-5 h-5 text-green-400" />
+              Prisvarianter
+            </h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newVariant: PriceVariant = {
+                  id: `variant-${Date.now()}`,
+                  name: '',
+                  description: '',
+                  pricing: {
+                    company: {
+                      basePrice: 0, // Börja med tomt pris istället för att kopiera baspris
+                      vatRate: formData.pricing.company.vatRate,
+                      discountPercent: 0
+                    },
+                    individual: {
+                      basePrice: 0, // Börja med tomt pris istället för att kopiera baspris
+                      taxDeduction: formData.pricing.individual.taxDeduction,
+                      discountPercent: 0
+                    }
+                  },
+                  isDefault: formData.priceVariants.length === 0,
+                  sortOrder: formData.priceVariants.length
+                }
+                updateFormData('priceVariants', [...formData.priceVariants, newVariant])
+              }}
+              className="flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              Lägg till variant
+            </Button>
+          </div>
+          
+          <p className="text-sm text-slate-400 mb-6">
+            Skapa olika prisalternativ för samma produkt (t.ex. olika storlekar, arbetstider, eller omfattning)
+          </p>
+
+          {formData.priceVariants.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <Copy className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg">Inga prisvarianter ännu</p>
+              <p className="text-sm">Klicka "Lägg till variant" för att skapa alternativ</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {formData.priceVariants.map((variant, index) => (
+                <div key={variant.id} className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/40 hover:border-slate-500/60 transition-all duration-200">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm bg-slate-600/60 text-slate-200 px-3 py-1.5 rounded-lg font-medium">
+                        Variant #{index + 1}
+                      </span>
+                      {variant.isDefault && (
+                        <span className="text-sm bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-current" />
+                          Standard
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const variants = [...formData.priceVariants]
+                          variants[index] = { ...variants[index], isDefault: !variants[index].isDefault }
+                          // Ta bort default från andra
+                          if (variants[index].isDefault) {
+                            variants.forEach((v, i) => {
+                              if (i !== index) v.isDefault = false
+                            })
+                          }
+                          updateFormData('priceVariants', variants)
+                        }}
+                        className="text-green-400 hover:text-green-300 hover:bg-green-500/10 px-3 py-2 rounded-lg transition-all duration-200"
+                        title={variant.isDefault ? "Ta bort som standard" : "Sätt som standard"}
+                      >
+                        <Star className={`w-4 h-4 ${variant.isDefault ? 'fill-current' : ''}`} />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== index))
+                        }}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-all duration-200"
+                        title="Ta bort variant"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Vänster kolumn: Variantinformation */}
+                    <div className="space-y-6">
+                      <div className="bg-slate-700/30 p-5 rounded-lg border border-slate-600/20">
+                        <h5 className="text-base font-medium text-white mb-4 flex items-center gap-2">
+                          <Info className="w-4 h-4 text-purple-400" />
+                          Variantinformation
+                        </h5>
+                        <div className="space-y-4">
+                          <Input
+                            label="Variantnamn *"
+                            value={variant.name}
+                            onChange={(e) => {
                               const variants = [...formData.priceVariants]
-                              variants[index] = { ...variants[index], isDefault: !variants[index].isDefault }
-                              // Ta bort default från andra
-                              if (variants[index].isDefault) {
-                                variants.forEach((v, i) => {
-                                  if (i !== index) v.isDefault = false
-                                })
-                              }
+                              variants[index] = { ...variants[index], name: e.target.value }
                               updateFormData('priceVariants', variants)
                             }}
-                            className="text-green-400 hover:text-green-300 hover:bg-green-500/10 px-3 py-2 rounded-lg transition-all duration-200"
-                            title={variant.isDefault ? "Ta bort som standard" : "Sätt som standard"}
-                          >
-                            <Star className={`w-4 h-4 ${variant.isDefault ? 'fill-current' : ''}`} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              updateFormData('priceVariants', formData.priceVariants.filter((_, i) => i !== index))
-                            }}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg transition-all duration-200"
-                            title="Ta bort variant"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600/20">
-                          <h5 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                            <Info className="w-4 h-4 text-purple-400" />
-                            Variantinformation
-                          </h5>
-                          <div className="space-y-4">
-                            <Input
-                              label="Variantnamn *"
-                              value={variant.name}
+                            placeholder="t.ex. 2 sovrum + vardagsrum"
+                            helperText="Kort beskrivande namn för denna variant"
+                            className="text-base"
+                          />
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Detaljerad beskrivning
+                            </label>
+                            <textarea
+                              className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-base leading-relaxed"
+                              rows={3}
+                              value={variant.description || ''}
                               onChange={(e) => {
                                 const variants = [...formData.priceVariants]
-                                variants[index] = { ...variants[index], name: e.target.value }
+                                variants[index] = { ...variants[index], description: e.target.value }
                                 updateFormData('priceVariants', variants)
                               }}
-                              placeholder="t.ex. 2 sovrum + vardagsrum"
-                              helperText="Kort beskrivande namn för denna variant"
-                              className="text-base"
+                              placeholder="Detaljerad beskrivning av vad som ingår i denna variant..."
                             />
-                            <div>
-                              <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Detaljerad beskrivning
-                              </label>
-                              <textarea
-                                className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-base leading-relaxed"
-                                rows={3}
-                                value={variant.description || ''}
-                                onChange={(e) => {
-                                  const variants = [...formData.priceVariants]
-                                  variants[index] = { ...variants[index], description: e.target.value }
-                                  updateFormData('priceVariants', variants)
-                                }}
-                                placeholder="Detaljerad beskrivning av vad som ingår i denna variant..."
-                              />
-                              <p className="text-xs text-slate-500 mt-1">
-                                Beskriv vad som ingår och skiljer denna variant från andra
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-600/20">
-                            <h5 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                              <DollarSign className="w-4 h-4 text-blue-400" />
-                              Prissättning för variant
-                            </h5>
-                            <div className="space-y-4">
-                              <div>
-                                <Input
-                                  label="Företagspris (exkl. moms) *"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={variant.pricing.company.basePrice}
-                                  onChange={(e) => {
-                                    const variants = [...formData.priceVariants]
-                                    variants[index] = {
-                                      ...variants[index],
-                                      pricing: {
-                                        ...variants[index].pricing,
-                                        company: {
-                                          ...variants[index].pricing.company,
-                                          basePrice: Number(e.target.value)
-                                        }
-                                      }
-                                    }
-                                    updateFormData('priceVariants', variants)
-                                  }}
-                                  placeholder="2490"
-                                  helperText="Pris i hela kronor exklusive moms"
-                                  className="text-base"
-                                />
-                              </div>
-                              <div>
-                                <Input
-                                  label="Privatpris (inkl. moms) *"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={variant.pricing.individual.basePrice}
-                                  onChange={(e) => {
-                                    const variants = [...formData.priceVariants]
-                                    variants[index] = {
-                                      ...variants[index],
-                                      pricing: {
-                                        ...variants[index].pricing,
-                                        individual: {
-                                          ...variants[index].pricing.individual,
-                                          basePrice: Number(e.target.value)
-                                        }
-                                      }
-                                    }
-                                    updateFormData('priceVariants', variants)
-                                  }}
-                                  placeholder="3490"
-                                  helperText="Pris i hela kronor inklusive moms"
-                                  className="text-base"
-                                />
-                              </div>
-                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Beskriv vad som ingår och skiljer denna variant från andra
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+
+                    {/* Höger kolumn: Prissättning */}
+                    <div className="space-y-6">
+                      <div className="bg-slate-800/30 p-5 rounded-lg border border-slate-600/20">
+                        <h5 className="text-base font-medium text-white mb-4 flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-blue-400" />
+                          Prissättning för variant
+                        </h5>
+                        <div className="space-y-4">
+                          <Input
+                            label="Företagspris (exkl. moms) *"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={variant.pricing.company.basePrice}
+                            onChange={(e) => {
+                              const variants = [...formData.priceVariants]
+                              variants[index] = {
+                                ...variants[index],
+                                pricing: {
+                                  ...variants[index].pricing,
+                                  company: {
+                                    ...variants[index].pricing.company,
+                                    basePrice: Number(e.target.value)
+                                  }
+                                }
+                              }
+                              updateFormData('priceVariants', variants)
+                            }}
+                            placeholder="2490"
+                            helperText="Pris i hela kronor exklusive moms"
+                            className="text-base"
+                          />
+                          <Input
+                            label="Privatpris (inkl. moms) *"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={variant.pricing.individual.basePrice}
+                            onChange={(e) => {
+                              const variants = [...formData.priceVariants]
+                              variants[index] = {
+                                ...variants[index],
+                                pricing: {
+                                  ...variants[index].pricing,
+                                  individual: {
+                                    ...variants[index].pricing.individual,
+                                    basePrice: Number(e.target.value)
+                                  }
+                                }
+                              }
+                              updateFormData('priceVariants', variants)
+                            }}
+                            placeholder="3490"
+                            helperText="Pris i hela kronor inklusive moms"
+                            className="text-base"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Konfiguration */}
