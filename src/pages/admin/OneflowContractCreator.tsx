@@ -2,7 +2,7 @@
 // KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
 import React, { useState } from 'react'
-import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
@@ -11,8 +11,32 @@ import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
-// Oneflow mallar - enkel version utan ikoner/beskrivningar
-const ONEFLOW_TEMPLATES = [
+// Oneflow mallar för offertförslag
+const OFFER_TEMPLATES = [
+  { 
+    id: '8598798', 
+    name: 'Offertförslag – Exkl Moms (Företag)',
+    type: 'company'
+  },
+  { 
+    id: '8919037', 
+    name: 'Offertförslag – Inkl moms (Privatperson)',
+    type: 'individual'
+  },
+  { 
+    id: '8919012', 
+    name: 'Offertförslag – ROT (Privatperson)',
+    type: 'individual'
+  },
+  { 
+    id: '8919059', 
+    name: 'Offertförslag – RUT (Privatperson)',
+    type: 'individual'
+  }
+]
+
+// Oneflow mallar för avtalsförslag
+const CONTRACT_TEMPLATES = [
   { 
     id: '8486368', 
     name: 'Skadedjursavtal',
@@ -37,19 +61,22 @@ const ONEFLOW_TEMPLATES = [
 ]
 
 interface WizardData {
-  // Steg 1
+  // Steg 1 - Dokumenttyp
+  documentType: 'offer' | 'contract'
+  
+  // Steg 2 - Mall
   selectedTemplate: string
   
-  // Steg 2
+  // Steg 3 - Avtalspart
   partyType: 'company' | 'individual'
   
-  // Steg 3 - BeGone info
+  // Steg 4 - BeGone info
   anstalld: string
   'e-post-anstlld': string
   avtalslngd: string
   begynnelsedag: string
   
-  // Steg 4 - Motpart
+  // Steg 5 - Motpart
   Kontaktperson: string
   'e-post-kontaktperson': string
   'telefonnummer-kontaktperson': string
@@ -57,20 +84,21 @@ interface WizardData {
   foretag: string
   'org-nr': string
   
-  // Steg 5 - Avtalsobjekt
+  // Steg 6 - Avtalsobjekt
   agreementText: string
   
-  // Steg 6 - Slutsteg
+  // Steg 7 - Slutsteg
   sendForSigning: boolean
 }
 
 const STEPS = [
-  { id: 1, title: 'Välj Mall', icon: FileText },
-  { id: 2, title: 'Avtalspart', icon: User },
-  { id: 3, title: 'BeGone Info', icon: Building2 },
-  { id: 4, title: 'Motpart', icon: Mail },
-  { id: 5, title: 'Avtalsobjekt', icon: FileText },
-  { id: 6, title: 'Granska & Skicka', icon: Send }
+  { id: 1, title: 'Dokumenttyp', icon: FileCheck },
+  { id: 2, title: 'Välj Mall', icon: FileText },
+  { id: 3, title: 'Avtalspart', icon: User },
+  { id: 4, title: 'BeGone Info', icon: Building2 },
+  { id: 5, title: 'Motpart', icon: Mail },
+  { id: 6, title: 'Avtalsobjekt', icon: FileText },
+  { id: 7, title: 'Granska & Skicka', icon: Send }
 ]
 
 export default function OneflowContractCreator() {
@@ -82,6 +110,7 @@ export default function OneflowContractCreator() {
   
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
   const [wizardData, setWizardData] = useState<WizardData>({
+    documentType: 'contract',
     selectedTemplate: '',
     partyType: 'company',
     // 🆕 ANVÄND INLOGGAD ANVÄNDARES INFO SOM DEFAULT
@@ -100,34 +129,70 @@ export default function OneflowContractCreator() {
   })
 
   const updateWizardData = (field: keyof WizardData, value: any) => {
-    setWizardData(prev => ({ ...prev, [field]: value }))
+    setWizardData(prev => {
+      const updated = { ...prev, [field]: value }
+      
+      // Om vi väljer en offertmall, uppdatera automatiskt partyType baserat på mallens typ
+      if (field === 'selectedTemplate' && updated.documentType === 'offer') {
+        const template = OFFER_TEMPLATES.find(t => t.id === value)
+        if (template) {
+          updated.partyType = template.type as 'company' | 'individual'
+        }
+      }
+      
+      // Om vi byter dokumenttyp, rensa vald mall
+      if (field === 'documentType') {
+        updated.selectedTemplate = ''
+      }
+      
+      return updated
+    })
   }
 
   const nextStep = () => {
     if (currentStep < STEPS.length) {
-      setCurrentStep(prev => prev + 1)
+      let nextStepNumber = currentStep + 1
+      
+      // Om vi är på steg 2 (mallval) och har valt en offertmall,
+      // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
+      if (currentStep === 2 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
+        nextStepNumber = 4
+      }
+      
+      setCurrentStep(nextStepNumber)
     }
   }
 
   const prevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1)
+      let prevStepNumber = currentStep - 1
+      
+      // Om vi kommer tillbaka från steg 4 och har en offertmall vald,
+      // hoppa över steg 3 (avtalspart) tillbaka till steg 2 (mallval)
+      if (currentStep === 4 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
+        prevStepNumber = 2
+      }
+      
+      setCurrentStep(prevStepNumber)
     }
   }
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return wizardData.selectedTemplate !== ''
-      case 2: return true // Partytype har default
-      case 3: return wizardData.anstalld && wizardData['e-post-anstlld'] && wizardData.avtalslngd
-      case 4: return wizardData.Kontaktperson && wizardData['e-post-kontaktperson']
-      case 5: return wizardData.agreementText.length > 0
-      case 6: return true
+      case 1: return wizardData.documentType !== ''
+      case 2: return wizardData.selectedTemplate !== ''
+      case 3: return true // Partytype har default
+      case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && wizardData.avtalslngd
+      case 5: return wizardData.Kontaktperson && wizardData['e-post-kontaktperson']
+      case 6: return wizardData.agreementText.length > 0
+      case 7: return true
       default: return false
     }
   }
 
-  const selectedTemplate = ONEFLOW_TEMPLATES.find(t => t.id === wizardData.selectedTemplate)
+  // Hitta rätt mall baserat på dokumenttyp
+  const availableTemplates = wizardData.documentType === 'offer' ? OFFER_TEMPLATES : CONTRACT_TEMPLATES
+  const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
   const handleSubmit = async () => {
     const LIMIT = 1024
@@ -169,6 +234,7 @@ export default function OneflowContractCreator() {
           recipient, 
           sendForSigning: wizardData.sendForSigning, 
           partyType: wizardData.partyType,
+          documentType: wizardData.documentType,
           // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
           senderEmail: user?.email,
           senderName: wizardData.anstalld
@@ -216,12 +282,82 @@ export default function OneflowContractCreator() {
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Välj Avtalstyp</h2>
-              <p className="text-slate-400">Välj vilken typ av avtal du vill skapa</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Typ av Dokument</h2>
+              <p className="text-slate-400">Välj om du vill skicka ett offertförslag eller avtalsförslag</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+              <div
+                onClick={() => updateWizardData('documentType', 'offer')}
+                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
+                  wizardData.documentType === 'offer'
+                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                }`}
+              >
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <DollarSign className="w-10 h-10 text-blue-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-3">Offertförslag</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Skicka prisförslag och tjänstebeskrivning till potentiell kund
+                  </p>
+                  <div className="text-xs text-slate-500 space-y-1">
+                    <div>• Företag (exkl moms)</div>
+                    <div>• Privatperson (inkl moms)</div>
+                    <div>• ROT/RUT-avdrag</div>
+                  </div>
+                  {wizardData.documentType === 'offer' && (
+                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                  )}
+                </div>
+              </div>
+
+              <div
+                onClick={() => updateWizardData('documentType', 'contract')}
+                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
+                  wizardData.documentType === 'contract'
+                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                }`}
+              >
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <FileCheck className="w-10 h-10 text-purple-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-3">Avtalsförslag</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Skapa bindande serviceavtal med kund
+                  </p>
+                  <div className="text-xs text-slate-500 space-y-1">
+                    <div>• Skadedjursavtal</div>
+                    <div>• Betesstationer</div>
+                    <div>• Speciallösningar</div>
+                  </div>
+                  {wizardData.documentType === 'contract' && (
+                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Välj {wizardData.documentType === 'offer' ? 'Offertmall' : 'Avtalsmall'}
+              </h2>
+              <p className="text-slate-400">
+                Välj vilken {wizardData.documentType === 'offer' ? 'offertmall' : 'avtalsmall'} du vill använda
+              </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {ONEFLOW_TEMPLATES.map(template => (
+              {availableTemplates.map(template => (
                 <div
                   key={template.id}
                   onClick={() => updateWizardData('selectedTemplate', template.id)}
@@ -234,6 +370,12 @@ export default function OneflowContractCreator() {
                   {template.popular && (
                     <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                       Populär
+                    </div>
+                  )}
+                  
+                  {wizardData.documentType === 'offer' && 'type' in template && (
+                    <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                      {template.type === 'company' ? 'Företag' : 'Privatperson'}
                     </div>
                   )}
                   
@@ -252,12 +394,12 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 2:
+      case 3:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-white mb-2">Typ av Avtalspart</h2>
-              <p className="text-slate-400">Är avtalet för ett företag eller en privatperson?</p>
+              <p className="text-slate-400">Är {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'} för ett företag eller en privatperson?</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -304,18 +446,21 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 3:
+      case 4:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">BeGone Information</h2>
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <Building2 className="w-6 h-6 text-blue-400" />
+                BeGone Information
+              </h3>
               <p className="text-slate-400">Uppgifter om ansvarig person från BeGone</p>
             </div>
             
             <Card className="p-6">
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* 🆕 VISA AKTUELL ANVÄNDARES INFO */}
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <div className="flex items-center gap-2 text-blue-400 text-sm mb-2">
                     <User className="w-4 h-4" />
                     <span>Inloggad som: {user?.email}</span>
@@ -325,7 +470,10 @@ export default function OneflowContractCreator() {
                   </p>
                 </div>
                 
-                <Input
+                <div className="border-t border-slate-700"></div>
+                
+                <div className="space-y-4">
+                  <Input
                   label="Ansvarig från BeGone *"
                   value={wizardData.anstalld}
                   onChange={e => updateWizardData('anstalld', e.target.value)}
@@ -360,26 +508,28 @@ export default function OneflowContractCreator() {
                     onChange={e => updateWizardData('begynnelsedag', e.target.value)}
                     icon={<Calendar className="w-4 h-4" />}
                   />
+                  </div>
                 </div>
               </div>
             </Card>
           </div>
         )
 
-      case 4:
+      case 5:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <User className="w-6 h-6 text-green-400" />
                 {wizardData.partyType === 'company' ? 'Företagsinformation' : 'Personuppgifter'}
-              </h2>
+              </h3>
               <p className="text-slate-400">
-                Uppgifter om {wizardData.partyType === 'company' ? 'företaget' : 'personen'} som ska teckna avtalet
+                Uppgifter om {wizardData.partyType === 'company' ? 'företaget' : 'personen'} som ska {wizardData.documentType === 'offer' ? 'få offerten' : 'teckna avtalet'}
               </p>
             </div>
             
             <Card className="p-6">
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {wizardData.partyType === 'company' && (
                   <>
                     <Input
@@ -400,18 +550,26 @@ export default function OneflowContractCreator() {
                   </>
                 )}
                 
-                {wizardData.partyType === 'individual' && (
-                  <Input
-                    label="Personnummer"
-                    value={wizardData['org-nr']}
-                    onChange={e => updateWizardData('org-nr', e.target.value)}
-                    icon={<Hash className="w-4 h-4" />}
-                    placeholder="YYYYMMDD-XXXX"
-                  />
+                {wizardData.partyType === 'company' && (
+                  <div className="border-t border-slate-700"></div>
                 )}
                 
-                <Input
-                  label={wizardData.partyType === 'company' ? 'Kontaktperson *' : 'Namn *'}
+                {wizardData.partyType === 'individual' && (
+                  <>
+                    <Input
+                      label="Personnummer"
+                      value={wizardData['org-nr']}
+                      onChange={e => updateWizardData('org-nr', e.target.value)}
+                      icon={<Hash className="w-4 h-4" />}
+                      placeholder="YYYYMMDD-XXXX"
+                    />
+                    <div className="border-t border-slate-700"></div>
+                  </>
+                )}
+                
+                <div className="space-y-4">
+                  <Input
+                    label={wizardData.partyType === 'company' ? 'Kontaktperson *' : 'Namn *'}
                   value={wizardData.Kontaktperson}
                   onChange={e => updateWizardData('Kontaktperson', e.target.value)}
                   icon={<User className="w-4 h-4" />}
@@ -443,6 +601,7 @@ export default function OneflowContractCreator() {
                   icon={<MapPin className="w-4 h-4" />}
                   placeholder="Gatuadress, Postnummer Stad"
                 />
+                </div>
               </div>
               
               <div className="mt-6 pt-4 border-t border-slate-700">
@@ -459,25 +618,34 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 5:
+      case 6:
         return (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Avtalsobjekt</h2>
-              <p className="text-slate-400">Beskriv vad som ska ingå i avtalet</p>
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <FileText className="w-6 h-6 text-blue-400" />
+                {wizardData.documentType === 'offer' ? 'Offertinnehåll' : 'Avtalsobjekt'}
+              </h3>
+              <p className="text-slate-400">
+                Beskriv vad som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
+              </p>
             </div>
             
             <Card className="p-6">
               <div className="space-y-4">
-                <label className="block text-sm font-medium text-slate-300">
-                  Avtalets innehåll och omfattning *
-                </label>
-                <textarea
+                <Input
+                  as="textarea"
+                  rows={10}
+                  label={wizardData.documentType === 'offer' ? 'Offertens innehåll och omfattning *' : 'Avtalets innehåll och omfattning *'}
                   value={wizardData.agreementText}
                   onChange={(e) => updateWizardData('agreementText', e.target.value)}
-                  rows={10}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm leading-relaxed"
-                  placeholder="Beskriv avtalets omfattning och villkor i detalj. Inkludera vad som ingår i servicen, frekvens av besök, rapportering, och andra viktiga villkor..."
+                  placeholder={wizardData.documentType === 'offer' 
+                    ? "Beskriv offertens omfattning och föreslagna tjänster i detalj. Inkludera vad som ingår, frekvens, priser och andra viktiga detaljer..."
+                    : "Beskriv avtalets omfattning och villkor i detalj. Inkludera vad som ingår i servicen, frekvens av besök, rapportering, och andra viktiga villkor..."
+                  }
+                  helperText="Detaljerad beskrivning hjälper kunden att förstå vad som ingår i tjänsten"
+                  icon={<FileText className="w-4 h-4" />}
+                  required
                 />
                 <div className="flex items-center justify-between text-sm">
                   <span className={`${wizardData.agreementText.length > 2048 ? 'text-red-500' : 'text-slate-400'}`}>
@@ -495,12 +663,17 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 6:
+      case 7:
         return (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Granska & Skicka</h2>
-              <p className="text-slate-400">Kontrollera att allt ser korrekt ut innan du skapar avtalet</p>
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <CheckCircle className="w-6 h-6 text-green-400" />
+                Granska & Skicka
+              </h3>
+              <p className="text-slate-400">
+                Kontrollera att allt ser korrekt ut innan du skapar {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
+              </p>
             </div>
             
             {/* 🆕 VISA AVSÄNDARINFO */}
@@ -530,7 +703,7 @@ export default function OneflowContractCreator() {
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Avtal & Mall
+                  {wizardData.documentType === 'offer' ? 'Offert & Mall' : 'Avtal & Mall'}
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -596,8 +769,8 @@ export default function OneflowContractCreator() {
               
               <p className="text-sm text-slate-400 mt-3 px-4">
                 {wizardData.sendForSigning 
-                  ? `📧 Kontraktet publiceras och skickas från ${user?.email} till motparten för signering` 
-                  : '📝 Kontraktet skapas som utkast i Oneflow och kan skickas senare'
+                  ? `📧 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} publiceras och skickas från ${user?.email} till motparten för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
+                  : `📝 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} skapas som utkast i Oneflow och kan skickas senare`
                 }
               </p>
             </Card>
@@ -618,7 +791,10 @@ export default function OneflowContractCreator() {
                 ) : (
                   <>
                     <CheckCircle className="w-5 h-5 mr-2" />
-                    {wizardData.sendForSigning ? 'Skapa & Skicka Avtal' : 'Skapa Utkast'}
+                    {wizardData.sendForSigning 
+                      ? `Skapa & Skicka ${wizardData.documentType === 'offer' ? 'Offert' : 'Avtal'}` 
+                      : 'Skapa Utkast'
+                    }
                   </>
                 )}
               </Button>
@@ -629,11 +805,11 @@ export default function OneflowContractCreator() {
               <Card className="p-6 bg-green-500/10 border-green-500/20">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <CheckCircle className="w-5 h-5 text-green-400" /> 
-                  Kontrakt skapat!
+                  {wizardData.documentType === 'offer' ? 'Offert skapad!' : 'Kontrakt skapat!'}
                 </h3>
                 <div className="grid gap-4 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Kontrakt-ID:</span>
+                    <span className="text-slate-400">{wizardData.documentType === 'offer' ? 'Offert-ID:' : 'Kontrakt-ID:'}</span>
                     <span className="font-mono text-green-400 bg-green-500/10 px-3 py-1 rounded">
                       #{createdContract.id}
                     </span>
@@ -646,7 +822,10 @@ export default function OneflowContractCreator() {
                         ? 'bg-green-500/20 text-green-400' 
                         : 'bg-yellow-500/20 text-yellow-400'
                     }`}>
-                      {createdContract.state === 'published' ? '📧 Skickat för signering' : '📝 Utkast'}
+                      {createdContract.state === 'published' 
+                        ? `📧 Skickat för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
+                        : '📝 Utkast'
+                      }
                     </span>
                   </div>
                 </div>
@@ -668,6 +847,7 @@ export default function OneflowContractCreator() {
                       setCreatedContract(null)
                       setCurrentStep(1)
                       setWizardData({
+                        documentType: 'contract',
                         selectedTemplate: '',
                         partyType: 'company',
                         // 🆕 ÅTERSTÄLL MED ANVÄNDARENS INFO
@@ -687,7 +867,7 @@ export default function OneflowContractCreator() {
                     }}
                     className="px-6"
                   >
-                    Skapa nytt avtal
+                    Skapa nytt dokument
                   </Button>
                 </div>
               </Card>
@@ -719,8 +899,8 @@ export default function OneflowContractCreator() {
                 <FileText className="w-6 h-6 text-green-500" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Skapa Oneflow Avtal</h1>
-                <p className="text-sm text-slate-400">Steg-för-steg guide för att skapa avtal</p>
+                <h1 className="text-2xl font-bold text-white">Skapa Oneflow Dokument</h1>
+                <p className="text-sm text-slate-400">Steg-för-steg guide för att skapa offert- eller avtalsförslag</p>
               </div>
             </div>
           </div>
@@ -736,6 +916,10 @@ export default function OneflowContractCreator() {
               const isActive = currentStep === step.id
               const isCompleted = currentStep > step.id
               const isClickable = currentStep > step.id || currentStep === step.id
+              
+              // Dölj steg 3 (avtalspart) för offerter eftersom det väljs automatiskt
+              const shouldSkip = step.id === 3 && wizardData.documentType === 'offer' && wizardData.selectedTemplate
+              if (shouldSkip) return null
               
               return (
                 <div key={step.id} className="flex items-center">
