@@ -90,45 +90,6 @@ function buildDataFieldsForDocument(
   return mappedFields
 }
 
-// 🆕 HÄMTA TEMPLATE INFORMATION OCH PRODUKTGRUPP ID
-async function getTemplateProductGroupId(
-  templateId: string,
-  token: string,
-  userEmail: string
-): Promise<number | null> {
-  try {
-    const response = await fetch(
-      `https://api.oneflow.com/v1/templates/${templateId}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-oneflow-api-token': token,
-          'x-oneflow-user-email': userEmail,
-          Accept: 'application/json',
-        },
-      }
-    )
-
-    if (!response.ok) {
-      console.error('Kunde inte hämta template information:', response.status)
-      return null
-    }
-
-    const templateData = await response.json()
-    
-    // Hitta första produktgruppen
-    if (templateData.product_groups && templateData.product_groups.length > 0) {
-      return templateData.product_groups[0].id
-    }
-    
-    console.warn('Ingen produktgrupp hittades i template')
-    return null
-  } catch (error) {
-    console.error('Fel vid hämtning av template information:', error)
-    return null
-  }
-}
 
 // 🆕 KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
 function convertProductsToOneflow(
@@ -322,11 +283,34 @@ export default async function handler(
     })
   }
 
-  const createPayload = {
+  // Förbered produktgrupper om produkter finns
+  let productGroups: any[] = []
+  if (selectedProducts && selectedProducts.length > 0) {
+    console.log(`🛒 Förbereder ${selectedProducts.length} produkter för kontraktet...`)
+    
+    const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
+    
+    if (oneflowProducts.length > 0) {
+      productGroups = [{
+        products: oneflowProducts,
+        configuration: {
+          hide_price_summation: false
+        }
+      }]
+      console.log(`✅ ${oneflowProducts.length} produkter förberedda för skapande`)
+    }
+  }
+
+  const createPayload: any = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
     data_fields,
     parties
+  }
+
+  // Lägg till produktgrupper om vi har några
+  if (productGroups.length > 0) {
+    createPayload.product_groups = productGroups
   }
 
   console.log('Skickar följande create payload till Oneflow:', JSON.stringify(createPayload, null, 2))
@@ -354,60 +338,6 @@ export default async function handler(
     }
 
     console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} skapat framgångsrikt:`, createdContract.id)
-
-    // 🆕 LÄGG TILL PRODUKTER OM TILLGÄNGLIGA
-    if (selectedProducts && selectedProducts.length > 0) {
-      console.log(`🛒 Lägger till ${selectedProducts.length} produkter till kontraktet...`)
-      
-      try {
-        // Hämta produktgrupp ID från template
-        const productGroupId = await getTemplateProductGroupId(templateId, token, userEmail)
-        
-        const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
-        
-        if (oneflowProducts.length > 0) {
-          // Skapa en produktgrupp och lägg till produkter
-          const productGroupPayload: any = {
-            products: oneflowProducts,
-            configuration: {
-              hide_price_summation: false
-            }
-          }
-          
-          // Lägg till ID om vi fick det från template
-          if (productGroupId) {
-            productGroupPayload.id = productGroupId
-            console.log(`📋 Använder produktgrupp ID: ${productGroupId}`)
-          } else {
-            console.log('⚠️ Kunde inte hämta produktgrupp ID, försöker utan ID')
-          }
-          
-          const addProductsResponse = await fetch(
-            `https://api.oneflow.com/v1/contracts/${createdContract.id}/product_groups`,
-            {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-oneflow-api-token': token,
-                'x-oneflow-user-email': userEmail,
-                Accept: 'application/json',
-              },
-              body: JSON.stringify({ product_groups: [productGroupPayload] }),
-            }
-          )
-          
-          if (!addProductsResponse.ok) {
-            const productError = await addProductsResponse.json()
-            console.error('⚠️ Kunde inte lägga till produkter:', JSON.stringify(productError, null, 2))
-          } else {
-            console.log(`✅ ${oneflowProducts.length} produkter tillagda framgångsrikt`)
-          }
-        }
-      } catch (productError) {
-        console.error('❌ Fel vid tillägg av produkter:', productError)
-        // Fortsätt ändå med kontraktet
-      }
-    }
 
     if (sendForSigning) {
       console.log('🚀 Publicerar kontrakt för signering...')
