@@ -2,7 +2,60 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
-const { ALLOWED_TEMPLATE_IDS } = require('../constants/oneflowTemplates')
+const { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } = require('../constants/oneflowTemplates')
+
+// Exakta fältmappningar baserat på OneFlow export-fält från OneflowContractCreator
+const CONTRACT_FIELD_MAPPING = {
+  // BeGone information
+  'anstalld': 'begone_employee_name',
+  'e-post-anstlld': 'begone_employee_email',
+  'avtalslngd': 'contract_length',
+  'begynnelsedag': 'start_date',
+  
+  // Kontaktinformation
+  'Kontaktperson': 'contact_person',
+  'e-post-kontaktperson': 'contact_email',
+  'telefonnummer-kontaktperson': 'contact_phone',
+  'utforande-adress': 'contact_address',
+  
+  // Företagsinformation
+  'foretag': 'company_name',
+  'org-nr': 'organization_number',
+  
+  // Avtalstext (kombineras till agreement_text)
+  'stycke-1': 'agreement_text_part1',
+  'stycke-2': 'agreement_text_part2',
+  
+  // Automatiskt genererade fält
+  'dokument-skapat': 'document_created_date',
+  'faktura-adress-pdf': 'invoice_email'
+}
+
+const OFFER_FIELD_MAPPING = {
+  // BeGone information (mappade från contract → offer)
+  'vr-kontaktperson': 'begone_employee_name',
+  'vr-kontakt-mail': 'begone_employee_email',
+  
+  // Kontaktinformation (mappade)
+  'kontaktperson': 'contact_person',
+  'kontaktperson-e-post': 'contact_email',
+  'tel-nr': 'contact_phone',
+  'utfrande-adress': 'contact_address',
+  
+  // Företagsinformation (mappade)
+  'kund': 'company_name',
+  'per--org-nr': 'organization_number',
+  
+  // Datum och avtalstext
+  'utfrande-datum': 'start_date',
+  'arbetsbeskrivning': 'agreement_text',
+  
+  // Offertspecifika fält
+  'offert-skapad': 'document_created_date',
+  'epost-faktura': 'invoice_email',
+  'faktura-referens': 'invoice_reference',
+  'mrkning-av-faktura': 'invoice_marking'
+}
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -11,6 +64,47 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 
 // Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+// Smart fältmappning baserad på dokumenttyp
+const mapDataFieldsFromOneFlow = (dataFields: Record<string, string>, templateId: string) => {
+  const contractType = getContractTypeFromTemplate(templateId)
+  const fieldMapping = contractType === 'offer' ? OFFER_FIELD_MAPPING : CONTRACT_FIELD_MAPPING
+  
+  const mappedData: Record<string, string> = {}
+  const foundFields: string[] = []
+  const unmappedFields: string[] = []
+  
+  // Mappa alla OneFlow-fält till våra databasfält
+  Object.entries(dataFields).forEach(([oneflowField, value]) => {
+    const dbField = fieldMapping[oneflowField as keyof typeof fieldMapping]
+    if (dbField && value && value.trim()) {
+      mappedData[dbField] = value.trim()
+      foundFields.push(oneflowField)
+    } else if (value && value.trim()) {
+      unmappedFields.push(oneflowField)
+    }
+  })
+  
+  // Specialhantering för avtalstext
+  if (contractType === 'contract') {
+    // Kombinera stycke-1 och stycke-2 till en fullständig agreement_text
+    const part1 = mappedData['agreement_text_part1'] || ''
+    const part2 = mappedData['agreement_text_part2'] || ''
+    if (part1 || part2) {
+      mappedData['agreement_text'] = [part1, part2].filter(Boolean).join('\n\n')
+      // Ta bort temporära fält
+      delete mappedData['agreement_text_part1']
+      delete mappedData['agreement_text_part2']
+    }
+  }
+  
+  return {
+    mappedData,
+    foundFields,
+    unmappedFields,
+    contractType
+  }
+}
 
 // Interface för OneFlow kontrakt från list API (baserat på verklig API-struktur)
 interface OneFlowContractListItem {
@@ -151,10 +245,9 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
     console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
 
-    // Filtrera på era godkända mallar direkt i OneFlow API
-    const templateIds = Array.from(ALLOWED_TEMPLATE_IDS).join(',')
+    // Hämta alla kontrakt - OneFlow API stöder inte template_id filtrering
     const offset = (page - 1) * limit
-    const apiUrl = `https://api.oneflow.com/v1/contracts?limit=${limit}&offset=${offset}&filter[template_id]=${templateIds}`
+    const apiUrl = `https://api.oneflow.com/v1/contracts?limit=${limit}&offset=${offset}`
     
     console.log(`🔍 OneFlow API URL: ${apiUrl}`)
     
@@ -210,9 +303,10 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       console.log(`📋 OneFlow data struktur: count=${totalCount}, data.length=${contracts.length}, hasMore=${hasMore}`)
     }
     
-    // Validera att kontrakten har rätt struktur (API-filtrering gör resten)
+    // Validera och filtrera kontrakt baserat på våra kriterier
     const originalCount = Array.isArray(data) ? data.length : (data.data?.length || 0)
     let draftFiltered = 0
+    let templateFiltered = 0
     
     contracts = contracts.filter((contract, index) => {
       if (!contract || typeof contract !== 'object') {
@@ -224,14 +318,21 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
         return false
       }
       
-      // Filtrera bort kontrakt med status "draft" (som backup)
+      // Filtrera bort kontrakt med status "draft"
       if (contract.state === 'draft') {
         console.log(`🚫 Hoppar över kontrakt ${contract.id} med draft status`)
         draftFiltered++
         return false
       }
       
-      // Template-filtrering görs nu av OneFlow API
+      // Filtrera på våra godkända template IDs
+      const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
+      if (templateId && !ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
+        console.log(`🚫 Hoppar över kontrakt ${contract.id} med otillåten template ID: ${templateId}`)
+        templateFiltered++
+        return false
+      }
+      
       return true
     })
     
@@ -240,10 +341,10 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     if (originalCount !== filteredCount) {
       console.log(`📊 Filtrerade kontrakt: ${originalCount} → ${filteredCount}`)
       console.log(`   - ${draftFiltered} draft-kontrakt exkluderade`)
-      console.log(`   - Template-filtrering gjord av OneFlow API`)
+      console.log(`   - ${templateFiltered} kontrakt med otillåtna template-mallar exkluderade`)
     }
     
-    // Pagination hanteras nu av OneFlow API
+    // Pagination hanteras av OneFlow API, template-filtrering i kod
     console.log(`✅ Hämtade ${contracts.length} relevanta kontrakt från OneFlow (bara era godkända mallar)`)
     
     return {
@@ -364,11 +465,11 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<Complete
   }
 }
 
-// Parsa OneFlow kontrakt till vårt databasformat (ny komplett mappning)
+// Parsa OneFlow kontrakt till vårt databasformat (komplett omarbetning med exakt fältmappning)
 const parseContractDetailsToInsertData = (contractData: CompleteContractData): ContractInsertData => {
   const { basic, data_fields, parties, products } = contractData
   
-  // Mappa OneFlow state till våra statusar (borttaget draft)
+  // Mappa OneFlow state till våra statusar
   const statusMapping: { [key: string]: ContractInsertData['status'] } = {
     'pending': 'pending', 
     'signed': 'signed',
@@ -379,27 +480,32 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     'expired': 'overdue'
   }
 
-  // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
-  const templateId = basic.template?.id?.toString()
-  const contractType = templateId ? getContractTypeFromTemplate(templateId) : null
-  const contractName = basic.name || ''
-  const templateName = basic.template?.name || ''
-  const isOffer = contractType === 'offer' || 
-                  contractName.toLowerCase().includes('offert') || 
-                  templateName.toLowerCase().includes('offert')
+  // Bestäm typ baserat på template ID
+  const templateId = basic.template?.id?.toString() || 'no_template'
+  const contractType = templateId !== 'no_template' ? getContractTypeFromTemplate(templateId) : null
+  const isOffer = contractType === 'offer'
   
-  // Extrahera data fields till objekt för enklare access
+  // Konvertera data fields array till objekt
   const dataFields = Object.fromEntries(
     data_fields.map(field => [field.custom_id, field.value])
   )
 
-  console.log(`📊 Debug - Data fields för ${basic.id}:`, Object.keys(dataFields))
+  // 🆕 ANVÄND EXAKT FÄLTMAPPNING FRÅN ONEFLOW EXPORT
+  const { mappedData, foundFields, unmappedFields, contractType: detectedType } = mapDataFieldsFromOneFlow(dataFields, templateId)
 
-  // Hitta BeGone-part (our company)
+  // 🆕 FÖRBÄTTRAD DEBUG-OUTPUT
+  console.log(`📊 OneFlow data fields mapping för kontrakt ${basic.id}:`)
+  console.log(`   🎯 Template: ${basic.template?.name || 'Okänd'} (${templateId})`)
+  console.log(`   📋 Typ: ${detectedType || 'contract'} (${isOffer ? 'offer' : 'contract'})`)
+  console.log(`   ✅ Mappade fält (${foundFields.length}): ${foundFields.join(', ')}`)
+  console.log(`   ❓ Ej mappade fält (${unmappedFields.length}): ${unmappedFields.join(', ')}`)
+  console.log(`   💾 Resultat:`, Object.keys(mappedData).join(', '))
+
+  // Hitta BeGone-part (vårt företag)
   const begonePart = parties.find(p => p.my_party === true)
   const begoneEmployee = begonePart?.participants?.[0]
 
-  // Hitta kund-part (customer)
+  // Hitta kund-part
   const customerPart = parties.find(p => p.my_party === false)
   const customerContact = customerPart?.participants?.[0]
 
@@ -412,39 +518,31 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     }
   }
 
-  // Bygg agreement text från data fields (behöver uppdateras när vi ser vilka fält som finns)
-  const agreementParts = [
-    dataFields['stycke-1'],
-    dataFields['stycke-2'], 
-    dataFields['arbetsbeskrivning'],
-    dataFields['beskrivning'],
-    dataFields['avtalsbeskrivning']
-  ].filter(Boolean)
-
+  // 🆕 BYGG FINAL DATA MED EXAKT MAPPNING + PARTIES FALLBACK
   return {
     oneflow_contract_id: basic.id.toString(),
     source_type: 'manual',
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
     status: statusMapping[basic.state] || 'pending',
-    template_id: basic.template?.id?.toString() || 'no_template',
+    template_id: templateId,
     
-    // BeGone-information (från our party)
-    begone_employee_name: begoneEmployee?.name || dataFields['anstalld'] || dataFields['vr-kontaktperson'],
-    begone_employee_email: begoneEmployee?.email || dataFields['e-post-anstlld'] || dataFields['vr-kontakt-mail'],
-    contract_length: dataFields['avtalslngd'] || dataFields['avtalsperiod'],
-    start_date: dataFields['begynnelsedag'] || dataFields['utfrande-datum'] || dataFields['startdatum'],
+    // BeGone-information (exakt mappning med parties fallback)
+    begone_employee_name: mappedData['begone_employee_name'] || begoneEmployee?.name || 'BeGone Medarbetare',
+    begone_employee_email: mappedData['begone_employee_email'] || begoneEmployee?.email || undefined,
+    contract_length: mappedData['contract_length'] || undefined,
+    start_date: mappedData['start_date'] || undefined,
     
-    // Kontakt-information (från customer party)
-    contact_person: customerContact?.name || dataFields['Kontaktperson'] || dataFields['kontaktperson'],
-    contact_email: customerContact?.email || dataFields['e-post-kontaktperson'] || dataFields['kontaktperson-e-post'],
-    contact_phone: dataFields['telefonnummer-kontaktperson'] || dataFields['tel-nr'] || dataFields['telefon'],
-    contact_address: dataFields['utforande-adress'] || dataFields['utfrande-adress'] || dataFields['adress'],
-    company_name: customerPart?.name || dataFields['foretag'] || dataFields['kund'] || dataFields['företagsnamn'],
-    organization_number: customerPart?.identification_number || dataFields['org-nr'] || dataFields['per--org-nr'] || dataFields['organisationsnummer'],
+    // Kontakt-information (exakt mappning med parties fallback)
+    contact_person: mappedData['contact_person'] || customerContact?.name || undefined,
+    contact_email: mappedData['contact_email'] || customerContact?.email || undefined,
+    contact_phone: mappedData['contact_phone'] || undefined,
+    contact_address: mappedData['contact_address'] || undefined,
+    company_name: mappedData['company_name'] || customerPart?.name || undefined,
+    organization_number: mappedData['organization_number'] || customerPart?.identification_number || undefined,
     
-    // Avtal/Offert-detaljer  
-    agreement_text: agreementParts.join('\n\n'),
+    // Avtal/Offert-innehåll (exakt mappning)
+    agreement_text: mappedData['agreement_text'] || undefined,
     total_value: totalValue > 0 ? totalValue : null,
     selected_products: products.length > 0 ? products : null,
     
@@ -702,13 +800,16 @@ export default async function handler(
           // Konvertera till vårt databasformat med korrekt mappning
           const contractData = parseContractDetailsToInsertData(completeData)
           
-          console.log(`📋 Kontrakt ${contractId} parsed:`)
-          console.log(`   - Template ID: ${contractData.template_id}`)
-          console.log(`   - Type: ${contractData.type}`)
-          console.log(`   - Status: ${contractData.status}`)
-          console.log(`   - BeGone employee: ${contractData.begone_employee_name}`)
-          console.log(`   - Contact person: ${contractData.contact_person}`)
-          console.log(`   - Company: ${contractData.company_name}`)
+          console.log(`📋 Kontrakt ${contractId} importerat och sparat:`)
+          console.log(`   📄 Template ID: ${contractData.template_id}`)
+          console.log(`   🏷️  Typ: ${contractData.type}`) 
+          console.log(`   📊 Status: ${contractData.status}`)
+          console.log(`   👤 BeGone anställd: ${contractData.begone_employee_name}`)
+          console.log(`   📧 BeGone email: ${contractData.begone_employee_email || 'Ej angiven'}`)
+          console.log(`   🤝 Kontaktperson: ${contractData.contact_person}`)
+          console.log(`   🏢 Företag: ${contractData.company_name}`)
+          console.log(`   💰 Totalt värde: ${contractData.total_value ? `${contractData.total_value} kr` : 'Ej angivet'}`)
+          console.log(`   📝 Avtalstext: ${contractData.agreement_text ? `${contractData.agreement_text.substring(0, 100)}...` : 'Ej angiven'}`)
           
           // Spara till databas
           const saveResult = await saveContractToDatabase(contractData)
@@ -734,8 +835,21 @@ export default async function handler(
 
       const successCount = results.filter(r => r.success).length
       const failCount = results.length - successCount
+      const contractCount = results.filter(r => r.success && r.type === 'contract').length
+      const offerCount = results.filter(r => r.success && r.type === 'offer').length
 
-      console.log(`✅ Import slutförd: ${successCount} framgångsrika, ${failCount} misslyckade`)
+      console.log(`✅ OneFlow import slutförd:`)
+      console.log(`   🎯 Totalt: ${results.length} kontrakt processerade`)
+      console.log(`   ✅ Framgångsrika: ${successCount}`)
+      console.log(`     - 📋 Avtal: ${contractCount}`)
+      console.log(`     - 💰 Offerter: ${offerCount}`)
+      console.log(`   ❌ Misslyckade: ${failCount}`)
+      if (failCount > 0) {
+        const failures = results.filter(r => !r.success)
+        failures.forEach(f => {
+          console.log(`     ❌ ${f.contract_id}: ${f.error}`)
+        })
+      }
 
       return res.status(200).json({
         success: true,
