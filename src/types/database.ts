@@ -317,6 +317,43 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
+      contracts: {
+        Row: {
+          id: string
+          oneflow_contract_id: string
+          
+          source_type: 'private_case' | 'business_case' | 'manual'
+          source_id: string | null
+          
+          type: 'contract' | 'offer'
+          status: 'draft' | 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
+          template_id: string
+          
+          begone_employee_name: string | null
+          begone_employee_email: string | null
+          contract_length: string | null
+          start_date: string | null
+          
+          contact_person: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          contact_address: string | null
+          company_name: string | null
+          organization_number: string | null
+          
+          agreement_text: string | null
+          total_value: number | null
+          
+          selected_products: any | null // JSONB
+          
+          customer_id: string | null
+          
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['contracts']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['contracts']['Insert']>
+      }
       visits: {
         Row: {
           id: string
@@ -588,6 +625,11 @@ export type MonthlyMarketingSpendUpdate = Database['public']['Tables']['monthly_
 export type BillingAuditLog = Database['public']['Tables']['billing_audit_log']['Row']
 export type BillingAuditLogInsert = Database['public']['Tables']['billing_audit_log']['Insert']
 export type BillingAuditLogUpdate = Database['public']['Tables']['billing_audit_log']['Update']
+
+// 🆕 CONTRACTS TYPES
+export type Contract = Database['public']['Tables']['contracts']['Row']
+export type ContractInsert = Database['public']['Tables']['contracts']['Insert']
+export type ContractUpdate = Database['public']['Tables']['contracts']['Update']
 
 // ✅ TECHNICIAN ABSENCE TYPE  
 export type TechnicianAbsence = Database['public']['Tables']['technician_absences']['Row']

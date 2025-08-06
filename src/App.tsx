@@ -25,6 +25,7 @@ import ProductManagementPage from './pages/admin/ProductManagement';
 // ONEFLOW ROUTES
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
+import ContractsOverview from './pages/admin/ContractsOverview';
 
 // KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
@@ -180,6 +181,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <OneflowDiagnostics />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/contracts-overview" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <ContractsOverview />
                 </ProtectedRoute>
               } 
             />

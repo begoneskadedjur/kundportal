@@ -410,6 +410,16 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
+                  href="/admin/contracts-overview"
+                  icon={FileText}
+                  title="Avtalsöversikt"
+                  description="Alla avtal & offerter"
+                  stats="Status & värdeanalys"
+                  tag="OneFlow"
+                  iconColor="text-purple-500"
+                />
+
+                <AdminDashboardCard
                   href="/admin/oneflow-diagnostics"
                   icon={BarChart3}
                   title="Övervaka Avtal"
