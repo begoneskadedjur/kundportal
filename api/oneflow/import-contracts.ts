@@ -154,10 +154,19 @@ interface OneflowContractDetails {
   data_fields?: OneflowDataField[] // Data fields från basic endpoint
 }
 
-// Interface för OneFlow data fields
+// Interface för OneFlow data fields (från basic endpoint har annan struktur)
 interface OneflowDataField {
-  custom_id: string
+  id: number
+  name: string
   value: string
+  description?: string
+  placeholder?: string
+  custom_id?: string // Kan finnas direkt (från separata endpoint)
+  _private_ownerside?: {
+    custom_id: string // Finns här från basic endpoint
+    created_time: string
+    updated_time: string
+  }
 }
 
 // Interface för OneFlow parties
@@ -508,9 +517,13 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
   console.log(`   🎯 Använd template_id: ${templateId}`)
   console.log(`   🏷️  Detekterad typ: ${contractType || 'null'} → ${isOffer ? 'offer' : 'contract'}`)
   
-  // Konvertera data fields array till objekt
+  // Konvertera data fields array till objekt (fixa custom_id location)
   const dataFields = Object.fromEntries(
-    data_fields.map(field => [field.custom_id, field.value])
+    data_fields.map(field => {
+      // Custom_id finns i _private_ownerside från basic endpoint
+      const customId = field._private_ownerside?.custom_id || field.custom_id
+      return [customId, field.value || '']
+    }).filter(([customId]) => customId) // Filtrera bort undefined custom_ids
   )
 
   // 🆕 DEBUG BASIC CONTRACT DATA FÖRST
@@ -524,7 +537,7 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
   
   // 🆕 DETALJERAD DATA FIELDS DEBUGGING
   console.log(`   📊 Raw data_fields array:`, JSON.stringify(data_fields.slice(0, 3), null, 2)) // Visa första 3 
-  console.log(`   📊 Alla OneFlow data fields custom_ids:`, data_fields.map(f => f.custom_id))
+  console.log(`   📊 Alla OneFlow data fields custom_ids:`, data_fields.map(f => f._private_ownerside?.custom_id || f.custom_id))
   console.log(`   📊 Data fields objekt:`, dataFields)
   console.log(`   📊 Data fields keys antal:`, Object.keys(dataFields).length)
 
