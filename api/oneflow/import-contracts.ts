@@ -147,15 +147,32 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     let totalCount: number
     let hasMore = false
     
+    console.log(`📄 OneFlow response type: ${Array.isArray(data) ? 'array' : 'object'}`)
+    console.log(`📄 Första objektet:`, JSON.stringify(Array.isArray(data) ? data[0] : data, null, 2))
+    
     if (Array.isArray(data)) {
       // Direkt array av kontrakt
       contracts = data
       totalCount = data.length
+      
+      // Validera att kontrakten har rätt struktur
+      contracts = contracts.filter((contract, index) => {
+        if (!contract || typeof contract !== 'object') {
+          console.warn(`⚠️ Kontrakt ${index} är inte ett objekt:`, contract)
+          return false
+        }
+        if (!contract.id) {
+          console.warn(`⚠️ Kontrakt ${index} saknar ID:`, contract)
+          return false
+        }
+        return true
+      })
+      
       // Enkel pagination - visa bara första sidan eller alla
       const startIndex = (page - 1) * limit
       const endIndex = startIndex + limit
       contracts = contracts.slice(startIndex, endIndex)
-      hasMore = endIndex < data.length
+      hasMore = endIndex < totalCount
     } else {
       // Objekt med data-property
       contracts = data.data || []
@@ -443,18 +460,30 @@ export default async function handler(
       const existingIds = await getExistingContractIds()
       
       // Märk vilka som redan är importerade
-      const contractsWithImportStatus = contracts.map(contract => ({
-        id: contract.id.toString(),
-        name: contract.name,
-        state: contract.state,
-        template_name: contract.template.name,
-        created_time: contract.created_time,
-        updated_time: contract.updated_time,
-        is_imported: existingIds.has(contract.id.toString()),
-        type: contract.name.toLowerCase().includes('offert') || 
-              contract.template.name.toLowerCase().includes('offert') 
-              ? 'offer' : 'contract'
-      }))
+      const contractsWithImportStatus = contracts.map(contract => {
+        // Säker parsing av kontraktsdata
+        const contractId = contract?.id?.toString() || 'unknown'
+        const contractName = contract?.name || 'Namnlöst kontrakt'
+        const contractState = contract?.state || 'unknown'
+        const templateName = contract?.template?.name || 'Okänd mall'
+        const createdTime = contract?.created_time || ''
+        const updatedTime = contract?.updated_time || ''
+        
+        // Säker typbestämning
+        const isOffer = (contractName.toLowerCase().includes('offert')) || 
+                       (templateName.toLowerCase().includes('offert'))
+        
+        return {
+          id: contractId,
+          name: contractName,
+          state: contractState,
+          template_name: templateName,
+          created_time: createdTime,
+          updated_time: updatedTime,
+          is_imported: existingIds.has(contractId),
+          type: isOffer ? 'offer' : 'contract'
+        }
+      })
 
       return res.status(200).json({
         success: true,
