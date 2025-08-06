@@ -134,7 +134,7 @@ interface OneFlowContractListItem {
   }
 }
 
-// Interface för OneFlow kontrakt basic info
+// Interface för OneFlow kontrakt basic info (inkluderar data_fields från basic endpoint)
 interface OneflowContractDetails {
   id: number
   name: string
@@ -151,6 +151,7 @@ interface OneflowContractDetails {
   }
   created_time: string
   updated_time: string
+  data_fields?: OneflowDataField[] // Data fields från basic endpoint
 }
 
 // Interface för OneFlow data fields
@@ -370,7 +371,7 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
   }
 }
 
-// Hämta komplett information om ett kontrakt från OneFlow (4 API-anrop)
+// Hämta komplett information om ett kontrakt från OneFlow (3 API-anrop)
 const fetchOneFlowContractDetails = async (contractId: string): Promise<CompleteContractData | null> => {
   try {
     const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
@@ -403,19 +404,18 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<Complete
 
     const basic = await basicResponse.json() as OneflowContractDetails
 
-    // 2. Hämta data fields
-    console.log(`📊 Hämtar data fields för ${contractId}`)
-    const dataFieldsResponse = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}/data_fields`, {
-      method: 'GET',
-      headers
-    })
-
+    // 2. Extrahera data fields från basic response (istället för separata anrop)
+    console.log(`📊 Extraherar data fields från basic response för ${contractId}`)
     let data_fields: OneflowDataField[] = []
-    if (dataFieldsResponse.ok) {
-      const dataFieldsData = await dataFieldsResponse.json()
-      data_fields = Array.isArray(dataFieldsData) ? dataFieldsData : dataFieldsData.data || []
+    
+    // Basic endpoint innehåller redan data_fields enligt OneFlow dokumentation
+    if (basic && basic.data_fields) {
+      data_fields = Array.isArray(basic.data_fields) ? basic.data_fields : []
+      console.log(`✅ Hittade ${data_fields.length} data fields i basic response`)
     } else {
-      console.warn(`⚠️ Kunde inte hämta data fields för ${contractId}`)
+      console.warn(`⚠️ Inga data fields hittades i basic response för ${contractId}`)
+      console.log(`🔍 Basic response struktur:`, Object.keys(basic))
+      console.log(`🔍 Basic response sample:`, JSON.stringify(basic, null, 2).substring(0, 500) + '...')
     }
 
     // 3. Hämta parties
@@ -522,9 +522,11 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
   console.log(`   👥 Parties antal: ${parties.length}`)
   console.log(`   🛍️ Products antal: ${products.length}`)
   
-  // Lista alla data fields som kom från OneFlow
-  console.log(`   📊 Alla OneFlow data fields:`, Object.keys(dataFields))
-  console.log(`   📊 Data fields värden:`, dataFields)
+  // 🆕 DETALJERAD DATA FIELDS DEBUGGING
+  console.log(`   📊 Raw data_fields array:`, JSON.stringify(data_fields.slice(0, 3), null, 2)) // Visa första 3 
+  console.log(`   📊 Alla OneFlow data fields custom_ids:`, data_fields.map(f => f.custom_id))
+  console.log(`   📊 Data fields objekt:`, dataFields)
+  console.log(`   📊 Data fields keys antal:`, Object.keys(dataFields).length)
 
   // 🆕 FÖRBÄTTRAD TYP-DETEKTERING MED FALLBACKS
   let finalContractType = contractType
