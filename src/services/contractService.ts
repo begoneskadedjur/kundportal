@@ -48,6 +48,20 @@ export class ContractService {
     try {
       console.log('🔍 Hämtar kontrakt med filter:', filters)
       
+      // 🆕 DEBUG: Först hämta ALLA kontrakt för att se vad som finns
+      const { data: allContracts, error: allError } = await supabase
+        .from('contracts')
+        .select('id, template_id, status, type, oneflow_contract_id, company_name')
+        .order('created_at', { ascending: false })
+      
+      if (allContracts) {
+        console.log('📊 ALLA kontrakt i databasen:')
+        allContracts.slice(0, 3).forEach(c => {
+          console.log(`  - ID: ${c.id}, OneFlow: ${c.oneflow_contract_id}, Template: ${c.template_id}, Status: ${c.status}, Typ: ${c.type}`)
+        })
+        console.log(`📊 Totalt ${allContracts.length} kontrakt i databasen`)
+      }
+      
       let query = supabase
         .from('contracts')
         .select(`
@@ -58,9 +72,10 @@ export class ContractService {
         `)
         .order('created_at', { ascending: false })
 
-      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
+      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar  
       query = query.neq('status', 'draft')
       const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      console.log('🏷️  Tillåtna template IDs:', allowedTemplates)
       query = query.in('template_id', allowedTemplates)
 
       // Tillämpa filter
@@ -104,6 +119,14 @@ export class ContractService {
       if (error) {
         console.error('❌ Fel vid hämtning av kontrakt:', error)
         throw new Error(`Databasfel: ${error.message}`)
+      }
+
+      console.log(`✅ Kontrakt hämtade: ${data?.length || 0}`)
+      if (data && data.length > 0) {
+        console.log('📋 Första 3 kontrakt från query:')
+        data.slice(0, 3).forEach(c => {
+          console.log(`  - ID: ${c.id}, OneFlow: ${c.oneflow_contract_id}, Template: ${c.template_id}, Status: ${c.status}`)
+        })
       }
 
       // Hämta källdata för kontrakt som har source_id
