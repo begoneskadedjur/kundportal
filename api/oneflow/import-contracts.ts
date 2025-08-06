@@ -23,8 +23,11 @@ const CONTRACT_FIELD_MAPPING = {
   'org-nr': 'organization_number',
   
   // Avtalstext (kombineras till agreement_text)
+  'avtalsobjekt': 'agreement_text_main', // Huvudavtalstext 
   'stycke-1': 'agreement_text_part1',
-  'stycke-2': 'agreement_text_part2',
+  'stycke-2': 'agreement_text_part2', 
+  'stycke-3': 'agreement_text_part3',
+  'stycke-4': 'agreement_text_part4',
   
   // Automatiskt genererade fält
   'dokument-skapat': 'document_created_date',
@@ -87,14 +90,22 @@ const mapDataFieldsFromOneFlow = (dataFields: Record<string, string>, templateId
   
   // Specialhantering för avtalstext
   if (contractType === 'contract') {
-    // Kombinera stycke-1 och stycke-2 till en fullständig agreement_text
+    // Kombinera alla avtalstext-delar till en fullständig agreement_text
+    const mainText = mappedData['agreement_text_main'] || ''
     const part1 = mappedData['agreement_text_part1'] || ''
     const part2 = mappedData['agreement_text_part2'] || ''
-    if (part1 || part2) {
-      mappedData['agreement_text'] = [part1, part2].filter(Boolean).join('\n\n')
+    const part3 = mappedData['agreement_text_part3'] || ''
+    const part4 = mappedData['agreement_text_part4'] || ''
+    
+    const allParts = [mainText, part1, part2, part3, part4].filter(Boolean)
+    if (allParts.length > 0) {
+      mappedData['agreement_text'] = allParts.join('\n\n')
       // Ta bort temporära fält
+      delete mappedData['agreement_text_main']
       delete mappedData['agreement_text_part1']
       delete mappedData['agreement_text_part2']
+      delete mappedData['agreement_text_part3']
+      delete mappedData['agreement_text_part4']
     }
   }
   
