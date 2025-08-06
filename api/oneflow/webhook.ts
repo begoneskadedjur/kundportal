@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import fetch from 'node-fetch'
-import { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } from '../src/constants/oneflowTemplates'
+const { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } = require('../constants/oneflowTemplates')
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
