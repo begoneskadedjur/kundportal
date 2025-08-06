@@ -40,7 +40,7 @@ interface OneFlowContractListItem {
   }
 }
 
-// Interface för komplett OneFlow kontrakt från get API  
+// Interface för OneFlow kontrakt basic info
 interface OneflowContractDetails {
   id: number
   name: string
@@ -48,31 +48,54 @@ interface OneflowContractDetails {
   template: {
     id: number
     name: string
-  }
-  data_fields: Array<{
-    custom_id: string
-    value: string
-  }>
-  parties: Array<{
-    type: 'company' | 'individual'
-    name?: string
-    identification_number?: string
-    participants: Array<{
-      name: string
-      email: string
-      signatory: boolean
-    }>
-  }>
-  product_groups?: Array<{
-    products: Array<{
-      name: string
-      description: string
-      price_1: { amount: { amount: string } }
-      quantity: { amount: number }
-    }>
-  }>
+  } | null
   created_time: string
   updated_time: string
+}
+
+// Interface för OneFlow data fields
+interface OneflowDataField {
+  custom_id: string
+  value: string
+}
+
+// Interface för OneFlow parties
+interface OneflowParty {
+  id: number
+  type: 'company' | 'individual'
+  name: string
+  identification_number?: string
+  my_party: boolean
+  participants: Array<{
+    id: number
+    name: string
+    email: string
+    signatory: boolean
+  }>
+}
+
+// Interface för OneFlow products
+interface OneflowProduct {
+  id: number
+  name: string
+  description?: string
+  unit_price: {
+    amount: string
+    currency: string
+  }
+  quantity: number
+  total_amount: {
+    amount: string
+    currency: string
+  }
+}
+
+// Komplett kontraktsdata från alla endpoints
+interface CompleteContractData {
+  basic: OneflowContractDetails
+  data_fields: OneflowDataField[]
+  parties: OneflowParty[]
+  products: OneflowProduct[]
 }
 
 // Interface för contract insert data (samma som webhook)
@@ -128,8 +151,14 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
     console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
 
-    // OneFlow API använder inte pagination-parametrar i contracts endpoint
-    const response = await fetch(`https://api.oneflow.com/v1/contracts`, {
+    // Filtrera på era godkända mallar direkt i OneFlow API
+    const templateIds = Array.from(ALLOWED_TEMPLATE_IDS).join(',')
+    const offset = (page - 1) * limit
+    const apiUrl = `https://api.oneflow.com/v1/contracts?limit=${limit}&offset=${offset}&filter[template_id]=${templateIds}`
+    
+    console.log(`🔍 OneFlow API URL: ${apiUrl}`)
+    
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'x-oneflow-api-token': ONEFLOW_API_TOKEN,
@@ -181,10 +210,9 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       console.log(`📋 OneFlow data struktur: count=${totalCount}, data.length=${contracts.length}, hasMore=${hasMore}`)
     }
     
-    // Validera att kontrakten har rätt struktur och filtrera bort draft-status och icke-använda mallar
+    // Validera att kontrakten har rätt struktur (API-filtrering gör resten)
     const originalCount = Array.isArray(data) ? data.length : (data.data?.length || 0)
     let draftFiltered = 0
-    let templateFiltered = 0
     
     contracts = contracts.filter((contract, index) => {
       if (!contract || typeof contract !== 'object') {
@@ -196,26 +224,14 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
         return false
       }
       
-      // Filtrera bort kontrakt med status "draft"
+      // Filtrera bort kontrakt med status "draft" (som backup)
       if (contract.state === 'draft') {
         console.log(`🚫 Hoppar över kontrakt ${contract.id} med draft status`)
         draftFiltered++
         return false
       }
       
-      // Filtrera bort kontrakt som inte använder våra mallar
-      const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
-      if (!templateId) {
-        console.log(`🚫 Hoppar över kontrakt ${contract.id} utan template_id`)
-        templateFiltered++
-        return false
-      }
-      if (!ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
-        console.log(`🚫 Hoppar över kontrakt ${contract.id} med oanvänd mall: ${templateId}`)
-        templateFiltered++
-        return false
-      }
-      
+      // Template-filtrering görs nu av OneFlow API
       return true
     })
     
@@ -224,17 +240,11 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     if (originalCount !== filteredCount) {
       console.log(`📊 Filtrerade kontrakt: ${originalCount} → ${filteredCount}`)
       console.log(`   - ${draftFiltered} draft-kontrakt exkluderade`)
-      console.log(`   - ${templateFiltered} kontrakt med oanvända mallar exkluderade`)
-      console.log(`   - ${originalCount - draftFiltered - templateFiltered - filteredCount} övriga exkluderade`)
+      console.log(`   - Template-filtrering gjord av OneFlow API`)
     }
     
-    // Client-side pagination baserat på page/limit parametrar
-    const startIndex = (page - 1) * limit
-    const endIndex = startIndex + limit
-    const paginatedContracts = contracts.slice(startIndex, endIndex)
-    hasMore = endIndex < contracts.length || hasMore
-
-    console.log(`✅ Hämtade ${contracts.length} relevanta kontrakt från OneFlow (exkluderat draft och oanvända mallar)`)
+    // Pagination hanteras nu av OneFlow API
+    console.log(`✅ Hämtade ${contracts.length} relevanta kontrakt från OneFlow (bara era godkända mallar)`)
     
     return {
       contracts,
@@ -253,37 +263,96 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
   }
 }
 
-// Hämta detaljerad information om ett kontrakt från OneFlow
-const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowContractDetails | null> => {
+// Hämta komplett information om ett kontrakt från OneFlow (4 API-anrop)
+const fetchOneFlowContractDetails = async (contractId: string): Promise<CompleteContractData | null> => {
   try {
     const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
     const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
     
-    console.log(`📋 Hämtar detaljer för kontrakt ${contractId}`)
+    console.log(`📋 Hämtar komplett data för kontrakt ${contractId}`)
 
-    const response = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
+    const headers = {
+      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+      'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
+      'Accept': 'application/json'
+    }
+
+    // 1. Hämta basic contract info
+    console.log(`🔍 Hämtar basic info för ${contractId}`)
+    const basicResponse = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
       method: 'GET',
-      headers: {
-        'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-        'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
-        'Accept': 'application/json'
-      }
+      headers
     })
 
-    if (!response.ok) {
-      const errorBody = await response.text()
-      console.error(`❌ OneFlow Contract API-fel för ${contractId}:`, {
-        status: response.status,
-        statusText: response.statusText,
+    if (!basicResponse.ok) {
+      const errorBody = await basicResponse.text()
+      console.error(`❌ OneFlow Basic API-fel för ${contractId}:`, {
+        status: basicResponse.status,
+        statusText: basicResponse.statusText,
         body: errorBody
       })
       return null
     }
 
-    const details = await response.json() as OneflowContractDetails
-    console.log(`✅ Kontrakt-detaljer hämtade för ${contractId}`)
+    const basic = await basicResponse.json() as OneflowContractDetails
+
+    // 2. Hämta data fields
+    console.log(`📊 Hämtar data fields för ${contractId}`)
+    const dataFieldsResponse = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}/data_fields`, {
+      method: 'GET',
+      headers
+    })
+
+    let data_fields: OneflowDataField[] = []
+    if (dataFieldsResponse.ok) {
+      const dataFieldsData = await dataFieldsResponse.json()
+      data_fields = Array.isArray(dataFieldsData) ? dataFieldsData : dataFieldsData.data || []
+    } else {
+      console.warn(`⚠️ Kunde inte hämta data fields för ${contractId}`)
+    }
+
+    // 3. Hämta parties
+    console.log(`👥 Hämtar parties för ${contractId}`)
+    const partiesResponse = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}/parties`, {
+      method: 'GET',
+      headers
+    })
+
+    let parties: OneflowParty[] = []
+    if (partiesResponse.ok) {
+      const partiesData = await partiesResponse.json()
+      parties = Array.isArray(partiesData) ? partiesData : partiesData.data || []
+    } else {
+      console.warn(`⚠️ Kunde inte hämta parties för ${contractId}`)
+    }
+
+    // 4. Hämta products
+    console.log(`🛍️ Hämtar products för ${contractId}`)
+    const productsResponse = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}/products`, {
+      method: 'GET',
+      headers
+    })
+
+    let products: OneflowProduct[] = []
+    if (productsResponse.ok) {
+      const productsData = await productsResponse.json()
+      products = Array.isArray(productsData) ? productsData : productsData.data || []
+    } else {
+      console.warn(`⚠️ Kunde inte hämta products för ${contractId}`)
+    }
+
+    console.log(`✅ Komplett kontrakts-data hämtad för ${contractId}:`)
+    console.log(`   - Template: ${basic.template?.name || 'Ingen'} (ID: ${basic.template?.id || 'N/A'})`)
+    console.log(`   - Data fields: ${data_fields.length} fält`)
+    console.log(`   - Parties: ${parties.length} parter`)
+    console.log(`   - Products: ${products.length} produkter`)
     
-    return details
+    return {
+      basic,
+      data_fields,
+      parties,
+      products
+    }
 
   } catch (error: any) {
     console.error(`💥 Fel vid hämtning av kontrakt-detaljer för ${contractId}:`, {
@@ -295,8 +364,10 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowC
   }
 }
 
-// Parsa OneFlow kontrakt till vårt databasformat (samma logik som webhook)
-const parseContractDetailsToInsertData = (details: OneflowContractDetails): ContractInsertData => {
+// Parsa OneFlow kontrakt till vårt databasformat (ny komplett mappning)
+const parseContractDetailsToInsertData = (contractData: CompleteContractData): ContractInsertData => {
+  const { basic, data_fields, parties, products } = contractData
+  
   // Mappa OneFlow state till våra statusar (borttaget draft)
   const statusMapping: { [key: string]: ContractInsertData['status'] } = {
     'pending': 'pending', 
@@ -309,68 +380,73 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   }
 
   // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
-  const templateId = details.template?.id?.toString()
+  const templateId = basic.template?.id?.toString()
   const contractType = templateId ? getContractTypeFromTemplate(templateId) : null
-  const contractName = details.name || ''
-  const templateName = details.template?.name || ''
+  const contractName = basic.name || ''
+  const templateName = basic.template?.name || ''
   const isOffer = contractType === 'offer' || 
                   contractName.toLowerCase().includes('offert') || 
                   templateName.toLowerCase().includes('offert')
   
-  // Extrahera data fields
+  // Extrahera data fields till objekt för enklare access
   const dataFields = Object.fromEntries(
-    details.data_fields.map(field => [field.custom_id, field.value])
+    data_fields.map(field => [field.custom_id, field.value])
   )
 
-  // Hämta kontaktinformation från första party
-  const firstParty = details.parties?.[0]
-  const firstParticipant = firstParty?.participants?.[0]
+  console.log(`📊 Debug - Data fields för ${basic.id}:`, Object.keys(dataFields))
+
+  // Hitta BeGone-part (our company)
+  const begonePart = parties.find(p => p.my_party === true)
+  const begoneEmployee = begonePart?.participants?.[0]
+
+  // Hitta kund-part (customer)
+  const customerPart = parties.find(p => p.my_party === false)
+  const customerContact = customerPart?.participants?.[0]
 
   // Beräkna totalt värde från produkter
   let totalValue = 0
-  if (details.product_groups) {
-    for (const group of details.product_groups) {
-      for (const product of group.products) {
-        const price = parseFloat(product.price_1?.amount?.amount || '0')
-        const quantity = product.quantity?.amount || 1
-        totalValue += price * quantity
-      }
+  if (products && products.length > 0) {
+    for (const product of products) {
+      const amount = parseFloat(product.total_amount?.amount || '0')
+      totalValue += amount
     }
   }
 
-  // Bygg agreement text från data fields
+  // Bygg agreement text från data fields (behöver uppdateras när vi ser vilka fält som finns)
   const agreementParts = [
     dataFields['stycke-1'],
-    dataFields['stycke-2'],
-    dataFields['arbetsbeskrivning']
+    dataFields['stycke-2'], 
+    dataFields['arbetsbeskrivning'],
+    dataFields['beskrivning'],
+    dataFields['avtalsbeskrivning']
   ].filter(Boolean)
 
   return {
-    oneflow_contract_id: details.id.toString(),
+    oneflow_contract_id: basic.id.toString(),
     source_type: 'manual',
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
-    status: statusMapping[details.state] || 'pending',
-    template_id: details.template?.id?.toString() || 'no_template',
+    status: statusMapping[basic.state] || 'pending',
+    template_id: basic.template?.id?.toString() || 'no_template',
     
-    // BeGone-information
-    begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],
-    begone_employee_email: dataFields['e-post-anstlld'] || dataFields['vr-kontakt-mail'],
-    contract_length: dataFields['avtalslngd'],
-    start_date: dataFields['begynnelsedag'] || dataFields['utfrande-datum'],
+    // BeGone-information (från our party)
+    begone_employee_name: begoneEmployee?.name || dataFields['anstalld'] || dataFields['vr-kontaktperson'],
+    begone_employee_email: begoneEmployee?.email || dataFields['e-post-anstlld'] || dataFields['vr-kontakt-mail'],
+    contract_length: dataFields['avtalslngd'] || dataFields['avtalsperiod'],
+    start_date: dataFields['begynnelsedag'] || dataFields['utfrande-datum'] || dataFields['startdatum'],
     
-    // Kontakt-information
-    contact_person: dataFields['Kontaktperson'] || dataFields['kontaktperson'] || firstParticipant?.name,
-    contact_email: dataFields['e-post-kontaktperson'] || dataFields['kontaktperson-e-post'] || firstParticipant?.email,
-    contact_phone: dataFields['telefonnummer-kontaktperson'] || dataFields['tel-nr'],
-    contact_address: dataFields['utforande-adress'] || dataFields['utfrande-adress'],
-    company_name: dataFields['foretag'] || dataFields['kund'] || firstParty?.name,
-    organization_number: dataFields['org-nr'] || dataFields['per--org-nr'] || firstParty?.identification_number,
+    // Kontakt-information (från customer party)
+    contact_person: customerContact?.name || dataFields['Kontaktperson'] || dataFields['kontaktperson'],
+    contact_email: customerContact?.email || dataFields['e-post-kontaktperson'] || dataFields['kontaktperson-e-post'],
+    contact_phone: dataFields['telefonnummer-kontaktperson'] || dataFields['tel-nr'] || dataFields['telefon'],
+    contact_address: dataFields['utforande-adress'] || dataFields['utfrande-adress'] || dataFields['adress'],
+    company_name: customerPart?.name || dataFields['foretag'] || dataFields['kund'] || dataFields['företagsnamn'],
+    organization_number: customerPart?.identification_number || dataFields['org-nr'] || dataFields['per--org-nr'] || dataFields['organisationsnummer'],
     
     // Avtal/Offert-detaljer  
     agreement_text: agreementParts.join('\n\n'),
     total_value: totalValue > 0 ? totalValue : null,
-    selected_products: details.product_groups || null,
+    selected_products: products.length > 0 ? products : null,
     
     // Kundkoppling sätts senare vid signering
     customer_id: null
@@ -610,26 +686,21 @@ export default async function handler(
         try {
           console.log(`🔍 Hämtar detaljerad information för kontrakt ${contractId}`)
           
-          // Hämta kontrakt-detaljer från OneFlow Detail API
-          const details = await fetchOneFlowContractDetails(contractId)
+          // Hämta komplett kontrakt-data från OneFlow (4 API-anrop)
+          const completeData = await fetchOneFlowContractDetails(contractId)
           
-          if (!details) {
-            console.error(`❌ Kunde inte hämta detaljer för kontrakt ${contractId}`)
+          if (!completeData) {
+            console.error(`❌ Kunde inte hämta komplett data för kontrakt ${contractId}`)
             results.push({
               contract_id: contractId,
               success: false,
-              error: 'Kunde inte hämta kontrakt-detaljer från OneFlow Detail API'
+              error: 'Kunde inte hämta komplett kontrakt-data från OneFlow API'
             })
             continue
           }
           
-          console.log(`✅ Kontrakt-detaljer hämtade för ${contractId}:`)
-          console.log(`   - Template: ${details.template?.name} (ID: ${details.template?.id})`)
-          console.log(`   - Status: ${details.state}`)
-          console.log(`   - Data fields: ${details.data_fields?.length || 0} fält`)
-          
-          // Konvertera till vårt databasformat med samma logik som webhook
-          const contractData = parseContractDetailsToInsertData(details)
+          // Konvertera till vårt databasformat med korrekt mappning
+          const contractData = parseContractDetailsToInsertData(completeData)
           
           console.log(`📋 Kontrakt ${contractId} parsed:`)
           console.log(`   - Template ID: ${contractData.template_id}`)
@@ -644,7 +715,7 @@ export default async function handler(
           
           results.push({
             contract_id: contractId,
-            contract_name: details.name,
+            contract_name: completeData.basic.name,
             success: saveResult.success,
             error: saveResult.error,
             type: contractData.type,
