@@ -84,7 +84,15 @@ export default function ContractImportModal({
 
     } catch (error: any) {
       console.error('Fel vid laddning av kontrakt:', error)
-      toast.error('Kunde inte hämta kontrakt från OneFlow')
+      
+      // Visa mer specifikt felmeddelande från API:et
+      let errorMessage = 'Kunde inte hämta kontrakt från OneFlow'
+      
+      if (error.message) {
+        errorMessage = error.message
+      }
+      
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

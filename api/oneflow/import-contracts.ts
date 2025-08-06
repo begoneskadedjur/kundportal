@@ -107,6 +107,8 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
 }> => {
   try {
     console.log(`🔍 Hämtar OneFlow-kontrakt, sida ${page}, limit ${limit}`)
+    console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
+    console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
 
     const response = await fetch(`https://api.oneflow.com/v1/contracts?page=${page}&per_page=${limit}&order=desc`, {
       method: 'GET',
@@ -117,9 +119,18 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       }
     })
 
+    console.log(`📡 OneFlow API response status: ${response.status} ${response.statusText}`)
+    console.log(`📋 Response headers:`, Object.fromEntries(response.headers.entries()))
+
     if (!response.ok) {
-      console.error('❌ OneFlow List API-fel:', response.status, response.statusText)
-      throw new Error(`OneFlow API error: ${response.status}`)
+      const errorBody = await response.text()
+      console.error('❌ OneFlow List API-fel:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+      throw new Error(`OneFlow API error: ${response.status} - ${errorBody || response.statusText}`)
     }
 
     const data = await response.json() as {
@@ -136,8 +147,13 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       hasMore: !!data._links?.next
     }
 
-  } catch (error) {
-    console.error('💥 Fel vid hämtning av OneFlow-kontrakt:', error)
+  } catch (error: any) {
+    console.error('💥 Fel vid hämtning av OneFlow-kontrakt:', {
+      message: error.message,
+      name: error.name,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      cause: error.cause
+    })
     throw error
   }
 }
@@ -157,7 +173,12 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowC
     })
 
     if (!response.ok) {
-      console.error(`❌ OneFlow Contract API-fel för ${contractId}:`, response.status)
+      const errorBody = await response.text()
+      console.error(`❌ OneFlow Contract API-fel för ${contractId}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody
+      })
       return null
     }
 
@@ -166,8 +187,12 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowC
     
     return details
 
-  } catch (error) {
-    console.error(`💥 Fel vid hämtning av kontrakt-detaljer för ${contractId}:`, error)
+  } catch (error: any) {
+    console.error(`💥 Fel vid hämtning av kontrakt-detaljer för ${contractId}:`, {
+      message: error.message,
+      name: error.name,
+      contractId
+    })
     return null
   }
 }
@@ -334,6 +359,29 @@ export default async function handler(
     return res.status(204).end()
   }
 
+  // Validera miljövariabler
+  if (!ONEFLOW_API_TOKEN) {
+    console.error('❌ ONEFLOW_API_TOKEN saknas')
+    return res.status(500).json({
+      success: false,
+      error: 'OneFlow API-token är inte konfigurerad'
+    })
+  }
+
+  if (!ONEFLOW_USER_EMAIL) {
+    console.error('❌ ONEFLOW_USER_EMAIL saknas')
+    return res.status(500).json({
+      success: false,
+      error: 'OneFlow användar-email är inte konfigurerad'
+    })
+  }
+
+  console.log('✓ Miljövariabler validerade:', {
+    hasToken: !!ONEFLOW_API_TOKEN,
+    tokenLength: ONEFLOW_API_TOKEN.length,
+    userEmail: ONEFLOW_USER_EMAIL
+  })
+
   // Acceptera både GET (för list) och POST (för import)
   if (req.method !== 'GET' && req.method !== 'POST') {
     console.error('❌ Ogiltigt HTTP-method:', req.method)
@@ -472,12 +520,39 @@ export default async function handler(
     })
 
   } catch (error: any) {
-    console.error('❌ Import contracts API fel:', error)
+    console.error('❌ Import contracts API fel:', {
+      message: error.message,
+      name: error.name,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      requestMethod: req.method,
+      requestBody: req.method === 'POST' ? req.body : req.query
+    })
+
+    // Mer specifika felmeddelanden baserat på feltyp
+    let userFriendlyError = 'Internt serverfel vid import av kontrakt'
+    
+    if (error.message?.includes('OneFlow API error')) {
+      userFriendlyError = 'Kunde inte ansluta till OneFlow API. Kontrollera API-inställningar.'
+    } else if (error.message?.includes('fetch')) {
+      userFriendlyError = 'Nätverksfel vid kommunikation med OneFlow.'
+    } else if (error.message?.includes('401')) {
+      userFriendlyError = 'Otillräckliga behörigheter för OneFlow API.'
+    } else if (error.message?.includes('403')) {
+      userFriendlyError = 'Nekad åtkomst till OneFlow API.'
+    } else if (error.message?.includes('404')) {
+      userFriendlyError = 'OneFlow API-endpoint hittades inte.'
+    } else if (error.message?.includes('429')) {
+      userFriendlyError = 'För många förfrågningar till OneFlow API. Försök igen senare.'
+    }
 
     return res.status(500).json({ 
       success: false,
-      error: 'Internt serverfel vid import av kontrakt',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: userFriendlyError,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      technical_details: process.env.NODE_ENV === 'development' ? {
+        error_name: error.name,
+        error_message: error.message
+      } : undefined
     })
   }
 }
