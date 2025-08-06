@@ -490,13 +490,53 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     data_fields.map(field => [field.custom_id, field.value])
   )
 
-  // 🆕 ANVÄND EXAKT FÄLTMAPPNING FRÅN ONEFLOW EXPORT
-  const { mappedData, foundFields, unmappedFields, contractType: detectedType } = mapDataFieldsFromOneFlow(dataFields, templateId)
+  // 🆕 DEBUG BASIC CONTRACT DATA FÖRST
+  console.log(`🔍 OneFlow Basic Contract Data för ${basic.id}:`)
+  console.log(`   📋 Namn: ${basic.name || 'Inget namn'}`)
+  console.log(`   🏷️  State: ${basic.state}`)
+  console.log(`   📄 Template objekt:`, basic.template)
+  console.log(`   🔢 Data fields antal: ${data_fields.length}`)
+  console.log(`   👥 Parties antal: ${parties.length}`)
+  console.log(`   🛍️ Products antal: ${products.length}`)
+  
+  // Lista alla data fields som kom från OneFlow
+  console.log(`   📊 Alla OneFlow data fields:`, Object.keys(dataFields))
+  console.log(`   📊 Data fields värden:`, dataFields)
+
+  // 🆕 FÖRBÄTTRAD TYP-DETEKTERING MED FALLBACKS
+  let finalContractType = contractType
+  let finalIsOffer = isOffer
+  
+  // Om template_id är "no_template", försök andra metoder
+  if (templateId === 'no_template') {
+    console.log(`⚠️ Template ID saknas - använder alternativa detekterings-metoder`)
+    
+    // Metod 1: Kontrollera kontraktnamn
+    const contractName = basic.name?.toLowerCase() || ''
+    if (contractName.includes('offert')) {
+      finalContractType = 'offer'
+      finalIsOffer = true
+      console.log(`   ✅ Detekterade 'offer' från kontraktnamn: "${basic.name}"`)
+    }
+    
+    // Metod 2: Kontrollera data fields för offert-specifika fält
+    if (dataFields['vr-kontaktperson'] || dataFields['kontaktperson-e-post'] || dataFields['arbetsbeskrivning']) {
+      finalContractType = 'offer'
+      finalIsOffer = true
+      console.log(`   ✅ Detekterade 'offer' från offert-specifika data fields`)
+    }
+  }
+
+  // 🆕 ANVÄND MAPPNING MED KORREKT TYP
+  const { mappedData, foundFields, unmappedFields } = mapDataFieldsFromOneFlow(
+    dataFields, 
+    finalContractType === 'offer' ? '8919037' : '8486368' // Använd representativ template ID för mappning
+  )
 
   // 🆕 FÖRBÄTTRAD DEBUG-OUTPUT
   console.log(`📊 OneFlow data fields mapping för kontrakt ${basic.id}:`)
   console.log(`   🎯 Template: ${basic.template?.name || 'Okänd'} (${templateId})`)
-  console.log(`   📋 Typ: ${detectedType || 'contract'} (${isOffer ? 'offer' : 'contract'})`)
+  console.log(`   📋 Detekterad typ: ${finalContractType || 'contract'} (original: ${contractType})`)
   console.log(`   ✅ Mappade fält (${foundFields.length}): ${foundFields.join(', ')}`)
   console.log(`   ❓ Ej mappade fält (${unmappedFields.length}): ${unmappedFields.join(', ')}`)
   console.log(`   💾 Resultat:`, Object.keys(mappedData).join(', '))
@@ -512,10 +552,36 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
   // Beräkna totalt värde från produkter
   let totalValue = 0
   if (products && products.length > 0) {
+    console.log(`💰 Beräknar totalt värde från ${products.length} produkter:`)
     for (const product of products) {
-      const amount = parseFloat(product.total_amount?.amount || '0')
-      totalValue += amount
+      // OneFlow produkter har olika prisstrukturer - försök flera fält
+      let productValue = 0
+      
+      // Försök price_1.amount.amount först
+      if (product.price_1?.amount?.amount) {
+        productValue = parseFloat(product.price_1.amount.amount)
+        console.log(`   💸 ${product.name}: ${productValue} kr (från price_1.amount.amount)`)
+      }
+      // Fallback till price_2.amount.amount
+      else if (product.price_2?.amount?.amount) {
+        productValue = parseFloat(product.price_2.amount.amount)
+        console.log(`   💸 ${product.name}: ${productValue} kr (från price_2.amount.amount)`)
+      }
+      // Fallback till total_amount.amount
+      else if (product.total_amount?.amount) {
+        productValue = parseFloat(product.total_amount.amount)
+        console.log(`   💸 ${product.name}: ${productValue} kr (från total_amount.amount)`)
+      }
+      else {
+        console.log(`   ⚠️ ${product.name}: Kunde inte hitta pris i produktdata`)
+        console.log(`      Produktstruktur:`, Object.keys(product))
+      }
+      
+      totalValue += productValue
     }
+    console.log(`   🎯 Totalt värde: ${totalValue} kr`)
+  } else {
+    console.log(`💰 Inga produkter att beräkna värde från`)
   }
 
   // 🆕 BYGG FINAL DATA MED EXAKT MAPPNING + PARTIES FALLBACK
@@ -523,7 +589,7 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     oneflow_contract_id: basic.id.toString(),
     source_type: 'manual',
     source_id: null,
-    type: isOffer ? 'offer' : 'contract',
+    type: finalIsOffer ? 'offer' : 'contract',
     status: statusMapping[basic.state] || 'pending',
     template_id: templateId,
     
