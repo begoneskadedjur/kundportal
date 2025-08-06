@@ -27,32 +27,42 @@ export default function FileDownloadButton({
     filesLoading, 
     downloadingFiles,
     loadContractFiles,
-    downloadContractFile 
+    downloadContractFile,
+    hasContractFiles
   } = useContracts()
-  
-  const [hasCheckedFiles, setHasCheckedFiles] = useState(false)
   
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
+  const hasCachedFiles = hasContractFiles(contractId)
   const hasDownloading = Object.keys(downloadingFiles).some(fileId => 
     downloadingFiles[fileId] && currentFiles.some(f => f.id === fileId)
   )
 
-  // Ladda filer första gången
-  useEffect(() => {
-    if (!hasCheckedFiles && contractId) {
-      loadContractFiles(contractId)
-        .finally(() => setHasCheckedFiles(true))
-    }
-  }, [contractId, hasCheckedFiles, loadContractFiles])
-
-  // Automatisk nedladdning av första filen (om endast en fil finns)
+  // Hantera fil-laddning och nedladdning
   const handleQuickDownload = async () => {
     try {
-      if (currentFiles.length === 0) {
-        // Ladda filer först om inga finns
-        await loadContractFiles(contractId)
+      // Om filer inte är laddade, ladda dem först
+      if (!hasCachedFiles) {
+        const files = await loadContractFiles(contractId)
+        
+        // Efter laddning, kolla resultatet
+        if (files.length === 0) {
+          return // Inga filer att ladda ner
+        }
+        
+        if (files.length === 1) {
+          // Ladda ner direkt om endast en fil
+          await downloadContractFile(contractId, files[0].id)
+        } else {
+          // Öppna modal om flera filer
+          onFilesModalOpen?.()
+        }
         return
+      }
+      
+      // Filer redan laddade - hantera baserat på antal
+      if (currentFiles.length === 0) {
+        return // Inga filer att ladda ner
       }
       
       if (currentFiles.length === 1) {
@@ -70,7 +80,7 @@ export default function FileDownloadButton({
 
   // Räkna ut status
   const getButtonState = () => {
-    if (isLoading || !hasCheckedFiles) {
+    if (isLoading) {
       return {
         icon: Loader,
         text: 'Laddar...',
@@ -88,6 +98,17 @@ export default function FileDownloadButton({
       }
     }
     
+    // Om filer inte laddade än
+    if (!hasCachedFiles) {
+      return {
+        icon: FileText,
+        text: 'Ladda filer',
+        disabled: false,
+        spin: false
+      }
+    }
+    
+    // Inga filer efter laddning
     if (currentFiles.length === 0) {
       return {
         icon: FileText,
@@ -120,11 +141,13 @@ export default function FileDownloadButton({
       disabled={buttonState.disabled}
       className={`${variant === 'ghost' ? 'text-slate-400 hover:text-slate-300' : ''} ${className}`}
       title={
-        currentFiles.length === 0 
-          ? 'Inga filer tillgängliga'
-          : currentFiles.length === 1
-            ? `Ladda ner: ${currentFiles[0].file_name}`
-            : `Visa ${currentFiles.length} filer`
+        !hasCachedFiles
+          ? 'Klicka för att ladda kontraktsfiler'
+          : currentFiles.length === 0 
+            ? 'Inga filer tillgängliga'
+            : currentFiles.length === 1
+              ? `Ladda ner: ${currentFiles[0].file_name}`
+              : `Visa ${currentFiles.length} filer`
       }
     >
       <IconComponent 

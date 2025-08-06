@@ -16,19 +16,18 @@ export default function FilesColumn({
   onFilesModalOpen,
   showButton = true 
 }: FilesColumnProps) {
-  const { contractFiles, filesLoading, loadContractFiles } = useContracts()
-  const [hasLoaded, setHasLoaded] = useState(false)
+  const { contractFiles, filesLoading, loadContractFiles, hasContractFiles } = useContracts()
   
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
+  const hasCachedFiles = hasContractFiles(contractId)
 
-  // Ladda filer första gången
-  useEffect(() => {
-    if (!hasLoaded && contractId) {
-      loadContractFiles(contractId)
-        .finally(() => setHasLoaded(true))
+  // Hämta filer bara när användaren klickar (lazy loading)
+  const handleLoadFiles = async () => {
+    if (!hasCachedFiles && !isLoading) {
+      await loadContractFiles(contractId)
     }
-  }, [contractId, hasLoaded, loadContractFiles])
+  }
 
   // Räkna filstatus
   const getFileStats = () => {
@@ -62,7 +61,7 @@ export default function FilesColumn({
   const stats = getFileStats()
 
   // Visa loading state
-  if (isLoading && !hasLoaded) {
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-500"></div>
@@ -71,7 +70,26 @@ export default function FilesColumn({
     )
   }
 
-  // Ingen filer
+  // Om inga filer laddade än, visa load-knapp
+  if (!hasCachedFiles) {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-slate-500">
+          <FileText className="w-4 h-4" />
+          <span className="text-xs">Filer ej laddade</span>
+        </div>
+        <button
+          onClick={handleLoadFiles}
+          className="text-xs text-blue-400 hover:text-blue-300 underline"
+          title="Ladda filer för detta kontrakt"
+        >
+          Ladda
+        </button>
+      </div>
+    )
+  }
+
+  // Inga filer efter laddning
   if (stats.total === 0) {
     return (
       <div className="flex items-center gap-2 text-slate-500">

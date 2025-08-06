@@ -32,9 +32,10 @@ export interface UseContractsReturn {
   refreshContracts: () => Promise<void>
   
   // Files actions
-  loadContractFiles: (contractId: string) => Promise<ContractFile[]>
+  loadContractFiles: (contractId: string, forceRefresh?: boolean) => Promise<ContractFile[]>
   downloadContractFile: (contractId: string, fileId: string) => Promise<void>
   getFileDownloadProgress: (fileId: string) => number
+  hasContractFiles: (contractId: string) => boolean
   
   // Filters
   currentFilters: ContractFilters
@@ -53,16 +54,52 @@ export function useContracts(): UseContractsReturn {
   const [contractFiles, setContractFiles] = useState<{ [contractId: string]: ContractFile[] }>({})
   const [filesLoading, setFilesLoading] = useState<{ [contractId: string]: boolean }>({})
   const [downloadingFiles, setDownloadingFiles] = useState<{ [fileId: string]: boolean }>({})
+  const [filesLoadedAt, setFilesLoadedAt] = useState<{ [contractId: string]: number }>({}) // Cache timestamp
+  
+  // Contract list caching
+  const [contractsLoadedAt, setContractsLoadedAt] = useState<number | null>(null)
+  const [contractsCache, setContractsCache] = useState<{ [filterKey: string]: { data: ContractWithSourceData[], timestamp: number } }>({})
 
-  // Ladda kontrakt med filter
+  // Ladda kontrakt med filter (med caching)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
     try {
+      // Skapa cache-nyckel baserat på filter
+      const filterKey = JSON.stringify(filters)
+      const cached = contractsCache[filterKey]
+      const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
+      
+      // Använd cache om tillgängligt
+      if (isCached && cached.data) {
+        console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
+        setContracts(cached.data)
+        setCurrentFilters(filters)
+        setLoading(false)
+        return
+      }
+      
+      // Förhindra multipla samtidiga requests för samma filter
+      if (loading) {
+        console.log(`⏳ Väntar på pågående request för filter: ${filterKey}`)
+        return
+      }
+      
+      console.log(`📄 Hämtar kontrakt från API med filter: ${filterKey}`)
       setLoading(true)
       setError(null)
       
       const contractList = await ContractService.getContracts(filters)
       setContracts(contractList)
       setCurrentFilters(filters)
+      
+      // Uppdatera cache
+      setContractsCache(prev => ({
+        ...prev,
+        [filterKey]: {
+          data: contractList,
+          timestamp: Date.now()
+        }
+      }))
+      setContractsLoadedAt(Date.now())
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Okänt fel vid hämtning av kontrakt'
@@ -71,7 +108,7 @@ export function useContracts(): UseContractsReturn {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loading, contractsCache])
 
   // Ladda kontraktstatistik
   const loadContractStats = useCallback(async (filters: Pick<ContractFilters, 'date_from' | 'date_to'> = {}) => {
@@ -135,12 +172,36 @@ export function useContracts(): UseContractsReturn {
     }
   }, [])
 
-  // Ladda filer för ett kontrakt
-  const loadContractFiles = useCallback(async (contractId: string): Promise<ContractFile[]> => {
+  // Ladda filer för ett kontrakt (med caching och lazy loading)
+  const loadContractFiles = useCallback(async (contractId: string, forceRefresh: boolean = false): Promise<ContractFile[]> => {
     try {
+      // Kontrollera cache - hämta bara om inte cached eller tvingad refresh
+      const cacheTime = filesLoadedAt[contractId]
+      const isCached = cacheTime && (Date.now() - cacheTime < 5 * 60 * 1000) // 5 minuter cache
+      
+      if (!forceRefresh && isCached && contractFiles[contractId]) {
+        console.log(`🔄 Använder cachade filer för kontrakt ${contractId}`)
+        return contractFiles[contractId]
+      }
+      
+      // Förhindra multipla samtidiga requests för samma kontrakt
+      if (filesLoading[contractId]) {
+        console.log(`⏳ Väntar på pågående request för kontrakt ${contractId}`)
+        // Vänta tills loading är klar och returnera cached result
+        return new Promise((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (!filesLoading[contractId] && contractFiles[contractId]) {
+              clearInterval(checkInterval)
+              resolve(contractFiles[contractId])
+            }
+          }, 100)
+        })
+      }
+      
+      console.log(`📁 Hämtar filer från OneFlow API för kontrakt ${contractId}`)
       setFilesLoading(prev => ({ ...prev, [contractId]: true }))
       
-      // Först hämta från OneFlow API för att synka nya filer
+      // Hämta från OneFlow API för att synka nya filer
       const response = await fetch(`/api/oneflow/contract-files?contractId=${contractId}`)
       const apiResponse = await response.json()
       
@@ -152,17 +213,19 @@ export function useContracts(): UseContractsReturn {
       const files = apiResponse.data.contractFiles || []
       
       setContractFiles(prev => ({ ...prev, [contractId]: files }))
+      setFilesLoadedAt(prev => ({ ...prev, [contractId]: Date.now() })) // Uppdatera cache timestamp
       
       return files
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta filer'
+      console.error(`❌ Fel vid hämtning av filer för ${contractId}:`, err)
       toast.error(errorMessage)
       throw err
     } finally {
       setFilesLoading(prev => ({ ...prev, [contractId]: false }))
     }
-  }, [])
+  }, [contractFiles, filesLoading, filesLoadedAt])
 
   // Ladda ner fil
   const downloadContractFile = useCallback(async (contractId: string, fileId: string) => {
@@ -216,21 +279,35 @@ export function useContracts(): UseContractsReturn {
     return downloadingFiles[fileId] ? 50 : 0
   }, [downloadingFiles])
 
-  // Uppdatera filter
-  const setFilters = useCallback((filters: ContractFilters) => {
+  // Kontrollera om filer redan är cachade (utan att trigga fetch) - memoized
+  const hasContractFiles = useCallback((contractId: string): boolean => {
+    const cacheTime = filesLoadedAt[contractId]
+    const isCached = cacheTime && (Date.now() - cacheTime < 5 * 60 * 1000) // 5 minuter cache
+    return isCached && Boolean(contractFiles[contractId])
+  }, [contractFiles, filesLoadedAt])
+
+  // Memoized filter functions
+  const setFilters = useMemo(() => (filters: ContractFilters) => {
     setCurrentFilters(filters)
     loadContracts(filters)
   }, [loadContracts])
 
-  // Rensa filter
-  const clearFilters = useCallback(() => {
+  const clearFilters = useMemo(() => () => {
     const emptyFilters = {}
     setCurrentFilters(emptyFilters)
     loadContracts(emptyFilters)
   }, [loadContracts])
 
-  // Refresh kontrakt (använd nuvarande filter)
+
+  // Refresh kontrakt (rensa cache och ladda om)
   const refreshContracts = useCallback(async () => {
+    console.log('🔄 Explicit refresh - rensar cache och laddar om kontrakt')
+    
+    // Rensa cache för att tvinga ny hämtning
+    setContractsCache({})
+    setFilesLoadedAt({}) // Rensa även filcache
+    setContractFiles({})
+    
     await loadContracts(currentFilters)
     await loadContractStats()
   }, [loadContracts, loadContractStats, currentFilters])
@@ -386,6 +463,7 @@ export function useContracts(): UseContractsReturn {
     loadContractFiles,
     downloadContractFile,
     getFileDownloadProgress,
+    hasContractFiles,
     
     // Filters
     currentFilters,
