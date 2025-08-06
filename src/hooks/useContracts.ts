@@ -1,5 +1,5 @@
 // src/hooks/useContracts.ts - Hook för contracts state management
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate, ContractFile } from '../types/database'
 import { 
