@@ -1,13 +1,14 @@
 // src/hooks/useContracts.ts - Hook för contracts state management
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { Contract, ContractInsert, ContractUpdate } from '../types/database'
+import { Contract, ContractInsert, ContractUpdate, ContractFile } from '../types/database'
 import { 
   ContractService, 
   ContractWithSourceData, 
   ContractFilters, 
   ContractStats 
 } from '../services/contractService'
+import { ContractFilesService, ContractFileWithProgress } from '../services/contractFilesService'
 import toast from 'react-hot-toast'
 
 export interface UseContractsReturn {
@@ -17,6 +18,11 @@ export interface UseContractsReturn {
   error: string | null
   stats: ContractStats | null
   
+  // Files state
+  contractFiles: { [contractId: string]: ContractFile[] }
+  filesLoading: { [contractId: string]: boolean }
+  downloadingFiles: { [fileId: string]: boolean }
+  
   // Actions
   loadContracts: (filters?: ContractFilters) => Promise<void>
   loadContractStats: (filters?: Pick<ContractFilters, 'date_from' | 'date_to'>) => Promise<void>
@@ -24,6 +30,11 @@ export interface UseContractsReturn {
   updateContract: (id: string, updates: ContractUpdate) => Promise<void>
   deleteContract: (id: string) => Promise<void>
   refreshContracts: () => Promise<void>
+  
+  // Files actions
+  loadContractFiles: (contractId: string) => Promise<ContractFile[]>
+  downloadContractFile: (contractId: string, fileId: string) => Promise<void>
+  getFileDownloadProgress: (fileId: string) => number
   
   // Filters
   currentFilters: ContractFilters
@@ -37,6 +48,11 @@ export function useContracts(): UseContractsReturn {
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<ContractStats | null>(null)
   const [currentFilters, setCurrentFilters] = useState<ContractFilters>({})
+  
+  // Files state
+  const [contractFiles, setContractFiles] = useState<{ [contractId: string]: ContractFile[] }>({})
+  const [filesLoading, setFilesLoading] = useState<{ [contractId: string]: boolean }>({})
+  const [downloadingFiles, setDownloadingFiles] = useState<{ [fileId: string]: boolean }>({})
 
   // Ladda kontrakt med filter
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
@@ -118,6 +134,87 @@ export function useContracts(): UseContractsReturn {
       throw err
     }
   }, [])
+
+  // Ladda filer för ett kontrakt
+  const loadContractFiles = useCallback(async (contractId: string): Promise<ContractFile[]> => {
+    try {
+      setFilesLoading(prev => ({ ...prev, [contractId]: true }))
+      
+      // Först hämta från OneFlow API för att synka nya filer
+      const response = await fetch(`/api/oneflow/contract-files?contractId=${contractId}`)
+      const apiResponse = await response.json()
+      
+      if (!apiResponse.success) {
+        throw new Error(apiResponse.error || 'Kunde inte hämta filer från OneFlow')
+      }
+      
+      // Använd filer från vår databas (som nu är synkade)
+      const files = apiResponse.data.contractFiles || []
+      
+      setContractFiles(prev => ({ ...prev, [contractId]: files }))
+      
+      return files
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta filer'
+      toast.error(errorMessage)
+      throw err
+    } finally {
+      setFilesLoading(prev => ({ ...prev, [contractId]: false }))
+    }
+  }, [])
+
+  // Ladda ner fil
+  const downloadContractFile = useCallback(async (contractId: string, fileId: string) => {
+    try {
+      setDownloadingFiles(prev => ({ ...prev, [fileId]: true }))
+      
+      const response = await fetch('/api/oneflow/download-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ contractId, fileId })
+      })
+      
+      const apiResponse = await response.json()
+      
+      if (!apiResponse.success) {
+        throw new Error(apiResponse.error || 'Kunde inte ladda ner fil')
+      }
+      
+      // Uppdatera fil-status i local state
+      setContractFiles(prev => ({
+        ...prev,
+        [contractId]: prev[contractId]?.map(file => 
+          file.id === fileId 
+            ? { ...file, download_status: 'completed', downloaded_at: new Date().toISOString() }
+            : file
+        ) || []
+      }))
+      
+      // Öppna nedladdningslänken
+      if (apiResponse.data.downloadUrl) {
+        window.open(apiResponse.data.downloadUrl, '_blank')
+      }
+      
+      toast.success(`Fil "${apiResponse.data.fileName}" nedladdad`)
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Kunde inte ladda ner fil'
+      toast.error(errorMessage)
+      throw err
+    } finally {
+      setDownloadingFiles(prev => ({ ...prev, [fileId]: false }))
+    }
+  }, [])
+
+  // Hämta download progress för en fil
+  const getFileDownloadProgress = useCallback((fileId: string): number => {
+    // För nu returnera bara 0 eller 100 baserat på download status
+    // I framtiden kan detta utökas med riktig progress tracking
+    return downloadingFiles[fileId] ? 50 : 0
+  }, [downloadingFiles])
 
   // Uppdatera filter
   const setFilters = useCallback((filters: ContractFilters) => {
@@ -201,12 +298,81 @@ export function useContracts(): UseContractsReturn {
     }
   }, [refreshContracts, loadContractStats])
 
+  // Real-time subscription för contract_files
+  useEffect(() => {
+    console.log('🔔 Sätter upp real-time subscription för contract files...')
+    
+    const filesSubscription = supabase
+      .channel('contract_files_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Lyssna på INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'contract_files'
+        },
+        (payload) => {
+          console.log('🔔 Contract files-förändring mottagen:', payload)
+          
+          const fileData = payload.new as ContractFile || payload.old as ContractFile
+          
+          switch (payload.eventType) {
+            case 'INSERT':
+              console.log('➕ Ny contract file skapad:', payload.new)
+              // Lägg till filen i rätt kontrakt
+              setContractFiles(prev => ({
+                ...prev,
+                [fileData.contract_id]: [...(prev[fileData.contract_id] || []), payload.new as ContractFile]
+              }))
+              break
+              
+            case 'UPDATE':
+              console.log('🔄 Contract file uppdaterad:', payload.new)
+              // Uppdatera specifik fil i state
+              const updatedFile = payload.new as ContractFile
+              setContractFiles(prev => ({
+                ...prev,
+                [updatedFile.contract_id]: (prev[updatedFile.contract_id] || []).map(file => 
+                  file.id === updatedFile.id ? updatedFile : file
+                )
+              }))
+              
+              // Om filen blev completed, visa notifikation
+              if (updatedFile.download_status === 'completed' && payload.old.download_status !== 'completed') {
+                toast.success(`Fil "${updatedFile.file_name}" nedladdad och sparad`)
+              }
+              break
+              
+            case 'DELETE':
+              console.log('🗑️ Contract file borttagen:', payload.old)
+              // Ta bort filen från state
+              setContractFiles(prev => ({
+                ...prev,
+                [fileData.contract_id]: (prev[fileData.contract_id] || []).filter(file => file.id !== fileData.id)
+              }))
+              break
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('🔕 Stänger av real-time subscription för contract files')
+      filesSubscription.unsubscribe()
+    }
+  }, [])
+
   return {
     // State
     contracts,
     loading,
     error,
     stats,
+    
+    // Files state
+    contractFiles,
+    filesLoading,
+    downloadingFiles,
     
     // Actions
     loadContracts,
@@ -215,6 +381,11 @@ export function useContracts(): UseContractsReturn {
     updateContract,
     deleteContract,
     refreshContracts,
+    
+    // Files actions
+    loadContractFiles,
+    downloadContractFile,
+    getFileDownloadProgress,
     
     // Filters
     currentFilters,

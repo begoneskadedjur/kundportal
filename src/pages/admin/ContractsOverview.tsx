@@ -4,6 +4,9 @@ import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingC
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
+import ContractFilesModal from '../../components/admin/contracts/ContractFilesModal'
+import FilesColumn from '../../components/admin/contracts/FilesColumn'
+import FileDownloadButton from '../../components/admin/contracts/FileDownloadButton'
 import { useContracts } from '../../hooks/useContracts'
 import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
@@ -45,7 +48,10 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 }
 
 // Mobil card-komponent
-const ContractMobileCard: React.FC<{ contract: ContractWithSourceData }> = ({ contract }) => {
+const ContractMobileCard: React.FC<{ 
+  contract: ContractWithSourceData
+  onOpenFilesModal: (contract: ContractWithSourceData) => void
+}> = ({ contract, onOpenFilesModal }) => {
   const handleViewOneFlow = () => {
     if (contract.oneflow_contract_id) {
       window.open(`https://app.oneflow.com/contracts/${contract.oneflow_contract_id}`, '_blank')
@@ -83,16 +89,25 @@ const ContractMobileCard: React.FC<{ contract: ContractWithSourceData }> = ({ co
           </p>
         )}
         
-        <div className="flex gap-2 mt-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleViewOneFlow}
-            className="text-xs"
-          >
-            <ExternalLink className="w-3 h-3 mr-1" />
-            OneFlow
-          </Button>
+        <div className="flex justify-between items-center mt-3">
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleViewOneFlow}
+              className="text-xs"
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />
+              OneFlow
+            </Button>
+          </div>
+          
+          {/* Files column för mobile */}
+          <FilesColumn 
+            contractId={contract.id}
+            onFilesModalOpen={() => onOpenFilesModal(contract)}
+            showButton={true}
+          />
         </div>
       </div>
     </Card>
@@ -104,6 +119,11 @@ export default function ContractsOverview() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  
+  // Files modal state
+  const [filesModalOpen, setFilesModalOpen] = useState(false)
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
+  const [selectedContractName, setSelectedContractName] = useState<string>('')
 
   // Filtrera kontrakt lokalt för snabb respons
   const filteredContracts = useMemo(() => {
@@ -152,6 +172,19 @@ export default function ContractsOverview() {
     if (contractId) {
       window.open(`https://app.oneflow.com/contracts/${contractId}`, '_blank')
     }
+  }
+
+  // Files modal handlers
+  const handleOpenFilesModal = (contract: ContractWithSourceData) => {
+    setSelectedContractId(contract.id)
+    setSelectedContractName(contract.company_name || contract.contact_person || 'Okänd motpart')
+    setFilesModalOpen(true)
+  }
+
+  const handleCloseFilesModal = () => {
+    setFilesModalOpen(false)
+    setSelectedContractId(null)
+    setSelectedContractName('')
   }
 
   const handleClearFilters = () => {
@@ -323,6 +356,7 @@ export default function ContractsOverview() {
                 <th className="px-4 py-3 text-right">Värde (SEK)</th>
                 <th className="px-4 py-3 text-left">Skapad</th>
                 <th className="px-4 py-3 text-left">BeGone-ansvarig</th>
+                <th className="px-4 py-3 text-left">Filer</th>
                 <th className="px-4 py-3 text-center">Åtgärder</th>
               </tr>
             </thead>
@@ -364,6 +398,14 @@ export default function ContractsOverview() {
                   </td>
                   
                   <td className="px-4 py-3">
+                    <FilesColumn 
+                      contractId={contract.id}
+                      onFilesModalOpen={() => handleOpenFilesModal(contract)}
+                      showButton={true}
+                    />
+                  </td>
+                  
+                  <td className="px-4 py-3">
                     <div className="flex justify-center gap-2">
                       <Button
                         variant="ghost"
@@ -393,7 +435,11 @@ export default function ContractsOverview() {
         {/* Mobile Cards */}
         <div className="block md:hidden space-y-4">
           {filteredContracts.map(contract => (
-            <ContractMobileCard key={contract.id} contract={contract} />
+            <ContractMobileCard 
+              key={contract.id} 
+              contract={contract} 
+              onOpenFilesModal={handleOpenFilesModal}
+            />
           ))}
           
           {filteredContracts.length === 0 && (
@@ -406,6 +452,14 @@ export default function ContractsOverview() {
           )}
         </div>
       </Card>
+
+      {/* Files Modal */}
+      <ContractFilesModal
+        isOpen={filesModalOpen}
+        onClose={handleCloseFilesModal}
+        contractId={selectedContractId}
+        contractName={selectedContractName}
+      />
     </div>
   )
 }

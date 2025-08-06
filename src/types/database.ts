@@ -354,6 +354,25 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['contracts']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['contracts']['Insert']>
       }
+      contract_files: {
+        Row: {
+          id: string
+          contract_id: string
+          oneflow_file_id: number
+          file_name: string
+          file_type: 'contract' | 'verification' | 'attachment' | 'pdf'
+          file_extension: string
+          file_size: number | null
+          file_url: string | null
+          supabase_storage_path: string | null
+          download_status: 'pending' | 'downloading' | 'completed' | 'failed'
+          downloaded_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['contract_files']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['contract_files']['Insert']>
+      }
       visits: {
         Row: {
           id: string
@@ -630,6 +649,11 @@ export type BillingAuditLogUpdate = Database['public']['Tables']['billing_audit_
 export type Contract = Database['public']['Tables']['contracts']['Row']
 export type ContractInsert = Database['public']['Tables']['contracts']['Insert']
 export type ContractUpdate = Database['public']['Tables']['contracts']['Update']
+
+// 🆕 CONTRACT FILES TYPES
+export type ContractFile = Database['public']['Tables']['contract_files']['Row']
+export type ContractFileInsert = Database['public']['Tables']['contract_files']['Insert']
+export type ContractFileUpdate = Database['public']['Tables']['contract_files']['Update']
 
 // ✅ TECHNICIAN ABSENCE TYPE  
 export type TechnicianAbsence = Database['public']['Tables']['technician_absences']['Row']
