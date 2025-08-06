@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import { ALLOWED_TEMPLATE_IDS } from '../src/constants/oneflowTemplates'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -180,7 +181,11 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       console.log(`📋 OneFlow data struktur: count=${totalCount}, data.length=${contracts.length}, hasMore=${hasMore}`)
     }
     
-    // Validera att kontrakten har rätt struktur
+    // Validera att kontrakten har rätt struktur och filtrera bort draft-status och icke-använda mallar
+    const originalCount = Array.isArray(data) ? data.length : (data.data?.length || 0)
+    let draftFiltered = 0
+    let templateFiltered = 0
+    
     contracts = contracts.filter((contract, index) => {
       if (!contract || typeof contract !== 'object') {
         console.warn(`⚠️ Kontrakt ${index} är inte ett objekt:`, contract)
@@ -190,8 +195,33 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
         console.warn(`⚠️ Kontrakt ${index} saknar ID:`, contract)
         return false
       }
+      
+      // Filtrera bort kontrakt med status "draft"
+      if (contract.state === 'draft') {
+        console.log(`🚫 Hoppar över kontrakt ${contract.id} med draft status`)
+        draftFiltered++
+        return false
+      }
+      
+      // Filtrera bort kontrakt som inte använder våra mallar
+      const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
+      if (templateId && !ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
+        console.log(`🚫 Hoppar över kontrakt ${contract.id} med oanvänd mall: ${templateId}`)
+        templateFiltered++
+        return false
+      }
+      
       return true
     })
+    
+    const filteredCount = contracts.length
+    
+    if (originalCount !== filteredCount) {
+      console.log(`📊 Filtrerade kontrakt: ${originalCount} → ${filteredCount}`)
+      console.log(`   - ${draftFiltered} draft-kontrakt exkluderade`)
+      console.log(`   - ${templateFiltered} kontrakt med oanvända mallar exkluderade`)
+      console.log(`   - ${originalCount - draftFiltered - templateFiltered - filteredCount} övriga exkluderade`)
+    }
     
     // Client-side pagination baserat på page/limit parametrar
     const startIndex = (page - 1) * limit
@@ -199,11 +229,11 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     const paginatedContracts = contracts.slice(startIndex, endIndex)
     hasMore = endIndex < contracts.length || hasMore
 
-    console.log(`✅ Hämtade ${contracts.length} kontrakt från OneFlow (total: ${totalCount})`)
+    console.log(`✅ Hämtade ${contracts.length} relevanta kontrakt från OneFlow (exkluderat draft och oanvända mallar)`)
     
     return {
       contracts,
-      totalCount,
+      totalCount: contracts.length, // Använd det filtrerade antalet som totalCount
       hasMore
     }
 

@@ -16,56 +16,8 @@ import ProductSummary from '../../components/admin/ProductSummary'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType } from '../../types/products'
 import { calculatePriceSummary, generateContractDescription, validateOneflowCompatibility } from '../../utils/pricingCalculator'
+import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import toast from 'react-hot-toast'
-
-// Oneflow mallar för offertförslag
-const OFFER_TEMPLATES = [
-  { 
-    id: '8598798', 
-    name: 'Offertförslag – Exkl Moms (Företag)',
-    type: 'company'
-  },
-  { 
-    id: '8919037', 
-    name: 'Offertförslag – Inkl moms (Privatperson)',
-    type: 'individual'
-  },
-  { 
-    id: '8919012', 
-    name: 'Offertförslag – ROT (Privatperson)',
-    type: 'individual'
-  },
-  { 
-    id: '8919059', 
-    name: 'Offertförslag – RUT (Privatperson)',
-    type: 'individual'
-  }
-]
-
-// Oneflow mallar för avtalsförslag
-const CONTRACT_TEMPLATES = [
-  { 
-    id: '8486368', 
-    name: 'Skadedjursavtal',
-    popular: true
-  },
-  { 
-    id: '9324573', 
-    name: 'Avtal Betesstationer'
-  },
-  { 
-    id: '8465556', 
-    name: 'Avtal Betongstationer'
-  },
-  { 
-    id: '8462854', 
-    name: 'Avtal Mekaniska fällor'
-  },
-  { 
-    id: '8732196', 
-    name: 'Avtal Indikationsfällor'
-  }
-]
 
 interface WizardData {
   // Steg 1 - Dokumenttyp
@@ -216,8 +168,8 @@ export default function OneflowContractCreator() {
       // Om vi väljer en offertmall, uppdatera automatiskt partyType baserat på mallens typ
       if (field === 'selectedTemplate' && updated.documentType === 'offer') {
         const template = OFFER_TEMPLATES.find(t => t.id === value)
-        if (template) {
-          updated.partyType = template.type as 'company' | 'individual'
+        if (template && template.category) {
+          updated.partyType = template.category as 'company' | 'individual'
         }
       }
       
@@ -509,9 +461,9 @@ export default function OneflowContractCreator() {
                     </div>
                   )}
                   
-                  {wizardData.documentType === 'offer' && 'type' in template && (
+                  {wizardData.documentType === 'offer' && template.category && (
                     <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                      {template.type === 'company' ? 'Företag' : 'Privatperson'}
+                      {template.category === 'company' ? 'Företag' : 'Privatperson'}
                     </div>
                   )}
                   

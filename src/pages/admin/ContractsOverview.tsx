@@ -30,7 +30,6 @@ const TypeBadge: React.FC<{ type: 'contract' | 'offer' }> = ({ type }) => {
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const getStatusColorClasses = (status: string) => {
     const colors = {
-      'draft': 'text-slate-400 bg-slate-500/20 border-slate-500/30',
       'pending': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
       'signed': 'text-green-400 bg-green-500/20 border-green-500/30',
       'active': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
@@ -38,7 +37,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       'ended': 'text-slate-400 bg-slate-500/20 border-slate-500/30',
       'overdue': 'text-red-400 bg-red-500/20 border-red-500/30'
     }
-    return colors[status as keyof typeof colors] || colors.draft
+    return colors[status as keyof typeof colors] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'
   }
   
   return (
@@ -353,7 +352,6 @@ export default function ContractsOverview() {
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Alla status</option>
-            <option value="draft">Utkast</option>
             <option value="pending">Väntande</option>
             <option value="signed">Signerat</option>
             <option value="active">Aktivt</option>

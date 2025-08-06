@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import fetch from 'node-fetch'
+import { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } from '../src/constants/oneflowTemplates'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -84,7 +85,7 @@ interface ContractInsertData {
   source_type: 'manual'
   source_id: null
   type: 'contract' | 'offer'
-  status: 'draft' | 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
+  status: 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
   template_id: string
   begone_employee_name?: string
   begone_employee_email?: string
@@ -203,11 +204,28 @@ const fetchOneflowContractDetails = async (contractId: string): Promise<OneflowC
   }
 }
 
+// Kontrollera om kontrakt ska processas (inte draft eller oanvänd mall)
+const shouldProcessContract = (details: OneflowContractDetails): boolean => {
+  // Hoppa över draft-kontrakt
+  if (details.state === 'draft') {
+    console.log(`🚫 Hoppar över draft-kontrakt: ${details.id}`)
+    return false
+  }
+  
+  // Hoppa över kontrakt som inte använder våra mallar
+  const templateId = details.template.id.toString()
+  if (!ALLOWED_TEMPLATE_IDS.has(templateId)) {
+    console.log(`🚫 Hoppar över kontrakt med oanvänd mall ${templateId}: ${details.id}`)
+    return false
+  }
+  
+  return true
+}
+
 // Extrahera data från OneFlow kontrakt och konvertera till vårt format
 const parseContractDetailsToInsertData = (details: OneflowContractDetails): ContractInsertData => {
-  // Mappa OneFlow state till våra statusar
+  // Mappa OneFlow state till våra statusar (draft är borttaget)
   const statusMapping: { [key: string]: ContractInsertData['status'] } = {
-    'draft': 'draft',
     'pending': 'pending', 
     'signed': 'signed',
     'declined': 'declined',
@@ -217,8 +235,10 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     'expired': 'overdue'
   }
 
-  // Bestäm typ baserat på template eller namn
-  const isOffer = details.name.toLowerCase().includes('offert') || 
+  // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
+  const contractType = getContractTypeFromTemplate(details.template.id.toString())
+  const isOffer = contractType === 'offer' || 
+                  details.name.toLowerCase().includes('offert') || 
                   details.template.name.toLowerCase().includes('offert')
   
   // Extrahera data fields
@@ -448,6 +468,12 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
   // Hämta kontrakt-detaljer från OneFlow API (en gång för alla events)
   const contractDetails = await fetchOneflowContractDetails(contractId)
+  
+  // Kontrollera om vi ska processa detta kontrakt
+  if (contractDetails && !shouldProcessContract(contractDetails)) {
+    console.log('ℹ️ Kontrakt hoppas över - webhook-processering avbruten')
+    return
+  }
   
   // Processera varje event
   for (const event of payload.events) {

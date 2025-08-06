@@ -326,7 +326,7 @@ export type Database = {
           source_id: string | null
           
           type: 'contract' | 'offer'
-          status: 'draft' | 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
+          status: 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
           template_id: string
           
           begone_employee_name: string | null

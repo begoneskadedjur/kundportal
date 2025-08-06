@@ -230,7 +230,6 @@ export default function ContractImportModal({
 
   const getStateColor = (state: string) => {
     const colors: { [key: string]: string } = {
-      'draft': 'text-slate-400',
       'pending': 'text-yellow-400', 
       'published': 'text-blue-400',
       'signed': 'text-green-400',
@@ -261,7 +260,7 @@ export default function ContractImportModal({
             <div>
               <h3 className="text-xl font-semibold text-white">Importera OneFlow Kontrakt</h3>
               <p className="text-sm text-slate-400">
-                {totalCount > 0 ? `${totalCount} kontrakt tillgängliga i OneFlow` : 'Laddar kontrakt...'}
+                {totalCount > 0 ? `${totalCount} relevanta kontrakt tillgängliga (draft och oanvända mallar exkluderade)` : 'Laddar kontrakt...'}
               </p>
             </div>
           </div>

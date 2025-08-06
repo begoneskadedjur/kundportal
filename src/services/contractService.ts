@@ -1,6 +1,7 @@
 // src/services/contractService.ts - Service för contracts CRUD-operationer
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate } from '../types/database'
+import { ALLOWED_TEMPLATE_IDS } from '../constants/oneflowTemplates'
 import toast from 'react-hot-toast'
 
 export interface ContractWithSourceData extends Contract {
@@ -56,6 +57,10 @@ export class ContractService {
           )
         `)
         .order('created_at', { ascending: false })
+
+      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
+      query = query.neq('status', 'draft')
+      query = query.in('template_id', Array.from(ALLOWED_TEMPLATE_IDS))
 
       // Tillämpa filter
       if (filters.status) {
@@ -364,6 +369,10 @@ export class ContractService {
         .from('contracts')
         .select('type, status, total_value')
 
+      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
+      query = query.neq('status', 'draft')
+      query = query.in('template_id', Array.from(ALLOWED_TEMPLATE_IDS))
+
       if (filters.date_from) {
         query = query.gte('created_at', filters.date_from)
       }
@@ -471,7 +480,6 @@ export class ContractService {
 // Hjälpfunktioner för kontrakt
 export const getContractStatusColor = (status: Contract['status']): string => {
   const colors = {
-    'draft': '#6b7280',      // gray-500  
     'pending': '#f59e0b',    // amber-500
     'signed': '#10b981',     // emerald-500
     'declined': '#ef4444',   // red-500
@@ -479,12 +487,11 @@ export const getContractStatusColor = (status: Contract['status']): string => {
     'ended': '#6b7280',      // gray-500
     'overdue': '#dc2626'     // red-600
   }
-  return colors[status] || colors.draft
+  return colors[status] || '#6b7280'
 }
 
 export const getContractStatusText = (status: Contract['status']): string => {
   const texts = {
-    'draft': 'Utkast',
     'pending': 'Väntar på signering',
     'signed': 'Signerat',
     'declined': 'Avvisat',
