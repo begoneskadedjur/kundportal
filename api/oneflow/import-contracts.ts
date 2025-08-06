@@ -423,6 +423,16 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<Complete
     }
 
     const basic = await basicResponse.json() as OneflowContractDetails
+    
+    // 🆕 DEBUG: Logga basic response för att hitta totalsumma
+    console.log(`🔍 Basic response struktur för ${contractId}:`, Object.keys(basic))
+    if (basic.hasOwnProperty('total') || basic.hasOwnProperty('total_amount') || basic.hasOwnProperty('amount')) {
+      console.log(`💰 Möjlig totalsumma i basic:`, {
+        total: (basic as any).total,
+        total_amount: (basic as any).total_amount, 
+        amount: (basic as any).amount
+      })
+    }
 
     // 2. Extrahera data fields från basic response (istället för separata anrop)
     console.log(`📊 Extraherar data fields från basic response för ${contractId}`)
@@ -598,10 +608,25 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
   const customerPart = parties.find(p => p.my_party === false)
   const customerContact = customerPart?.participants?.[0]
 
-  // Beräkna totalt värde från produkter
+  // Beräkna totalt värde - prioritera kontraktets totalsumma före produktsummering
   let totalValue = 0
-  if (products && products.length > 0) {
-    console.log(`💰 Beräknar totalt värde från ${products.length} produkter:`)
+  
+  // 🆕 FÖRSTA: Försök hämta totalsumma från basic contract data
+  if ((basic as any).total?.amount) {
+    totalValue = parseFloat((basic as any).total.amount)
+    console.log(`💰 Hittade kontraktets totalsumma: ${totalValue} kr (från basic.total.amount)`)
+  }
+  else if ((basic as any).total_amount?.amount) {
+    totalValue = parseFloat((basic as any).total_amount.amount)
+    console.log(`💰 Hittade kontraktets totalsumma: ${totalValue} kr (från basic.total_amount.amount)`)
+  }
+  else if ((basic as any).amount) {
+    totalValue = parseFloat((basic as any).amount)
+    console.log(`💰 Hittade kontraktets totalsumma: ${totalValue} kr (från basic.amount)`)
+  }
+  // 🆕 FALLBACK: Summera produkter om ingen totalsumma finns
+  else if (products && products.length > 0) {
+    console.log(`💰 Ingen totalsumma hittad - beräknar från ${products.length} produkter:`)
     for (const product of products) {
       // OneFlow produkter har olika prisstrukturer - försök flera fält
       let productValue = 0
