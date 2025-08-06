@@ -1,5 +1,5 @@
 // src/hooks/useContracts.ts - Hook för contracts state management
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate, ContractFile } from '../types/database'
 import { 
@@ -49,6 +49,7 @@ export function useContracts(): UseContractsReturn {
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<ContractStats | null>(null)
   const [currentFilters, setCurrentFilters] = useState<ContractFilters>({})
+  const currentFiltersRef = useRef<ContractFilters>({})
   
   // Files state
   const [contractFiles, setContractFiles] = useState<{ [contractId: string]: ContractFile[] }>({})
@@ -90,6 +91,7 @@ export function useContracts(): UseContractsReturn {
       const contractList = await ContractService.getContracts(filters)
       setContracts(contractList)
       setCurrentFilters(filters)
+      currentFiltersRef.current = filters
       
       // Uppdatera cache
       setContractsCache(prev => ({
@@ -108,7 +110,7 @@ export function useContracts(): UseContractsReturn {
     } finally {
       setLoading(false)
     }
-  }, [loading, contractsCache])
+  }, []) // Inga externa dependencies för att undvika loop
 
   // Ladda kontraktstatistik
   const loadContractStats = useCallback(async (filters: Pick<ContractFilters, 'date_from' | 'date_to'> = {}) => {
@@ -286,13 +288,13 @@ export function useContracts(): UseContractsReturn {
     return isCached && Boolean(contractFiles[contractId])
   }, [contractFiles, filesLoadedAt])
 
-  // Memoized filter functions
-  const setFilters = useMemo(() => (filters: ContractFilters) => {
+  // Filter functions med useCallback
+  const setFilters = useCallback((filters: ContractFilters) => {
     setCurrentFilters(filters)
     loadContracts(filters)
   }, [loadContracts])
 
-  const clearFilters = useMemo(() => () => {
+  const clearFilters = useCallback(() => {
     const emptyFilters = {}
     setCurrentFilters(emptyFilters)
     loadContracts(emptyFilters)
@@ -308,9 +310,9 @@ export function useContracts(): UseContractsReturn {
     setFilesLoadedAt({}) // Rensa även filcache
     setContractFiles({})
     
-    await loadContracts(currentFilters)
+    await loadContracts(currentFiltersRef.current)
     await loadContractStats()
-  }, [loadContracts, loadContractStats, currentFilters])
+  }, [loadContracts, loadContractStats])
 
   // Initial loading vid mount
   useEffect(() => {
