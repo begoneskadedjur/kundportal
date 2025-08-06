@@ -297,9 +297,8 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowC
 
 // Parsa OneFlow kontrakt till vårt databasformat (samma logik som webhook)
 const parseContractDetailsToInsertData = (details: OneflowContractDetails): ContractInsertData => {
-  // Mappa OneFlow state till våra statusar
+  // Mappa OneFlow state till våra statusar (borttaget draft)
   const statusMapping: { [key: string]: ContractInsertData['status'] } = {
-    'draft': 'draft',
     'pending': 'pending', 
     'signed': 'signed',
     'declined': 'declined',
@@ -309,10 +308,13 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     'expired': 'overdue'
   }
 
-  // Bestäm typ baserat på template eller namn (säker null-hantering)
+  // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
+  const templateId = details.template?.id?.toString()
+  const contractType = templateId ? getContractTypeFromTemplate(templateId) : null
   const contractName = details.name || ''
   const templateName = details.template?.name || ''
-  const isOffer = contractName.toLowerCase().includes('offert') || 
+  const isOffer = contractType === 'offer' || 
+                  contractName.toLowerCase().includes('offert') || 
                   templateName.toLowerCase().includes('offert')
   
   // Extrahera data fields
@@ -349,7 +351,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
     status: statusMapping[details.state] || 'pending',
-    template_id: details.template?.id?.toString() || 'unknown',
+    template_id: details.template?.id?.toString() || 'no_template',
     
     // BeGone-information
     begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],
