@@ -69,20 +69,8 @@ export function useContracts(): UseContractsReturn {
       const cached = contractsCache[filterKey]
       const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
       
-      // Använd cache om tillgängligt
-      if (isCached && cached.data) {
-        console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
-        setContracts(cached.data)
-        setCurrentFilters(filters)
-        setLoading(false)
-        return
-      }
-      
-      // Förhindra multipla samtidiga requests för samma filter
-      if (loading) {
-        console.log(`⏳ Väntar på pågående request för filter: ${filterKey}`)
-        return
-      }
+      // 🆕 TILLFÄLLIGT: Skippa cache för debugging
+      console.log(`🚨 DEBUG: Hoppar över cache - tvingar API-anrop för filter: ${filterKey}`)
       
       console.log(`📄 Hämtar kontrakt från API med filter: ${filterKey}`)
       setLoading(true)
