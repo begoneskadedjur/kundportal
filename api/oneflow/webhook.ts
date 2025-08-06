@@ -236,7 +236,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   }
 
   // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
-  const contractType = getContractTypeFromTemplate(details.template.id.toString())
+  const contractType = details.template?.id ? getContractTypeFromTemplate(details.template.id.toString()) : null
   const contractName = details.name || ''
   const templateName = details.template?.name || ''
   const isOffer = contractType === 'offer' || 
@@ -277,7 +277,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
     status: statusMapping[details.state] || 'pending',
-    template_id: details.template.id.toString(),
+    template_id: details.template?.id?.toString() || 'unknown',
     
     // BeGone-information
     begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],

@@ -344,7 +344,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
     status: statusMapping[details.state] || 'pending',
-    template_id: details.template.id.toString(),
+    template_id: details.template?.id?.toString() || 'unknown',
     
     // BeGone-information
     begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],
