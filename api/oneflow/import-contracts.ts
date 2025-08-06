@@ -11,17 +11,32 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 // Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// Interface för OneFlow kontrakt från list API
+// Interface för OneFlow kontrakt från list API (baserat på verklig API-struktur)
 interface OneFlowContractListItem {
   id: number
-  name: string
+  name?: string
   state: string
-  template: {
+  template?: {
     id: number
     name: string
   }
-  created_time: string
+  created_time?: string
   updated_time: string
+  // Verklig OneFlow API-struktur från användarens logs
+  _private?: {
+    name: string
+    folder?: {
+      name: string
+    }
+    updated_time?: string
+  }
+  _private_ownerside?: {
+    template_id?: number
+    template?: {
+      name: string
+    }
+    created_time?: string
+  }
 }
 
 // Interface för komplett OneFlow kontrakt från get API  
@@ -151,34 +166,38 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     console.log(`📄 Första objektet:`, JSON.stringify(Array.isArray(data) ? data[0] : data, null, 2))
     
     if (Array.isArray(data)) {
-      // Direkt array av kontrakt
+      // Direkt array av kontrakt (oväntat format)
+      console.warn('⚠️ OneFlow returnerade direkt array, förväntar objekt med data-property')
       contracts = data
       totalCount = data.length
-      
-      // Validera att kontrakten har rätt struktur
-      contracts = contracts.filter((contract, index) => {
-        if (!contract || typeof contract !== 'object') {
-          console.warn(`⚠️ Kontrakt ${index} är inte ett objekt:`, contract)
-          return false
-        }
-        if (!contract.id) {
-          console.warn(`⚠️ Kontrakt ${index} saknar ID:`, contract)
-          return false
-        }
-        return true
-      })
-      
-      // Enkel pagination - visa bara första sidan eller alla
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-      contracts = contracts.slice(startIndex, endIndex)
-      hasMore = endIndex < totalCount
+      hasMore = false
     } else {
-      // Objekt med data-property
+      // Förväntat OneFlow API format med data-property
       contracts = data.data || []
       totalCount = data.count || contracts.length
       hasMore = !!data._links?.next
+      
+      console.log(`📋 OneFlow data struktur: count=${totalCount}, data.length=${contracts.length}, hasMore=${hasMore}`)
     }
+    
+    // Validera att kontrakten har rätt struktur
+    contracts = contracts.filter((contract, index) => {
+      if (!contract || typeof contract !== 'object') {
+        console.warn(`⚠️ Kontrakt ${index} är inte ett objekt:`, contract)
+        return false
+      }
+      if (!contract.id) {
+        console.warn(`⚠️ Kontrakt ${index} saknar ID:`, contract)
+        return false
+      }
+      return true
+    })
+    
+    // Client-side pagination baserat på page/limit parametrar
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const paginatedContracts = contracts.slice(startIndex, endIndex)
+    hasMore = endIndex < contracts.length || hasMore
 
     console.log(`✅ Hämtade ${contracts.length} kontrakt från OneFlow (total: ${totalCount})`)
     
@@ -461,17 +480,44 @@ export default async function handler(
       
       // Märk vilka som redan är importerade
       const contractsWithImportStatus = contracts.map(contract => {
-        // Säker parsing av kontraktsdata
+        // Säker parsing av OneFlow kontraktsdata baserat på verklig API-struktur
         const contractId = contract?.id?.toString() || 'unknown'
-        const contractName = contract?.name || 'Namnlöst kontrakt'
-        const contractState = contract?.state || 'unknown'
-        const templateName = contract?.template?.name || 'Okänd mall'
-        const createdTime = contract?.created_time || ''
-        const updatedTime = contract?.updated_time || ''
         
-        // Säker typbestämning
+        // Namn finns i _private.name enligt OneFlow API-strukturen
+        const contractName = contract?._private?.name || contract?.name || 'Namnlöst kontrakt'
+        const contractState = contract?.state || 'unknown'
+        
+        // Template-information från _private_ownerside.template_id
+        const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
+        let templateName = 'Okänd mall'
+        if (templateId) {
+          // Försök att få mallnamn från template-objektet om det finns
+          templateName = contract?._private_ownerside?.template?.name || 
+                        contract?.template?.name || 
+                        `Mall ${templateId}`
+        }
+        
+        // Datum från _private_ownerside eller fallback
+        const createdTime = contract?._private_ownerside?.created_time || 
+                           contract?.created_time || 
+                           contract?.updated_time || ''
+        const updatedTime = contract?.updated_time || contract?._private?.updated_time || ''
+        
+        // Hämta foldernamn för bättre klassificering
+        const folderName = contract?._private?.folder?.name
+        
+        // Förbättrad typbestämning baserat på folder och namn
         const isOffer = (contractName.toLowerCase().includes('offert')) || 
+                       (folderName?.toLowerCase().includes('offert')) ||
                        (templateName.toLowerCase().includes('offert'))
+        
+        console.log(`📋 Kontrakt ${contractId} parsed:`, {
+          name: contractName,
+          template: templateName,
+          state: contractState,
+          folder: folderName,
+          type: isOffer ? 'offer' : 'contract'
+        })
         
         return {
           id: contractId,
@@ -481,7 +527,9 @@ export default async function handler(
           created_time: createdTime,
           updated_time: updatedTime,
           is_imported: existingIds.has(contractId),
-          type: isOffer ? 'offer' : 'contract'
+          type: isOffer ? 'offer' : 'contract',
+          // Extra metadata för debugging
+          folder_name: folderName || 'Ingen mapp'
         }
       })
 
