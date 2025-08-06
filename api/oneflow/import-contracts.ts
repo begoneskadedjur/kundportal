@@ -304,9 +304,11 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     'expired': 'overdue'
   }
 
-  // Bestäm typ baserat på template eller namn
-  const isOffer = details.name.toLowerCase().includes('offert') || 
-                  details.template.name.toLowerCase().includes('offert')
+  // Bestäm typ baserat på template eller namn (säker null-hantering)
+  const contractName = details.name || ''
+  const templateName = details.template?.name || ''
+  const isOffer = contractName.toLowerCase().includes('offert') || 
+                  templateName.toLowerCase().includes('offert')
   
   // Extrahera data fields
   const dataFields = Object.fromEntries(

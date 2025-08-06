@@ -237,9 +237,11 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
 
   // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
   const contractType = getContractTypeFromTemplate(details.template.id.toString())
+  const contractName = details.name || ''
+  const templateName = details.template?.name || ''
   const isOffer = contractType === 'offer' || 
-                  details.name.toLowerCase().includes('offert') || 
-                  details.template.name.toLowerCase().includes('offert')
+                  contractName.toLowerCase().includes('offert') || 
+                  templateName.toLowerCase().includes('offert')
   
   // Extrahera data fields
   const dataFields = Object.fromEntries(
