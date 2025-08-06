@@ -112,7 +112,8 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
     console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
 
-    const response = await fetch(`https://api.oneflow.com/v1/contracts?page=${page}&per_page=${limit}&order=desc`, {
+    // OneFlow API använder inte pagination-parametrar i contracts endpoint
+    const response = await fetch(`https://api.oneflow.com/v1/contracts`, {
       method: 'GET',
       headers: {
         'x-oneflow-api-token': ONEFLOW_API_TOKEN,
@@ -135,18 +136,39 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       throw new Error(`OneFlow API error: ${response.status} - ${errorBody || response.statusText}`)
     }
 
-    const data = await response.json() as {
+    const data = await response.json() as OneFlowContractListItem[] | {
       data: OneFlowContractListItem[]
       count: number
       _links?: { next?: { href: string } }
     }
 
-    console.log(`✅ Hämtade ${data.data.length} kontrakt från OneFlow`)
+    // OneFlow API kan returnera antingen array eller objekt med data
+    let contracts: OneFlowContractListItem[]
+    let totalCount: number
+    let hasMore = false
+    
+    if (Array.isArray(data)) {
+      // Direkt array av kontrakt
+      contracts = data
+      totalCount = data.length
+      // Enkel pagination - visa bara första sidan eller alla
+      const startIndex = (page - 1) * limit
+      const endIndex = startIndex + limit
+      contracts = contracts.slice(startIndex, endIndex)
+      hasMore = endIndex < data.length
+    } else {
+      // Objekt med data-property
+      contracts = data.data || []
+      totalCount = data.count || contracts.length
+      hasMore = !!data._links?.next
+    }
+
+    console.log(`✅ Hämtade ${contracts.length} kontrakt från OneFlow (total: ${totalCount})`)
     
     return {
-      contracts: data.data,
-      totalCount: data.count,
-      hasMore: !!data._links?.next
+      contracts,
+      totalCount,
+      hasMore
     }
 
   } catch (error: any) {
