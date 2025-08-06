@@ -631,18 +631,18 @@ export default function TechnicianDashboard() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/oneflow-contract-creator')}
-              className="p-4 bg-gradient-to-br from-slate-500/20 to-slate-600/20 border border-slate-500/30 rounded-lg hover:from-slate-500/30 hover:to-slate-600/30 transition-all group"
+              onClick={() => navigate('/technician/oneflow-contract-creator')}
+              className="p-4 bg-gradient-to-br from-purple-500/20 to-indigo-600/20 border border-purple-500/30 rounded-lg hover:from-purple-500/30 hover:to-indigo-600/30 transition-all group"
             >
               <div className="flex items-center gap-3">
                 <motion.div
                   whileHover={{ rotate: 10 }}
-                  className="w-10 h-10 bg-slate-500/20 rounded-full flex items-center justify-center group-hover:bg-slate-500/30 transition-colors"
+                  className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center group-hover:bg-purple-500/30 transition-colors"
                 >
-                  <FileText className="w-5 h-5 text-slate-400" />
+                  <FileText className="w-5 h-5 text-purple-400" />
                 </motion.div>
-                <div className="text-left"><p className="font-medium text-white">Skapa Avtal</p><p className="text-slate-300 text-sm">Generera nya kontrakt</p></div>
-                <ArrowRight className="w-4 h-4 text-slate-400 ml-auto group-hover:translate-x-1 transition-transform" />
+                <div className="text-left"><p className="font-medium text-white">Avtal & Offerter</p><p className="text-purple-300 text-sm">Skapa serviceavtal</p></div>
+                <ArrowRight className="w-4 h-4 text-purple-400 ml-auto group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.button>
 

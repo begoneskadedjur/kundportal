@@ -150,10 +150,27 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* OneflowContractCreator - TILLGÄNGLIG FÖR ADMIN, KOORDINATOR OCH TEKNIKER */}
             <Route 
               path="/admin/oneflow-contract-creator" 
               element={
                 <ProtectedRoute requiredRole="admin">
+                  <OneflowContractCreator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/oneflow-contract-creator" 
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <OneflowContractCreator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/technician/oneflow-contract-creator" 
+              element={
+                <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
                 </ProtectedRoute>
               } 

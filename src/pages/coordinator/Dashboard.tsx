@@ -9,7 +9,7 @@ import GeographicOverview from '../../components/admin/coordinator/GeographicOve
 import { BeGoneCaseRow, Technician } from '../../types/database';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3 } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
@@ -295,6 +295,13 @@ export default function CoordinatorDashboard() {
               title="Schemaoptimerare"
               description="Optimera befintligt schema för att minska körsträckor och maximera tekniker-effektivitet."
               tag="Uppdaterad"
+            />
+            <CoordinatorDashboardCard
+              href="/koordinator/oneflow-contract-creator"
+              icon={FileSignature}
+              title="Avtal & Offerter"
+              description="Skapa professionella serviceavtal och offertförslag direkt från ärendedata med Oneflow-integration."
+              tag="Tillgänglig"
             />
             <CoordinatorDashboardCard
               href="/koordinator/sok-arenden"

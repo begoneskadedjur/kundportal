@@ -9,6 +9,7 @@ import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 // ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
@@ -313,6 +314,7 @@ const BackupRestorePrompt: React.FC<{
 
 export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -341,6 +343,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     created_date: new Date().toISOString()
   });
 
+  // Funktion för att få rätt route baserat på användarens roll
+  const getOneflowRoute = useCallback(() => {
+    const role = profile?.role || 'admin';
+    switch (role) {
+      case 'koordinator':
+        return '/koordinator/oneflow-contract-creator';
+      case 'technician':
+        return '/technician/oneflow-contract-creator';
+      default:
+        return '/admin/oneflow-contract-creator';
+    }
+  }, [profile?.role]);
+
   // Funktioner för att hantera avtal- och offertskapning
   const prepareCustomerData = useCallback(() => {
     if (!currentCase) return null;
@@ -364,6 +379,22 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     };
   }, [currentCase, formData]);
 
+  // Hjälpfunktion för att bestämma rätt OneflowContractCreator route baserat på användarens roll
+  const getOneflowRoute = useCallback(() => {
+    const userRole = profile?.role;
+    switch (userRole) {
+      case 'admin':
+        return '/admin/oneflow-contract-creator';
+      case 'koordinator':
+        return '/koordinator/oneflow-contract-creator';
+      case 'technician':
+        return '/technician/oneflow-contract-creator';
+      default:
+        // Fallback till admin route
+        return '/admin/oneflow-contract-creator';
+    }
+  }, [profile?.role]);
+
   const handleCreateContract = useCallback(() => {
     const customerData = prepareCustomerData();
     if (!customerData) return;
@@ -375,11 +406,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       targetStep: 2 // Gå direkt till mallval
     }));
     
-    // Navigera till avtalskaparen
-    navigate('/admin/oneflow-contract-creator?prefill=contract');
+    // Navigera till avtalskaparen med rollbaserad route
+    const oneflowRoute = getOneflowRoute();
+    navigate(`${oneflowRoute}?prefill=contract`);
     
     toast.success('Navigerar till avtalskapning med kundinformation...');
-  }, [prepareCustomerData, navigate]);
+  }, [prepareCustomerData, navigate, getOneflowRoute]);
 
   const handleCreateOffer = useCallback(() => {
     const customerData = prepareCustomerData();
@@ -392,11 +424,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       targetStep: 2 // Gå direkt till mallval
     }));
     
-    // Navigera till avtalskaparen
-    navigate('/admin/oneflow-contract-creator?prefill=offer');
+    // Navigera till avtalskaparen med rollbaserad route
+    const oneflowRoute = getOneflowRoute();
+    navigate(`${oneflowRoute}?prefill=offer`);
     
     toast.success('Navigerar till offertskapning med kundinformation...');
-  }, [prepareCustomerData, navigate]);
+  }, [prepareCustomerData, navigate, getOneflowRoute]);
 
   useEffect(() => {
     if (caseData) {

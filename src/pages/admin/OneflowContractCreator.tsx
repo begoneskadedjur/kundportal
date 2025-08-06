@@ -115,6 +115,19 @@ const STEPS = [
 export default function OneflowContractCreator() {
   const navigate = useNavigate()
   const { user, profile } = useAuth() // 🆕 HÄMTA ANVÄNDARINFO
+
+  // Funktion för att navigera till rätt dashboard baserat på användarens roll
+  const getDashboardRoute = useCallback(() => {
+    const role = profile?.role || 'admin';
+    switch (role) {
+      case 'koordinator':
+        return '/koordinator/dashboard';
+      case 'technician':
+        return '/technician/dashboard';
+      default:
+        return '/admin/dashboard';
+    }
+  }, [profile?.role]);
   const [currentStep, setCurrentStep] = useState(1)
   const [isCreating, setIsCreating] = useState(false)
   const [creationStep, setCreationStep] = useState('')
@@ -1092,7 +1105,7 @@ export default function OneflowContractCreator() {
             <Button 
               variant="secondary" 
               size="sm" 
-              onClick={() => navigate('/admin/dashboard')} 
+              onClick={() => navigate(getDashboardRoute())} 
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Tillbaka
