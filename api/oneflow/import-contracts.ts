@@ -68,6 +68,30 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 // Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+// Beräkna totalt avtalsvärde med avtalslängd-multiplikation
+const calculateContractTotalValue = (baseValue: number, contractLength: string | undefined): number | null => {
+  if (!baseValue || baseValue <= 0) return null
+  
+  // Parsa avtalslängd från text (ex: "1 år", "2 år", "3 år")
+  if (!contractLength) {
+    console.log(`💰 Inget avtalslängd angivet - använder baspris: ${baseValue} kr`)
+    return baseValue
+  }
+  
+  // Extrahera antal år från avtalslängd (ex: "3 år" -> 3)
+  const yearMatch = contractLength.toLowerCase().match(/(\d+)\s*(år|year)/i)
+  if (yearMatch) {
+    const years = parseInt(yearMatch[1])
+    const totalValue = baseValue * years
+    console.log(`💰 Avtalsvärde: ${baseValue} kr × ${years} år = ${totalValue} kr`)
+    return totalValue
+  }
+  
+  // Om vi inte kan parsa avtalslängden, använd baspris
+  console.log(`⚠️ Kunde inte parsa avtalslängd "${contractLength}" - använder baspris: ${baseValue} kr`)
+  return baseValue
+}
+
 // Smart fältmappning baserad på dokumenttyp
 const mapDataFieldsFromOneFlow = (dataFields: Record<string, string>, templateId: string) => {
   const contractType = getContractTypeFromTemplate(templateId)
@@ -423,16 +447,6 @@ const fetchOneFlowContractDetails = async (contractId: string): Promise<Complete
     }
 
     const basic = await basicResponse.json() as OneflowContractDetails
-    
-    // 🆕 DEBUG: Logga basic response för att hitta totalsumma
-    console.log(`🔍 Basic response struktur för ${contractId}:`, Object.keys(basic))
-    if (basic.hasOwnProperty('total') || basic.hasOwnProperty('total_amount') || basic.hasOwnProperty('amount')) {
-      console.log(`💰 Möjlig totalsumma i basic:`, {
-        total: (basic as any).total,
-        total_amount: (basic as any).total_amount, 
-        amount: (basic as any).amount
-      })
-    }
 
     // 2. Extrahera data fields från basic response (istället för separata anrop)
     console.log(`📊 Extraherar data fields från basic response för ${contractId}`)
@@ -681,9 +695,9 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     company_name: mappedData['company_name'] || customerPart?.name || undefined,
     organization_number: mappedData['organization_number'] || customerPart?.identification_number || undefined,
     
-    // Avtal/Offert-innehåll (exakt mappning)
+    // Avtal/Offert-innehåll (exakt mappning med avtalslängd-multiplikation)
     agreement_text: mappedData['agreement_text'] || undefined,
-    total_value: totalValue > 0 ? totalValue : null,
+    total_value: calculateContractTotalValue(totalValue, mappedData['contract_length']),
     selected_products: products.length > 0 ? products : null,
     
     // Kundkoppling sätts senare vid signering
