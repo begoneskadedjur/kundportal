@@ -115,7 +115,7 @@ const ContractMobileCard: React.FC<{
 }
 
 export default function ContractsOverview() {
-  const { contracts, loading, error, stats, currentFilters, setFilters, clearFilters } = useContracts()
+  const { contracts, loading, error, stats, currentFilters, setFilters, clearFilters, refreshContracts } = useContracts()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
