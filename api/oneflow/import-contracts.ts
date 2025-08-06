@@ -205,7 +205,12 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       
       // Filtrera bort kontrakt som inte använder våra mallar
       const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
-      if (templateId && !ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
+      if (!templateId) {
+        console.log(`🚫 Hoppar över kontrakt ${contract.id} utan template_id`)
+        templateFiltered++
+        return false
+      }
+      if (!ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
         console.log(`🚫 Hoppar över kontrakt ${contract.id} med oanvänd mall: ${templateId}`)
         templateFiltered++
         return false
@@ -510,7 +515,7 @@ export default async function handler(
       // Hämta befintliga kontrakt från databas
       const existingIds = await getExistingContractIds()
       
-      // Märk vilka som redan är importerade
+      // Märk vilka som redan är importerade (förenklad för List API)
       const contractsWithImportStatus = contracts.map(contract => {
         // Säker parsing av OneFlow kontraktsdata baserat på verklig API-struktur
         const contractId = contract?.id?.toString() || 'unknown'
@@ -539,16 +544,18 @@ export default async function handler(
         const folderName = contract?._private?.folder?.name
         
         // Förbättrad typbestämning baserat på folder och namn
+        // NOTERA: För komplett typbestämning behövs Detail API med data_fields
         const isOffer = (contractName.toLowerCase().includes('offert')) || 
                        (folderName?.toLowerCase().includes('offert')) ||
                        (templateName.toLowerCase().includes('offert'))
         
-        console.log(`📋 Kontrakt ${contractId} parsed:`, {
+        console.log(`📋 List API kontrakt ${contractId}:`, {
           name: contractName,
           template: templateName,
+          template_id: templateId,
           state: contractState,
           folder: folderName,
-          type: isOffer ? 'offer' : 'contract'
+          preliminär_type: isOffer ? 'offer' : 'contract'
         })
         
         return {
@@ -556,6 +563,7 @@ export default async function handler(
           name: contractName,
           state: contractState,
           template_name: templateName,
+          template_id: templateId, // Lägg till template_id för bättre spårning
           created_time: createdTime,
           updated_time: updatedTime,
           is_imported: existingIds.has(contractId),
@@ -598,20 +606,36 @@ export default async function handler(
       
       for (const contractId of contractIds) {
         try {
-          // Hämta kontrakt-detaljer från OneFlow
+          console.log(`🔍 Hämtar detaljerad information för kontrakt ${contractId}`)
+          
+          // Hämta kontrakt-detaljer från OneFlow Detail API
           const details = await fetchOneFlowContractDetails(contractId)
           
           if (!details) {
+            console.error(`❌ Kunde inte hämta detaljer för kontrakt ${contractId}`)
             results.push({
               contract_id: contractId,
               success: false,
-              error: 'Kunde inte hämta kontrakt-detaljer från OneFlow'
+              error: 'Kunde inte hämta kontrakt-detaljer från OneFlow Detail API'
             })
             continue
           }
           
-          // Konvertera till vårt databasformat
+          console.log(`✅ Kontrakt-detaljer hämtade för ${contractId}:`)
+          console.log(`   - Template: ${details.template?.name} (ID: ${details.template?.id})`)
+          console.log(`   - Status: ${details.state}`)
+          console.log(`   - Data fields: ${details.data_fields?.length || 0} fält`)
+          
+          // Konvertera till vårt databasformat med samma logik som webhook
           const contractData = parseContractDetailsToInsertData(details)
+          
+          console.log(`📋 Kontrakt ${contractId} parsed:`)
+          console.log(`   - Template ID: ${contractData.template_id}`)
+          console.log(`   - Type: ${contractData.type}`)
+          console.log(`   - Status: ${contractData.status}`)
+          console.log(`   - BeGone employee: ${contractData.begone_employee_name}`)
+          console.log(`   - Contact person: ${contractData.contact_person}`)
+          console.log(`   - Company: ${contractData.company_name}`)
           
           // Spara till databas
           const saveResult = await saveContractToDatabase(contractData)

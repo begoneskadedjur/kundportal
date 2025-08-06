@@ -60,7 +60,8 @@ export class ContractService {
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
-      query = query.in('template_id', Array.from(ALLOWED_TEMPLATE_IDS))
+      const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      query = query.in('template_id', allowedTemplates)
 
       // Tillämpa filter
       if (filters.status) {
@@ -371,7 +372,8 @@ export class ContractService {
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
-      query = query.in('template_id', Array.from(ALLOWED_TEMPLATE_IDS))
+      const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      query = query.in('template_id', allowedTemplates)
 
       if (filters.date_from) {
         query = query.gte('created_at', filters.date_from)

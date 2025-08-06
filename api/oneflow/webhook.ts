@@ -212,9 +212,15 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
     return false
   }
   
+  // Hoppa över kontrakt utan template (anställningsavtal etc)
+  const templateId = details.template?.id
+  if (!templateId) {
+    console.log(`🚫 Hoppar över kontrakt utan template: ${details.id}`)
+    return false
+  }
+  
   // Hoppa över kontrakt som inte använder våra mallar
-  const templateId = details.template.id.toString()
-  if (!ALLOWED_TEMPLATE_IDS.has(templateId)) {
+  if (!ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
     console.log(`🚫 Hoppar över kontrakt med oanvänd mall ${templateId}: ${details.id}`)
     return false
   }
@@ -277,7 +283,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     source_id: null,
     type: isOffer ? 'offer' : 'contract',
     status: statusMapping[details.state] || 'pending',
-    template_id: details.template?.id?.toString() || 'unknown',
+    template_id: details.template?.id?.toString() || 'no_template',
     
     // BeGone-information
     begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],
