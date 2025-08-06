@@ -606,15 +606,15 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
       // OneFlow produkter har olika prisstrukturer - försök flera fält
       let productValue = 0
       
-      // Försök price_1.amount.amount först
-      if (product.price_1?.amount?.amount) {
-        productValue = parseFloat(product.price_1.amount.amount)
-        console.log(`   💸 ${product.name}: ${productValue} kr (från price_1.amount.amount)`)
-      }
-      // Fallback till price_2.amount.amount
-      else if (product.price_2?.amount?.amount) {
+      // Försök price_2.amount.amount först (totalpris)
+      if (product.price_2?.amount?.amount) {
         productValue = parseFloat(product.price_2.amount.amount)
-        console.log(`   💸 ${product.name}: ${productValue} kr (från price_2.amount.amount)`)
+        console.log(`   💸 ${product.name}: ${productValue} kr (från price_2.amount.amount - totalpris)`)
+      }
+      // Fallback till price_1.amount.amount (per enhet)
+      else if (product.price_1?.amount?.amount) {
+        productValue = parseFloat(product.price_1.amount.amount)
+        console.log(`   💸 ${product.name}: ${productValue} kr (från price_1.amount.amount - per enhet)`)
       }
       // Fallback till total_amount.amount
       else if (product.total_amount?.amount) {
