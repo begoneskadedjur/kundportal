@@ -6,8 +6,7 @@ import fetch from 'node-fetch'
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
-const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
-const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+// OneFlow-variabler läses direkt i handler-funktionen för att undvika top-level scope problem
 
 // Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -106,6 +105,9 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
   hasMore: boolean
 }> => {
   try {
+    const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
+    const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+    
     console.log(`🔍 Hämtar OneFlow-kontrakt, sida ${page}, limit ${limit}`)
     console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
     console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
@@ -161,6 +163,9 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
 // Hämta detaljerad information om ett kontrakt från OneFlow
 const fetchOneFlowContractDetails = async (contractId: string): Promise<OneflowContractDetails | null> => {
   try {
+    const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
+    const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+    
     console.log(`📋 Hämtar detaljer för kontrakt ${contractId}`)
 
     const response = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
@@ -359,7 +364,10 @@ export default async function handler(
     return res.status(204).end()
   }
 
-  // Validera miljövariabler
+  // Läs och validera miljövariabler
+  const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN
+  const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL
+  
   if (!ONEFLOW_API_TOKEN) {
     console.error('❌ ONEFLOW_API_TOKEN saknas')
     return res.status(500).json({
