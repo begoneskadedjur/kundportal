@@ -142,6 +142,60 @@ export default function OneflowContractCreator() {
     sendForSigning: true
   })
 
+  // Hantera förifyllda data från EditCaseModal
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const prefillType = urlParams.get('prefill')
+    
+    if (prefillType && (prefillType === 'contract' || prefillType === 'offer')) {
+      const savedData = sessionStorage.getItem('prefill_customer_data')
+      if (savedData) {
+        try {
+          const customerData = JSON.parse(savedData)
+          console.log('Prefilling customer data:', customerData)
+          
+          setWizardData(prev => ({
+            ...prev,
+            documentType: customerData.documentType || prefillType,
+            partyType: customerData.partyType || 'company',
+            Kontaktperson: customerData.Kontaktperson || '',
+            'e-post-kontaktperson': customerData['e-post-kontaktperson'] || '',
+            'telefonnummer-kontaktperson': customerData['telefonnummer-kontaktperson'] || '',
+            'utforande-adress': customerData['utforande-adress'] || '',
+            foretag: customerData.foretag || '',
+            'org-nr': customerData['org-nr'] || '',
+          }))
+          
+          // Navigera till rätt steg om specifierat
+          if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
+            setCurrentStep(customerData.targetStep)
+          } else {
+            // Börja från steg 1 men med förvald dokumenttyp
+            setCurrentStep(1)
+          }
+          
+          sessionStorage.removeItem('prefill_customer_data') // Rensa efter användning
+          
+          toast.success(`Kundinformation förifylld från ärende! (${prefillType === 'contract' ? 'Avtal' : 'Offert'})`, {
+            duration: 4000,
+            icon: prefillType === 'contract' ? '📄' : '💰'
+          })
+          
+        } catch (error) {
+          console.error('Error parsing prefill data:', error)
+          toast.error('Kunde inte läsa förifylld kundinformation')
+        }
+      } else {
+        // Om ingen data finns men prefill är angett, sätt bara dokumenttyp
+        setWizardData(prev => ({
+          ...prev,
+          documentType: prefillType as 'contract' | 'offer'
+        }))
+        toast.info(`Startar ${prefillType === 'contract' ? 'avtals' : 'offert'}-skapning`)
+      }
+    }
+  }, [])  // Kör bara en gång vid mount
+
   const updateWizardData = (field: keyof WizardData, value: any) => {
     setWizardData(prev => {
       const updated = { ...prev, [field]: value }

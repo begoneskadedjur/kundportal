@@ -4,10 +4,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 // ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
@@ -311,6 +312,7 @@ const BackupRestorePrompt: React.FC<{
 };
 
 export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: EditCaseModalProps) {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -338,6 +340,63 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     status: '',
     created_date: new Date().toISOString()
   });
+
+  // Funktioner för att hantera avtal- och offertskapning
+  const prepareCustomerData = useCallback(() => {
+    if (!currentCase) return null;
+    
+    return {
+      partyType: currentCase.case_type === 'business' ? 'company' : 'individual',
+      Kontaktperson: formData.kontaktperson || currentCase.kontaktperson || '',
+      'e-post-kontaktperson': formData.e_post_kontaktperson || currentCase.e_post_kontaktperson || '',
+      'telefonnummer-kontaktperson': formData.telefon_kontaktperson || currentCase.telefon_kontaktperson || '',
+      'utforande-adress': formatAddress(formData.adress || currentCase.adress),
+      foretag: currentCase.case_type === 'business' ? (currentCase.title || '') : '',
+      'org-nr': currentCase.case_type === 'business' 
+        ? (formData.org_nr || currentCase.org_nr || '')
+        : (formData.personnummer || currentCase.personnummer || ''),
+      // Lägg till referens till ursprungsärendet
+      sourceCase: {
+        id: currentCase.id,
+        title: currentCase.title,
+        type: currentCase.case_type
+      }
+    };
+  }, [currentCase, formData]);
+
+  const handleCreateContract = useCallback(() => {
+    const customerData = prepareCustomerData();
+    if (!customerData) return;
+    
+    // Spara data för förifyllning
+    sessionStorage.setItem('prefill_customer_data', JSON.stringify({
+      ...customerData,
+      documentType: 'contract',
+      targetStep: 2 // Gå direkt till mallval
+    }));
+    
+    // Navigera till avtalskaparen
+    navigate('/admin/oneflow-contract-creator?prefill=contract');
+    
+    toast.success('Navigerar till avtalskapning med kundinformation...');
+  }, [prepareCustomerData, navigate]);
+
+  const handleCreateOffer = useCallback(() => {
+    const customerData = prepareCustomerData();
+    if (!customerData) return;
+    
+    // Spara data för förifyllning
+    sessionStorage.setItem('prefill_customer_data', JSON.stringify({
+      ...customerData,
+      documentType: 'offer',
+      targetStep: 2 // Gå direkt till mallval
+    }));
+    
+    // Navigera till avtalskaparen
+    navigate('/admin/oneflow-contract-creator?prefill=offer');
+    
+    toast.success('Navigerar till offertskapning med kundinformation...');
+  }, [prepareCustomerData, navigate]);
 
   useEffect(() => {
     if (caseData) {
@@ -623,29 +682,72 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Redigera ärende: ${currentCase.title}`} size="xl" footer={footer} preventClose={loading || timeTrackingLoading} usePortal={true} className="scroll-smooth">
       <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-        {/* Custom header with report functionality */}
-        {currentCase && reportGeneration.canGenerateReport && (
-          <div className="mb-6 -mt-6 -mx-6 px-6 py-3 bg-slate-800/30 border-b border-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileCheck className="w-5 h-5 text-blue-400" />
-                <span className="text-sm text-slate-300">
-                  Generera saneringsrapport för detta ärende
-                </span>
+        {/* Enhanced header with report, contract, and offer functionality */}
+        {currentCase && (
+          <div className="mb-6 -mt-6 -mx-6 px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+            {/* Main action buttons */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 lg:gap-4">
+                {/* Avtal Button */}
+                <button
+                  type="button"
+                  onClick={handleCreateContract}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg text-purple-300 hover:text-purple-200 transition-all duration-200 hover:scale-105"
+                  title="Skapa serviceavtal för denna kund"
+                >
+                  <FileSignature className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">Avtal</span>
+                  <ChevronRight className="w-3 h-3 opacity-60" />
+                </button>
+
+                {/* Offert Button */}
+                <button
+                  type="button"
+                  onClick={handleCreateOffer}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg text-green-300 hover:text-green-200 transition-all duration-200 hover:scale-105"
+                  title="Skapa offertförslag för denna kund"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">Offert</span>
+                  <ChevronRight className="w-3 h-3 opacity-60" />
+                </button>
               </div>
-              <WorkReportDropdown
-                onDownload={reportGeneration.downloadReport}
-                onSendToTechnician={reportGeneration.sendToTechnician}
-                onSendToContact={reportGeneration.sendToContact}
-                disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
-                technicianName={reportGeneration.technicianName}
-                contactName={reportGeneration.contactName}
-              />
+
+              {/* Rapport Dropdown - right aligned */}
+              <div className="flex items-center gap-3">
+                {reportGeneration.canGenerateReport ? (
+                  <div className="flex items-center gap-2">
+                    <span className="hidden lg:inline text-xs text-slate-400">Rapport:</span>
+                    <WorkReportDropdown
+                      onDownload={reportGeneration.downloadReport}
+                      onSendToTechnician={reportGeneration.sendToTechnician}
+                      onSendToContact={reportGeneration.sendToContact}
+                      disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
+                      technicianName={reportGeneration.technicianName}
+                      contactName={reportGeneration.contactName}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <FileCheck className="w-4 h-4" />
+                    <span className="hidden sm:inline text-xs">Rapport ej tillgänglig</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {(!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail) && (
-              <div className="mt-2 text-xs text-amber-400">
+
+            {/* Warnings and status messages */}
+            {(reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
+              <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
                 {!reportGeneration.hasTechnicianEmail && '⚠️ Ingen tekniker-email tillgänglig. '}
                 {!reportGeneration.hasContactEmail && '⚠️ Ingen kontaktperson-email tillgänglig.'}
+              </div>
+            )}
+            
+            {/* Missing customer info warning */}
+            {(!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
+              <div className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-3 py-2">
+                ⚠️ Komplettera kontaktuppgifter för bästa avtal/offert-skapning
               </div>
             )}
           </div>
