@@ -379,21 +379,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
     };
   }, [currentCase, formData]);
 
-  // Hjälpfunktion för att bestämma rätt OneflowContractCreator route baserat på användarens roll
-  const getOneflowRoute = useCallback(() => {
-    const userRole = profile?.role;
-    switch (userRole) {
-      case 'admin':
-        return '/admin/oneflow-contract-creator';
-      case 'koordinator':
-        return '/koordinator/oneflow-contract-creator';
-      case 'technician':
-        return '/technician/oneflow-contract-creator';
-      default:
-        // Fallback till admin route
-        return '/admin/oneflow-contract-creator';
-    }
-  }, [profile?.role]);
 
   const handleCreateContract = useCallback(() => {
     const customerData = prepareCustomerData();
