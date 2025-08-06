@@ -1,10 +1,11 @@
 // src/pages/admin/ContractsOverview.tsx - Dashboard för avtals- och offertöverblick
 import React, { useState, useMemo } from 'react'
-import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter } from 'lucide-react'
+import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
 import ContractFilesModal from '../../components/admin/contracts/ContractFilesModal'
+import ContractImportModal from '../../components/admin/contracts/ContractImportModal'
 import FilesColumn from '../../components/admin/contracts/FilesColumn'
 import FileDownloadButton from '../../components/admin/contracts/FileDownloadButton'
 import { useContracts } from '../../hooks/useContracts'
@@ -125,6 +126,9 @@ export default function ContractsOverview() {
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
   const [selectedContractName, setSelectedContractName] = useState<string>('')
 
+  // Import modal state
+  const [importModalOpen, setImportModalOpen] = useState(false)
+
   // Filtrera kontrakt lokalt för snabb respons
   const filteredContracts = useMemo(() => {
     return contracts.filter(contract => {
@@ -187,6 +191,21 @@ export default function ContractsOverview() {
     setSelectedContractName('')
   }
 
+  // Import modal handlers
+  const handleOpenImportModal = () => {
+    setImportModalOpen(true)
+  }
+
+  const handleCloseImportModal = () => {
+    setImportModalOpen(false)
+  }
+
+  const handleImportComplete = () => {
+    // Ladda om kontraktslistan efter lyckad import
+    refreshContracts()
+    toast.success('Kontraktslistan uppdaterad efter import!')
+  }
+
   const handleClearFilters = () => {
     setSearchTerm('')
     setStatusFilter('all')
@@ -242,15 +261,27 @@ export default function ContractsOverview() {
           Avtalsöversikt
         </h3>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClearFilters}
-          className="text-slate-400"
-        >
-          <Filter className="w-4 h-4 mr-2" />
-          Rensa filter
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenImportModal}
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Importera Kontrakt
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearFilters}
+            className="text-slate-400"
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Rensa filter
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -459,6 +490,13 @@ export default function ContractsOverview() {
         onClose={handleCloseFilesModal}
         contractId={selectedContractId}
         contractName={selectedContractName}
+      />
+
+      {/* Import Modal */}
+      <ContractImportModal
+        isOpen={importModalOpen}
+        onClose={handleCloseImportModal}
+        onImportComplete={handleImportComplete}
       />
     </div>
   )
