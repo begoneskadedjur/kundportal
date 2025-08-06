@@ -143,6 +143,12 @@ interface OneflowContractDetails {
     id: number
     name: string
   } | null
+  template_id?: number // Fallback om template saknas
+  _private_ownerside?: {
+    template_id?: number
+    template_type_id?: number
+    created_time?: string
+  }
   created_time: string
   updated_time: string
 }
@@ -480,10 +486,27 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     'expired': 'overdue'
   }
 
-  // Bestäm typ baserat på template ID
-  const templateId = basic.template?.id?.toString() || 'no_template'
+  // Bestäm typ baserat på template ID (OneFlow sparar template_id i _private_ownerside)
+  let templateId = 'no_template'
+  
+  // Försök olika platser där OneFlow kan spara template_id
+  if (basic.template?.id) {
+    templateId = basic.template.id.toString()
+  } else if (basic._private_ownerside?.template_id) {
+    templateId = basic._private_ownerside.template_id.toString()
+  } else if (basic.template_id) {
+    templateId = basic.template_id.toString()
+  }
+  
   const contractType = templateId !== 'no_template' ? getContractTypeFromTemplate(templateId) : null
   const isOffer = contractType === 'offer'
+  
+  console.log(`🔍 Template ID sökning för ${basic.id}:`)
+  console.log(`   📄 basic.template?.id: ${basic.template?.id || 'null'}`)
+  console.log(`   📄 basic._private_ownerside?.template_id: ${basic._private_ownerside?.template_id || 'null'}`)
+  console.log(`   📄 basic.template_id: ${basic.template_id || 'null'}`)
+  console.log(`   🎯 Använd template_id: ${templateId}`)
+  console.log(`   🏷️  Detekterad typ: ${contractType || 'null'} → ${isOffer ? 'offer' : 'contract'}`)
   
   // Konvertera data fields array till objekt
   const dataFields = Object.fromEntries(
