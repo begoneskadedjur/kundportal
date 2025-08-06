@@ -780,8 +780,25 @@ export default async function handler(
       // Hämta befintliga kontrakt från databas
       const existingIds = await getExistingContractIds()
       
-      // Märk vilka som redan är importerade (förenklad för List API)
-      const contractsWithImportStatus = contracts.map(contract => {
+      console.log(`🔍 Befintliga kontrakt i databas: ${existingIds.size} st`)
+      console.log(`📋 Befintliga IDs: ${Array.from(existingIds).join(', ')}`)
+      
+      // Filtrera bort redan importerade kontrakt INNAN mappning
+      const notImportedContracts = contracts.filter(contract => {
+        const contractId = contract?.id?.toString() || 'unknown'
+        const isAlreadyImported = existingIds.has(contractId)
+        
+        if (isAlreadyImported) {
+          console.log(`🚫 Hoppar över redan importerat kontrakt: ${contractId} (${contract?._private?.name || 'Namnlöst'})`)
+        }
+        
+        return !isAlreadyImported
+      })
+      
+      console.log(`✅ Kontrakt att visa för import: ${notImportedContracts.length}/${contracts.length}`)
+      
+      // Märk vilka som redan är importerade (alla återstående är ej importerade)
+      const contractsWithImportStatus = notImportedContracts.map(contract => {
         // Säker parsing av OneFlow kontraktsdata baserat på verklig API-struktur
         const contractId = contract?.id?.toString() || 'unknown'
         
@@ -831,7 +848,7 @@ export default async function handler(
           template_id: templateId, // Lägg till template_id för bättre spårning
           created_time: createdTime,
           updated_time: updatedTime,
-          is_imported: existingIds.has(contractId),
+          is_imported: false, // Alla kontrakt i denna lista är INTE importerade
           type: isOffer ? 'offer' : 'contract',
           // Extra metadata för debugging
           folder_name: folderName || 'Ingen mapp'
@@ -849,9 +866,11 @@ export default async function handler(
             has_more: hasMore
           },
           summary: {
-            total_contracts: contracts.length,
-            already_imported: contractsWithImportStatus.filter(c => c.is_imported).length,
-            available_for_import: contractsWithImportStatus.filter(c => !c.is_imported).length
+            total_contracts: contractsWithImportStatus.length,
+            already_imported: 0, // Vi filtrerade bort alla importerade
+            available_for_import: contractsWithImportStatus.length,
+            original_total: contracts.length,
+            filtered_out: contracts.length - contractsWithImportStatus.length
           }
         }
       })
