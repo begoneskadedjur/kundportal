@@ -23,35 +23,58 @@ export type Database = {
       customers: {
         Row: {
           id: string
+          // Basic Customer Information
           company_name: string
-          org_number: string
-          contact_person: string
-          email: string
-          phone: string
-          address: string
-          contract_type_id: string
-          clickup_list_id: string
-          clickup_list_name: string
-          is_active: boolean
-          created_at: string
-          updated_at: string
+          organization_number: string | null
+          contact_person: string | null
+          contact_email: string
+          contact_phone: string | null
+          contact_address: string | null
           
-          // Avtalsfält - UTÖKAD med contract_end_date
+          // OneFlow Contract Linking
+          oneflow_contract_id: string | null
+          created_from_contract_id: string | null
+          
+          // Contract Details
+          contract_template_id: string | null
+          contract_type: string | null
+          contract_status: 'signed' | 'active' | 'terminated' | 'expired'
+          contract_length: string | null
           contract_start_date: string | null
-          contract_length_months: number | null
           contract_end_date: string | null
-          annual_premium: number | null
-          total_contract_value: number | null
-          contract_description: string | null
-          assigned_account_manager: string | null
-          contract_status: 'active' | 'pending' | 'expired' | 'cancelled'
           
-          // Verksamhetstyp
+          // Financial Information
+          total_contract_value: number | null
+          annual_value: number | null
+          monthly_value: number | null
+          currency: string | null
+          
+          // Agreement Content
+          agreement_text: string | null
+          products: any | null // JSONB
+          product_summary: string | null
+          service_details: string | null
+          
+          // Account Management
+          assigned_account_manager: string | null
+          account_manager_email: string | null
+          sales_person: string | null
+          sales_person_email: string | null
+          
+          // Business Intelligence
           business_type: string | null
+          industry_category: string | null
+          customer_size: 'small' | 'medium' | 'large' | null
+          service_frequency: string | null
+          
+          // Metadata
+          source_type: 'oneflow' | 'manual' | 'import' | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
         }
-        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at' | 'contract_status'> & {
-          contract_status?: 'active' | 'pending' | 'expired' | 'cancelled'
-          contract_end_date?: string | null
+        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+          contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
         }
         Update: Partial<Database['public']['Tables']['customers']['Insert']>
       }

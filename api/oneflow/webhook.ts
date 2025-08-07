@@ -359,6 +359,125 @@ const saveOrUpdateContract = async (contractData: ContractInsertData): Promise<v
   }
 }
 
+// === HJÄLPFUNKTIONER FÖR CUSTOMER CREATION ===
+
+// Parsa kontraktslängd från text till månader
+const parseContractLength = (lengthText: string | null): number => {
+  if (!lengthText) return 12 // Default 1 år
+  
+  const yearMatch = lengthText.match(/(\d+)\s*år/i)
+  if (yearMatch) return parseInt(yearMatch[1]) * 12
+  
+  const monthMatch = lengthText.match(/(\d+)\s*månad/i)
+  if (monthMatch) return parseInt(monthMatch[1])
+  
+  return 12 // Fallback
+}
+
+// Beräkna slutdatum för kontrakt
+const calculateEndDate = (startDate: string | null, lengthText: string | null): string | null => {
+  if (!startDate) return null
+  
+  const start = new Date(startDate)
+  const months = parseContractLength(lengthText)
+  start.setMonth(start.getMonth() + months)
+  return start.toISOString().split('T')[0]
+}
+
+// Beräkna finansiella värden
+const calculateFinancialValues = (totalValue: number | null, lengthText: string | null) => {
+  if (!totalValue) return { annual_value: null, monthly_value: null }
+  
+  const months = parseContractLength(lengthText)
+  
+  return {
+    annual_value: months >= 12 ? (totalValue / months) * 12 : totalValue,
+    monthly_value: totalValue / months
+  }
+}
+
+// Generera produktsammanfattning från OneFlow produkter
+const generateProductSummary = (products: any[] | null): string | null => {
+  if (!products || !Array.isArray(products)) return null
+  
+  const summaries = products.map(product => {
+    const quantity = product.quantity?.amount || 1
+    return `${quantity}st ${product.name}`
+  })
+  
+  return summaries.join(', ')
+}
+
+// Detektera företagstyp baserat på företagsnamn och produkter
+const detectBusinessType = (companyName: string | null, products: any[] | null): string | null => {
+  const companyNameLower = companyName?.toLowerCase() || ''
+  
+  // Detektera från företagsnamn
+  if (companyNameLower.includes('bostadsrättsförening') || companyNameLower.includes('hsb')) {
+    return 'housing_association'
+  }
+  if (companyNameLower.includes('restaurang') || companyNameLower.includes('kök')) {
+    return 'restaurant'
+  }
+  if (companyNameLower.includes('hotell') || companyNameLower.includes('logi')) {
+    return 'hotel'
+  }
+  if (companyNameLower.includes('skola') || companyNameLower.includes('förskola')) {
+    return 'education'
+  }
+  
+  // Detektera från produkter
+  if (products && Array.isArray(products)) {
+    const productNames = products.map(p => p.name?.toLowerCase() || '').join(' ')
+    
+    if (productNames.includes('restaurang') || productNames.includes('kök')) {
+      return 'restaurant'
+    }
+    if (productNames.includes('hotell') || productNames.includes('logi')) {
+      return 'hotel'
+    }
+  }
+  
+  return 'general'
+}
+
+// Mappa bransch från business_type
+const mapToIndustryCategory = (businessType: string | null): string | null => {
+  const mapping: { [key: string]: string } = {
+    'housing_association': 'residential',
+    'restaurant': 'commercial',
+    'hotel': 'commercial',
+    'education': 'public',
+    'general': 'commercial'
+  }
+  
+  return businessType ? mapping[businessType] || 'commercial' : null
+}
+
+// Beräkna kundstorlek baserat på kontraktsvärde
+const calculateCustomerSize = (totalValue: number | null): 'small' | 'medium' | 'large' | null => {
+  if (!totalValue) return null
+  
+  if (totalValue < 25000) return 'small'
+  if (totalValue < 100000) return 'medium'
+  return 'large'
+}
+
+// Kontrakttyp-mappning baserat på template ID
+const getContractTypeName = (templateId: string | null): string | null => {
+  const mapping: { [key: string]: string } = {
+    '8486368': 'Skadedjursavtal',
+    '8462854': 'Mekaniska fällor',
+    '9324573': 'Betesstationer',
+    '8465556': 'Betongstationer',
+    '8732196': 'Indikationsfällor'
+  }
+  
+  return templateId ? mapping[templateId] || 'Okänt avtal' : null
+}
+
+// === HUVUDFUNKTION FÖR CUSTOMER CREATION ===
+
 // Automatisk kundregistrering vid signerat avtal
 const createCustomerFromSignedContract = async (contractId: string): Promise<void> => {
   try {
@@ -376,39 +495,72 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       return
     }
 
-    // Endast för avtal (inte offerter) och endast om det inte redan har en customer_id
-    if (contract.type !== 'contract' || contract.customer_id) {
+    // KRITISK KONTROLL: Endast signerade avtal blir kunder
+    if (contract.type !== 'contract' || contract.status !== 'signed') {
       console.log('ℹ️ Hoppar över kundregistrering:', {
         type: contract.type,
-        hasCustomer: !!contract.customer_id
+        status: contract.status,
+        reason: 'Endast signerade avtal blir kunder'
       })
       return
     }
 
-    if (!contract.contact_email || !contract.contact_person) {
-      console.log('⚠️ Otillräcklig kontaktinformation för att skapa kund')
+    // Kontrollera om kontrakt redan har en kund kopplad
+    if (contract.customer_id) {
+      console.log('ℹ️ Kontrakt har redan en kund kopplad:', contract.customer_id)
       return
     }
 
-    // Kontrollera om kund redan finns
-    let existingCustomerId = null
-    
-    if (contract.organization_number) {
-      const { data } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('org_number', contract.organization_number)
-        .single()
-      existingCustomerId = data?.id
+    // Validera att vi har minimum required data
+    if (!contract.contact_email || !contract.company_name) {
+      console.log('⚠️ Otillräcklig information för att skapa kund:', {
+        hasEmail: !!contract.contact_email,
+        hasCompanyName: !!contract.company_name
+      })
+      return
     }
 
-    if (!existingCustomerId) {
-      const { data } = await supabase
+    // Kontrollera om kund redan finns (baserat på OneFlow contract ID eller org nummer)
+    let existingCustomerId = null
+    
+    // Kolla först efter oneflow_contract_id
+    const { data: existingByOneflow } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('oneflow_contract_id', contractId)
+      .single()
+    
+    if (existingByOneflow) {
+      existingCustomerId = existingByOneflow.id
+      console.log('✅ Kund finns redan med OneFlow contract ID:', existingCustomerId)
+    }
+    
+    // Om inte hittat och vi har org nummer, kolla org nummer
+    if (!existingCustomerId && contract.organization_number) {
+      const { data: existingByOrg } = await supabase
         .from('customers')
         .select('id')
-        .eq('email', contract.contact_email)
+        .eq('organization_number', contract.organization_number)
         .single()
-      existingCustomerId = data?.id
+      
+      if (existingByOrg) {
+        existingCustomerId = existingByOrg.id
+        console.log('✅ Kund finns redan med org nummer:', existingCustomerId)
+      }
+    }
+    
+    // Om inte hittat, kolla email
+    if (!existingCustomerId) {
+      const { data: existingByEmail } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('contact_email', contract.contact_email)
+        .single()
+      
+      if (existingByEmail) {
+        existingCustomerId = existingByEmail.id
+        console.log('✅ Kund finns redan med email:', existingCustomerId)
+      }
     }
 
     if (existingCustomerId) {
@@ -422,26 +574,84 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       return
     }
 
-    // Skapa ny kund
+    // === SKAPA NY KUND MED KOMPLETT DATA ===
+    
+    console.log('📋 Skapar ny avtalskund från kontrakt:', {
+      oneflow_id: contractId,
+      company: contract.company_name,
+      template: contract.template_id,
+      value: contract.total_value
+    })
+
+    // Beräkna alla värden
+    const financialValues = calculateFinancialValues(
+      contract.total_value ? parseFloat(contract.total_value.toString()) : null, 
+      contract.contract_length
+    )
+    
+    const businessType = detectBusinessType(contract.company_name, contract.selected_products)
+    const productSummary = generateProductSummary(contract.selected_products)
+    const contractEndDate = calculateEndDate(contract.start_date, contract.contract_length)
+    
     const customerData = {
-      company_name: contract.company_name || contract.contact_person,
-      org_number: contract.organization_number || '',
+      // Basic Customer Information
+      company_name: contract.company_name!,
+      organization_number: contract.organization_number,
       contact_person: contract.contact_person,
-      email: contract.contact_email,
-      phone: contract.contact_phone || '',
-      address: contract.contact_address || '',
-      contract_type_id: '', // Behöver mappas
-      clickup_list_id: '',
-      clickup_list_name: 'Avtalskunder från OneFlow',
-      is_active: true,
+      contact_email: contract.contact_email!,
+      contact_phone: contract.contact_phone,
+      contact_address: contract.contact_address,
+      
+      // OneFlow Contract Linking
+      oneflow_contract_id: contractId,
+      created_from_contract_id: contract.id,
+      
+      // Contract Details
+      contract_template_id: contract.template_id,
+      contract_type: getContractTypeName(contract.template_id),
+      contract_status: 'signed' as const,
+      contract_length: contract.contract_length,
       contract_start_date: contract.start_date,
-      contract_length_months: contract.contract_length ? parseInt(contract.contract_length) : null,
-      total_contract_value: contract.total_value,
-      contract_description: contract.agreement_text?.substring(0, 500),
+      contract_end_date: contractEndDate,
+      
+      // Financial Information
+      total_contract_value: contract.total_value ? parseFloat(contract.total_value.toString()) : null,
+      annual_value: financialValues.annual_value,
+      monthly_value: financialValues.monthly_value,
+      currency: 'SEK',
+      
+      // Agreement Content
+      agreement_text: contract.agreement_text,
+      products: contract.selected_products,
+      product_summary: productSummary,
+      service_details: null, // Kan extraheras från agreement_text i framtiden
+      
+      // Account Management
       assigned_account_manager: contract.begone_employee_name,
-      contract_status: 'active' as const,
-      business_type: 'Avtalskund'
+      account_manager_email: contract.begone_employee_email,
+      sales_person: contract.created_by_name,
+      sales_person_email: contract.created_by_email,
+      
+      // Business Intelligence
+      business_type: businessType,
+      industry_category: mapToIndustryCategory(businessType),
+      customer_size: calculateCustomerSize(contract.total_value ? parseFloat(contract.total_value.toString()) : null),
+      service_frequency: null, // Kan detekteras från produkter i framtiden
+      
+      // Metadata
+      source_type: 'oneflow' as const,
+      is_active: true
     }
+
+    console.log('💾 Sparar ny kund med data:', {
+      company_name: customerData.company_name,
+      business_type: customerData.business_type,
+      total_value: customerData.total_contract_value,
+      annual_value: customerData.annual_value,
+      monthly_value: customerData.monthly_value,
+      contract_type: customerData.contract_type,
+      customer_size: customerData.customer_size
+    })
 
     const { data: newCustomer, error: customerError } = await supabase
       .from('customers')
@@ -450,19 +660,30 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       .single()
 
     if (customerError) {
+      console.error('❌ Fel vid skapande av kund:', customerError)
       throw customerError
     }
 
     // Länka kontraktet till den nya kunden
-    await supabase
+    const { error: linkError } = await supabase
       .from('contracts')
       .update({ customer_id: newCustomer.id })
       .eq('id', contract.id)
 
-    console.log('✅ Ny kund skapad och kontrakt länkat:', newCustomer.id)
+    if (linkError) {
+      console.error('❌ Fel vid länkning av kontrakt till kund:', linkError)
+      throw linkError
+    }
+
+    console.log('✅ Ny avtalskund skapad och länkad:', {
+      customer_id: newCustomer.id,
+      contract_id: contract.id,
+      company: customerData.company_name,
+      value: customerData.total_contract_value
+    })
 
   } catch (error) {
-    console.error('💥 Fel vid kundregistrering:', error)
+    console.error('💥 Fel vid kundregistrering för kontrakt', contractId, ':', error)
     // Inte kritiskt - låt webhook fortsätta även om kundregistrering misslyckas
   }
 }
@@ -523,11 +744,20 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           break
 
         case 'contract:lifecycle_state:start':
-          console.log('🚀 Kontrakt aktiverat')
+          console.log('🚀 Kontrakt aktiverat - uppdaterar kontrakt och kund status')
           await supabase
             .from('contracts')
             .update({ 
               status: 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('oneflow_contract_id', contractId)
+          
+          // Uppdatera även kund status till active
+          await supabase
+            .from('customers')
+            .update({
+              contract_status: 'active',
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
@@ -536,7 +766,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
         case 'contract:lifecycle_state:end':
         case 'contract:lifecycle_state:terminate':
         case 'contract:lifecycle_state:cancel':
-          console.log('🔚 Kontrakt avslutat/uppsagt')
+          console.log('🔚 Kontrakt avslutat/uppsagt - uppdaterar kontrakt och kund status')
           await supabase
             .from('contracts')
             .update({ 
@@ -544,14 +774,33 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
+          
+          // Uppdatera även kund status till terminated
+          await supabase
+            .from('customers')
+            .update({
+              contract_status: 'terminated',
+              is_active: false,
+              updated_at: new Date().toISOString()
+            })
+            .eq('oneflow_contract_id', contractId)
           break
 
         case 'contract:signing_period_expire':
-          console.log('⏰ Signeringsperiod gått ut')
+          console.log('⏰ Signeringsperiod gått ut - uppdaterar status')
           await supabase
             .from('contracts')
             .update({ 
               status: 'overdue',
+              updated_at: new Date().toISOString()
+            })
+            .eq('oneflow_contract_id', contractId)
+          
+          // Uppdatera även kund status till expired
+          await supabase
+            .from('customers')
+            .update({
+              contract_status: 'expired',
               updated_at: new Date().toISOString()
             })
             .eq('oneflow_contract_id', contractId)
