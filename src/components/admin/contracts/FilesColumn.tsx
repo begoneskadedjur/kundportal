@@ -22,10 +22,17 @@ export default function FilesColumn({
   const isLoading = filesLoading[contractId] || false
   const hasCachedFiles = hasContractFiles(contractId)
 
-  // Hämta filer bara när användaren klickar (lazy loading)
-  const handleLoadFiles = async () => {
+  // Ladda filer automatiskt när komponenten monteras
+  useEffect(() => {
     if (!hasCachedFiles && !isLoading) {
-      await loadContractFiles(contractId)
+      loadContractFiles(contractId).catch(console.error)
+    }
+  }, [contractId, hasCachedFiles, isLoading, loadContractFiles])
+
+  // Hämta filer manuellt (för refresh)
+  const handleLoadFiles = async () => {
+    if (!isLoading) {
+      await loadContractFiles(contractId, true) // Force refresh
     }
   }
 

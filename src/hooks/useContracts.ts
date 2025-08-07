@@ -70,15 +70,14 @@ export function useContracts(): UseContractsReturn {
       const cached = contractsCache[filterKey]
       const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
       
-      // TEMP: Inaktivera cache för debugging
       // Använd cache om tillgängligt
-      // if (isCached && cached.data) {
-      //   console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
-      //   setContracts(cached.data)
-      //   setCurrentFilters(filters)
-      //   setLoading(false)
-      //   return
-      // }
+      if (isCached && cached.data) {
+        console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
+        setContracts(cached.data)
+        setCurrentFilters(filters)
+        setLoading(false)
+        return
+      }
       
       // Förhindra multipla samtidiga requests för samma filter
       if (loadingRef.current.has(filterKey)) {
@@ -92,7 +91,6 @@ export function useContracts(): UseContractsReturn {
       loadingRef.current.add(filterKey) // Mark as loading
       
       const contractList = await ContractService.getContracts(filters)
-      console.log('✅ useContracts fick data:', contractList?.length || 0, 'kontrakt')
       setContracts(contractList)
       setCurrentFilters(filters)
       currentFiltersRef.current = filters

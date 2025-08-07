@@ -38,6 +38,13 @@ export default function FileDownloadButton({
     downloadingFiles[fileId] && currentFiles.some(f => f.id === fileId)
   )
 
+  // Ladda filer automatiskt när komponenten monteras
+  useEffect(() => {
+    if (!hasCachedFiles && !isLoading) {
+      loadContractFiles(contractId).catch(console.error)
+    }
+  }, [contractId, hasCachedFiles, isLoading, loadContractFiles])
+
   // Hantera fil-laddning och nedladdning
   const handleQuickDownload = async () => {
     try {
