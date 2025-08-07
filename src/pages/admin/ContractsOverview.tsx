@@ -898,7 +898,7 @@ export default function ContractsOverview() {
                         <div className="text-slate-400 text-xs truncate" title={`Ansvarig: ${contract.begone_employee_name}`}>
                           <div className="flex items-center gap-1">
                             <Users className="w-3 h-3 text-green-400" />
-                            <span>{contract.begone_employee_name.split(' ')[0]}</span>
+                            <span>{contract.begone_employee_name}</span>
                           </div>
                         </div>
                       )}
@@ -906,7 +906,7 @@ export default function ContractsOverview() {
                         <div className="text-slate-500 text-xs truncate" title={`Skapad av: ${contract.created_by_name} (${contract.created_by_email || ''})`}>
                           <div className="flex items-center gap-1">
                             <User className="w-3 h-3 text-blue-400" />
-                            <span>{contract.created_by_name.split(' ')[0]}</span>
+                            <span>{contract.created_by_name}</span>
                           </div>
                         </div>
                       )}

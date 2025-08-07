@@ -92,8 +92,9 @@ export default function OneflowContractCreator() {
     selectedTemplate: '',
     partyType: 'company',
     // 🆕 ANVÄND INLOGGAD ANVÄNDARES INFO SOM DEFAULT
-    anstalld: user?.user_metadata?.full_name || profile?.display_name || 'BeGone Medarbetare',
-    'e-post-anstlld': user?.email || 'medarbetare@begone.se',
+    // Prioritera technicians.name om det finns, annars display_name eller user metadata
+    anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
+    'e-post-anstlld': user?.email || '',
     avtalslngd: '1',
     begynnelsedag: new Date().toISOString().split('T')[0],
     Kontaktperson: '',
@@ -240,7 +241,7 @@ export default function OneflowContractCreator() {
       begynnelsedag: wizardData.begynnelsedag,
       'dokument-skapat': new Date().toISOString().split('T')[0],
       'e-post-kontaktperson': wizardData['e-post-kontaktperson'],
-      'faktura-adress-pdf': wizardData['e-post-kontaktperson'],
+      // 'faktura-adress-pdf' lämnas tom så kunden kan fylla i
       foretag: wizardData.foretag,
       Kontaktperson: wizardData.Kontaktperson,
       'org-nr': wizardData['org-nr'],
@@ -1009,8 +1010,8 @@ export default function OneflowContractCreator() {
                         selectedTemplate: '',
                         partyType: 'company',
                         // 🆕 ÅTERSTÄLL MED ANVÄNDARENS INFO
-                        anstalld: user?.user_metadata?.full_name || profile?.display_name || 'BeGone Medarbetare',
-                        'e-post-anstlld': user?.email || 'medarbetare@begone.se',
+                        anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
+                        'e-post-anstlld': user?.email || '',
                         avtalslngd: '1',
                         begynnelsedag: new Date().toISOString().split('T')[0],
                         Kontaktperson: '',

@@ -90,9 +90,8 @@ function buildDataFieldsForDocument(
   const currentDate = new Date().toISOString().split('T')[0]
   mappedFields.push(
     { custom_id: 'offert-skapad', value: currentDate },
-    { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' },
-    { custom_id: 'faktura-referens', value: `Offert-${Date.now()}` },
-    { custom_id: 'mrkning-av-faktura', value: 'BeGone Offert' }
+    { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' }
+    // Faktura-referens och märkning lämnas tomma så kunden kan fylla i
   )
   
   return mappedFields
