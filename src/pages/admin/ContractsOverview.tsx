@@ -1,6 +1,6 @@
-// src/pages/admin/ContractsOverview.tsx - Dashboard för avtals- och offertöverblick
+// src/pages/admin/ContractsOverview.tsx - Avancerad Business Dashboard för avtals- och offerthantering
 import React, { useState, useMemo } from 'react'
-import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3 } from 'lucide-react'
+import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, Award, User } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
@@ -23,6 +23,213 @@ const TypeBadge: React.FC<{ type: 'contract' | 'offer' }> = ({ type }) => {
     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colors}`}>
       {getContractTypeText(type)}
     </span>
+  )
+}
+
+// Employee Performance Card komponent
+const EmployeePerformanceCard: React.FC<{ 
+  employee: { name: string, email: string, contract_count: number, total_value: number, avg_value: number },
+  rank: number,
+  onClick?: () => void
+}> = ({ employee, rank, onClick }) => {
+  const rankColors = rank === 1 ? 'text-yellow-400 border-yellow-400/30' : 
+                   rank === 2 ? 'text-slate-300 border-slate-300/30' : 
+                   rank === 3 ? 'text-orange-400 border-orange-400/30' : 
+                   'text-slate-400 border-slate-600'
+
+  return (
+    <div 
+      className={`p-4 bg-slate-800 rounded-lg border hover:bg-slate-700 transition-all cursor-pointer ${rankColors}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+            rank === 1 ? 'bg-yellow-400/20' : 
+            rank === 2 ? 'bg-slate-300/20' : 
+            rank === 3 ? 'bg-orange-400/20' : 
+            'bg-slate-600/20'
+          }`}>
+            #{rank}
+          </div>
+          <User className="w-4 h-4 text-slate-400" />
+        </div>
+        <Award className={`w-5 h-5 ${rank <= 3 ? rankColors.split(' ')[0] : 'text-slate-500'}`} />
+      </div>
+      
+      <div className="space-y-1">
+        <div className="font-medium text-white text-sm truncate" title={employee.name}>
+          {employee.name}
+        </div>
+        <div className="text-xs text-slate-400 truncate" title={employee.email}>
+          {employee.email}
+        </div>
+        
+        <div className="flex justify-between items-center mt-3">
+          <div className="text-center">
+            <div className="text-lg font-bold text-white">{employee.contract_count}</div>
+            <div className="text-xs text-slate-500">Kontrakt</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-green-400">{formatContractValue(employee.total_value)}</div>
+            <div className="text-xs text-slate-500">Totalt</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm font-medium text-blue-400">{formatContractValue(employee.avg_value)}</div>
+            <div className="text-xs text-slate-500">Snitt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Product Intelligence Card komponent
+const ProductCard: React.FC<{ 
+  product: { name: string, count: number, total_value: number },
+  onClick?: () => void
+}> = ({ product, onClick }) => {
+  const averageValue = product.count > 0 ? product.total_value / product.count : 0
+
+  return (
+    <div 
+      className="p-4 bg-slate-800 rounded-lg border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <Package className="w-5 h-5 text-blue-400" />
+        <div className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">
+          {product.count}x
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="font-medium text-white text-sm truncate" title={product.name}>
+          {product.name}
+        </div>
+        
+        <div className="flex justify-between items-center">
+          <div className="text-center flex-1">
+            <div className="text-sm font-bold text-green-400">{formatContractValue(product.total_value)}</div>
+            <div className="text-xs text-slate-500">Total</div>
+          </div>
+          <div className="text-center flex-1">
+            <div className="text-sm font-medium text-blue-400">{formatContractValue(averageValue)}</div>
+            <div className="text-xs text-slate-500">Snitt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Advanced Filter Panel komponent
+const AdvancedFilterPanel: React.FC<{
+  isOpen: boolean,
+  filters: ContractFilters,
+  onFilterChange: (filters: ContractFilters) => void,
+  topEmployees: Array<{ name: string, email: string }>
+}> = ({ isOpen, filters, onFilterChange, topEmployees }) => {
+  if (!isOpen) return null
+
+  const dateRangeOptions = [
+    { label: 'Alla', value: '' },
+    { label: 'Idag', value: 'today' },
+    { label: 'Denna vecka', value: 'week' },
+    { label: 'Denna månad', value: 'month' },
+    { label: 'Detta kvartal', value: 'quarter' },
+    { label: 'Detta år', value: 'year' }
+  ]
+
+  const handleDateRangeChange = (range: string) => {
+    const now = new Date()
+    let date_from = ''
+    let date_to = ''
+
+    switch (range) {
+      case 'today':
+        date_from = date_to = now.toISOString().split('T')[0]
+        break
+      case 'week':
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - now.getDay())
+        date_from = weekStart.toISOString().split('T')[0]
+        date_to = now.toISOString().split('T')[0]
+        break
+      case 'month':
+        date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+        date_to = now.toISOString().split('T')[0]
+        break
+      case 'quarter':
+        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+        date_from = quarterStart.toISOString().split('T')[0]
+        date_to = now.toISOString().split('T')[0]
+        break
+      case 'year':
+        date_from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+        date_to = now.toISOString().split('T')[0]
+        break
+    }
+
+    onFilterChange({ ...filters, date_from, date_to })
+  }
+
+  return (
+    <Card className="mb-6 p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Date Range */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">Tidsperiod</label>
+          <select
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => handleDateRangeChange(e.target.value)}
+          >
+            {dateRangeOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Employee Filter */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">Medarbetare</label>
+          <select
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
+            value={filters.employee || ''}
+            onChange={(e) => onFilterChange({ ...filters, employee: e.target.value || undefined })}
+          >
+            <option value="">Alla medarbetare</option>
+            {topEmployees.map(emp => (
+              <option key={emp.email} value={emp.name}>{emp.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Min Value */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">Min värde (SEK)</label>
+          <input
+            type="number"
+            placeholder="0"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
+            value={filters.min_value || ''}
+            onChange={(e) => onFilterChange({ ...filters, min_value: e.target.value ? parseInt(e.target.value) : undefined })}
+          />
+        </div>
+
+        {/* Max Value */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">Max värde (SEK)</label>
+          <input
+            type="number"
+            placeholder="1000000"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
+            value={filters.max_value || ''}
+            onChange={(e) => onFilterChange({ ...filters, max_value: e.target.value ? parseInt(e.target.value) : undefined })}
+          />
+        </div>
+      </div>
+    </Card>
   )
 }
 
@@ -461,6 +668,85 @@ export default function ContractsOverview() {
         />
       </div>
 
+      {/* Employee Performance & Product Intelligence Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Top Performing Employees */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-400" />
+              <h3 className="text-lg font-semibold text-white">Top Medarbetare</h3>
+            </div>
+            <div className="text-xs text-slate-400">
+              Värde & Antal kontrakt
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            {stats?.top_employees && stats.top_employees.length > 0 ? (
+              stats.top_employees.map((employee, index) => (
+                <EmployeePerformanceCard
+                  key={employee.email}
+                  employee={employee}
+                  rank={index + 1}
+                  onClick={() => {
+                    setSearchTerm(employee.name)
+                    // Scrollar till tabellen
+                    document.getElementById('contracts-table')?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                <Users className="w-12 h-12 mx-auto mb-2 text-slate-500" />
+                <p>Ingen medarbetardata tillgänglig</p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Product Intelligence */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-green-400" />
+              <h3 className="text-lg font-semibold text-white">Populära Produkter</h3>
+            </div>
+            <div className="text-xs text-slate-400">
+              Frekvens & Värde
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            {stats?.popular_products && stats.popular_products.length > 0 ? (
+              stats.popular_products.map((product, index) => (
+                <ProductCard
+                  key={`${product.name}-${index}`}
+                  product={product}
+                  onClick={() => {
+                    setSearchTerm(product.name)
+                    document.getElementById('contracts-table')?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                <Package className="w-12 h-12 mx-auto mb-2 text-slate-500" />
+                <p>Ingen produktdata tillgänglig</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Advanced Filters Panel */}
+      <AdvancedFilterPanel
+        isOpen={showAdvancedFilters}
+        filters={{}}
+        onFilterChange={() => {}}
+        topEmployees={stats?.top_employees?.map(emp => ({ name: emp.name, email: emp.email })) || []}
+      />
+
       {/* Filters */}
       <Card>
         <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
@@ -503,39 +789,41 @@ export default function ContractsOverview() {
           </select>
         </div>
 
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
+        {/* Enhanced Desktop Table */}
+        <div id="contracts-table" className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-20" /> {/* Typ */}
-              <col className="w-64" /> {/* Motpart */}
-              <col className="w-24" /> {/* Status */}
-              <col className="w-28" /> {/* Värde */}
-              <col className="w-24" /> {/* Startdatum */}
-              <col className="w-24" /> {/* Skapad */}
-              <col className="w-32" /> {/* BeGone-ansvarig */}
-              <col className="w-32" /> {/* Filer */}
-              <col className="w-20" /> {/* Åtgärder */}
+              <col className="w-16" /> {/* Typ */}
+              <col className="w-48" /> {/* Motpart */}
+              <col className="w-20" /> {/* Status */}
+              <col className="w-24" /> {/* Värde */}
+              <col className="w-20" /> {/* Längd */}
+              <col className="w-20" /> {/* Startdatum */}
+              <col className="w-20" /> {/* Skapad */}
+              <col className="w-28" /> {/* BeGone-ansvarig */}
+              <col className="w-28" /> {/* Filer */}
+              <col className="w-16" /> {/* Åtgärder */}
             </colgroup>
             <thead className="bg-slate-800 border-b border-slate-700">
               <tr className="text-slate-300">
-                <th className="px-3 py-3 text-left cursor-pointer hover:bg-slate-700 transition-colors">
-                  <div className="flex items-center">Typ</div>
+                <th className="px-2 py-3 text-center cursor-pointer hover:bg-slate-700 transition-colors">
+                  <div className="flex items-center justify-center">Typ</div>
                 </th>
-                <th className="px-3 py-3 text-left">Motpart</th>
-                <th className="px-3 py-3 text-left">Status</th>
-                <th className="px-3 py-3 text-right">Värde (SEK)</th>
-                <th className="px-3 py-3 text-left">Startdatum</th>
-                <th className="px-3 py-3 text-left">Skapad</th>
-                <th className="px-3 py-3 text-left">BeGone-ansvarig</th>
-                <th className="px-3 py-3 text-left">Filer</th>
-                <th className="px-3 py-3 text-center">Åtgärder</th>
+                <th className="px-3 py-3 text-left">Motpart & Kontakt</th>
+                <th className="px-2 py-3 text-center">Status</th>
+                <th className="px-2 py-3 text-right">Värde</th>
+                <th className="px-2 py-3 text-center">Längd</th>
+                <th className="px-2 py-3 text-center">Start</th>
+                <th className="px-2 py-3 text-center">Skapad</th>
+                <th className="px-2 py-3 text-left">Ansvarig</th>
+                <th className="px-2 py-3 text-center">Filer</th>
+                <th className="px-2 py-3 text-center">Åtgärder</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700">
               {filteredContracts.map((contract) => (
                 <tr key={contract.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-3 py-3">
+                  <td className="px-2 py-3">
                     <div className="flex justify-center">
                       <TypeBadge type={contract.type} />
                     </div>
@@ -543,69 +831,88 @@ export default function ContractsOverview() {
                   
                   <td className="px-3 py-3">
                     <div className="min-w-0">
-                      <div className="text-white font-medium truncate" title={contract.company_name || contract.contact_person || 'Okänd motpart'}>
+                      <div className="text-white font-medium text-sm truncate" title={contract.company_name || contract.contact_person || 'Okänd motpart'}>
                         {contract.company_name || contract.contact_person || 'Okänd motpart'}
                       </div>
                       {contract.contact_person && contract.company_name && (
                         <div className="text-slate-400 text-xs truncate" title={contract.contact_person}>
-                          {contract.contact_person}
+                          👤 {contract.contact_person}
                         </div>
                       )}
                       {contract.contact_email && (
                         <div className="text-slate-500 text-xs truncate" title={contract.contact_email}>
-                          {contract.contact_email}
+                          ✉️ {contract.contact_email}
+                        </div>
+                      )}
+                      {contract.organization_number && (
+                        <div className="text-slate-500 text-xs truncate" title={contract.organization_number}>
+                          🏢 {contract.organization_number}
                         </div>
                       )}
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3">
+                  <td className="px-2 py-3">
                     <div className="flex justify-center">
                       <StatusBadge status={contract.status} />
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3 text-right">
-                    <div className="text-white font-medium">
+                  <td className="px-2 py-3 text-right">
+                    <div className="text-white font-medium text-sm">
                       {contract.total_value ? formatContractValue(contract.total_value) : '-'}
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3">
-                    <div className="text-slate-400 text-xs">
-                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
+                  <td className="px-2 py-3">
+                    <div className="text-center text-slate-400 text-xs">
+                      {contract.contract_length || '-'}
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3">
-                    <div className="text-slate-400 text-xs">
-                      {new Date(contract.created_at).toLocaleDateString('sv-SE')}
+                  <td className="px-2 py-3">
+                    <div className="text-center text-slate-400 text-xs">
+                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE').slice(0, -5) : '-'}
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3">
+                  <td className="px-2 py-3">
+                    <div className="text-center text-slate-400 text-xs">
+                      {new Date(contract.created_at).toLocaleDateString('sv-SE').slice(0, -5)}
+                    </div>
+                  </td>
+                  
+                  <td className="px-2 py-3">
                     <div className="text-slate-400 text-xs truncate" title={contract.begone_employee_name || '-'}>
-                      {contract.begone_employee_name || '-'}
+                      {contract.begone_employee_name ? (
+                        <div className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          <span>{contract.begone_employee_name.split(' ')[0]}</span>
+                        </div>
+                      ) : '-'}
                     </div>
                   </td>
                   
-                  <td className="px-3 py-3">
-                    <FilesColumn 
-                      contractId={contract.id}
-                      onFilesModalOpen={() => handleOpenFilesModal(contract)}
-                      showButton={true}
-                    />
+                  <td className="px-2 py-3">
+                    <div className="flex justify-center">
+                      <FilesColumn 
+                        contractId={contract.id}
+                        onFilesModalOpen={() => handleOpenFilesModal(contract)}
+                        showButton={false}
+                      />
+                    </div>
                   </td>
                   
-                  <td className="px-3 py-3">
+                  <td className="px-2 py-3">
                     <div className="flex justify-center">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleViewOneFlow(contract.oneflow_contract_id)}
-                        className="text-blue-400 hover:text-blue-300"
+                        className="text-blue-400 hover:text-blue-300 p-1"
+                        title="Öppna i OneFlow"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3 h-3" />
                       </Button>
                     </div>
                   </td>
