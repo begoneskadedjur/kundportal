@@ -17,6 +17,10 @@ export interface ContractWithSourceData extends Contract {
     contact_person?: string
     email?: string
   }
+  // Creator tracking (från nya databas-kolumner)
+  created_by_email?: string | null
+  created_by_name?: string | null
+  created_by_role?: string | null
 }
 
 export interface ContractFilters {

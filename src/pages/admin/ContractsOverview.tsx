@@ -300,14 +300,24 @@ const ContractMobileCard: React.FC<{
           </div>
         </div>
         
-        {contract.begone_employee_name && (
-          <div className="flex items-center gap-2">
-            <Users className="w-3 h-3 text-green-400" />
-            <p className="text-xs text-slate-400">
-              {contract.begone_employee_name}
-            </p>
-          </div>
-        )}
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-700">
+          {contract.begone_employee_name && (
+            <div className="flex items-center gap-2">
+              <Users className="w-3 h-3 text-green-400" />
+              <p className="text-xs text-slate-400">
+                Ansvarig: {contract.begone_employee_name}
+              </p>
+            </div>
+          )}
+          {contract.created_by_name && (
+            <div className="flex items-center gap-2">
+              <User className="w-3 h-3 text-blue-400" />
+              <p className="text-xs text-slate-400" title={contract.created_by_email || ''}>
+                Skapad av: {contract.created_by_name}
+              </p>
+            </div>
+          )}
+        </div>
         
         <div className="flex justify-between items-center mt-3">
           <div className="flex gap-2">
@@ -800,7 +810,7 @@ export default function ContractsOverview() {
               <col className="w-20" /> {/* Längd */}
               <col className="w-20" /> {/* Startdatum */}
               <col className="w-20" /> {/* Skapad */}
-              <col className="w-28" /> {/* BeGone-ansvarig */}
+              <col className="w-32" /> {/* BeGone-ansvarig/Skapare */}
               <col className="w-28" /> {/* Filer */}
               <col className="w-16" /> {/* Åtgärder */}
             </colgroup>
@@ -815,7 +825,7 @@ export default function ContractsOverview() {
                 <th className="px-2 py-3 text-center">Längd</th>
                 <th className="px-2 py-3 text-center">Start</th>
                 <th className="px-2 py-3 text-center">Skapad</th>
-                <th className="px-2 py-3 text-left">Ansvarig</th>
+                <th className="px-2 py-3 text-left">Ansvarig/Skapare</th>
                 <th className="px-2 py-3 text-center">Filer</th>
                 <th className="px-2 py-3 text-center">Åtgärder</th>
               </tr>
@@ -883,13 +893,26 @@ export default function ContractsOverview() {
                   </td>
                   
                   <td className="px-2 py-3">
-                    <div className="text-slate-400 text-xs truncate" title={contract.begone_employee_name || '-'}>
-                      {contract.begone_employee_name ? (
-                        <div className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          <span>{contract.begone_employee_name.split(' ')[0]}</span>
+                    <div className="space-y-1">
+                      {contract.begone_employee_name && (
+                        <div className="text-slate-400 text-xs truncate" title={`Ansvarig: ${contract.begone_employee_name}`}>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-green-400" />
+                            <span>{contract.begone_employee_name.split(' ')[0]}</span>
+                          </div>
                         </div>
-                      ) : '-'}
+                      )}
+                      {contract.created_by_name && (
+                        <div className="text-slate-500 text-xs truncate" title={`Skapad av: ${contract.created_by_name} (${contract.created_by_email || ''})`}>
+                          <div className="flex items-center gap-1">
+                            <User className="w-3 h-3 text-blue-400" />
+                            <span>{contract.created_by_name.split(' ')[0]}</span>
+                          </div>
+                        </div>
+                      )}
+                      {!contract.begone_employee_name && !contract.created_by_name && (
+                        <span className="text-slate-500">-</span>
+                      )}
                     </div>
                   </td>
                   

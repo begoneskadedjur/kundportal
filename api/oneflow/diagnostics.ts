@@ -44,7 +44,7 @@ const oneflowFetch = async (endpoint: string, token: string, method: 'GET' | 'PO
 // Validera miljövariabler
 const validateEnvironment = () => {
   const token = process.env.ONEFLOW_API_TOKEN
-  const userEmail = process.env.ONEFLOW_USER_EMAIL
+  const userEmail = 'info@begone.se' // Centraliserad avsändare
   const workspaceId = process.env.ONEFLOW_WORKSPACE_ID
 
   if (!token) {
@@ -158,7 +158,7 @@ const analyzeTemplate = async (templateId: string, token: string, userEmail?: st
         method: 'POST',
         headers: {
           'x-oneflow-api-token': token,
-          'x-oneflow-user-email': userEmail,
+          'x-oneflow-user-email': 'info@begone.se',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(testPayload)

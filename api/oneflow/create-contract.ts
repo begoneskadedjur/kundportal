@@ -266,9 +266,11 @@ export default async function handler(
   const token = process.env.ONEFLOW_API_TOKEN!
   const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!
   
-  // 🆕 ANVÄND DYNAMISK ANVÄNDARE ELLER FALLBACK
-  const userEmail = senderEmail || process.env.ONEFLOW_USER_EMAIL!
-  const userName = validatedUser?.displayName || senderName || 'BeGone Medarbetare'
+  // 🔄 CENTRALISERAD AVSÄNDARE - Alltid info@begone.se
+  const userEmail = 'info@begone.se' // Alltid skicka från info@begone.se
+  const creatorEmail = senderEmail || process.env.ONEFLOW_USER_EMAIL! // Spara vem som skapade
+  const creatorName = validatedUser?.displayName || senderName || 'BeGone Medarbetare'
+  const creatorRole = validatedUser?.profile?.role || 'admin'
 
   if (!token || !userEmail || !workspaceId) {
     console.error('Saknade miljövariabler för Oneflow-integrationen')
@@ -276,7 +278,8 @@ export default async function handler(
   }
 
   const documentTypeText = documentType === 'offer' ? 'offert' : 'kontrakt'
-  console.log(`🔧 Skapar ${documentTypeText} med avsändare: ${userName} (${userEmail})`)
+  console.log(`🔧 Skapar ${documentTypeText} från: info@begone.se`)
+  console.log(`👤 Skapad av: ${creatorName} (${creatorEmail})`)
 
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
   const data_fields = buildDataFieldsForDocument(contractData, documentType)
@@ -382,7 +385,7 @@ export default async function handler(
       const isOffer = documentType === 'offer'
       const publishPayload = {
         subject: `${isOffer ? 'Offert' : 'Avtal'} från BeGone Skadedjur & Sanering AB`,
-        message: `Hej ${recipient.name}!\n\nBifogat finner du vår${isOffer ? 't offertförslag' : 't avtal'} för ${isOffer ? 'granskning' : 'signering'}.\n\nMed vänliga hälsningar,\n${userName}\nBeGone Skadedjur & Sanering AB`
+        message: `Hej ${recipient.name}!\n\nBifogat finner du vår${isOffer ? 't offertförslag' : 't avtal'} för ${isOffer ? 'granskning' : 'signering'}.\n\nMed vänliga hälsningar,\n${creatorName}\nBeGone Skadedjur & Sanering AB`
       }
 
       const publishResponse = await fetch(
@@ -413,12 +416,39 @@ export default async function handler(
       console.log(`✅ ${documentTypeText.charAt(0).toUpperCase() + documentTypeText.slice(1)} publicerat och skickat för ${isOffer ? 'granskning' : 'signering'}`)
     }
 
+    // Spara creator info i databasen
+    const supabase = createClient(
+      process.env.VITE_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY!
+    )
+    
+    // Uppdatera kontraktet med creator info
+    const { error: updateError } = await supabase
+      .from('contracts')
+      .update({
+        created_by_email: creatorEmail,
+        created_by_name: creatorName,
+        created_by_role: creatorRole
+      })
+      .eq('oneflow_contract_id', createdContract.id)
+    
+    if (updateError) {
+      console.error('⚠️ Kunde inte uppdatera creator info:', updateError)
+    } else {
+      console.log('✅ Creator info sparad i databasen')
+    }
+    
     return res.status(200).json({ 
       contract: createdContract,
       sender: {
-        name: userName,
-        email: userEmail,
-        validated: !!validatedUser
+        name: 'info@begone.se',
+        email: 'info@begone.se',
+        validated: true
+      },
+      creator: {
+        name: creatorName,
+        email: creatorEmail,
+        role: creatorRole
       }
     })
     

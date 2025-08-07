@@ -559,7 +559,7 @@ export default function OneflowContractCreator() {
                     <span>Inloggad som: {user?.email}</span>
                   </div>
                   <p className="text-xs text-slate-400">
-                    Avtalet kommer att skapas i ditt namn och skickas från din e-post.
+                    Avtalet kommer att skickas från info@begone.se med ditt namn som ansvarig.
                   </p>
                 </div>
                 
@@ -833,12 +833,12 @@ export default function OneflowContractCreator() {
                   <span className="text-white">{wizardData.anstalld}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">E-post:</span>
-                  <span className="text-white">{user?.email}</span>
+                  <span className="text-slate-400">Avsändare:</span>
+                  <span className="text-white">info@begone.se</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Oneflow-användare:</span>
-                  <span className="text-green-400">✓ Aktiv</span>
+                  <span className="text-slate-400">OneFlow-konto:</span>
+                  <span className="text-green-400">✓ Centraliserat</span>
                 </div>
               </div>
             </Card>
@@ -923,7 +923,7 @@ export default function OneflowContractCreator() {
               
               <p className="text-sm text-slate-400 mt-3 px-4">
                 {wizardData.sendForSigning 
-                  ? `📧 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} publiceras och skickas från ${user?.email} till motparten för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
+                  ? `📧 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} publiceras och skickas från info@begone.se till motparten för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
                   : `📝 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} skapas som utkast i Oneflow och kan skickas senare`
                 }
               </p>

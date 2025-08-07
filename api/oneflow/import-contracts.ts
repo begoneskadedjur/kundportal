@@ -362,10 +362,10 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
 }> => {
   try {
     const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
-    const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+    const ONEFLOW_USER_EMAIL = 'info@begone.se' // Centraliserad avsändare
     
     console.log(`🔍 Hämtar OneFlow-kontrakt, sida ${page}, limit ${limit}`)
-    console.log(`🔐 Använder OneFlow email: ${ONEFLOW_USER_EMAIL}`)
+    console.log(`🔐 Använder OneFlow email: info@begone.se`)
     console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
 
     // Hämta alla kontrakt - OneFlow API stöder inte template_id filtrering
@@ -378,7 +378,7 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       method: 'GET',
       headers: {
         'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-        'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
+        'x-oneflow-user-email': 'info@begone.se',
         'Accept': 'application/json'
       }
     })
@@ -491,7 +491,7 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
 const fetchOneFlowContractDetails = async (contractId: string): Promise<CompleteContractData | null> => {
   try {
     const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
-    const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+    const ONEFLOW_USER_EMAIL = 'info@begone.se' // Centraliserad avsändare
     
     console.log(`📋 Hämtar komplett data för kontrakt ${contractId}`)
 
@@ -863,7 +863,7 @@ export default async function handler(
 
   // Läs och validera miljövariabler
   const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN
-  const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL
+  const ONEFLOW_USER_EMAIL = 'info@begone.se' // Centraliserad avsändare
   
   if (!ONEFLOW_API_TOKEN) {
     console.error('❌ ONEFLOW_API_TOKEN saknas')
@@ -873,18 +873,12 @@ export default async function handler(
     })
   }
 
-  if (!ONEFLOW_USER_EMAIL) {
-    console.error('❌ ONEFLOW_USER_EMAIL saknas')
-    return res.status(500).json({
-      success: false,
-      error: 'OneFlow användar-email är inte konfigurerad'
-    })
-  }
+  // ONEFLOW_USER_EMAIL behöver inte kollas då vi använder info@begone.se
 
   console.log('✓ Miljövariabler validerade:', {
     hasToken: !!ONEFLOW_API_TOKEN,
     tokenLength: ONEFLOW_API_TOKEN.length,
-    userEmail: ONEFLOW_USER_EMAIL
+    userEmail: 'info@begone.se'
   })
 
   // Acceptera både GET (för list) och POST (för import)

@@ -10,7 +10,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const ONEFLOW_SIGN_KEY = process.env.ONEFLOW_WEBHOOK_SECRET!
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
-const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL!
+const ONEFLOW_USER_EMAIL = 'info@begone.se' // Centraliserad avsändare
 
 // Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -183,7 +183,7 @@ const fetchOneflowContractDetails = async (contractId: string): Promise<OneflowC
       method: 'GET',
       headers: {
         'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-        'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
+        'x-oneflow-user-email': 'info@begone.se',
         'Accept': 'application/json'
       }
     })

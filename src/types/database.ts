@@ -334,6 +334,11 @@ export type Database = {
           contract_length: string | null
           start_date: string | null
           
+          // Creator tracking (vem skapade kontraktet)
+          created_by_email: string | null
+          created_by_name: string | null
+          created_by_role: string | null
+          
           contact_person: string | null
           contact_email: string | null
           contact_phone: string | null
