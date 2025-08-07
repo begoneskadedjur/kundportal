@@ -28,6 +28,67 @@ const setCorsHeaders = (res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
+// Hitta och ta bort orphaned filer
+const cleanupOrphanedContractFiles = async (): Promise<{
+  orphanedFilesFound: number
+  orphanedFilesRemoved: number
+}> => {
+  try {
+    console.log('🗂️ Söker efter orphaned contract files...')
+
+    // Hämta alla contract_files med joinad contract info
+    const { data: allFiles, error: filesError } = await supabase
+      .from('contract_files')
+      .select(`
+        id, 
+        contract_id, 
+        oneflow_file_id, 
+        file_name,
+        contracts!inner(id, oneflow_contract_id)
+      `)
+
+    if (filesError) {
+      throw new Error(`Fel vid hämtning av contract files: ${filesError.message}`)
+    }
+
+    if (!allFiles || allFiles.length === 0) {
+      return { orphanedFilesFound: 0, orphanedFilesRemoved: 0 }
+    }
+
+    // Hitta filer där kontraktet inte existerar längre
+    const orphanedFiles = allFiles.filter(file => !file.contracts)
+    
+    if (orphanedFiles.length === 0) {
+      console.log('✅ Inga orphaned filer hittades')
+      return { orphanedFilesFound: 0, orphanedFilesRemoved: 0 }
+    }
+
+    console.log(`🗑️ Hittade ${orphanedFiles.length} orphaned filer`)
+
+    // Ta bort orphaned filer
+    const orphanedFileIds = orphanedFiles.map(f => f.id)
+    const { error: deleteError } = await supabase
+      .from('contract_files')
+      .delete()
+      .in('id', orphanedFileIds)
+
+    if (deleteError) {
+      throw new Error(`Fel vid borttagning av orphaned filer: ${deleteError.message}`)
+    }
+
+    console.log(`✅ Tog bort ${orphanedFiles.length} orphaned filer`)
+
+    return {
+      orphanedFilesFound: orphanedFiles.length,
+      orphanedFilesRemoved: orphanedFiles.length
+    }
+
+  } catch (error: any) {
+    console.error('💥 Fel vid cleanup av orphaned filer:', error)
+    throw error
+  }
+}
+
 // Hitta och ta bort duplikater
 const cleanupDuplicateContracts = async (): Promise<{
   duplicatesFound: number
@@ -150,15 +211,30 @@ export default async function handler(
   }
 
   try {
-    console.log('🧹 Startar cleanup av duplikatkontrakt...')
+    console.log('🧹 Startar cleanup av duplikatkontrakt och orphaned filer...')
 
-    const result = await cleanupDuplicateContracts()
+    // 1. Rensa orphaned contract files först
+    const filesResult = await cleanupOrphanedContractFiles()
+
+    // 2. Rensa duplikatkontrakt
+    const contractsResult = await cleanupDuplicateContracts()
+
+    const totalMessage = [
+      `Kontrakt: ${contractsResult.contractsRemoved} duplikater borttagna från ${contractsResult.duplicatesFound} grupper`,
+      `Filer: ${filesResult.orphanedFilesRemoved} orphaned filer borttagna`
+    ].join(' | ')
 
     return res.status(200).json({
       success: true,
       data: {
-        message: `Cleanup slutförd: ${result.contractsRemoved} duplikater borttagna från ${result.duplicatesFound} grupper`,
-        ...result
+        message: `Cleanup slutförd - ${totalMessage}`,
+        contracts: contractsResult,
+        files: filesResult,
+        summary: {
+          contractsRemoved: contractsResult.contractsRemoved,
+          filesRemoved: filesResult.orphanedFilesRemoved,
+          totalItemsRemoved: contractsResult.contractsRemoved + filesResult.orphanedFilesRemoved
+        }
       }
     })
 
