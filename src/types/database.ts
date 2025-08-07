@@ -459,6 +459,20 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['technician_absences']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['technician_absences']['Insert']>
       }
+      // 🆕 ONEFLOW SYNC LOG TABELL
+      oneflow_sync_log: {
+        Row: {
+          id: string
+          event_type: string
+          oneflow_contract_id: string
+          status: 'received' | 'verified' | 'processed' | 'error'
+          details: any // JSONB
+          error_message: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['oneflow_sync_log']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['oneflow_sync_log']['Insert']>
+      }
     }
   }
 }
@@ -687,6 +701,11 @@ export type ContractFileUpdate = Database['public']['Tables']['contract_files'][
 export type TechnicianAbsence = Database['public']['Tables']['technician_absences']['Row']
 export type TechnicianAbsenceInsert = Database['public']['Tables']['technician_absences']['Insert']
 export type TechnicianAbsenceUpdate = Database['public']['Tables']['technician_absences']['Update']
+
+// 🆕 ONEFLOW SYNC LOG TYPES
+export type OneflowSyncLog = Database['public']['Tables']['oneflow_sync_log']['Row']
+export type OneflowSyncLogInsert = Database['public']['Tables']['oneflow_sync_log']['Insert']
+export type OneflowSyncLogUpdate = Database['public']['Tables']['oneflow_sync_log']['Update']
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [
