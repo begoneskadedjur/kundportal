@@ -86,16 +86,20 @@ const ContractTechnicianRevenueChart: React.FC = () => {
       }
 
       // 2. Nya avtalskunder (för att beräkna nya kunder per tekniker)
-      const { data: customers, error: customersError } = await supabase
-        .from('customers')
-        .select('id, annual_premium, total_contract_value, created_at')
-        .gte('created_at', dateString)
-        .eq('is_active', true)
+      // TILLFÄLLIGT: Returnera tom array eftersom customers-tabellen är tom
+      const customers: any[] = []
+      const customersError = null
+      
+      // const { data: customers, error: customersError } = await supabase
+      //   .from('customers')
+      //   .select('id, annual_value, total_contract_value, created_at')
+      //   .gte('created_at', dateString)
+      //   .eq('is_active', true)
 
-      if (customersError) {
-        console.error('❌ Customers error:', customersError)
-        throw new Error(`Customers: ${customersError.message}`)
-      }
+      // if (customersError) {
+      //   console.error('❌ Customers error:', customersError)
+      //   throw new Error(`Customers: ${customersError.message}`)
+      // }
 
       console.log(`📊 Loaded contract data: ${(cases || []).length} cases, ${(customers || []).length} new customers`)
 
