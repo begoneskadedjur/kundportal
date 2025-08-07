@@ -34,19 +34,36 @@ export default function WebhookConfig() {
       setLoading(true)
       setError(null)
 
+      console.log('🔄 Hämtar webhook-konfiguration...')
       const response = await fetch('/api/oneflow/webhook-config')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
       const result = await response.json()
+      console.log('📦 Webhook config response:', result)
 
       if (!result.success) {
         throw new Error(result.error || 'Kunde inte hämta webhook-konfiguration')
       }
 
+      // Validera att data har rätt struktur
+      if (!result.data) {
+        throw new Error('Ingen data returnerad från API')
+      }
+      
+      if (!result.data.webhooks || !Array.isArray(result.data.webhooks)) {
+        throw new Error('Webhook data har felaktig struktur')
+      }
+
       setData(result.data)
+      console.log('✅ Webhook-konfiguration laddad')
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Okänt fel'
       setError(errorMessage)
-      console.error('Webhook config error:', err)
+      console.error('❌ Webhook config error:', err)
     } finally {
       setLoading(false)
     }

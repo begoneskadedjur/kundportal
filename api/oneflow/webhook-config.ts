@@ -26,21 +26,49 @@ interface OneFlowWebhook {
 
 // Hämta alla webhooks
 async function getWebhooks(): Promise<OneFlowWebhook[]> {
-  const response = await fetch('https://api.oneflow.com/v1/webhooks', {
-    method: 'GET',
-    headers: {
-      'accept': 'application/json',
-      'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-      'x-oneflow-user-email': ONEFLOW_USER_EMAIL
+  try {
+    console.log('🔍 Hämtar webhooks från OneFlow API...')
+    
+    const response = await fetch('https://api.oneflow.com/v1/webhooks', {
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+        'x-oneflow-user-email': ONEFLOW_USER_EMAIL
+      }
+    })
+
+    console.log(`📡 OneFlow API response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`❌ OneFlow API error: ${response.status} - ${errorText}`)
+      throw new Error(`OneFlow API error: ${response.status} - ${response.statusText}`)
     }
-  })
 
-  if (!response.ok) {
-    throw new Error(`OneFlow API error: ${response.status} - ${response.statusText}`)
+    const data = await response.json()
+    console.log('📦 Raw OneFlow response:', JSON.stringify(data, null, 2))
+    
+    // OneFlow kan returnera antingen en array eller ett objekt med data property
+    let webhooks: OneFlowWebhook[]
+    if (Array.isArray(data)) {
+      webhooks = data
+    } else if (data && Array.isArray(data.data)) {
+      webhooks = data.data
+    } else if (data && data.webhooks && Array.isArray(data.webhooks)) {
+      webhooks = data.webhooks
+    } else {
+      console.log('⚠️ Unexpected data structure from OneFlow API, treating as empty array')
+      webhooks = []
+    }
+    
+    console.log(`✅ Processed ${webhooks.length} webhooks`)
+    return webhooks
+    
+  } catch (error) {
+    console.error('💥 Error in getWebhooks:', error)
+    throw error
   }
-
-  const data = await response.json()
-  return data as OneFlowWebhook[]
 }
 
 // Uppdatera webhook med nya event filters
@@ -114,7 +142,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Hämta och visa nuvarande webhook-konfiguration
         const webhooks = await getWebhooks()
         
-        const analysis = webhooks.map(webhook => {
+        console.log(`📊 Analyserar ${webhooks.length} webhooks...`)
+        
+        const analysis = (webhooks || []).map(webhook => {
           const eventTypes = webhook.filters?.flatMap(filter => 
             filter.filter_rules.flatMap(rule => rule.values)
           ) || []
@@ -131,15 +161,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               "contract:publish", 
               "contract:sign"
             ].filter(event => !eventTypes.includes(event)),
-            is_our_webhook: webhook.callback_url.includes('kundportal.vercel.app')
+            is_our_webhook: webhook.callback_url?.includes('kundportal.vercel.app') || false
           }
         })
+
+        console.log('✅ Webhook analys klar')
 
         res.json({
           success: true,
           data: {
-            webhooks,
-            analysis,
+            webhooks: webhooks || [],
+            analysis: analysis || [],
             recommended_events: RECOMMENDED_EVENT_FILTERS[0].filter_rules[0].values
           }
         })
