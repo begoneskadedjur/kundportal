@@ -64,9 +64,10 @@ export function useContracts(): UseContractsReturn {
 
   // Ladda kontrakt med filter (med caching)
   const loadContracts = useCallback(async (filters: ContractFilters = {}) => {
+    const filterKey = JSON.stringify(filters)
+    
     try {
       // Skapa cache-nyckel baserat på filter
-      const filterKey = JSON.stringify(filters)
       const cached = contractsCache[filterKey]
       const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
       
@@ -111,9 +112,11 @@ export function useContracts(): UseContractsReturn {
       console.error('useContracts.loadContracts fel:', err)
     } finally {
       setLoading(false)
-      loadingRef.current.delete(filterKey) // Remove from loading set
+      if (filterKey) { // Säkerhetscheck för att undvika ReferenceError
+        loadingRef.current.delete(filterKey) // Remove from loading set
+      }
     }
-  }, []) // Inga externa dependencies för att undvika loop
+  }, [contractsCache]) // Lägg till contractsCache som dependency
 
   // Ladda kontraktstatistik
   const loadContractStats = useCallback(async (filters: Pick<ContractFilters, 'date_from' | 'date_to'> = {}) => {
@@ -313,9 +316,28 @@ export function useContracts(): UseContractsReturn {
     setFilesLoadedAt({}) // Rensa även filcache
     setContractFiles({})
     
-    await loadContracts(currentFiltersRef.current)
-    await loadContractStats()
-  }, [loadContracts, loadContractStats])
+    // Ladda data utan cache
+    const filters = currentFiltersRef.current
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const contractList = await ContractService.getContracts(filters)
+      setContracts(contractList)
+      setCurrentFilters(filters)
+      
+      // Ladda också stats
+      const contractStats = await ContractService.getContractStats()
+      setStats(contractStats)
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Okänt fel vid refresh'
+      setError(errorMessage)
+      console.error('useContracts.refreshContracts fel:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, []) // Inga dependencies för att undvika cykler
 
   // Initial loading vid mount
   useEffect(() => {
@@ -351,16 +373,21 @@ export function useContracts(): UseContractsReturn {
               console.log('🔄 Kontrakt uppdaterat:', payload.new)
               // Uppdatera specifikt kontrakt i state
               const updatedContract = payload.new as Contract
-              setContracts(prev => 
-                prev.map(contract => 
+              let contractExists = false
+              
+              setContracts(prev => {
+                contractExists = prev.some(c => c.id === updatedContract.id)
+                return prev.map(contract => 
                   contract.id === updatedContract.id
                     ? { ...contract, ...updatedContract }
                     : contract
                 )
-              )
+              })
               
-              // Uppdatera stats också
-              loadContractStats()
+              // Uppdatera stats också (men bara om kontraktet verkligen finns)
+              if (contractExists) {
+                loadContractStats()
+              }
               break
               
             case 'DELETE':
@@ -378,7 +405,7 @@ export function useContracts(): UseContractsReturn {
       console.log('🔕 Stänger av real-time subscription för kontrakt')
       subscription.unsubscribe()
     }
-  }, [refreshContracts, loadContractStats])
+  }, [refreshContracts])
 
   // Real-time subscription för contract_files
   useEffect(() => {
@@ -401,11 +428,22 @@ export function useContracts(): UseContractsReturn {
           switch (payload.eventType) {
             case 'INSERT':
               console.log('➕ Ny contract file skapad:', payload.new)
-              // Lägg till filen i rätt kontrakt
-              setContractFiles(prev => ({
-                ...prev,
-                [fileData.contract_id]: [...(prev[fileData.contract_id] || []), payload.new as ContractFile]
-              }))
+              // Lägg till filen i rätt kontrakt, men kontrollera först om den redan existerar
+              const newFile = payload.new as ContractFile
+              setContractFiles(prev => {
+                const existingFiles = prev[fileData.contract_id] || []
+                const fileExists = existingFiles.some(file => file.id === newFile.id)
+                
+                if (fileExists) {
+                  console.log('📄 Fil existerar redan, hoppar över duplikat:', newFile.id)
+                  return prev // Ingen förändring
+                }
+                
+                return {
+                  ...prev,
+                  [fileData.contract_id]: [...existingFiles, newFile]
+                }
+              })
               break
               
             case 'UPDATE':
