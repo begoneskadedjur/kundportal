@@ -332,6 +332,9 @@ export default function WebhookConfig() {
                       {webhook.is_our_webhook && (
                         <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">Vår webhook</span>
                       )}
+                      <span className="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded font-mono">
+                        ID: {webhook.id}
+                      </span>
                     </div>
                     
                     {webhook.is_our_webhook && (webhook.missing_events.length > 0 || !webhook.sign_key_matches) && (

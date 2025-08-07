@@ -264,6 +264,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             data: result
           })
 
+        } else if (action === 'test_webhook_ids') {
+          // Testa att hämta varje webhook individuellt för debugging
+          const webhooks = await getWebhooks()
+          const testResults = []
+
+          for (const webhook of webhooks) {
+            try {
+              console.log(`🧪 Testar webhook ID: ${webhook.id}`)
+              const response = await fetch(`https://api.oneflow.com/v1/webhooks/${webhook.id}`, {
+                method: 'GET',
+                headers: {
+                  'accept': 'application/json',
+                  'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+                  'x-oneflow-user-email': ONEFLOW_USER_EMAIL
+                }
+              })
+
+              testResults.push({
+                id: webhook.id,
+                callback_url: webhook.callback_url,
+                accessible: response.ok,
+                status: response.status,
+                is_our_webhook: webhook.callback_url?.includes('kundportal.vercel.app')
+              })
+
+            } catch (error) {
+              testResults.push({
+                id: webhook.id,
+                callback_url: webhook.callback_url,
+                accessible: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                is_our_webhook: webhook.callback_url?.includes('kundportal.vercel.app')
+              })
+            }
+          }
+
+          res.json({
+            success: true,
+            data: {
+              webhook_tests: testResults,
+              total_webhooks: webhooks.length
+            }
+          })
+
         } else if (action === 'create_webhook') {
           const newWebhook = {
             callback_url: WEBHOOK_URL,
