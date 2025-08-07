@@ -78,9 +78,14 @@ const ContractMobileCard: React.FC<{
           <span className="text-slate-400 text-sm">
             {contract.total_value ? formatContractValue(contract.total_value) : '-'}
           </span>
-          <span className="text-slate-400 text-sm">
-            {new Date(contract.created_at).toLocaleDateString('sv-SE')}
-          </span>
+          <div className="text-right">
+            <div className="text-slate-400 text-sm">
+              Start: {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
+            </div>
+            <div className="text-slate-500 text-xs">
+              Skapad: {new Date(contract.created_at).toLocaleDateString('sv-SE')}
+            </div>
+          </div>
         </div>
         
         {contract.begone_employee_name && (
@@ -383,6 +388,7 @@ export default function ContractsOverview() {
                 <th className="px-4 py-3 text-left">Motpart</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-right">Värde (SEK)</th>
+                <th className="px-4 py-3 text-left">Startdatum</th>
                 <th className="px-4 py-3 text-left">Skapad</th>
                 <th className="px-4 py-3 text-left">BeGone-ansvarig</th>
                 <th className="px-4 py-3 text-left">Filer</th>
@@ -416,6 +422,10 @@ export default function ContractsOverview() {
                   
                   <td className="px-4 py-3 text-right text-white font-medium">
                     {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+                  </td>
+                  
+                  <td className="px-4 py-3 text-slate-400">
+                    {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
                   </td>
                   
                   <td className="px-4 py-3 text-slate-400">

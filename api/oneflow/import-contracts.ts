@@ -243,6 +243,78 @@ interface CompleteContractData {
   products: OneflowProduct[]
 }
 
+// Smart datumparser för OneFlow-datum som kan innehålla text
+const parseContractDate = (dateValue: string | undefined): string | null => {
+  if (!dateValue || dateValue.trim() === '') return null
+  
+  // Ignorera vanliga textfraser
+  const textPhrases = [
+    'enligt överenskommelse',
+    'snarast möjligt', 
+    'efter överenskommelse',
+    'vid leverans',
+    'omgående',
+    'överenskommelse',
+    'snarast',
+    'direkt'
+  ]
+  
+  const lowerValue = dateValue.toLowerCase().trim()
+  if (textPhrases.some(phrase => lowerValue.includes(phrase))) {
+    console.log(`📅 Ignorerar textdatum: "${dateValue}"`)
+    return null
+  }
+  
+  // Försök parsa olika datumformat
+  try {
+    // YYYY-MM-DD format (ISO)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue.trim())) {
+      const date = new Date(dateValue.trim())
+      if (!isNaN(date.getTime())) {
+        console.log(`📅 Parsade ISO-datum: "${dateValue}" → ${dateValue.trim()}`)
+        return dateValue.trim()
+      }
+    }
+    
+    // DD/MM/YYYY eller D/M/YYYY format
+    const ddmmMatch = dateValue.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (ddmmMatch) {
+      const [, day, month, year] = ddmmMatch
+      const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      const date = new Date(isoDate)
+      if (!isNaN(date.getTime())) {
+        console.log(`📅 Parsade DD/MM/YYYY: "${dateValue}" → ${isoDate}`)
+        return isoDate
+      }
+    }
+    
+    // DD-MM-YYYY format
+    const ddmmDashMatch = dateValue.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+    if (ddmmDashMatch) {
+      const [, day, month, year] = ddmmDashMatch
+      const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      const date = new Date(isoDate)
+      if (!isNaN(date.getTime())) {
+        console.log(`📅 Parsade DD-MM-YYYY: "${dateValue}" → ${isoDate}`)
+        return isoDate
+      }
+    }
+    
+    // Försök Date.parse som sista utväg
+    const date = new Date(dateValue.trim())
+    if (!isNaN(date.getTime())) {
+      const isoDate = date.toISOString().split('T')[0]
+      console.log(`📅 Parsade generiskt datum: "${dateValue}" → ${isoDate}`)
+      return isoDate
+    }
+  } catch (error) {
+    console.warn(`⚠️ Fel vid parsning av datum: "${dateValue}"`, error)
+  }
+  
+  console.warn(`⚠️ Ogiltigt datumformat ignorerat: "${dateValue}"`)
+  return null
+}
+
 // Interface för contract insert data (samma som webhook)
 interface ContractInsertData {
   oneflow_contract_id: string
@@ -685,7 +757,7 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     begone_employee_name: mappedData['begone_employee_name'] || begoneEmployee?.name || 'BeGone Medarbetare',
     begone_employee_email: mappedData['begone_employee_email'] || begoneEmployee?.email || undefined,
     contract_length: mappedData['contract_length'] || undefined,
-    start_date: mappedData['start_date'] || undefined,
+    start_date: parseContractDate(mappedData['start_date']),
     
     // Kontakt-information (exakt mappning med parties fallback)
     contact_person: mappedData['contact_person'] || customerContact?.name || undefined,
