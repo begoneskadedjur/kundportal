@@ -32,6 +32,8 @@ const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
       suffix={suffix}
       preserveValue={preserveValue}
       className={className}
+      separator=" "
+      decimal=","
     />
   );
 };
