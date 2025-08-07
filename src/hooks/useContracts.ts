@@ -327,12 +327,21 @@ export function useContracts(): UseContractsReturn {
       
       // 🔧 FIX: Hybrid nedladdningsmetod - försök direktnedladdning först
       if (apiResponse.data.downloadUrl) {
-        const downloadSuccess = await tryDirectDownload(contractId, fileId, apiResponse.data.fileName)
+        // Säkerställ att filnamnet har .pdf extension
+        let correctedFileName = apiResponse.data.fileName
+        if (!correctedFileName.toLowerCase().endsWith('.pdf')) {
+          correctedFileName = correctedFileName.includes('.') 
+            ? correctedFileName.replace(/\.[^.]*$/, '.pdf') 
+            : `${correctedFileName}.pdf`
+          console.log(`🔧 Frontend: Korrigerat filnamn ${apiResponse.data.fileName} → ${correctedFileName}`)
+        }
+        
+        const downloadSuccess = await tryDirectDownload(contractId, fileId, correctedFileName)
         
         // Fallback till blob-metod om direktnedladdning misslyckas
         if (!downloadSuccess) {
           console.log('Direktnedladdning misslyckades, använder blob-metod...')
-          await downloadFileFromUrl(apiResponse.data.downloadUrl, apiResponse.data.fileName)
+          await downloadFileFromUrl(apiResponse.data.downloadUrl, correctedFileName)
         }
       }
       

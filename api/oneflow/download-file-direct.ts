@@ -110,8 +110,15 @@ export default async function handler(
     }
 
     // 4. Sätt headers för nedladdning (detta är nyckeln!)
-    const fileName = contractFile.file_name
+    let fileName = contractFile.file_name
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'pdf'
+    
+    // 🔧 FIX: Säkerställ att PDF-filer har .pdf extension för korrekt filtyp i OS
+    if (fileExtension !== 'pdf' && !fileName.toLowerCase().endsWith('.pdf')) {
+      // Om filen inte har extension eller fel extension, lägg till .pdf
+      fileName = fileName.includes('.') ? fileName.replace(/\.[^.]*$/, '.pdf') : `${fileName}.pdf`
+      console.log(`🔧 Korrigerat filnamn: ${contractFile.file_name} → ${fileName}`)
+    }
     
     // 🔧 FIX: Använd korrekt Content-Type för att visa rätt filtyp men trigga nedladdning via Content-Disposition
     let contentType = 'application/octet-stream' // Default fallback
