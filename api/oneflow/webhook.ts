@@ -331,6 +331,42 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   const dataFields = Object.fromEntries(
     details.data_fields.map(field => [field.custom_id, field.value])
   )
+  
+  // Debug: Logga alla tillgängliga data fields
+  console.log('📋 Tillgängliga data fields från OneFlow:')
+  details.data_fields.forEach(field => {
+    console.log(`  - ${field.custom_id}: ${field.value || '(tomt)'}`)
+  })
+  console.log('📋 Parties från OneFlow:')
+  details.parties?.forEach((party, index) => {
+    console.log(`  Party ${index}: ${party.name} (${party.country})`)
+    party.participants?.forEach(participant => {
+      console.log(`    - ${participant.name} (${participant.email})`)
+    })
+  })
+  
+  // Helper-funktion för att hitta datafält med olika varianter av namn
+  const findField = (...fieldNames: string[]): string | undefined => {
+    for (const fieldName of fieldNames) {
+      // Testa olika varianter av fältnamnet
+      const variations = [
+        fieldName,
+        fieldName.toLowerCase(),
+        fieldName.replace(/-/g, ''),
+        fieldName.replace(/-/g, '_'),
+        fieldName.replace(/_/g, '-')
+      ]
+      
+      for (const variant of variations) {
+        if (dataFields[variant] !== undefined) {
+          console.log(`✅ Hittade fält: ${variant} = ${dataFields[variant]}`)
+          return dataFields[variant]
+        }
+      }
+    }
+    console.log(`⚠️ Kunde inte hitta fält: ${fieldNames.join(', ')}`)
+    return undefined
+  }
 
   // Hämta kontaktinformation från första party
   const firstParty = details.parties?.[0]
@@ -338,15 +374,20 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
 
   // Beräkna totalt värde från produkter
   let totalValue = 0
+  console.log('💰 Beräknar produktvärde:')
   if (details.product_groups) {
     for (const group of details.product_groups) {
+      console.log(`  Produktgrupp: ${group.name || 'Namnlös'}`)
       for (const product of group.products) {
         const price = parseFloat(product.price_1?.amount?.amount || '0')
         const quantity = product.quantity?.amount || 1
-        totalValue += price * quantity
+        const productTotal = price * quantity
+        console.log(`    - ${product.name}: ${price} kr x ${quantity} = ${productTotal} kr`)
+        totalValue += productTotal
       }
     }
   }
+  console.log(`  💰 Totalt värde: ${totalValue} kr`)
 
   // Bygg agreement text från data fields
   const agreementParts = [
@@ -364,18 +405,18 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     template_id: details.template?.id?.toString() || 'no_template',
     
     // BeGone-information
-    begone_employee_name: dataFields['anstalld'] || dataFields['vr-kontaktperson'],
-    begone_employee_email: dataFields['e-post-anstlld'] || dataFields['vr-kontakt-mail'],
-    contract_length: dataFields['avtalslngd'],
-    start_date: dataFields['begynnelsedag'] || dataFields['utfrande-datum'],
+    begone_employee_name: findField('anstalld', 'anställd', 'vr-kontaktperson', 'vår-kontaktperson') || null,
+    begone_employee_email: findField('e-post-anstlld', 'e-post-anstalld', 'e-post-anställd', 'vr-kontakt-mail', 'vår-kontakt-mail') || null,
+    contract_length: findField('avtalslngd', 'avtalslängd', 'avtals-längd', 'contract-length') || null,
+    start_date: findField('begynnelsedag', 'startdatum', 'start-date', 'utfrande-datum', 'utförande-datum') || null,
     
-    // Kontakt-information
-    contact_person: dataFields['Kontaktperson'] || dataFields['kontaktperson'] || firstParticipant?.name,
-    contact_email: dataFields['e-post-kontaktperson'] || dataFields['kontaktperson-e-post'] || firstParticipant?.email,
-    contact_phone: dataFields['telefonnummer-kontaktperson'] || dataFields['tel-nr'],
-    contact_address: dataFields['utforande-adress'] || dataFields['utfrande-adress'],
-    company_name: dataFields['foretag'] || dataFields['kund'] || firstParty?.name,
-    organization_number: dataFields['org-nr'] || dataFields['per--org-nr'] || firstParty?.identification_number,
+    // Kontakt-information (använd party/participant som fallback)
+    contact_person: findField('Kontaktperson', 'kontaktperson', 'kontakt-person', 'contact-person') || firstParticipant?.name || null,
+    contact_email: findField('e-post-kontaktperson', 'kontaktperson-e-post', 'contact-email', 'e-post') || firstParticipant?.email || null,
+    contact_phone: findField('telefonnummer-kontaktperson', 'tel-nr', 'telefon', 'phone', 'telefonnummer') || firstParticipant?.phone_number || null,
+    contact_address: findField('utforande-adress', 'utförande-adress', 'adress', 'address', 'leveransadress') || null,
+    company_name: findField('foretag', 'företag', 'kund', 'company', 'bolag') || firstParty?.name || null,
+    organization_number: findField('org-nr', 'orgnr', 'per-org-nr', 'organisationsnummer') || firstParty?.identification_number || null,
     
     // Avtal/Offert-detaljer  
     agreement_text: agreementParts.join('\n\n'),
