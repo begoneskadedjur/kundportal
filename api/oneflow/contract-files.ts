@@ -53,6 +53,15 @@ const fetchOneFlowFiles = async (oneflowContractId: string): Promise<OneFlowFile
     })
 
     if (!response.ok) {
+      // Om kontraktet inte finns (404), returnera tomt resultat istället för fel
+      if (response.status === 404) {
+        console.log('⚠️ Kontrakt finns inte längre i OneFlow (404) - returnerar tomt resultat')
+        return {
+          data: [],
+          count: 0
+        }
+      }
+      
       console.error('❌ OneFlow Files API-fel:', response.status, response.statusText)
       const errorText = await response.text()
       console.error('❌ Error response:', errorText)
@@ -174,15 +183,19 @@ export default async function handler(
     // 2. Hämta filer från OneFlow API
     const oneflowFiles = await fetchOneFlowFiles(contract.oneflow_contract_id)
 
-    if (!oneflowFiles) {
+    // Om OneFlow returnerar null (inte 404), är det ett verkligt fel
+    if (oneflowFiles === null) {
+      console.error('❌ Allvarligt fel vid hämtning från OneFlow')
       return res.status(500).json({
         success: false,
         error: 'Kunde inte hämta filer från OneFlow'
       })
     }
 
-    // 3. Synka filer till vår databas
-    await syncFilesToDatabase(contractId, oneflowFiles.data)
+    // 3. Synka filer till vår databas (bara om vi har några filer)
+    if (oneflowFiles.data && oneflowFiles.data.length > 0) {
+      await syncFilesToDatabase(contractId, oneflowFiles.data)
+    }
 
     // 4. Hämta uppdaterad fillista från vår databas
     const { data: contractFiles, error: filesError } = await supabase

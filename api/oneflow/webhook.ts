@@ -61,8 +61,12 @@ interface OneflowContractDetails {
   }
   template_id?: number // Direkt på root-objektet
   data_fields: Array<{
-    custom_id: string
+    custom_id?: string
     value: string
+    _private_ownerside?: {
+      custom_id?: string
+      [key: string]: any
+    }
   }>
   parties: Array<{
     type: 'company' | 'individual'
@@ -306,6 +310,34 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
   return true
 }
 
+// Template field mapping - definierar ordningen på fält för varje mall
+const TEMPLATE_FIELD_ORDER: { [templateId: string]: string[] } = {
+  // Skadedjursavtal (8486368)
+  '8486368': [
+    'begynnelsedag',           // Index 0 - Startdatum
+    'kontaktperson',           // Index 1 - Kontaktperson
+    'foretag',                 // Index 2 - Företag
+    'org-nr',                  // Index 3 - Org nummer
+    'e-post-kontaktperson',    // Index 4 - E-post kontaktperson  
+    'utforande-adress',        // Index 5 - Utförande adress
+    'e-post-anstlld',          // Index 6 - E-post anställd
+    'anstalld',                // Index 7 - Anställd
+    'vr-kontakt-mail',         // Index 8 - Vår kontakt mail
+    'tel-nr',                  // Index 9 - Telefonnummer
+    'stycke-1',                // Index 10 - Stycke 1
+    'avtalslngd',              // Index 11 - Avtalslängd
+    'datum',                   // Index 12 - Datum
+    'arbetsbeskrivning',       // Index 13 - Arbetsbeskrivning
+    'stycke-2',                // Index 14 - Stycke 2
+    'ovrig-info'               // Index 15 - Övrig info
+  ],
+  // Lägg till fler mallar här när vi vet deras fältordning
+  '9324573': [], // Avtal Betesstationer - behöver mappas
+  '8465556': [], // Avtal Betongstationer - behöver mappas
+  '8462854': [], // Avtal Mekaniska fällor - behöver mappas
+  '8732196': []  // Avtal Indikationsfällor - behöver mappas
+}
+
 // Extrahera data från OneFlow kontrakt och konvertera till vårt format
 const parseContractDetailsToInsertData = (details: OneflowContractDetails): ContractInsertData => {
   // Mappa OneFlow state till våra statusar (draft är borttaget)
@@ -327,15 +359,49 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
                   contractName.toLowerCase().includes('offert') || 
                   templateName.toLowerCase().includes('offert')
   
-  // Extrahera data fields
-  const dataFields = Object.fromEntries(
-    details.data_fields.map(field => [field.custom_id, field.value])
+  // Extrahera data fields - hantera både custom_id och index-baserad mappning
+  let dataFields: { [key: string]: string } = {}
+  
+  // Kontrollera om vi har custom_ids
+  const hasCustomIds = details.data_fields.some(field => 
+    field.custom_id || field._private_ownerside?.custom_id
   )
+  
+  if (hasCustomIds) {
+    // Använd custom_id om tillgänglig
+    dataFields = Object.fromEntries(
+      details.data_fields.map(field => {
+        const customId = field.custom_id || field._private_ownerside?.custom_id || 'undefined'
+        return [customId, field.value]
+      }).filter(([customId]) => customId !== 'undefined')
+    )
+  } else {
+    // Använd index-baserad mappning för API-skapade kontrakt
+    const templateId = details.template?.id?.toString()
+    const fieldOrder = TEMPLATE_FIELD_ORDER[templateId || '']
+    
+    if (fieldOrder && fieldOrder.length > 0) {
+      console.log(`📝 Använder index-baserad mappning för mall ${templateId}`)
+      details.data_fields.forEach((field, index) => {
+        if (index < fieldOrder.length) {
+          const fieldName = fieldOrder[index]
+          dataFields[fieldName] = field.value || ''
+          console.log(`  Mappat index ${index} → ${fieldName}: ${field.value || '(tomt)'}`)
+        }
+      })
+    } else {
+      console.log(`⚠️ Ingen fältordning definierad för mall ${templateId}`)
+      // Fallback: använd index som nyckel
+      details.data_fields.forEach((field, index) => {
+        dataFields[`field_${index}`] = field.value || ''
+      })
+    }
+  }
   
   // Debug: Logga alla tillgängliga data fields
   console.log('📋 Tillgängliga data fields från OneFlow:')
-  details.data_fields.forEach(field => {
-    console.log(`  - ${field.custom_id}: ${field.value || '(tomt)'}`)
+  Object.entries(dataFields).forEach(([key, value]) => {
+    console.log(`  - ${key}: ${value || '(tomt)'}`)
   })
   console.log('📋 Parties från OneFlow:')
   details.parties?.forEach((party, index) => {
