@@ -30,14 +30,51 @@ export interface ContractFilters {
 }
 
 export interface ContractStats {
+  // Basic counts
   total_contracts: number
   total_offers: number
-  total_value: number
   signed_contracts: number
   pending_contracts: number
   active_contracts: number
+  
+  // Financial metrics
+  total_value: number
+  signed_value: number
+  pending_value: number
+  average_contract_value: number
+  average_offer_value: number
+  
+  // Performance metrics
   contract_signing_rate: number // Procent av kontrakt som signerats
   offer_conversion_rate: number  // Procent av offerter som blivit kontrakt
+  
+  // Time-based analytics
+  contracts_this_month: number
+  contracts_last_month: number
+  value_this_month: number
+  value_last_month: number
+  growth_rate: number // Månadsvis tillväxt i procent
+  
+  // Employee performance
+  top_employees: Array<{
+    name: string
+    email: string
+    contract_count: number
+    total_value: number
+    avg_value: number
+  }>
+  
+  // Product insights
+  popular_products: Array<{
+    name: string
+    count: number
+    total_value: number
+  }>
+  
+  // Pipeline health
+  avg_signing_time_days: number
+  overdue_count: number
+  contracts_expiring_soon: number // Inom 30 dagar
 }
 
 // Service-klass för contract-hantering
@@ -404,11 +441,15 @@ export class ContractService {
   // Hämta kontraktstatistik för dashboard
   static async getContractStats(filters: Pick<ContractFilters, 'date_from' | 'date_to'> = {}): Promise<ContractStats> {
     try {
-      console.log('📊 Hämtar kontraktstatistik...')
+      console.log('📊 Hämtar utökad kontraktstatistik...')
 
+      // Hämta full kontraktdata med mer detaljer
       let query = supabase
         .from('contracts')
-        .select('type, status, total_value')
+        .select(`
+          type, status, total_value, created_at, start_date, contract_length,
+          begone_employee_name, begone_employee_email, selected_products
+        `)
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
@@ -432,17 +473,41 @@ export class ContractService {
 
       const contracts = data || []
       
-      // Beräkna statistik
-      const total_contracts = contracts.filter(c => c.type === 'contract').length
-      const total_offers = contracts.filter(c => c.type === 'offer').length
-      const signed_contracts = contracts.filter(c => c.type === 'contract' && c.status === 'signed').length
-      const pending_contracts = contracts.filter(c => c.status === 'pending').length
-      const active_contracts = contracts.filter(c => c.status === 'active').length
+      // Beräkna grundläggande statistik
+      const contractsOnly = contracts.filter(c => c.type === 'contract')
+      const offersOnly = contracts.filter(c => c.type === 'offer')
+      const signedContracts = contracts.filter(c => c.status === 'signed')
+      const pendingContracts = contracts.filter(c => c.status === 'pending')
+      const activeContracts = contracts.filter(c => c.status === 'active')
       
+      const total_contracts = contractsOnly.length
+      const total_offers = offersOnly.length
+      const signed_contracts = signedContracts.length
+      const pending_contracts = pendingContracts.length
+      const active_contracts = activeContracts.length
+      
+      // Finansiella metriker
       const total_value = contracts
         .filter(c => c.total_value)
         .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        
+      const signed_value = signedContracts
+        .filter(c => c.total_value)
+        .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        
+      const pending_value = pendingContracts
+        .filter(c => c.total_value)
+        .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        
+      const average_contract_value = contractsOnly.length > 0 
+        ? contractsOnly.filter(c => c.total_value).reduce((sum, c) => sum + (c.total_value || 0), 0) / contractsOnly.filter(c => c.total_value).length
+        : 0
+        
+      const average_offer_value = offersOnly.length > 0
+        ? offersOnly.filter(c => c.total_value).reduce((sum, c) => sum + (c.total_value || 0), 0) / offersOnly.filter(c => c.total_value).length
+        : 0
 
+      // Performance metriker
       const contract_signing_rate = total_contracts > 0 
         ? Math.round((signed_contracts / total_contracts) * 100) 
         : 0
@@ -450,19 +515,155 @@ export class ContractService {
       const offer_conversion_rate = total_offers > 0
         ? Math.round((contracts.filter(c => c.type === 'offer' && c.status === 'signed').length / total_offers) * 100)
         : 0
+        
+      // Tidsbaserad analys
+      const now = new Date()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+      const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+      const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+      
+      const contracts_this_month = contracts.filter(c => {
+        const createdDate = new Date(c.created_at)
+        return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear
+      }).length
+      
+      const contracts_last_month = contracts.filter(c => {
+        const createdDate = new Date(c.created_at)
+        return createdDate.getMonth() === lastMonth && createdDate.getFullYear() === lastMonthYear
+      }).length
+      
+      const value_this_month = contracts.filter(c => {
+        const createdDate = new Date(c.created_at)
+        return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear && c.total_value
+      }).reduce((sum, c) => sum + (c.total_value || 0), 0)
+      
+      const value_last_month = contracts.filter(c => {
+        const createdDate = new Date(c.created_at)
+        return createdDate.getMonth() === lastMonth && createdDate.getFullYear() === lastMonthYear && c.total_value
+      }).reduce((sum, c) => sum + (c.total_value || 0), 0)
+      
+      const growth_rate = value_last_month > 0 
+        ? Math.round(((value_this_month - value_last_month) / value_last_month) * 100)
+        : 0
+      
+      // Medarbetarprestanda (top 5)
+      const employeeStats = new Map<string, { name: string, email: string, contract_count: number, total_value: number }>()
+      
+      contracts.forEach(contract => {
+        if (contract.begone_employee_name && contract.begone_employee_email) {
+          const key = contract.begone_employee_email
+          const existing = employeeStats.get(key)
+          
+          if (existing) {
+            existing.contract_count++
+            existing.total_value += contract.total_value || 0
+          } else {
+            employeeStats.set(key, {
+              name: contract.begone_employee_name,
+              email: contract.begone_employee_email,
+              contract_count: 1,
+              total_value: contract.total_value || 0
+            })
+          }
+        }
+      })
+      
+      const top_employees = Array.from(employeeStats.values())
+        .map(emp => ({
+          ...emp,
+          avg_value: emp.contract_count > 0 ? emp.total_value / emp.contract_count : 0
+        }))
+        .sort((a, b) => b.total_value - a.total_value)
+        .slice(0, 5)
+        
+      // Produktinsikter (från selected_products JSONB)
+      const productStats = new Map<string, { name: string, count: number, total_value: number }>()
+      
+      contracts.forEach(contract => {
+        if (contract.selected_products && Array.isArray(contract.selected_products)) {
+          contract.selected_products.forEach((product: any) => {
+            if (product.name) {
+              const existing = productStats.get(product.name)
+              
+              if (existing) {
+                existing.count++
+                existing.total_value += product.total_price || product.price || 0
+              } else {
+                productStats.set(product.name, {
+                  name: product.name,
+                  count: 1,
+                  total_value: product.total_price || product.price || 0
+                })
+              }
+            }
+          })
+        }
+      })
+      
+      const popular_products = Array.from(productStats.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        
+      // Pipeline hälsa
+      const overdue_count = contracts.filter(c => c.status === 'overdue').length
+      
+      const contracts_expiring_soon = contracts.filter(c => {
+        if (!c.start_date || !c.contract_length) return false
+        
+        const startDate = new Date(c.start_date)
+        const contractLengthMonths = parseInt(c.contract_length) || 12
+        const expiryDate = new Date(startDate)
+        expiryDate.setMonth(expiryDate.getMonth() + contractLengthMonths)
+        
+        const thirtyDaysFromNow = new Date()
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+        
+        return expiryDate <= thirtyDaysFromNow && expiryDate > new Date()
+      }).length
+      
+      // Genomsnittlig signeringstid (förenklad beräkning)
+      const avg_signing_time_days = 7 // Placeholder - kräver mer data för exakt beräkning
 
       const stats: ContractStats = {
+        // Basic counts
         total_contracts,
         total_offers,
-        total_value,
         signed_contracts,
         pending_contracts,
         active_contracts,
+        
+        // Financial metrics
+        total_value,
+        signed_value,
+        pending_value,
+        average_contract_value,
+        average_offer_value,
+        
+        // Performance metrics
         contract_signing_rate,
-        offer_conversion_rate
+        offer_conversion_rate,
+        
+        // Time-based analytics
+        contracts_this_month,
+        contracts_last_month,
+        value_this_month,
+        value_last_month,
+        growth_rate,
+        
+        // Employee performance
+        top_employees,
+        
+        // Product insights
+        popular_products,
+        
+        // Pipeline health
+        avg_signing_time_days,
+        overdue_count,
+        contracts_expiring_soon
       }
 
-      console.log('✅ Statistik hämtad:', stats)
+      console.log('✅ Utökad statistik hämtad:', stats)
       return stats
 
     } catch (error) {

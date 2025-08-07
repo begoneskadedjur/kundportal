@@ -16,7 +16,7 @@ export default function FilesColumn({
   onFilesModalOpen,
   showButton = true 
 }: FilesColumnProps) {
-  const { contractFiles, filesLoading, downloadingFiles, loadContractFiles, hasContractFiles, downloadContractFile } = useContracts()
+  const { contractFiles, filesLoading, downloadingFiles, loadContractFiles, hasContractFiles, viewContractFile, downloadContractFile } = useContracts()
   
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
@@ -150,12 +150,14 @@ export default function FilesColumn({
   }
 
   // Hantera direkt filåtgärder
-  const handleViewFile = async (fileId: string) => {
+  const handleViewFile = async (fileId: string, fileName: string) => {
     if (!contractId) return
     try {
-      await downloadContractFile(contractId, fileId) // Detta öppnar redan filen i ny flik
+      await viewContractFile(contractId, fileId) // Använd hook-funktionen
     } catch (error) {
       console.error('Fel vid visning av fil:', error)
+      // Fallback till vanlig download om view misslyckas
+      await downloadContractFile(contractId, fileId)
     }
   }
 
@@ -179,20 +181,28 @@ export default function FilesColumn({
           // Visa ikoner för enstaka pending fil
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handleViewFile(currentFiles[0].id)}
+              onClick={() => handleViewFile(currentFiles[0].id, currentFiles[0].file_name)}
               className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded transition-colors"
-              title="Visa PDF i webbläsaren"
+              title={`Visa ${currentFiles[0].file_name} i webbläsaren`}
               disabled={downloadingFiles[currentFiles[0].id] || false}
             >
-              <Eye className="w-4 h-4" />
+              {downloadingFiles[currentFiles[0].id] ? (
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </button>
             <button
               onClick={() => handleDownloadFile(currentFiles[0].id)}
               className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-colors"
-              title="Ladda ner PDF"
+              title={`Ladda ner ${currentFiles[0].file_name}`}
               disabled={downloadingFiles[currentFiles[0].id] || false}
             >
-              <Download className="w-4 h-4" />
+              {downloadingFiles[currentFiles[0].id] ? (
+                <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
             </button>
           </div>
         ) : (

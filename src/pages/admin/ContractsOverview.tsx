@@ -1,6 +1,6 @@
 // src/pages/admin/ContractsOverview.tsx - Dashboard för avtals- och offertöverblick
 import React, { useState, useMemo } from 'react'
-import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download } from 'lucide-react'
+import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
@@ -79,6 +79,11 @@ const ContractMobileCard: React.FC<{
             {contract.total_value ? formatContractValue(contract.total_value) : '-'}
           </span>
           <div className="text-right">
+            {contract.contract_length && (
+              <div className="text-slate-400 text-sm">
+                {contract.contract_length} månader
+              </div>
+            )}
             <div className="text-slate-400 text-sm">
               Start: {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
             </div>
@@ -89,9 +94,12 @@ const ContractMobileCard: React.FC<{
         </div>
         
         {contract.begone_employee_name && (
-          <p className="text-xs text-slate-500">
-            Ansvarig: {contract.begone_employee_name}
-          </p>
+          <div className="flex items-center gap-2">
+            <Users className="w-3 h-3 text-green-400" />
+            <p className="text-xs text-slate-400">
+              {contract.begone_employee_name}
+            </p>
+          </div>
         )}
         
         <div className="flex justify-between items-center mt-3">
@@ -124,6 +132,10 @@ export default function ContractsOverview() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [dateFilter, setDateFilter] = useState<string>('all')
+  const [valueFilter, setValueFilter] = useState<{ min: string, max: string }>({ min: '', max: '' })
+  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set())
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   
   // Files modal state
   const [filesModalOpen, setFilesModalOpen] = useState(false)
@@ -140,14 +152,52 @@ export default function ContractsOverview() {
         contract.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contract.contact_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contract.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contract.oneflow_contract_id?.includes(searchTerm)
+        contract.oneflow_contract_id?.includes(searchTerm) ||
+        contract.begone_employee_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesStatus = statusFilter === 'all' || contract.status === statusFilter
       const matchesType = typeFilter === 'all' || contract.type === typeFilter
+      
+      // Date filtering
+      const matchesDate = (() => {
+        if (dateFilter === 'all') return true
+        
+        const contractDate = new Date(contract.created_at)
+        const now = new Date()
+        
+        switch (dateFilter) {
+          case 'today':
+            return contractDate.toDateString() === now.toDateString()
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return contractDate >= weekAgo
+          case 'month':
+            return contractDate.getMonth() === now.getMonth() && contractDate.getFullYear() === now.getFullYear()
+          case 'quarter':
+            const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+            return contractDate >= quarterStart
+          case 'year':
+            return contractDate.getFullYear() === now.getFullYear()
+          default:
+            return true
+        }
+      })()
+      
+      // Value filtering
+      const matchesValue = (() => {
+        if (!valueFilter.min && !valueFilter.max) return true
+        if (!contract.total_value) return false
+        
+        const value = contract.total_value
+        const min = valueFilter.min ? parseFloat(valueFilter.min) : 0
+        const max = valueFilter.max ? parseFloat(valueFilter.max) : Infinity
+        
+        return value >= min && value <= max
+      })()
 
-      return matchesSearch && matchesStatus && matchesType
+      return matchesSearch && matchesStatus && matchesType && matchesDate && matchesValue
     })
-  }, [contracts, searchTerm, statusFilter, typeFilter])
+  }, [contracts, searchTerm, statusFilter, typeFilter, dateFilter, valueFilter])
 
   // Hantera filter-uppdateringar
   const updateFilters = (newFilters: Partial<ContractFilters>) => {
@@ -172,6 +222,14 @@ export default function ContractsOverview() {
         break
       case 'signed':
         setStatusFilter('signed')
+        break
+      case 'overdue':
+        setStatusFilter('overdue')
+        break
+      case 'value':
+      case 'conversion':
+      default:
+        // För vissa KPIs visar vi bara data utan att filtrera
         break
     }
   }
@@ -214,6 +272,9 @@ export default function ContractsOverview() {
     setSearchTerm('')
     setStatusFilter('all')
     setTypeFilter('all')
+    setDateFilter('all')
+    setValueFilter({ min: '', max: '' })
+    setSelectedContracts(new Set())
     clearFilters()
   }
 
@@ -288,28 +349,8 @@ export default function ContractsOverview() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <EnhancedKpiCard
-          title="Totala Avtal"
-          value={stats?.total_contracts || 0}
-          icon={FileText}
-          onClick={() => handleKpiClick('contracts')}
-          trend="neutral"
-          trendValue={`${stats?.signed_contracts || 0} signerade`}
-          delay={0}
-        />
-
-        <EnhancedKpiCard
-          title="Totala Offerter"
-          value={stats?.total_offers || 0}
-          icon={ShoppingCart}
-          onClick={() => handleKpiClick('offers')}
-          trend="neutral"
-          trendValue={`${stats?.pending_contracts || 0} väntande`}
-          delay={0.1}
-        />
-
+      {/* Primary KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <EnhancedKpiCard
           title="Total Avtalsvärd"
           value={stats?.total_value || 0}
@@ -318,20 +359,105 @@ export default function ContractsOverview() {
           suffix=" kr"
           decimals={0}
           onClick={() => handleKpiClick('value')}
+          trend={stats?.growth_rate ? (stats.growth_rate > 0 ? "up" : stats.growth_rate < 0 ? "down" : "neutral") : "neutral"}
+          trendValue={stats?.growth_rate ? `${stats.growth_rate > 0 ? '+' : ''}${stats.growth_rate}% denna månad` : 'Ingen data'}
+          delay={0}
+        />
+
+        <EnhancedKpiCard
+          title="Signerat Värde"
+          value={stats?.signed_value || 0}
+          icon={CheckCircle}
+          prefix=""
+          suffix=" kr"
+          decimals={0}
+          onClick={() => handleKpiClick('signed')}
           trend="up"
-          trendValue="+18%"
+          trendValue={`${stats?.signed_contracts || 0} signerade avtal`}
+          delay={0.1}
+        />
+
+        <EnhancedKpiCard
+          title="Väntande Värde"
+          value={stats?.pending_value || 0}
+          icon={Clock}
+          prefix=""
+          suffix=" kr"
+          decimals={0}
+          onClick={() => handleKpiClick('pending')}
+          trend="neutral"
+          trendValue={`${stats?.pending_contracts || 0} väntande`}
           delay={0.2}
         />
 
         <EnhancedKpiCard
           title="Signeringsgrad"
           value={stats?.contract_signing_rate || 0}
-          icon={CheckCircle}
+          icon={TrendingUp}
           suffix="%"
-          onClick={() => handleKpiClick('signed')}
-          trend="up"
+          onClick={() => handleKpiClick('conversion')}
+          trend={stats?.contract_signing_rate && stats.contract_signing_rate > 70 ? "up" : "neutral"}
           trendValue={`${stats?.offer_conversion_rate || 0}% offert-konvertering`}
           delay={0.3}
+        />
+      </div>
+
+      {/* Secondary Business Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <EnhancedKpiCard
+          title="Totala Avtal"
+          value={stats?.total_contracts || 0}
+          icon={FileText}
+          onClick={() => handleKpiClick('contracts')}
+          trend={stats?.contracts_this_month && stats.contracts_last_month ? 
+            (stats.contracts_this_month > stats.contracts_last_month ? "up" : 
+             stats.contracts_this_month < stats.contracts_last_month ? "down" : "neutral") : "neutral"}
+          trendValue={`${stats?.contracts_this_month || 0} denna månad`}
+          delay={0.4}
+        />
+
+        <EnhancedKpiCard
+          title="Totala Offerter"
+          value={stats?.total_offers || 0}
+          icon={ShoppingCart}
+          onClick={() => handleKpiClick('offers')}
+          trend="neutral"
+          trendValue={`Ø ${stats?.average_offer_value ? Math.round(stats.average_offer_value).toLocaleString('sv-SE') : 0} kr`}
+          delay={0.5}
+        />
+
+        <EnhancedKpiCard
+          title="Snitt Avtalsvärde"
+          value={stats?.average_contract_value || 0}
+          icon={BarChart3}
+          prefix=""
+          suffix=" kr"
+          decimals={0}
+          onClick={() => {}}
+          trend="neutral"
+          trendValue="per avtal"
+          delay={0.6}
+        />
+
+        <EnhancedKpiCard
+          title="Pipeline Hälsa"
+          value={stats?.overdue_count || 0}
+          icon={AlertTriangle}
+          onClick={() => handleKpiClick('overdue')}
+          trend={stats?.overdue_count && stats.overdue_count > 0 ? "down" : "up"}
+          trendValue={`${stats?.contracts_expiring_soon || 0} utgår snart`}
+          delay={0.7}
+        />
+
+        <EnhancedKpiCard
+          title="Snitt Signeringstid"
+          value={stats?.avg_signing_time_days || 0}
+          icon={Calendar}
+          suffix=" dagar"
+          onClick={() => {}}
+          trend="neutral"
+          trendValue="genomsnitt"
+          delay={0.8}
         />
       </div>
 

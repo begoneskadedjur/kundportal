@@ -235,7 +235,42 @@ export function useContracts(): UseContractsReturn {
     }
   }, [contractFiles, filesLoading, filesLoadedAt])
 
-  // Ladda ner fil
+  // Visa fil i webbläsaren (utan att markera som nedladdad)
+  const viewContractFile = useCallback(async (contractId: string, fileId: string) => {
+    try {
+      setDownloadingFiles(prev => ({ ...prev, [fileId]: true }))
+      
+      const response = await fetch('/api/oneflow/view-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ contractId, fileId })
+      })
+
+      const apiResponse = await response.json()
+
+      if (!apiResponse.success) {
+        throw new Error(apiResponse.error || 'Kunde inte visa fil')
+      }
+      
+      // Öppna filen i ny flik för visning (markeras INTE som nedladdad)
+      if (apiResponse.data.viewUrl) {
+        window.open(apiResponse.data.viewUrl, '_blank')
+      }
+      
+      toast.success(`Öppnar "${apiResponse.data.fileName}" i webbläsaren`)
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Kunde inte visa fil'
+      toast.error(errorMessage)
+      throw err
+    } finally {
+      setDownloadingFiles(prev => ({ ...prev, [fileId]: false }))
+    }
+  }, [])
+
+  // Ladda ner fil (markerar som nedladdad)
   const downloadContractFile = useCallback(async (contractId: string, fileId: string) => {
     try {
       setDownloadingFiles(prev => ({ ...prev, [fileId]: true }))
@@ -519,6 +554,7 @@ export function useContracts(): UseContractsReturn {
     
     // Files actions
     loadContractFiles,
+    viewContractFile,
     downloadContractFile,
     getFileDownloadProgress,
     hasContractFiles,
