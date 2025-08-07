@@ -113,8 +113,13 @@ export default async function handler(
     const fileName = contractFile.file_name
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'pdf'
     
-    // 🔧 FIX: Använd application/octet-stream för alla nedladdningar (förhindrar korruption)
-    const contentType = 'application/octet-stream'
+    // 🔧 FIX: Använd korrekt Content-Type för att visa rätt filtyp men trigga nedladdning via Content-Disposition
+    let contentType = 'application/octet-stream' // Default fallback
+    if (fileExtension === 'pdf') {
+      contentType = 'application/pdf' // Korrekt för PDF-filer så de visas som PDF
+    } else if (fileExtension === 'doc' || fileExtension === 'docx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
 
     // KRITISKA HEADERS för nedladdning:
     res.setHeader('Content-Type', contentType)
