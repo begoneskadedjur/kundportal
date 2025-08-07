@@ -302,9 +302,15 @@ export function useContracts(): UseContractsReturn {
         ) || []
       }))
       
-      // Öppna nedladdningslänken
+      // 🔧 FIX: Hybrid nedladdningsmetod - försök direktnedladdning först
       if (apiResponse.data.downloadUrl) {
-        window.open(apiResponse.data.downloadUrl, '_blank')
+        const downloadSuccess = await tryDirectDownload(contractId, fileId, apiResponse.data.fileName)
+        
+        // Fallback till blob-metod om direktnedladdning misslyckas
+        if (!downloadSuccess) {
+          console.log('Direktnedladdning misslyckades, använder blob-metod...')
+          await downloadFileFromUrl(apiResponse.data.downloadUrl, apiResponse.data.fileName)
+        }
       }
       
       toast.success(`Fil "${apiResponse.data.fileName}" nedladdad`)
@@ -317,6 +323,67 @@ export function useContracts(): UseContractsReturn {
       setDownloadingFiles(prev => ({ ...prev, [fileId]: false }))
     }
   }, [])
+
+  // Metod 1: Direktnedladdning med rätta headers (snabbaste)
+  const tryDirectDownload = async (contractId: string, fileId: string, fileName: string): Promise<boolean> => {
+    try {
+      // Använd direktnedladdning-endpoint med rätta headers
+      const directUrl = `/api/oneflow/download-file-direct?contractId=${contractId}&fileId=${fileId}`
+      
+      // Skapa temporärt <a> element för nedladdning
+      const link = document.createElement('a')
+      link.href = directUrl
+      link.download = fileName || 'contract-file.pdf'
+      link.style.display = 'none'
+      
+      // Lägg till i DOM, klicka och ta bort
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      return true
+      
+    } catch (error) {
+      console.warn('Direktnedladdning misslyckades:', error)
+      return false
+    }
+  }
+
+  // Metod 2: Blob-baserad nedladdning (fallback för kompatibilitet)
+  const downloadFileFromUrl = async (url: string, fileName: string): Promise<void> => {
+    try {
+      // Hämta filen som blob
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error('Kunde inte hämta fil för nedladdning')
+      }
+      
+      const blob = await response.blob()
+      
+      // Skapa temporär URL för blob
+      const blobUrl = URL.createObjectURL(blob)
+      
+      // Skapa temporärt <a> element för nedladdning
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName || 'downloaded-file.pdf'
+      link.style.display = 'none'
+      
+      // Lägg till i DOM, klicka och ta bort
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Rensa blob URL för att frigöra minne
+      URL.revokeObjectURL(blobUrl)
+      
+    } catch (error) {
+      console.error('Fel vid blob-nedladdning:', error)
+      // Sista utväg: öppna i ny flik som tidigare
+      window.open(url, '_blank')
+      toast.warning('Fil öppnas i webbläsaren istället för nedladdning')
+    }
+  }
 
   // Hämta download progress för en fil
   const getFileDownloadProgress = useCallback((fileId: string): number => {

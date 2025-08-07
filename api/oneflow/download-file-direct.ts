@@ -1,0 +1,136 @@
+// api/oneflow/download-file-direct.ts - Direkt nedladdning med rätta headers
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createClient } from '@supabase/supabase-js'
+
+// Miljövariabler
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+
+// Supabase admin client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+// Interface för direct download request
+interface DirectDownloadRequest {
+  contractId: string
+  fileId: string
+}
+
+// Sätt CORS headers
+const setCorsHeaders = (res: VercelResponse) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+}
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  setCorsHeaders(res)
+
+  // Hantera OPTIONS request för CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end()
+  }
+
+  // Acceptera både POST och GET
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({
+      success: false,
+      error: 'Endast POST- och GET-anrop tillåtna'
+    })
+  }
+
+  try {
+    let contractId: string
+    let fileId: string
+
+    // Hantera både POST body och GET query params
+    if (req.method === 'POST') {
+      ({ contractId, fileId } = req.body as DirectDownloadRequest)
+    } else {
+      contractId = req.query.contractId as string
+      fileId = req.query.fileId as string
+    }
+
+    if (!contractId || !fileId) {
+      return res.status(400).json({
+        success: false,
+        error: 'contractId och fileId krävs'
+      })
+    }
+
+    console.log('⬇️ Direct download request för fil:', fileId, 'i kontrakt:', contractId)
+
+    // 1. Hämta fil-metadata från vår databas
+    const { data: contractFile, error: fileError } = await supabase
+      .from('contract_files')
+      .select(`
+        *,
+        contracts!inner(oneflow_contract_id)
+      `)
+      .eq('id', fileId)
+      .eq('contract_id', contractId)
+      .single()
+
+    if (fileError || !contractFile) {
+      console.error('❌ Fil hittades inte:', fileError)
+      return res.status(404).json({
+        success: false,
+        error: 'Fil hittades inte'
+      })
+    }
+
+    // 2. Kontrollera om filen finns i storage
+    if (contractFile.download_status !== 'completed' || !contractFile.supabase_storage_path) {
+      return res.status(404).json({
+        success: false,
+        error: 'Filen har inte laddats ner än. Använd vanliga download-funktionen först.'
+      })
+    }
+
+    // 3. Hämta filen från Supabase Storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('contract-files')
+      .download(contractFile.supabase_storage_path)
+
+    if (downloadError || !fileData) {
+      console.error('❌ Fel vid hämtning från storage:', downloadError)
+      return res.status(500).json({
+        success: false,
+        error: 'Kunde inte hämta fil från storage'
+      })
+    }
+
+    // 4. Sätt headers för nedladdning (detta är nyckeln!)
+    const fileName = contractFile.file_name
+    const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'pdf'
+    
+    // Content-Type baserat på filtyp
+    let contentType = 'application/octet-stream' // Default för nedladdning
+    if (fileExtension === 'pdf') {
+      contentType = 'application/pdf'
+    }
+
+    // KRITISKA HEADERS för nedladdning:
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`) // 🔑 Detta triggar nedladdning
+    res.setHeader('Content-Length', fileData.size)
+    res.setHeader('Cache-Control', 'no-cache')
+
+    console.log('✅ Skickar fil för nedladdning:', fileName)
+
+    // 5. Streama filen direkt till klienten
+    const buffer = await fileData.arrayBuffer()
+    res.status(200).send(Buffer.from(buffer))
+
+  } catch (error: any) {
+    console.error('❌ Direct download API fel:', error)
+
+    return res.status(500).json({
+      success: false,
+      error: 'Internt serverfel vid direktnedladdning',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+}
