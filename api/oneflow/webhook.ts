@@ -155,7 +155,7 @@ const verifySignature = (payload: OneflowWebhookPayload): boolean => {
   return isValid
 }
 
-// Logga webhook till databas
+// Logga webhook till databas (utan att stoppa processingen vid fel)
 const logWebhookToDatabase = async (logEntry: WebhookLogEntry) => {
   try {
     const { error } = await supabase
@@ -164,13 +164,15 @@ const logWebhookToDatabase = async (logEntry: WebhookLogEntry) => {
 
     if (error) {
       console.error('❌ Fel vid loggning till databas:', error.message)
-      throw error
+      console.warn('⚠️ Webhook-loggning misslyckades men fortsätter processering...')
+      return // Fortsätt utan att kasta fel
     }
 
     console.log('💾 Webhook loggad till databas framgångsrikt')
   } catch (error) {
     console.error('❌ Databasfel vid webhook-loggning:', error)
-    throw error
+    console.warn('⚠️ Webhook-loggning misslyckades men fortsätter processering...')
+    // Kasta INTE error här - låt webhook-processingen fortsätta
   }
 }
 
@@ -1014,27 +1016,35 @@ export default async function handler(
       })
     }
 
-    // 4. Logga inkommande webhook
-    await logWebhookToDatabase({
-      event_type: payload.events.map(e => e.type).join(', '),
-      oneflow_contract_id: contractId,
-      status: 'verified',
-      details: payload
-    })
+    // 4. Logga inkommande webhook (men stoppa inte vid fel)
+    try {
+      await logWebhookToDatabase({
+        event_type: payload.events.map(e => e.type).join(', '),
+        oneflow_contract_id: contractId,
+        status: 'verified',
+        details: payload
+      })
+    } catch (logError) {
+      console.warn('⚠️ Kunde inte logga webhook till databas, men fortsätter processering')
+    }
 
-    // 5. Processera events
+    // 5. Processera events - DETTA ÄR DET VIKTIGA!
     await processWebhookEvents(payload)
 
-    // 6. Logga framgångsrik processering
-    await logWebhookToDatabase({
-      event_type: 'webhook_processed',
-      oneflow_contract_id: contractId,
-      status: 'processed',
-      details: {
-        events_processed: payload.events.length,
-        callback_id: payload.callback_id
-      }
-    })
+    // 6. Logga framgångsrik processering (men stoppa inte vid fel)
+    try {
+      await logWebhookToDatabase({
+        event_type: 'webhook_processed',
+        oneflow_contract_id: contractId,
+        status: 'processed',
+        details: {
+          events_processed: payload.events.length,
+          callback_id: payload.callback_id
+        }
+      })
+    } catch (logError) {
+      console.warn('⚠️ Kunde inte logga framgång till databas, men processering lyckades')
+    }
 
     console.log('✅ Webhook processad framgångsrikt')
     
