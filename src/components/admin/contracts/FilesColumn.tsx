@@ -1,6 +1,6 @@
 // src/components/admin/contracts/FilesColumn.tsx - Kolumn för filstatus i kontraktstabell
 import React, { useEffect, useState } from 'react'
-import { FileText, Download, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { FileText, Download, CheckCircle, Clock, XCircle, Eye } from 'lucide-react'
 import FileDownloadButton from './FileDownloadButton'
 import { useContracts } from '../../../hooks/useContracts'
 import { ContractFile } from '../../../types/database'
@@ -16,7 +16,7 @@ export default function FilesColumn({
   onFilesModalOpen,
   showButton = true 
 }: FilesColumnProps) {
-  const { contractFiles, filesLoading, loadContractFiles, hasContractFiles } = useContracts()
+  const { contractFiles, filesLoading, downloadingFiles, loadContractFiles, hasContractFiles, downloadContractFile } = useContracts()
   
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
@@ -132,7 +132,7 @@ export default function FilesColumn({
           return 'Misslyckad'
         case 'pending':
         default:
-          return 'Väntande'
+          return null // Returnera null för att visa ikoner istället
       }
     }
 
@@ -149,22 +149,69 @@ export default function FilesColumn({
     return `${stats.total} filer`
   }
 
+  // Hantera direkt filåtgärder
+  const handleViewFile = async (fileId: string) => {
+    if (!contractId) return
+    try {
+      await downloadContractFile(contractId, fileId) // Detta öppnar redan filen i ny flik
+    } catch (error) {
+      console.error('Fel vid visning av fil:', error)
+    }
+  }
+
+  const handleDownloadFile = async (fileId: string) => {
+    if (!contractId) return
+    try {
+      await downloadContractFile(contractId, fileId)
+    } catch (error) {
+      console.error('Fel vid nedladdning av fil:', error)
+    }
+  }
+
+  const statusText = getStatusText()
+  const isPendingSingleFile = stats.total === 1 && stats.pending === 1
+
   return (
     <div className="flex items-center justify-between gap-2">
       {/* Status indikator */}
       <div className="flex items-center gap-2 min-w-0">
-        {getStatusIcon()}
-        <span 
-          className="text-xs text-slate-400 truncate cursor-pointer"
-          onClick={onFilesModalOpen}
-          title="Klicka för att se alla filer"
-        >
-          {getStatusText()}
-        </span>
+        {isPendingSingleFile ? (
+          // Visa ikoner för enstaka pending fil
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleViewFile(currentFiles[0].id)}
+              className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded transition-colors"
+              title="Visa PDF i webbläsaren"
+              disabled={downloadingFiles[currentFiles[0].id] || false}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleDownloadFile(currentFiles[0].id)}
+              className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-colors"
+              title="Ladda ner PDF"
+              disabled={downloadingFiles[currentFiles[0].id] || false}
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          // Standard status för andra fall
+          <>
+            {getStatusIcon()}
+            <span 
+              className="text-xs text-slate-400 truncate cursor-pointer"
+              onClick={onFilesModalOpen}
+              title="Klicka för att se alla filer"
+            >
+              {statusText}
+            </span>
+          </>
+        )}
       </div>
 
-      {/* Action button */}
-      {showButton && (
+      {/* Action button - endast för komplexa fall eller om inte pending single file */}
+      {showButton && !isPendingSingleFile && (
         <FileDownloadButton
           contractId={contractId}
           onFilesModalOpen={onFilesModalOpen}
