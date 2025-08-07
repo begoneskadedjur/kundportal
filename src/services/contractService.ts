@@ -15,7 +15,7 @@ export interface ContractWithSourceData extends Contract {
   customer_data?: {
     company_name?: string
     contact_person?: string
-    email?: string
+    contact_email?: string
   }
   // Creator tracking (från nya databas-kolumner)
   created_by_email?: string | null
@@ -93,8 +93,8 @@ export class ContractService {
         .from('contracts')
         .select(`
           *,
-          customers (
-            id, company_name, contact_person, email
+          customers!contracts_customer_id_fkey (
+            id, company_name, contact_person, contact_email
           )
         `)
         .order('created_at', { ascending: false })
@@ -234,8 +234,8 @@ export class ContractService {
         .from('contracts')
         .select(`
           *,
-          customers (
-            id, company_name, contact_person, email, phone, address, org_number
+          customers!contracts_customer_id_fkey (
+            id, company_name, contact_person, contact_email, contact_phone, contact_address, organization_number
           )
         `)
         .eq('id', id)
