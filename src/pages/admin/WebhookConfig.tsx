@@ -103,6 +103,39 @@ export default function WebhookConfig() {
     }
   }
 
+  // Automatisk fix av befintlig webhook
+  const autoFixWebhook = async () => {
+    try {
+      setUpdating(true)
+
+      const response = await fetch('/api/oneflow/webhook-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'auto_fix_webhook'
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Kunde inte fixa webhook')
+      }
+
+      toast.success('Webhook automatiskt fixad!')
+      await loadWebhookConfig() // Ladda om data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Okänt fel'
+      toast.error(`Fel vid auto fix: ${errorMessage}`)
+      console.error('Webhook auto fix error:', err)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   // Skapa ny webhook
   const createWebhook = async () => {
     try {
@@ -301,17 +334,30 @@ export default function WebhookConfig() {
                       )}
                     </div>
                     
-                    {webhook.is_our_webhook && webhook.missing_events.length > 0 && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => updateWebhookEvents(webhook.id)}
-                        disabled={updating}
-                        className="flex items-center gap-2"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${updating ? 'animate-spin' : ''}`} />
-                        Uppdatera Events
-                      </Button>
+                    {webhook.is_our_webhook && (webhook.missing_events.length > 0 || !webhook.sign_key_matches) && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => updateWebhookEvents(webhook.id)}
+                          disabled={updating}
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${updating ? 'animate-spin' : ''}`} />
+                          Uppdatera Events
+                        </Button>
+                        
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={autoFixWebhook}
+                          disabled={updating}
+                          className="flex items-center gap-2"
+                        >
+                          <Settings className={`w-4 h-4 ${updating ? 'animate-spin' : ''}`} />
+                          Auto Fix
+                        </Button>
+                      </div>
                     )}
                   </div>
 

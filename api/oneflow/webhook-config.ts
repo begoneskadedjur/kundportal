@@ -161,7 +161,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               "contract:publish", 
               "contract:sign"
             ].filter(event => !eventTypes.includes(event)),
-            is_our_webhook: webhook.callback_url?.includes('kundportal.vercel.app') || false
+            is_our_webhook: (webhook.callback_url?.includes('kundportal.vercel.app') && 
+                           (webhook.callback_url?.includes('/api/oneflow/webhook') || 
+                            webhook.callback_url?.includes('/api/oneflow-webhook'))) || false
           }
         })
 
@@ -200,6 +202,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.json({
             success: true,
             message: 'Webhook uppdaterad med nya event filters',
+            data: result
+          })
+
+        } else if (action === 'auto_fix_webhook') {
+          // Hitta vår webhook automatiskt och uppdatera den
+          const webhooks = await getWebhooks()
+          const ourWebhook = webhooks.find(webhook => 
+            webhook.callback_url?.includes('kundportal.vercel.app') && 
+            (webhook.callback_url?.includes('/api/oneflow/webhook') || 
+             webhook.callback_url?.includes('/api/oneflow-webhook'))
+          )
+
+          if (!ourWebhook) {
+            return res.status(404).json({
+              success: false,
+              error: 'Ingen BeGone webhook hittad. Skapa en ny webhook istället.'
+            })
+          }
+
+          const updateData = {
+            callback_url: WEBHOOK_URL, // Rätt URL
+            sign_key: WEBHOOK_SECRET,
+            filters: RECOMMENDED_EVENT_FILTERS
+          }
+
+          const result = await updateWebhook(ourWebhook.id, updateData)
+          
+          res.json({
+            success: true,
+            message: `Webhook #${ourWebhook.id} automatiskt uppdaterad med alla events`,
             data: result
           })
 
