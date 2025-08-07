@@ -50,6 +50,7 @@ export function useContracts(): UseContractsReturn {
   const [stats, setStats] = useState<ContractStats | null>(null)
   const [currentFilters, setCurrentFilters] = useState<ContractFilters>({})
   const currentFiltersRef = useRef<ContractFilters>({})
+  const loadingRef = useRef<Set<string>>(new Set()) // Track loading requests by filter key
   
   // Files state
   const [contractFiles, setContractFiles] = useState<{ [contractId: string]: ContractFile[] }>({})
@@ -69,17 +70,18 @@ export function useContracts(): UseContractsReturn {
       const cached = contractsCache[filterKey]
       const isCached = cached && (Date.now() - cached.timestamp < 2 * 60 * 1000) // 2 minuter cache
       
+      // TEMP: Inaktivera cache för debugging
       // Använd cache om tillgängligt
-      if (isCached && cached.data) {
-        console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
-        setContracts(cached.data)
-        setCurrentFilters(filters)
-        setLoading(false)
-        return
-      }
+      // if (isCached && cached.data) {
+      //   console.log(`🔄 Använder cachade kontrakt för filter: ${filterKey}`)
+      //   setContracts(cached.data)
+      //   setCurrentFilters(filters)
+      //   setLoading(false)
+      //   return
+      // }
       
       // Förhindra multipla samtidiga requests för samma filter
-      if (loading) {
+      if (loadingRef.current.has(filterKey)) {
         console.log(`⏳ Väntar på pågående request för filter: ${filterKey}`)
         return
       }
@@ -87,8 +89,10 @@ export function useContracts(): UseContractsReturn {
       console.log(`📄 Hämtar kontrakt från API med filter: ${filterKey}`)
       setLoading(true)
       setError(null)
+      loadingRef.current.add(filterKey) // Mark as loading
       
       const contractList = await ContractService.getContracts(filters)
+      console.log('✅ useContracts fick data:', contractList?.length || 0, 'kontrakt')
       setContracts(contractList)
       setCurrentFilters(filters)
       currentFiltersRef.current = filters
@@ -109,6 +113,7 @@ export function useContracts(): UseContractsReturn {
       console.error('useContracts.loadContracts fel:', err)
     } finally {
       setLoading(false)
+      loadingRef.current.delete(filterKey) // Remove from loading set
     }
   }, []) // Inga externa dependencies för att undvika loop
 

@@ -47,6 +47,7 @@ export class ContractService {
   static async getContracts(filters: ContractFilters = {}): Promise<ContractWithSourceData[]> {
     try {
       console.log('🔍 Hämtar kontrakt med filter:', filters)
+      console.log('🏷️ Tillåtna Template IDs:', Array.from(ALLOWED_TEMPLATE_IDS))
       
       let query = supabase
         .from('contracts')
@@ -61,6 +62,7 @@ export class ContractService {
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar  
       query = query.neq('status', 'draft')
       const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      console.log('📋 Filtrerar med templates:', allowedTemplates)
       query = query.in('template_id', allowedTemplates)
 
       // Tillämpa filter
@@ -104,6 +106,17 @@ export class ContractService {
       if (error) {
         console.error('❌ Fel vid hämtning av kontrakt:', error)
         throw new Error(`Databasfel: ${error.message}`)
+      }
+
+      console.log('📊 Rå data från Supabase:', data?.length || 0, 'kontrakt')
+      if (data && data.length > 0) {
+        console.log('🔍 Första kontraktet:', {
+          id: data[0].id,
+          status: data[0].status, 
+          template_id: data[0].template_id,
+          type: data[0].type,
+          company_name: data[0].company_name
+        })
       }
 
 
