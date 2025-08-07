@@ -42,7 +42,7 @@ export default function NewCustomer() {
     contract_start_date: '',
     contract_length_months: '',
     contract_end_date: '', // 🆕 NYA FÄLTET
-    annual_premium: '',
+    annual_value: '',
     total_contract_value: '',
     contract_description: '',
     assigned_account_manager: '' // Kommer att vara tekniker-email från TechnicianDropdown
@@ -65,17 +65,17 @@ export default function NewCustomer() {
 
   // Beräkna totalt avtalsvärde automatiskt (BEHÅLLS OFÖRÄNDRAD)
   useEffect(() => {
-    if (formData.annual_premium && formData.contract_length_months) {
-      const annualPremium = parseFloat(formData.annual_premium)
+    if (formData.annual_value && formData.contract_length_months) {
+      const annualValue = parseFloat(formData.annual_value)
       const lengthYears = parseInt(formData.contract_length_months) / 12
-      const totalValue = annualPremium * lengthYears
+      const totalValue = annualValue * lengthYears
       
       setFormData(prev => ({
         ...prev,
         total_contract_value: totalValue.toFixed(2)
       }))
     }
-  }, [formData.annual_premium, formData.contract_length_months])
+  }, [formData.annual_value, formData.contract_length_months])
 
   const fetchContractTypes = async () => {
     try {
@@ -158,14 +158,14 @@ export default function NewCustomer() {
     
     setFormData(prev => ({
       ...prev,
-      annual_premium: e.target.value,
+      annual_value: e.target.value,
       total_contract_value: months > 0 ? (premium * (months / 12)).toFixed(2) : ''
     }))
   }
 
   const handleLengthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const months = parseInt(e.target.value) || 0
-    const premium = parseFloat(formData.annual_premium) || 0
+    const premium = parseFloat(formData.annual_value) || 0
     
     setFormData(prev => ({
       ...prev,
@@ -407,8 +407,8 @@ export default function NewCustomer() {
                   </label>
                   <input
                     type="number"
-                    name="annual_premium"
-                    value={formData.annual_premium}
+                    name="annual_value"
+                    value={formData.annual_value}
                     onChange={handlePremiumChange}
                     min="0"
                     step="0.01"
@@ -513,9 +513,9 @@ export default function NewCustomer() {
                       <strong>Längd:</strong> {formData.contract_length_months} månader ({(parseInt(formData.contract_length_months) / 12).toFixed(1)} år)
                     </p>
                   )}
-                  {formData.annual_premium && (
+                  {formData.annual_value && (
                     <p className="text-slate-300">
-                      <strong>Årspremie:</strong> {formatCurrency(parseFloat(formData.annual_premium))}
+                      <strong>Årspremie:</strong> {formatCurrency(parseFloat(formData.annual_value))}
                     </p>
                   )}
                   {formData.total_contract_value && (

@@ -138,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       contract_start_date: customerData.contract_start_date || null,
       contract_length_months: customerData.contract_length_months ? parseInt(customerData.contract_length_months) : null,
       contract_end_date: customerData.contract_end_date || null,
-      annual_premium: customerData.annual_premium ? parseFloat(customerData.annual_premium) : null,
+      annual_value: customerData.annual_value ? parseFloat(customerData.annual_value) : null,
       total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
       contract_description: customerData.contract_description?.trim() || null,
       assigned_account_manager: customerData.assigned_account_manager || null,
@@ -308,7 +308,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
     
     // Förbättrat avtalsinformation med slutdatum
-    const contractInfo = customer.contract_start_date || customer.annual_premium ? `
+    const contractInfo = customer.contract_start_date || customer.annual_value ? `
       <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <h3 style="color: #22c55e; margin: 0 0 12px 0;">📋 Avtalsinformation</h3>
         ${customer.contract_start_date ? `
@@ -320,8 +320,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${customer.contract_length_months ? `
           <p style="margin: 4px 0;"><strong>⏱️ Avtalslängd:</strong> ${customer.contract_length_months} månader</p>
         ` : ''}
-        ${customer.annual_premium ? `
-          <p style="margin: 4px 0;"><strong>💰 Årspremie:</strong> ${customer.annual_premium.toLocaleString('sv-SE')} SEK</p>
+        ${customer.annual_value ? `
+          <p style="margin: 4px 0;"><strong>💰 Årspremie:</strong> ${customer.annual_value.toLocaleString('sv-SE')} SEK</p>
         ` : ''}
         ${customer.total_contract_value ? `
           <p style="margin: 4px 0;"><strong>💎 Totalt avtalsvärde:</strong> ${customer.total_contract_value.toLocaleString('sv-SE')} SEK</p>
@@ -438,7 +438,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contract_start_date: customer.contract_start_date,
         contract_end_date: customer.contract_end_date,
         contract_length_months: customer.contract_length_months,
-        annual_premium: customer.annual_premium,
+        annual_value: customer.annual_value,
         total_contract_value: customer.total_contract_value,
         assigned_account_manager: customer.assigned_account_manager
       }

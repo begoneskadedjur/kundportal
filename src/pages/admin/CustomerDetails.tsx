@@ -36,7 +36,7 @@ interface CustomerDetails {
   contract_start_date?: string | null
   contract_length_months?: number | null
   contract_end_date?: string | null // 🆕 NYA FÄLTET
-  annual_premium?: number | null
+  annual_value?: number | null
   total_contract_value?: number | null
   contract_description?: string | null
   assigned_account_manager?: string | null
@@ -529,7 +529,7 @@ export default function CustomerDetails() {
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Årspremie</label>
                   <p className="text-2xl font-bold text-green-400">
-                    {formatCurrency(customer.annual_premium)}
+                    {formatCurrency(customer.annual_value)}
                   </p>
                 </div>
                 
@@ -540,11 +540,11 @@ export default function CustomerDetails() {
                   </p>
                 </div>
                 
-                {customer.annual_premium && customer.contract_length_months && (
+                {customer.annual_value && customer.contract_length_months && (
                   <div>
                     <label className="block text-sm text-slate-400 mb-1">Månadsbelopp</label>
                     <p className="text-white">
-                      {formatCurrency(customer.annual_premium / 12)}
+                      {formatCurrency(customer.annual_value / 12)}
                     </p>
                   </div>
                 )}

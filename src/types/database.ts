@@ -744,7 +744,7 @@ export type CustomerFormData = {
   contract_start_date: string
   contract_length_months: string
   contract_end_date: string
-  annual_premium: string
+  annual_value: string
   total_contract_value: string
   contract_description: string
   assigned_account_manager: string

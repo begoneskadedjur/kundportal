@@ -31,7 +31,7 @@ interface ContractCasesData {
   }>
   customers: Array<{
     id: number
-    annual_premium: number
+    annual_value: number
     total_contract_value: number
     created_at: string
   }>

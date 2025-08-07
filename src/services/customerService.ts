@@ -17,7 +17,7 @@ export type CreateCustomerData = {
   // Nya avtalsfält
   contract_start_date?: string
   contract_length_months?: string
-  annual_premium?: string
+  annual_value?: string
   total_contract_value?: string
   contract_description?: string
   assigned_account_manager?: string
@@ -103,8 +103,8 @@ export const customerService = {
     if (updates.contract_length_months) {
       dbUpdates.contract_length_months = parseInt(updates.contract_length_months)
     }
-    if (updates.annual_premium) {
-      dbUpdates.annual_premium = parseFloat(updates.annual_premium)
+    if (updates.annual_value) {
+      dbUpdates.annual_value = parseFloat(updates.annual_value)
     }
     if (updates.total_contract_value) {
       dbUpdates.total_contract_value = parseFloat(updates.total_contract_value)
@@ -180,7 +180,7 @@ export const customerService = {
     try {
       const { data: customers, error } = await supabase
         .from('customers')
-        .select('is_active, contract_status, annual_premium, total_contract_value')
+        .select('is_active, contract_status, annual_value, total_contract_value')
 
       if (error) throw error
 
@@ -188,7 +188,7 @@ export const customerService = {
         total: customers?.length || 0,
         active: customers?.filter(c => c.is_active)?.length || 0,
         inactive: customers?.filter(c => !c.is_active)?.length || 0,
-        totalAnnualRevenue: customers?.reduce((sum, c) => sum + (c.annual_premium || 0), 0) || 0,
+        totalAnnualRevenue: customers?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0,
         totalContractValue: customers?.reduce((sum, c) => sum + (c.total_contract_value || 0), 0) || 0,
         averageContractValue: 0
       }

@@ -22,7 +22,7 @@ interface CompanyInformationProps {
     contract_start_date?: string
     contract_end_date?: string
     contract_length_months?: number
-    annual_premium?: number
+    annual_value?: number
     total_contract_value?: number
     assigned_account_manager?: string
     contract_status?: string
@@ -183,12 +183,12 @@ const CompanyInformation: React.FC<CompanyInformationProps> = ({ customer, onEdi
               </div>
             )}
 
-            {customer.annual_premium && (
+            {customer.annual_value && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 text-sm">Årspremie</span>
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-green-500" />
-                  <span className="text-white font-medium">{formatCurrency(customer.annual_premium)}</span>
+                  <span className="text-white font-medium">{formatCurrency(customer.annual_value)}</span>
                 </div>
               </div>
             )}

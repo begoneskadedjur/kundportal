@@ -37,7 +37,7 @@ type Customer = {
   business_type?: string
   contract_start_date?: string
   contract_end_date?: string
-  annual_premium?: number
+  annual_value?: number
   assigned_account_manager?: string
 }
 

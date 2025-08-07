@@ -32,7 +32,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
         <p className="text-white font-medium">{data.company_name}</p>
-        <p className="text-slate-300 text-sm">Årspremie: {formatCurrency(data.annual_premium)}</p>
+        <p className="text-slate-300 text-sm">Årspremie: {formatCurrency(data.annual_value)}</p>
         <p className="text-slate-300 text-sm">Månader kvar: {data.months_remaining}</p>
         <p className="text-slate-300 text-sm">Account Manager: {data.assigned_account_manager}</p>
       </div>
@@ -96,7 +96,7 @@ const ExpiringContractsChart: React.FC = () => {
       }
     }
     acc[risk].count++
-    acc[risk].totalValue += contract.annual_premium
+    acc[risk].totalValue += contract.annual_value
     acc[risk].contracts.push(contract)
     return acc
   }, {} as Record<string, any>)
@@ -118,7 +118,7 @@ const ExpiringContractsChart: React.FC = () => {
         : contract.company_name
     }))
 
-  const totalAtRisk = contracts.reduce((sum, c) => sum + c.annual_premium, 0)
+  const totalAtRisk = contracts.reduce((sum, c) => sum + c.annual_value, 0)
   const highRiskCount = contracts.filter(c => c.risk_level === 'high').length
   const mediumRiskCount = contracts.filter(c => c.risk_level === 'medium').length
 
@@ -225,7 +225,7 @@ const ExpiringContractsChart: React.FC = () => {
                 <div key={contract.customer_id} className="flex items-center justify-between text-sm bg-red-500/5 border border-red-500/20 rounded p-2">
                   <span className="text-white">{contract.company_name}</span>
                   <span className="text-red-400">{contract.months_remaining} mån</span>
-                  <span className="text-slate-300">{formatCurrency(contract.annual_premium)}</span>
+                  <span className="text-slate-300">{formatCurrency(contract.annual_value)}</span>
                   <span className="text-slate-400">{contract.assigned_account_manager}</span>
                 </div>
               ))}

@@ -37,7 +37,7 @@ interface Customer {
   // Avtalsfält
   contract_start_date?: string | null
   contract_length_months?: number | null
-  annual_premium?: number | null
+  annual_value?: number | null
   total_contract_value?: number | null
   assigned_account_manager?: string | null
   contract_status?: string
@@ -162,8 +162,9 @@ export default function Customers() {
   const calculateStats = (customerData: Customer[]) => {
     const activeCustomers = customerData.filter(c => c.is_active)
     
+    // Använd annual_value för årligt kontraktsvärde
     const totalAnnualRevenue = activeCustomers.reduce((sum, customer) => {
-      return sum + (customer.annual_premium || 0)
+      return sum + (customer.annual_value || 0)
     }, 0)
 
     const contractsExpiringSoon = activeCustomers.filter(customer => {
@@ -752,7 +753,7 @@ export default function Customers() {
                           <td className="py-4 px-4">
                             <div>
                               <p className="text-white font-medium">
-                                {customer.annual_premium ? formatCurrency(customer.annual_premium) : 'Ej satt'}
+                                {(customer as any).annual_value ? formatCurrency((customer as any).annual_value) : 'Ej satt'}
                               </p>
                               <p className="text-slate-400 text-sm">
                                 {customer.contract_types?.name || 'Okänt avtal'}

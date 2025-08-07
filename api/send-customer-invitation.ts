@@ -482,7 +482,7 @@ async function sendReminderEmail({ email, contactPerson, companyName, loginLink,
 }
 
 function getContractInfoText(customer: any): string {
-  if (!customer.annual_premium && !customer.contract_start_date) {
+  if (!customer.annual_value && !customer.contract_start_date) {
     return ''
   }
 
@@ -509,8 +509,8 @@ function getContractInfoText(customer: any): string {
     contractText += `<p style="margin: 5px 0;"><strong>Avtalstyp:</strong> ${customer.contract_types.name}</p>`
   }
 
-  if (customer.annual_premium) {
-    contractText += `<p style="margin: 5px 0;"><strong>Årspremie:</strong> ${formatCurrency(customer.annual_premium)}</p>`
+  if (customer.annual_value) {
+    contractText += `<p style="margin: 5px 0;"><strong>Årspremie:</strong> ${formatCurrency(customer.annual_value)}</p>`
   }
 
   if (customer.contract_start_date) {

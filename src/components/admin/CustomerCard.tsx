@@ -32,7 +32,7 @@ interface Customer {
   // Avtalsfält
   contract_start_date?: string | null
   contract_length_months?: number | null
-  annual_premium?: number | null
+  annual_value?: number | null
   total_contract_value?: number | null
   assigned_account_manager?: string | null
   contract_status?: string
@@ -296,7 +296,7 @@ export default function CustomerCard({ customer, onToggleStatus, onDelete, onCas
             <div>
               <p className="text-xs text-slate-400">Årspremie</p>
               <p className="text-sm font-medium text-white">
-                {formatCurrency(customer.annual_premium)}
+                {formatCurrency(customer.annual_value)}
               </p>
             </div>
           </div>

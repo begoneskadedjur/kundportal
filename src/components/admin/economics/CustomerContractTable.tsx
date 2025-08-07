@@ -141,7 +141,7 @@ const CustomerContractTable: React.FC = () => {
   }
 
   // Statistik för filtrerad data
-  const totalFilteredRevenue = sortedContracts.reduce((sum, c) => sum + c.annual_premium, 0)
+  const totalFilteredRevenue = sortedContracts.reduce((sum, c) => sum + c.annual_value, 0)
   const expiringCount = sortedContracts.filter(c => c.days_remaining <= 180).length
 
   // Unika verksamhetstyper för filter
@@ -240,11 +240,11 @@ const CustomerContractTable: React.FC = () => {
               <th className="px-4 py-3 text-left">Verksamhet</th>
               <th 
                 className="px-4 py-3 text-right cursor-pointer hover:bg-slate-700 transition-colors"
-                onClick={() => handleSort('annual_premium')}
+                onClick={() => handleSort('annual_value')}
               >
                 <div className="flex items-center justify-end">
                   Årspremie
-                  {getSortIcon('annual_premium')}
+                  {getSortIcon('annual_value')}
                 </div>
               </th>
               <th 
@@ -292,9 +292,9 @@ const CustomerContractTable: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <div className="font-semibold text-green-400">{formatCurrency(contract.annual_premium)}</div>
+                  <div className="font-semibold text-green-400">{formatCurrency(contract.annual_value)}</div>
                   <div className="text-xs text-slate-400">
-                    {formatCurrency(contract.annual_premium / 12)}/mån
+                    {formatCurrency(contract.annual_value / 12)}/mån
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right">

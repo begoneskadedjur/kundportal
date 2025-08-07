@@ -14,7 +14,7 @@ export interface ExpiringContract {
   customer_id: number
   company_name: string
   contract_end_date: string
-  annual_premium: number
+  annual_value: number
   assigned_account_manager: string
   months_remaining: number
   risk_level: 'high' | 'medium' | 'low'
@@ -80,7 +80,7 @@ export interface CustomerContract {
   company_name: string
   business_type: string
   contract_type_name: string
-  annual_premium: number
+  annual_value: number
   total_contract_value: number
   contract_start_date: string
   contract_end_date: string
@@ -106,11 +106,11 @@ export const getKpiData = async (): Promise<KpiData> => {
     // ARR från aktiva kunder
     const { data: arrData } = await supabase
       .from('customers')
-      .select('annual_premium')
+      .select('annual_value')
       .eq('is_active', true)
       .eq('contract_status', 'active')
 
-    const total_arr = arrData?.reduce((sum, c) => sum + (c.annual_premium || 0), 0) || 0
+    const total_arr = arrData?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
     const monthly_recurring_revenue = total_arr / 12
     const active_customers = arrData?.length || 0
     const avg_customer_value = active_customers > 0 ? total_arr / active_customers : 0
@@ -178,7 +178,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
     // Hämta alla kunder för kontraktsintäkter
     const { data: customers } = await supabase
       .from('customers')
-      .select('annual_premium, contract_start_date, contract_end_date, is_active')
+      .select('annual_value, contract_start_date, contract_end_date, is_active')
       .eq('is_active', true)
 
     // Senaste 12 månader
@@ -228,7 +228,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
 
     // Lägg till kontraktsintäkter (fördelat per månad)
     customers?.forEach(customer => {
-      const monthlyContractRevenue = (customer.annual_premium || 0) / 12
+      const monthlyContractRevenue = (customer.annual_value || 0) / 12
       Object.keys(monthlyData).forEach(month => {
         monthlyData[month].contract_revenue += monthlyContractRevenue
       })
@@ -507,7 +507,7 @@ export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
 
     const { data } = await supabase
       .from('customers')
-      .select('id, company_name, contract_end_date, annual_premium, assigned_account_manager')
+      .select('id, company_name, contract_end_date, annual_value, assigned_account_manager')
       .eq('is_active', true)
       .lte('contract_end_date', threeMonthsFromNow.toISOString())
       .gte('contract_end_date', new Date().toISOString())
@@ -522,7 +522,7 @@ export const getExpiringContracts = async (): Promise<ExpiringContract[]> => {
         customer_id: customer.id,
         company_name: customer.company_name,
         contract_end_date: customer.contract_end_date,
-        annual_premium: customer.annual_premium || 0,
+        annual_value: customer.annual_value || 0,
         assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad',
         months_remaining,
         risk_level: months_remaining <= 1 ? 'high' : months_remaining <= 2 ? 'medium' : 'low'
@@ -577,7 +577,7 @@ export const getAccountManagerRevenue = async (): Promise<AccountManagerRevenue[
   try {
     const { data } = await supabase
       .from('customers')
-      .select('assigned_account_manager, annual_premium, total_contract_value')
+      .select('assigned_account_manager, annual_value, total_contract_value')
       .eq('is_active', true)
       .not('assigned_account_manager', 'is', null)
 
@@ -598,7 +598,7 @@ export const getAccountManagerRevenue = async (): Promise<AccountManagerRevenue[
       
       managerStats[manager].customers_count++
       managerStats[manager].total_contract_value += customer.total_contract_value || 0
-      managerStats[manager].annual_revenue += customer.annual_premium || 0
+      managerStats[manager].annual_revenue += customer.annual_value || 0
     })
 
     return Object.values(managerStats).map((manager: any) => ({
@@ -665,7 +665,7 @@ export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
         id,
         company_name,
         business_type,
-        annual_premium,
+        annual_value,
         total_contract_value,
         contract_start_date,
         contract_end_date,
@@ -687,7 +687,7 @@ export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
         company_name: customer.company_name,
         business_type: customer.business_type || '',
         contract_type_name: (customer.contract_types as any)?.name || 'Okänt',
-        annual_premium: customer.annual_premium || 0,
+        annual_value: customer.annual_value || 0,
         total_contract_value: customer.total_contract_value || 0,
         contract_start_date: customer.contract_start_date,
         contract_end_date: customer.contract_end_date,

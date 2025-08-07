@@ -8,7 +8,7 @@ import EditCaseModal from './technicians/EditCaseModal';
 interface Customer {
   id: string;
   company_name: string;
-  annual_premium: number;
+  annual_value: number;
   is_active: boolean;
   customer_type: string;
 }
@@ -93,7 +93,7 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
                       Avtalskund
                     </p>
                   </div>
-                  <p className="text-green-400 font-medium">{formatCurrency(customer.annual_premium || 0)}</p>
+                  <p className="text-green-400 font-medium">{formatCurrency(customer.annual_value || 0)}</p>
                 </div>
               ))}
             </div>
