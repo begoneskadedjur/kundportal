@@ -97,8 +97,7 @@ const AdminDashboard: React.FC = () => {
         techniciansResult,
         absencesResult
       ] = await Promise.all([
-        // TILLFÄLLIGT: Returnera tom array eftersom customers-tabellen är tom
-        Promise.resolve({ data: [], error: null }), // supabase.from('customers').select('id, company_name, annual_value').eq('is_active', true),
+        supabase.from('customers').select('id, company_name, annual_value').eq('is_active', true),
         supabase.from('cases').select('id, price').not('completed_date', 'is', null),
         supabase.from('private_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
         supabase.from('business_cases').select('id, title, kontaktperson, pris').eq('status', 'Avslutat').not('pris', 'is', null),
@@ -116,7 +115,7 @@ const AdminDashboard: React.FC = () => {
       if (absencesResult.error) throw absencesResult.error
 
       // Beräkna total revenue
-      const contractRevenue = customersResult.data?.reduce((sum, c) => sum + ((c as any).annual_value || 0), 0) || 0
+      const contractRevenue = customersResult.data?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
       const caseRevenue = casesResult.data?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
       const privateRevenue = privateCasesResult.data?.reduce((sum, c) => sum + (c.pris || 0), 0) || 0
       const businessRevenue = businessCasesResult.data?.reduce((sum, c) => sum + (c.pris * 1.25 || 0), 0) || 0
