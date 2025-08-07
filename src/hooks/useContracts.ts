@@ -339,6 +339,21 @@ export function useContracts(): UseContractsReturn {
     }
   }, []) // Inga dependencies för att undvika cykler
 
+  // Lyssna på deduplikations-events för att rensa filcache
+  useEffect(() => {
+    const handleContractsDeduplication = (event: any) => {
+      console.log('🧹 Kontrakt deduplikation detekterad, rensar filcache...', event.detail)
+      setContractFiles({})
+      setFilesLoadedAt({})
+    }
+
+    window.addEventListener('contracts-deduplicated', handleContractsDeduplication)
+
+    return () => {
+      window.removeEventListener('contracts-deduplicated', handleContractsDeduplication)
+    }
+  }, [])
+
   // Initial loading vid mount
   useEffect(() => {
     loadContracts()

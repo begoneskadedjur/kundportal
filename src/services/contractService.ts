@@ -164,6 +164,17 @@ export class ContractService {
 
       if (uniqueContracts.length !== contractsWithSourceData.length) {
         console.warn(`⚠️ Duplikatkontroll: Reducerade ${contractsWithSourceData.length} till ${uniqueContracts.length} unika kontrakt`)
+        
+        // Skicka en custom event för att indikera att cache bör rensas
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('contracts-deduplicated', {
+            detail: {
+              originalCount: contractsWithSourceData.length,
+              uniqueCount: uniqueContracts.length,
+              removedDuplicates: contractsWithSourceData.length - uniqueContracts.length
+            }
+          }))
+        }
       }
 
       console.log('✅ Kontrakt hämtade:', uniqueContracts.length)

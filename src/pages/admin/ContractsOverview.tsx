@@ -379,64 +379,91 @@ export default function ContractsOverview() {
 
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-20" /> {/* Typ */}
+              <col className="w-64" /> {/* Motpart */}
+              <col className="w-24" /> {/* Status */}
+              <col className="w-28" /> {/* Värde */}
+              <col className="w-24" /> {/* Startdatum */}
+              <col className="w-24" /> {/* Skapad */}
+              <col className="w-32" /> {/* BeGone-ansvarig */}
+              <col className="w-32" /> {/* Filer */}
+              <col className="w-20" /> {/* Åtgärder */}
+            </colgroup>
             <thead className="bg-slate-800 border-b border-slate-700">
               <tr className="text-slate-300">
-                <th className="px-4 py-3 text-left cursor-pointer hover:bg-slate-700 transition-colors">
+                <th className="px-3 py-3 text-left cursor-pointer hover:bg-slate-700 transition-colors">
                   <div className="flex items-center">Typ</div>
                 </th>
-                <th className="px-4 py-3 text-left">Motpart</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-right">Värde (SEK)</th>
-                <th className="px-4 py-3 text-left">Startdatum</th>
-                <th className="px-4 py-3 text-left">Skapad</th>
-                <th className="px-4 py-3 text-left">BeGone-ansvarig</th>
-                <th className="px-4 py-3 text-left">Filer</th>
-                <th className="px-4 py-3 text-center">Åtgärder</th>
+                <th className="px-3 py-3 text-left">Motpart</th>
+                <th className="px-3 py-3 text-left">Status</th>
+                <th className="px-3 py-3 text-right">Värde (SEK)</th>
+                <th className="px-3 py-3 text-left">Startdatum</th>
+                <th className="px-3 py-3 text-left">Skapad</th>
+                <th className="px-3 py-3 text-left">BeGone-ansvarig</th>
+                <th className="px-3 py-3 text-left">Filer</th>
+                <th className="px-3 py-3 text-center">Åtgärder</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700">
               {filteredContracts.map((contract) => (
                 <tr key={contract.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-4 py-3">
-                    <TypeBadge type={contract.type} />
+                  <td className="px-3 py-3">
+                    <div className="flex justify-center">
+                      <TypeBadge type={contract.type} />
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3">
-                    <div>
-                      <div className="text-white font-medium">
+                  <td className="px-3 py-3">
+                    <div className="min-w-0">
+                      <div className="text-white font-medium truncate" title={contract.company_name || contract.contact_person || 'Okänd motpart'}>
                         {contract.company_name || contract.contact_person || 'Okänd motpart'}
                       </div>
                       {contract.contact_person && contract.company_name && (
-                        <div className="text-slate-400 text-xs">{contract.contact_person}</div>
+                        <div className="text-slate-400 text-xs truncate" title={contract.contact_person}>
+                          {contract.contact_person}
+                        </div>
                       )}
                       {contract.contact_email && (
-                        <div className="text-slate-500 text-xs">{contract.contact_email}</div>
+                        <div className="text-slate-500 text-xs truncate" title={contract.contact_email}>
+                          {contract.contact_email}
+                        </div>
                       )}
                     </div>
                   </td>
                   
-                  <td className="px-4 py-3">
-                    <StatusBadge status={contract.status} />
+                  <td className="px-3 py-3">
+                    <div className="flex justify-center">
+                      <StatusBadge status={contract.status} />
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3 text-right text-white font-medium">
-                    {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+                  <td className="px-3 py-3 text-right">
+                    <div className="text-white font-medium">
+                      {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3 text-slate-400">
-                    {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
+                  <td className="px-3 py-3">
+                    <div className="text-slate-400 text-xs">
+                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE') : 'Ej angivet'}
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3 text-slate-400">
-                    {new Date(contract.created_at).toLocaleDateString('sv-SE')}
+                  <td className="px-3 py-3">
+                    <div className="text-slate-400 text-xs">
+                      {new Date(contract.created_at).toLocaleDateString('sv-SE')}
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3 text-slate-400">
-                    {contract.begone_employee_name || '-'}
+                  <td className="px-3 py-3">
+                    <div className="text-slate-400 text-xs truncate" title={contract.begone_employee_name || '-'}>
+                      {contract.begone_employee_name || '-'}
+                    </div>
                   </td>
                   
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <FilesColumn 
                       contractId={contract.id}
                       onFilesModalOpen={() => handleOpenFilesModal(contract)}
@@ -444,8 +471,8 @@ export default function ContractsOverview() {
                     />
                   </td>
                   
-                  <td className="px-4 py-3">
-                    <div className="flex justify-center gap-2">
+                  <td className="px-3 py-3">
+                    <div className="flex justify-center">
                       <Button
                         variant="ghost"
                         size="sm"
