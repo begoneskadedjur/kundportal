@@ -176,10 +176,10 @@ const logWebhookToDatabase = async (logEntry: WebhookLogEntry) => {
   }
 }
 
-// Hämta kontrakt-detaljer från OneFlow API
-const fetchOneflowContractDetails = async (contractId: string): Promise<OneflowContractDetails | null> => {
+// Hämta kontrakt-detaljer från OneFlow API (med retry för timing-problem)
+const fetchOneflowContractDetails = async (contractId: string, retryCount = 0): Promise<OneflowContractDetails | null> => {
   try {
-    console.log('🔍 Hämtar kontrakt-detaljer från OneFlow API:', contractId)
+    console.log(`🔍 Hämtar kontrakt-detaljer från OneFlow API: ${contractId} (försök ${retryCount + 1}/3)`)
 
     const response = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
       method: 'GET',
@@ -210,6 +210,13 @@ const fetchOneflowContractDetails = async (contractId: string): Promise<OneflowC
     if (!contractDetails) {
       console.error('❌ Kontrakt-detaljer är null eller undefined')
       return null
+    }
+
+    // Om template info saknas, försök igen efter delay (max 3 försök)
+    if (!contractDetails.template?.id && retryCount < 2) {
+      console.log(`⏰ Template info saknas, väntar 3 sekunder och försöker igen...`)
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      return await fetchOneflowContractDetails(contractId, retryCount + 1)
     }
     
     console.log('✅ Kontrakt-detaljer hämtade:', contractDetails.name || `ID ${contractDetails.id}`)
