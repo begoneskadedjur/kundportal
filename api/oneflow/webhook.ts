@@ -49,10 +49,17 @@ interface OneflowContractDetails {
   id: number
   name: string
   state: string
-  template: {
+  template?: {
     id: number
     name: string
   }
+  // Alternativa platser där OneFlow kan spara template ID
+  _private_ownerside?: {
+    template_id?: number
+    custom_id?: string
+    [key: string]: any
+  }
+  template_id?: number // Direkt på root-objektet
   data_fields: Array<{
     custom_id: string
     value: string
@@ -211,22 +218,53 @@ const fetchOneflowContractDetails = async (contractId: string, retryCount = 0, s
     }
 
     const contractDetails = await response.json() as OneflowContractDetails
+    
+    // Försök hitta template ID från olika platser där OneFlow kan spara den
+    let templateId: number | null = null
+    let templateName: string = 'Unknown'
+    
+    if (contractDetails?.template?.id) {
+      templateId = contractDetails.template.id
+      templateName = contractDetails.template.name || 'Unknown'
+      console.log(`✅ Template ID hittad i standard plats: ${templateId}`)
+    } else if (contractDetails?._private_ownerside?.template_id) {
+      templateId = contractDetails._private_ownerside.template_id
+      templateName = 'API Created Template'
+      console.log(`✅ Template ID hittad i _private_ownerside: ${templateId}`)
+    } else if (contractDetails?.template_id) {
+      templateId = contractDetails.template_id
+      templateName = 'Direct Template'
+      console.log(`✅ Template ID hittad direkt på root: ${templateId}`)
+    }
+    
     console.log('📦 Raw contract details response:')
     console.log(`- ID: ${contractDetails?.id}`)
     console.log(`- Name: ${contractDetails?.name || 'N/A'}`)
     console.log(`- State: ${contractDetails?.state}`)
-    console.log(`- Template ID: ${contractDetails?.template?.id || 'SAKNAS'}`)
-    console.log(`- Template name: ${contractDetails?.template?.name || 'SAKNAS'}`)
+    console.log(`- Template ID (standard): ${contractDetails?.template?.id || 'SAKNAS'}`)
+    console.log(`- Template ID (_private_ownerside): ${contractDetails?._private_ownerside?.template_id || 'SAKNAS'}`)
+    console.log(`- Template ID (root): ${contractDetails?.template_id || 'SAKNAS'}`)
+    console.log(`- ✅ SLUTLIG Template ID: ${templateId || 'SAKNAS'}`)
+    console.log(`- Template name: ${templateName}`)
 
     if (!contractDetails) {
       console.error('❌ Kontrakt-detaljer är null eller undefined')
       return null
     }
+    
+    // Om vi hittade template ID, sätt den i standard-platsen för enklare hantering senare
+    if (templateId && !contractDetails.template) {
+      contractDetails.template = {
+        id: templateId,
+        name: templateName
+      }
+      console.log(`📝 Template info satt i standard plats för vidare processering`)
+    }
 
-    // Om template info saknas och vi inte ska skippa retry
-    if (!contractDetails.template?.id && !skipRetryForMissingTemplate && retryCount < 4) {
+    // Om template info FORTFARANDE saknas och vi inte ska skippa retry
+    if (!templateId && !skipRetryForMissingTemplate && retryCount < 4) {
       const waitTime = (retryCount + 1) * 10000 // 10s, 20s, 30s, 40s
-      console.log(`⏰ Template info saknas, väntar ${waitTime/1000} sekunder och försöker igen...`)
+      console.log(`⏰ Template info saknas helt, väntar ${waitTime/1000} sekunder och försöker igen...`)
       await new Promise(resolve => setTimeout(resolve, waitTime))
       return await fetchOneflowContractDetails(contractId, retryCount + 1, skipRetryForMissingTemplate)
     }
