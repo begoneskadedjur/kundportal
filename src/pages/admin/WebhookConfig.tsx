@@ -103,6 +103,34 @@ export default function WebhookConfig() {
     }
   }
 
+  // Testa webhook endpoint
+  const testWebhook = async () => {
+    try {
+      setUpdating(true)
+
+      console.log('🧪 Testar webhook endpoint...')
+      const response = await fetch('/api/test-webhook', {
+        method: 'GET'
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Webhook test misslyckades')
+      }
+
+      toast.success('Webhook test skickat! Kolla Vercel logs för resultat.')
+      console.log('📊 Webhook test resultat:', result.data)
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Okänt fel'
+      toast.error(`Webhook test fel: ${errorMessage}`)
+      console.error('Webhook test error:', err)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   // Automatisk fix av befintlig webhook
   const autoFixWebhook = async () => {
     try {
@@ -239,6 +267,17 @@ export default function WebhookConfig() {
         
         <div className="flex items-center gap-3">
           <Button
+            variant="ghost" 
+            size="sm"
+            onClick={testWebhook}
+            disabled={updating}
+            className="text-slate-400"
+          >
+            <Play className="w-4 h-4 mr-2" />
+            Testa Webhook
+          </Button>
+          
+          <Button
             variant="ghost"
             size="sm"
             onClick={loadWebhookConfig}
@@ -327,7 +366,7 @@ export default function WebhookConfig() {
               {data.analysis.map((webhook, index) => (
                 <div key={webhook.id} className={`p-4 rounded-lg border ${webhook.is_our_webhook ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-800 border-slate-700'}`}>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-white">Webhook #{webhook.id}</span>
                       {webhook.is_our_webhook && (
                         <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">Vår webhook</span>
@@ -335,6 +374,9 @@ export default function WebhookConfig() {
                       <span className="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded font-mono">
                         ID: {webhook.id}
                       </span>
+                      {webhook.callback_url?.includes('kundportal.vercel.app') && (
+                        <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded">BeGone URL</span>
+                      )}
                     </div>
                     
                     {webhook.is_our_webhook && (webhook.missing_events.length > 0 || !webhook.sign_key_matches) && (
