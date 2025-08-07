@@ -139,8 +139,35 @@ export class ContractService {
         })
       )
 
-      console.log('✅ Kontrakt hämtade:', contractsWithSourceData.length)
-      return contractsWithSourceData
+      // Deduplicate contracts baserat på oneflow_contract_id
+      const uniqueContracts = contractsWithSourceData.reduce((acc: ContractWithSourceData[], current) => {
+        const existingIndex = acc.findIndex(contract => 
+          contract.oneflow_contract_id === current.oneflow_contract_id
+        )
+        
+        if (existingIndex === -1) {
+          // Nytt kontrakt, lägg till
+          acc.push(current)
+        } else {
+          // Duplikat hittat, behåll det senast uppdaterade
+          const existing = acc[existingIndex]
+          if (new Date(current.updated_at) > new Date(existing.updated_at)) {
+            console.warn(`🔄 Ersätter duplikat kontrakt ${current.oneflow_contract_id} med senare version`)
+            acc[existingIndex] = current
+          } else {
+            console.warn(`🚫 Hoppar över äldre duplikat av kontrakt ${current.oneflow_contract_id}`)
+          }
+        }
+        
+        return acc
+      }, [])
+
+      if (uniqueContracts.length !== contractsWithSourceData.length) {
+        console.warn(`⚠️ Duplikatkontroll: Reducerade ${contractsWithSourceData.length} till ${uniqueContracts.length} unika kontrakt`)
+      }
+
+      console.log('✅ Kontrakt hämtade:', uniqueContracts.length)
+      return uniqueContracts
 
     } catch (error) {
       console.error('💥 ContractService.getContracts fel:', error)
