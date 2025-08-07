@@ -233,6 +233,8 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
   const templateId = details.template?.id
   if (!templateId) {
     console.log(`🚫 Hoppar över kontrakt utan template: ${details.id}`)
+    console.log(`ℹ️ Detta kan hända på contract:create events innan template info laddas`)
+    console.log(`ℹ️ Kontraktet kommer processas igen på contract:publish event`)
     return false
   }
   
@@ -242,6 +244,7 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
     return false
   }
   
+  console.log(`✅ Kontrakt godkänt för processering: ${details.id} (mall: ${templateId})`)
   return true
 }
 
