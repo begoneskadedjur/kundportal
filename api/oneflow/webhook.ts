@@ -158,12 +158,23 @@ const verifySignature = (payload: OneflowWebhookPayload): boolean => {
 // Logga webhook till databas (utan att stoppa processingen vid fel)
 const logWebhookToDatabase = async (logEntry: WebhookLogEntry) => {
   try {
+    // Säkerställ att vi har alla required fields
+    const safeLogEntry = {
+      event_type: logEntry.event_type || 'unknown',
+      oneflow_contract_id: logEntry.oneflow_contract_id || 'unknown',
+      status: logEntry.status || 'error',
+      details: logEntry.details || {},
+      error_message: logEntry.error_message || null,
+      created_at: new Date().toISOString()
+    }
+    
     const { error } = await supabase
       .from('oneflow_sync_log')
-      .insert(logEntry)
+      .insert(safeLogEntry)
 
     if (error) {
       console.error('❌ Fel vid loggning till databas:', error.message)
+      console.error('❌ Log entry som försöktes sparas:', safeLogEntry)
       console.warn('⚠️ Webhook-loggning misslyckades men fortsätter processering...')
       return // Fortsätt utan att kasta fel
     }
@@ -177,9 +188,9 @@ const logWebhookToDatabase = async (logEntry: WebhookLogEntry) => {
 }
 
 // Hämta kontrakt-detaljer från OneFlow API (med retry för timing-problem)
-const fetchOneflowContractDetails = async (contractId: string, retryCount = 0): Promise<OneflowContractDetails | null> => {
+const fetchOneflowContractDetails = async (contractId: string, retryCount = 0, skipRetryForMissingTemplate = false): Promise<OneflowContractDetails | null> => {
   try {
-    console.log(`🔍 Hämtar kontrakt-detaljer från OneFlow API: ${contractId} (försök ${retryCount + 1}/3)`)
+    console.log(`🔍 Hämtar kontrakt-detaljer från OneFlow API: ${contractId} (försök ${retryCount + 1}/5)`)
 
     const response = await fetch(`https://api.oneflow.com/v1/contracts/${contractId}`, {
       method: 'GET',
@@ -202,21 +213,22 @@ const fetchOneflowContractDetails = async (contractId: string, retryCount = 0): 
     const contractDetails = await response.json() as OneflowContractDetails
     console.log('📦 Raw contract details response:')
     console.log(`- ID: ${contractDetails?.id}`)
-    console.log(`- Name: ${contractDetails?.name}`)
+    console.log(`- Name: ${contractDetails?.name || 'N/A'}`)
     console.log(`- State: ${contractDetails?.state}`)
-    console.log(`- Template ID: ${contractDetails?.template?.id}`)
-    console.log(`- Template name: ${contractDetails?.template?.name}`)
+    console.log(`- Template ID: ${contractDetails?.template?.id || 'SAKNAS'}`)
+    console.log(`- Template name: ${contractDetails?.template?.name || 'SAKNAS'}`)
 
     if (!contractDetails) {
       console.error('❌ Kontrakt-detaljer är null eller undefined')
       return null
     }
 
-    // Om template info saknas, försök igen efter delay (max 3 försök)
-    if (!contractDetails.template?.id && retryCount < 2) {
-      console.log(`⏰ Template info saknas, väntar 3 sekunder och försöker igen...`)
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      return await fetchOneflowContractDetails(contractId, retryCount + 1)
+    // Om template info saknas och vi inte ska skippa retry
+    if (!contractDetails.template?.id && !skipRetryForMissingTemplate && retryCount < 4) {
+      const waitTime = (retryCount + 1) * 10000 // 10s, 20s, 30s, 40s
+      console.log(`⏰ Template info saknas, väntar ${waitTime/1000} sekunder och försöker igen...`)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+      return await fetchOneflowContractDetails(contractId, retryCount + 1, skipRetryForMissingTemplate)
     }
     
     console.log('✅ Kontrakt-detaljer hämtade:', contractDetails.name || `ID ${contractDetails.id}`)
@@ -240,14 +252,15 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
   const templateId = details.template?.id
   if (!templateId) {
     console.log(`🚫 Hoppar över kontrakt utan template: ${details.id}`)
-    console.log(`ℹ️ Detta kan hända på contract:create events innan template info laddas`)
-    console.log(`ℹ️ Kontraktet kommer processas igen på contract:publish event`)
+    console.log(`ℹ️ Detta är normalt för contract:publish events`)
+    console.log(`ℹ️ Kontraktet processas när contract:content_update kommer`)
     return false
   }
   
   // Hoppa över kontrakt som inte använder våra mallar
   if (!ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
     console.log(`🚫 Hoppar över kontrakt med oanvänd mall ${templateId}: ${details.id}`)
+    console.log(`📌 Mall namn: ${details.template?.name || 'Okänd'}`)
     return false
   }
   
@@ -722,13 +735,33 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
   
   console.log(`🔄 Processar ${payload.events.length} events för kontrakt ${contractId}:`, eventTypes)
 
-  // Hämta kontrakt-detaljer från OneFlow API (en gång för alla events)
-  const contractDetails = await fetchOneflowContractDetails(contractId)
+  // Bestäm om vi ska hämta kontrakt-detaljer baserat på event-typ
+  let contractDetails: OneflowContractDetails | null = null
+  const needsFullData = eventTypes.some(type => 
+    ['contract:content_update', 'contract:sign', 'data_field:update', 
+     'product:create', 'product:update', 'product:delete',
+     'party:create', 'party:update', 'party:delete'].includes(type)
+  )
   
-  // Kontrollera om vi ska processa detta kontrakt
-  if (contractDetails && !shouldProcessContract(contractDetails)) {
-    console.log('ℹ️ Kontrakt hoppas över - webhook-processering avbruten')
-    return
+  // För vissa events behöver vi inte template-info (publish, create)
+  const skipRetryForTemplate = eventTypes.some(type => 
+    ['contract:publish', 'contract:create'].includes(type)
+  )
+  
+  if (needsFullData) {
+    console.log('📊 Events kräver full data - hämtar kontrakt-detaljer')
+    console.log(`📋 Event types som triggar datahämtning: ${eventTypes.filter(t => needsFullData).join(', ')}`)
+    contractDetails = await fetchOneflowContractDetails(contractId, 0, skipRetryForTemplate)
+    
+    // Kontrollera om vi ska processa detta kontrakt
+    if (contractDetails && !shouldProcessContract(contractDetails)) {
+      console.log('ℹ️ Kontrakt använder inte godkänd mall - webhook-processering avbruten')
+      console.log(`📌 Mall ID: ${contractDetails.template?.id}, Godkända: ${Array.from(ALLOWED_TEMPLATE_IDS).join(', ')}`)
+      return
+    }
+  } else {
+    console.log('ℹ️ Events kräver inte full data - skippar API-anrop')
+    console.log(`📋 Event types som INTE kräver data: ${eventTypes.join(', ')}`)
   }
   
   // Processera varje event
@@ -739,21 +772,16 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
       switch (event.type) {
         // Kontrakt-lifecycle events
         case 'contract:create':
-          console.log('📄 Nytt kontrakt skapat - sparar kontrakt-data')
-          if (contractDetails) {
-            const contractData = parseContractDetailsToInsertData(contractDetails)
-            // Sätt status baserat på OneFlow state
-            await saveOrUpdateContract(contractData)
-          }
+          console.log('📄 Nytt kontrakt skapat')
+          console.log('ℹ️ Skippar processering - väntar på contract:content_update för full data')
+          // Vi processar INTE contract:create då template info ofta saknas
           break
           
         case 'contract:publish':
-          console.log('📧 Kontrakt publicerat - sparar kontrakt-data')
-          if (contractDetails) {
-            const contractData = parseContractDetailsToInsertData(contractDetails)
-            contractData.status = 'pending'
-            await saveOrUpdateContract(contractData)
-          }
+          console.log('📧 Kontrakt publicerat (draft → pending)')
+          console.log('ℹ️ Skippar processering - väntar på contract:content_update för full data')
+          // Vi processar INTE contract:publish då template info ofta saknas
+          // OneFlow skickar detta event för tidigt innan API är konsistent
           break
 
         case 'contract:sign':
@@ -854,10 +882,21 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           break
 
         case 'contract:content_update':
-          console.log('📝 Kontrakt-innehåll uppdaterat - uppdaterar data')
+          console.log('📝 Kontrakt-innehåll uppdaterat - NU processar vi full data!')
+          // Detta är den primära event för att skapa/uppdatera kontrakt
+          // Här har OneFlow garanterat all data tillgänglig
+          if (!contractDetails) {
+            console.log('🔄 Hämtar kontrakt-detaljer för content_update event...')
+            // Hämta detaljer igen specifikt för detta event med full retry
+            contractDetails = await fetchOneflowContractDetails(contractId, 0, false)
+          }
+          
           if (contractDetails) {
+            console.log('✅ Processar kontrakt med fullständig data')
             const contractData = parseContractDetailsToInsertData(contractDetails)
             await saveOrUpdateContract(contractData)
+          } else {
+            console.error('❌ Kunde inte hämta kontrakt-detaljer för content_update')
           }
           break
 
