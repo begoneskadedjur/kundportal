@@ -16,7 +16,7 @@ export default function FilesColumn({
   onFilesModalOpen,
   showButton = true 
 }: FilesColumnProps) {
-  const { contractFiles, filesLoading, downloadingFiles, loadContractFiles, hasContractFiles, viewContractFile, downloadContractFile } = useContracts()
+  const { contractFiles, filesLoading, downloadingFiles, viewingFiles, loadContractFiles, hasContractFiles, viewContractFile, downloadContractFile } = useContracts()
   
   const currentFiles = contractFiles[contractId] || []
   const isLoading = filesLoading[contractId] || false
@@ -121,22 +121,14 @@ export default function FilesColumn({
   }
 
   const getStatusText = () => {
+    // 🔧 FIX: För enstaka filer - visa alltid ikoner (returnera null)
     if (stats.total === 1) {
-      const file = currentFiles[0]
-      switch (file.download_status) {
-        case 'completed':
-          return 'Nedladdad'
-        case 'downloading':
-          return 'Laddar ner...'
-        case 'failed':
-          return 'Misslyckad'
-        case 'pending':
-        default:
-          return null // Returnera null för att visa ikoner istället
-      }
+      return null // Alltid visa ikoner för enstaka filer
     }
 
-    // Flera filer - visa sammanfattning
+    // Flera filer - visa korrekt sammanfattning
+    if (stats.total === 0) return 'Inga filer'
+    
     if (stats.completed === stats.total) {
       return `${stats.total} nedladdade`
     }
@@ -153,11 +145,10 @@ export default function FilesColumn({
   const handleViewFile = async (fileId: string, fileName: string) => {
     if (!contractId) return
     try {
-      await viewContractFile(contractId, fileId) // Använd hook-funktionen
+      await viewContractFile(contractId, fileId)
     } catch (error) {
       console.error('Fel vid visning av fil:', error)
-      // Fallback till vanlig download om view misslyckas
-      await downloadContractFile(contractId, fileId)
+      // Förbättrad felhantering - visa inte toast här eftersom hook redan gör det
     }
   }
 
@@ -171,22 +162,22 @@ export default function FilesColumn({
   }
 
   const statusText = getStatusText()
-  const isPendingSingleFile = stats.total === 1 && stats.pending === 1
+  const isSingleFile = stats.total === 1 // 🔧 FIX: Visa ikoner för ALLA enstaka filer, inte bara pending
 
   return (
     <div className="flex items-center justify-between gap-2">
       {/* Status indikator */}
       <div className="flex items-center gap-2 min-w-0">
-        {isPendingSingleFile ? (
-          // Visa ikoner för enstaka pending fil
+        {isSingleFile ? (
+          // 🔧 FIX: Visa ikoner för ALLA enstaka filer med separerade loading states
           <div className="flex items-center gap-1">
             <button
               onClick={() => handleViewFile(currentFiles[0].id, currentFiles[0].file_name)}
-              className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded transition-colors"
-              title={`Visa ${currentFiles[0].file_name} i webbläsaren`}
-              disabled={downloadingFiles[currentFiles[0].id] || false}
+              className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              title={`👁️ Visa "${currentFiles[0].file_name}" i webbläsaren (markeras inte som nedladdad)`}
+              disabled={viewingFiles[currentFiles[0].id] || false}
             >
-              {downloadingFiles[currentFiles[0].id] ? (
+              {viewingFiles[currentFiles[0].id] ? (
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Eye className="w-4 h-4" />
@@ -194,8 +185,8 @@ export default function FilesColumn({
             </button>
             <button
               onClick={() => handleDownloadFile(currentFiles[0].id)}
-              className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-colors"
-              title={`Ladda ner ${currentFiles[0].file_name}`}
+              className="p-1 text-green-400 hover:text-green-300 hover:bg-green-400/10 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/50"
+              title={`⬇️ Ladda ner "${currentFiles[0].file_name}" (markeras som nedladdad)`}
               disabled={downloadingFiles[currentFiles[0].id] || false}
             >
               {downloadingFiles[currentFiles[0].id] ? (
@@ -220,8 +211,8 @@ export default function FilesColumn({
         )}
       </div>
 
-      {/* Action button - endast för komplexa fall eller om inte pending single file */}
-      {showButton && !isPendingSingleFile && (
+      {/* Action button - endast för komplexa fall eller om inte single file */}
+      {showButton && !isSingleFile && (
         <FileDownloadButton
           contractId={contractId}
           onFilesModalOpen={onFilesModalOpen}

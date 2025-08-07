@@ -22,6 +22,7 @@ export interface UseContractsReturn {
   contractFiles: { [contractId: string]: ContractFile[] }
   filesLoading: { [contractId: string]: boolean }
   downloadingFiles: { [fileId: string]: boolean }
+  viewingFiles: { [fileId: string]: boolean } // 🆕 TILLAGD I INTERFACE
   
   // Actions
   loadContracts: (filters?: ContractFilters) => Promise<void>
@@ -33,6 +34,7 @@ export interface UseContractsReturn {
   
   // Files actions
   loadContractFiles: (contractId: string, forceRefresh?: boolean) => Promise<ContractFile[]>
+  viewContractFile: (contractId: string, fileId: string) => Promise<void> // 🔧 FIX: Tillagd i interface
   downloadContractFile: (contractId: string, fileId: string) => Promise<void>
   getFileDownloadProgress: (fileId: string) => number
   hasContractFiles: (contractId: string) => boolean
@@ -56,6 +58,7 @@ export function useContracts(): UseContractsReturn {
   const [contractFiles, setContractFiles] = useState<{ [contractId: string]: ContractFile[] }>({})
   const [filesLoading, setFilesLoading] = useState<{ [contractId: string]: boolean }>({})
   const [downloadingFiles, setDownloadingFiles] = useState<{ [fileId: string]: boolean }>({})
+  const [viewingFiles, setViewingFiles] = useState<{ [fileId: string]: boolean }>({}) // 🆕 SEPARERAD STATE FÖR VIEW
   const [filesLoadedAt, setFilesLoadedAt] = useState<{ [contractId: string]: number }>({}) // Cache timestamp
   
   // Contract list caching
@@ -238,7 +241,7 @@ export function useContracts(): UseContractsReturn {
   // Visa fil i webbläsaren (utan att markera som nedladdad)
   const viewContractFile = useCallback(async (contractId: string, fileId: string) => {
     try {
-      setDownloadingFiles(prev => ({ ...prev, [fileId]: true }))
+      setViewingFiles(prev => ({ ...prev, [fileId]: true })) // 🔧 FIX: Använd viewingFiles istället
       
       const response = await fetch('/api/oneflow/view-file', {
         method: 'POST',
@@ -266,7 +269,7 @@ export function useContracts(): UseContractsReturn {
       toast.error(errorMessage)
       throw err
     } finally {
-      setDownloadingFiles(prev => ({ ...prev, [fileId]: false }))
+      setViewingFiles(prev => ({ ...prev, [fileId]: false })) // 🔧 FIX: Använd viewingFiles istället
     }
   }, [])
 
@@ -543,6 +546,7 @@ export function useContracts(): UseContractsReturn {
     contractFiles,
     filesLoading,
     downloadingFiles,
+    viewingFiles, // 🆕 EXPORTERAD STATE
     
     // Actions
     loadContracts,
