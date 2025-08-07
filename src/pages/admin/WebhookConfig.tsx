@@ -131,6 +131,39 @@ export default function WebhookConfig() {
     }
   }
 
+  // Specifik fix för webhook 18000
+  const fixWebhook18000 = async () => {
+    try {
+      setUpdating(true)
+
+      const response = await fetch('/api/oneflow/webhook-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fix_webhook_18000'
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Kunde inte fixa webhook #18000')
+      }
+
+      toast.success('Webhook #18000 fixad med alla events!')
+      await loadWebhookConfig() // Ladda om data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Okänt fel'
+      toast.error(`Fel vid fix av webhook #18000: ${errorMessage}`)
+      console.error('Webhook 18000 fix error:', err)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   // Automatisk fix av befintlig webhook
   const autoFixWebhook = async () => {
     try {
@@ -287,9 +320,20 @@ export default function WebhookConfig() {
             Ladda om
           </Button>
           
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={fixWebhook18000}
+            disabled={updating}
+            className="flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Fixa Webhook #18000
+          </Button>
+          
           {!ourWebhook && (
             <Button
-              variant="primary"
+              variant="secondary"
               size="sm"
               onClick={createWebhook}
               disabled={updating}

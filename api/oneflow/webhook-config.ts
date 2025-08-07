@@ -220,6 +220,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             data: result
           })
 
+        } else if (action === 'fix_webhook_18000') {
+          // Specifik fix för webhook ID 18000
+          console.log('🔧 Fixar webhook ID 18000 direkt...')
+          
+          const updateData = {
+            callback_url: 'https://kundportal.vercel.app/api/oneflow-webhook',
+            sign_key: WEBHOOK_SECRET,
+            filters: RECOMMENDED_EVENT_FILTERS
+          }
+
+          const result = await updateWebhook(18000, updateData)
+          
+          res.json({
+            success: true,
+            message: 'Webhook #18000 uppdaterad med alla events och sign key',
+            data: result
+          })
+
         } else if (action === 'auto_fix_webhook') {
           // Hitta vår webhook automatiskt och uppdatera den
           console.log('🔍 Söker efter BeGone webhook...')
