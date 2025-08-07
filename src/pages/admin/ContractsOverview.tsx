@@ -292,10 +292,10 @@ const ContractMobileCard: React.FC<{
               </div>
             )}
             <div className="text-slate-400 text-sm">
-              Start: {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Ej angivet'}
+              Start: {contract.start_date ? new Date(contract.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Ej angivet'}
             </div>
             <div className="text-slate-500 text-xs">
-              Skapad: {new Date(contract.created_at).toLocaleDateString('sv-SE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              Skapad: {new Date(contract.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
             </div>
           </div>
         </div>
@@ -872,13 +872,13 @@ export default function ContractsOverview() {
                   
                   <td className="px-2 py-3">
                     <div className="text-center text-slate-400 text-xs">
-                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('sv-SE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                     </div>
                   </td>
                   
                   <td className="px-2 py-3">
                     <div className="text-center text-slate-400 text-xs">
-                      {new Date(contract.created_at).toLocaleDateString('sv-SE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      {new Date(contract.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </div>
                   </td>
                   
