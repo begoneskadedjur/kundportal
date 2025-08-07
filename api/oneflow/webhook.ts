@@ -711,6 +711,15 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
     try {
       switch (event.type) {
         // Kontrakt-lifecycle events
+        case 'contract:create':
+          console.log('📄 Nytt kontrakt skapat - sparar kontrakt-data')
+          if (contractDetails) {
+            const contractData = parseContractDetailsToInsertData(contractDetails)
+            // Sätt status baserat på OneFlow state
+            await saveOrUpdateContract(contractData)
+          }
+          break
+          
         case 'contract:publish':
           console.log('📧 Kontrakt publicerat - sparar kontrakt-data')
           if (contractDetails) {
