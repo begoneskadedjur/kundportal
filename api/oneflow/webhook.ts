@@ -190,14 +190,29 @@ const fetchOneflowContractDetails = async (contractId: string): Promise<OneflowC
       }
     })
 
+    console.log(`📡 OneFlow API response status: ${response.status}`)
+
     if (!response.ok) {
+      const errorText = await response.text()
       console.error('❌ OneFlow API-fel:', response.status, response.statusText)
+      console.error('❌ Error response:', errorText)
       return null
     }
 
     const contractDetails = await response.json() as OneflowContractDetails
-    console.log('✅ Kontrakt-detaljer hämtade:', contractDetails.name)
+    console.log('📦 Raw contract details response:')
+    console.log(`- ID: ${contractDetails?.id}`)
+    console.log(`- Name: ${contractDetails?.name}`)
+    console.log(`- State: ${contractDetails?.state}`)
+    console.log(`- Template ID: ${contractDetails?.template?.id}`)
+    console.log(`- Template name: ${contractDetails?.template?.name}`)
+
+    if (!contractDetails) {
+      console.error('❌ Kontrakt-detaljer är null eller undefined')
+      return null
+    }
     
+    console.log('✅ Kontrakt-detaljer hämtade:', contractDetails.name || `ID ${contractDetails.id}`)
     return contractDetails
 
   } catch (error) {
