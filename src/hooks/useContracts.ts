@@ -191,7 +191,7 @@ export function useContracts(): UseContractsReturn {
       const isCached = cacheTime && (Date.now() - cacheTime < 5 * 60 * 1000) // 5 minuter cache
       
       if (!forceRefresh && isCached && contractFiles[contractId]) {
-        console.log(`🔄 Använder cachade filer för kontrakt ${contractId}`)
+        console.log(`🔄 Använder cachade filer för kontrakt ${contractId} (${contractFiles[contractId].length} filer)`)
         return contractFiles[contractId]
       }
       
@@ -209,8 +209,23 @@ export function useContracts(): UseContractsReturn {
         })
       }
       
-      console.log(`📁 Hämtar filer från OneFlow API för kontrakt ${contractId}`)
+      console.log(`📁 Hämtar filer från OneFlow API för kontrakt ${contractId} (forceRefresh: ${forceRefresh})`)
       setFilesLoading(prev => ({ ...prev, [contractId]: true }))
+      
+      // 🔧 FIX: Rensa gammal cache vid force refresh för att förhindra state conflicts
+      if (forceRefresh) {
+        console.log(`🧹 Rensar cache för kontrakt ${contractId}`)
+        setContractFiles(prev => {
+          const updated = { ...prev }
+          delete updated[contractId]
+          return updated
+        })
+        setFilesLoadedAt(prev => {
+          const updated = { ...prev }
+          delete updated[contractId]
+          return updated
+        })
+      }
       
       // Hämta från OneFlow API för att synka nya filer
       const response = await fetch(`/api/oneflow/contract-files?contractId=${contractId}`)
@@ -220,13 +235,21 @@ export function useContracts(): UseContractsReturn {
         throw new Error(apiResponse.error || 'Kunde inte hämta filer från OneFlow')
       }
       
-      // Använd filer från vår databas (som nu är synkade)
-      const files = apiResponse.data.contractFiles || []
+      // 🔧 FIX: Deduplikation av filer från API-response
+      const rawFiles = apiResponse.data.contractFiles || []
+      const deduplicatedFiles = rawFiles.filter((file: ContractFile, index: number, arr: ContractFile[]) => {
+        // Behåll endast första förekomsten av varje fil baserat på oneflow_file_id
+        return arr.findIndex(f => f.oneflow_file_id === file.oneflow_file_id) === index
+      })
       
-      setContractFiles(prev => ({ ...prev, [contractId]: files }))
+      if (deduplicatedFiles.length !== rawFiles.length) {
+        console.log(`🧹 Deduplikation: ${rawFiles.length} → ${deduplicatedFiles.length} filer för kontrakt ${contractId}`)
+      }
+      
+      setContractFiles(prev => ({ ...prev, [contractId]: deduplicatedFiles }))
       setFilesLoadedAt(prev => ({ ...prev, [contractId]: Date.now() })) // Uppdatera cache timestamp
       
-      return files
+      return deduplicatedFiles
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Kunde inte hämta filer'
@@ -548,16 +571,32 @@ export function useContracts(): UseContractsReturn {
           switch (payload.eventType) {
             case 'INSERT':
               console.log('➕ Ny contract file skapad:', payload.new)
-              // Lägg till filen i rätt kontrakt, men kontrollera först om den redan existerar
+              // 🔧 FIX: Förbättrad deduplikation med både ID och OneFlow ID kontroll
               const newFile = payload.new as ContractFile
               setContractFiles(prev => {
                 const existingFiles = prev[fileData.contract_id] || []
-                const fileExists = existingFiles.some(file => file.id === newFile.id)
+                
+                // Dubbel kontroll: både database ID och OneFlow ID för säkerhet
+                const fileExists = existingFiles.some(file => 
+                  file.id === newFile.id || 
+                  (file.oneflow_file_id === newFile.oneflow_file_id && newFile.oneflow_file_id !== null)
+                )
                 
                 if (fileExists) {
-                  console.log('📄 Fil existerar redan, hoppar över duplikat:', newFile.id)
+                  console.log('🚫 Duplikatfil upptäckt och ignorerad:', {
+                    id: newFile.id,
+                    oneflow_id: newFile.oneflow_file_id,
+                    name: newFile.file_name
+                  })
                   return prev // Ingen förändring
                 }
+                
+                console.log('✅ Lägger till ny fil:', {
+                  id: newFile.id,
+                  name: newFile.file_name,
+                  contract_id: fileData.contract_id,
+                  total_files_after: existingFiles.length + 1
+                })
                 
                 return {
                   ...prev,

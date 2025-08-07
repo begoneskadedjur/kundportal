@@ -47,7 +47,17 @@ export default function FilesColumn({
       }
     }
 
-    return currentFiles.reduce((stats, file) => {
+    // 🔧 FIX: Deduplikation för att förhindra "1/2 nedladdade" för enstaka filer
+    const deduplicatedFiles = currentFiles.filter((file, index, arr) => 
+      arr.findIndex(f => f.oneflow_file_id === file.oneflow_file_id) === index
+    )
+
+    // Logga om deduplikation skedde
+    if (deduplicatedFiles.length !== currentFiles.length) {
+      console.warn(`🔧 FilesColumn deduplikation för ${contractId}: ${currentFiles.length} → ${deduplicatedFiles.length} filer`)
+    }
+
+    const stats = deduplicatedFiles.reduce((stats, file) => {
       stats.total++
       switch (file.download_status) {
         case 'completed':
@@ -63,6 +73,29 @@ export default function FilesColumn({
       }
       return stats
     }, { total: 0, completed: 0, pending: 0, failed: 0 })
+
+    // 🔧 DEBUG: Logga filstatistik för felsökning av "1/2 nedladdade" problemet
+    if (stats.total > 0 && process.env.NODE_ENV === 'development') {
+      console.log(`📊 Filstatus för kontrakt ${contractId}:`, {
+        stats,
+        originalCount: currentFiles.length,
+        deduplicatedCount: deduplicatedFiles.length,
+        originalFiles: currentFiles.map(f => ({
+          id: f.id,
+          name: f.file_name,
+          status: f.download_status,
+          oneflow_id: f.oneflow_file_id
+        })),
+        deduplicatedFiles: deduplicatedFiles.map(f => ({
+          id: f.id,
+          name: f.file_name,
+          status: f.download_status,
+          oneflow_id: f.oneflow_file_id
+        }))
+      })
+    }
+
+    return stats
   }
 
   const stats = getFileStats()

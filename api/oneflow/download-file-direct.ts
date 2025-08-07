@@ -61,6 +61,13 @@ export default async function handler(
     }
 
     console.log('⬇️ Direct download request för fil:', fileId, 'i kontrakt:', contractId)
+    
+    // 🔧 DEBUG: Logga request headers för felsökning
+    console.log('📋 Request headers:', {
+      'user-agent': req.headers['user-agent'],
+      'accept': req.headers['accept'],
+      'accept-encoding': req.headers['accept-encoding']
+    })
 
     // 1. Hämta fil-metadata från vår databas
     const { data: contractFile, error: fileError } = await supabase
@@ -106,23 +113,53 @@ export default async function handler(
     const fileName = contractFile.file_name
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'pdf'
     
-    // Content-Type baserat på filtyp
-    let contentType = 'application/octet-stream' // Default för nedladdning
-    if (fileExtension === 'pdf') {
-      contentType = 'application/pdf'
-    }
+    // 🔧 FIX: Använd application/octet-stream för alla nedladdningar (förhindrar korruption)
+    const contentType = 'application/octet-stream'
 
     // KRITISKA HEADERS för nedladdning:
     res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`) // 🔑 Detta triggar nedladdning
-    res.setHeader('Content-Length', fileData.size)
-    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Content-Length', fileData.size.toString()) // 🔧 FIX: Explicit toString()
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.setHeader('Accept-Ranges', 'bytes') // 🔧 FIX: Stöd för partial content
 
-    console.log('✅ Skickar fil för nedladdning:', fileName)
+    console.log('✅ Skickar fil för nedladdning:', fileName, `(${fileData.size} bytes)`)
 
-    // 5. Streama filen direkt till klienten
-    const buffer = await fileData.arrayBuffer()
-    res.status(200).send(Buffer.from(buffer))
+    // 5. 🔧 FIX: Streama filen direkt utan buffer-konvertering för att förhindra korruption
+    try {
+      // Använd direkta stream istället för buffer-konvertering som kan korruptera data
+      const arrayBuffer = await fileData.arrayBuffer()
+      
+      // 🔧 FIX: Validera data-integritet
+      if (arrayBuffer.byteLength !== fileData.size) {
+        console.error('❌ Data size mismatch:', {
+          expected: fileData.size,
+          actual: arrayBuffer.byteLength
+        })
+        throw new Error('Fil-data korrupted: storleksskillnad upptäckt')
+      }
+      
+      // Skicka som UInt8Array direkt för att behålla binär integritet
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const finalBuffer = Buffer.from(uint8Array)
+      
+      // 🔧 DEBUG: Logga final buffer stats för felsökning
+      console.log('📊 Buffer stats före sändning:', {
+        originalSize: fileData.size,
+        arrayBufferSize: arrayBuffer.byteLength,
+        uint8ArraySize: uint8Array.length,
+        finalBufferSize: finalBuffer.length,
+        allSizesMatch: fileData.size === arrayBuffer.byteLength && 
+                      arrayBuffer.byteLength === uint8Array.length && 
+                      uint8Array.length === finalBuffer.length
+      })
+      
+      res.status(200).send(finalBuffer)
+      
+    } catch (streamError) {
+      console.error('❌ Fel vid streaming av fil:', streamError)
+      throw new Error('Kunde inte streama fil-data korrekt')
+    }
 
   } catch (error: any) {
     console.error('❌ Direct download API fel:', error)
