@@ -26,6 +26,7 @@ import ProductManagementPage from './pages/admin/ProductManagement';
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
 import ContractsOverview from './pages/admin/ContractsOverview';
+import WebhookConfig from './pages/admin/WebhookConfig';
 
 // KOORDINATOR IMPORTS
 import CoordinatorMainDashboard from './pages/coordinator/Dashboard';
@@ -189,6 +190,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="admin">
                   <ContractsOverview />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/webhook-config" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <WebhookConfig />
                 </ProtectedRoute>
               } 
             />

@@ -420,6 +420,16 @@ const AdminDashboard: React.FC = () => {
                 />
 
                 <AdminDashboardCard
+                  href="/admin/webhook-config"
+                  icon={Settings}
+                  title="Webhook Config"
+                  description="OneFlow webhook-inställningar"
+                  stats="Events & automation"
+                  tag="Konfiguration"
+                  iconColor="text-blue-500"
+                />
+                
+                <AdminDashboardCard
                   href="/admin/oneflow-diagnostics"
                   icon={BarChart3}
                   title="Övervaka Avtal"
