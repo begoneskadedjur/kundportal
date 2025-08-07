@@ -8,6 +8,7 @@ import { BarChart, Search, X } from 'lucide-react';
 import Button from '../../ui/Button';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 import { BeGoneCaseRow } from '../../../types/database'; // Importera din typ för flexibilitet
+import { formatCurrency } from '../../../utils/formatters';
 
 // Använd den importerade typen, men lägg till case_price eftersom vi mappar det manuellt
 type ReportCase = BeGoneCaseRow & { case_price?: number; };
@@ -121,7 +122,7 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                                 <h3 className="text-lg font-bold mb-4">Statistik</h3>
                                 <div className="space-y-3 text-sm mb-6">
                                     <div className="flex justify-between items-center p-2 bg-slate-800/50 rounded-lg"><span>Antal Ärenden:</span><span className="font-bold text-lg">{stats.caseCount}</span></div>
-                                    <div className="flex justify-between items-center p-2 bg-slate-800/50 rounded-lg"><span>Totalt Värde:</span><span className="font-bold text-lg">{stats.totalValue.toLocaleString('sv-SE')} kr</span></div>
+                                    <div className="flex justify-between items-center p-2 bg-slate-800/50 rounded-lg"><span>Totalt Värde:</span><span className="font-bold text-lg">{formatCurrency(stats.totalValue)}</span></div>
                                 </div>
                                 <h3 className="text-lg font-bold mb-2">Filtrera Status</h3>
                                 <div className="space-y-1">
@@ -135,7 +136,7 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                                 {!loading && filteredReportCases.length === 0 && <div className="text-center p-16 text-slate-500">Inga ärenden matchade dina val. Prova att justera datum eller filter.</div>}
                                 {!loading && filteredReportCases.map(caseData => (
                                     <div key={caseData.id} onClick={() => onOpenCase(caseData)} className="p-4 border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer transition-colors">
-                                        <div className="flex justify-between items-center mb-1"><span className="font-bold text-white">{caseData.title}</span><span className="text-sm font-semibold text-blue-300">{caseData.case_price?.toLocaleString('sv-SE')} kr</span></div>
+                                        <div className="flex justify-between items-center mb-1"><span className="font-bold text-white">{caseData.title}</span><span className="text-sm font-semibold text-blue-300">{caseData.case_price ? formatCurrency(caseData.case_price) : '0 kr'}</span></div>
                                         <div className="flex justify-between items-center text-sm text-slate-400"><span>{caseData.start_date ? new Date(caseData.start_date).toLocaleDateString('sv-SE') : 'Inget datum'} - {caseData.kontaktperson}</span><span>{caseData.status}</span></div>
                                     </div>
                                 ))}

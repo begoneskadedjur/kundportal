@@ -3,6 +3,7 @@
 // FIX: Ersatt JSX-baserad toast.custom med vanlig toast för att behålla filen som .ts
 
 import { toast } from 'react-hot-toast';
+import { formatCurrency } from '../utils/formatters';
 
 // =================================================================================
 // SECTION 1: DATA STRUCTURES & TYPES
@@ -241,12 +242,12 @@ class AIAnalysisService {
     return {
       executiveSummary: {
         headline: "Förenklad Fallback-Analys",
-        summary: `Det gick inte att ansluta till AI-tjänsten. Denna analys är autogenererad baserat på grundläggande data. ${technician.name} har rank #${technician.rank} och en total intäkt på ${technician.total_revenue.toLocaleString('sv-SE')} kr.`,
+        summary: `Det gick inte att ansluta till AI-tjänsten. Denna analys är autogenererad baserat på grundläggande data. ${technician.name} har rank #${technician.rank} och en total intäkt på ${formatCurrency(technician.total_revenue)}.`,
       },
       performanceDashboard: {
         overall_performance_grade: isTopPerformer ? 'A' : 'C',
         key_metrics: [
-          { metric: "Total Intäkt", value: `${technician.total_revenue.toLocaleString('sv-SE')} kr`, comparison_to_team_avg: technician.total_revenue / teamAvgRevenue, comparison_to_top_performer: technician.total_revenue / topPerformer.total_revenue },
+          { metric: "Total Intäkt", value: formatCurrency(technician.total_revenue), comparison_to_team_avg: technician.total_revenue / teamAvgRevenue, comparison_to_top_performer: technician.total_revenue / topPerformer.total_revenue },
           { metric: "Antal Ärenden", value: `${technician.total_cases}`, comparison_to_team_avg: 1.0, comparison_to_top_performer: 1.0 },
         ],
       },

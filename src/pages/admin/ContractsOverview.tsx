@@ -639,7 +639,7 @@ export default function ContractsOverview() {
           icon={ShoppingCart}
           onClick={() => handleKpiClick('offers')}
           trend="neutral"
-          trendValue={`Snitt ${stats?.average_offer_value ? Math.round(stats.average_offer_value).toLocaleString('sv-SE').replace(/,/g, ' ') : 0} kr`}
+          trendValue={`Snitt ${stats?.average_offer_value ? formatContractValue(Math.round(stats.average_offer_value)) : '0 kr'}`}
           delay={0.5}
         />
 

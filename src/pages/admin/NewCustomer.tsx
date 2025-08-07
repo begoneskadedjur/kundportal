@@ -15,6 +15,7 @@ import { BUSINESS_TYPES, getBusinessTypeIcon } from '../../constants/businessTyp
 import { calculateContractEndDate } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/shared'
+import { formatCurrency } from '../../utils/formatters'
 
 type ContractType = {
   id: string
@@ -514,12 +515,12 @@ export default function NewCustomer() {
                   )}
                   {formData.annual_premium && (
                     <p className="text-slate-300">
-                      <strong>Årspremie:</strong> {parseFloat(formData.annual_premium).toLocaleString('sv-SE')} SEK
+                      <strong>Årspremie:</strong> {formatCurrency(parseFloat(formData.annual_premium))}
                     </p>
                   )}
                   {formData.total_contract_value && (
                     <p className="text-slate-300">
-                      <strong>Totalt värde:</strong> {parseFloat(formData.total_contract_value).toLocaleString('sv-SE')} SEK
+                      <strong>Totalt värde:</strong> {formatCurrency(parseFloat(formData.total_contract_value))}
                     </p>
                   )}
                 </div>

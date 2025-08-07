@@ -4,6 +4,7 @@ import { Building2, Edit, MapPin, Calendar, Crown, DollarSign, Timer, User } fro
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/businessTypes'
+import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters'
 
 interface CompanyInformationProps {
   customer: {
@@ -62,7 +63,7 @@ const CompanyInformation: React.FC<CompanyInformationProps> = ({ customer, onEdi
   // Formatera pengar
   const formatCurrency = (amount?: number) => {
     if (!amount) return '-'
-    return `${amount.toLocaleString('sv-SE')} kr`
+    return formatCurrencyUtil(amount)
   }
 
   // Få namnet från e-post
