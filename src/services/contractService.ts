@@ -755,9 +755,9 @@ export const getContractTypeText = (type: Contract['type']): string => {
 
 export const formatContractValue = (value: number | null): string => {
   if (!value) return '-'
+  // Använd mellanslag som tusental-separator och lägg till "kr" manuellt
   return new Intl.NumberFormat('sv-SE', { 
-    style: 'currency', 
-    currency: 'SEK',
+    useGrouping: true,
     maximumFractionDigits: 0
-  }).format(value)
+  }).format(value).replace(/,/g, ' ') + ' kr'
 }
