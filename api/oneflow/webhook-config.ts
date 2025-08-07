@@ -5,7 +5,7 @@ import fetch from 'node-fetch'
 // Miljövariabler
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
 const ONEFLOW_USER_EMAIL = 'info@begone.se'
-const WEBHOOK_URL = 'https://kundportal.vercel.app/api/oneflow/webhook'
+const WEBHOOK_URL = 'https://kundportal.vercel.app/api/oneflow-webhook'
 const WEBHOOK_SECRET = process.env.ONEFLOW_WEBHOOK_SECRET!
 
 interface OneFlowWebhookFilter {
@@ -250,7 +250,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.log(`🔧 Förbereder uppdatering av webhook ID: ${ourWebhook.id}`)
           
           const updateData = {
-            callback_url: WEBHOOK_URL, // Rätt URL
+            // Behåll befintlig callback_url - ändra inte den
+            callback_url: ourWebhook.callback_url,
             sign_key: WEBHOOK_SECRET,
             filters: RECOMMENDED_EVENT_FILTERS
           }
