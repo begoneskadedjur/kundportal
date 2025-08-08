@@ -5,7 +5,7 @@ import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin, 
   Calendar, DollarSign, FileText, Users, Eye, Edit,
   AlertTriangle, CheckCircle, Clock, Briefcase,
-  BarChart3, TrendingUp, CreditCard, Activity
+  BarChart3, TrendingUp, CreditCard, Activity, Package
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -15,6 +15,10 @@ import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/busin
 import { getContractStatus } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/shared'
+import EditableCustomerField from '../../components/admin/EditableCustomerField'
+import ProductsViewer from '../../components/admin/ProductsViewer'
+import { useTechnicians } from '../../hooks/useTechnicians'
+import { SERVICE_FREQUENCIES, CUSTOMER_SIZES, getIndustryCategory } from '../../constants/customerOptions'
 
 interface CustomerDetails {
   id: string
@@ -51,6 +55,9 @@ interface CustomerDetails {
   customer_size?: 'small' | 'medium' | 'large' | null
   service_frequency?: string | null
   source_type?: 'oneflow' | 'manual' | 'import' | null
+  // Produkter och tjänster
+  products?: any | null
+  service_details?: string | null
   // Ärenden
   cases?: Array<{
     id: string
@@ -68,6 +75,7 @@ export default function CustomerDetails() {
   const [customer, setCustomer] = useState<CustomerDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { accountManagers, loading: techniciansLoading } = useTechnicians()
 
   useEffect(() => {
     if (id) {
@@ -97,6 +105,37 @@ export default function CustomerDetails() {
       await fetchCustomerDetails() // Uppdatera data
     } catch (error) {
       console.error('Error toggling customer status:', error)
+    }
+  }
+
+  // Hantera uppdatering av enskilda fält med optimistisk uppdatering
+  const handleFieldUpdate = async (field: string, value: string) => {
+    if (!customer) return
+
+    // Optimistisk uppdatering
+    const previousCustomer = { ...customer }
+    let updateData: any = { [field]: value }
+    
+    // Auto-uppdatera branschkategori när verksamhetstyp ändras
+    if (field === 'business_type') {
+      updateData.industry_category = getIndustryCategory(value)
+      setCustomer(prev => prev ? {
+        ...prev,
+        business_type: value,
+        industry_category: getIndustryCategory(value)
+      } : null)
+    } else {
+      setCustomer(prev => prev ? { ...prev, [field]: value } : null)
+    }
+
+    try {
+      await customerService.updateCustomer(customer.id, updateData)
+      // Hämta uppdaterade data för att säkerställa konsistens
+      await fetchCustomerDetails()
+    } catch (error) {
+      // Rollback optimistisk uppdatering vid fel
+      setCustomer(previousCustomer)
+      throw error
     }
   }
 
@@ -261,25 +300,27 @@ export default function CustomerDetails() {
                   <p className="text-white">{customer.organization_number || '-'}</p>
                 </div>
                 
-                {customer.business_type && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Verksamhetstyp</label>
-                    <div className="flex items-center gap-2">
-                      <span>{getBusinessTypeIcon(customer.business_type)}</span>
-                      <p className="text-white">{getBusinessTypeLabel(customer.business_type)}</p>
-                    </div>
-                  </div>
-                )}
+                <EditableCustomerField
+                  label="Verksamhetstyp"
+                  value={customer.business_type}
+                  onSave={(value) => handleFieldUpdate('business_type', value)}
+                  type="business_type"
+                  placeholder="Välj verksamhetstyp"
+                />
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Avtalstyp</label>
                   <p className="text-white">{customer.contract_type || '-'}</p>
                 </div>
                 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Adress</label>
-                  <p className="text-white">{customer.contact_address || '-'}</p>
-                </div>
+                <EditableCustomerField
+                  label="Adress"
+                  value={customer.contact_address}
+                  onSave={(value) => handleFieldUpdate('contact_address', value)}
+                  type="text"
+                  placeholder="Ange adress"
+                  icon={<MapPin className="w-4 h-4" />}
+                />
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Registrerad</label>
@@ -296,39 +337,68 @@ export default function CustomerDetails() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Kontaktperson</label>
-                  <p className="text-white font-medium">{customer.contact_person || '-'}</p>
-                </div>
+                <EditableCustomerField
+                  label="Kontaktperson"
+                  value={customer.contact_person}
+                  onSave={(value) => handleFieldUpdate('contact_person', value)}
+                  type="text"
+                  placeholder="Ange kontaktperson"
+                  icon={<User className="w-4 h-4" />}
+                />
                 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">E-postadress</label>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <p className="text-white">{customer.contact_email}</p>
-                  </div>
-                </div>
+                <EditableCustomerField
+                  label="E-postadress"
+                  value={customer.contact_email}
+                  onSave={(value) => handleFieldUpdate('contact_email', value)}
+                  type="email"
+                  placeholder="Ange e-postadress"
+                  icon={<Mail className="w-4 h-4" />}
+                />
                 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Telefonnummer</label>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <p className="text-white">{customer.contact_phone || '-'}</p>
-                  </div>
-                </div>
+                <EditableCustomerField
+                  label="Telefonnummer"
+                  value={customer.contact_phone}
+                  onSave={(value) => handleFieldUpdate('contact_phone', value)}
+                  type="tel"
+                  placeholder="Ange telefonnummer"
+                  icon={<Phone className="w-4 h-4" />}
+                />
                 
-                {customer.assigned_account_manager && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Avtalsansvarig</label>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-purple-400" />
-                      <p className="text-white">{customer.assigned_account_manager}</p>
-                    </div>
-                    {customer.account_manager_email && (
-                      <p className="text-sm text-slate-400 mt-1">{customer.account_manager_email}</p>
-                    )}
-                  </div>
-                )}
+                <EditableCustomerField
+                  label="Avtalsansvarig"
+                  value={customer.assigned_account_manager}
+                  onSave={(value) => handleFieldUpdate('assigned_account_manager', value)}
+                  type="technician"
+                  placeholder="Välj avtalsansvarig"
+                  technicians={accountManagers}
+                  icon={<Users className="w-4 h-4 text-purple-400" />}
+                  disabled={techniciansLoading}
+                />
+              </div>
+            </Card>
+
+            {/* Produkter och tjänster */}
+            <Card>
+              <div className="flex items-center mb-6">
+                <Package className="w-5 h-5 text-blue-400 mr-2" />
+                <h2 className="text-lg font-semibold text-white">Produkter och tjänster</h2>
+              </div>
+              
+              <div className="space-y-6">
+                <ProductsViewer
+                  products={customer.products}
+                  editable={true}
+                  onEdit={() => toast.info('Produktredigering kommer snart')}
+                />
+                
+                <EditableCustomerField
+                  label="Servicedetaljer"
+                  value={customer.service_details}
+                  onSave={(value) => handleFieldUpdate('service_details', value)}
+                  type="textarea"
+                  placeholder="Beskriv specifika servicedetaljer och krav"
+                  multiline={true}
+                />
               </div>
             </Card>
 
@@ -358,30 +428,32 @@ export default function CustomerDetails() {
                   </div>
                 )}
                 
-                {customer.industry_category && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Branschkategori</label>
-                    <p className="text-white">{customer.industry_category}</p>
-                  </div>
-                )}
+                <EditableCustomerField
+                  label="Branschkategori"
+                  value={customer.industry_category}
+                  onSave={(value) => handleFieldUpdate('industry_category', value)}
+                  type="text"
+                  placeholder="Branschkategori uppdateras automatiskt"
+                  disabled={true}
+                />
                 
-                {customer.customer_size && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Företagsstorlek</label>
-                    <p className="text-white">
-                      {customer.customer_size === 'small' ? 'Litet' : 
-                       customer.customer_size === 'medium' ? 'Medelstort' : 
-                       customer.customer_size === 'large' ? 'Stort' : customer.customer_size}
-                    </p>
-                  </div>
-                )}
+                <EditableCustomerField
+                  label="Företagsstorlek"
+                  value={customer.customer_size}
+                  onSave={(value) => handleFieldUpdate('customer_size', value)}
+                  type="select"
+                  placeholder="Välj företagsstorlek"
+                  options={CUSTOMER_SIZES}
+                />
                 
-                {customer.service_frequency && (
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Servicefrekvens</label>
-                    <p className="text-white">{customer.service_frequency}</p>
-                  </div>
-                )}
+                <EditableCustomerField
+                  label="Servicefrekvens"
+                  value={customer.service_frequency}
+                  onSave={(value) => handleFieldUpdate('service_frequency', value)}
+                  type="select"
+                  placeholder="Välj servicefrekvens"
+                  options={SERVICE_FREQUENCIES}
+                />
 
                 {customer.source_type && (
                   <div>
