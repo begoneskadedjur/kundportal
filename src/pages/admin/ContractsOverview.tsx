@@ -162,6 +162,21 @@ const CompactSellerCard: React.FC<{
 const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}> }> = ({ products }) => {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const [backdropClickable, setBackdropClickable] = useState(false)
+  
+  // Förhindra backdrop från att stänga tooltip direkt efter öppning
+  useEffect(() => {
+    if (showTooltip) {
+      console.log('⏱️ Tooltip öppnad - backdrop inaktiv i 200ms')
+      setBackdropClickable(false)
+      const timer = setTimeout(() => {
+        setBackdropClickable(true)
+        console.log('✅ Backdrop nu klickbar')
+      }, 200) // Vänta 200ms innan backdrop blir klickbar
+      
+      return () => clearTimeout(timer)
+    }
+  }, [showTooltip])
   
   if (products.length === 0) {
     return <span className="text-xs text-slate-500">Inga produkter</span>
@@ -241,8 +256,12 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
           <div 
             className="fixed inset-0 z-40" 
             onClick={() => {
-              console.log('🔴 Backdrop klickad - stänger tooltip')
-              setShowTooltip(false)
+              if (backdropClickable) {
+                console.log('🔴 Backdrop klickad - stänger tooltip')
+                setShowTooltip(false)
+              } else {
+                console.log('⚠️ Backdrop klick ignorerat - för tidigt!')
+              }
             }}
           />
           
