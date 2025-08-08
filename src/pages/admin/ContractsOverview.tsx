@@ -252,9 +252,9 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
       {/* Tooltip/Popover med alla produkter */}
       {showTooltip && products.length > 3 && (
         <>
-          {/* Backdrop för att fånga klick utanför */}
+          {/* DEBUG: Lägg till synlig backdrop för att se om den renderas */}
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 bg-black/20" 
             onClick={() => {
               if (backdropClickable) {
                 console.log('🔴 Backdrop klickad - stänger tooltip')
@@ -265,13 +265,22 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             }}
           />
           
-          {/* Popover - INGEN HOVER-LOGIK */}
+          {/* Popover - ta bort animation-klasser för nu */}
           <div 
-            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-xl max-w-sm min-w-72 md:max-w-sm animate-in fade-in-0 slide-in-from-top-1 duration-200"
+            className="fixed z-50 bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl max-w-sm min-w-[18rem]"
             style={{
               left: `${tooltipPosition.x}px`,
               top: `${tooltipPosition.y}px`,
               transform: 'translateX(-50%)'
+            }}
+            ref={(el) => {
+              if (el) {
+                console.log('🟩 POPOVER RENDERAD!', {
+                  position: { x: tooltipPosition.x, y: tooltipPosition.y },
+                  element: el,
+                  products: products.length
+                })
+              }
             }}
           >
             <div className="flex items-center justify-between mb-3">
