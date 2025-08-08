@@ -154,7 +154,7 @@ async function sendRevocationEmail({ email, contactPerson, companyName, reason }
   companyName: string
   reason: string
 }) {
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: 'smtp.resend.com',
     port: 587,
     secure: false,
@@ -167,22 +167,22 @@ async function sendRevocationEmail({ email, contactPerson, companyName, reason }
   const reasonTexts: { [key: string]: { title: string, message: string, color: string } } = {
     'admin_action': {
       title: 'Administrativ åtgärd',
-      message: 'Din inbjudan har återkallats av administrativ anledning.',
+      message: 'Er inbjudan har återkallats av administrativ anledning.',
       color: '#3b82f6'
     },
     'customer_request': {
       title: 'På din begäran',
-      message: 'Din inbjudan har återkallats på din begäran.',
+      message: 'Er inbjudan har återkallats på er begäran.',
       color: '#22c55e'
     },
     'customer_terminated': {
       title: 'Avtal avslutat',
-      message: 'Din tillgång till kundportalen har återkallats eftersom avtalet har avslutats.',
+      message: 'Er tillgång till kundportalen har återkallats eftersom avtalet har avslutats.',
       color: '#ef4444'
     },
     'security_concern': {
       title: 'Säkerhetsskäl',
-      message: 'Din inbjudan har återkallats av säkerhetsskäl. Kontakta oss för mer information.',
+      message: 'Er inbjudan har återkallats av säkerhetsskäl. Kontakta oss för mer information.',
       color: '#f59e0b'
     },
     'duplicate_invitation': {
@@ -200,18 +200,18 @@ async function sendRevocationEmail({ email, contactPerson, companyName, reason }
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Inbjudan återkallad - BeGone Kundportal</title>
+        <title>Inbjudan återkallad - Begone Kundportal</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: ${reasonInfo.color}; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
           <h1 style="margin: 0; font-size: 24px;">⚠️ Inbjudan återkallad</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">BeGone Kundportal</p>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Begone Kundportal</p>
         </div>
 
         <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
           <h2 style="color: ${reasonInfo.color}; margin-top: 0;">Hej ${contactPerson}!</h2>
           
-          <p>Vi vill informera dig om att din inbjudan till BeGone Kundportal för <strong>${companyName}</strong> har återkallats.</p>
+          <p>Vi vill informera er om att er inbjudan till Begone Kundportal för <strong>${companyName}</strong> har återkallats.</p>
 
           <div style="background-color: #fff; border: 1px solid ${reasonInfo.color}; padding: 20px; border-radius: 10px; margin: 20px 0;">
             <h3 style="color: ${reasonInfo.color}; margin: 0 0 10px 0;">📋 Anledning</h3>
@@ -220,15 +220,15 @@ async function sendRevocationEmail({ email, contactPerson, companyName, reason }
 
           ${reason !== 'customer_request' ? `
           <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0; color: #475569;"><strong>Har du frågor?</strong> Kontakta oss gärna så hjälper vi dig.</p>
+            <p style="margin: 0; color: #475569;"><strong>Har ni frågor?</strong> Kontakta oss gärna så hjälper vi er.</p>
           </div>
           ` : ''}
 
           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p>📧 <a href="mailto:support@begone.se" style="color: ${reasonInfo.color};">support@begone.se</a> | 📞 <a href="tel:010-123-45-67" style="color: ${reasonInfo.color};">010-123 45 67</a></p>
+            <p>📧 <a href="mailto:support@begone.se" style="color: ${reasonInfo.color};">support@begone.se</a> | 📞 <a href="tel:0101292200" style="color: ${reasonInfo.color};">010-129 22 00</a></p>
             <p style="margin-top: 20px;">
               Med vänliga hälsningar,<br>
-              <strong>BeGone Skadedjur Team</strong>
+              <strong>Begone Skadedjur</strong>
             </p>
           </div>
         </div>
@@ -237,9 +237,9 @@ async function sendRevocationEmail({ email, contactPerson, companyName, reason }
   `
 
   const mailOptions = {
-    from: 'BeGone Kundportal <noreply@begone.se>',
+    from: 'Begone Kundportal <noreply@begone.se>',
     to: email,
-    subject: `⚠️ Inbjudan återkallad - ${companyName} | BeGone Kundportal`,
+    subject: `⚠️ Inbjudan återkallad - ${companyName} | Begone Kundportal`,
     html: emailHtml
   }
 

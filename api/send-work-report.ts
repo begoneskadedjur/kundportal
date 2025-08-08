@@ -217,10 +217,10 @@ async function generatePDFReportBuffer(
     const pageWidth = pdf.internal.pageSize.width
     const pageHeight = pdf.internal.pageSize.height
     
-    // BeGone Professional Color Palette
-    const beGoneColors = {
-      primary: [10, 19, 40],        // BeGone Dark Blue
-      accent: [32, 197, 143],       // BeGone Green
+    // Begone Professional Color Palette
+    const begoneColors = {
+      primary: [10, 19, 40],        // Begone Dark Blue
+      accent: [32, 197, 143],       // Begone Green
       white: [255, 255, 255],
       lightGray: [241, 245, 249],
       darkGray: [51, 65, 85],
@@ -264,18 +264,18 @@ async function generatePDFReportBuffer(
     // Om bilden inte laddades, skapa bara en minimal bakgrund
     if (!headerSuccessful) {
       // Minimal header bakgrund
-      pdf.setFillColor(...beGoneColors.primary)
+      pdf.setFillColor(...begoneColors.primary)
       pdf.rect(0, 0, pageWidth, 40, 'F')
       
-      // BeGone text som fallback
-      pdf.setTextColor(...beGoneColors.white)
+      // Begone text som fallback
+      pdf.setTextColor(...begoneColors.white)
       pdf.setFontSize(16)
       pdf.setFont(undefined, 'bold')
-      pdf.text('BeGone Skadedjur & Sanering', pageWidth/2, 25, { align: 'center' })
+      pdf.text('Begone Skadedjur & Sanering', pageWidth/2, 25, { align: 'center' })
     }
 
     // Metadata
-    pdf.setTextColor(...beGoneColors.darkGray)
+    pdf.setTextColor(...begoneColors.darkGray)
     pdf.setFontSize(typography.caption.size)
     pdf.setFont(undefined, 'normal')
     
@@ -298,9 +298,9 @@ async function generatePDFReportBuffer(
 
     // Helper function för section headers
     const drawSectionHeader = (text: string, y: number) => {
-      pdf.setFillColor(...beGoneColors.charcoal)
+      pdf.setFillColor(...begoneColors.charcoal)
       pdf.roundedRect(margins.left, y, contentWidth, 22, 4, 4, 'F')
-      pdf.setTextColor(...beGoneColors.white)
+      pdf.setTextColor(...begoneColors.white)
       pdf.setFontSize(typography.sectionHeader.size)
       pdf.setFont(undefined, typography.sectionHeader.weight)
       pdf.text(text, pageWidth/2, y + 14, { align: 'center' })
@@ -323,7 +323,7 @@ async function generatePDFReportBuffer(
       }
       
       // Main card background
-      const bgColor = backgroundColor === 'white' ? beGoneColors.white : [248, 250, 252] // lightestGray
+      const bgColor = backgroundColor === 'white' ? begoneColors.white : [248, 250, 252] // lightestGray
       pdf.setFillColor(...bgColor)
       pdf.roundedRect(x, y, width, height, radius, radius, 'F')
       
@@ -473,7 +473,7 @@ async function generatePDFReportBuffer(
     pdf.setFontSize(typography.body.size)
     pdf.setFont(undefined, 'normal')
     
-    pdf.text('BeGone Skadedjur & Sanering AB', leftCol, cardY + spacing.sm)
+    pdf.text('Begone Skadedjur & Sanering AB', leftCol, cardY + spacing.sm)
     pdf.text('559378-9208', rightCol, cardY + spacing.sm)
     
     cardY += spacing.lg
@@ -807,7 +807,7 @@ async function generatePDFReportBuffer(
       pdf.setFont(undefined, 'bold')
       pdf.text('Totalkostnad för utförd sanering:', margins.left + spacing.md, yPosition + spacing.md)
       
-      pdf.setTextColor(...beGoneColors.accent)
+      pdf.setTextColor(...begoneColors.accent)
       pdf.setFontSize(18)
       pdf.setFont(undefined, 'bold')
       pdf.text(`${priceField.value} SEK`, contentWidth - margins.right, yPosition + spacing.lg, { align: 'right' })
@@ -835,7 +835,7 @@ async function generatePDFReportBuffer(
     pdf.setFont(undefined, 'normal')
     
     // Vänster sida: Företagsinfo
-    pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
+    pdf.text('Begone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
     pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
     
     // Mitten: Kontaktinfo
@@ -905,7 +905,7 @@ async function sendReportEmail({
   const fileName = `Saneringsrapport_${taskDetails.task_id}_${customerName}_${reportDate}.pdf`
 
   const mailOptions = {
-    from: 'BeGone Saneringsrapporter <noreply@begone.se>',
+    from: 'Begone Saneringsrapporter <noreply@begone.se>',
     to: recipientEmail,
     subject: subject,
     html: emailHtml,
@@ -941,7 +941,7 @@ function getTechnicianEmailTemplate(
           <!-- Header -->
           <div style="background: linear-gradient(135deg, #0a1328, #1e293b); color: white; padding: 32px 30px; text-align: center;">
             <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.025em;">Saneringsrapport klar</h1>
-            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">BeGone Skadedjur & Sanering AB</p>
+            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">Begone Skadedjur & Sanering AB</p>
           </div>
 
           <!-- Content -->
@@ -949,7 +949,7 @@ function getTechnicianEmailTemplate(
             <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Bästa ${technicianName},</h2>
             
             <p style="margin: 0 0 24px 0; color: #475569; font-size: 16px;">
-              Vi bekräftar härmed att saneringsrapporten för ditt genomförda uppdrag har genererats och är redo för leverans till kunden. Rapporten följer våra professionella standarder och innehåller all nödvändig dokumentation.
+              Vi bekräftar härmed att saneringsrapporten för ert genomförda uppdrag har genererats och är redo för leverans till kunden. Rapporten följer våra professionella standarder och innehåller all nödvändig dokumentation.
             </p>
 
             <!-- Case Details Card -->
@@ -1005,8 +1005,8 @@ function getTechnicianEmailTemplate(
             <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; margin-top: 32px;">
               <p style="margin: 0; color: #64748b; font-size: 14px;">
                 Med vänliga hälsningar,<br>
-                <strong style="color: #1e293b;">BeGone Koordinationsteam</strong><br>
-                <span style="font-size: 13px; color: #94a3b8;">BeGone Skadedjur & Sanering AB</span>
+                <strong style="color: #1e293b;">Begone Koordinationsteam</strong><br>
+                <span style="font-size: 13px; color: #94a3b8;">Begone Skadedjur & Sanering AB</span>
               </p>
             </div>
           </div>
@@ -1038,7 +1038,7 @@ function getContactEmailTemplate(
           <!-- Header -->
           <div style="background: linear-gradient(135deg, #0a1328, #1e293b); color: white; padding: 32px 30px; text-align: center;">
             <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.025em;">Saneringsrapport</h1>
-            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">BeGone Skadedjur & Sanering AB</p>
+            <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9; font-weight: 500;">Begone Skadedjur & Sanering AB</p>
           </div>
 
           <!-- Content -->
@@ -1046,7 +1046,7 @@ function getContactEmailTemplate(
             <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Bästa ${contactName},</h2>
             
             <p style="margin: 0 0 24px 0; color: #475569; font-size: 16px;">
-              Vi bekräftar härmed att BeGone Skadedjur & Sanering AB har slutfört ärendet för <strong>${customerInfo.company_name}</strong>. 
+              Vi bekräftar härmed att Begone Skadedjur & Sanering AB har slutfört ärendet för <strong>${customerInfo.company_name}</strong>. 
               Bifogad saneringsrapport utgör fullständig dokumentation av det utförda arbetet.
             </p>
 
@@ -1140,7 +1140,7 @@ function getContactEmailTemplate(
                 Vi tackar för förtroendet och står till er tjänst för framtida behov.
               </p>
               <p style="margin: 0; color: #1e293b; font-weight: 600; font-size: 16px;">
-                BeGone Skadedjur & Sanering AB
+                Begone Skadedjur & Sanering AB
               </p>
               <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">
                 Org.nr: 559378-9208 | Bläcksvampsvägen 17, 141 60 Huddinge

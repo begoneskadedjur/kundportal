@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
+import { getWelcomeEmailTemplate, getAccessEmailTemplate } from './email-templates'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -362,101 +363,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Profile created/updated successfully')
 
-    // 11. Skicka välkomstmail
-    console.log('Preparing welcome email...')
+    // 11. Skicka välkomstmail med ny professionell mall
+    console.log('Preparing welcome email using professional template...')
     
     const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
     
-    // Förbättrat avtalsinformation med slutdatum
-    const contractInfo = customer.contract_start_date || customer.annual_value ? `
-      <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <h3 style="color: #22c55e; margin: 0 0 12px 0;">📋 Avtalsinformation</h3>
-        ${customer.contract_start_date ? `
-          <p style="margin: 4px 0;"><strong>📅 Startdatum:</strong> ${new Date(customer.contract_start_date).toLocaleDateString('sv-SE')}</p>
-        ` : ''}
-        ${customer.contract_end_date ? `
-          <p style="margin: 4px 0;"><strong>🏁 Slutdatum:</strong> ${new Date(customer.contract_end_date).toLocaleDateString('sv-SE')}</p>
-        ` : ''}
-        ${customer.contract_length ? `
-          <p style="margin: 4px 0;"><strong>⏱️ Avtalslängd:</strong> ${customer.contract_length} år</p>
-        ` : ''}
-        ${customer.annual_value ? `
-          <p style="margin: 4px 0;"><strong>💰 Årspremie:</strong> ${customer.annual_value.toLocaleString('sv-SE')} SEK</p>
-        ` : ''}
-        ${customer.total_contract_value ? `
-          <p style="margin: 4px 0;"><strong>💎 Totalt avtalsvärde:</strong> ${customer.total_contract_value.toLocaleString('sv-SE')} SEK</p>
-        ` : ''}
-        ${customer.assigned_account_manager ? `
-          <p style="margin: 4px 0;"><strong>👤 Avtalsansvarig:</strong> ${customer.assigned_account_manager}</p>
-        ` : ''}
-      </div>
-    ` : ''
-
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Välkommen till BeGone Kundportal</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #22c55e; margin: 0;">🐛 BeGone Skadedjur</h1>
-          <h2 style="color: #64748b; margin: 10px 0;">Välkommen till vår kundportal!</h2>
-        </div>
-
-        <div style="background-color: #f1f5f9; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-          <p>Hej <strong>${customer.contact_person}</strong>!</p>
-          
-          <p>Tack för att du valt BeGone Skadedjur. Vi har nu skapat ett konto för ditt företag <strong>${customer.company_name}</strong> i vår kundportal.</p>
-          
-          ${contractInfo}
-          
-          <p>I portalen kan du:</p>
-          <ul style="color: #475569;">
-            <li>📊 Följa dina ärenden i realtid</li>
-            <li>📷 Se tekniska rapporter och bilder</li>
-            <li>➕ Skapa nya ärenden direkt</li>
-            <li>⚙️ Hantera dina företagsuppgifter</li>
-            <li>📈 Få översikt över avtalet och dess status</li>
-          </ul>
-        </div>
-
-        ${isNewUser ? `
-        <div style="background-color: #ecfdf5; border: 1px solid #22c55e; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-          <h3 style="color: #22c55e; margin: 0 0 10px 0;">Dina inloggningsuppgifter</h3>
-          <p><strong>E-post för inloggning:</strong> ${customerData.contact_email}</p>
-          <p><strong>Tillfälligt lösenord:</strong> ${tempPassword}</p>
-          <p style="color: #ef4444; font-size: 14px;">⚠️ Ändra ditt lösenord efter första inloggningen</p>
-          <p style="color: #64748b; font-size: 12px;"><em>Obs: Om du har flera företag registrerade med samma e-post kan du byta mellan dem efter inloggning.</em></p>
-        </div>
-        ` : `
-        <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-          <h3 style="color: #f59e0b; margin: 0 0 10px 0;">Befintligt konto</h3>
-          <p>Du kan logga in med ditt befintliga lösenord.</p>
-          <p><strong>E-post:</strong> ${customerData.contact_email}</p>
-          <p style="color: #64748b; font-size: 12px;"><em>Ditt konto har nu tillgång till företaget ${customer.company_name}.</em></p>
-        </div>
-        `}
-
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${loginLink}" 
-             style="display: inline-block; background-color: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            🚀 Logga in på kundportalen
-          </a>
-        </div>
-
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-          <p>Vid frågor, kontakta oss gärna:</p>
-          <p>📧 support@begone.se | 📞 010-123 45 67</p>
-          <p style="margin-top: 15px;">
-            Med vänliga hälsningar,<br>
-            <strong>BeGone Skadedjur Team</strong>
-          </p>
-        </div>
-      </body>
-      </html>
-    `
+    // Använd den nya professionella e-postmallen
+    const emailHtml = isNewUser 
+      ? getWelcomeEmailTemplate({
+          customer,
+          recipientEmail: customerData.contact_email,
+          recipientName: customer.contact_person,
+          loginLink,
+          isNewUser: true,
+          tempPassword: tempPassword
+        })
+      : getAccessEmailTemplate({
+          customer,
+          recipientEmail: customerData.contact_email,
+          recipientName: customer.contact_person,
+          loginLink,
+          isNewUser: false
+        })
 
     // FIXAD: Konfigurera Nodemailer med Resend - använd createTransport
     const transporter = nodemailer.createTransport({
@@ -471,9 +399,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // VIKTIGT: Skicka alltid till den email som användaren angav
     const mailOptions = {
-      from: 'BeGone Kundportal <noreply@begone.se>',
+      from: 'Begone Kundportal <noreply@begone.se>',
       to: customerData.contact_email, // Skicka till original-emailen som kunden angav
-      subject: isNewUser ? 'Välkommen till BeGone Kundportal - Avtal aktiverat' : 'Ny företagskoppling - BeGone Kundportal',
+      subject: isNewUser 
+        ? `Välkommen till Begone Kundportal - ${customer.company_name}` 
+        : `Ny företagskoppling tillagd - ${customer.company_name}`,
       html: emailHtml
     }
 

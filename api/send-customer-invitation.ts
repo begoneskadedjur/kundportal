@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
+import { getWelcomeEmailTemplate, getAccessEmailTemplate, getReminderEmailTemplate } from './email-templates'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -86,13 +87,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Användaren har redan tillgång, skicka påminnelse-email istället
         const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
         
-        await sendReminderEmail({
-          email,
-          contactPerson,
-          companyName,
-          loginLink,
-          customer
+        // Skicka påminnelse med ny professionell mall
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.resend.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: 'resend',
+            pass: RESEND_API_KEY
+          }
         })
+
+        const emailHtml = getReminderEmailTemplate({
+          customer,
+          recipientEmail: email,
+          recipientName: contactPerson,
+          loginLink,
+          isNewUser: false
+        })
+
+        const mailOptions = {
+          from: 'Begone Kundportal <noreply@begone.se>',
+          to: email,
+          subject: `Påminnelse: Er kundportal väntar - ${companyName}`,
+          html: emailHtml
+        }
+
+        await transporter.sendMail(mailOptions)
+        console.log('Professional reminder email sent to:', email)
 
         // Uppdatera eller skapa invitation record
         await upsertInvitation(supabase, customerId, email, userId)
@@ -170,24 +192,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 5. Skicka inbjudan email
     const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
     
+    // Använd professionella e-postmallar
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.resend.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'resend',
+        pass: RESEND_API_KEY
+      }
+    })
+
+    let emailHtml: string
+    let subject: string
+    
     if (isNewUser && tempPassword) {
-      await sendWelcomeEmail({
-        email,
-        contactPerson,
-        companyName,
-        tempPassword,
+      emailHtml = getWelcomeEmailTemplate({
+        customer,
+        recipientEmail: email,
+        recipientName: contactPerson,
         loginLink,
-        customer
+        isNewUser: true,
+        tempPassword
       })
+      subject = `Välkommen till Begone Kundportal - ${companyName}`
     } else {
-      await sendAccessEmail({
-        email,
-        contactPerson,
-        companyName,
+      emailHtml = getAccessEmailTemplate({
+        customer,
+        recipientEmail: email,
+        recipientName: contactPerson,
         loginLink,
-        customer
+        isNewUser: false
       })
+      subject = `Ny företagskoppling tillagd - ${companyName}`
     }
+
+    const mailOptions = {
+      from: 'Begone Kundportal <noreply@begone.se>',
+      to: email,
+      subject: subject,
+      html: emailHtml
+    }
+
+    await transporter.sendMail(mailOptions)
+    console.log('Professional invitation email sent to:', email)
 
     // 6. Registrera inbjudan i databas
     await upsertInvitation(supabase, customerId, email, userId)
@@ -248,281 +296,4 @@ async function upsertInvitation(supabase: any, customerId: string, email: string
   }
 }
 
-// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
-async function sendWelcomeEmail({ email, contactPerson, companyName, tempPassword, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: 'resend',
-      pass: RESEND_API_KEY
-    }
-  })
-
-  const contractInfo = getContractInfoText(customer)
-
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Välkommen till BeGone Kundportal</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 28px;">🚀 Välkommen till BeGone Kundportal!</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Din digitala plattform för skadedjursbekämpning</p>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #22c55e; margin-top: 0;">Hej ${contactPerson}!</h2>
-          
-          <p>Vi är glada att välkomna <strong>${companyName}</strong> till BeGone Kundportal. Ditt konto är nu aktiverat och du kan börja använda alla funktioner.</p>
-
-          <div style="background-color: #dcfce7; border: 1px solid #22c55e; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <h3 style="color: #22c55e; margin: 0 0 15px 0;">🔐 Dina inloggningsuppgifter</h3>
-            <div style="background-color: white; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e;">
-              <p style="margin: 5px 0;"><strong>E-post:</strong> ${email}</p>
-              <p style="margin: 5px 0;"><strong>Tillfälligt lösenord:</strong> <code style="background-color: #f1f5f9; padding: 3px 6px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
-            </div>
-            <p style="color: #dc2626; font-size: 14px; margin: 10px 0 0 0;">⚠️ <strong>Viktigt:</strong> Ändra ditt lösenord direkt efter första inloggningen av säkerhetsskäl.</p>
-          </div>
-
-          ${contractInfo}
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${loginLink}" 
-               style="display: inline-block; background-color: #22c55e; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-              🚀 Logga in på kundportalen
-            </a>
-          </div>
-
-          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #475569; margin: 0 0 10px 0;">📋 Vad kan du göra i kundportalen?</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #64748b;">
-              <li>Följ dina pågående ärenden i realtid</li>
-              <li>Skapa nya serviceförfrågningar</li>
-              <li>Se tekniker-rapporter och bilder</li>
-              <li>Få notifikationer om viktiga uppdateringar</li>
-              <li>Hantera dina kontaktuppgifter</li>
-            </ul>
-          </div>
-
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p><strong>Behöver du hjälp?</strong> Vi finns här för dig!</p>
-            <p>📧 <a href="mailto:support@begone.se" style="color: #22c55e;">support@begone.se</a> | 📞 <a href="tel:010-123-45-67" style="color: #22c55e;">010-123 45 67</a></p>
-            <p style="margin-top: 20px;">
-              Med vänliga hälsningar,<br>
-              <strong>BeGone Skadedjur Team</strong> 🐛🚫
-            </p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-
-  const mailOptions = {
-    from: 'BeGone Kundportal <noreply@begone.se>',
-    to: email,
-    subject: `🚀 Välkommen till BeGone Kundportal - ${companyName}`,
-    html: emailHtml
-  }
-
-  await transporter.sendMail(mailOptions)
-  console.log('Welcome email sent to:', email)
-}
-
-// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
-async function sendAccessEmail({ email, contactPerson, companyName, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: 'resend',
-      pass: RESEND_API_KEY
-    }
-  })
-
-  const contractInfo = getContractInfoText(customer)
-
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Ny företagskoppling - BeGone Kundportal</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 26px;">🏢 Ny företagskoppling tillagd!</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">BeGone Kundportal</p>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #3b82f6; margin-top: 0;">Hej ${contactPerson}!</h2>
-          
-          <p>Vi har lagt till <strong>${companyName}</strong> till ditt befintliga BeGone Kundportal-konto. Du kan nu hantera detta företag tillsammans med dina andra företag.</p>
-
-          <div style="background-color: #dbeafe; border: 1px solid #3b82f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <h3 style="color: #3b82f6; margin: 0 0 15px 0;">🔑 Inloggningsuppgifter</h3>
-            <div style="background-color: white; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-              <p style="margin: 5px 0;"><strong>E-post:</strong> ${email}</p>
-              <p style="margin: 5px 0;"><strong>Lösenord:</strong> Använd ditt befintliga lösenord</p>
-            </div>
-            <p style="color: #1e40af; font-size: 14px; margin: 10px 0 0 0;">💡 <strong>Tips:</strong> Du kan växla mellan företag efter inloggning.</p>
-          </div>
-
-          ${contractInfo}
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${loginLink}" 
-               style="display: inline-block; background-color: #3b82f6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-              🚀 Logga in på kundportalen
-            </a>
-          </div>
-
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p><strong>Frågor eller problem?</strong> Kontakta oss gärna!</p>
-            <p>📧 <a href="mailto:support@begone.se" style="color: #3b82f6;">support@begone.se</a> | 📞 <a href="tel:010-123-45-67" style="color: #3b82f6;">010-123 45 67</a></p>
-            <p style="margin-top: 20px;">
-              Med vänliga hälsningar,<br>
-              <strong>BeGone Skadedjur Team</strong> 🐛🚫
-            </p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-
-  const mailOptions = {
-    from: 'BeGone Kundportal <noreply@begone.se>',
-    to: email,
-    subject: `🏢 Ny företagskoppling - ${companyName} | BeGone Kundportal`,
-    html: emailHtml
-  }
-
-  await transporter.sendMail(mailOptions)
-  console.log('Access email sent to:', email)
-}
-
-// FIXAD FUNCTION: Använd nodemailer.createTransport (INTE createTransporter)
-async function sendReminderEmail({ email, contactPerson, companyName, loginLink, customer }: any) {
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: 'resend',
-      pass: RESEND_API_KEY
-    }
-  })
-
-  const contractInfo = getContractInfoText(customer)
-
-  const emailHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Påminnelse - BeGone Kundportal</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 26px;">🔔 Påminnelse om BeGone Kundportal</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Ditt konto väntar på dig</p>
-        </div>
-
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #f59e0b; margin-top: 0;">Hej ${contactPerson}!</h2>
-          
-          <p>Vi vill påminna dig om att du har tillgång till BeGone Kundportal för <strong>${companyName}</strong>. Logga in för att se dina ärenden och hantera ditt konto.</p>
-
-          ${contractInfo}
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${loginLink}" 
-               style="display: inline-block; background-color: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-              🚀 Logga in nu
-            </a>
-          </div>
-
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; font-size: 14px; color: #64748b;">
-            <p><strong>Behöver du hjälp med inloggning?</strong> Kontakta oss!</p>
-            <p>📧 <a href="mailto:support@begone.se" style="color: #f59e0b;">support@begone.se</a> | 📞 <a href="tel:010-123-45-67" style="color: #f59e0b;">010-123 45 67</a></p>
-            <p style="margin-top: 20px;">
-              Med vänliga hälsningar,<br>
-              <strong>BeGone Skadedjur Team</strong> 🐛🚫
-            </p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-
-  const mailOptions = {
-    from: 'BeGone Kundportal <noreply@begone.se>',
-    to: email,
-    subject: `🔔 Påminnelse: Din BeGone Kundportal väntar - ${companyName}`,
-    html: emailHtml
-  }
-
-  await transporter.sendMail(mailOptions)
-  console.log('Reminder email sent to:', email)
-}
-
-function getContractInfoText(customer: any): string {
-  if (!customer.annual_value && !customer.contract_start_date) {
-    return ''
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('sv-SE', {
-      style: 'currency',
-      currency: 'SEK',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('sv-SE')
-  }
-
-  let contractText = `
-    <div style="background-color: #f0f9ff; border: 1px solid #0ea5e9; padding: 20px; border-radius: 10px; margin: 20px 0;">
-      <h3 style="color: #0ea5e9; margin: 0 0 15px 0;">📄 Avtalsinformation</h3>
-      <div style="background-color: white; padding: 15px; border-radius: 8px;">
-  `
-
-  if (customer.contract_types?.name) {
-    contractText += `<p style="margin: 5px 0;"><strong>Avtalstyp:</strong> ${customer.contract_types.name}</p>`
-  }
-
-  if (customer.annual_value) {
-    contractText += `<p style="margin: 5px 0;"><strong>Årspremie:</strong> ${formatCurrency(customer.annual_value)}</p>`
-  }
-
-  if (customer.contract_start_date) {
-    contractText += `<p style="margin: 5px 0;"><strong>Avtalets startdatum:</strong> ${formatDate(customer.contract_start_date)}</p>`
-  }
-
-  if (customer.contract_end_date) {
-    contractText += `<p style="margin: 5px 0;"><strong>Avtalets slutdatum:</strong> ${formatDate(customer.contract_end_date)}</p>`
-  }
-
-  if (customer.assigned_account_manager) {
-    contractText += `<p style="margin: 5px 0;"><strong>Din kontakt hos oss:</strong> ${customer.assigned_account_manager}</p>`
-  }
-
-  contractText += `
-      </div>
-    </div>
-  `
-
-  return contractText
-}
+// Gamla funktioner borttagna - ersatta med professionella mallar från email-templates.ts
