@@ -253,7 +253,7 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-green-400" />
-                <h4 className="text-sm font-medium text-white">Alla produkter</h4>
+                <h4 className="text-sm font-medium text-white">Alla {products.length} produkter</h4>
               </div>
               <button
                 onClick={() => setShowTooltip(false)}
@@ -264,14 +264,30 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
               </button>
             </div>
             <div className="space-y-1 max-h-48 overflow-y-auto">
-              {products.map((product, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs py-1">
-                  <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
-                  <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
-                    {product.quantity}x
-                  </span>
-                </div>
-              ))}
+              {/* Visa först de som redan syns */}
+              <div className="pb-2 mb-2 border-b border-slate-700">
+                <p className="text-xs text-slate-500 mb-1">Visade:</p>
+                {products.slice(0, 3).map((product, idx) => (
+                  <div key={`shown-${idx}`} className="flex items-center justify-between text-xs py-1">
+                    <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
+                    <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
+                      {product.quantity}x
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {/* Visa sedan de återstående */}
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Övriga:</p>
+                {products.slice(3).map((product, idx) => (
+                  <div key={`hidden-${idx}`} className="flex items-center justify-between text-xs py-1">
+                    <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
+                    <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
+                      {product.quantity}x
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </>
