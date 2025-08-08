@@ -1,5 +1,6 @@
 // src/pages/admin/ContractsOverview.tsx - Pipeline-fokuserad försäljningsöversikt med kollapsbar sidopanel
 import React, { useState, useMemo, useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { 
   FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, 
   ShoppingCart, Filter, Download, TrendingUp, Users, Package, 
@@ -200,14 +201,24 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     }
   }
   
-  // Beräkna position baserat på button ref
+  // Beräkna position baserat på button ref - FIX SCROLL ISSUE
   const getTooltipStyle = () => {
     if (!buttonRef.current) return {}
     const rect = buttonRef.current.getBoundingClientRect()
+    
+    // rect.bottom är redan relativ till viewport, INGEN scrollY behövs!
+    const top = rect.bottom + 8
+    
+    console.log('📍 POSITION BERÄKNING:', {
+      buttonBottom: rect.bottom,
+      calculatedTop: top,
+      scrollY: window.scrollY
+    })
+    
     return {
       position: 'fixed' as const,
       left: `${rect.left}px`,
-      top: `${rect.bottom + 8}px`,
+      top: `${top}px`,
       zIndex: 99999
     }
   }
@@ -241,12 +252,12 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
         )}
       </div>
       
-      {/* Tooltip/Popover med alla produkter */}
-      {showTooltip && products.length > 3 && (
+      {/* Tooltip/Popover med alla produkter - PORTAL VERSION */}
+      {showTooltip && products.length > 3 && ReactDOM.createPortal(
         <>
           {/* DEBUG: Lägg till synlig backdrop för att se om den renderas */}
           <div 
-            className="fixed inset-0 z-40 bg-black/20" 
+            className="fixed inset-0 z-[9998] bg-black/20" 
             onClick={() => {
               if (backdropClickable) {
                 console.log('🔴 Backdrop klickad - stänger tooltip')
@@ -257,14 +268,14 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             }}
           />
           
-          {/* Popover - FIXED POSITIONERING MED REF */}
+          {/* Popover - FIXED POSITIONERING MED REF - RENDERAD I BODY */}
           <div 
-            className="bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80"
+            className="fixed bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80 z-[9999]"
             style={getTooltipStyle()}
             ref={(el) => {
               if (el) {
                 const style = getTooltipStyle()
-                console.log('🟩 POPOVER RENDERAD!', {
+                console.log('🟩 POPOVER RENDERAD VIA PORTAL!', {
                   style,
                   element: el,
                   products: products.length,
@@ -321,7 +332,8 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
               className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-600 rotate-45 border-l border-t border-slate-600"
             />
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
