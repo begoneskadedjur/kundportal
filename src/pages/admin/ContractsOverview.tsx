@@ -158,7 +158,7 @@ const CompactSellerCard: React.FC<{
   )
 }
 
-// Interaktiv produktvisning med popover
+// Interaktiv produktvisning med popover - FÖRENKLAD VERSION
 const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}> }> = ({ products }) => {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
@@ -186,37 +186,24 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     }
   }
   
-  const handleToggleTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
+  // ENKEL KLICK-HANDLER - inga timeouts, ingen hover-logik
+  const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
     
+    console.log('🔵 KLICK PÅ +X TILL KNAPPEN!', { 
+      currentTooltipState: showTooltip, 
+      totalProducts: products.length,
+      hiddenProducts: products.length - 3 
+    })
+    
     if (products.length > 3) {
-      if (showTooltip) {
-        setShowTooltip(false)
-      } else {
-        const position = calculateTooltipPosition(event.currentTarget)
-        setTooltipPosition(position)
-        setShowTooltip(true)
-      }
-    }
-  }
-  
-  const handleMouseEnter = (event: React.MouseEvent<HTMLSpanElement>) => {
-    if (products.length > 3 && !showTooltip) {
       const position = calculateTooltipPosition(event.currentTarget)
       setTooltipPosition(position)
-      // Delay för att undvika flicker vid snabb hover
-      setTimeout(() => setShowTooltip(true), 100)
+      const newState = !showTooltip
+      setShowTooltip(newState)
+      console.log('✅ Tooltip state ändrad till:', newState)
     }
-  }
-  
-  const handleMouseLeave = () => {
-    // Delay för att användare ska hinna flytta musen till popover
-    setTimeout(() => {
-      if (showTooltip) {
-        setShowTooltip(false)
-      }
-    }, 150)
   }
   
   return (
@@ -234,24 +221,16 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
           </span>
         ))}
         {products.length > 3 && (
-          <span 
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-400 cursor-pointer hover:bg-green-500/30 hover:text-green-300 hover:scale-105 active:scale-95 transition-all duration-200 font-medium select-none"
-            onClick={handleToggleTooltip}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                handleToggleTooltip(e as any)
-              }
-            }}
+          /* ANVÄND BUTTON ISTÄLLET FÖR SPAN - INGEN HOVER, BARA KLICK */
+          <button 
+            type="button"
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-400 cursor-pointer hover:bg-green-500/30 hover:text-green-300 hover:scale-105 active:scale-95 transition-all duration-200 font-medium select-none focus:outline-none focus:ring-2 focus:ring-green-500/50"
+            onClick={handleButtonClick}
             aria-label={`Visa alla ${products.length} produkter`}
             title={`Klicka för att visa alla ${products.length} produkter`}
           >
             +{products.length - 3} till
-          </span>
+          </button>
         )}
       </div>
       
@@ -261,10 +240,13 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
           {/* Backdrop för att fånga klick utanför */}
           <div 
             className="fixed inset-0 z-40" 
-            onClick={() => setShowTooltip(false)}
+            onClick={() => {
+              console.log('🔴 Backdrop klickad - stänger tooltip')
+              setShowTooltip(false)
+            }}
           />
           
-          {/* Popover */}
+          {/* Popover - INGEN HOVER-LOGIK */}
           <div 
             className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-xl max-w-sm min-w-72 md:max-w-sm animate-in fade-in-0 slide-in-from-top-1 duration-200"
             style={{
@@ -272,8 +254,6 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
               top: `${tooltipPosition.y}px`,
               transform: 'translateX(-50%)'
             }}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 100)}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -281,8 +261,10 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
                 <h4 className="text-sm font-medium text-white">Alla {products.length} produkter</h4>
               </div>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
+                  console.log('❌ Stäng-knapp klickad')
                   setShowTooltip(false)
                 }}
                 className="text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-all p-1 -m-1"
