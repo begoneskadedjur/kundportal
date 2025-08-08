@@ -581,27 +581,64 @@ export class ContractService {
         .sort((a, b) => b.total_value - a.total_value)
         .slice(0, 5)
         
-      // Produktinsikter (från selected_products JSONB)
+      // Produktinsikter (från selected_products JSONB med korrekt parsing)
       const productStats = new Map<string, { name: string, count: number, total_value: number }>()
       
       contracts.forEach(contract => {
-        if (contract.selected_products && Array.isArray(contract.selected_products)) {
-          contract.selected_products.forEach((product: any) => {
+        try {
+          let parsedProducts: any[] = []
+          
+          // Parse selected_products med samma logik som parseContractProducts i frontend
+          if (contract.selected_products) {
+            const data = typeof contract.selected_products === 'string' 
+              ? JSON.parse(contract.selected_products) 
+              : contract.selected_products
+            
+            // OneFlow struktur: array av produktgrupper
+            if (Array.isArray(data)) {
+              data.forEach((group: any) => {
+                // Varje grupp har en products array
+                if (group.products && Array.isArray(group.products)) {
+                  group.products.forEach((product: any) => {
+                    parsedProducts.push({
+                      name: product.name || 'Okänd produkt',
+                      quantity: product.quantity?.amount || product.quantity || 1,
+                      price: product.total_price || product.price || 0
+                    })
+                  })
+                }
+                // Fallback om produkter ligger direkt i arrayen (gammal struktur)
+                else if (group.name) {
+                  parsedProducts.push({
+                    name: group.name || group.product_name || 'Okänd produkt',
+                    quantity: group.quantity?.amount || group.quantity || 1,
+                    price: group.total_price || group.price || 0
+                  })
+                }
+              })
+            }
+          }
+          
+          // Aggregera produkter
+          parsedProducts.forEach((product: any) => {
             if (product.name) {
               const existing = productStats.get(product.name)
               
               if (existing) {
-                existing.count++
-                existing.total_value += product.total_price || product.price || 0
+                existing.count += product.quantity || 1
+                existing.total_value += product.price || 0
               } else {
                 productStats.set(product.name, {
                   name: product.name,
-                  count: 1,
-                  total_value: product.total_price || product.price || 0
+                  count: product.quantity || 1,
+                  total_value: product.price || 0
                 })
               }
             }
           })
+          
+        } catch (error) {
+          console.warn('Fel vid parsing av produkter för kontrakt:', contract.id, error)
         }
       })
       

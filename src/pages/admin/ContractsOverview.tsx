@@ -5,7 +5,7 @@ import {
   ShoppingCart, Filter, Download, TrendingUp, Users, Package, 
   Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, 
   Award, User, ChevronLeft, ChevronRight, Tag, Layers, X,
-  ArrowUp, ArrowDown, Menu, Building2, Mail, Phone
+  ArrowUp, ArrowDown, Menu, Building2, Mail, Phone, Info
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -14,6 +14,7 @@ import ContractFilesModal from '../../components/admin/contracts/ContractFilesMo
 import ContractImportModal from '../../components/admin/contracts/ContractImportModal'
 import FilesColumn from '../../components/admin/contracts/FilesColumn'
 import FileDownloadButton from '../../components/admin/contracts/FileDownloadButton'
+import { PageHeader } from '../../components/shared'
 import { useContracts } from '../../hooks/useContracts'
 import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
@@ -152,6 +153,133 @@ const CompactSellerCard: React.FC<{
   )
 }
 
+// Interaktiv produktvisning med popover
+const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}> }> = ({ products }) => {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  
+  if (products.length === 0) {
+    return <span className="text-xs text-slate-500">Inga produkter</span>
+  }
+  
+  const handleMouseEnter = (event: React.MouseEvent) => {
+    if (products.length > 3) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      let x = rect.left + rect.width / 2
+      
+      // Justera position för att hålla popover inom viewport
+      if (x + 150 > viewportWidth) {
+        x = viewportWidth - 170 // 150px popover width + 20px margin
+      }
+      if (x < 20) {
+        x = 20
+      }
+      
+      setTooltipPosition({
+        x: x,
+        y: rect.bottom + 8
+      })
+      setShowTooltip(true)
+    }
+  }
+  
+  const handleMouseLeave = () => {
+    setShowTooltip(false)
+  }
+  
+  const handleClick = (event: React.MouseEvent) => {
+    if (products.length > 3) {
+      event.stopPropagation()
+      if (showTooltip) {
+        setShowTooltip(false)
+      } else {
+        handleMouseEnter(event)
+      }
+    }
+  }
+  
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap gap-1" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+        {products.slice(0, 3).map((product, idx) => (
+          <span 
+            key={idx}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-300"
+          >
+            {product.quantity > 1 && (
+              <span className="font-bold mr-1">{product.quantity}x</span>
+            )}
+            {product.name}
+          </span>
+        ))}
+        {products.length > 3 && (
+          <span 
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-400 cursor-pointer hover:bg-slate-600 hover:text-slate-300 transition-colors touch-manipulation"
+            onClick={handleClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                handleClick(e as any)
+              }
+            }}
+            aria-label={`Visa alla ${products.length} produkter`}
+          >
+            +{products.length - 3} till
+          </span>
+        )}
+      </div>
+      
+      {/* Tooltip/Popover med alla produkter */}
+      {showTooltip && products.length > 3 && (
+        <>
+          {/* Backdrop för att fånga klick utanför */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setShowTooltip(false)}
+          />
+          
+          {/* Popover */}
+          <div 
+            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-xl max-w-sm min-w-72 md:max-w-sm"
+            style={{
+              left: `${tooltipPosition.x}px`,
+              top: `${tooltipPosition.y}px`,
+              transform: 'translateX(-50%)'
+            }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-green-400" />
+                <h4 className="text-sm font-medium text-white">Alla produkter</h4>
+              </div>
+              <button
+                onClick={() => setShowTooltip(false)}
+                className="text-slate-400 hover:text-white transition-colors p-1 -m-1"
+                aria-label="Stäng"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {products.map((product, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs py-1">
+                  <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
+                  <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
+                    {product.quantity}x
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // Pipeline filter pills
 const PipelineFilters: React.FC<{
   activeFilter: string,
@@ -272,8 +400,50 @@ export default function ContractsOverview() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      <div className="space-y-6">
+        <PageHeader 
+          title="Försäljningspipeline"
+          icon={FileText}
+          iconColor="text-green-500"
+          showBackButton={false}
+        />
+        
+        {/* Skeleton KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => (
+            <Card key={i} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 bg-slate-700 rounded w-20 animate-pulse"></div>
+                  <div className="h-8 bg-slate-600 rounded w-24 animate-pulse"></div>
+                  <div className="h-3 bg-slate-700 rounded w-16 animate-pulse"></div>
+                </div>
+                <div className="w-8 h-8 bg-slate-700 rounded opacity-50 animate-pulse"></div>
+              </div>
+            </Card>
+          ))}
+        </div>
+        
+        {/* Skeleton Filter Pills */}
+        <div className="flex flex-wrap gap-2">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="h-10 bg-slate-700 rounded-full w-20 animate-pulse"></div>
+          ))}
+        </div>
+        
+        {/* Skeleton Table */}
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="h-6 bg-slate-700 rounded w-48 animate-pulse"></div>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="flex gap-4">
+                <div className="h-12 bg-slate-700 rounded flex-1 animate-pulse"></div>
+                <div className="h-12 bg-slate-700 rounded w-32 animate-pulse"></div>
+                <div className="h-12 bg-slate-700 rounded w-24 animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     )
   }
@@ -290,39 +460,42 @@ export default function ContractsOverview() {
   }
 
   return (
-    <div className="relative">
-      {/* Huvudinnehåll */}
-      <div className={`transition-all duration-300 ${sidePanelOpen ? 'lg:mr-96' : ''}`}>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-6 h-6 text-green-500" />
-              Försäljningspipeline
-            </h3>
+    <div className="space-y-6">
+      <PageHeader 
+        title="Försäljningspipeline"
+        subtitle="Hantera kontrakt och försäljningsprocesser"
+        icon={FileText}
+        iconColor="text-green-500"
+        showBackButton={false}
+        rightContent={
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setImportModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Importera
+            </Button>
             
-            <div className="flex items-center gap-3">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setImportModalOpen(true)}
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Importera
-              </Button>
-              
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSidePanelOpen(!sidePanelOpen)}
-                className="flex items-center gap-2"
-              >
-                {sidePanelOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                Statistik
-              </Button>
-            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setSidePanelOpen(!sidePanelOpen)}
+              className="flex items-center gap-2"
+            >
+              {sidePanelOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              Statistik
+            </Button>
           </div>
+        }
+      />
+      
+      <div className="relative">
+        {/* Huvudinnehåll */}
+        <div className={`transition-all duration-300 ${sidePanelOpen ? 'lg:mr-96' : ''}`}>
+          <div className="space-y-6">
 
           {/* Kompakt KPI-rad */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -493,28 +666,7 @@ export default function ContractsOverview() {
                         </td>
                         
                         <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {products.length > 0 ? (
-                              products.slice(0, 3).map((product, idx) => (
-                                <span 
-                                  key={idx}
-                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-300"
-                                >
-                                  {product.quantity > 1 && (
-                                    <span className="font-bold mr-1">{product.quantity}x</span>
-                                  )}
-                                  {product.name}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-500">Inga produkter</span>
-                            )}
-                            {products.length > 3 && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-400">
-                                +{products.length - 3} till
-                              </span>
-                            )}
-                          </div>
+                          <ProductsCell products={products} />
                         </td>
                         
                         <td className="px-4 py-4">
@@ -602,10 +754,10 @@ export default function ContractsOverview() {
               )}
             </div>
           </Card>
+          </div>
         </div>
-      </div>
 
-      {/* Kollapsbar sidopanel */}
+        {/* Kollapsbar sidopanel */}
       <div className={`
         fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-800 
         transform transition-transform duration-300 z-40 overflow-y-auto
@@ -678,29 +830,43 @@ export default function ContractsOverview() {
               Top 5 Produkter
             </h4>
             <div className="space-y-2">
-              {stats?.popular_products?.slice(0, 5).map((product: any, index: number) => (
-                <div 
-                  key={`${product.name}-${index}`}
-                  className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">#{index + 1}</span>
-                    <p className="text-sm text-white">{product.name}</p>
+              {stats?.popular_products && stats.popular_products.length > 0 ? (
+                stats.popular_products.slice(0, 5).map((product: any, index: number) => (
+                  <div 
+                    key={`${product.name}-${index}`}
+                    className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">#{index + 1}</span>
+                      <p className="text-sm text-white truncate">{product.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-green-400">
+                        {product.count} st
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {formatContractValue(product.total_value)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-green-400">
-                      {product.count} st
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatContractValue(product.total_value)}
-                    </p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500">
+                    Ingen produktdata tillgänglig
+                  </p>
+                  <details className="mt-2">
+                    <summary className="text-xs text-slate-600 cursor-pointer hover:text-slate-400">
+                      Debug info
+                    </summary>
+                    <div className="text-xs text-slate-600 mt-1 font-mono bg-slate-800 p-2 rounded">
+                      <p>Stats exists: {!!stats ? 'Yes' : 'No'}</p>
+                      <p>Popular products: {JSON.stringify(stats?.popular_products)}</p>
+                      <p>Contracts count: {contracts.length}</p>
+                    </div>
+                  </details>
                 </div>
-              ))}
-              {!stats?.popular_products?.length && (
-                <p className="text-xs text-slate-500 text-center py-4">
-                  Ingen produktdata tillgänglig
-                </p>
               )}
             </div>
           </div>
@@ -736,28 +902,29 @@ export default function ContractsOverview() {
             </div>
           </Card>
         </div>
+        </div>
+
+        {/* Modals */}
+        <ContractImportModal
+          isOpen={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          onImportComplete={() => {
+            refreshContracts()
+            toast.success('Kontrakt importerade!')
+          }}
+        />
+
+        <ContractFilesModal
+          isOpen={filesModalOpen}
+          onClose={() => {
+            setFilesModalOpen(false)
+            setSelectedContractId(null)
+            setSelectedContractName('')
+          }}
+          contractId={selectedContractId}
+          contractName={selectedContractName}
+        />
       </div>
-
-      {/* Modals */}
-      <ContractImportModal
-        isOpen={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        onImportComplete={() => {
-          refreshContracts()
-          toast.success('Kontrakt importerade!')
-        }}
-      />
-
-      <ContractFilesModal
-        isOpen={filesModalOpen}
-        onClose={() => {
-          setFilesModalOpen(false)
-          setSelectedContractId(null)
-          setSelectedContractName('')
-        }}
-        contractId={selectedContractId}
-        contractName={selectedContractName}
-      />
     </div>
   )
 }
