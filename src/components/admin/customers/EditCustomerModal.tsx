@@ -65,6 +65,8 @@ export default function EditCustomerModal({
         contact_email: customer.contact_email || '',
         contact_phone: customer.contact_phone || '',
         contact_address: customer.contact_address || '',
+        billing_email: customer.billing_email || '',
+        billing_address: customer.billing_address || '',
         business_type: customer.business_type || '',
         industry_category: customer.industry_category || '',
         customer_size: customer.customer_size || null,
