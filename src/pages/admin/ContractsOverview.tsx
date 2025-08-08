@@ -482,7 +482,7 @@ export default function ContractsOverview() {
         icon={FileText}
         iconColor="text-green-500"
         showBackButton={true}
-        backPath="/admin"
+        backPath="/admin/dashboard"
         rightContent={
           <div className="flex items-center gap-3">
             <Button
