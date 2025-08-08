@@ -53,6 +53,11 @@ const parseContractProducts = (contract: ContractWithSourceData): Array<{name: s
           }
         })
         
+        // Debug-logging för att verifiera alla produkter
+        if (allProducts.length > 3) {
+          console.log(`Contract ${contract.id} har ${allProducts.length} produkter:`, allProducts)
+        }
+        
         return allProducts.length > 0 ? allProducts : []
       }
     }
@@ -263,31 +268,24 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
                 <X className="w-3 h-3" />
               </button>
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {/* Visa först de som redan syns */}
-              <div className="pb-2 mb-2 border-b border-slate-700">
-                <p className="text-xs text-slate-500 mb-1">Visade:</p>
-                {products.slice(0, 3).map((product, idx) => (
-                  <div key={`shown-${idx}`} className="flex items-center justify-between text-xs py-1">
-                    <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
-                    <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
-                      {product.quantity}x
-                    </span>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {/* Visa alla produkter med indikering av vilka som syns i listan */}
+              {products.map((product, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50">
+                  <div className="flex items-center gap-2 flex-1">
+                    {idx < 3 && (
+                      <span className="text-green-400 text-xs">●</span>
+                    )}
+                    <span className="text-slate-300 truncate flex-1">{product.name}</span>
                   </div>
-                ))}
-              </div>
-              {/* Visa sedan de återstående */}
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Övriga:</p>
-                {products.slice(3).map((product, idx) => (
-                  <div key={`hidden-${idx}`} className="flex items-center justify-between text-xs py-1">
-                    <span className="text-slate-300 truncate flex-1 mr-2">{product.name}</span>
-                    <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded">
-                      {product.quantity}x
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded ml-2">
+                    {product.quantity}x
+                  </span>
+                </div>
+              ))}
+              {products.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-2">Inga produkter att visa</p>
+              )}
             </div>
           </div>
         </>
