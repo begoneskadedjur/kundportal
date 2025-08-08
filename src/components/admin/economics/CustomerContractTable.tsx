@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Calendar, DollarSign, Users, Filter } from 'lucide-react'
 import Card from '../../ui/Card'
-import { useEconomicsDashboard } from '../../../hooks/useEconomicsDashboard'
+import { useCustomerContracts } from '../../../hooks/useEconomicsDashboard'
 import type { CustomerContract } from '../../../services/economicsService'
 
 const formatCurrency = (amount: number): string => {
@@ -47,7 +47,7 @@ type SortField = keyof CustomerContract
 type SortDirection = 'asc' | 'desc'
 
 const CustomerContractTable: React.FC = () => {
-  const { customerContracts, loading, error } = useEconomicsDashboard()
+  const { data: customerContracts, loading, error } = useCustomerContracts()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortField, setSortField] = useState<SortField>('days_remaining')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -79,7 +79,7 @@ const CustomerContractTable: React.FC = () => {
     )
   }
 
-  if (!customerContracts.length) {
+  if (!customerContracts || !customerContracts.length) {
     return (
       <Card>
         <div className="flex items-center mb-6">

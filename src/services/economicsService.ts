@@ -11,7 +11,7 @@ export interface MonthlyRevenue {
 }
 
 export interface ExpiringContract {
-  customer_id: number
+  customer_id: string
   company_name: string
   contract_end_date: string
   annual_value: number
@@ -76,7 +76,7 @@ export interface BeGoneMonthlyStats {
 }
 
 export interface CustomerContract {
-  id: number
+  id: string
   company_name: string
   business_type: string
   contract_type_name: string
@@ -84,7 +84,7 @@ export interface CustomerContract {
   total_contract_value: number
   contract_start_date: string
   contract_end_date: string
-  contract_length_months: number
+  contract_length: string
   assigned_account_manager: string
   contract_status: string
   days_remaining: number
@@ -108,7 +108,7 @@ export const getKpiData = async (): Promise<KpiData> => {
       .from('customers')
       .select('annual_value')
       .eq('is_active', true)
-      .eq('contract_status', 'active')
+      .eq('contract_status', 'signed')
 
     const total_arr = arrData?.reduce((sum, c) => sum + (c.annual_value || 0), 0) || 0
     const monthly_recurring_revenue = total_arr / 12
@@ -669,10 +669,10 @@ export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
         total_contract_value,
         contract_start_date,
         contract_end_date,
-        contract_length_months,
+        contract_length,
+        contract_type,
         assigned_account_manager,
-        contract_status,
-        contract_types(name)
+        contract_status
       `)
       .eq('is_active', true)
       .order('contract_end_date')
@@ -686,14 +686,14 @@ export const getCustomerContracts = async (): Promise<CustomerContract[]> => {
         id: customer.id,
         company_name: customer.company_name,
         business_type: customer.business_type || '',
-        contract_type_name: (customer.contract_types as any)?.name || 'Okänt',
+        contract_type_name: customer.contract_type || 'Okänt',
         annual_value: customer.annual_value || 0,
         total_contract_value: customer.total_contract_value || 0,
         contract_start_date: customer.contract_start_date,
         contract_end_date: customer.contract_end_date,
-        contract_length_months: customer.contract_length_months || 12,
+        contract_length: customer.contract_length || '12',
         assigned_account_manager: customer.assigned_account_manager || 'Ej tilldelad',
-        contract_status: customer.contract_status || 'active',
+        contract_status: customer.contract_status || 'signed',
         days_remaining
       }
     }) || []

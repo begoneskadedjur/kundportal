@@ -6,21 +6,39 @@ import toast from 'react-hot-toast'
 export type CreateCustomerData = {
   // Grundinformation
   company_name: string
-  org_number: string
+  organization_number?: string
   contact_person: string
-  email: string
-  phone: string
-  address: string
-  contract_type_id: string
-  business_type: string
+  contact_email: string
+  contact_phone: string
+  contact_address: string
   
-  // Nya avtalsfält
+  // OneFlow fält
+  oneflow_contract_id?: string
+  contract_template_id?: string
+  contract_type?: string
+  contract_status?: string
+  
+  // Avtalsfält
   contract_start_date?: string
-  contract_length_months?: string
+  contract_end_date?: string
+  contract_length?: string
   annual_value?: string
+  monthly_value?: string
   total_contract_value?: string
-  contract_description?: string
+  agreement_text?: string
+  
+  // Account management
   assigned_account_manager?: string
+  account_manager_email?: string
+  sales_person?: string
+  sales_person_email?: string
+  
+  // Affärstyp
+  business_type?: string
+  industry_category?: string
+  customer_size?: string
+  service_frequency?: string
+  source_type?: string
 }
 
 export const customerService = {
@@ -53,13 +71,7 @@ export const customerService = {
   async getCustomers() {
     const { data, error } = await supabase
       .from('customers')
-      .select(`
-        *,
-        contract_types (
-          id,
-          name
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
     if (error) throw error
@@ -76,10 +88,6 @@ export const customerService = {
       .from('customers')
       .select(`
         *,
-        contract_types (
-          id,
-          name
-        ),
         cases (
           id,
           case_number,
@@ -100,11 +108,11 @@ export const customerService = {
     // Konvertera string-värden till rätt datatyper för databas
     const dbUpdates: any = { ...updates }
     
-    if (updates.contract_length_months) {
-      dbUpdates.contract_length_months = parseInt(updates.contract_length_months)
-    }
     if (updates.annual_value) {
       dbUpdates.annual_value = parseFloat(updates.annual_value)
+    }
+    if (updates.monthly_value) {
+      dbUpdates.monthly_value = parseFloat(updates.monthly_value)
     }
     if (updates.total_contract_value) {
       dbUpdates.total_contract_value = parseFloat(updates.total_contract_value)

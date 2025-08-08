@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     // 1. Validera inkommande data
-    const requiredFields = ['company_name', 'org_number', 'contact_person', 'email', 'contract_type_id', 'business_type']
+    const requiredFields = ['company_name', 'contact_person', 'contact_email']
     for (const field of requiredFields) {
       if (!customerData[field]) {
         return res.status(400).json({ error: `Fält "${field}" är obligatoriskt` })
@@ -44,52 +44,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Validera e-post format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(customerData.email)) {
+    if (!emailRegex.test(customerData.contact_email)) {
       return res.status(400).json({ error: 'Ogiltig e-postadress' })
     }
 
-    // 3. Hämta avtalstyp från databas
-    console.log('Fetching contract type:', customerData.contract_type_id)
-    const { data: contractType, error: contractError } = await supabase
-      .from('contract_types')
-      .select('*')
-      .eq('id', customerData.contract_type_id)
-      .eq('is_active', true)
-      .single()
+    // 3. Hämta avtalstyp från databas (om det finns)
+    let contractType = null
+    if (customerData.contract_type_id) {
+      console.log('Fetching contract type:', customerData.contract_type_id)
+      const { data: ct, error: contractError } = await supabase
+        .from('contract_types')
+        .select('*')
+        .eq('id', customerData.contract_type_id)
+        .eq('is_active', true)
+        .single()
 
-    if (contractError || !contractType) {
-      console.error('Contract type error:', contractError)
-      return res.status(400).json({ error: 'Ogiltig avtalstyp' })
+      if (!contractError && ct) {
+        contractType = ct
+        console.log('Contract type found:', contractType.name)
+      }
     }
-
-    console.log('Contract type found:', contractType.name)
 
     // 4. Kolla om kund redan finns - FIXAD med säker email access
     const { data: existingCustomers } = await supabase
       .from('customers')
-      .select('company_name, org_number, email')
-      .or(`company_name.eq.${customerData.company_name},org_number.eq.${customerData.org_number},email.eq.${customerData.email}`)
+      .select('company_name, organization_number, contact_email')
+      .or(`company_name.eq.${customerData.company_name},organization_number.eq.${customerData.organization_number || ''},contact_email.eq.${customerData.contact_email}`)
 
     if (existingCustomers && existingCustomers.length > 0) {
       const existingCustomer = existingCustomers[0]
       if (existingCustomer.company_name === customerData.company_name) {
         return res.status(400).json({ error: `Företaget "${customerData.company_name}" finns redan` })
       }
-      if (existingCustomer.org_number === customerData.org_number) {
-        return res.status(400).json({ error: `Organisationsnummer "${customerData.org_number}" finns redan` })
+      if (customerData.organization_number && existingCustomer.organization_number === customerData.organization_number) {
+        return res.status(400).json({ error: `Organisationsnummer "${customerData.organization_number}" finns redan` })
       }
-      if (existingCustomer.email === customerData.email) {
-        return res.status(400).json({ error: `E-postadressen "${customerData.email}" används redan` })
+      if (existingCustomer.contact_email === customerData.contact_email) {
+        return res.status(400).json({ error: `E-postadressen "${customerData.contact_email}" används redan` })
       }
     }
 
-    // 5. Skapa unikt företagsnamn för ClickUp
-    const uniqueListName = `${customerData.company_name} - ${contractType.name}`
-    console.log('Creating ClickUp list with name:', uniqueListName)
+    // 5. Skapa ClickUp lista (om contractType finns)
+    let clickupList = null
+    if (contractType) {
+      const uniqueListName = `${customerData.company_name} - ${contractType.name}`
+      console.log('Creating ClickUp list with name:', uniqueListName)
 
-    // 6. Skapa ClickUp lista
-    const clickupResponse = await fetch(
-      `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
+      // 6. Skapa ClickUp lista
+      const clickupResponse = await fetch(
+        `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
       {
         method: 'POST',
         headers: {
@@ -117,32 +120,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: `ClickUp API fel: ${errorData}` })
     }
 
-    const clickupList = await clickupResponse.json()
-    console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
+      clickupList = await clickupResponse.json()
+      console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
+    }
 
     // 7. Förbered kunddata för databas
-    const dbCustomerData = {
+    const dbCustomerData: any = {
       company_name: customerData.company_name.trim(),
-      org_number: customerData.org_number.trim(),
+      organization_number: customerData.organization_number?.trim() || null,
       contact_person: customerData.contact_person.trim(),
-      email: customerData.email.trim().toLowerCase(),
-      phone: customerData.phone?.trim() || null,
-      address: customerData.address?.trim() || null,
-      contract_type_id: customerData.contract_type_id,
-      business_type: customerData.business_type,
-      clickup_list_id: clickupList.id,
-      clickup_list_name: clickupList.name,
-      is_active: true,
+      contact_email: customerData.contact_email.trim().toLowerCase(),
+      contact_phone: customerData.contact_phone?.trim() || null,
+      contact_address: customerData.contact_address?.trim() || null,
       
-      // Avancerade avtalsfält
+      // OneFlow fält
+      oneflow_contract_id: customerData.oneflow_contract_id || null,
+      contract_template_id: customerData.contract_template_id || null,
+      contract_type: customerData.contract_type || contractType?.name || null,
+      contract_status: customerData.contract_status || 'signed',
+      
+      // Avtalsfält
       contract_start_date: customerData.contract_start_date || null,
-      contract_length_months: customerData.contract_length_months ? parseInt(customerData.contract_length_months) : null,
       contract_end_date: customerData.contract_end_date || null,
+      contract_length: customerData.contract_length || null,
       annual_value: customerData.annual_value ? parseFloat(customerData.annual_value) : null,
+      monthly_value: customerData.monthly_value ? parseFloat(customerData.monthly_value) : null,
       total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
-      contract_description: customerData.contract_description?.trim() || null,
+      agreement_text: customerData.agreement_text || null,
+      
+      // Account management
       assigned_account_manager: customerData.assigned_account_manager || null,
-      contract_status: 'active'
+      account_manager_email: customerData.account_manager_email || null,
+      sales_person: customerData.sales_person || null,
+      sales_person_email: customerData.sales_person_email || null,
+      
+      // Affärstyp
+      business_type: customerData.business_type || null,
+      industry_category: customerData.industry_category || null,
+      customer_size: customerData.customer_size || null,
+      service_frequency: customerData.service_frequency || null,
+      source_type: customerData.source_type || 'manual',
+      
+      is_active: true
+    }
+    
+    // Lägg till ClickUp data om det finns
+    if (clickupList) {
+      dbCustomerData.clickup_list_id = clickupList.id
+      dbCustomerData.clickup_list_name = clickupList.name
     }
 
     // 8. Skapa kund i databas
@@ -155,14 +180,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (customerError) {
       console.error('Customer creation error:', customerError)
-      // Försök ta bort ClickUp-listan vid fel
-      try {
-        await fetch(`https://api.clickup.com/api/v2/list/${clickupList.id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': CLICKUP_API_TOKEN }
-        })
-      } catch (cleanupError) {
-        console.error('Failed to cleanup ClickUp list:', cleanupError)
+      // Försök ta bort ClickUp-listan vid fel (om den skapades)
+      if (clickupList) {
+        try {
+          await fetch(`https://api.clickup.com/api/v2/list/${clickupList.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': CLICKUP_API_TOKEN }
+          })
+        } catch (cleanupError) {
+          console.error('Failed to cleanup ClickUp list:', cleanupError)
+        }
       }
       return res.status(500).json({ error: `Kunde inte skapa kund: ${customerError.message}` })
     }
@@ -170,9 +197,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Customer created successfully:', customer.id)
 
     // 9. Hantera autentisering och profil - FIXAD med säker email access
-    console.log('Checking for existing auth user with email:', customerData.email)
+    console.log('Checking for existing auth user with email:', customerData.contact_email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
-    const existingAuthUser = users.find(u => u.email === customerData.email)
+    const existingAuthUser = users.find(u => u.email === customerData.contact_email)
     
     let userId: string
     let isNewUser = false
@@ -198,14 +225,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
         
         // Skapa ny användare med modifierad e-post (tillfällig lösning)
-        const modifiedEmail = `${customerData.email.split('@')[0]}+${customer.id}@${customerData.email.split('@')[1]}`
+        const modifiedEmail = `${customerData.contact_email.split('@')[0]}+${customer.id}@${customerData.contact_email.split('@')[1]}`
         
         const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
           email: modifiedEmail,
           password: tempPassword,
           email_confirm: true,
           user_metadata: {
-            actual_email: customerData.email, // Spara riktiga e-posten
+            actual_email: customerData.contact_email, // Spara riktiga e-posten
             company_name: customerData.company_name,
             contact_person: customerData.contact_person,
             customer_id: customer.id
@@ -228,7 +255,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
 
       const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
-        email: customerData.email,
+        email: customerData.contact_email,
         password: tempPassword,
         email_confirm: true,
         user_metadata: {
@@ -263,7 +290,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('profiles')
         .update({
           customer_id: customer.id,
-          email: customerData.email, // Använd den riktiga e-posten
+          email: customerData.contact_email, // Använd den riktiga e-posten
           is_active: true,
           updated_at: new Date().toISOString()
         })
@@ -284,7 +311,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .insert({
           id: userId,
           user_id: userId,
-          email: customerData.email, // Använd den riktiga e-posten
+          email: customerData.contact_email, // Använd den riktiga e-posten
           customer_id: customer.id,
           is_admin: false,
           is_active: true
@@ -317,8 +344,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${customer.contract_end_date ? `
           <p style="margin: 4px 0;"><strong>🏁 Slutdatum:</strong> ${new Date(customer.contract_end_date).toLocaleDateString('sv-SE')}</p>
         ` : ''}
-        ${customer.contract_length_months ? `
-          <p style="margin: 4px 0;"><strong>⏱️ Avtalslängd:</strong> ${customer.contract_length_months} månader</p>
+        ${customer.contract_length ? `
+          <p style="margin: 4px 0;"><strong>⏱️ Avtalslängd:</strong> ${customer.contract_length} år</p>
         ` : ''}
         ${customer.annual_value ? `
           <p style="margin: 4px 0;"><strong>💰 Årspremie:</strong> ${customer.annual_value.toLocaleString('sv-SE')} SEK</p>
@@ -365,7 +392,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ${isNewUser ? `
         <div style="background-color: #ecfdf5; border: 1px solid #22c55e; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
           <h3 style="color: #22c55e; margin: 0 0 10px 0;">Dina inloggningsuppgifter</h3>
-          <p><strong>E-post för inloggning:</strong> ${customerData.email}</p>
+          <p><strong>E-post för inloggning:</strong> ${customerData.contact_email}</p>
           <p><strong>Tillfälligt lösenord:</strong> ${tempPassword}</p>
           <p style="color: #ef4444; font-size: 14px;">⚠️ Ändra ditt lösenord efter första inloggningen</p>
           <p style="color: #64748b; font-size: 12px;"><em>Obs: Om du har flera företag registrerade med samma e-post kan du byta mellan dem efter inloggning.</em></p>
@@ -374,7 +401,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
           <h3 style="color: #f59e0b; margin: 0 0 10px 0;">Befintligt konto</h3>
           <p>Du kan logga in med ditt befintliga lösenord.</p>
-          <p><strong>E-post:</strong> ${customerData.email}</p>
+          <p><strong>E-post:</strong> ${customerData.contact_email}</p>
           <p style="color: #64748b; font-size: 12px;"><em>Ditt konto har nu tillgång till företaget ${customer.company_name}.</em></p>
         </div>
         `}
@@ -412,14 +439,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // VIKTIGT: Skicka alltid till den email som användaren angav
     const mailOptions = {
       from: 'BeGone Kundportal <noreply@begone.se>',
-      to: customerData.email, // Skicka till original-emailen som kunden angav
+      to: customerData.contact_email, // Skicka till original-emailen som kunden angav
       subject: isNewUser ? 'Välkommen till BeGone Kundportal - Avtal aktiverat' : 'Ny företagskoppling - BeGone Kundportal',
       html: emailHtml
     }
 
     try {
       await transporter.sendMail(mailOptions)
-      console.log('Welcome email sent successfully to:', customerData.email)
+      console.log('Welcome email sent successfully to:', customerData.contact_email)
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError)
       // Fortsätt ändå - kunden är skapad
@@ -432,12 +459,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customer: {
         id: customer.id,
         company_name: customer.company_name,
-        email: customer.email,
+        email: customer.contact_email,
         clickup_list_id: customer.clickup_list_id,
-        contract_type: contractType.name,
+        contract_type: customer.contract_type,
         contract_start_date: customer.contract_start_date,
         contract_end_date: customer.contract_end_date,
-        contract_length_months: customer.contract_length_months,
+        contract_length: customer.contract_length,
         annual_value: customer.annual_value,
         total_contract_value: customer.total_contract_value,
         assigned_account_manager: customer.assigned_account_manager

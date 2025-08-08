@@ -21,27 +21,36 @@ import { PageHeader } from '../../components/shared'
 interface Customer {
   id: string
   company_name: string
-  org_number: string
-  contact_person: string
-  email: string
-  phone: string
-  address: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  organization_number?: string | null
+  contact_person: string | null
+  contact_email: string
+  contact_phone?: string | null
+  contact_address?: string | null
+  is_active: boolean | null
+  created_at: string | null
+  updated_at: string | null
   business_type?: string | null
-  contract_types?: {
-    id: string
-    name: string
-  }
+  contract_type?: string | null
+  // OneFlow fält
+  oneflow_contract_id?: string | null
+  contract_template_id?: string | null
+  contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
   // Avtalsfält
   contract_start_date?: string | null
-  contract_length_months?: number | null
+  contract_end_date?: string | null
+  contract_length?: string | null
   annual_value?: number | null
+  monthly_value?: number | null
   total_contract_value?: number | null
   assigned_account_manager?: string | null
-  contract_status?: string
-  contract_end_date?: string | null
+  account_manager_email?: string | null
+  sales_person?: string | null
+  sales_person_email?: string | null
+  // Business Intelligence
+  industry_category?: string | null
+  customer_size?: 'small' | 'medium' | 'large' | null
+  service_frequency?: string | null
+  source_type?: 'oneflow' | 'manual' | 'import' | null
   // ClickUp integration
   clickup_list_id?: string | null
   clickup_list_name?: string | null
@@ -116,7 +125,7 @@ export default function Customers() {
       // Beräkna extra fält för varje kund
       const enrichedCustomers = customersData.map(customer => ({
         ...customer,
-        monthsLeft: calculateMonthsLeft(customer.contract_start_date, customer.contract_length_months),
+        monthsLeft: calculateMonthsLeft(customer.contract_start_date, customer.contract_end_date),
         activeCases: Math.floor(Math.random() * 5) // TODO: Hämta från databas
       }))
       
@@ -146,13 +155,10 @@ export default function Customers() {
     }
   }
 
-  const calculateMonthsLeft = (startDate: string | null, lengthMonths: number | null): number | null => {
-    if (!startDate || !lengthMonths) return null
+  const calculateMonthsLeft = (startDate: string | null, endDate: string | null): number | null => {
+    if (!endDate) return null
     
-    const start = new Date(startDate)
-    const end = new Date(start)
-    end.setMonth(end.getMonth() + lengthMonths)
-    
+    const end = new Date(endDate)
     const now = new Date()
     const monthsLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))
     
@@ -188,9 +194,9 @@ export default function Customers() {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(customer =>
         customer.company_name.toLowerCase().includes(searchLower) ||
-        customer.contact_person.toLowerCase().includes(searchLower) ||
-        customer.email.toLowerCase().includes(searchLower) ||
-        customer.org_number?.toLowerCase().includes(searchLower)
+        (customer.contact_person?.toLowerCase().includes(searchLower) || false) ||
+        customer.contact_email.toLowerCase().includes(searchLower) ||
+        (customer.organization_number?.toLowerCase().includes(searchLower) || false)
       )
     }
 
@@ -243,7 +249,7 @@ export default function Customers() {
         },
         body: JSON.stringify({
           customerId: customer.id,
-          email: customer.email,
+          email: customer.contact_email,
           contactPerson: customer.contact_person,
           companyName: customer.company_name
         })
@@ -280,7 +286,7 @@ export default function Customers() {
         },
         body: JSON.stringify({
           customerId: customer.id,
-          email: customer.email,
+          email: customer.contact_email,
           reason,
           sendNotification: true
         })
@@ -304,7 +310,7 @@ export default function Customers() {
 
   // NYTT: Skapa ClickUp lista manuellt
   const handleCreateClickUpList = async (customer: Customer) => {
-    if (!customer.contract_types?.id) {
+    if (!customer.contract_type) {
       toast.error('Kunden saknar avtalstyp - kan inte skapa ClickUp lista')
       return
     }
@@ -319,8 +325,8 @@ export default function Customers() {
         body: JSON.stringify({
           customerId: customer.id,
           companyName: customer.company_name,
-          orgNumber: customer.org_number,
-          contractTypeId: customer.contract_types.id
+          orgNumber: customer.organization_number,
+          contractType: customer.contract_type
         })
       })
 
@@ -381,9 +387,9 @@ export default function Customers() {
     }
   }
 
-  const handleToggleStatus = async (customerId: string, currentStatus: boolean) => {
+  const handleToggleStatus = async (customerId: string, currentStatus: boolean | null) => {
     try {
-      await customerService.updateCustomer(customerId, { is_active: !currentStatus })
+      await customerService.toggleCustomerStatus(customerId, !currentStatus)
       
       setCustomers(prev => prev.map(customer =>
         customer.id === customerId
@@ -736,7 +742,7 @@ export default function Customers() {
                               </div>
                               <div className="ml-3">
                                 <p className="text-white font-medium">{customer.company_name}</p>
-                                <p className="text-slate-400 text-sm">{customer.org_number}</p>
+                                <p className="text-slate-400 text-sm">{customer.organization_number || 'Org.nr saknas'}</p>
                                 {customer.business_type && (
                                   <p className="text-slate-500 text-xs">{getBusinessTypeLabel(customer.business_type)}</p>
                                 )}
@@ -745,9 +751,9 @@ export default function Customers() {
                           </td>
                           <td className="py-4 px-4">
                             <div>
-                              <p className="text-white font-medium">{customer.contact_person}</p>
-                              <p className="text-slate-400 text-sm">{customer.email}</p>
-                              <p className="text-slate-400 text-sm">{customer.phone}</p>
+                              <p className="text-white font-medium">{customer.contact_person || 'Kontakt saknas'}</p>
+                              <p className="text-slate-400 text-sm">{customer.contact_email}</p>
+                              <p className="text-slate-400 text-sm">{customer.contact_phone || 'Telefon saknas'}</p>
                             </div>
                           </td>
                           <td className="py-4 px-4">
@@ -756,7 +762,7 @@ export default function Customers() {
                                 {(customer as any).annual_value ? formatCurrency((customer as any).annual_value) : 'Ej satt'}
                               </p>
                               <p className="text-slate-400 text-sm">
-                                {customer.contract_types?.name || 'Okänt avtal'}
+                                {customer.contract_type || 'Okänt avtal'}
                               </p>
                               {customer.monthsLeft !== null && (
                                 <p className={`text-sm ${getContractStatusColor(customer.monthsLeft)}`}>
@@ -883,7 +889,7 @@ export default function Customers() {
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => window.open(`mailto:${customer.email}`, '_blank')}
+                                onClick={() => window.open(`mailto:${customer.contact_email}`, '_blank')}
                                 className="p-2"
                                 title="Skicka e-post"
                               >
@@ -893,7 +899,7 @@ export default function Customers() {
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => window.open(`tel:${customer.phone}`, '_blank')}
+                                onClick={() => window.open(`tel:${customer.contact_phone}`, '_blank')}
                                 className="p-2"
                                 title="Ring"
                               >

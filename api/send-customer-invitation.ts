@@ -45,13 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Fetching customer data...')
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select(`
-        *,
-        contract_types (
-          name,
-          clickup_folder_id
-        )
-      `)
+      .select('*')
       .eq('id', customerId)
       .single()
 

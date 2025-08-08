@@ -604,16 +604,94 @@ const calculateFinancialValues = (oneflowTotalValue: number | null, lengthText: 
   }
 }
 
-// Generera produktsammanfattning från OneFlow produkter
-const generateProductSummary = (products: any[] | null): string | null => {
-  if (!products || !Array.isArray(products)) return null
+// Generera produktsammanfattning från OneFlow produkter (hanterar nested product_groups)
+const generateProductSummary = (productGroups: any[] | null): string | null => {
+  if (!productGroups || !Array.isArray(productGroups)) return null
   
-  const summaries = products.map(product => {
-    const quantity = product.quantity?.amount || 1
-    return `${quantity}st ${product.name}`
-  })
+  const summaries: string[] = []
   
-  return summaries.join(', ')
+  // Iterera genom alla product_groups
+  for (const group of productGroups) {
+    // Kontrollera om det är en product_group med products array
+    if (group.products && Array.isArray(group.products)) {
+      for (const product of group.products) {
+        const quantity = product.quantity?.amount || 1
+        const name = product.name || 'Okänd produkt'
+        summaries.push(`${quantity}st ${name}`)
+      }
+    } 
+    // Fallback om strukturen är annorlunda (direkt produkt)
+    else if (group.name) {
+      const quantity = group.quantity?.amount || 1
+      summaries.push(`${quantity}st ${group.name}`)
+    }
+  }
+  
+  return summaries.length > 0 ? summaries.join(', ') : null
+}
+
+// Extrahera service-detaljer från produkter
+const extractServiceDetails = (productGroups: any[] | null): string | null => {
+  if (!productGroups || !Array.isArray(productGroups)) return null
+  
+  const serviceDetails: string[] = []
+  
+  for (const group of productGroups) {
+    if (group.products && Array.isArray(group.products)) {
+      for (const product of group.products) {
+        if (product.description) {
+          serviceDetails.push(product.description)
+        }
+      }
+    }
+  }
+  
+  return serviceDetails.length > 0 ? serviceDetails.join('. ') : null
+}
+
+// Detektera service-frekvens från agreement_text och produkter
+const detectServiceFrequency = (agreementText: string | null, productGroups: any[] | null): string | null => {
+  const textToAnalyze = agreementText?.toLowerCase() || ''
+  
+  // Kontrollera vanliga frekvenser i texten
+  if (textToAnalyze.includes('månadsvis') || textToAnalyze.includes('månatlig') || 
+      textToAnalyze.includes('varje månad') || textToAnalyze.includes('per månad')) {
+    return 'monthly'
+  }
+  
+  if (textToAnalyze.includes('kvartalsvis') || textToAnalyze.includes('kvartal') || 
+      textToAnalyze.includes('var tredje månad')) {
+    return 'quarterly'
+  }
+  
+  if (textToAnalyze.includes('halvårsvis') || textToAnalyze.includes('halvår') || 
+      textToAnalyze.includes('var sjätte månad')) {
+    return 'biannual'
+  }
+  
+  if (textToAnalyze.includes('årsvis') || textToAnalyze.includes('årlig') || 
+      textToAnalyze.includes('en gång per år')) {
+    return 'annual'
+  }
+  
+  if (textToAnalyze.includes('veckovis') || textToAnalyze.includes('varje vecka')) {
+    return 'weekly'
+  }
+  
+  if (textToAnalyze.includes('varannan vecka')) {
+    return 'biweekly'
+  }
+  
+  if (textToAnalyze.includes('vid behov') || textToAnalyze.includes('efter behov')) {
+    return 'on_demand'
+  }
+  
+  // Om inget hittas, anta månadsvis som standard för skadedjursavtal
+  if (textToAnalyze.includes('regelbunden') || textToAnalyze.includes('kontinuerlig')) {
+    return 'monthly'
+  }
+  
+  return null
 }
 
 // Detektera företagstyp baserat på företagsnamn och produkter
@@ -792,13 +870,22 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
     })
 
     // Beräkna alla värden
-    const financialValues = calculateFinancialValues(
-      contract.total_value ? parseFloat(contract.total_value.toString()) : null, 
-      contract.contract_length
-    )
+    // OBS: contract.total_value från OneFlow är årsvärdet, inte totalt kontraktsvärde
+    const annualValue = contract.total_value ? parseFloat(contract.total_value.toString()) : null
+    const monthlyValue = annualValue ? annualValue / 12 : null
+    const contractYears = parseContractLength(contract.contract_length) / 12
+    const totalContractValue = annualValue && contractYears ? annualValue * contractYears : null
+    
+    console.log(`💰 Korrigerade finansiella beräkningar:`)
+    console.log(`  - Årsvärde från OneFlow: ${annualValue} kr`)
+    console.log(`  - Antal år: ${contractYears}`)
+    console.log(`  - Totalt kontraktsvärde: ${totalContractValue} kr (${annualValue} × ${contractYears})`)
+    console.log(`  - Månadsvärde: ${monthlyValue} kr`)
     
     const businessType = detectBusinessType(contract.company_name, contract.selected_products)
     const productSummary = generateProductSummary(contract.selected_products)
+    const serviceDetails = extractServiceDetails(contract.selected_products)
+    const serviceFrequency = detectServiceFrequency(contract.agreement_text, contract.selected_products)
     const contractEndDate = calculateEndDate(contract.start_date, contract.contract_length)
     
     const customerData = {
@@ -823,31 +910,29 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       contract_end_date: contractEndDate,
       
       // Financial Information
-      // Beräkna total_contract_value korrekt: annual_value × antal år
-      total_contract_value: financialValues.annual_value && contract.contract_length ? 
-        financialValues.annual_value * (parseContractLength(contract.contract_length) / 12) : 
-        null,
-      annual_value: financialValues.annual_value,
-      monthly_value: financialValues.monthly_value,
+      total_contract_value: totalContractValue,
+      annual_value: annualValue,
+      monthly_value: monthlyValue,
       currency: 'SEK',
       
       // Agreement Content
       agreement_text: contract.agreement_text,
       products: contract.selected_products,
       product_summary: productSummary,
-      service_details: null, // Kan extraheras från agreement_text i framtiden
+      service_details: serviceDetails,
       
       // Account Management
       assigned_account_manager: contract.begone_employee_name,
       account_manager_email: contract.begone_employee_email,
-      sales_person: contract.created_by_name,
-      sales_person_email: contract.created_by_email,
+      // Använd begone_employee som fallback för sales_person om created_by saknas
+      sales_person: contract.created_by_name || contract.begone_employee_name,
+      sales_person_email: contract.created_by_email || contract.begone_employee_email,
       
       // Business Intelligence
       business_type: businessType,
       industry_category: mapToIndustryCategory(businessType),
-      customer_size: calculateCustomerSize(contract.total_value ? parseFloat(contract.total_value.toString()) : null),
-      service_frequency: null, // Kan detekteras från produkter i framtiden
+      customer_size: calculateCustomerSize(totalContractValue),
+      service_frequency: serviceFrequency
       
       // Metadata
       source_type: 'oneflow' as const,
