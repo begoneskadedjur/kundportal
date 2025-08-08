@@ -883,14 +883,14 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
   // Bestäm om vi ska hämta kontrakt-detaljer baserat på event-typ
   let contractDetails: OneflowContractDetails | null = null
   const needsFullData = eventTypes.some(type => 
-    ['contract:content_update', 'contract:sign', 'data_field:update', 
+    ['contract:publish', 'contract:content_update', 'contract:sign', 'data_field:update', 
      'product:create', 'product:update', 'product:delete',
      'party:create', 'party:update', 'party:delete'].includes(type)
   )
   
-  // För vissa events behöver vi inte template-info (publish, create)
+  // För vissa events behöver vi inte template-info (endast create)
   const skipRetryForTemplate = eventTypes.some(type => 
-    ['contract:publish', 'contract:create'].includes(type)
+    ['contract:create'].includes(type)
   )
   
   if (needsFullData) {
@@ -924,9 +924,17 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           
         case 'contract:publish':
           console.log('📧 Kontrakt publicerat (draft → pending)')
-          console.log('ℹ️ Skippar processering - väntar på contract:content_update för full data')
-          // Vi processar INTE contract:publish då template info ofta saknas
-          // OneFlow skickar detta event för tidigt innan API är konsistent
+          console.log('📝 Processar och sparar kontrakt med status pending')
+          
+          // Nu när workplace ID är fixat bör all data vara tillgänglig
+          if (contractDetails) {
+            const contractData = parseContractDetailsToInsertData(contractDetails)
+            contractData.status = 'pending' // Kontrakt är skickat men inte signerat
+            await saveOrUpdateContract(contractData)
+            console.log('✅ Kontrakt sparat med status pending - syns nu i contracts-overview')
+          } else {
+            console.log('⚠️ Kontraktdetaljer saknas för publish event')
+          }
           break
 
         case 'contract:sign':
