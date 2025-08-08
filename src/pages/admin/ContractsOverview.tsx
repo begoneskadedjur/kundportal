@@ -1,6 +1,12 @@
-// src/pages/admin/ContractsOverview.tsx - Pipeline-fokuserad försäljningsöversikt
-import React, { useState, useMemo } from 'react'
-import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, Award, User, ChevronDown, ChevronRight, Tag, Layers } from 'lucide-react'
+// src/pages/admin/ContractsOverview.tsx - Pipeline-fokuserad försäljningsöversikt med kollapsbar sidopanel
+import React, { useState, useMemo, useEffect } from 'react'
+import { 
+  FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, 
+  ShoppingCart, Filter, Download, TrendingUp, Users, Package, 
+  Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, 
+  Award, User, ChevronLeft, ChevronRight, Tag, Layers, X,
+  ArrowUp, ArrowDown, Menu, Building2, Mail, Phone
+} from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
@@ -13,409 +19,154 @@ import { ContractFilters, ContractWithSourceData } from '../../services/contract
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
 import toast from 'react-hot-toast'
 
-// Pipeline Stage Badge - Förbättrad för pipeline-vy
-const PipelineStageBadge: React.FC<{ status: string, type?: 'contract' | 'offer' }> = ({ status, type }) => {
-  const getStageInfo = (status: string, type?: string) => {
-    switch (status) {
-      case 'pending':
-        return { 
-          label: 'Skickad', 
-          color: 'text-blue-400 bg-blue-500/20 border-blue-500/30',
-          stage: 'sent'
-        }
-      case 'signed':
-        return { 
-          label: 'Signerad', 
-          color: 'text-green-400 bg-green-500/20 border-green-500/30',
-          stage: 'signed'
-        }
-      case 'active':
-        return { 
-          label: 'Aktiv', 
-          color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
-          stage: 'active'
-        }
-      case 'declined':
-        return { 
-          label: 'Avvisad', 
-          color: 'text-red-400 bg-red-500/20 border-red-500/30',
-          stage: 'declined'
-        }
-      case 'overdue':
-        return { 
-          label: 'Försenad', 
-          color: 'text-orange-400 bg-orange-500/20 border-orange-500/30',
-          stage: 'overdue'
-        }
-      default:
-        return { 
-          label: 'Utkast', 
-          color: 'text-slate-400 bg-slate-500/20 border-slate-500/30',
-          stage: 'draft'
-        }
-    }
-  }
-
-  const stageInfo = getStageInfo(status, type)
-  const isOffer = type === 'offer'
-  
-  return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${stageInfo.color}`}>
-      <div className="flex items-center gap-1">
-        {isOffer && <Tag className="w-3 h-3" />}
-        {stageInfo.label}
-      </div>
-    </span>
-  )
-}
-
-// Typ badge-komponent
-const TypeBadge: React.FC<{ type: 'contract' | 'offer' }> = ({ type }) => {
-  const colors = type === 'contract' 
-    ? 'text-green-400 bg-green-500/20 border-green-500/30'
-    : 'text-blue-400 bg-blue-500/20 border-blue-500/30'
-  
-  return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colors}`}>
-      {getContractTypeText(type)}
-    </span>
-  )
-}
-
-// Parsera products från JSONB-fält
-const parseContractProducts = (selectedProducts: any): Array<{ name: string, quantity: number, price: number, total: number }> => {
-  if (!selectedProducts || !Array.isArray(selectedProducts)) return []
-  
+// Parse products från JSON-fält
+const parseContractProducts = (contract: ContractWithSourceData): Array<{name: string, quantity: number}> => {
   try {
-    return selectedProducts.map((product: any) => {
-      // Hantera olika strukturer beroende på hur produkterna är lagrade
-      const name = product.name || product.product?.name || 'Okänd produkt'
-      const quantity = product.quantity || 1
-      const price = product.price || product.product?.pricing?.company?.basePrice || product.selectedVariant?.pricing?.company?.basePrice || 0
-      const total = product.total_price || (price * quantity)
+    // Kolla om det finns selected_products först (från contracts)
+    if (contract.selected_products) {
+      const products = typeof contract.selected_products === 'string' 
+        ? JSON.parse(contract.selected_products) 
+        : contract.selected_products
       
-      return { name, quantity, price, total }
-    }).filter(p => p.name !== 'Okänd produkt')
+      if (Array.isArray(products)) {
+        return products.map(p => ({
+          name: p.name || p.product_name || 'Okänd produkt',
+          quantity: p.quantity || 1
+        }))
+      }
+    }
+    
+    // Fallback till customer products om de finns
+    if (contract.customer_data?.products) {
+      const customerProducts = contract.customer_data.products
+      
+      if (Array.isArray(customerProducts)) {
+        // OneFlow struktur - products är en array av produktgrupper
+        const allProducts: any[] = []
+        customerProducts.forEach((group: any) => {
+          if (group.products && Array.isArray(group.products)) {
+            group.products.forEach((product: any) => {
+              allProducts.push({
+                name: product.name || 'Okänd produkt',
+                quantity: product.quantity?.amount || 1
+              })
+            })
+          }
+        })
+        return allProducts
+      }
+    }
+    
+    return []
   } catch (error) {
-    console.warn('Fel vid parsing av produkter:', error)
+    console.error('Error parsing products:', error)
     return []
   }
 }
 
-// Produktbadge-komponent för kontraktslistan
-const ProductBadges: React.FC<{ products: Array<{ name: string, quantity: number }>, maxShow?: number }> = ({ 
-  products, 
-  maxShow = 2 
-}) => {
-  if (!products || products.length === 0) return null
-  
-  const displayProducts = products.slice(0, maxShow)
-  const remainingCount = products.length - maxShow
-  
-  return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {displayProducts.map((product, index) => (
-        <span 
-          key={index}
-          className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30"
-          title={`${product.name} (${product.quantity}st)`}
-        >
-          <Package className="w-3 h-3 mr-1" />
-          {product.name}
-          {product.quantity > 1 && (
-            <span className="ml-1 font-semibold">×{product.quantity}</span>
-          )}
-        </span>
-      ))}
-      {remainingCount > 0 && (
-        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-slate-600/20 text-slate-400 border border-slate-600/30">
-          +{remainingCount} till
-        </span>
-      )}
-    </div>
-  )
-}
-
-// Kompakt medarbetarkort
-const CompactEmployeeCard: React.FC<{ 
-  employee: { name: string, email: string, contract_count: number, total_value: number },
-  rank: number
-}> = ({ employee, rank }) => {
-  const medalColor = rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-slate-300' : rank === 3 ? 'text-orange-400' : 'text-slate-500'
-  
-  return (
-    <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-      <div className="flex items-center gap-2">
-        <Award className={`w-4 h-4 ${medalColor}`} />
-        <div>
-          <div className="text-sm font-medium text-white">{employee.name}</div>
-          <div className="text-xs text-slate-400">{employee.contract_count} avtal</div>
-        </div>
-      </div>
-      <div className="text-sm font-semibold text-green-400">
-        {formatContractValue(employee.total_value)}
-      </div>
-    </div>
-  )
-}
-
-// Product Intelligence Card komponent
-const ProductCard: React.FC<{ 
-  product: { name: string, count: number, total_value: number },
-  onClick?: () => void
-}> = ({ product, onClick }) => {
-  const averageValue = product.count > 0 ? product.total_value / product.count : 0
-
-  return (
-    <div 
-      className="p-4 bg-slate-800 rounded-lg border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer"
-      onClick={onClick}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <Package className="w-5 h-5 text-blue-400" />
-        <div className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">
-          {product.count}x
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <div className="font-medium text-white text-sm truncate" title={product.name}>
-          {product.name}
-        </div>
-        
-        <div className="flex justify-between items-center">
-          <div className="text-center flex-1">
-            <div className="text-sm font-bold text-green-400">{formatContractValue(product.total_value)}</div>
-            <div className="text-xs text-slate-500">Total</div>
-          </div>
-          <div className="text-center flex-1">
-            <div className="text-sm font-medium text-blue-400">{formatContractValue(averageValue)}</div>
-            <div className="text-xs text-slate-500">Snitt</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Advanced Filter Panel komponent
-const AdvancedFilterPanel: React.FC<{
-  isOpen: boolean,
-  filters: ContractFilters,
-  onFilterChange: (filters: ContractFilters) => void,
-  topEmployees: Array<{ name: string, email: string }>
-}> = ({ isOpen, filters, onFilterChange, topEmployees }) => {
-  if (!isOpen) return null
-
-  const dateRangeOptions = [
-    { label: 'Alla', value: '' },
-    { label: 'Idag', value: 'today' },
-    { label: 'Denna vecka', value: 'week' },
-    { label: 'Denna månad', value: 'month' },
-    { label: 'Detta kvartal', value: 'quarter' },
-    { label: 'Detta år', value: 'year' }
-  ]
-
-  const handleDateRangeChange = (range: string) => {
-    const now = new Date()
-    let date_from = ''
-    let date_to = ''
-
-    switch (range) {
-      case 'today':
-        date_from = date_to = now.toISOString().split('T')[0]
-        break
-      case 'week':
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - now.getDay())
-        date_from = weekStart.toISOString().split('T')[0]
-        date_to = now.toISOString().split('T')[0]
-        break
-      case 'month':
-        date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-        date_to = now.toISOString().split('T')[0]
-        break
-      case 'quarter':
-        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-        date_from = quarterStart.toISOString().split('T')[0]
-        date_to = now.toISOString().split('T')[0]
-        break
-      case 'year':
-        date_from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
-        date_to = now.toISOString().split('T')[0]
-        break
+// Pipeline Stage Badge
+const PipelineStageBadge: React.FC<{ status: string }> = ({ status }) => {
+  const getStageInfo = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return { label: 'Utkast', color: 'text-slate-400 bg-slate-500/20', icon: '📝' }
+      case 'pending':
+        return { label: 'Skickad', color: 'text-blue-400 bg-blue-500/20', icon: '📤' }
+      case 'signed':
+        return { label: 'Signerad', color: 'text-green-400 bg-green-500/20', icon: '✅' }
+      case 'active':
+        return { label: 'Aktiv', color: 'text-emerald-400 bg-emerald-500/20', icon: '🟢' }
+      case 'declined':
+        return { label: 'Avvisad', color: 'text-red-400 bg-red-500/20', icon: '❌' }
+      case 'overdue':
+        return { label: 'Försenad', color: 'text-orange-400 bg-orange-500/20', icon: '⚠️' }
+      case 'ended':
+        return { label: 'Avslutad', color: 'text-gray-400 bg-gray-500/20', icon: '🏁' }
+      default:
+        return { label: status, color: 'text-slate-400 bg-slate-500/20', icon: '📄' }
     }
-
-    onFilterChange({ ...filters, date_from, date_to })
   }
 
+  const info = getStageInfo(status)
   return (
-    <Card className="mb-6 p-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Date Range */}
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Tidsperiod</label>
-          <select
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => handleDateRangeChange(e.target.value)}
-          >
-            {dateRangeOptions.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Employee Filter */}
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Medarbetare</label>
-          <select
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-            value={filters.employee || ''}
-            onChange={(e) => onFilterChange({ ...filters, employee: e.target.value || undefined })}
-          >
-            <option value="">Alla medarbetare</option>
-            {topEmployees.map(emp => (
-              <option key={emp.email} value={emp.name}>{emp.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Min Value */}
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Min värde (SEK)</label>
-          <input
-            type="number"
-            placeholder="0"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-            value={filters.min_value || ''}
-            onChange={(e) => onFilterChange({ ...filters, min_value: e.target.value ? parseInt(e.target.value) : undefined })}
-          />
-        </div>
-
-        {/* Max Value */}
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Max värde (SEK)</label>
-          <input
-            type="number"
-            placeholder="1000000"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:ring-2 focus:ring-blue-500"
-            value={filters.max_value || ''}
-            onChange={(e) => onFilterChange({ ...filters, max_value: e.target.value ? parseInt(e.target.value) : undefined })}
-          />
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-// Status badge-komponent  
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const getStatusColorClasses = (status: string) => {
-    const colors = {
-      'pending': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
-      'signed': 'text-green-400 bg-green-500/20 border-green-500/30',
-      'active': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
-      'declined': 'text-red-400 bg-red-500/20 border-red-500/30',
-      'ended': 'text-slate-400 bg-slate-500/20 border-slate-500/30',
-      'overdue': 'text-red-400 bg-red-500/20 border-red-500/30'
-    }
-    return colors[status as keyof typeof colors] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'
-  }
-  
-  return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColorClasses(status)}`}>
-      {getContractStatusText(status as any)}
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${info.color}`}>
+      <span className="mr-1">{info.icon}</span>
+      {info.label}
     </span>
   )
 }
 
-// Mobil card-komponent
-const ContractMobileCard: React.FC<{ 
-  contract: ContractWithSourceData
-  onOpenFilesModal: (contract: ContractWithSourceData) => void
-}> = ({ contract, onOpenFilesModal }) => {
-  const handleViewOneFlow = () => {
-    if (contract.oneflow_contract_id) {
-      window.open(`https://app.oneflow.com/contracts/${contract.oneflow_contract_id}`, '_blank')
-    }
-  }
+// Kompakt säljarkort för sidopanel
+const CompactSellerCard: React.FC<{ 
+  seller: any, 
+  rank: number,
+  onClick: () => void 
+}> = ({ seller, rank, onClick }) => {
+  const medalEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏅'
+  
+  return (
+    <div 
+      onClick={onClick}
+      className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer group"
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-lg">{medalEmoji}</span>
+        <div>
+          <p className="text-sm font-medium text-white group-hover:text-green-400 transition-colors">
+            {seller.name}
+          </p>
+          <p className="text-xs text-slate-400">
+            {seller.contract_count} avtal
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-sm font-bold text-green-400">
+          {formatContractValue(seller.total_value)}
+        </p>
+        <p className="text-xs text-slate-500">
+          Snitt: {formatContractValue(Math.round(seller.avg_value))}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Pipeline filter pills
+const PipelineFilters: React.FC<{
+  activeFilter: string,
+  onFilterChange: (filter: string) => void,
+  stats: any
+}> = ({ activeFilter, onFilterChange, stats }) => {
+  const stages = [
+    { key: 'all', label: 'Alla', count: stats?.total_contracts || 0, color: 'bg-slate-600' },
+    { key: 'pending', label: 'Skickade', count: stats?.pending_contracts || 0, color: 'bg-blue-600' },
+    { key: 'signed', label: 'Signerade', count: stats?.signed_contracts || 0, color: 'bg-green-600' },
+    { key: 'active', label: 'Aktiva', count: stats?.active_contracts || 0, color: 'bg-emerald-600' },
+    { key: 'overdue', label: 'Försenade', count: stats?.overdue_count || 0, color: 'bg-orange-600' }
+  ]
 
   return (
-    <Card className="p-4">
-      <div className="flex justify-between items-start mb-3">
-        <TypeBadge type={contract.type} />
-        <StatusBadge status={contract.status} />
-      </div>
-      
-      <div className="space-y-2">
-        <h3 className="font-semibold text-white">
-          {contract.company_name || contract.contact_person || 'Okänd motpart'}
-        </h3>
-        
-        {contract.contact_person && contract.company_name && (
-          <p className="text-sm text-slate-400">{contract.contact_person}</p>
-        )}
-        
-        <div className="flex justify-between items-center">
-          <span className="text-slate-400 text-sm">
-            {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+    <div className="flex flex-wrap gap-2 mb-4">
+      {stages.map(stage => (
+        <button
+          key={stage.key}
+          onClick={() => onFilterChange(stage.key)}
+          className={`
+            px-4 py-2 rounded-full text-sm font-medium transition-all
+            ${activeFilter === stage.key 
+              ? `${stage.color} text-white shadow-lg scale-105` 
+              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }
+          `}
+        >
+          {stage.label}
+          <span className="ml-2 px-2 py-0.5 bg-black/20 rounded-full text-xs">
+            {stage.count}
           </span>
-          <div className="text-right">
-            {contract.contract_length && (
-              <div className="text-slate-400 text-sm">
-                {contract.contract_length} månader
-              </div>
-            )}
-            <div className="text-slate-400 text-sm">
-              Start: {contract.start_date ? new Date(contract.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Ej angivet'}
-            </div>
-            <div className="text-slate-500 text-xs">
-              Skapad: {new Date(contract.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-700">
-          {contract.begone_employee_name && (
-            <div className="flex items-center gap-2">
-              <Users className="w-3 h-3 text-green-400" />
-              <p className="text-xs text-slate-400">
-                Ansvarig: {contract.begone_employee_name}
-              </p>
-            </div>
-          )}
-          {contract.created_by_name && (
-            <div className="flex items-center gap-2">
-              <User className="w-3 h-3 text-blue-400" />
-              <p className="text-xs text-slate-400" title={contract.created_by_email || ''}>
-                Skapad av: {contract.created_by_name}
-              </p>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex justify-between items-center mt-3">
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleViewOneFlow}
-              className="text-xs"
-            >
-              <ExternalLink className="w-3 h-3 mr-1" />
-              OneFlow
-            </Button>
-          </div>
-          
-          {/* Files column för mobile */}
-          <FilesColumn 
-            contractId={contract.id}
-            onFilesModalOpen={() => onOpenFilesModal(contract)}
-            showButton={true}
-          />
-        </div>
-      </div>
-    </Card>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -424,20 +175,26 @@ export default function ContractsOverview() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [dateFilter, setDateFilter] = useState<string>('all')
-  const [valueFilter, setValueFilter] = useState<{ min: string, max: string }>({ min: '', max: '' })
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set())
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   
-  // Files modal state
+  // Sidopanel state
+  const [sidePanelOpen, setSidePanelOpen] = useState(() => {
+    const saved = localStorage.getItem('contractsSidePanelOpen')
+    return saved ? saved === 'true' : false
+  })
+  
+  // Modal states
   const [filesModalOpen, setFilesModalOpen] = useState(false)
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
   const [selectedContractName, setSelectedContractName] = useState<string>('')
-
-  // Import modal state
   const [importModalOpen, setImportModalOpen] = useState(false)
 
-  // Filtrera kontrakt lokalt för snabb respons
+  // Spara sidopanel-preferens
+  useEffect(() => {
+    localStorage.setItem('contractsSidePanelOpen', sidePanelOpen.toString())
+  }, [sidePanelOpen])
+
+  // Filtrera kontrakt
   const filteredContracts = useMemo(() => {
     return contracts.filter(contract => {
       const matchesSearch = !searchTerm || 
@@ -449,81 +206,35 @@ export default function ContractsOverview() {
 
       const matchesStatus = statusFilter === 'all' || contract.status === statusFilter
       const matchesType = typeFilter === 'all' || contract.type === typeFilter
-      
-      // Date filtering
-      const matchesDate = (() => {
-        if (dateFilter === 'all') return true
-        
-        const contractDate = new Date(contract.created_at)
-        const now = new Date()
-        
-        switch (dateFilter) {
-          case 'today':
-            return contractDate.toDateString() === now.toDateString()
-          case 'week':
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-            return contractDate >= weekAgo
-          case 'month':
-            return contractDate.getMonth() === now.getMonth() && contractDate.getFullYear() === now.getFullYear()
-          case 'quarter':
-            const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-            return contractDate >= quarterStart
-          case 'year':
-            return contractDate.getFullYear() === now.getFullYear()
-          default:
-            return true
-        }
-      })()
-      
-      // Value filtering
-      const matchesValue = (() => {
-        if (!valueFilter.min && !valueFilter.max) return true
-        if (!contract.total_value) return false
-        
-        const value = contract.total_value
-        const min = valueFilter.min ? parseFloat(valueFilter.min) : 0
-        const max = valueFilter.max ? parseFloat(valueFilter.max) : Infinity
-        
-        return value >= min && value <= max
-      })()
 
-      return matchesSearch && matchesStatus && matchesType && matchesDate && matchesValue
+      return matchesSearch && matchesStatus && matchesType
     })
-  }, [contracts, searchTerm, statusFilter, typeFilter, dateFilter, valueFilter])
+  }, [contracts, searchTerm, statusFilter, typeFilter])
 
-  // Hantera filter-uppdateringar
-  const updateFilters = (newFilters: Partial<ContractFilters>) => {
-    setFilters({
-      ...currentFilters,
-      ...newFilters,
-      search: searchTerm || undefined
-    })
-  }
-
-  // KPI-card click handlers
-  const handleKpiClick = (type: string) => {
-    switch (type) {
-      case 'contracts':
-        setTypeFilter('contract')
-        break
-      case 'offers':
-        setTypeFilter('offer')
-        break
-      case 'pending':
-        setStatusFilter('pending')
-        break
-      case 'signed':
-        setStatusFilter('signed')
-        break
-      case 'overdue':
-        setStatusFilter('overdue')
-        break
-      case 'value':
-      case 'conversion':
-      default:
-        // För vissa KPIs visar vi bara data utan att filtrera
-        break
+  // Pipeline statistik
+  const pipelineStats = useMemo(() => {
+    const stages = {
+      pending: { count: 0, value: 0 },
+      signed: { count: 0, value: 0 },
+      active: { count: 0, value: 0 },
+      overdue: { count: 0, value: 0 }
     }
+
+    filteredContracts.forEach(contract => {
+      const status = contract.status as keyof typeof stages
+      if (stages[status]) {
+        stages[status].count++
+        stages[status].value += contract.total_value || 0
+      }
+    })
+
+    return stages
+  }, [filteredContracts])
+
+  const handleOpenFilesModal = (contract: ContractWithSourceData) => {
+    setSelectedContractId(contract.id)
+    setSelectedContractName(contract.company_name || contract.contact_person || 'Okänd motpart')
+    setFilesModalOpen(true)
   }
 
   const handleViewOneFlow = (contractId: string) => {
@@ -532,561 +243,498 @@ export default function ContractsOverview() {
     }
   }
 
-  // Files modal handlers
-  const handleOpenFilesModal = (contract: ContractWithSourceData) => {
-    setSelectedContractId(contract.id)
-    setSelectedContractName(contract.company_name || contract.contact_person || 'Okänd motpart')
-    setFilesModalOpen(true)
-  }
-
-  const handleCloseFilesModal = () => {
-    setFilesModalOpen(false)
-    setSelectedContractId(null)
-    setSelectedContractName('')
-  }
-
-  // Import modal handlers
-  const handleOpenImportModal = () => {
-    setImportModalOpen(true)
-  }
-
-  const handleCloseImportModal = () => {
-    setImportModalOpen(false)
-  }
-
-  const handleImportComplete = () => {
-    // Ladda om kontraktslistan efter lyckad import
-    refreshContracts()
-    toast.success('Kontraktslistan uppdaterad efter import!')
-  }
-
   const handleClearFilters = () => {
     setSearchTerm('')
     setStatusFilter('all')
     setTypeFilter('all')
-    setDateFilter('all')
-    setValueFilter({ min: '', max: '' })
-    setSelectedContracts(new Set())
     clearFilters()
   }
 
-  // Loading state
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-400" />
-            Avtalsöversikt
-          </h3>
-        </div>
-        
-        <Card>
-          <div className="h-80 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500"></div>
-          </div>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
       </div>
     )
   }
 
-  // Error state  
   if (error) {
     return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-400" />
-          Avtalsöversikt
-        </h3>
-        
-        <Card className="bg-red-500/10 border-red-500/20">
-          <div className="flex items-center text-red-400">
-            <FileText className="w-5 h-5 mr-2" />
-            <span>Fel vid laddning av avtalsdata: {error}</span>
-          </div>
-        </Card>
-      </div>
+      <Card className="bg-red-500/10 border-red-500/20 p-8">
+        <div className="flex items-center text-red-400">
+          <AlertTriangle className="w-5 h-5 mr-2" />
+          <span>Fel vid laddning av avtalsdata: {error}</span>
+        </div>
+      </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-400" />
-          Avtalsöversikt
-        </h3>
-        
-        <div className="flex items-center gap-3">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenImportModal}
-            className="flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Importera Kontrakt
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearFilters}
-            className="text-slate-400"
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            Rensa filter
-          </Button>
+    <div className="relative">
+      {/* Huvudinnehåll */}
+      <div className={`transition-all duration-300 ${sidePanelOpen ? 'lg:mr-96' : ''}`}>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <FileText className="w-6 h-6 text-green-500" />
+              Försäljningspipeline
+            </h3>
+            
+            <div className="flex items-center gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setImportModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Importera
+              </Button>
+              
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSidePanelOpen(!sidePanelOpen)}
+                className="flex items-center gap-2"
+              >
+                {sidePanelOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                Statistik
+              </Button>
+            </div>
+          </div>
+
+          {/* Kompakt KPI-rad */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Pipeline-värde</p>
+                  <p className="text-xl font-bold text-white">
+                    {formatContractValue(stats?.total_value || 0)}
+                  </p>
+                  <p className="text-xs text-green-400 mt-1">
+                    {stats?.total_contracts || 0} avtal totalt
+                  </p>
+                </div>
+                <DollarSign className="w-8 h-8 text-green-500 opacity-50" />
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Signerat värde</p>
+                  <p className="text-xl font-bold text-white">
+                    {formatContractValue(stats?.signed_value || 0)}
+                  </p>
+                  <p className="text-xs text-blue-400 mt-1">
+                    {stats?.signed_contracts || 0} signerade
+                  </p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-blue-500 opacity-50" />
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Konvertering</p>
+                  <p className="text-xl font-bold text-white">
+                    {stats?.contract_signing_rate || 0}%
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Signeringsgrad
+                  </p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-purple-500 opacity-50" />
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Snitt deal</p>
+                  <p className="text-xl font-bold text-white">
+                    {formatContractValue(stats?.average_contract_value || 0)}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Per avtal
+                  </p>
+                </div>
+                <Target className="w-8 h-8 text-orange-500 opacity-50" />
+              </div>
+            </Card>
+          </div>
+
+          {/* Pipeline-stadier filter */}
+          <PipelineFilters 
+            activeFilter={statusFilter} 
+            onFilterChange={setStatusFilter}
+            stats={stats}
+          />
+
+          {/* Sök och filter */}
+          <Card className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Sök företag, kontakt, e-post eller säljare..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
+              >
+                <option value="all">Alla typer</option>
+                <option value="contract">Kontrakt</option>
+                <option value="offer">Offert</option>
+              </select>
+
+              {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="text-slate-400"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Rensa
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Kontraktslista - Huvudfokus */}
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-800/50 border-b border-slate-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Företag / Kontakt
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Produkter
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Värde
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Säljare
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Datum
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Åtgärder
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {filteredContracts.map((contract) => {
+                    const products = parseContractProducts(contract)
+                    const isMultiYear = contract.contract_length && parseInt(contract.contract_length) > 12
+                    
+                    return (
+                      <tr key={contract.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-4">
+                          <PipelineStageBadge status={contract.status} />
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              {contract.company_name || contract.contact_person || 'Okänd'}
+                            </p>
+                            {contract.contact_person && contract.company_name && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                <User className="w-3 h-3 inline mr-1" />
+                                {contract.contact_person}
+                              </p>
+                            )}
+                            {contract.contact_email && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                <Mail className="w-3 h-3 inline mr-1" />
+                                {contract.contact_email}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {products.length > 0 ? (
+                              products.slice(0, 3).map((product, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-300"
+                                >
+                                  {product.quantity > 1 && (
+                                    <span className="font-bold mr-1">{product.quantity}x</span>
+                                  )}
+                                  {product.name}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-500">Inga produkter</span>
+                            )}
+                            {products.length > 3 && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-400">
+                                +{products.length - 3} till
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div>
+                            <p className="text-sm font-bold text-white">
+                              {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+                            </p>
+                            {isMultiYear && contract.total_value && (
+                              <p className="text-xs text-green-400 mt-1">
+                                {formatContractValue(Math.round(contract.total_value / (parseInt(contract.contract_length) / 12)))} /år
+                              </p>
+                            )}
+                            {contract.contract_length && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                {contract.contract_length} {parseInt(contract.contract_length) === 1 ? 'månad' : 'månader'}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div>
+                            {contract.begone_employee_name && (
+                              <p className="text-sm text-white">
+                                {contract.begone_employee_name}
+                              </p>
+                            )}
+                            {contract.created_by_name && contract.created_by_name !== contract.begone_employee_name && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                Skapad av: {contract.created_by_name}
+                              </p>
+                            )}
+                            {!contract.begone_employee_name && !contract.created_by_name && (
+                              <span className="text-sm text-slate-500">-</span>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div className="text-sm text-slate-400">
+                            {new Date(contract.created_at).toLocaleDateString('sv-SE')}
+                          </div>
+                          {contract.start_date && (
+                            <div className="text-xs text-slate-500 mt-1">
+                              Start: {new Date(contract.start_date).toLocaleDateString('sv-SE')}
+                            </div>
+                          )}
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <div className="flex justify-center gap-2">
+                            <FilesColumn 
+                              contractId={contract.id}
+                              onFilesModalOpen={() => handleOpenFilesModal(contract)}
+                              showButton={false}
+                            />
+                            {contract.oneflow_contract_id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewOneFlow(contract.oneflow_contract_id)}
+                                className="text-blue-400 hover:text-blue-300 p-1"
+                                title="Öppna i OneFlow"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              
+              {filteredContracts.length === 0 && (
+                <div className="text-center py-16">
+                  <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">
+                    {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                      ? 'Inga kontrakt matchar dina filter'
+                      : 'Inga kontrakt att visa'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
 
-      {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <EnhancedKpiCard
-          title="Total Avtalsvärd"
-          value={stats?.total_value || 0}
-          icon={DollarSign}
-          prefix=""
-          suffix=" kr"
-          decimals={0}
-          onClick={() => handleKpiClick('value')}
-          trend={stats?.growth_rate ? (stats.growth_rate > 0 ? "up" : stats.growth_rate < 0 ? "down" : "neutral") : "neutral"}
-          trendValue={stats?.growth_rate ? `${stats.growth_rate > 0 ? '+' : ''}${stats.growth_rate}% denna månad` : 'Ingen data'}
-          delay={0}
-        />
-
-        <EnhancedKpiCard
-          title="Signerat Värde"
-          value={stats?.signed_value || 0}
-          icon={CheckCircle}
-          prefix=""
-          suffix=" kr"
-          decimals={0}
-          onClick={() => handleKpiClick('signed')}
-          trend="up"
-          trendValue={`${stats?.signed_contracts || 0} signerade avtal`}
-          delay={0.1}
-        />
-
-        <EnhancedKpiCard
-          title="Väntande Värde"
-          value={stats?.pending_value || 0}
-          icon={Clock}
-          prefix=""
-          suffix=" kr"
-          decimals={0}
-          onClick={() => handleKpiClick('pending')}
-          trend="neutral"
-          trendValue={`${stats?.pending_contracts || 0} väntande`}
-          delay={0.2}
-        />
-
-        <EnhancedKpiCard
-          title="Signeringsgrad"
-          value={stats?.contract_signing_rate || 0}
-          icon={TrendingUp}
-          suffix="%"
-          onClick={() => handleKpiClick('conversion')}
-          trend={stats?.contract_signing_rate && stats.contract_signing_rate > 70 ? "up" : "neutral"}
-          trendValue={`${stats?.offer_conversion_rate || 0}% offert-konvertering`}
-          delay={0.3}
-        />
-      </div>
-
-      {/* Secondary Business Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <EnhancedKpiCard
-          title="Totala Avtal"
-          value={stats?.total_contracts || 0}
-          icon={FileText}
-          onClick={() => handleKpiClick('contracts')}
-          trend={stats?.contracts_this_month && stats.contracts_last_month ? 
-            (stats.contracts_this_month > stats.contracts_last_month ? "up" : 
-             stats.contracts_this_month < stats.contracts_last_month ? "down" : "neutral") : "neutral"}
-          trendValue={`${stats?.contracts_this_month || 0} denna månad`}
-          delay={0.4}
-        />
-
-        <EnhancedKpiCard
-          title="Totala Offerter"
-          value={stats?.total_offers || 0}
-          icon={ShoppingCart}
-          onClick={() => handleKpiClick('offers')}
-          trend="neutral"
-          trendValue={`Snitt ${stats?.average_offer_value ? formatContractValue(Math.round(stats.average_offer_value)) : '0 kr'}`}
-          delay={0.5}
-        />
-
-        <EnhancedKpiCard
-          title="Snitt Avtalsvärde"
-          value={stats?.average_contract_value || 0}
-          icon={BarChart3}
-          prefix=""
-          suffix=" kr"
-          decimals={0}
-          onClick={() => {}}
-          trend="neutral"
-          trendValue="per avtal"
-          delay={0.6}
-        />
-
-        <EnhancedKpiCard
-          title="Pipeline Hälsa"
-          value={stats?.overdue_count || 0}
-          icon={AlertTriangle}
-          onClick={() => handleKpiClick('overdue')}
-          trend={stats?.overdue_count && stats.overdue_count > 0 ? "down" : "up"}
-          trendValue={`${stats?.contracts_expiring_soon || 0} utgår snart`}
-          delay={0.7}
-        />
-
-        <EnhancedKpiCard
-          title="Snitt Signeringstid"
-          value={stats?.avg_signing_time_days || 0}
-          icon={Calendar}
-          suffix=" dagar"
-          onClick={() => {}}
-          trend="neutral"
-          trendValue="genomsnitt"
-          delay={0.8}
-        />
-      </div>
-
-      {/* Employee Performance & Product Intelligence Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Top Performing Employees */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-400" />
-              <h3 className="text-lg font-semibold text-white">Top Medarbetare</h3>
-            </div>
-            <div className="text-xs text-slate-400">
-              Värde & Antal kontrakt
-            </div>
+      {/* Kollapsbar sidopanel */}
+      <div className={`
+        fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-800 
+        transform transition-transform duration-300 z-40 overflow-y-auto
+        ${sidePanelOpen ? 'translate-x-0' : 'translate-x-full'}
+      `}>
+        <div className="p-6 space-y-6">
+          {/* Sidopanel header */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-green-500" />
+              Analys & Insikter
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidePanelOpen(false)}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
-          
-          <div className="space-y-3">
-            {stats?.top_employees && stats.top_employees.length > 0 ? (
-              stats.top_employees.map((employee, index) => (
-                <CompactEmployeeCard
-                  key={employee.email}
-                  employee={employee}
+
+          {/* Pipeline översikt */}
+          <Card className="p-4 bg-gradient-to-br from-slate-800 to-slate-800/50">
+            <h4 className="text-sm font-medium text-slate-300 mb-3">Pipeline-stadier</h4>
+            <div className="space-y-2">
+              {Object.entries(pipelineStats).map(([stage, data]) => (
+                <div key={stage} className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 capitalize">{stage}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-white">{data.count}</span>
+                    <span className="text-xs text-slate-500">|</span>
+                    <span className="text-xs text-green-400">{formatContractValue(data.value)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Top säljare */}
+          <div>
+            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-400" />
+              Top 3 Säljare
+            </h4>
+            <div className="space-y-2">
+              {stats?.top_employees?.slice(0, 3).map((seller: any, index: number) => (
+                <CompactSellerCard
+                  key={seller.email}
+                  seller={seller}
                   rank={index + 1}
                   onClick={() => {
-                    setSearchTerm(employee.name)
-                    // Scrollar till tabellen
-                    document.getElementById('contracts-table')?.scrollIntoView({ behavior: 'smooth' })
+                    setSearchTerm(seller.name)
+                    setSidePanelOpen(false)
                   }}
                 />
-              ))
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <Users className="w-12 h-12 mx-auto mb-2 text-slate-500" />
-                <p>Ingen medarbetardata tillgänglig</p>
-              </div>
-            )}
+              ))}
+              {!stats?.top_employees?.length && (
+                <p className="text-xs text-slate-500 text-center py-4">
+                  Ingen säljdata tillgänglig
+                </p>
+              )}
+            </div>
           </div>
-        </Card>
 
-        {/* Product Intelligence */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-green-400" />
-              <h3 className="text-lg font-semibold text-white">Populära Produkter</h3>
-            </div>
-            <div className="text-xs text-slate-400">
-              Frekvens & Värde
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            {stats?.popular_products && stats.popular_products.length > 0 ? (
-              stats.popular_products.map((product, index) => (
-                <ProductCard
+          {/* Populära produkter */}
+          <div>
+            <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4 text-green-400" />
+              Top 5 Produkter
+            </h4>
+            <div className="space-y-2">
+              {stats?.popular_products?.slice(0, 5).map((product: any, index: number) => (
+                <div 
                   key={`${product.name}-${index}`}
-                  product={product}
-                  onClick={() => {
-                    setSearchTerm(product.name)
-                    document.getElementById('contracts-table')?.scrollIntoView({ behavior: 'smooth' })
-                  }}
-                />
-              ))
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <Package className="w-12 h-12 mx-auto mb-2 text-slate-500" />
-                <p>Ingen produktdata tillgänglig</p>
-              </div>
-            )}
+                  className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">#{index + 1}</span>
+                    <p className="text-sm text-white">{product.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-medium text-green-400">
+                      {product.count} st
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatContractValue(product.total_value)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {!stats?.popular_products?.length && (
+                <p className="text-xs text-slate-500 text-center py-4">
+                  Ingen produktdata tillgänglig
+                </p>
+              )}
+            </div>
           </div>
-        </Card>
+
+          {/* Quick stats */}
+          <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+            <h4 className="text-sm font-medium text-slate-300 mb-3">Snabbstatistik</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Snitt signeringstid</p>
+                <p className="text-lg font-bold text-white">
+                  {stats?.avg_signing_time_days || 0} dagar
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Utgår snart</p>
+                <p className="text-lg font-bold text-orange-400">
+                  {stats?.contracts_expiring_soon || 0} st
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Denna månad</p>
+                <p className="text-lg font-bold text-white">
+                  {stats?.contracts_this_month || 0} avtal
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Tillväxt</p>
+                <p className="text-lg font-bold text-green-400">
+                  {stats?.growth_rate ? `${stats.growth_rate > 0 ? '+' : ''}${stats.growth_rate}%` : '0%'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
 
-
-      {/* Filters */}
-      <Card>
-        <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
-          {/* Sökruta */}
-          <div className="relative flex-1 min-w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Sök namn, företag, e-post..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Alla status</option>
-            <option value="pending">Väntande</option>
-            <option value="signed">Signerat</option>
-            <option value="active">Aktivt</option>
-            <option value="declined">Avvisat</option>
-            <option value="ended">Avslutat</option>
-            <option value="overdue">Försenat</option>
-          </select>
-
-          {/* Typ filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Alla typer</option>
-            <option value="contract">Avtal</option>
-            <option value="offer">Offert</option>
-          </select>
-        </div>
-
-        {/* Enhanced Desktop Table */}
-        <div id="contracts-table" className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-16" /> {/* Typ */}
-              <col className="w-48" /> {/* Motpart */}
-              <col className="w-20" /> {/* Status */}
-              <col className="w-24" /> {/* Värde */}
-              <col className="w-20" /> {/* Längd */}
-              <col className="w-20" /> {/* Startdatum */}
-              <col className="w-20" /> {/* Skapad */}
-              <col className="w-32" /> {/* BeGone-ansvarig/Skapare */}
-              <col className="w-28" /> {/* Filer */}
-              <col className="w-16" /> {/* Åtgärder */}
-            </colgroup>
-            <thead className="bg-slate-800 border-b border-slate-700">
-              <tr className="text-slate-300">
-                <th className="px-2 py-3 text-center cursor-pointer hover:bg-slate-700 transition-colors">
-                  <div className="flex items-center justify-center">Typ</div>
-                </th>
-                <th className="px-3 py-3 text-left">Motpart & Kontakt</th>
-                <th className="px-2 py-3 text-center">Status</th>
-                <th className="px-2 py-3 text-right">Värde</th>
-                <th className="px-2 py-3 text-center">Längd</th>
-                <th className="px-2 py-3 text-center">Start</th>
-                <th className="px-2 py-3 text-center">Skapad</th>
-                <th className="px-2 py-3 text-left">Ansvarig/Skapare</th>
-                <th className="px-2 py-3 text-center">Filer</th>
-                <th className="px-2 py-3 text-center">Åtgärder</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {filteredContracts.map((contract) => (
-                <tr key={contract.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-2 py-3">
-                    <div className="flex justify-center">
-                      <TypeBadge type={contract.type} />
-                    </div>
-                  </td>
-                  
-                  <td className="px-3 py-3">
-                    <div className="min-w-0">
-                      <div className="text-white font-medium text-sm truncate" title={contract.company_name || contract.contact_person || 'Okänd motpart'}>
-                        {contract.company_name || contract.contact_person || 'Okänd motpart'}
-                      </div>
-                      {contract.contact_person && contract.company_name && (
-                        <div className="text-slate-400 text-xs truncate" title={contract.contact_person}>
-                          👤 {contract.contact_person}
-                        </div>
-                      )}
-                      {contract.contact_email && (
-                        <div className="text-slate-500 text-xs truncate" title={contract.contact_email}>
-                          ✉️ {contract.contact_email}
-                        </div>
-                      )}
-                      {contract.organization_number && (
-                        <div className="text-slate-500 text-xs truncate" title={contract.organization_number}>
-                          🏢 {contract.organization_number}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="flex justify-center">
-                      <StatusBadge status={contract.status} />
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3 text-right">
-                    <div className="text-white font-medium text-sm">
-                      {contract.total_value ? formatContractValue(contract.total_value) : '-'}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="text-center text-slate-400 text-xs">
-                      {contract.contract_length || '-'}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="text-center text-slate-400 text-xs">
-                      {contract.start_date ? new Date(contract.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="text-center text-slate-400 text-xs">
-                      {new Date(contract.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="space-y-1">
-                      {contract.begone_employee_name && (
-                        <div className="text-slate-400 text-xs truncate" title={`Ansvarig: ${contract.begone_employee_name}`}>
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-green-400" />
-                            <span>{contract.begone_employee_name}</span>
-                          </div>
-                        </div>
-                      )}
-                      {contract.created_by_name && (
-                        <div className="text-slate-500 text-xs truncate" title={`Skapad av: ${contract.created_by_name} (${contract.created_by_email || ''})`}>
-                          <div className="flex items-center gap-1">
-                            <User className="w-3 h-3 text-blue-400" />
-                            <span>{contract.created_by_name}</span>
-                          </div>
-                        </div>
-                      )}
-                      {!contract.begone_employee_name && !contract.created_by_name && (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="flex justify-center">
-                      <FilesColumn 
-                        contractId={contract.id}
-                        onFilesModalOpen={() => handleOpenFilesModal(contract)}
-                        showButton={false}
-                      />
-                    </div>
-                  </td>
-                  
-                  <td className="px-2 py-3">
-                    <div className="flex justify-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewOneFlow(contract.oneflow_contract_id)}
-                        className="text-blue-400 hover:text-blue-300 p-1"
-                        title="Öppna i OneFlow"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {filteredContracts.length === 0 && (
-              <tbody>
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">
-                    <div className="flex flex-col items-center gap-3">
-                      <FileText className="w-12 h-12 text-slate-600" />
-                      <div>
-                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                          ? 'Inga kontrakt matchar dina filter. Prova att justera sökningen eller filtren.'
-                          : 'Inga kontrakt eller offerter hittades. Importera kontrakt från OneFlow för att komma igång.'
-                        }
-                      </div>
-                      {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleClearFilters}
-                          className="text-blue-400"
-                        >
-                          Rensa alla filter
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            )}
-          </table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="block md:hidden space-y-4">
-          {filteredContracts.map(contract => (
-            <ContractMobileCard 
-              key={contract.id} 
-              contract={contract} 
-              onOpenFilesModal={handleOpenFilesModal}
-            />
-          ))}
-          
-          {filteredContracts.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
-              <div className="flex flex-col items-center gap-3">
-                <FileText className="w-12 h-12 text-slate-600" />
-                <div>
-                  {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                    ? 'Inga kontrakt matchar dina filter. Prova att justera sökningen eller filtren.'
-                    : 'Inga kontrakt eller offerter hittades. Importera kontrakt från OneFlow för att komma igång.'
-                  }
-                </div>
-                {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    className="text-blue-400"
-                  >
-                    Rensa alla filter
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
-      
-      {/* Import Modal */}
+      {/* Modals */}
       <ContractImportModal
         isOpen={importModalOpen}
-        onClose={handleCloseImportModal}
-        onImportComplete={handleImportComplete}
+        onClose={() => setImportModalOpen(false)}
+        onImportComplete={() => {
+          refreshContracts()
+          toast.success('Kontrakt importerade!')
+        }}
       />
 
-      {/* Files Modal */}
       <ContractFilesModal
         isOpen={filesModalOpen}
-        onClose={handleCloseFilesModal}
+        onClose={() => {
+          setFilesModalOpen(false)
+          setSelectedContractId(null)
+          setSelectedContractName('')
+        }}
         contractId={selectedContractId}
         contractName={selectedContractName}
       />
