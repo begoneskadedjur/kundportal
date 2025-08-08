@@ -481,7 +481,8 @@ export default function ContractsOverview() {
         subtitle="Hantera kontrakt och försäljningsprocesser"
         icon={FileText}
         iconColor="text-green-500"
-        showBackButton={false}
+        showBackButton={true}
+        backPath="/admin"
         rightContent={
           <div className="flex items-center gap-3">
             <Button
