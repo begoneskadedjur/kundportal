@@ -158,10 +158,10 @@ const CompactSellerCard: React.FC<{
   )
 }
 
-// Interaktiv produktvisning med popover - FÖRENKLAD VERSION
+// Interaktiv produktvisning med popover - PORTAL VERSION
 const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}> }> = ({ products }) => {
   const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
   const [backdropClickable, setBackdropClickable] = useState(false)
   
   // Förhindra backdrop från att stänga tooltip direkt efter öppning
@@ -182,18 +182,6 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     return <span className="text-xs text-slate-500">Inga produkter</span>
   }
   
-  const calculateTooltipPosition = (element: HTMLElement) => {
-    const rect = element.getBoundingClientRect()
-    const scrollY = window.scrollY || window.pageYOffset
-    const scrollX = window.scrollX || window.pageXOffset
-    
-    // Position direkt under knappen med scroll-kompensation
-    return {
-      x: rect.left + scrollX,
-      y: rect.bottom + scrollY + 8
-    }
-  }
-  
   // ENKEL KLICK-HANDLER - inga timeouts, ingen hover-logik
   const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
@@ -206,11 +194,21 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     })
     
     if (products.length > 3) {
-      const position = calculateTooltipPosition(event.currentTarget)
-      setTooltipPosition(position)
       const newState = !showTooltip
       setShowTooltip(newState)
       console.log('✅ Tooltip state ändrad till:', newState)
+    }
+  }
+  
+  // Beräkna position baserat på button ref
+  const getTooltipStyle = () => {
+    if (!buttonRef.current) return {}
+    const rect = buttonRef.current.getBoundingClientRect()
+    return {
+      position: 'fixed' as const,
+      left: `${rect.left}px`,
+      top: `${rect.bottom + 8}px`,
+      zIndex: 99999
     }
   }
   
@@ -231,6 +229,7 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
         {products.length > 3 && (
           /* ANVÄND BUTTON ISTÄLLET FÖR SPAN - INGEN HOVER, BARA KLICK */
           <button 
+            ref={buttonRef}
             type="button"
             className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-400 cursor-pointer hover:bg-green-500/30 hover:text-green-300 hover:scale-105 active:scale-95 transition-all duration-200 font-medium select-none focus:outline-none focus:ring-2 focus:ring-green-500/50"
             onClick={handleButtonClick}
@@ -258,26 +257,21 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             }}
           />
           
-          {/* Popover - ENKEL POSITIONERING */}
+          {/* Popover - FIXED POSITIONERING MED REF */}
           <div 
-            className="absolute z-[9999] bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80"
-            style={{
-              left: `${tooltipPosition.x}px`,
-              top: `${tooltipPosition.y}px`
-            }}
+            className="bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80"
+            style={getTooltipStyle()}
             ref={(el) => {
               if (el) {
+                const style = getTooltipStyle()
                 console.log('🟩 POPOVER RENDERAD!', {
-                  position: { x: tooltipPosition.x, y: tooltipPosition.y },
+                  style,
                   element: el,
                   products: products.length,
                   boundingRect: el.getBoundingClientRect(),
+                  buttonRect: buttonRef.current?.getBoundingClientRect(),
                   viewport: { width: window.innerWidth, height: window.innerHeight }
                 })
-                // TVINGA popover att vara synlig med viktiga styles
-                el.style.visibility = 'visible'
-                el.style.opacity = '1'
-                el.style.display = 'block'
               }
             }}
           >
