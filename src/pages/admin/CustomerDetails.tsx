@@ -19,29 +19,39 @@ import { PageHeader } from '../../components/shared'
 interface CustomerDetails {
   id: string
   company_name: string
-  org_number: string
-  contact_person: string
-  email: string
-  phone: string
-  address: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  organization_number?: string | null
+  contact_person?: string | null
+  contact_email: string
+  contact_phone?: string | null
+  contact_address?: string | null
+  is_active?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
   business_type?: string | null
-  contract_types?: {
-    id: string
-    name: string
-  }
-  // Avtalsfält - UPPDATERAD med contract_end_date
+  contract_type?: string | null
+  // OneFlow fält
+  oneflow_contract_id?: string | null
+  contract_template_id?: string | null
+  contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
+  // Avtalsfält
   contract_start_date?: string | null
-  contract_length_months?: number | null
-  contract_end_date?: string | null // 🆕 NYA FÄLTET
+  contract_end_date?: string | null
+  contract_length?: string | null
   annual_value?: number | null
+  monthly_value?: number | null
   total_contract_value?: number | null
-  contract_description?: string | null
+  agreement_text?: string | null
+  // Account management
   assigned_account_manager?: string | null
-  contract_status?: string
-  // Ärenden (BEHÅLLS OFÖRÄNDRAD)
+  account_manager_email?: string | null
+  sales_person?: string | null
+  sales_person_email?: string | null
+  // Business Intelligence
+  industry_category?: string | null
+  customer_size?: 'small' | 'medium' | 'large' | null
+  service_frequency?: string | null
+  source_type?: 'oneflow' | 'manual' | 'import' | null
+  // Ärenden
   cases?: Array<{
     id: string
     case_number: string
@@ -90,28 +100,14 @@ export default function CustomerDetails() {
     }
   }
 
-  // 🆕 FÖRBÄTTRAD månadsberäkning som använder contract_end_date först
+  // Månadsberäkning baserat på contract_end_date
   const getMonthsUntilExpiry = (): number | null => {
-    // Använd contract_end_date om tillgängligt
-    if (customer?.contract_end_date) {
-      const end = new Date(customer.contract_end_date)
-      const now = new Date()
-      const diffTime = end.getTime() - now.getTime()
-      const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44))
-      return diffMonths
-    }
+    if (!customer?.contract_end_date) return null
     
-    // Fallback till gammal beräkning om contract_end_date saknas
-    if (!customer?.contract_start_date || !customer?.contract_length_months) return null
-    
-    const start = new Date(customer.contract_start_date)
-    const end = new Date(start)
-    end.setMonth(end.getMonth() + customer.contract_length_months)
-    
+    const end = new Date(customer.contract_end_date)
     const now = new Date()
     const diffTime = end.getTime() - now.getTime()
     const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44))
-    
     return diffMonths
   }
 
@@ -205,7 +201,7 @@ export default function CustomerDetails() {
                 <Building2 className="w-5 h-5 text-green-500" />
                 <div>
                   <h1 className="text-xl font-semibold">{customer.company_name}</h1>
-                  <p className="text-sm text-slate-400">{customer.org_number}</p>
+                  <p className="text-sm text-slate-400">{customer.organization_number || 'Org.nr saknas'}</p>
                 </div>
               </div>
             </div>
@@ -262,7 +258,7 @@ export default function CustomerDetails() {
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Organisationsnummer</label>
-                  <p className="text-white">{customer.org_number}</p>
+                  <p className="text-white">{customer.organization_number || '-'}</p>
                 </div>
                 
                 {customer.business_type && (
@@ -277,12 +273,12 @@ export default function CustomerDetails() {
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Avtalstyp</label>
-                  <p className="text-white">{customer.contract_types?.name || '-'}</p>
+                  <p className="text-white">{customer.contract_type || '-'}</p>
                 </div>
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Adress</label>
-                  <p className="text-white">{customer.address}</p>
+                  <p className="text-white">{customer.contact_address || '-'}</p>
                 </div>
                 
                 <div>
@@ -302,14 +298,14 @@ export default function CustomerDetails() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Kontaktperson</label>
-                  <p className="text-white font-medium">{customer.contact_person}</p>
+                  <p className="text-white font-medium">{customer.contact_person || '-'}</p>
                 </div>
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">E-postadress</label>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-slate-400" />
-                    <p className="text-white">{customer.email}</p>
+                    <p className="text-white">{customer.contact_email}</p>
                   </div>
                 </div>
                 
@@ -317,7 +313,7 @@ export default function CustomerDetails() {
                   <label className="block text-sm text-slate-400 mb-1">Telefonnummer</label>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-slate-400" />
-                    <p className="text-white">{customer.phone}</p>
+                    <p className="text-white">{customer.contact_phone || '-'}</p>
                   </div>
                 </div>
                 
@@ -326,23 +322,89 @@ export default function CustomerDetails() {
                     <label className="block text-sm text-slate-400 mb-1">Avtalsansvarig</label>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-purple-400" />
-                      <p className="text-white">{customer.assigned_account_manager.split('@')[0]}</p>
+                      <p className="text-white">{customer.assigned_account_manager}</p>
                     </div>
+                    {customer.account_manager_email && (
+                      <p className="text-sm text-slate-400 mt-1">{customer.account_manager_email}</p>
+                    )}
                   </div>
                 )}
               </div>
             </Card>
 
-            {/* Avtalsbeskrivning (BEHÅLLS HELT OFÖRÄNDRAD) */}
-            {customer.contract_description && (
+            {/* Avtalsinformation */}
+            {customer.agreement_text && (
               <Card>
                 <div className="flex items-center mb-4">
                   <FileText className="w-5 h-5 text-yellow-500 mr-2" />
-                  <h2 className="text-lg font-semibold text-white">Avtalsobjekt</h2>
+                  <h2 className="text-lg font-semibold text-white">Avtalsbeskrivning</h2>
                 </div>
-                <p className="text-slate-300 leading-relaxed">{customer.contract_description}</p>
+                <p className="text-slate-300 leading-relaxed">{customer.agreement_text}</p>
               </Card>
             )}
+
+            {/* OneFlow & Affärsinformation */}
+            <Card>
+              <div className="flex items-center mb-6">
+                <Briefcase className="w-5 h-5 text-purple-500 mr-2" />
+                <h2 className="text-lg font-semibold text-white">Affärsinformation</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {customer.oneflow_contract_id && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">OneFlow Kontrakt-ID</label>
+                    <p className="text-white font-mono text-sm">{customer.oneflow_contract_id}</p>
+                  </div>
+                )}
+                
+                {customer.industry_category && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Branschkategori</label>
+                    <p className="text-white">{customer.industry_category}</p>
+                  </div>
+                )}
+                
+                {customer.customer_size && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Företagsstorlek</label>
+                    <p className="text-white">
+                      {customer.customer_size === 'small' ? 'Litet' : 
+                       customer.customer_size === 'medium' ? 'Medelstort' : 
+                       customer.customer_size === 'large' ? 'Stort' : customer.customer_size}
+                    </p>
+                  </div>
+                )}
+                
+                {customer.service_frequency && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Servicefrekvens</label>
+                    <p className="text-white">{customer.service_frequency}</p>
+                  </div>
+                )}
+
+                {customer.source_type && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Källa</label>
+                    <p className="text-white">
+                      {customer.source_type === 'oneflow' ? 'OneFlow' : 
+                       customer.source_type === 'manual' ? 'Manuell' : 
+                       customer.source_type === 'import' ? 'Importerad' : customer.source_type}
+                    </p>
+                  </div>
+                )}
+
+                {customer.sales_person && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Säljare</label>
+                    <p className="text-white">{customer.sales_person}</p>
+                    {customer.sales_person_email && (
+                      <p className="text-sm text-slate-400">{customer.sales_person_email}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Card>
 
             {/* Ärenden (BEHÅLLS HELT OFÖRÄNDRAD) */}
             {customer.cases && customer.cases.length > 0 && (
@@ -427,7 +489,7 @@ export default function CustomerDetails() {
                   <div>
                     <label className="block text-sm text-slate-400 mb-1">Avtalslängd</label>
                     <p className="text-white">
-                      {customer.contract_length_months ? `${customer.contract_length_months} månader` : 'Ej angivet'}
+                      {customer.contract_length ? `${customer.contract_length} år` : 'Ej angivet'}
                     </p>
                   </div>
                   
@@ -540,9 +602,18 @@ export default function CustomerDetails() {
                   </p>
                 </div>
                 
-                {customer.annual_value && customer.contract_length_months && (
+                {customer.monthly_value && (
                   <div>
                     <label className="block text-sm text-slate-400 mb-1">Månadsbelopp</label>
+                    <p className="text-white">
+                      {formatCurrency(customer.monthly_value)}
+                    </p>
+                  </div>
+                )}
+                
+                {!customer.monthly_value && customer.annual_value && (
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Månadsbelopp (beräknat)</label>
                     <p className="text-white">
                       {formatCurrency(customer.annual_value / 12)}
                     </p>
