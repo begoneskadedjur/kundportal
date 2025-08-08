@@ -18,6 +18,8 @@ interface Customer {
   contact_email: string
   contact_phone?: string | null
   contact_address?: string | null
+  billing_email?: string | null
+  billing_address?: string | null
   business_type?: string | null
   industry_category?: string | null
   customer_size?: 'small' | 'medium' | 'large' | null

@@ -21,6 +21,8 @@ interface Customer {
   contact_email: string
   contact_phone?: string | null
   contact_address?: string | null
+  billing_email?: string | null
+  billing_address?: string | null
   is_active: boolean | null
   created_at: string | null
   updated_at: string | null
