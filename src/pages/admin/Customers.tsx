@@ -6,7 +6,7 @@ import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
   Mail, Phone, Building2, User, Calendar, DollarSign,
   ChevronLeft, ChevronRight, X, UserPlus, ExternalLink,
-  TrendingUp, AlertTriangle, Activity
+  TrendingUp, AlertTriangle, Activity, Send
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -17,6 +17,7 @@ import CustomerKpiCards from '../../components/admin/customers/CustomerKpiCards'
 import HealthScoreBadge from '../../components/admin/customers/HealthScoreBadge'
 import ChurnRiskBadge from '../../components/admin/customers/ChurnRiskBadge'
 import PortalAccessBadge from '../../components/admin/customers/PortalAccessBadge'
+import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { 
@@ -160,6 +161,7 @@ export default function Customers() {
   const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -268,6 +270,17 @@ export default function Customers() {
         backPath="/admin/dashboard"
         rightContent={
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEmailCampaignOpen(true)}
+              className="flex items-center gap-2 text-slate-400 hover:text-green-400 hover:bg-green-400/10"
+              title="Skicka e-postkampanj"
+            >
+              <Send className="w-4 h-4" />
+              <span className="hidden md:inline">E-postkampanj</span>
+            </Button>
+            <div className="w-px h-6 bg-slate-700"></div>
             <Button
               variant="secondary"
               size="sm"
@@ -757,6 +770,13 @@ export default function Customers() {
           </div>
         </div>
       </div>
+
+      {/* Email Campaign Modal */}
+      <EmailCampaignModal
+        isOpen={emailCampaignOpen}
+        onClose={() => setEmailCampaignOpen(false)}
+        customers={filteredCustomers}
+      />
     </div>
   )
 }
