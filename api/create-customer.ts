@@ -399,7 +399,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // VIKTIGT: Skicka alltid till den email som användaren angav
     const mailOptions = {
-      from: 'Begone Kundportal <noreply@begone.se>',
+      from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
       to: customerData.contact_email, // Skicka till original-emailen som kunden angav
       subject: isNewUser 
         ? `Välkommen till Begone Kundportal - ${customer.company_name}` 

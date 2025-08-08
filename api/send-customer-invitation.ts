@@ -107,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
 
         const mailOptions = {
-          from: 'Begone Kundportal <noreply@begone.se>',
+          from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
           to: email,
           subject: `Påminnelse: Er kundportal väntar - ${companyName}`,
           html: emailHtml
@@ -228,7 +228,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const mailOptions = {
-      from: 'Begone Kundportal <noreply@begone.se>',
+      from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
       to: email,
       subject: subject,
       html: emailHtml

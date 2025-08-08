@@ -63,11 +63,11 @@ const baseTemplate = (content: string, title: string = 'Begone Skadedjur') => `
       <div style="background: linear-gradient(135deg, #0a1328 0%, #1e3a5f 100%); padding: 40px 30px; text-align: center;">
         <div style="display: inline-block; padding: 12px 24px; background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; backdrop-filter: blur(10px);">
           <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">
-            Begone Skadedjur
+            Begone Skadedjur & Sanering AB
           </h1>
         </div>
         <p style="margin: 10px 0 0 0; color: #20c58f; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">
-          Professionell Skadedjursbekämpning
+          Skadedjursbekämpning i världsklass
         </p>
       </div>
       
@@ -79,10 +79,13 @@ const baseTemplate = (content: string, title: string = 'Begone Skadedjur') => `
       <!-- Footer -->
       <div class="footer" style="background-color: #f7fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
         <p style="margin: 0 0 10px 0; color: #718096; font-size: 14px;">
-          Begone Skadedjur AB
+          Begone Skadedjur & Sanering AB
         </p>
         <p style="margin: 0 0 10px 0; color: #718096; font-size: 13px;">
-          Org.nr: 559238-4405 | Tel: 010-129 22 00
+          Org.nr: 559378-9208 | Tel: 010 280 44 10
+        </p>
+        <p style="margin: 0 0 10px 0; color: #718096; font-size: 13px;">
+          E-post: <a href="mailto:info@begone.se" style="color: #20c58f; text-decoration: none;">info@begone.se</a>
         </p>
         <p style="margin: 0 0 15px 0; color: #718096; font-size: 13px;">
           <a href="https://begone.se" style="color: #20c58f; text-decoration: none;">www.begone.se</a>
@@ -181,8 +184,8 @@ export const welcomeEmailTemplate = (params: EmailTemplateParams): string => {
       </p>
       <p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
         Vårt supportteam finns tillgängligt vardagar 08:00-17:00<br>
-        E-post: <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: none;">support@begone.se</a><br>
-        Telefon: <a href="tel:0101292200" style="color: #20c58f; text-decoration: none;">010-129 22 00</a>
+        E-post: <a href="mailto:info@begone.se" style="color: #20c58f; text-decoration: none;">info@begone.se</a><br>
+        Telefon: <a href="tel:0102804410" style="color: #20c58f; text-decoration: none;">010 280 44 10</a>
       </p>
     </div>
   `
@@ -292,8 +295,8 @@ export const workReportEmailTemplate = (params: EmailTemplateParams): string => 
     <div style="border-top: 1px solid #e2e8f0; padding-top: 25px; margin-top: 35px;">
       <p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
         Har ni frågor om rapporten? Kontakta oss gärna på<br>
-        <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: none;">support@begone.se</a> eller 
-        <a href="tel:0101292200" style="color: #20c58f; text-decoration: none;">010-129 22 00</a>
+        <a href="mailto:info@begone.se" style="color: #20c58f; text-decoration: none;">info@begone.se</a> eller 
+        <a href="tel:0102804410" style="color: #20c58f; text-decoration: none;">010 280 44 10</a>
       </p>
     </div>
   `
