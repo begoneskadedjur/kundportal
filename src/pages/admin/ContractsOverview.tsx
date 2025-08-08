@@ -167,46 +167,61 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     return <span className="text-xs text-slate-500">Inga produkter</span>
   }
   
-  const handleMouseEnter = (event: React.MouseEvent) => {
+  const calculateTooltipPosition = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    let x = rect.left + rect.width / 2
+    
+    // Justera position för att hålla popover inom viewport
+    if (x + 150 > viewportWidth) {
+      x = viewportWidth - 170 // 150px popover width + 20px margin
+    }
+    if (x < 20) {
+      x = 20
+    }
+    
+    return {
+      x: x,
+      y: rect.bottom + 8
+    }
+  }
+  
+  const handleToggleTooltip = (event: React.MouseEvent<HTMLSpanElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
     if (products.length > 3) {
-      const rect = event.currentTarget.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
-      let x = rect.left + rect.width / 2
-      
-      // Justera position för att hålla popover inom viewport
-      if (x + 150 > viewportWidth) {
-        x = viewportWidth - 170 // 150px popover width + 20px margin
+      if (showTooltip) {
+        setShowTooltip(false)
+      } else {
+        const position = calculateTooltipPosition(event.currentTarget)
+        setTooltipPosition(position)
+        setShowTooltip(true)
       }
-      if (x < 20) {
-        x = 20
-      }
-      
-      setTooltipPosition({
-        x: x,
-        y: rect.bottom + 8
-      })
-      setShowTooltip(true)
+    }
+  }
+  
+  const handleMouseEnter = (event: React.MouseEvent<HTMLSpanElement>) => {
+    if (products.length > 3 && !showTooltip) {
+      const position = calculateTooltipPosition(event.currentTarget)
+      setTooltipPosition(position)
+      // Delay för att undvika flicker vid snabb hover
+      setTimeout(() => setShowTooltip(true), 100)
     }
   }
   
   const handleMouseLeave = () => {
-    setShowTooltip(false)
-  }
-  
-  const handleClick = (event: React.MouseEvent) => {
-    if (products.length > 3) {
-      event.stopPropagation()
+    // Delay för att användare ska hinna flytta musen till popover
+    setTimeout(() => {
       if (showTooltip) {
         setShowTooltip(false)
-      } else {
-        handleMouseEnter(event)
       }
-    }
+    }, 150)
   }
   
   return (
     <div className="relative">
-      <div className="flex flex-wrap gap-1" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <div className="flex flex-wrap gap-1">
         {products.slice(0, 3).map((product, idx) => (
           <span 
             key={idx}
@@ -220,17 +235,20 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
         ))}
         {products.length > 3 && (
           <span 
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-400 cursor-pointer hover:bg-slate-600 hover:text-slate-300 transition-colors touch-manipulation"
-            onClick={handleClick}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-400 cursor-pointer hover:bg-green-500/30 hover:text-green-300 hover:scale-105 active:scale-95 transition-all duration-200 font-medium select-none"
+            onClick={handleToggleTooltip}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                handleClick(e as any)
+                handleToggleTooltip(e as any)
               }
             }}
             aria-label={`Visa alla ${products.length} produkter`}
+            title={`Klicka för att visa alla ${products.length} produkter`}
           >
             +{products.length - 3} till
           </span>
@@ -248,12 +266,14 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
           
           {/* Popover */}
           <div 
-            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-xl max-w-sm min-w-72 md:max-w-sm"
+            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-xl max-w-sm min-w-72 md:max-w-sm animate-in fade-in-0 slide-in-from-top-1 duration-200"
             style={{
               left: `${tooltipPosition.x}px`,
               top: `${tooltipPosition.y}px`,
               transform: 'translateX(-50%)'
             }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setTimeout(() => setShowTooltip(false), 100)}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -261,8 +281,11 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
                 <h4 className="text-sm font-medium text-white">Alla {products.length} produkter</h4>
               </div>
               <button
-                onClick={() => setShowTooltip(false)}
-                className="text-slate-400 hover:text-white transition-colors p-1 -m-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowTooltip(false)
+                }}
+                className="text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-all p-1 -m-1"
                 aria-label="Stäng"
               >
                 <X className="w-3 h-3" />
@@ -271,14 +294,17 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {/* Visa alla produkter med indikering av vilka som syns i listan */}
               {products.map((product, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50">
+                <div key={idx} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50 transition-colors">
                   <div className="flex items-center gap-2 flex-1">
                     {idx < 3 && (
-                      <span className="text-green-400 text-xs">●</span>
+                      <span className="text-green-400 text-xs" title="Visas i listan">●</span>
+                    )}
+                    {idx >= 3 && (
+                      <span className="text-slate-600 text-xs">○</span>
                     )}
                     <span className="text-slate-300 truncate flex-1">{product.name}</span>
                   </div>
-                  <span className="text-slate-400 font-mono bg-slate-700 px-1.5 py-0.5 rounded ml-2">
+                  <span className="text-slate-400 font-mono bg-slate-700/50 px-1.5 py-0.5 rounded ml-2 text-xs">
                     {product.quantity}x
                   </span>
                 </div>
@@ -287,6 +313,11 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
                 <p className="text-xs text-slate-500 text-center py-2">Inga produkter att visa</p>
               )}
             </div>
+            
+            {/* Liten pil som pekar mot knappen */}
+            <div 
+              className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-600 rotate-45 border-l border-t border-slate-600"
+            />
           </div>
         </>
       )}
