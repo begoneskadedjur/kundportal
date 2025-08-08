@@ -550,12 +550,30 @@ const saveOrUpdateContract = async (contractData: ContractInsertData): Promise<v
 const parseContractLength = (lengthText: string | null): number => {
   if (!lengthText) return 12 // Default 1 år
   
+  // Hantera enbart siffror (antar år om inget annat anges)
+  if (/^\d+$/.test(lengthText.trim())) {
+    const years = parseInt(lengthText.trim())
+    console.log(`📅 Parsade kontraktslängd: ${years} år → ${years * 12} månader`)
+    return years * 12
+  }
+  
+  // Hantera text med "år"
   const yearMatch = lengthText.match(/(\d+)\s*år/i)
-  if (yearMatch) return parseInt(yearMatch[1]) * 12
+  if (yearMatch) {
+    const years = parseInt(yearMatch[1])
+    console.log(`📅 Parsade kontraktslängd: ${years} år → ${years * 12} månader`)
+    return years * 12
+  }
   
+  // Hantera text med "månad"
   const monthMatch = lengthText.match(/(\d+)\s*månad/i)
-  if (monthMatch) return parseInt(monthMatch[1])
+  if (monthMatch) {
+    const months = parseInt(monthMatch[1])
+    console.log(`📅 Parsade kontraktslängd: ${months} månader`)
+    return months
+  }
   
+  console.log(`⚠️ Kunde inte parsa kontraktslängd '${lengthText}', använder default 12 månader`)
   return 12 // Fallback
 }
 
@@ -570,14 +588,19 @@ const calculateEndDate = (startDate: string | null, lengthText: string | null): 
 }
 
 // Beräkna finansiella värden
-const calculateFinancialValues = (totalValue: number | null, lengthText: string | null) => {
-  if (!totalValue) return { annual_value: null, monthly_value: null }
+const calculateFinancialValues = (oneflowTotalValue: number | null, lengthText: string | null) => {
+  if (!oneflowTotalValue) return { annual_value: null, monthly_value: null }
   
-  const months = parseContractLength(lengthText)
+  // OneFlow skickar redan årsvärdet (inte totalt kontraktsvärde)
+  // Så vi behöver inte dividera med antal år
+  const annualValue = oneflowTotalValue
+  const monthlyValue = annualValue / 12
+  
+  console.log(`💰 Finansiella värden: Årsvärde=${annualValue}, Månadsvärde=${monthlyValue}`)
   
   return {
-    annual_value: months >= 12 ? (totalValue / months) * 12 : totalValue,
-    monthly_value: totalValue / months
+    annual_value: annualValue,
+    monthly_value: monthlyValue
   }
 }
 
@@ -800,7 +823,10 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       contract_end_date: contractEndDate,
       
       // Financial Information
-      total_contract_value: contract.total_value ? parseFloat(contract.total_value.toString()) : null,
+      // Beräkna total_contract_value korrekt: annual_value × antal år
+      total_contract_value: financialValues.annual_value && contract.contract_length ? 
+        financialValues.annual_value * (parseContractLength(contract.contract_length) / 12) : 
+        null,
       annual_value: financialValues.annual_value,
       monthly_value: financialValues.monthly_value,
       currency: 'SEK',
