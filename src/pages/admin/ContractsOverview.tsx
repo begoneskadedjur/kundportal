@@ -168,11 +168,9 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
   // Förhindra backdrop från att stänga tooltip direkt efter öppning
   useEffect(() => {
     if (showTooltip) {
-      console.log('⏱️ Tooltip öppnad - backdrop inaktiv i 200ms')
       setBackdropClickable(false)
       const timer = setTimeout(() => {
         setBackdropClickable(true)
-        console.log('✅ Backdrop nu klickbar')
       }, 200) // Vänta 200ms innan backdrop blir klickbar
       
       return () => clearTimeout(timer)
@@ -183,42 +181,25 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
     return <span className="text-xs text-slate-500">Inga produkter</span>
   }
   
-  // ENKEL KLICK-HANDLER - inga timeouts, ingen hover-logik
+  // Klick-handler för att visa/dölja popover
   const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
     
-    console.log('🔵 KLICK PÅ +X TILL KNAPPEN!', { 
-      currentTooltipState: showTooltip, 
-      totalProducts: products.length,
-      hiddenProducts: products.length - 3 
-    })
-    
     if (products.length > 3) {
-      const newState = !showTooltip
-      setShowTooltip(newState)
-      console.log('✅ Tooltip state ändrad till:', newState)
+      setShowTooltip(!showTooltip)
     }
   }
   
-  // Beräkna position baserat på button ref - FIX SCROLL ISSUE
+  // Beräkna position baserat på button ref
   const getTooltipStyle = () => {
     if (!buttonRef.current) return {}
     const rect = buttonRef.current.getBoundingClientRect()
     
-    // rect.bottom är redan relativ till viewport, INGEN scrollY behövs!
-    const top = rect.bottom + 8
-    
-    console.log('📍 POSITION BERÄKNING:', {
-      buttonBottom: rect.bottom,
-      calculatedTop: top,
-      scrollY: window.scrollY
-    })
-    
     return {
       position: 'fixed' as const,
       left: `${rect.left}px`,
-      top: `${top}px`,
+      top: `${rect.bottom + 8}px`,
       zIndex: 99999
     }
   }
@@ -255,36 +236,20 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
       {/* Tooltip/Popover med alla produkter - PORTAL VERSION */}
       {showTooltip && products.length > 3 && ReactDOM.createPortal(
         <>
-          {/* DEBUG: Lägg till synlig backdrop för att se om den renderas */}
+          {/* Backdrop för att stänga popover vid klick utanför */}
           <div 
-            className="fixed inset-0 z-[9998] bg-black/20" 
+            className="fixed inset-0 z-[9998]" 
             onClick={() => {
               if (backdropClickable) {
-                console.log('🔴 Backdrop klickad - stänger tooltip')
                 setShowTooltip(false)
-              } else {
-                console.log('⚠️ Backdrop klick ignorerat - för tidigt!')
               }
             }}
           />
           
-          {/* Popover - FIXED POSITIONERING MED REF - RENDERAD I BODY */}
+          {/* Popover med alla produkter */}
           <div 
-            className="fixed bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80 z-[9999]"
+            className="fixed bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-2xl w-80 z-[9999]"
             style={getTooltipStyle()}
-            ref={(el) => {
-              if (el) {
-                const style = getTooltipStyle()
-                console.log('🟩 POPOVER RENDERAD VIA PORTAL!', {
-                  style,
-                  element: el,
-                  products: products.length,
-                  boundingRect: el.getBoundingClientRect(),
-                  buttonRect: buttonRef.current?.getBoundingClientRect(),
-                  viewport: { width: window.innerWidth, height: window.innerHeight }
-                })
-              }
-            }}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -295,7 +260,6 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  console.log('❌ Stäng-knapp klickad')
                   setShowTooltip(false)
                 }}
                 className="text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-all p-1 -m-1"
@@ -308,15 +272,7 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
               {/* Visa alla produkter med indikering av vilka som syns i listan */}
               {products.map((product, idx) => (
                 <div key={idx} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-slate-700/50 transition-colors">
-                  <div className="flex items-center gap-2 flex-1">
-                    {idx < 3 && (
-                      <span className="text-green-400 text-xs" title="Visas i listan">●</span>
-                    )}
-                    {idx >= 3 && (
-                      <span className="text-slate-600 text-xs">○</span>
-                    )}
-                    <span className="text-slate-300 truncate flex-1">{product.name}</span>
-                  </div>
+                  <span className="text-slate-300 truncate flex-1">{product.name}</span>
                   <span className="text-slate-400 font-mono bg-slate-700/50 px-1.5 py-0.5 rounded ml-2 text-xs">
                     {product.quantity}x
                   </span>
