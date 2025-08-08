@@ -126,7 +126,7 @@ const PipelineStageBadge: React.FC<{ status: string }> = ({ status }) => {
 // Contract Type Badge - visuell differentiering mellan avtal och offerter
 const ContractTypeBadge: React.FC<{ type: string, contractLength?: string | null }> = ({ type, contractLength }) => {
   if (type === 'contract') {
-    const years = contractLength ? Math.round(parseInt(contractLength) / 12) : 0
+    const years = contractLength ? parseInt(contractLength) : 0
     const yearText = years > 0 ? ` ${years}år` : ''
     return (
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400">
@@ -717,13 +717,13 @@ export default function ContractsOverview() {
                             {contract.type === 'contract' && contract.contract_length ? (
                               <>
                                 <p className="text-sm font-bold text-white">
-                                  {contract.total_value ? formatContractValue(contract.total_value * (parseInt(contract.contract_length) / 12)) : '-'}
+                                  {contract.total_value ? formatContractValue(contract.total_value * parseInt(contract.contract_length)) : '-'}
                                 </p>
                                 <p className="text-xs text-green-400 mt-1">
                                   {contract.total_value ? formatContractValue(contract.total_value) : '-'} /år
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                  {Math.round(parseInt(contract.contract_length) / 12)} års avtal
+                                  {parseInt(contract.contract_length)} års avtal
                                 </p>
                               </>
                             ) : (

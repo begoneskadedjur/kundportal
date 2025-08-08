@@ -496,7 +496,7 @@ export class ContractService {
         .reduce((sum, c) => {
           // För avtal: multiplicera årsvärdet med antal år
           if (c.type === 'contract' && c.contract_length) {
-            const years = parseInt(c.contract_length) / 12
+            const years = parseInt(c.contract_length)
             return sum + ((c.total_value || 0) * years)
           }
           // För offerter: använd värdet direkt
@@ -507,7 +507,7 @@ export class ContractService {
         .filter(c => c.total_value)
         .reduce((sum, c) => {
           if (c.type === 'contract' && c.contract_length) {
-            const years = parseInt(c.contract_length) / 12
+            const years = parseInt(c.contract_length)
             return sum + ((c.total_value || 0) * years)
           }
           return sum + (c.total_value || 0)
@@ -517,7 +517,7 @@ export class ContractService {
         .filter(c => c.total_value)
         .reduce((sum, c) => {
           if (c.type === 'contract' && c.contract_length) {
-            const years = parseInt(c.contract_length) / 12
+            const years = parseInt(c.contract_length)
             return sum + ((c.total_value || 0) * years)
           }
           return sum + (c.total_value || 0)
@@ -594,7 +594,7 @@ export class ContractService {
           // Beräkna korrekt totalvärde baserat på typ
           let contractValue = contract.total_value || 0
           if (contract.type === 'contract' && contract.contract_length) {
-            const years = parseInt(contract.contract_length) / 12
+            const years = parseInt(contract.contract_length)
             contractValue = contractValue * years
           }
           
