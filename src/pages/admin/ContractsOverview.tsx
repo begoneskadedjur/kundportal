@@ -184,20 +184,13 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
   
   const calculateTooltipPosition = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect()
-    const viewportWidth = window.innerWidth
-    let x = rect.left + rect.width / 2
+    const scrollY = window.scrollY || window.pageYOffset
+    const scrollX = window.scrollX || window.pageXOffset
     
-    // Justera position för att hålla popover inom viewport
-    if (x + 150 > viewportWidth) {
-      x = viewportWidth - 170 // 150px popover width + 20px margin
-    }
-    if (x < 20) {
-      x = 20
-    }
-    
+    // Position direkt under knappen med scroll-kompensation
     return {
-      x: x,
-      y: rect.bottom + 8
+      x: rect.left + scrollX,
+      y: rect.bottom + scrollY + 8
     }
   }
   
@@ -265,21 +258,26 @@ const ProductsCell: React.FC<{ products: Array<{name: string, quantity: number}>
             }}
           />
           
-          {/* Popover - ta bort animation-klasser för nu */}
+          {/* Popover - ENKEL POSITIONERING */}
           <div 
-            className="fixed z-50 bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl max-w-sm min-w-[18rem]"
+            className="absolute z-[9999] bg-slate-800 border-2 border-green-500 rounded-lg p-4 shadow-2xl w-80"
             style={{
               left: `${tooltipPosition.x}px`,
-              top: `${tooltipPosition.y}px`,
-              transform: 'translateX(-50%)'
+              top: `${tooltipPosition.y}px`
             }}
             ref={(el) => {
               if (el) {
                 console.log('🟩 POPOVER RENDERAD!', {
                   position: { x: tooltipPosition.x, y: tooltipPosition.y },
                   element: el,
-                  products: products.length
+                  products: products.length,
+                  boundingRect: el.getBoundingClientRect(),
+                  viewport: { width: window.innerWidth, height: window.innerHeight }
                 })
+                // TVINGA popover att vara synlig med viktiga styles
+                el.style.visibility = 'visible'
+                el.style.opacity = '1'
+                el.style.display = 'block'
               }
             }}
           >
