@@ -6,7 +6,7 @@ import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
   Mail, Phone, Building2, User, Calendar, DollarSign,
   ChevronLeft, ChevronRight, X, UserPlus, ExternalLink,
-  TrendingUp, AlertTriangle, Activity, Send
+  TrendingUp, AlertTriangle, Activity, Send, Edit3
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -18,6 +18,8 @@ import HealthScoreBadge from '../../components/admin/customers/HealthScoreBadge'
 import ChurnRiskBadge from '../../components/admin/customers/ChurnRiskBadge'
 import PortalAccessBadge from '../../components/admin/customers/PortalAccessBadge'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
+import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
+import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { 
@@ -162,6 +164,8 @@ export default function Customers() {
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<any>(null)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -224,6 +228,17 @@ export default function Customers() {
     } finally {
       setSendingInvitation(null)
     }
+  }
+
+  // Handle customer edit
+  const handleEditCustomer = (customer: any) => {
+    setEditingCustomer(customer)
+    setEditModalOpen(true)
+  }
+
+  const handleCustomerSaved = (updatedCustomer: any) => {
+    // Refresh the data to show updated information
+    refresh()
   }
 
   // Get unique managers for filter
@@ -514,6 +529,16 @@ export default function Customers() {
 
                           <td className="px-4 py-4">
                             <div className="flex justify-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditCustomer(customer)}
+                                className="text-green-400 hover:text-green-300"
+                                title="Redigera kund"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </Button>
+                              
                               {customer.invitationStatus === 'none' && (
                                 <Button
                                   variant="ghost"
@@ -609,6 +634,12 @@ export default function Customers() {
                 <X className="w-5 h-5" />
               </Button>
             </div>
+
+            {/* ARR Forecast - Prominent feature */}
+            <ARRForecastChart customers={customers} />
+
+            {/* Separator */}
+            <div className="border-t border-slate-700"></div>
 
             {/* Industry breakdown */}
             <Card className="p-4">
@@ -776,6 +807,17 @@ export default function Customers() {
         isOpen={emailCampaignOpen}
         onClose={() => setEmailCampaignOpen(false)}
         customers={filteredCustomers}
+      />
+
+      {/* Edit Customer Modal */}
+      <EditCustomerModal
+        customer={editingCustomer}
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false)
+          setEditingCustomer(null)
+        }}
+        onSave={handleCustomerSaved}
       />
     </div>
   )
