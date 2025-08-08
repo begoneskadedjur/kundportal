@@ -1,6 +1,6 @@
-// src/pages/admin/ContractsOverview.tsx - Avancerad Business Dashboard för avtals- och offerthantering
+// src/pages/admin/ContractsOverview.tsx - Pipeline-fokuserad försäljningsöversikt
 import React, { useState, useMemo } from 'react'
-import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, Award, User } from 'lucide-react'
+import { FileText, Search, ExternalLink, Eye, DollarSign, CheckCircle, ShoppingCart, Filter, Download, TrendingUp, Users, Package, Calendar, Clock, AlertTriangle, BarChart3, Percent, Target, Award, User, ChevronDown, ChevronRight, Tag, Layers } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
@@ -12,6 +12,62 @@ import { useContracts } from '../../hooks/useContracts'
 import { ContractFilters, ContractWithSourceData } from '../../services/contractService'
 import { formatContractValue, getContractStatusColor, getContractStatusText, getContractTypeText } from '../../services/contractService'
 import toast from 'react-hot-toast'
+
+// Pipeline Stage Badge - Förbättrad för pipeline-vy
+const PipelineStageBadge: React.FC<{ status: string, type?: 'contract' | 'offer' }> = ({ status, type }) => {
+  const getStageInfo = (status: string, type?: string) => {
+    switch (status) {
+      case 'pending':
+        return { 
+          label: 'Skickad', 
+          color: 'text-blue-400 bg-blue-500/20 border-blue-500/30',
+          stage: 'sent'
+        }
+      case 'signed':
+        return { 
+          label: 'Signerad', 
+          color: 'text-green-400 bg-green-500/20 border-green-500/30',
+          stage: 'signed'
+        }
+      case 'active':
+        return { 
+          label: 'Aktiv', 
+          color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
+          stage: 'active'
+        }
+      case 'declined':
+        return { 
+          label: 'Avvisad', 
+          color: 'text-red-400 bg-red-500/20 border-red-500/30',
+          stage: 'declined'
+        }
+      case 'overdue':
+        return { 
+          label: 'Försenad', 
+          color: 'text-orange-400 bg-orange-500/20 border-orange-500/30',
+          stage: 'overdue'
+        }
+      default:
+        return { 
+          label: 'Utkast', 
+          color: 'text-slate-400 bg-slate-500/20 border-slate-500/30',
+          stage: 'draft'
+        }
+    }
+  }
+
+  const stageInfo = getStageInfo(status, type)
+  const isOffer = type === 'offer'
+  
+  return (
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${stageInfo.color}`}>
+      <div className="flex items-center gap-1">
+        {isOffer && <Tag className="w-3 h-3" />}
+        {stageInfo.label}
+      </div>
+    </span>
+  )
+}
 
 // Typ badge-komponent
 const TypeBadge: React.FC<{ type: 'contract' | 'offer' }> = ({ type }) => {
@@ -26,59 +82,78 @@ const TypeBadge: React.FC<{ type: 'contract' | 'offer' }> = ({ type }) => {
   )
 }
 
-// Employee Performance Card komponent
-const EmployeePerformanceCard: React.FC<{ 
-  employee: { name: string, email: string, contract_count: number, total_value: number, avg_value: number },
-  rank: number,
-  onClick?: () => void
-}> = ({ employee, rank, onClick }) => {
-  const rankColors = rank === 1 ? 'text-yellow-400 border-yellow-400/30' : 
-                   rank === 2 ? 'text-slate-300 border-slate-300/30' : 
-                   rank === 3 ? 'text-orange-400 border-orange-400/30' : 
-                   'text-slate-400 border-slate-600'
-
-  return (
-    <div 
-      className={`p-4 bg-slate-800 rounded-lg border hover:bg-slate-700 transition-all cursor-pointer ${rankColors}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-            rank === 1 ? 'bg-yellow-400/20' : 
-            rank === 2 ? 'bg-slate-300/20' : 
-            rank === 3 ? 'bg-orange-400/20' : 
-            'bg-slate-600/20'
-          }`}>
-            #{rank}
-          </div>
-          <User className="w-4 h-4 text-slate-400" />
-        </div>
-        <Award className={`w-5 h-5 ${rank <= 3 ? rankColors.split(' ')[0] : 'text-slate-500'}`} />
-      </div>
+// Parsera products från JSONB-fält
+const parseContractProducts = (selectedProducts: any): Array<{ name: string, quantity: number, price: number, total: number }> => {
+  if (!selectedProducts || !Array.isArray(selectedProducts)) return []
+  
+  try {
+    return selectedProducts.map((product: any) => {
+      // Hantera olika strukturer beroende på hur produkterna är lagrade
+      const name = product.name || product.product?.name || 'Okänd produkt'
+      const quantity = product.quantity || 1
+      const price = product.price || product.product?.pricing?.company?.basePrice || product.selectedVariant?.pricing?.company?.basePrice || 0
+      const total = product.total_price || (price * quantity)
       
-      <div className="space-y-1">
-        <div className="font-medium text-white text-sm truncate" title={employee.name}>
-          {employee.name}
+      return { name, quantity, price, total }
+    }).filter(p => p.name !== 'Okänd produkt')
+  } catch (error) {
+    console.warn('Fel vid parsing av produkter:', error)
+    return []
+  }
+}
+
+// Produktbadge-komponent för kontraktslistan
+const ProductBadges: React.FC<{ products: Array<{ name: string, quantity: number }>, maxShow?: number }> = ({ 
+  products, 
+  maxShow = 2 
+}) => {
+  if (!products || products.length === 0) return null
+  
+  const displayProducts = products.slice(0, maxShow)
+  const remainingCount = products.length - maxShow
+  
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {displayProducts.map((product, index) => (
+        <span 
+          key={index}
+          className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30"
+          title={`${product.name} (${product.quantity}st)`}
+        >
+          <Package className="w-3 h-3 mr-1" />
+          {product.name}
+          {product.quantity > 1 && (
+            <span className="ml-1 font-semibold">×{product.quantity}</span>
+          )}
+        </span>
+      ))}
+      {remainingCount > 0 && (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-slate-600/20 text-slate-400 border border-slate-600/30">
+          +{remainingCount} till
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Kompakt medarbetarkort
+const CompactEmployeeCard: React.FC<{ 
+  employee: { name: string, email: string, contract_count: number, total_value: number },
+  rank: number
+}> = ({ employee, rank }) => {
+  const medalColor = rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-slate-300' : rank === 3 ? 'text-orange-400' : 'text-slate-500'
+  
+  return (
+    <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+      <div className="flex items-center gap-2">
+        <Award className={`w-4 h-4 ${medalColor}`} />
+        <div>
+          <div className="text-sm font-medium text-white">{employee.name}</div>
+          <div className="text-xs text-slate-400">{employee.contract_count} avtal</div>
         </div>
-        <div className="text-xs text-slate-400 truncate" title={employee.email}>
-          {employee.email}
-        </div>
-        
-        <div className="flex justify-between items-center mt-3">
-          <div className="text-center">
-            <div className="text-lg font-bold text-white">{employee.contract_count}</div>
-            <div className="text-xs text-slate-500">Kontrakt</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-bold text-green-400">{formatContractValue(employee.total_value)}</div>
-            <div className="text-xs text-slate-500">Totalt</div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-blue-400">{formatContractValue(employee.avg_value)}</div>
-            <div className="text-xs text-slate-500">Snitt</div>
-          </div>
-        </div>
+      </div>
+      <div className="text-sm font-semibold text-green-400">
+        {formatContractValue(employee.total_value)}
       </div>
     </div>
   )
@@ -749,13 +824,6 @@ export default function ContractsOverview() {
         </Card>
       </div>
 
-      {/* Advanced Filters Panel */}
-      <AdvancedFilterPanel
-        isOpen={showAdvancedFilters}
-        filters={{}}
-        onFilterChange={() => {}}
-        topEmployees={stats?.top_employees?.map(emp => ({ name: emp.name, email: emp.email })) || []}
-      />
 
       {/* Filters */}
       <Card>
@@ -942,16 +1010,34 @@ export default function ContractsOverview() {
                 </tr>
               ))}
             </tbody>
+            {filteredContracts.length === 0 && (
+              <tbody>
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                    <div className="flex flex-col items-center gap-3">
+                      <FileText className="w-12 h-12 text-slate-600" />
+                      <div>
+                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                          ? 'Inga kontrakt matchar dina filter. Prova att justera sökningen eller filtren.'
+                          : 'Inga kontrakt eller offerter hittades. Importera kontrakt från OneFlow för att komma igång.'
+                        }
+                      </div>
+                      {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearFilters}
+                          className="text-blue-400"
+                        >
+                          Rensa alla filter
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            )}
           </table>
-
-          {filteredContracts.length === 0 && (
-            <div className="text-center py-8 text-slate-400">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                ? 'Inga avtal matchar de valda filtren.'
-                : 'Inga avtal eller offerter hittades.'
-              }
-            </div>
-          )}
         </div>
 
         {/* Mobile Cards */}
@@ -965,15 +1051,37 @@ export default function ContractsOverview() {
           ))}
           
           {filteredContracts.length === 0 && (
-            <div className="text-center py-8 text-slate-400">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                ? 'Inga avtal matchar de valda filtren.'
-                : 'Inga avtal eller offerter hittades.'
-              }
+            <div className="text-center py-12 text-slate-400">
+              <div className="flex flex-col items-center gap-3">
+                <FileText className="w-12 h-12 text-slate-600" />
+                <div>
+                  {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                    ? 'Inga kontrakt matchar dina filter. Prova att justera sökningen eller filtren.'
+                    : 'Inga kontrakt eller offerter hittades. Importera kontrakt från OneFlow för att komma igång.'
+                  }
+                </div>
+                {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="text-blue-400"
+                  >
+                    Rensa alla filter
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
       </Card>
+      
+      {/* Import Modal */}
+      <ContractImportModal
+        isOpen={importModalOpen}
+        onClose={handleCloseImportModal}
+        onImportComplete={handleImportComplete}
+      />
 
       {/* Files Modal */}
       <ContractFilesModal
@@ -981,13 +1089,6 @@ export default function ContractsOverview() {
         onClose={handleCloseFilesModal}
         contractId={selectedContractId}
         contractName={selectedContractName}
-      />
-
-      {/* Import Modal */}
-      <ContractImportModal
-        isOpen={importModalOpen}
-        onClose={handleCloseImportModal}
-        onImportComplete={handleImportComplete}
       />
     </div>
   )
