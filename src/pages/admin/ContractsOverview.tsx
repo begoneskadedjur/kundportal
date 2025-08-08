@@ -123,6 +123,27 @@ const PipelineStageBadge: React.FC<{ status: string }> = ({ status }) => {
   )
 }
 
+// Contract Type Badge - visuell differentiering mellan avtal och offerter
+const ContractTypeBadge: React.FC<{ type: string, contractLength?: string | null }> = ({ type, contractLength }) => {
+  if (type === 'contract') {
+    const years = contractLength ? Math.round(parseInt(contractLength) / 12) : 0
+    const yearText = years > 0 ? ` ${years}år` : ''
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400">
+        <FileText className="w-3 h-3 mr-1" />
+        Avtal{yearText}
+      </span>
+    )
+  }
+  
+  return (
+    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-500/20 text-sky-400">
+      <DollarSign className="w-3 h-3 mr-1" />
+      Offert
+    </span>
+  )
+}
+
 // Kompakt säljarkort för sidopanel
 const CompactSellerCard: React.FC<{ 
   seller: any, 
@@ -518,12 +539,12 @@ export default function ContractsOverview() {
             <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Pipeline-värde</p>
+                  <p className="text-xs text-slate-400">Totalt Kontraktsvärde</p>
                   <p className="text-xl font-bold text-white">
                     {formatContractValue(stats?.total_value || 0)}
                   </p>
                   <p className="text-xs text-green-400 mt-1">
-                    {stats?.total_contracts || 0} avtal totalt
+                    {(stats?.total_contracts || 0) + (stats?.total_offers || 0)} dokument totalt
                   </p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500 opacity-50" />
@@ -533,7 +554,7 @@ export default function ContractsOverview() {
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Signerat värde</p>
+                  <p className="text-xs text-slate-400">Aktivt Kontraktsvärde</p>
                   <p className="text-xl font-bold text-white">
                     {formatContractValue(stats?.signed_value || 0)}
                   </p>
@@ -602,9 +623,9 @@ export default function ContractsOverview() {
                 onChange={(e) => setTypeFilter(e.target.value)}
                 className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
               >
-                <option value="all">Alla typer</option>
-                <option value="contract">Kontrakt</option>
-                <option value="offer">Offert</option>
+                <option value="all">📄 Alla typer</option>
+                <option value="contract">📋 Endast Avtal</option>
+                <option value="offer">💼 Endast Offerter</option>
               </select>
 
               {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
@@ -628,7 +649,7 @@ export default function ContractsOverview() {
                 <thead className="bg-slate-800/50 border-b border-slate-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Status
+                      Status & Typ
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Företag / Kontakt
@@ -637,7 +658,10 @@ export default function ContractsOverview() {
                       Produkter
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Värde
+                      Kontraktsvärde
+                      <span className="block text-xs font-normal text-slate-500 mt-1">
+                        Total / Årligt
+                      </span>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Säljare
@@ -658,7 +682,10 @@ export default function ContractsOverview() {
                     return (
                       <tr key={contract.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="px-4 py-4">
-                          <PipelineStageBadge status={contract.status} />
+                          <div className="space-y-2">
+                            <PipelineStageBadge status={contract.status} />
+                            <ContractTypeBadge type={contract.type} contractLength={contract.contract_length} />
+                          </div>
                         </td>
                         
                         <td className="px-4 py-4">
@@ -687,18 +714,25 @@ export default function ContractsOverview() {
                         
                         <td className="px-4 py-4">
                           <div>
-                            <p className="text-sm font-bold text-white">
-                              {contract.total_value ? formatContractValue(contract.total_value) : '-'}
-                            </p>
-                            {isMultiYear && contract.total_value && (
-                              <p className="text-xs text-green-400 mt-1">
-                                {formatContractValue(Math.round(contract.total_value / (parseInt(contract.contract_length) / 12)))} /år
-                              </p>
-                            )}
-                            {contract.contract_length && (
-                              <p className="text-xs text-slate-500 mt-1">
-                                {contract.contract_length} {parseInt(contract.contract_length) === 1 ? 'månad' : 'månader'}
-                              </p>
+                            {contract.type === 'contract' && contract.contract_length ? (
+                              <>
+                                <p className="text-sm font-bold text-white">
+                                  {contract.total_value ? formatContractValue(contract.total_value * (parseInt(contract.contract_length) / 12)) : '-'}
+                                </p>
+                                <p className="text-xs text-green-400 mt-1">
+                                  {contract.total_value ? formatContractValue(contract.total_value) : '-'} /år
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {Math.round(parseInt(contract.contract_length) / 12)} års avtal
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm font-bold text-white">
+                                  {contract.total_value ? formatContractValue(contract.total_value) : '-'}
+                                </p>
+                                <p className="text-xs text-amber-400 mt-1">Engångsjobb</p>
+                              </>
                             )}
                           </div>
                         </td>

@@ -490,18 +490,38 @@ export class ContractService {
       const pending_contracts = pendingContracts.length
       const active_contracts = activeContracts.length
       
-      // Finansiella metriker
+      // Finansiella metriker - korrekt beräkning av totala kontraktsvärden
       const total_value = contracts
         .filter(c => c.total_value)
-        .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        .reduce((sum, c) => {
+          // För avtal: multiplicera årsvärdet med antal år
+          if (c.type === 'contract' && c.contract_length) {
+            const years = parseInt(c.contract_length) / 12
+            return sum + ((c.total_value || 0) * years)
+          }
+          // För offerter: använd värdet direkt
+          return sum + (c.total_value || 0)
+        }, 0)
         
       const signed_value = signedContracts
         .filter(c => c.total_value)
-        .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        .reduce((sum, c) => {
+          if (c.type === 'contract' && c.contract_length) {
+            const years = parseInt(c.contract_length) / 12
+            return sum + ((c.total_value || 0) * years)
+          }
+          return sum + (c.total_value || 0)
+        }, 0)
         
       const pending_value = pendingContracts
         .filter(c => c.total_value)
-        .reduce((sum, c) => sum + (c.total_value || 0), 0)
+        .reduce((sum, c) => {
+          if (c.type === 'contract' && c.contract_length) {
+            const years = parseInt(c.contract_length) / 12
+            return sum + ((c.total_value || 0) * years)
+          }
+          return sum + (c.total_value || 0)
+        }, 0)
         
       const average_contract_value = contractsOnly.length > 0 
         ? contractsOnly.filter(c => c.total_value).reduce((sum, c) => sum + (c.total_value || 0), 0) / contractsOnly.filter(c => c.total_value).length
@@ -540,12 +560,24 @@ export class ContractService {
       const value_this_month = contracts.filter(c => {
         const createdDate = new Date(c.created_at)
         return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear && c.total_value
-      }).reduce((sum, c) => sum + (c.total_value || 0), 0)
+      }).reduce((sum, c) => {
+        if (c.type === 'contract' && c.contract_length) {
+          const years = parseInt(c.contract_length) / 12
+          return sum + ((c.total_value || 0) * years)
+        }
+        return sum + (c.total_value || 0)
+      }, 0)
       
       const value_last_month = contracts.filter(c => {
         const createdDate = new Date(c.created_at)
         return createdDate.getMonth() === lastMonth && createdDate.getFullYear() === lastMonthYear && c.total_value
-      }).reduce((sum, c) => sum + (c.total_value || 0), 0)
+      }).reduce((sum, c) => {
+        if (c.type === 'contract' && c.contract_length) {
+          const years = parseInt(c.contract_length) / 12
+          return sum + ((c.total_value || 0) * years)
+        }
+        return sum + (c.total_value || 0)
+      }, 0)
       
       const growth_rate = value_last_month > 0 
         ? Math.round(((value_this_month - value_last_month) / value_last_month) * 100)
@@ -559,15 +591,22 @@ export class ContractService {
           const key = contract.begone_employee_email
           const existing = employeeStats.get(key)
           
+          // Beräkna korrekt totalvärde baserat på typ
+          let contractValue = contract.total_value || 0
+          if (contract.type === 'contract' && contract.contract_length) {
+            const years = parseInt(contract.contract_length) / 12
+            contractValue = contractValue * years
+          }
+          
           if (existing) {
             existing.contract_count++
-            existing.total_value += contract.total_value || 0
+            existing.total_value += contractValue
           } else {
             employeeStats.set(key, {
               name: contract.begone_employee_name,
               email: contract.begone_employee_email,
               contract_count: 1,
-              total_value: contract.total_value || 0
+              total_value: contractValue
             })
           }
         }
