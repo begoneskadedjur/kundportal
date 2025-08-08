@@ -24,15 +24,35 @@ const parseContractProducts = (contract: ContractWithSourceData): Array<{name: s
   try {
     // Kolla om det finns selected_products först (från contracts)
     if (contract.selected_products) {
-      const products = typeof contract.selected_products === 'string' 
+      const data = typeof contract.selected_products === 'string' 
         ? JSON.parse(contract.selected_products) 
         : contract.selected_products
       
-      if (Array.isArray(products)) {
-        return products.map(p => ({
-          name: p.name || p.product_name || 'Okänd produkt',
-          quantity: p.quantity || 1
-        }))
+      // OneFlow struktur: array av produktgrupper
+      if (Array.isArray(data)) {
+        const allProducts: any[] = []
+        
+        data.forEach((group: any) => {
+          // Varje grupp har en products array
+          if (group.products && Array.isArray(group.products)) {
+            group.products.forEach((product: any) => {
+              allProducts.push({
+                name: product.name || 'Okänd produkt',
+                // Hantera quantity som objekt med amount
+                quantity: product.quantity?.amount || product.quantity || 1
+              })
+            })
+          }
+          // Fallback om produkter ligger direkt i arrayen (gammal struktur)
+          else if (group.name) {
+            allProducts.push({
+              name: group.name || group.product_name || 'Okänd produkt',
+              quantity: group.quantity?.amount || group.quantity || 1
+            })
+          }
+        })
+        
+        return allProducts.length > 0 ? allProducts : []
       }
     }
     
@@ -41,14 +61,14 @@ const parseContractProducts = (contract: ContractWithSourceData): Array<{name: s
       const customerProducts = contract.customer_data.products
       
       if (Array.isArray(customerProducts)) {
-        // OneFlow struktur - products är en array av produktgrupper
+        // OneFlow struktur från customers table
         const allProducts: any[] = []
         customerProducts.forEach((group: any) => {
           if (group.products && Array.isArray(group.products)) {
             group.products.forEach((product: any) => {
               allProducts.push({
                 name: product.name || 'Okänd produkt',
-                quantity: product.quantity?.amount || 1
+                quantity: product.quantity?.amount || product.quantity || 1
               })
             })
           }
@@ -59,7 +79,7 @@ const parseContractProducts = (contract: ContractWithSourceData): Array<{name: s
     
     return []
   } catch (error) {
-    console.error('Error parsing products:', error)
+    console.error('Error parsing products:', error, { contract_id: contract.id })
     return []
   }
 }

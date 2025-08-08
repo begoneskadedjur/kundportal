@@ -94,7 +94,7 @@ export class ContractService {
         .select(`
           *,
           customers!contracts_customer_id_fkey (
-            id, company_name, contact_person, contact_email
+            id, company_name, contact_person, contact_email, products
           )
         `)
         .order('created_at', { ascending: false })
