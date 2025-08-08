@@ -48,155 +48,181 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Ogiltig e-postadress' })
     }
 
-    // 3. Hämta avtalstyp från databas (om det finns)
-    let contractType = null
-    if (customerData.contract_type_id) {
-      console.log('Fetching contract type:', customerData.contract_type_id)
-      const { data: ct, error: contractError } = await supabase
-        .from('contract_types')
-        .select('*')
-        .eq('id', customerData.contract_type_id)
-        .eq('is_active', true)
-        .single()
-
-      if (!contractError && ct) {
-        contractType = ct
-        console.log('Contract type found:', contractType.name)
-      }
-    }
-
-    // 4. Kolla om kund redan finns - FIXAD med säker email access
-    const { data: existingCustomers } = await supabase
-      .from('customers')
-      .select('company_name, organization_number, contact_email')
-      .or(`company_name.eq.${customerData.company_name},organization_number.eq.${customerData.organization_number || ''},contact_email.eq.${customerData.contact_email}`)
-
-    if (existingCustomers && existingCustomers.length > 0) {
-      const existingCustomer = existingCustomers[0]
-      if (existingCustomer.company_name === customerData.company_name) {
-        return res.status(400).json({ error: `Företaget "${customerData.company_name}" finns redan` })
-      }
-      if (customerData.organization_number && existingCustomer.organization_number === customerData.organization_number) {
-        return res.status(400).json({ error: `Organisationsnummer "${customerData.organization_number}" finns redan` })
-      }
-      if (existingCustomer.contact_email === customerData.contact_email) {
-        return res.status(400).json({ error: `E-postadressen "${customerData.contact_email}" används redan` })
-      }
-    }
-
-    // 5. Skapa ClickUp lista (om contractType finns)
-    let clickupList = null
-    if (contractType) {
-      const uniqueListName = `${customerData.company_name} - ${contractType.name}`
-      console.log('Creating ClickUp list with name:', uniqueListName)
-
-      // 6. Skapa ClickUp lista
-      const clickupResponse = await fetch(
-        `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': CLICKUP_API_TOKEN,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: uniqueListName,
-          content: `Kundlista för ${customerData.company_name} (${contractType.name})`,
-          due_date: null,
-          due_date_time: false,
-          priority: 3
-        })
-      }
-    )
-
-    if (!clickupResponse.ok) {
-      const errorData = await clickupResponse.text()
-      console.error('ClickUp API error:', errorData)
-      
-      if (errorData.includes('SUBCAT_016') || errorData.includes('List name taken')) {
-        return res.status(400).json({ error: `En ClickUp-lista med namnet "${uniqueListName}" finns redan.` })
-      }
-      
-      return res.status(500).json({ error: `ClickUp API fel: ${errorData}` })
-    }
-
-      clickupList = await clickupResponse.json()
-      console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
-    }
-
-    // 7. Förbered kunddata för databas
-    const dbCustomerData: any = {
-      company_name: customerData.company_name.trim(),
-      organization_number: customerData.organization_number?.trim() || null,
-      contact_person: customerData.contact_person.trim(),
-      contact_email: customerData.contact_email.trim().toLowerCase(),
-      contact_phone: customerData.contact_phone?.trim() || null,
-      contact_address: customerData.contact_address?.trim() || null,
-      
-      // OneFlow fält
-      oneflow_contract_id: customerData.oneflow_contract_id || null,
-      contract_template_id: customerData.contract_template_id || null,
-      contract_type: customerData.contract_type || contractType?.name || null,
-      contract_status: customerData.contract_status || 'signed',
-      
-      // Avtalsfält
-      contract_start_date: customerData.contract_start_date || null,
-      contract_end_date: customerData.contract_end_date || null,
-      contract_length: customerData.contract_length || null,
-      annual_value: customerData.annual_value ? parseFloat(customerData.annual_value) : null,
-      monthly_value: customerData.monthly_value ? parseFloat(customerData.monthly_value) : null,
-      total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
-      agreement_text: customerData.agreement_text || null,
-      
-      // Account management
-      assigned_account_manager: customerData.assigned_account_manager || null,
-      account_manager_email: customerData.account_manager_email || null,
-      sales_person: customerData.sales_person || null,
-      sales_person_email: customerData.sales_person_email || null,
-      
-      // Affärstyp
-      business_type: customerData.business_type || null,
-      industry_category: customerData.industry_category || null,
-      customer_size: customerData.customer_size || null,
-      service_frequency: customerData.service_frequency || null,
-      source_type: customerData.source_type || 'manual',
-      
-      is_active: true
-    }
+    // 3. Hantera befintlig kund om skip_customer_creation är satt
+    let customer = null
     
-    // Lägg till ClickUp data om det finns
-    if (clickupList) {
-      dbCustomerData.clickup_list_id = clickupList.id
-      dbCustomerData.clickup_list_name = clickupList.name
-    }
+    if (customerData.skip_customer_creation && customerData.customer_id) {
+      console.log('Skip customer creation flag detected, fetching existing customer:', customerData.customer_id)
+      
+      // Hämta befintlig kund
+      const { data: existingCustomer, error: fetchError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customerData.customer_id)
+        .single()
+      
+      if (fetchError || !existingCustomer) {
+        return res.status(404).json({ error: 'Kunden hittades inte' })
+      }
+      
+      customer = existingCustomer
+      console.log('Using existing customer:', customer.id, customer.company_name)
+      
+      // Gå direkt till att skapa portal-användare
+    } else {
+      // Normal flöde - skapa ny kund
+      
+      // 3a. Hämta avtalstyp från databas (om det finns)
+      let contractType = null
+      if (customerData.contract_type_id) {
+        console.log('Fetching contract type:', customerData.contract_type_id)
+        const { data: ct, error: contractError } = await supabase
+          .from('contract_types')
+          .select('*')
+          .eq('id', customerData.contract_type_id)
+          .eq('is_active', true)
+          .single()
 
-    // 8. Skapa kund i databas
-    console.log('Creating customer in database...')
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .insert(dbCustomerData)
-      .select()
-      .single()
-
-    if (customerError) {
-      console.error('Customer creation error:', customerError)
-      // Försök ta bort ClickUp-listan vid fel (om den skapades)
-      if (clickupList) {
-        try {
-          await fetch(`https://api.clickup.com/api/v2/list/${clickupList.id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': CLICKUP_API_TOKEN }
-          })
-        } catch (cleanupError) {
-          console.error('Failed to cleanup ClickUp list:', cleanupError)
+        if (!contractError && ct) {
+          contractType = ct
+          console.log('Contract type found:', contractType.name)
         }
       }
-      return res.status(500).json({ error: `Kunde inte skapa kund: ${customerError.message}` })
+
+      // 3b. Kolla om kund redan finns - FIXAD med säker email access
+      const { data: existingCustomers } = await supabase
+        .from('customers')
+        .select('company_name, organization_number, contact_email')
+        .or(`company_name.eq.${customerData.company_name},organization_number.eq.${customerData.organization_number || ''},contact_email.eq.${customerData.contact_email}`)
+
+      if (existingCustomers && existingCustomers.length > 0) {
+        const existingCustomer = existingCustomers[0]
+        if (existingCustomer.company_name === customerData.company_name) {
+          return res.status(400).json({ error: `Företaget "${customerData.company_name}" finns redan` })
+        }
+        if (customerData.organization_number && existingCustomer.organization_number === customerData.organization_number) {
+          return res.status(400).json({ error: `Organisationsnummer "${customerData.organization_number}" finns redan` })
+        }
+        if (existingCustomer.contact_email === customerData.contact_email) {
+          return res.status(400).json({ error: `E-postadressen "${customerData.contact_email}" används redan` })
+        }
+      }
+
+      // 5. Skapa ClickUp lista (om contractType finns)
+      let clickupList = null
+      if (contractType) {
+        const uniqueListName = `${customerData.company_name} - ${contractType.name}`
+        console.log('Creating ClickUp list with name:', uniqueListName)
+
+        // 6. Skapa ClickUp lista
+        const clickupResponse = await fetch(
+          `https://api.clickup.com/api/v2/folder/${contractType.clickup_folder_id}/list`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': CLICKUP_API_TOKEN,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: uniqueListName,
+            content: `Kundlista för ${customerData.company_name} (${contractType.name})`,
+            due_date: null,
+            due_date_time: false,
+            priority: 3
+          })
+        }
+      )
+
+      if (!clickupResponse.ok) {
+        const errorData = await clickupResponse.text()
+        console.error('ClickUp API error:', errorData)
+        
+        if (errorData.includes('SUBCAT_016') || errorData.includes('List name taken')) {
+          return res.status(400).json({ error: `En ClickUp-lista med namnet "${uniqueListName}" finns redan.` })
+        }
+        
+        return res.status(500).json({ error: `ClickUp API fel: ${errorData}` })
+      }
+
+        clickupList = await clickupResponse.json()
+        console.log('ClickUp list created:', { id: clickupList.id, name: clickupList.name })
+      }
+
+      // 7. Förbered kunddata för databas
+      const dbCustomerData: any = {
+        company_name: customerData.company_name.trim(),
+        organization_number: customerData.organization_number?.trim() || null,
+        contact_person: customerData.contact_person.trim(),
+        contact_email: customerData.contact_email.trim().toLowerCase(),
+        contact_phone: customerData.contact_phone?.trim() || null,
+        contact_address: customerData.contact_address?.trim() || null,
+        
+        // OneFlow fält
+        oneflow_contract_id: customerData.oneflow_contract_id || null,
+        contract_template_id: customerData.contract_template_id || null,
+        contract_type: customerData.contract_type || contractType?.name || null,
+        contract_status: customerData.contract_status || 'signed',
+        
+        // Avtalsfält
+        contract_start_date: customerData.contract_start_date || null,
+        contract_end_date: customerData.contract_end_date || null,
+        contract_length: customerData.contract_length || null,
+        annual_value: customerData.annual_value ? parseFloat(customerData.annual_value) : null,
+        monthly_value: customerData.monthly_value ? parseFloat(customerData.monthly_value) : null,
+        total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
+        agreement_text: customerData.agreement_text || null,
+        
+        // Account management
+        assigned_account_manager: customerData.assigned_account_manager || null,
+        account_manager_email: customerData.account_manager_email || null,
+        sales_person: customerData.sales_person || null,
+        sales_person_email: customerData.sales_person_email || null,
+        
+        // Affärstyp
+        business_type: customerData.business_type || null,
+        industry_category: customerData.industry_category || null,
+        customer_size: customerData.customer_size || null,
+        service_frequency: customerData.service_frequency || null,
+        source_type: customerData.source_type || 'manual',
+        
+        is_active: true
+      }
+      
+      // Lägg till ClickUp data om det finns
+      if (clickupList) {
+        dbCustomerData.clickup_list_id = clickupList.id
+        dbCustomerData.clickup_list_name = clickupList.name
+      }
+
+      // 8. Skapa kund i databas
+      console.log('Creating customer in database...')
+      const { data: newCustomer, error: customerError } = await supabase
+        .from('customers')
+        .insert(dbCustomerData)
+        .select()
+        .single()
+
+      if (customerError) {
+        console.error('Customer creation error:', customerError)
+        // Försök ta bort ClickUp-listan vid fel (om den skapades)
+        if (clickupList) {
+          try {
+            await fetch(`https://api.clickup.com/api/v2/list/${clickupList.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': CLICKUP_API_TOKEN }
+            })
+          } catch (cleanupError) {
+            console.error('Failed to cleanup ClickUp list:', cleanupError)
+          }
+        }
+        return res.status(500).json({ error: `Kunde inte skapa kund: ${customerError.message}` })
+      }
+
+      customer = newCustomer
+      console.log('Customer created successfully:', customer.id)
     }
 
-    console.log('Customer created successfully:', customer.id)
-
-    // 9. Hantera autentisering och profil - FIXAD med säker email access
+    // 9. Hantera autentisering och profil
     console.log('Checking for existing auth user with email:', customerData.contact_email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
     const existingAuthUser = users.find(u => u.email === customerData.contact_email)
@@ -209,44 +235,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Found existing auth user:', existingAuthUser.id)
       userId = existingAuthUser.id
       
-      // Kolla om användaren redan har en profil kopplad till en annan kund
+      // Kolla om användaren redan har en profil
       const { data: existingProfile } = await supabase
         .from('profiles')
-        .select('*, customers(*)')
+        .select('*')
         .eq('user_id', userId)
         .single()
 
-      if (existingProfile && existingProfile.customer_id && existingProfile.customer_id !== customer.id) {
-        console.log('User already has profile with different customer:', existingProfile)
-        // Denna användare är redan kopplad till en annan kund
-        // Vi behöver skapa en ny auth-användare för denna kund
-        console.log('Creating new auth user for existing email (different customer)...')
-        isNewUser = true
-        tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
-        
-        // Skapa ny användare med modifierad e-post (tillfällig lösning)
-        const modifiedEmail = `${customerData.contact_email.split('@')[0]}+${customer.id}@${customerData.contact_email.split('@')[1]}`
-        
-        const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
-          email: modifiedEmail,
-          password: tempPassword,
-          email_confirm: true,
-          user_metadata: {
-            actual_email: customerData.contact_email, // Spara riktiga e-posten
-            company_name: customerData.company_name,
-            contact_person: customerData.contact_person,
-            customer_id: customer.id
-          }
-        })
-
-        if (authError) {
-          console.error('Auth creation error:', authError)
-          await supabase.from('customers').delete().eq('id', customer.id)
-          return res.status(500).json({ error: `Kunde inte skapa användarkonto: ${authError.message}` })
+      if (existingProfile) {
+        // Om profilen redan är kopplad till samma kund, är vi klara
+        if (existingProfile.customer_id === customer.id) {
+          console.log('User already has profile for this customer, skipping...')
+          return res.status(200).json({ 
+            success: true, 
+            message: 'Användaren har redan portal-access',
+            customer,
+            userId
+          })
         }
         
-        userId = newAuthUser.user.id
-        console.log('Created new auth user with modified email:', userId)
+        // Om profilen är kopplad till en annan kund, returnera fel
+        if (existingProfile.customer_id && existingProfile.customer_id !== customer.id) {
+          console.log('User already has profile with different customer:', existingProfile.customer_id)
+          return res.status(400).json({ 
+            error: 'Denna e-postadress är redan kopplad till en annan kund' 
+          })
+        }
+        
+        // Om profilen inte har någon customer_id, uppdatera den
+        console.log('Updating existing profile with customer_id...')
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            customer_id: customer.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+        
+        if (updateError) {
+          console.error('Profile update error:', updateError)
+          return res.status(500).json({ error: `Kunde inte uppdatera profil: ${updateError.message}` })
+        }
+        
+        // Skicka inbjudan om det är en befintlig användare som nu kopplas till kund
+        isNewUser = false
       }
     } else {
       // Skapa helt ny användare
@@ -291,6 +323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .update({
           customer_id: customer.id,
           email: customerData.contact_email, // Använd den riktiga e-posten
+          role: 'customer', // Sätt rätt roll
           is_active: true,
           updated_at: new Date().toISOString()
         })
@@ -313,7 +346,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_id: userId,
           email: customerData.contact_email, // Använd den riktiga e-posten
           customer_id: customer.id,
-          is_admin: false,
+          role: 'customer', // Sätt rätt roll för kundportal
           is_active: true
         })
 
