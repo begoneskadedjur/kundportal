@@ -55,6 +55,10 @@ export type Database = {
           product_summary: string | null
           service_details: string | null
           
+          // Billing Information
+          billing_email: string | null
+          billing_address: string | null
+          
           // Account Management
           assigned_account_manager: string | null
           account_manager_email: string | null
@@ -373,6 +377,9 @@ export type Database = {
           total_value: number | null
           
           selected_products: any | null // JSONB
+          
+          billing_email: string | null
+          billing_address: string | null
           
           customer_id: string | null
           

@@ -352,6 +352,34 @@ export default function EditCustomerModal({
                 placeholder="Gatuadress, Postnummer Ort"
               />
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Faktura E-post
+              </label>
+              <Input
+                type="email"
+                value={formData.billing_email || ''}
+                onChange={(e) => handleInputChange('billing_email', e.target.value)}
+                placeholder="faktura@example.com"
+              />
+              {formData.billing_email && formData.billing_email !== formData.contact_email && (
+                <p className="text-xs text-yellow-400 mt-1">
+                  Skiljer sig från kontakt-email
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Faktura Adress
+              </label>
+              <Input
+                value={formData.billing_address || ''}
+                onChange={(e) => handleInputChange('billing_address', e.target.value)}
+                placeholder="Fakturaadress om annan än kontaktadress"
+              />
+            </div>
           </div>
         </Card>
 

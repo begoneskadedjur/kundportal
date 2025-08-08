@@ -80,6 +80,15 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
                   {customer.contact_email}
                 </a>
               </div>
+              {customer.billing_email && customer.billing_email !== customer.contact_email && (
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-yellow-400" />
+                  <span className="text-slate-400">Faktura:</span>
+                  <a href={`mailto:${customer.billing_email}`} className="text-yellow-400 hover:text-yellow-300">
+                    {customer.billing_email}
+                  </a>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-slate-500" />
                 <span className="text-slate-400">Telefon:</span>
@@ -559,11 +568,11 @@ export default function Customers() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.location.href = `mailto:${customer.contact_email}`}
+                                onClick={() => window.location.href = `mailto:${customer.billing_email || customer.contact_email}`}
                                 className="text-slate-400 hover:text-white"
-                                title="Skicka e-post"
+                                title={customer.billing_email ? "Skicka faktura-mail" : "Skicka e-post"}
                               >
-                                <Mail className="w-4 h-4" />
+                                <Mail className={`w-4 h-4 ${customer.billing_email ? 'text-yellow-400' : ''}`} />
                               </Button>
 
                               {customer.contact_phone && (

@@ -111,6 +111,8 @@ interface ContractInsertData {
   agreement_text?: string
   total_value?: number
   selected_products?: any
+  billing_email?: string
+  billing_address?: string
   customer_id?: string
 }
 
@@ -403,6 +405,37 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   Object.entries(dataFields).forEach(([key, value]) => {
     console.log(`  - ${key}: ${value || '(tomt)'}`)
   })
+  
+  // Specifikt leta efter faktura-email med key eller extern nyckel
+  const billingEmailKey = '101d137e-236c-43c9-bf11-d14749ac8f4b'
+  const billingEmailExternKey = 'faktura-adress-pdf'
+  
+  // Hitta faktura-email från data fields
+  let billingEmail: string | null = null
+  let billingAddress: string | null = null
+  
+  // Först kolla med den exakta key
+  if (dataFields[billingEmailKey]) {
+    billingEmail = dataFields[billingEmailKey]
+    console.log(`✅ Hittade faktura-email med key: ${billingEmail}`)
+  }
+  // Sedan kolla med extern nyckel
+  else if (dataFields[billingEmailExternKey]) {
+    billingEmail = dataFields[billingEmailExternKey]
+    console.log(`✅ Hittade faktura-email med extern nyckel: ${billingEmail}`)
+  }
+  // Kolla också om det finns ett separat faktura-adress fält
+  else if (dataFields['faktura-email'] || dataFields['billing-email']) {
+    billingEmail = dataFields['faktura-email'] || dataFields['billing-email']
+    console.log(`✅ Hittade faktura-email med alternativt namn: ${billingEmail}`)
+  }
+  
+  // Leta efter faktura-adress
+  if (dataFields['faktura-adress'] || dataFields['billing-address']) {
+    billingAddress = dataFields['faktura-adress'] || dataFields['billing-address']
+    console.log(`✅ Hittade faktura-adress: ${billingAddress}`)
+  }
+  
   console.log('📋 Parties från OneFlow:')
   details.parties?.forEach((party, index) => {
     console.log(`  Party ${index}: ${party.name} (${party.country})`)
@@ -488,6 +521,10 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     agreement_text: agreementParts.join('\n\n'),
     total_value: totalValue > 0 ? totalValue : null,
     selected_products: details.product_groups || null,
+    
+    // Fakturering
+    billing_email: billingEmail || null,
+    billing_address: billingAddress || null,
     
     // Kundkoppling sätts senare vid signering
     customer_id: null
@@ -896,6 +933,10 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       contact_email: contract.contact_email!,
       contact_phone: contract.contact_phone,
       contact_address: contract.contact_address,
+      
+      // Billing Information - kopierat från contract
+      billing_email: contract.billing_email || contract.contact_email, // Fallback till contact_email om billing_email saknas
+      billing_address: contract.billing_address || contract.contact_address, // Fallback till contact_address
       
       // OneFlow Contract Linking
       oneflow_contract_id: contractId,
