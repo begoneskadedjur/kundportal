@@ -770,7 +770,7 @@ export default function ContractsOverview() {
           <div className="space-y-3">
             {stats?.top_employees && stats.top_employees.length > 0 ? (
               stats.top_employees.map((employee, index) => (
-                <EmployeePerformanceCard
+                <CompactEmployeeCard
                   key={employee.email}
                   employee={employee}
                   rank={index + 1}
