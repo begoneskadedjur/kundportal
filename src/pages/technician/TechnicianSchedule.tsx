@@ -77,10 +77,10 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
   const ls = status?.toLowerCase() || '';
   
   // Premium lila färgschema för avtalsärenden
-  if (ls.includes('avtalsärende') || caseType === 'contract') {
+  if (caseType === 'contract') {
     if (ls.includes('avslutat')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' };
     if (ls.includes('pågående')) return { bg: 'bg-purple-800/50', text: 'text-purple-200', border: 'border-purple-600/50' };
-    if (ls.includes('bokad')) return { bg: 'bg-purple-700/50', text: 'text-purple-100', border: 'border-purple-500/50' };
+    if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-purple-700/50', text: 'text-purple-100', border: 'border-purple-500/50' };
     return { bg: 'bg-purple-800/50', text: 'text-purple-200', border: 'border-purple-600/50' };
   }
   
@@ -93,7 +93,7 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
   return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' }; 
 };
 const formatTimeSpan = (start: string, end?: string): string => { if (!start) return ''; const s = new Date(start); const e = end ? new Date(end) : null; const opt: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' }; const fs = s.toLocaleTimeString('sv-SE', opt); if (!e || e.getTime() === s.getTime()) return fs; return `${fs} - ${e.toLocaleTimeString('sv-SE', opt)}`; };
-const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat', 'Avtalsärende - Öppen', 'Avtalsärende - Bokad', 'Avtalsärende - Pågående', 'Avtalsärende - Avslutat'];
+const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat', 'Pågående'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOpen: (c: ScheduleCaseType) => void }) => {
@@ -164,7 +164,7 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.all([ 
         supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`), 
         supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*, customer:customers(*)').eq('assigned_technician_id', technicianId).in('status', ['scheduled', 'in_progress', 'completed'])
+        supabase.from('cases').select('*, customer:customers(*)').eq('primary_technician_id', technicianId).in('status', ['scheduled', 'in_progress', 'completed'])
       ]); 
 
       if (privateResult.error) throw privateResult.error;
@@ -191,27 +191,27 @@ export default function TechnicianSchedule() {
         return {
           ...c,
           // Mappa fields korrekt från cases-tabellen
-          start_date: c.scheduled_start || c.scheduled_date,
-          due_date: c.scheduled_end || c.scheduled_date,
-          primary_assignee_id: c.assigned_technician_id,
-          primary_assignee_name: c.assigned_technician_name,
-          primary_assignee_email: c.assigned_technician_email,
+          start_date: c.scheduled_start,
+          due_date: c.scheduled_end,
+          primary_assignee_id: c.primary_technician_id,
+          primary_assignee_name: c.primary_technician_name,
+          primary_assignee_email: c.primary_technician_email,
           secondary_assignee_id: null,
           secondary_assignee_name: null,
           tertiary_assignee_id: null,
           tertiary_assignee_name: null,
           // Kontaktuppgifter
-          adress: customer.contact_address || c.address_formatted,
+          adress: customer.contact_address || c.address?.formatted_address || c.address,
           kontaktperson: customer.contact_person || c.contact_person,
           telefon_kontaktperson: customer.contact_phone || c.contact_phone,
           email: customer.contact_email || c.contact_email,
           // Skadedjur och beskrivning
           skadedjur: c.pest_type,
           annat_skadedjur: c.other_pest_type,
-          // Status med avtalsprefiks
-          status: c.status === 'scheduled' ? 'Avtalsärende - Bokad' : 
-                  c.status === 'in_progress' ? 'Avtalsärende - Pågående' : 
-                  c.status === 'completed' ? 'Avtalsärende - Avslutat' : 'Avtalsärende - Öppen',
+          // Status mappning
+          status: c.status === 'scheduled' ? 'Bokad' : 
+                  c.status === 'in_progress' ? 'Pågående' : 
+                  c.status === 'completed' ? 'Avslutat' : 'Öppen',
           // Övriga fält
           case_price: c.price,
           case_type: 'contract' as const,
