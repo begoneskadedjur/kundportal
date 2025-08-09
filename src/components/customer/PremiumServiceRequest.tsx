@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
+import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 
 interface PremiumServiceRequestProps {
   isOpen: boolean
@@ -119,17 +120,9 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
     other: <HelpCircle className="w-5 h-5" />
   }
 
-  const commonPestTypes = [
-    'Gnagare (råttor/möss)',
-    'Kackerlackor',
-    'Myror',
-    'Vägglöss',
-    'Flugor',
-    'Getingar',
-    'Silverfisk',
-    'Mal',
-    'Annat'
-  ]
+  // Använd standardiserad lista från clickupFieldMapper
+  // Detta säkerställer kompatibilitet med CreateCaseModal
+  const pestTypes = [...PEST_TYPES, 'Annat']
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -281,7 +274,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">Välj eller osäker</option>
-                {commonPestTypes.map(pest => (
+                {pestTypes.map(pest => (
                   <option key={pest} value={pest}>{pest}</option>
                 ))}
               </select>

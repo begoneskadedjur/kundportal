@@ -58,7 +58,10 @@ export default function CoordinatorSchedule() {
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false);
 
   // Adapter för att konvertera Case till BeGoneCaseRow-liknande format
-  const adaptCaseToBeGoneRow = (contractCase: Case): BeGoneCaseRow => {
+  const adaptCaseToBeGoneRow = (contractCase: Case & { customer?: any }): BeGoneCaseRow => {
+    // Hämta customer data om den finns
+    const customer = contractCase.customer || (contractCase as any).customer_data;
+    
     return {
       id: contractCase.id,
       case_id: contractCase.case_number,
@@ -80,7 +83,16 @@ export default function CoordinatorSchedule() {
       description: contractCase.description,
       price: contractCase.price,
       created_at: contractCase.created_at,
-      updated_at: contractCase.updated_at
+      updated_at: contractCase.updated_at,
+      // Lägg till saknade fält
+      pest_type: contractCase.pest_type,
+      other_pest_type: contractCase.other_pest_type,
+      organization_number: customer?.organization_number || null,
+      customer_id: contractCase.customer_id,
+      // Beställare/kund info från customer
+      bestallare: customer?.company_name || null,
+      faktura_email: customer?.billing_email || customer?.contact_email || null,
+      faktura_adress: customer?.billing_address || customer?.contact_address || null
     } as BeGoneCaseRow;
   };
 
@@ -93,7 +105,7 @@ export default function CoordinatorSchedule() {
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
         supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('cases').select('*').in('status', ['scheduled', 'in_progress', 'completed']).order('created_at', { ascending: false }),
+        supabase.from('cases').select('*, customer:customers(*)').in('status', ['scheduled', 'in_progress', 'completed']).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*')
       ]);
 
@@ -174,8 +186,8 @@ export default function CoordinatorSchedule() {
   };
 
   // Hantera schemaläggning av avtalskundärende från sidebar
-  const handleSchedulePendingCase = (caseData: Case) => {
-    // Konvertera till BeGoneCaseRow-format för modal
+  const handleSchedulePendingCase = (caseData: Case & { customer?: any }) => {
+    // Konvertera till BeGoneCaseRow-format för modal med customer data
     const adaptedCase = adaptCaseToBeGoneRow(caseData);
     setSelectedCase(adaptedCase);
     setIsCreateModalOpen(true);

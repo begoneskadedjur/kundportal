@@ -44,7 +44,18 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
   }
 
   const handleSchedule = (caseItem: Case) => {
-    onScheduleClick(caseItem)
+    // Ensure we pass the complete case with customer data
+    const caseWithCustomer = {
+      ...caseItem,
+      customer: (caseItem as any).customer || {
+        company_name: (caseItem as any).customer_name,
+        contact_person: (caseItem as any).customer_contact,
+        contact_email: (caseItem as any).customer_email,
+        contact_phone: (caseItem as any).customer_phone,
+        organization_number: (caseItem as any).customer_org_number
+      }
+    }
+    onScheduleClick(caseWithCustomer)
     onClose()
   }
 
