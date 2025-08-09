@@ -114,22 +114,33 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                    initialCaseData.case_type === 'business' ? 'business' : 'contract';
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
-      // Mappa pest_type till skadedjur för contract cases
-      const mappedData = {
-        ...initialCaseData,
-        status: 'Bokat',
-        adress: formattedAddress,
-        skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur
-      };
-      setFormData(mappedData);
+      
+      // För contract cases, låt customer useEffect hantera kunddata
+      if (type === 'contract' && initialCaseData.customer_id) {
+        // Sätt bara ärende-specifik data, inte kunddata
+        setFormData({
+          title: initialCaseData.title,
+          status: 'Bokat',
+          adress: formattedAddress,
+          skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur,
+          priority: initialCaseData.priority,
+          description: initialCaseData.description
+        });
+        setSelectedContractCustomer(initialCaseData.customer_id);
+      } else {
+        // För private/business cases, använd all data
+        const mappedData = {
+          ...initialCaseData,
+          status: 'Bokat',
+          adress: formattedAddress,
+          skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur
+        };
+        setFormData(mappedData);
+      }
+      
       setStep('form');
       const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
-      
-      // Om det är ett contract case, sätt selectedContractCustomer
-      if (type === 'contract' && initialCaseData.customer_id) {
-        setSelectedContractCustomer(initialCaseData.customer_id);
-      }
     } else if (isOpen) {
       handleReset();
       if (technicians.length > 0) {
@@ -138,6 +149,29 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     }
   }, [isOpen, initialCaseData, handleReset]);
+
+  // Separat useEffect för att fylla i kunddata när selectedContractCustomer ändras
+  useEffect(() => {
+    if (selectedContractCustomer && contractCustomers.length > 0) {
+      const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
+      if (customer) {
+        setFormData(prev => ({
+          ...prev,
+          kontaktperson: customer.contact_person,
+          telefon_kontaktperson: customer.contact_phone,
+          e_post_kontaktperson: customer.contact_email,
+          org_nr: customer.organization_number,
+          bestallare: customer.company_name,
+          adress: customer.contact_address ? {
+            formatted_address: customer.contact_address
+          } : prev.adress,
+          // Lägg även till faktura-fält om de finns
+          e_post_faktura: customer.billing_email || customer.contact_email,
+          faktura_adress: customer.billing_address || customer.contact_address
+        }));
+      }
+    }
+  }, [selectedContractCustomer, contractCustomers]);
 
   const selectCaseType = (type: 'private' | 'business' | 'contract') => {
     setCaseType(type); 
@@ -406,19 +440,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     value={selectedContractCustomer || ''}
                     onChange={(e) => {
                       setSelectedContractCustomer(e.target.value);
-                      const customer = contractCustomers.find(c => c.id === e.target.value);
-                      if (customer) {
-                        setFormData(prev => ({
-                          ...prev,
-                          kontaktperson: customer.contact_person,
-                          telefon: customer.contact_phone,
-                          email: customer.contact_email,
-                          organization_number: customer.organization_number,
-                          adress: customer.contact_address ? {
-                            formatted_address: customer.contact_address
-                          } : prev.adress
-                        }));
-                      }
+                      // Data fylls nu i via useEffect när selectedContractCustomer ändras
                     }}
                     className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
                     required
