@@ -90,7 +90,7 @@ export const calculateServiceMetrics = (cases: CaseData[]) => {
   }
 }
 
-// Export to PDF functionality
+// Export to PDF functionality with professional BeGone branding
 export const exportStatisticsToPDF = (
   customer: Customer,
   cases: CaseData[],
@@ -99,101 +99,277 @@ export const exportStatisticsToPDF = (
 ) => {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
-  const margin = 20
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 25
+  const contentWidth = pageWidth - (margin * 2)
 
-  // Header
-  doc.setFontSize(20)
-  doc.setTextColor(31, 41, 55) // slate-800
-  doc.text('BeGone - Statistikrapport', margin, 30)
+  // BeGone brand colors
+  const brandPurple = [139, 92, 246] // #8b5cf6
+  const darkBlue = [10, 19, 40] // #0a1328
+  const lightGray = [226, 232, 240] // #e2e8f0
+  const mediumGray = [100, 116, 139] // #64748b
+  const accentTeal = [32, 197, 143] // #20c58f
 
-  doc.setFontSize(14)
-  doc.setTextColor(71, 85, 105) // slate-600
-  doc.text(`Kund: ${customer.company_name}`, margin, 45)
-  doc.text(`Period: ${getPeriodLabel(period)}`, margin, 55)
-  doc.text(`Genererad: ${new Date().toLocaleDateString('sv-SE')}`, margin, 65)
+  // Helper function to draw a rounded rectangle
+  const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[]) => {
+    if (fillColor) {
+      doc.setFillColor(...fillColor)
+    }
+    doc.roundedRect(x, y, width, height, radius, radius, 'F')
+  }
 
-  // Key Statistics
-  let yPosition = 85
-  doc.setFontSize(16)
-  doc.setTextColor(31, 41, 55)
-  doc.text('Nyckelstatistik', margin, yPosition)
+  // Helper function to add header to each page
+  const addPageHeader = () => {
+    // Header background gradient effect
+    doc.setFillColor(...brandPurple)
+    doc.rect(0, 0, pageWidth, 45, 'F')
+    
+    // BeGone logo area (simulated)
+    doc.setFillColor(255, 255, 255)
+    doc.circle(margin + 15, 22, 12, 'F')
+    doc.setTextColor(...darkBlue)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('BG', margin + 10, 27)
 
-  yPosition += 15
-  doc.setFontSize(12)
-  doc.setTextColor(71, 85, 105)
+    // Main title
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.text('BeGone', margin + 35, 22)
+    
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Statistikrapport', margin + 35, 32)
+
+    // Date stamp
+    doc.setFontSize(10)
+    doc.setTextColor(255, 255, 255)
+    const dateText = `Genererad: ${new Date().toLocaleDateString('sv-SE')}`
+    const dateWidth = doc.getTextWidth(dateText)
+    doc.text(dateText, pageWidth - margin - dateWidth, 25)
+  }
+
+  // Helper function to add footer
+  const addPageFooter = (pageNumber: number, totalPages: number) => {
+    const footerY = pageHeight - 15
+    
+    // Footer line
+    doc.setDrawColor(...brandPurple)
+    doc.setLineWidth(1)
+    doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5)
+    
+    // Footer text
+    doc.setTextColor(...mediumGray)
+    doc.setFontSize(8)
+    doc.text('BeGone Kundportal - Professionell skadedjurshantering', margin, footerY)
+    
+    // Page number
+    const pageText = `Sida ${pageNumber} av ${totalPages}`
+    const pageTextWidth = doc.getTextWidth(pageText)
+    doc.text(pageText, pageWidth - margin - pageTextWidth, footerY)
+  }
+
+  // Calculate total pages needed
+  const casesPerPage = 15
+  const totalPages = Math.ceil(cases.length / casesPerPage) + 1
+
+  // PAGE 1: Summary and Key Metrics
+  addPageHeader()
   
-  const keyStats = [
-    `Totalt antal ärenden: ${statistics.totalCases}`,
-    `Avslutade ärenden: ${statistics.completedCases}`,
-    `Avslutningsgrad: ${statistics.completionRate}%`,
-    `Aktiva ärenden: ${statistics.activeCases}`,
+  let yPosition = 65
+  
+  // Customer info card
+  drawRoundedRect(margin, yPosition, contentWidth, 35, 5, [248, 250, 252]) // bg-slate-50 equivalent
+  
+  doc.setTextColor(...darkBlue)
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.text(customer.company_name, margin + 15, yPosition + 15)
+  
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...mediumGray)
+  doc.text(`Rapportperiod: ${getPeriodLabel(period)}`, margin + 15, yPosition + 27)
+  
+  yPosition += 55
+  
+  // Executive Summary
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...darkBlue)
+  doc.text('Sammanfattning', margin, yPosition)
+  
+  yPosition += 20
+  
+  // Key metrics in attractive cards
+  const metricsData = [
+    { label: 'Totalt antal ärenden', value: statistics.totalCases.toString(), color: brandPurple },
+    { label: 'Avslutade ärenden', value: statistics.completedCases.toString(), color: accentTeal },
+    { label: 'Avslutningsgrad', value: `${statistics.completionRate}%`, color: brandPurple },
+    { label: 'Aktiva ärenden', value: statistics.activeCases.toString(), color: [245, 158, 11] } // amber-500
+  ]
+  
+  const cardWidth = (contentWidth - 30) / 2
+  const cardHeight = 45
+  
+  metricsData.forEach((metric, index) => {
+    const col = index % 2
+    const row = Math.floor(index / 2)
+    const cardX = margin + (col * (cardWidth + 15))
+    const cardY = yPosition + (row * (cardHeight + 15))
+    
+    // Card background
+    drawRoundedRect(cardX, cardY, cardWidth, cardHeight, 8, [255, 255, 255])
+    
+    // Card border
+    doc.setDrawColor(...metric.color)
+    doc.setLineWidth(2)
+    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 8, 8, 'S')
+    
+    // Accent stripe
+    doc.setFillColor(...metric.color)
+    doc.roundedRect(cardX, cardY, 4, cardHeight, 8, 8, 'F')
+    
+    // Metric value
+    doc.setTextColor(...darkBlue)
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text(metric.value, cardX + 15, cardY + 20)
+    
+    // Metric label
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...mediumGray)
+    doc.text(metric.label, cardX + 15, cardY + 32)
+  })
+  
+  yPosition += 120
+  
+  // Additional insights
+  const insights = [
     `Genomsnittlig responstid: ${statistics.avgResponseTime} dagar`,
     `Vanligaste skadedjur: ${statistics.topPestType}`,
-    `Total kostnad: ${statistics.totalCost.toLocaleString('sv-SE')} kr`
+    `Total kontraktsvärde: ${statistics.totalCost.toLocaleString('sv-SE')} kr`,
+    `Serviceeffektivitet: ${Math.round((statistics.completedCases / statistics.totalCases) * 100)}%`
   ]
-
-  keyStats.forEach((stat) => {
-    doc.text(stat, margin, yPosition)
-    yPosition += 10
-  })
-
-  // Case Details Table
-  yPosition += 20
+  
   doc.setFontSize(16)
-  doc.setTextColor(31, 41, 55)
-  doc.text('Ärendedetaljer', margin, yPosition)
-
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...darkBlue)
+  doc.text('Viktiga insikter', margin, yPosition)
+  
   yPosition += 15
-  doc.setFontSize(10)
-  doc.setTextColor(71, 85, 105)
-
-  // Table headers
-  const headers = ['Titel', 'Status', 'Skadedjur', 'Datum']
-  const colWidths = [60, 40, 40, 40]
-  let xPosition = margin
-
-  headers.forEach((header, index) => {
-    doc.text(header, xPosition, yPosition)
-    xPosition += colWidths[index]
+  
+  insights.forEach((insight) => {
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...mediumGray)
+    
+    // Bullet point
+    doc.setFillColor(...brandPurple)
+    doc.circle(margin + 3, yPosition - 3, 2, 'F')
+    
+    doc.text(insight, margin + 12, yPosition)
+    yPosition += 12
   })
+  
+  addPageFooter(1, totalPages)
 
-  yPosition += 10
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 5
-
-  // Table rows
-  cases.slice(0, 20).forEach((caseItem) => {
-    if (yPosition > 270) {
-      doc.addPage()
-      yPosition = 30
-    }
-
-    xPosition = margin
-    const rowData = [
-      caseItem.title.substring(0, 25) + (caseItem.title.length > 25 ? '...' : ''),
-      getCustomerStatusDisplay(caseItem.status),
-      caseItem.pest_type || 'Okänt',
-      caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : 'N/A'
-    ]
-
-    rowData.forEach((data, index) => {
-      doc.text(data, xPosition, yPosition)
+  // SUBSEQUENT PAGES: Detailed Case Data
+  let currentPage = 1
+  let caseIndex = 0
+  
+  while (caseIndex < cases.length) {
+    doc.addPage()
+    currentPage++
+    addPageHeader()
+    
+    yPosition = 65
+    
+    // Page title
+    doc.setFontSize(18)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...darkBlue)
+    doc.text('Ärendedetaljer', margin, yPosition)
+    
+    yPosition += 25
+    
+    // Table header
+    const tableHeaders = ['Ärendetitel', 'Status', 'Skadedjur', 'Pris', 'Datum']
+    const colWidths = [70, 35, 30, 25, 30]
+    const headerHeight = 25
+    
+    // Header background
+    doc.setFillColor(...brandPurple)
+    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight, 5, 5, 'F')
+    
+    // Header text
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    
+    let xPosition = margin + 8
+    tableHeaders.forEach((header, index) => {
+      doc.text(header, xPosition, yPosition + 8)
       xPosition += colWidths[index]
     })
+    
+    yPosition += headerHeight + 5
+    
+    // Table rows
+    const pageCases = cases.slice(caseIndex, caseIndex + casesPerPage)
+    
+    pageCases.forEach((caseItem, rowIndex) => {
+      const isEvenRow = rowIndex % 2 === 0
+      const rowHeight = 18
+      
+      // Alternating row background
+      if (isEvenRow) {
+        doc.setFillColor(248, 250, 252) // Very light gray
+        doc.rect(margin, yPosition - 3, contentWidth, rowHeight, 'F')
+      }
+      
+      // Row data
+      doc.setTextColor(...darkBlue)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      
+      xPosition = margin + 8
+      
+      const rowData = [
+        (caseItem.title || '').substring(0, 35) + ((caseItem.title || '').length > 35 ? '...' : ''),
+        getCustomerStatusDisplay(caseItem.status),
+        caseItem.pest_type || 'Okänt',
+        caseItem.price ? `${caseItem.price.toLocaleString('sv-SE')} kr` : 'N/A',
+        caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : 'N/A'
+      ]
+      
+      rowData.forEach((data, colIndex) => {
+        // Special formatting for status
+        if (colIndex === 1) {
+          const isCompleted = isCompletedStatus(caseItem.status)
+          doc.setTextColor(...(isCompleted ? accentTeal : [245, 158, 11]))
+          doc.setFont('helvetica', 'bold')
+        } else {
+          doc.setTextColor(...darkBlue)
+          doc.setFont('helvetica', 'normal')
+        }
+        
+        doc.text(data, xPosition, yPosition + 5)
+        xPosition += colWidths[colIndex]
+      })
+      
+      yPosition += rowHeight
+    })
+    
+    caseIndex += casesPerPage
+    addPageFooter(currentPage, totalPages)
+  }
 
-    yPosition += 8
-  })
-
-  // Footer
-  doc.setFontSize(8)
-  doc.setTextColor(156, 163, 175)
-  doc.text(
-    'Denna rapport genererades automatiskt av BeGone Kundportal',
-    margin,
-    doc.internal.pageSize.getHeight() - 20
-  )
-
-  doc.save(`${customer.company_name}_statistik_${new Date().toISOString().split('T')[0]}.pdf`)
+  // Save with professional filename
+  const filename = `BeGone_Rapport_${customer.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+  doc.save(filename)
 }
 
 // Export to CSV functionality
@@ -223,14 +399,14 @@ export const exportStatisticsToCSV = (
     headers.join(','),
     ...cases.map(caseItem => [
       caseItem.id,
-      `"${caseItem.title.replace(/"/g, '""')}"`,
+      `"${String(caseItem.title || '').replace(/"/g, '""')}"`,
       getCustomerStatusDisplay(caseItem.status),
       caseItem.pest_type || 'Okänt',
       caseItem.price || 0,
       caseItem.created_at || '',
       caseItem.scheduled_start || '',
       caseItem.completed_date || '',
-      `"${(caseItem.address || '').replace(/"/g, '""')}"`
+      `"${String(caseItem.address || '').replace(/"/g, '""')}"`
     ].join(','))
   ].join('\n')
 
