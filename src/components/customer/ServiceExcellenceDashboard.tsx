@@ -27,14 +27,15 @@ interface KpiCard {
 const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({ customer }) => {
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
   const [activeCasesCount, setActiveCasesCount] = useState<number>(0)
+  const [nextVisit, setNextVisit] = useState<string | null>(null)
 
-  // Fetch active cases count
+  // Fetch active cases count and next scheduled visit
   useEffect(() => {
-    const fetchActiveCases = async () => {
+    const fetchCasesData = async () => {
       try {
         const { data, error } = await supabase
           .from('cases')
-          .select('status')
+          .select('status, next_scheduled_visit')
           .eq('customer_id', customer.id)
         
         if (error) throw error
@@ -42,13 +43,23 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         // Count cases that are not completed
         const activeCount = data?.filter(caseItem => !isCompletedStatus(caseItem.status)).length || 0
         setActiveCasesCount(activeCount)
+
+        // Find next scheduled visit (earliest upcoming date)
+        const upcomingVisits = data
+          ?.filter(caseItem => caseItem.next_scheduled_visit)
+          ?.map(caseItem => new Date(caseItem.next_scheduled_visit!))
+          ?.filter(date => date > new Date())
+          ?.sort((a, b) => a.getTime() - b.getTime())
+
+        setNextVisit(upcomingVisits?.[0]?.toISOString() || null)
       } catch (error) {
-        console.error('Error fetching active cases:', error)
+        console.error('Error fetching cases data:', error)
         setActiveCasesCount(0)
+        setNextVisit(null)
       }
     }
 
-    fetchActiveCases()
+    fetchCasesData()
   }, [customer.id])
 
   // Animate numbers on mount
@@ -79,6 +90,32 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     return () => clearInterval(interval)
   }, [customer.annual_value, activeCasesCount])
 
+  const formatNextVisitDate = (dateString: string | null) => {
+    if (!dateString) return { value: 'Ej schemalagt', subtitle: 'Kontakta för bokning' }
+    
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) {
+      return { value: 'Idag', subtitle: date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) }
+    } else if (diffDays === 1) {
+      return { value: 'Imorgon', subtitle: date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) }
+    } else if (diffDays < 7) {
+      return { 
+        value: `${diffDays} dagar`, 
+        subtitle: date.toLocaleDateString('sv-SE', { weekday: 'long', month: 'short', day: 'numeric' })
+      }
+    } else {
+      return { 
+        value: date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }), 
+        subtitle: date.toLocaleDateString('sv-SE', { weekday: 'long' })
+      }
+    }
+  }
+
+  const nextVisitDisplay = formatNextVisitDate(nextVisit)
+
   const kpiCards: KpiCard[] = [
     {
       title: 'Service Quality Score',
@@ -106,8 +143,8 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     },
     {
       title: 'Nästa besök',
-      value: 'Ej schemalagt',
-      subtitle: 'Kontakta för bokning',
+      value: nextVisitDisplay.value,
+      subtitle: nextVisitDisplay.subtitle,
       icon: <Calendar className="w-5 h-5" />,
       color: 'amber'
     }

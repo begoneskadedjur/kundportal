@@ -57,14 +57,6 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
           </div>
 
           <div className="space-y-3">
-            {/* Name */}
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-sm text-slate-400">Namn</span>
-              <span className="text-white font-medium">
-                {accountManager || 'Ej tilldelad'}
-              </span>
-            </div>
-
             {/* Email */}
             {customer.account_manager_email && (
               <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
@@ -90,6 +82,14 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
                 </div>
               </div>
             )}
+
+            {/* Name */}
+            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+              <span className="text-sm text-slate-400">Namn</span>
+              <span className="text-white font-medium">
+                {accountManager || 'Ej tilldelad'}
+              </span>
+            </div>
 
             {/* Phone - if available in future */}
             {false && ( // Placeholder for future phone number
