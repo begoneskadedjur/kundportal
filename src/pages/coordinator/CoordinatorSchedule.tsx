@@ -14,6 +14,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 
 // Modaler
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
+import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal';
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal';
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal';
@@ -51,7 +52,9 @@ export default function CoordinatorSchedule() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
+  const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
@@ -189,10 +192,20 @@ export default function CoordinatorSchedule() {
     });
   }, [scheduledCases, activeStatuses, selectedTechnicianIds, searchQuery]);
   
-  // Hantera klick på ClickUp-ärende
+  // Hantera klick på ärende - öppna rätt modal beroende på ärendetyp
   const handleOpenCaseModal = (caseData: BeGoneCaseRow) => {
-    setSelectedCase(caseData);
-    setIsEditModalOpen(true);
+    if (caseData.case_type === 'contract') {
+      // För avtalsärenden, hitta det ursprungliga Case-objektet
+      const contractCase = contractCases.find(c => c.id === caseData.id);
+      if (contractCase) {
+        setSelectedContractCase(contractCase);
+        setIsEditContractModalOpen(true);
+      }
+    } else {
+      // För ClickUp-ärenden, använd standard EditCaseModal
+      setSelectedCase(caseData);
+      setIsEditModalOpen(true);
+    }
   };
   
   // Hantera schemaläggning av ClickUp-ärende som ska bokas in
@@ -211,6 +224,7 @@ export default function CoordinatorSchedule() {
 
   const handleUpdateSuccess = () => { 
     setIsEditModalOpen(false); 
+    setIsEditContractModalOpen(false);
     fetchData(); 
   };
   
@@ -312,13 +326,24 @@ export default function CoordinatorSchedule() {
         </div>
       </div>
       
-      {/* Edit Modal för befintliga ärenden */}
+      {/* Edit Modal för ClickUp-ärenden */}
       <EditCaseModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
         onSuccess={handleUpdateSuccess} 
         caseData={selectedCase as any} 
         technicians={technicians} 
+      />
+      
+      {/* Edit Modal för avtalsärenden */}
+      <EditContractCaseModal
+        isOpen={isEditContractModalOpen}
+        onClose={() => {
+          setIsEditContractModalOpen(false);
+          setSelectedContractCase(null);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedContractCase}
       />
       
       {/* Create Modal för nya/schemaläggning */}

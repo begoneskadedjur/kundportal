@@ -18,6 +18,7 @@ import { ArrowLeft, Calendar, Phone, MapPin, ChevronLeft, ChevronRight, User, Us
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
+import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow } from '../../types/database' // NYTT: Importerar den centrala typen
@@ -152,6 +153,7 @@ export default function TechnicianSchedule() {
   const [cases, setCases] = useState<ScheduleCaseType[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()));
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduleCaseType | null>(null);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [searchQuery, setSearchQuery] = useState('');
@@ -246,7 +248,16 @@ export default function TechnicianSchedule() {
   
   const eventsByDay = useMemo(() => filteredCases.reduce((acc, event) => { if (!event.start_date) return acc; const day = event.start_date.split('T')[0]; if (!acc[day]) acc[day] = 0; acc[day]++; return acc; }, {} as Record<string, number>), [filteredCases]);
 
-  const handleOpenModal = (caseData: ScheduleCaseType) => { setSelectedCase(caseData); setIsEditModalOpen(true); };
+  const handleOpenModal = (caseData: ScheduleCaseType) => { 
+    if (caseData.case_type === 'contract') {
+      setSelectedCase(caseData);
+      setIsEditContractModalOpen(true);
+    } else {
+      setSelectedCase(caseData);
+      setIsEditModalOpen(true);
+    }
+  };
+  
   const handleUpdateSuccess = (updatedCase?: any) => { 
     // Optimistic UI update - uppdatera lokalt state omedelbart
     if (updatedCase) {
@@ -261,7 +272,8 @@ export default function TechnicianSchedule() {
       fetchScheduledCases(profile.technician_id);
     }
     
-    setIsEditModalOpen(false); 
+    setIsEditModalOpen(false);
+    setIsEditContractModalOpen(false);
   };
 
   // Pull-to-refresh funktionalitet för mobil
@@ -348,7 +360,20 @@ export default function TechnicianSchedule() {
           </main>
         </div>
       </div>
+      {/* Modal för ClickUp-ärenden */}
       <EditCaseModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onSuccess={handleUpdateSuccess} caseData={selectedCase as any} />
+      
+      {/* Modal för avtalsärenden */}
+      <EditContractCaseModal
+        isOpen={isEditContractModalOpen}
+        onClose={() => {
+          setIsEditContractModalOpen(false);
+          setSelectedCase(null);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedCase}
+      />
+      
       <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)} activeStatuses={activeStatuses} setActiveStatuses={setActiveStatuses} />
       {profile?.technician_id && (<ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} technicianId={profile.technician_id} onOpenCase={handleOpenCaseFromReport as any} />)}
     </>
