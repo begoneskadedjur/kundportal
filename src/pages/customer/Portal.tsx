@@ -134,9 +134,11 @@ const CustomerPortal: React.FC = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         {/* Service Excellence Dashboard */}
-        <ServiceExcellenceDashboard 
-          customer={customer}
-        />
+        <div className="mt-8">
+          <ServiceExcellenceDashboard 
+            customer={customer}
+          />
+        </div>
 
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">

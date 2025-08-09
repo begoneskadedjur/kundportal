@@ -67,18 +67,18 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
             {/* Email */}
             {customer.account_manager_email && (
-              <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
-                <span className="text-sm text-slate-400">E-post</span>
-                <div className="flex items-center gap-2">
+              <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
+                <span className="text-sm text-slate-400 min-w-0 flex-shrink-0 mr-3">E-post</span>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <a 
                     href={`mailto:${customer.account_manager_email}`}
-                    className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors truncate flex-1"
                   >
                     {customer.account_manager_email}
                   </a>
                   <button
                     onClick={() => copyToClipboard(customer.account_manager_email!, 'E-post')}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded flex-shrink-0"
                     title="Kopiera e-post"
                   >
                     {copiedEmail === customer.account_manager_email ? (
@@ -125,19 +125,19 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
           <div className="space-y-3">
             {/* Support Email */}
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
-              <span className="text-sm text-slate-400">E-post</span>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
+              <span className="text-sm text-slate-400 min-w-0 flex-shrink-0 mr-3">E-post</span>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <a 
                   href="mailto:info@begone.se"
-                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 flex-1 min-w-0"
                 >
-                  <Mail className="w-3 h-3" />
-                  info@begone.se
+                  <Mail className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">info@begone.se</span>
                 </a>
                 <button
                   onClick={() => copyToClipboard('info@begone.se', 'E-post')}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-700 rounded flex-shrink-0"
                   title="Kopiera e-post"
                 >
                   {copiedEmail === 'info@begone.se' ? (
@@ -166,7 +166,10 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
               <span className="text-sm text-slate-400">Öppettider</span>
               <div className="flex items-center gap-2 text-white">
                 <Clock className="w-3 h-3 text-slate-400" />
-                <span className="text-sm">08-17 mån-fre</span>
+                <div className="text-sm">
+                  <span className="font-mono">08:00 - 17:00</span>
+                  <span className="text-slate-400 ml-1">mån-fre</span>
+                </div>
               </div>
             </div>
           </div>

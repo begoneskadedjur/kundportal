@@ -2,9 +2,12 @@
 import React, { useEffect, useState } from 'react'
 import { TrendingUp, Calendar, CreditCard, CheckCircle } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
+import { supabase } from '../../lib/supabase'
+import { isCompletedStatus } from '../../types/database'
 
 interface ServiceExcellenceDashboardProps {
   customer: {
+    id: string
     annual_value: number | null
     contract_type: string | null
     contract_start_date: string | null
@@ -23,6 +26,30 @@ interface KpiCard {
 
 const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({ customer }) => {
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
+  const [activeCasesCount, setActiveCasesCount] = useState<number>(0)
+
+  // Fetch active cases count
+  useEffect(() => {
+    const fetchActiveCases = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('cases')
+          .select('status')
+          .eq('customer_id', customer.id)
+        
+        if (error) throw error
+        
+        // Count cases that are not completed
+        const activeCount = data?.filter(caseItem => !isCompletedStatus(caseItem.status)).length || 0
+        setActiveCasesCount(activeCount)
+      } catch (error) {
+        console.error('Error fetching active cases:', error)
+        setActiveCasesCount(0)
+      }
+    }
+
+    fetchActiveCases()
+  }, [customer.id])
 
   // Animate numbers on mount
   useEffect(() => {
@@ -40,7 +67,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
       setAnimatedValues({
         annual: Math.floor(annualValue * easeOutQuart),
         quality: Math.floor(92 * easeOutQuart),
-        cases: Math.floor(0 * easeOutQuart), // Placeholder
+        cases: Math.floor(activeCasesCount * easeOutQuart),
         visits: Math.floor(12 * easeOutQuart) // Placeholder
       })
 
@@ -50,7 +77,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     }, stepDuration)
 
     return () => clearInterval(interval)
-  }, [customer.annual_value])
+  }, [customer.annual_value, activeCasesCount])
 
   const kpiCards: KpiCard[] = [
     {
@@ -71,10 +98,10 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
     },
     {
       title: 'Aktiva ärenden',
-      value: animatedValues.cases || 0,
-      subtitle: 'Alla hanterade',
+      value: activeCasesCount,
+      subtitle: activeCasesCount === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
       icon: <CheckCircle className="w-5 h-5" />,
-      trend: 'stable',
+      trend: activeCasesCount > 0 ? 'stable' : undefined,
       color: 'purple'
     },
     {

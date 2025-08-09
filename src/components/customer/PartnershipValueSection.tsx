@@ -6,14 +6,13 @@ const PartnershipValueSection: React.FC = () => {
   const certifications = [
     { icon: Shield, label: 'Certifierad skadedjursbekämpning' },
     { icon: Award, label: 'ISO 9001 & 14001 certifierad' },
-    { icon: CheckCircle, label: 'Godkänd av Anticimex' }
+    { icon: CheckCircle, label: 'Auktoriserad skadedjursbekämpare' }
   ]
 
   const values = [
-    { number: '25+', label: 'År av erfarenhet' },
     { number: '5000+', label: 'Nöjda kunder' },
-    { number: '24/7', label: 'Support tillgänglig' },
-    { number: '99%', label: 'Kundnöjdhet' }
+    { number: '99%', label: 'Kundnöjdhet' },
+    { number: '100%', label: 'Miljöcertifierad' }
   ]
 
   return (
@@ -123,7 +122,10 @@ const PartnershipValueSection: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-slate-500">Öppettider</span>
-                  <p className="text-white">08-17 mån-fre</p>
+                  <p className="text-white">
+                    <span className="font-mono">08:00 - 17:00</span>
+                    <span className="text-slate-400 ml-1">mån-fre</span>
+                  </p>
                 </div>
               </div>
             </div>

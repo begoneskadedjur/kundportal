@@ -147,9 +147,18 @@ const PremiumWelcomeHero: React.FC<PremiumWelcomeHeroProps> = ({
                   </linearGradient>
                 </defs>
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div 
+                className="absolute inset-0 flex flex-col items-center justify-center group cursor-help"
+                title="Service Quality Score baserat på genomsnittlig kundnöjdhet, responstid och ärendehantering"
+              >
                 <span className="text-3xl font-bold text-white">92%</span>
-                <span className="text-xs text-slate-400">Service Quality</span>
+                <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">Service Quality</span>
+                
+                {/* Tooltip */}
+                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 whitespace-nowrap border border-slate-600">
+                  Baserat på kundnöjdhet, responstid & ärendehantering
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45 border-l border-t border-slate-600"></div>
+                </div>
               </div>
             </div>
 
