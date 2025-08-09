@@ -41,6 +41,12 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  
+  // Alternativ kontaktperson
+  const [useAlternativeContact, setUseAlternativeContact] = useState(false)
+  const [alternativeContactPerson, setAlternativeContactPerson] = useState('')
+  const [alternativeContactPhone, setAlternativeContactPhone] = useState('')
+  const [alternativeContactEmail, setAlternativeContactEmail] = useState('')
 
   if (!isOpen) return null
 
@@ -72,9 +78,13 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           service_type: serviceType,
           pest_type: pestType || null,
           other_pest_type: otherPestType || null,
-          contact_person: customer.contact_person,
-          contact_email: customer.contact_email,
-          contact_phone: customer.contact_phone,
+          contact_person: useAlternativeContact && alternativeContactPerson ? alternativeContactPerson : customer.contact_person,
+          contact_email: useAlternativeContact && alternativeContactEmail ? alternativeContactEmail : customer.contact_email,
+          contact_phone: useAlternativeContact && alternativeContactPhone ? alternativeContactPhone : customer.contact_phone,
+          // Spara även alternativ kontaktperson om den används
+          alternative_contact_person: useAlternativeContact ? alternativeContactPerson : null,
+          alternative_contact_phone: useAlternativeContact ? alternativeContactPhone : null,
+          alternative_contact_email: useAlternativeContact ? alternativeContactEmail : null,
           address: customer.contact_address ? {
             formatted_address: customer.contact_address
           } : null,
@@ -352,6 +362,50 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               </div>
             </div>
 
+            {/* Alternative Contact Person */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-3">
+                Kontaktperson för detta ärende
+              </label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useAlternativeContact}
+                    onChange={(e) => setUseAlternativeContact(e.target.checked)}
+                    className="w-5 h-5 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                  />
+                  <span className="text-sm text-slate-400">Använd alternativ kontaktperson för detta ärende</span>
+                </label>
+                
+                {useAlternativeContact && (
+                  <div className="space-y-3 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
+                    <Input
+                      type="text"
+                      value={alternativeContactPerson}
+                      onChange={(e) => setAlternativeContactPerson(e.target.value)}
+                      placeholder="Namn på alternativ kontaktperson"
+                      className="w-full"
+                    />
+                    <Input
+                      type="tel"
+                      value={alternativeContactPhone}
+                      onChange={(e) => setAlternativeContactPhone(e.target.value)}
+                      placeholder="Telefonnummer"
+                      className="w-full"
+                    />
+                    <Input
+                      type="email"
+                      value={alternativeContactEmail}
+                      onChange={(e) => setAlternativeContactEmail(e.target.value)}
+                      placeholder="E-postadress"
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Contact Method */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">
@@ -382,7 +436,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                       : 'border-slate-700 hover:border-slate-600 text-slate-400'
                     }
                   `}
-                  disabled={!customer.contact_phone}
+                  disabled={!customer.contact_phone && (!useAlternativeContact || !alternativeContactPhone)}
                 >
                   <Phone className="w-4 h-4" />
                   <span className="text-sm font-medium">Telefon</span>
