@@ -205,7 +205,15 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
           <div className="space-y-6">
             {filteredCases.map((caseItem, index) => {
               const isExpanded = expandedCase === caseItem.id
-              const config = caseStatusConfig[caseItem.status]
+              // Add fallback for undefined status values
+              const config = caseStatusConfig[caseItem.status] || {
+                label: 'Okänd status',
+                color: 'slate',
+                bgColor: 'bg-slate-700',
+                borderColor: 'border-slate-600',
+                textColor: 'text-slate-300',
+                icon: 'Clock'
+              }
               const serviceType = caseItem.service_type ? serviceTypeConfig[caseItem.service_type] : null
               
               return (

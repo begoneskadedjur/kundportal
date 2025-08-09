@@ -288,6 +288,7 @@ export default function EditContractCaseModal({
                       <option value="scheduled">Schemalagd</option>
                       <option value="in_progress">Pågående</option>
                       <option value="completed">Avslutad</option>
+                      <option value="cancelled">Avbruten</option>
                     </select>
                   </div>
                 </div>
