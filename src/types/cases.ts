@@ -1,6 +1,6 @@
 // src/types/cases.ts - Case Management Types
 
-export type CaseStatus = 'requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+// Use ClickUpStatus from database.ts instead
 export type CasePriority = 'normal' | 'urgent'
 export type ServiceType = 'routine' | 'acute' | 'inspection' | 'other'
 export type BillingStatus = 'pending' | 'sent' | 'paid' | 'skip'
@@ -12,7 +12,7 @@ export interface Case {
   case_number: string
   title: string
   description: string | null
-  status: CaseStatus
+  status: string // Uses ClickUpStatus from database.ts
   priority: CasePriority
   service_type: ServiceType | null
   created_at: string
@@ -95,120 +95,7 @@ export interface CreateCaseInput {
   files?: File[]
 }
 
-// Status configurations for UI
-export const caseStatusConfig = {
-  requested: {
-    label: 'Väntar på schemaläggning',
-    color: 'amber',
-    bgColor: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/20',
-    textColor: 'text-amber-500',
-    icon: 'Clock'
-  },
-  scheduled: {
-    label: 'Schemalagt',
-    color: 'blue',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/20',
-    textColor: 'text-blue-500',
-    icon: 'Calendar'
-  },
-  in_progress: {
-    label: 'Pågående',
-    color: 'purple',
-    bgColor: 'bg-purple-500/10',
-    borderColor: 'border-purple-500/20',
-    textColor: 'text-purple-500',
-    icon: 'Wrench'
-  },
-  completed: {
-    label: 'Slutfört',
-    color: 'green',
-    bgColor: 'bg-green-500/10',
-    borderColor: 'border-green-500/20',
-    textColor: 'text-green-500',
-    icon: 'CheckCircle'
-  },
-  cancelled: {
-    label: 'Avbrutet',
-    color: 'red',
-    bgColor: 'bg-red-500/10',
-    borderColor: 'border-red-500/20',
-    textColor: 'text-red-500',
-    icon: 'XCircle'
-  }
-}
-
-// Type guard to ensure status is valid
-export const isValidCaseStatus = (status: any): status is CaseStatus => {
-  return typeof status === 'string' && status in caseStatusConfig
-}
-
-// Safe status getter with guaranteed fallback
-export const getSafeStatusConfig = (status: any) => {
-  if (isValidCaseStatus(status)) {
-    return caseStatusConfig[status]
-  }
-  
-  // Default fallback config for any invalid status
-  return {
-    label: `Okänd status (${status})`,
-    color: 'slate',
-    bgColor: 'bg-slate-500/10',
-    borderColor: 'border-slate-500/20',
-    textColor: 'text-slate-400',
-    icon: 'AlertCircle'
-  }
-}
-
-// Status normalization function to handle various input formats
-export const normalizeStatus = (status: any): CaseStatus => {
-  if (!status) return 'requested'
-  
-  const statusStr = String(status).toLowerCase().trim()
-  
-  // Direct matches
-  if (statusStr in caseStatusConfig) {
-    return statusStr as CaseStatus
-  }
-  
-  // Common variations and mappings
-  const statusMappings: { [key: string]: CaseStatus } = {
-    // Swedish variations
-    'begärd': 'requested',
-    'väntar': 'requested',
-    'ny': 'requested',
-    'new': 'requested',
-    'schemalagd': 'scheduled',
-    'schemalagt': 'scheduled',
-    'planerad': 'scheduled',
-    'planned': 'scheduled',
-    'booking': 'scheduled',
-    'bokat': 'scheduled',
-    'pågående': 'in_progress',
-    'påbörjad': 'in_progress',
-    'working': 'in_progress',
-    'active': 'in_progress',
-    'avslutad': 'completed',
-    'slutförd': 'completed',
-    'slutfört': 'completed',
-    'klar': 'completed',
-    'done': 'completed',
-    'finished': 'completed',
-    'avbruten': 'cancelled',
-    'avbrutet': 'cancelled',
-    'annullerad': 'cancelled',
-    'canceled': 'cancelled'
-  }
-  
-  if (statusStr in statusMappings) {
-    return statusMappings[statusStr]
-  }
-  
-  // Default fallback
-  console.warn(`Unknown status "${status}", defaulting to 'requested'`)
-  return 'requested'
-}
+// Status configurations moved to database.ts - use STATUS_CONFIG from there
 
 // Service type configurations
 export const serviceTypeConfig = {

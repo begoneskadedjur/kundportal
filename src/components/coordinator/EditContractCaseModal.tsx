@@ -77,7 +77,7 @@ export default function EditContractCaseModal({
       setFormData({
         title: caseData.title || '',
         description: caseData.description || '',
-        status: normalizeStatus(caseData.status),
+        status: caseData.status || 'Öppen',
         contact_person: caseData.contact_person || caseData.kontaktperson || '',
         contact_phone: caseData.contact_phone || caseData.telefon_kontaktperson || '',
         contact_email: caseData.contact_email || caseData.email || '',
@@ -285,11 +285,11 @@ export default function EditContractCaseModal({
                       disabled={isCustomerView}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >
-                      <option value="requested">Väntar på schemaläggning</option>
-                      <option value="scheduled">Schemalagt</option>
-                      <option value="in_progress">Pågående</option>
-                      <option value="completed">Slutfört</option>
-                      <option value="cancelled">Avbrutet</option>
+                      <option value="Öppen">Öppen</option>
+                      <option value="Bokad">Bokad</option>
+                      <option value="Pågående">Pågående</option>
+                      <option value="Avslutat">Avslutat</option>
+                      <option value="Stängt - slasklogg">Stängt</option>
                     </select>
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export default function EditContractCaseModal({
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    disabled={isCustomerView && formData.status !== 'requested'}
+                    disabled={isCustomerView && formData.status !== 'Öppen'}
                     rows={3}
                     className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                   />
@@ -325,7 +325,7 @@ export default function EditContractCaseModal({
                       placeholder="Namn"
                       value={formData.contact_person}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                     
@@ -334,7 +334,7 @@ export default function EditContractCaseModal({
                       placeholder="Telefon"
                       value={formData.contact_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                     
@@ -343,7 +343,7 @@ export default function EditContractCaseModal({
                       placeholder="E-post"
                       value={formData.contact_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                   </div>
@@ -357,7 +357,7 @@ export default function EditContractCaseModal({
                       placeholder="Namn"
                       value={formData.alternative_contact_person}
                       onChange={(e) => setFormData(prev => ({ ...prev, alternative_contact_person: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                     
@@ -366,7 +366,7 @@ export default function EditContractCaseModal({
                       placeholder="Telefon"
                       value={formData.alternative_contact_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, alternative_contact_phone: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                     
@@ -375,7 +375,7 @@ export default function EditContractCaseModal({
                       placeholder="E-post"
                       value={formData.alternative_contact_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, alternative_contact_email: e.target.value }))}
-                      disabled={isCustomerView && formData.status !== 'requested'}
+                      disabled={isCustomerView && formData.status !== 'Öppen'}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                     />
                   </div>

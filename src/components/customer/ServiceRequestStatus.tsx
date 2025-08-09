@@ -1,10 +1,10 @@
 // src/components/customer/ServiceRequestStatus.tsx - Visual Status Indicator
 import React from 'react'
 import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { CaseStatus, caseStatusConfig, normalizeStatus, getSafeStatusConfig } from '../../types/cases'
+import { ClickUpStatus, STATUS_CONFIG, getStatusColor } from '../../types/database'
 
 interface ServiceRequestStatusProps {
-  status: CaseStatus
+  status: ClickUpStatus | string
   size?: 'sm' | 'md' | 'lg'
   showLabel?: boolean
   className?: string
@@ -20,9 +20,19 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
   scheduledDate,
   technicianName
 }) => {
-  // Use safe status handling
-  const normalizedStatus = normalizeStatus(status)
-  const config = getSafeStatusConfig(normalizedStatus)
+  // Get status config from database types
+  const statusName = status as ClickUpStatus
+  const statusInfo = STATUS_CONFIG[statusName]
+  const statusColor = statusInfo ? statusInfo.color : '#87909e'
+  
+  // Create config for backward compatibility
+  const config = {
+    label: statusName,
+    color: statusColor,
+    bgColor: `bg-[${statusColor}]/10`,
+    borderColor: `border-[${statusColor}]/20`,
+    textColor: `text-[${statusColor}]`
+  }
   
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs',
@@ -37,16 +47,17 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
   }
 
   const getIcon = () => {
-    switch (normalizedStatus) {
-      case 'requested':
+    switch (statusName) {
+      case 'Öppen':
         return <Clock className={`${iconSizes[size]} animate-pulse`} />
-      case 'scheduled':
+      case 'Bokad':
+      case 'Bokat':
         return <Calendar className={iconSizes[size]} />
-      case 'in_progress':
+      case 'Pågående':
         return <Wrench className={`${iconSizes[size]} animate-spin-slow`} />
-      case 'completed':
+      case 'Avslutat':
         return <CheckCircle className={iconSizes[size]} />
-      case 'cancelled':
+      case 'Stängt - slasklogg':
         return <XCircle className={iconSizes[size]} />
       default:
         return <AlertCircle className={iconSizes[size]} />
@@ -76,7 +87,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       </div>
       
       {/* Additional info for scheduled status */}
-      {normalizedStatus === 'scheduled' && scheduledDate && (
+      {(statusName === 'Bokad' || statusName === 'Bokat') && scheduledDate && (
         <div className="text-xs text-slate-400 ml-1">
           <div>{formatScheduledDate(scheduledDate)}</div>
           {technicianName && (

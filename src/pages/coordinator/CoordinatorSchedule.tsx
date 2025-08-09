@@ -69,9 +69,7 @@ export default function CoordinatorSchedule() {
       id: contractCase.id,
       case_id: contractCase.case_number,
       title: contractCase.title,
-      status: contractCase.status === 'scheduled' ? 'Bokad' : 
-              contractCase.status === 'in_progress' ? 'Pågående' : 
-              contractCase.status === 'completed' ? 'Avslutat' : 'Öppen',
+      status: contractCase.status, // Använd status direkt från databasen
       priority: contractCase.priority,
       // Prioritera customer-data över case-data för kontaktuppgifter
       adress: customer?.contact_address || (contractCase as any).address_formatted,

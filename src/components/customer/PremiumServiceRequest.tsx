@@ -73,7 +73,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           customer_id: profile.customer_id,
           title: subject,
           description: description,
-          status: 'requested', // Always requested for customer-created cases
+          status: 'Öppen', // Alltid 'Öppen' för kundinitierade ärenden
           priority: priority,
           service_type: serviceType,
           pest_type: pestType || null,

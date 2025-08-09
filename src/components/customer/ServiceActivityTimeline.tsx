@@ -5,7 +5,8 @@ import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Case, CaseStatus, caseStatusConfig, serviceTypeConfig, normalizeStatus, getSafeStatusConfig } from '../../types/cases'
+import { Case, serviceTypeConfig } from '../../types/cases'
+import { STATUS_CONFIG, ClickUpStatus, getStatusColor } from '../../types/database'
 import ServiceRequestStatus from './ServiceRequestStatus'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -18,7 +19,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
   const { profile } = useAuth()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | CaseStatus>('all')
+  const [filter, setFilter] = useState<'all' | ClickUpStatus>('all')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [expandedCase, setExpandedCase] = useState<string | null>(null)
 
@@ -62,14 +63,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
 
       if (error) throw error
       
-      // Validate and clean case data using new normalize function
-      const validatedCases = (data || []).map(caseItem => {
-        // Normalize status to ensure it's always valid
-        caseItem.status = normalizeStatus(caseItem.status)
-        return caseItem
-      })
-      
-      setCases(validatedCases)
+      setCases(data || [])
     } catch (error: any) {
       console.error('Error fetching cases:', error)
       toast.error('Kunde inte hämta ärenden')
@@ -95,11 +89,12 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
   const getStatusCounts = () => {
     const counts: Record<string, number> = {
       all: cases.length,
-      requested: 0,
-      scheduled: 0,
-      in_progress: 0,
-      completed: 0,
-      cancelled: 0
+      'Öppen': 0,
+      'Bokad': 0,
+      'Bokat': 0,
+      'Pågående': 0,
+      'Avslutat': 0,
+      'Stängt - slasklogg': 0
     }
     
     cases.forEach(c => {
@@ -111,13 +106,13 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
 
   const counts = getStatusCounts()
 
-  const filterOptions: Array<{ value: 'all' | CaseStatus, label: string }> = [
+  const filterOptions: Array<{ value: 'all' | ClickUpStatus, label: string }> = [
     { value: 'all', label: 'Alla ärenden' },
-    { value: 'requested', label: 'Väntar på svar' },
-    { value: 'scheduled', label: 'Schemalagda' },
-    { value: 'in_progress', label: 'Pågående' },
-    { value: 'completed', label: 'Slutförda' },
-    { value: 'cancelled', label: 'Avbrutna' }
+    { value: 'Öppen', label: 'Väntar på svar' },
+    { value: 'Bokad', label: 'Schemalagda' },
+    { value: 'Pågående', label: 'Pågående' },
+    { value: 'Avslutat', label: 'Slutförda' },
+    { value: 'Stängt - slasklogg', label: 'Stängda' }
   ]
 
   if (loading) {
@@ -185,13 +180,13 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
         </div>
 
         {/* Priority Notice for Requested Cases */}
-        {counts.requested > 0 && filter === 'all' && (
+        {counts['Öppen'] > 0 && filter === 'all' && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-amber-400 font-medium">
-                  {counts.requested} förfrågan{counts.requested > 1 ? 'ar' : ''} väntar på svar
+                  {counts['Öppen']} förfrågan{counts['Öppen'] > 1 ? 'ar' : ''} väntar på svar
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   Vi återkommer inom 24 timmar med förslag på tid
@@ -213,9 +208,14 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
             {filteredCases.map((caseItem, index) => {
               const isExpanded = expandedCase === caseItem.id
               
-              // Use the new safe status handling
-              const safeStatus = normalizeStatus(caseItem.status)
-              const config = getSafeStatusConfig(safeStatus)
+              // Get status config from database types
+              const status = caseItem.status as ClickUpStatus
+              const statusColor = getStatusColor(status)
+              const config = {
+                bgColor: `bg-[${statusColor}]/10`,
+                borderColor: `border-[${statusColor}]/20`,
+                textColor: `text-[${statusColor}]`
+              }
               const serviceType = caseItem.service_type ? serviceTypeConfig[caseItem.service_type] : null
               
               return (
@@ -226,11 +226,11 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     ${config.bgColor} ${config.borderColor} ${config.textColor} border transition-all duration-300
                     group-hover:scale-110
                   `}>
-                    {safeStatus === 'requested' && <Clock className="w-5 h-5" />}
-                    {safeStatus === 'scheduled' && <Calendar className="w-5 h-5" />}
-                    {safeStatus === 'in_progress' && <Wrench className="w-5 h-5" />}
-                    {safeStatus === 'completed' && <CheckCircle className="w-5 h-5" />}
-                    {safeStatus === 'cancelled' && <XCircle className="w-5 h-5" />}
+                    {status === 'Öppen' && <Clock className="w-5 h-5" />}
+                    {(status === 'Bokad' || status === 'Bokat') && <Calendar className="w-5 h-5" />}
+                    {status === 'Pågående' && <Wrench className="w-5 h-5" />}
+                    {status === 'Avslutat' && <CheckCircle className="w-5 h-5" />}
+                    {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5" />}
                   </div>
 
                   {/* Content */}
@@ -246,7 +246,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                           <p className="text-xs text-slate-500">{formatDate(caseItem.created_at)}</p>
                         </div>
                         <ServiceRequestStatus 
-                          status={safeStatus}
+                          status={status}
                           size="sm"
                           scheduledDate={caseItem.scheduled_start}
                           technicianName={caseItem.primary_technician_name}
