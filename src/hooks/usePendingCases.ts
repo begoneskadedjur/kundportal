@@ -28,7 +28,7 @@ export const usePendingCases = (): UsePendingCasesReturn => {
         .from('cases')
         .select(`
           *,
-          customers (
+          customer:customers (
             company_name,
             contact_person,
             contact_email,
@@ -48,17 +48,17 @@ export const usePendingCases = (): UsePendingCasesReturn => {
       // Map the data to include customer info directly
       const mappedData = (data || []).map(item => {
         // Debug: Check what we're getting
-        if (item.customers === null) {
+        if (item.customer === null) {
           console.log('Case without customer:', item.id, item.title)
         }
         
         return {
           ...item,
-          customer_name: item.customers?.company_name || 'Okänd kund',
-          customer_contact: item.customers?.contact_person,
-          customer_email: item.customers?.contact_email,
-          customer_phone: item.customers?.contact_phone,
-          customer_org_number: item.customers?.organization_number
+          customer_name: item.customer?.company_name || 'Okänd kund',
+          customer_contact: item.customer?.contact_person,
+          customer_email: item.customer?.contact_email,
+          customer_phone: item.customer?.contact_phone,
+          customer_org_number: item.customer?.organization_number
         }
       })
 
