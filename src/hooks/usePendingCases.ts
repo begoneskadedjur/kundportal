@@ -24,26 +24,41 @@ export const usePendingCases = (): UsePendingCasesReturn => {
     try {
       setError(null)
       
-      const { data, error } = await supabase
+      // Först hämta cases
+      const { data: casesData, error: casesError } = await supabase
         .from('cases')
-        .select(`
-          *,
-          customer:customers (
-            company_name,
-            contact_person,
-            contact_email,
-            contact_phone,
-            organization_number
-          )
-        `)
+        .select('*')
         .eq('status', 'requested')
         .order('priority', { ascending: false }) // Urgent first
         .order('created_at', { ascending: true }) // Oldest first within priority
       
+      if (casesError) throw casesError
+      
+      // Sen hämta customers för alla customer_ids
+      const customerIds = [...new Set(casesData?.map(c => c.customer_id).filter(Boolean) || [])]
+      
+      let customersMap: Record<string, any> = {}
+      if (customerIds.length > 0) {
+        const { data: customersData, error: customersError } = await supabase
+          .from('customers')
+          .select('*')
+          .in('id', customerIds)
+        
+        if (!customersError && customersData) {
+          customersMap = Object.fromEntries(customersData.map(c => [c.id, c]))
+        }
+      }
+      
+      // Kombinera datan manuellt
+      const data = casesData?.map(caseItem => ({
+        ...caseItem,
+        customer: customersMap[caseItem.customer_id] || null
+      }))
+      
       console.log('Fetching pending cases, found:', data?.length || 0) // Debug
       console.log('First case data:', data?.[0]) // Debug customer structure
 
-      if (error) throw error
+      // No error to check here anymore since we handle it above
 
       // Map the data to include customer info directly
       const mappedData = (data || []).map(item => {
