@@ -9,7 +9,7 @@ import { Case } from '../../types/cases';
 // Komponenter för schemat
 import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleControlPanel';
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
-import PendingRequestsPanel from '../../components/coordinator/PendingRequestsPanel';
+import PendingRequestsNotifier from '../../components/coordinator/PendingRequestsNotifier';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 
 // Modaler
@@ -19,9 +19,8 @@ import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsence
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal';
 
 import Button from '../../components/ui/Button';
-import { usePendingCases } from '../../hooks/usePendingCases';
 
-import { LayoutGrid, CalendarOff, ArrowLeft, LogOut, FileText, Menu, X, AlertCircle } from 'lucide-react';
+import { LayoutGrid, CalendarOff, ArrowLeft, LogOut, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
@@ -50,7 +49,6 @@ export default function CoordinatorSchedule() {
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSidebar, setShowSidebar] = useState(true);
 
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -58,9 +56,6 @@ export default function CoordinatorSchedule() {
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false);
-  
-  // Use the pending cases hook för sidebar
-  const { pendingCases, urgentCount, oldRequestsCount, totalCount, refresh: refreshPending } = usePendingCases();
 
   // Adapter för att konvertera Case till BeGoneCaseRow-liknande format
   const adaptCaseToBeGoneRow = (contractCase: Case): BeGoneCaseRow => {
@@ -195,7 +190,6 @@ export default function CoordinatorSchedule() {
     setIsCreateModalOpen(false); 
     setSelectedCase(null); 
     fetchData();
-    refreshPending(); // Uppdatera sidebar
   };
   
   const handleAbsenceCreateSuccess = () => { 
@@ -216,19 +210,6 @@ export default function CoordinatorSchedule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="flex items-center gap-2 relative"
-              >
-                {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-                {!showSidebar && totalCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-                    {totalCount}
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
                 onClick={() => navigate('/koordinator/dashboard')}
                 className="flex items-center gap-2"
               >
@@ -244,17 +225,6 @@ export default function CoordinatorSchedule() {
                     <>
                       <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
                       <span>{actionableCases.length} att boka in</span>
-                    </>
-                  )}
-                  {totalCount > 0 && (
-                    <>
-                      <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
-                      <span className="flex items-center gap-1">
-                        {urgentCount > 0 && (
-                          <AlertCircle className="w-3 h-3 text-red-400 animate-pulse" />
-                        )}
-                        {totalCount} avtalsförfrågningar
-                      </span>
                     </>
                   )}
                   <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
@@ -282,17 +252,6 @@ export default function CoordinatorSchedule() {
         </header>
 
         <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-[calc(100vh-65px)]">
-          {/* Avtalskundärenden Sidebar */}
-          <aside className={`
-            ${showSidebar ? 'w-96' : 'w-0'}
-            transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0
-          `}>
-            <PendingRequestsPanel
-              onScheduleClick={handleSchedulePendingCase}
-              className="h-full"
-            />
-          </aside>
-          
           {/* ClickUp Control Panel */}
           <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
             <ScheduleControlPanel
@@ -356,13 +315,18 @@ export default function CoordinatorSchedule() {
         technicianName={selectedAbsence ? technicians.find(t => t.id === selectedAbsence.technician_id)?.name : undefined}
       />
       
+      {/* Pending Requests Notifier - Diskret modul för avtalskundärenden */}
+      <PendingRequestsNotifier
+        onScheduleClick={handleSchedulePendingCase}
+      />
+      
       {/* Global Coordinator Chat */}
       <GlobalCoordinatorChat 
         currentPage="schedule"
         contextData={{
           technicians,
           scheduledCases: filteredScheduledCases,
-          actionableCases: [...actionableCases, ...pendingCases.map(adaptCaseToBeGoneRow)],
+          actionableCases: actionableCases,
           absences
         }}
       />

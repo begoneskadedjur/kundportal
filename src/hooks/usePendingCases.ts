@@ -28,7 +28,7 @@ export const usePendingCases = (): UsePendingCasesReturn => {
         .from('cases')
         .select(`
           *,
-          customers!inner (
+          customers (
             company_name,
             contact_person,
             contact_email,
@@ -39,6 +39,8 @@ export const usePendingCases = (): UsePendingCasesReturn => {
         .eq('status', 'requested')
         .order('priority', { ascending: false }) // Urgent first
         .order('created_at', { ascending: true }) // Oldest first within priority
+      
+      console.log('Fetching pending cases, found:', data?.length || 0) // Debug
 
       if (error) throw error
 
