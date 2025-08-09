@@ -1,15 +1,23 @@
 // 📁 src/pages/coordinator/CoordinatorSchedule.tsx
-// ⭐ VERSION 3.0 - Updated with new database structure and pending requests sidebar ⭐
+// ⭐ VERSION 3.1 - Hybrid system med ClickUp och avtalskundärenden ⭐
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { BeGoneCaseRow, Technician, isScheduledCase } from '../../types/database';
 import { Case } from '../../types/cases';
-import PendingRequestsPanel from '../../components/coordinator/PendingRequestsPanel';
+
+// Komponenter för schemat
+import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleControlPanel';
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
+import PendingRequestsPanel from '../../components/coordinator/PendingRequestsPanel';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
+
+// Modaler
+import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal';
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal';
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal';
+
 import Button from '../../components/ui/Button';
 import { usePendingCases } from '../../hooks/usePendingCases';
 
@@ -27,54 +35,92 @@ export interface Absence {
   notes?: string;
 }
 
-export interface Technician {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  role: string;
-  is_active: boolean;
-  work_schedule?: any;
-}
+const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
+const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 export default function CoordinatorSchedule() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [cases, setCases] = useState<Case[]>([]);
+  const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]); // Alla schemalagda ärenden
+  const [contractCases, setContractCases] = useState<Case[]>([]); // Avtalskundärenden
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   
+  const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
 
-  const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false);
   
-  // Use the pending cases hook
+  // Use the pending cases hook för sidebar
   const { pendingCases, urgentCount, oldRequestsCount, totalCount, refresh: refreshPending } = usePendingCases();
+
+  // Adapter för att konvertera Case till BeGoneCaseRow-liknande format
+  const adaptCaseToBeGoneRow = (contractCase: Case): BeGoneCaseRow => {
+    return {
+      id: contractCase.id,
+      case_id: contractCase.case_number,
+      title: contractCase.title,
+      status: contractCase.status === 'scheduled' ? 'Bokad' : 
+              contractCase.status === 'in_progress' ? 'Pågående' : 
+              contractCase.status === 'completed' ? 'Avslutat' : 'Öppen',
+      priority: contractCase.priority,
+      adress: contractCase.address,
+      kontaktperson: contractCase.contact_person,
+      telefon: contractCase.contact_phone,
+      email: contractCase.contact_email,
+      start_date: contractCase.scheduled_start,
+      end_date: contractCase.scheduled_end,
+      primary_assignee_id: contractCase.primary_technician_id,
+      secondary_assignee_id: null,
+      tertiary_assignee_id: null,
+      case_type: 'contract' as const,
+      description: contractCase.description,
+      price: contractCase.price,
+      created_at: contractCase.created_at,
+      updated_at: contractCase.updated_at
+    } as BeGoneCaseRow;
+  };
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [techniciansResult, casesResult, absencesResult] = await Promise.all([
+      
+      // Hämta alla data parallellt
+      const [techniciansResult, privateCasesResult, businessCasesResult, contractCasesResult, absencesResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
-        supabase.from('cases').select('*').neq('status', 'requested').order('created_at', { ascending: false }),
+        supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
+        supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
+        supabase.from('cases').select('*').in('status', ['scheduled', 'in_progress', 'completed']).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*')
       ]);
 
       if (techniciansResult.error) throw techniciansResult.error;
-      if (casesResult.error) throw casesResult.error;
+      if (privateCasesResult.error) throw privateCasesResult.error;
+      if (businessCasesResult.error) throw businessCasesResult.error;
+      if (contractCasesResult.error) throw contractCasesResult.error;
       if (absencesResult.error) throw absencesResult.error;
 
       const fetchedTechnicians = techniciansResult.data || [];
       setTechnicians(fetchedTechnicians);
       setAbsences(absencesResult.data || []);
-      setCases(casesResult.data || []);
+      setContractCases(contractCasesResult.data || []);
+
+      // Kombinera alla ärenden för schemat
+      const combinedCases = [
+        ...(privateCasesResult.data || []).map(c => ({ ...c, case_type: 'private' as const })),
+        ...(businessCasesResult.data || []).map(c => ({ ...c, case_type: 'business' as const })),
+        ...(contractCasesResult.data || []).map(adaptCaseToBeGoneRow)
+      ];
+      
+      setAllCases(combinedCases as BeGoneCaseRow[]);
 
       if (selectedTechnicianIds.size === 0 && fetchedTechnicians.length > 0) {
         const defaultSelected = fetchedTechnicians.filter(t => t.role === 'Skadedjurstekniker').map(t => t.id);
@@ -92,40 +138,64 @@ export default function CoordinatorSchedule() {
     fetchData();
   }, [fetchData]);
 
-  // Filter scheduled cases (not requested status)
-  const scheduledCases = useMemo(() => {
-    return cases.filter(c => c.status === 'scheduled' || c.status === 'in_progress' || c.status === 'completed');
-  }, [cases]);
+  // Filtrera schemalagda ärenden (från båda systemen)
+  const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases]);
 
-  // Filter cases by search and selected technicians
+  // Ärenden som behöver bokas in (från ClickUp)
+  const actionableCases = useMemo(() => {
+    return allCases.filter(c => c.status === 'Offert signerad - boka in');
+  }, [allCases]);
+
+  // Filtrera baserat på status, tekniker och sökning
   const filteredScheduledCases = useMemo(() => {
     return scheduledCases.filter(c => {
-      if (selectedTechnicianIds.size > 0 && c.primary_technician_id) {
-        if (!selectedTechnicianIds.has(c.primary_technician_id)) {
+      if (!activeStatuses.has(c.status)) return false;
+      if (selectedTechnicianIds.size > 0) {
+        const caseTechnicians = [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean);
+        if (caseTechnicians.length > 0 && !caseTechnicians.some(id => selectedTechnicianIds.has(id!))) {
           return false;
         }
       }
       const query = searchQuery.toLowerCase();
       if (query) {
         return (c.title?.toLowerCase() || '').includes(query) || 
-               (c.contact_person?.toLowerCase() || '').includes(query) || 
-               (c.address?.formatted_address?.toLowerCase() || '').includes(query);
+               (c.kontaktperson?.toLowerCase() || '').includes(query) || 
+               (c.adress?.toString().toLowerCase() || '').includes(query);
       }
       return true;
     });
-  }, [scheduledCases, selectedTechnicianIds, searchQuery]);
+  }, [scheduledCases, activeStatuses, selectedTechnicianIds, searchQuery]);
   
-  // Handle scheduling a pending request
-  const handleSchedulePendingCase = (caseData: Case) => {
+  // Hantera klick på ClickUp-ärende
+  const handleOpenCaseModal = (caseData: BeGoneCaseRow) => {
+    setSelectedCase(caseData);
+    setIsEditModalOpen(true);
+  };
+  
+  // Hantera schemaläggning av ClickUp-ärende som ska bokas in
+  const handleScheduleActionableCase = (caseData: BeGoneCaseRow) => {
     setSelectedCase(caseData);
     setIsCreateModalOpen(true);
   };
 
+  // Hantera schemaläggning av avtalskundärende från sidebar
+  const handleSchedulePendingCase = (caseData: Case) => {
+    // Konvertera till BeGoneCaseRow-format för modal
+    const adaptedCase = adaptCaseToBeGoneRow(caseData);
+    setSelectedCase(adaptedCase);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleUpdateSuccess = () => { 
+    setIsEditModalOpen(false); 
+    fetchData(); 
+  };
+  
   const handleCreateSuccess = () => { 
     setIsCreateModalOpen(false); 
     setSelectedCase(null); 
     fetchData();
-    refreshPending();
+    refreshPending(); // Uppdatera sidebar
   };
   
   const handleAbsenceCreateSuccess = () => { 
@@ -170,6 +240,12 @@ export default function CoordinatorSchedule() {
                 <h1 className="text-xl font-bold text-white">Koordinator - Schemaöversikt</h1>
                 <div className="flex items-center gap-3 text-sm text-slate-400">
                   <span>{filteredScheduledCases.length} schemalagda</span>
+                  {actionableCases.length > 0 && (
+                    <>
+                      <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
+                      <span>{actionableCases.length} att boka in</span>
+                    </>
+                  )}
                   {totalCount > 0 && (
                     <>
                       <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
@@ -177,7 +253,7 @@ export default function CoordinatorSchedule() {
                         {urgentCount > 0 && (
                           <AlertCircle className="w-3 h-3 text-red-400 animate-pulse" />
                         )}
-                        {totalCount} väntande
+                        {totalCount} avtalsförfrågningar
                       </span>
                     </>
                   )}
@@ -206,7 +282,7 @@ export default function CoordinatorSchedule() {
         </header>
 
         <div className="flex-grow max-w-screen-3xl mx-auto w-full flex flex-row h-[calc(100vh-65px)]">
-          {/* Pending Requests Sidebar */}
+          {/* Avtalskundärenden Sidebar */}
           <aside className={`
             ${showSidebar ? 'w-96' : 'w-0'}
             transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0
@@ -217,60 +293,48 @@ export default function CoordinatorSchedule() {
             />
           </aside>
           
-          {/* Main Schedule View */}
-          <main className="flex-1 h-full overflow-hidden">
-            <div className="h-full flex flex-col">
-              {/* Search and Filter Controls */}
-              <div className="p-4 bg-slate-900/50 border-b border-slate-800">
-                <div className="flex items-center gap-4">
-                  <input
-                    type="text"
-                    placeholder="Sök ärenden..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  />
-                  <select
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    onChange={(e) => {
-                      if (e.target.value === 'all') {
-                        setSelectedTechnicianIds(new Set());
-                      } else {
-                        setSelectedTechnicianIds(new Set([e.target.value]));
-                      }
-                    }}
-                  >
-                    <option value="all">Alla tekniker</option>
-                    {technicians.map(tech => (
-                      <option key={tech.id} value={tech.id}>{tech.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              {/* Schedule Timeline */}
-              <div className="flex-1 overflow-auto">
-                <ScheduleTimeline
-                  technicians={technicians.filter(t => selectedTechnicianIds.size === 0 || selectedTechnicianIds.has(t.id))}
-                  cases={filteredScheduledCases as any}
-                  absences={absences}
-                  onCaseClick={(caseData) => {
-                    setSelectedCase(caseData as any);
-                    setIsCreateModalOpen(true);
-                  }}
-                  onAbsenceClick={(absence) => {
-                    setSelectedAbsence(absence);
-                    setIsAbsenceDetailsModalOpen(true);
-                  }}
-                  onUpdate={fetchData}
-                />
-              </div>
-            </div>
+          {/* ClickUp Control Panel */}
+          <aside className="w-1/4 xl:w-1/5 min-w-[320px] flex flex-col h-full">
+            <ScheduleControlPanel
+              technicians={technicians}
+              actionableCases={actionableCases}
+              activeStatuses={activeStatuses}
+              setActiveStatuses={setActiveStatuses}
+              selectedTechnicianIds={selectedTechnicianIds}
+              setSelectedTechnicianIds={setSelectedTechnicianIds}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onCaseClick={handleScheduleActionableCase}
+            />
+          </aside>
+          
+          {/* Main Schedule Timeline */}
+          <main className="w-3/4 xl:w-4/5 flex-grow h-full">
+            <ScheduleTimeline
+              technicians={technicians.filter(t => selectedTechnicianIds.size === 0 || selectedTechnicianIds.has(t.id))}
+              cases={filteredScheduledCases}
+              absences={absences}
+              onCaseClick={handleOpenCaseModal}
+              onAbsenceClick={(absence) => {
+                setSelectedAbsence(absence);
+                setIsAbsenceDetailsModalOpen(true);
+              }}
+              onUpdate={fetchData}
+            />
           </main>
         </div>
       </div>
       
-      {/* Create/Edit Case Modal */}
+      {/* Edit Modal för befintliga ärenden */}
+      <EditCaseModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        onSuccess={handleUpdateSuccess} 
+        caseData={selectedCase as any} 
+        technicians={technicians} 
+      />
+      
+      {/* Create Modal för nya/schemaläggning */}
       <CreateCaseModal 
         isOpen={isCreateModalOpen} 
         onClose={() => { 
@@ -279,7 +343,7 @@ export default function CoordinatorSchedule() {
         }} 
         onSuccess={handleCreateSuccess} 
         technicians={technicians} 
-        initialCaseData={selectedCase as any} 
+        initialCaseData={selectedCase} 
       />
       <CreateAbsenceModal isOpen={isAbsenceModalOpen} onClose={() => setIsAbsenceModalOpen(false)} onSuccess={handleAbsenceCreateSuccess} technicians={technicians} />
       <AbsenceDetailsModal 
@@ -298,7 +362,7 @@ export default function CoordinatorSchedule() {
         contextData={{
           technicians,
           scheduledCases: filteredScheduledCases,
-          actionableCases: actionableCases,
+          actionableCases: [...actionableCases, ...pendingCases.map(adaptCaseToBeGoneRow)],
           absences
         }}
       />
