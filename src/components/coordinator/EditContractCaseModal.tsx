@@ -9,7 +9,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
-import { normalizeStatus, CaseStatus } from '../../types/cases'
+// Status types now from database.ts
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 
 interface EditContractCaseModalProps {
