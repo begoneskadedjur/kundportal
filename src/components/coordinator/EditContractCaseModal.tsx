@@ -138,10 +138,31 @@ export default function EditContractCaseModal({
 
     setLoading(true)
     try {
-      const updateData: any = {
+      // Rensa tomma strängar för UUID och andra fält som ska vara NULL
+      const cleanedFormData = {
         ...formData,
-        scheduled_start: formData.scheduled_start?.toISOString(),
-        scheduled_end: formData.scheduled_end?.toISOString(),
+        // Konvertera tomma strängar till null för UUID-fält
+        primary_technician_id: formData.primary_technician_id || null,
+        secondary_technician_id: formData.secondary_technician_id || null,
+        tertiary_technician_id: formData.tertiary_technician_id || null,
+        // Konvertera tomma strängar till null för text-fält som kan vara null
+        primary_technician_name: formData.primary_technician_name || null,
+        secondary_technician_name: formData.secondary_technician_name || null,
+        tertiary_technician_name: formData.tertiary_technician_name || null,
+        other_pest_type: formData.other_pest_type || null,
+        alternative_contact_person: formData.alternative_contact_person || null,
+        alternative_contact_phone: formData.alternative_contact_phone || null,
+        alternative_contact_email: formData.alternative_contact_email || null,
+        work_report: formData.work_report || null,
+        recommendations: formData.recommendations || null,
+        materials_used: formData.materials_used || null,
+        pest_type: formData.pest_type || null
+      };
+
+      const updateData: any = {
+        ...cleanedFormData,
+        scheduled_start: formData.scheduled_start?.toISOString() || null,
+        scheduled_end: formData.scheduled_end?.toISOString() || null,
         updated_at: new Date().toISOString()
       }
 
