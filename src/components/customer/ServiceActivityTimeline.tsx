@@ -289,6 +289,21 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                             </div>
                           )}
 
+                          {/* Materials/Products Used - Safety Information */}
+                          {caseItem.materials_used && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <h5 className="text-xs font-medium text-amber-400 mb-1">Använda preparat & säkerhetsinformation</h5>
+                                  <p className="text-sm text-slate-300 whitespace-pre-wrap">
+                                    {caseItem.materials_used}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Recommendations */}
                           {caseItem.recommendations && (
                             <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">

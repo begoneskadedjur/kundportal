@@ -62,11 +62,10 @@ export default function EditContractCaseModal({
     work_report: '',
     recommendations: '',
     
-    // Tid och material (döljs för kunder)
+    // Tid, material och pris
     time_spent_minutes: 0,
     materials_used: '',
-    
-    // Pris
+    material_cost: 0,
     price: 0
   })
 
@@ -99,6 +98,7 @@ export default function EditContractCaseModal({
         recommendations: caseData.recommendations || '',
         time_spent_minutes: caseData.time_spent_minutes || 0,
         materials_used: caseData.materials_used || '',
+        material_cost: caseData.material_cost || 0,
         price: caseData.price || 0
       })
     }
@@ -499,11 +499,11 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Arbetsrapport - visas för alla */}
+              {/* Arbetsrapport och kundinformation */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-purple-300 flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Arbetsrapport
+                  Arbetsrapport & Kundinformation
                 </h3>
 
                 <div>
@@ -518,6 +518,25 @@ export default function EditContractCaseModal({
                     placeholder="Beskriv utfört arbete..."
                     className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
                   />
+                </div>
+
+                {/* Preparat/produkter - viktig säkerhetsinformation */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <AlertCircle className="inline w-4 h-4 text-amber-400 mr-1" />
+                    Använda preparat & säkerhetsinformation
+                  </label>
+                  <textarea
+                    value={formData.materials_used}
+                    onChange={(e) => setFormData(prev => ({ ...prev, materials_used: e.target.value }))}
+                    disabled={isCustomerView}
+                    rows={4}
+                    placeholder="Lista använda preparat, gifter och säkerhetsinformation för kunden..."
+                    className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
+                  />
+                  <p className="text-xs text-amber-400/70 mt-1">
+                    Inkludera information om gifter, säkerhetsåtgärder och hanteringsriktlinjer
+                  </p>
                 </div>
 
                 {/* Rekommendationer - viktig för kunder */}
@@ -537,15 +556,15 @@ export default function EditContractCaseModal({
                 </div>
               </div>
 
-              {/* Tid och material - endast för koordinator/tekniker */}
+              {/* Tid och kostnader - endast för koordinator/tekniker */}
               {!isCustomerView && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-purple-300 flex items-center gap-2">
                     <Clock className="w-5 h-5" />
-                    Tid & Material
+                    Tid & Kostnader
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         Arbetstid (minuter)
@@ -561,7 +580,20 @@ export default function EditContractCaseModal({
 
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Pris (kr)
+                        Materialkostnad (kr)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.material_cost}
+                        onChange={(e) => setFormData(prev => ({ ...prev, material_cost: parseFloat(e.target.value) || 0 }))}
+                        min="0"
+                        className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Totalpris (kr)
                       </label>
                       <input
                         type="number"
@@ -571,19 +603,6 @@ export default function EditContractCaseModal({
                         className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Material använt
-                    </label>
-                    <textarea
-                      value={formData.materials_used}
-                      onChange={(e) => setFormData(prev => ({ ...prev, materials_used: e.target.value }))}
-                      rows={2}
-                      placeholder="Lista använt material..."
-                      className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                    />
                   </div>
                 </div>
               )}
