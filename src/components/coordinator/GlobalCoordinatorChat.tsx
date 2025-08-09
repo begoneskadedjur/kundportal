@@ -228,7 +228,7 @@ Vad kan jag hjälpa dig med idag?`,
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-24 right-6 z-50">
         <button
           onClick={() => setIsOpen(true)}
           className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-105 group"
@@ -251,7 +251,7 @@ Vad kan jag hjälpa dig med idag?`,
 
   return (
     <div 
-      className={`fixed bottom-6 right-6 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl transition-all duration-300 z-50 flex flex-col ${
+      className={`fixed bottom-24 right-6 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl transition-all duration-300 z-50 flex flex-col ${
         isMinimized 
           ? 'w-80 h-16' 
           : 'w-[28rem] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-4rem)] sm:max-w-[calc(100vw-3rem)] sm:max-h-[calc(100vh-6rem)]'
