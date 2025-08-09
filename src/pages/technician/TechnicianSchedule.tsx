@@ -169,7 +169,7 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.all([ 
         supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`), 
         supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*, customer:customers(*)').eq('primary_technician_id', technicianId).in('status', ['scheduled', 'in_progress', 'completed'])
+        supabase.from('cases').select('*, customer:customers(*)').eq('primary_technician_id', technicianId).in('status', ['Öppen', 'Bokad', 'Bokat', 'Pågående', 'Avslutat'])
       ]); 
 
       if (privateResult.error) throw privateResult.error;
@@ -213,10 +213,8 @@ export default function TechnicianSchedule() {
           // Skadedjur och beskrivning
           skadedjur: c.pest_type,
           annat_skadedjur: c.other_pest_type,
-          // Status mappning
-          status: c.status === 'scheduled' ? 'Bokad' : 
-                  c.status === 'in_progress' ? 'Pågående' : 
-                  c.status === 'completed' ? 'Avslutat' : 'Öppen',
+          // Använd status direkt från databasen (redan på svenska)
+          status: c.status,
           // Övriga fält
           case_price: c.price,
           case_type: 'contract' as const,

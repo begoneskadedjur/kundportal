@@ -97,7 +97,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       )}
       
       {/* Response time for requested status */}
-      {normalizedStatus === 'requested' && (
+      {statusName === 'Öppen' && (
         <div className="text-xs text-amber-400/80 ml-1 animate-pulse">
           Svar inom 24h
         </div>

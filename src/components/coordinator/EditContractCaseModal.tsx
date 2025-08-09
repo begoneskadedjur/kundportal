@@ -32,7 +32,7 @@ export default function EditContractCaseModal({
     // Grundläggande information
     title: '',
     description: '',
-    status: 'requested',
+    status: 'Öppen',
     
     // Kontaktperson
     contact_person: '',
@@ -281,7 +281,7 @@ export default function EditContractCaseModal({
                     </label>
                     <select
                       value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: normalizeStatus(e.target.value) }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                       disabled={isCustomerView}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >

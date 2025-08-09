@@ -28,7 +28,7 @@ export const usePendingCases = (): UsePendingCasesReturn => {
       const { data: casesData, error: casesError } = await supabase
         .from('cases')
         .select('*')
-        .eq('status', 'requested')
+        .eq('status', 'Öppen')
         .order('priority', { ascending: false }) // Urgent first
         .order('created_at', { ascending: true }) // Oldest first within priority
       
@@ -120,12 +120,12 @@ export const usePendingCases = (): UsePendingCasesReturn => {
           table: 'cases'
         },
         (payload) => {
-          // If a case was just scheduled (no longer requested), remove it
-          if (payload.old.status === 'requested' && payload.new.status !== 'requested') {
+          // If a case was just scheduled (no longer open), remove it
+          if (payload.old.status === 'Öppen' && payload.new.status !== 'Öppen') {
             setPendingCases(prev => prev.filter(c => c.id !== payload.new.id))
           }
-          // If a case became requested, fetch all again
-          else if (payload.new.status === 'requested') {
+          // If a case became open, fetch all again
+          else if (payload.new.status === 'Öppen') {
             fetchPendingCases()
           }
         }

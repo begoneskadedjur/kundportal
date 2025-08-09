@@ -122,7 +122,7 @@ export default function CoordinatorSchedule() {
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
         supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('cases').select('*, customer:customers(*)').in('status', ['scheduled', 'in_progress', 'completed']).order('created_at', { ascending: false }),
+        supabase.from('cases').select('*, customer:customers(*)').in('status', ['Öppen', 'Bokad', 'Bokat', 'Pågående', 'Avslutat']).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*')
       ]);
 
