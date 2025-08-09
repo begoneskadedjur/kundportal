@@ -25,7 +25,7 @@ import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
 type ScheduleCaseType = BeGoneCaseRow & {
-    case_type: 'private' | 'business';
+    case_type: 'private' | 'business' | 'contract';
     case_price?: number;
     technician_role?: 'primary' | 'secondary' | 'tertiary';
 }
@@ -72,15 +72,33 @@ const openInMaps = (addressData: any) => {
     }
   }
 };
-const getCaseTypeIcon = (caseType: 'private' | 'business') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; default: return <Clock {...props} color="#c084fc" />; } };
-const getStatusColor = (status: string): { bg: string; text: string; border: string } => { const ls = status?.toLowerCase() || ''; if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700/50' }; if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' }; if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' }; if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' }; if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' }; return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' }; };
+const getCaseTypeIcon = (caseType: 'private' | 'business' | 'contract') => { const props = { className: "w-4 h-4" }; switch (caseType) { case 'private': return <User {...props} color="#60a5fa" />; case 'business': return <Users {...props} color="#4ade80" />; case 'contract': return <span className="text-purple-400">👑</span>; default: return <Clock {...props} color="#c084fc" />; } };
+const getStatusColor = (status: string, caseType?: string): { bg: string; text: string; border: string } => { 
+  const ls = status?.toLowerCase() || '';
+  
+  // Premium lila färgschema för avtalsärenden
+  if (ls.includes('avtalsärende') || caseType === 'contract') {
+    if (ls.includes('avslutat')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' };
+    if (ls.includes('pågående')) return { bg: 'bg-purple-800/50', text: 'text-purple-200', border: 'border-purple-600/50' };
+    if (ls.includes('bokad')) return { bg: 'bg-purple-700/50', text: 'text-purple-100', border: 'border-purple-500/50' };
+    return { bg: 'bg-purple-800/50', text: 'text-purple-200', border: 'border-purple-600/50' };
+  }
+  
+  // Standard färgschema för ClickUp-ärenden
+  if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700/50' }; 
+  if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' }; 
+  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' }; 
+  if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' }; 
+  if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' }; 
+  return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' }; 
+};
 const formatTimeSpan = (start: string, end?: string): string => { if (!start) return ''; const s = new Date(start); const e = end ? new Date(end) : null; const opt: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' }; const fs = s.toLocaleTimeString('sv-SE', opt); if (!e || e.getTime() === s.getTime()) return fs; return `${fs} - ${e.toLocaleTimeString('sv-SE', opt)}`; };
-const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
+const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat', 'Avtalsärende - Öppen', 'Avtalsärende - Bokad', 'Avtalsärende - Pågående', 'Avtalsärende - Avslutat'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOpen: (c: ScheduleCaseType) => void }) => {
     const { status, title, kontaktperson, start_date, due_date, case_type, adress, telefon_kontaktperson, skadedjur, secondary_assignee_name, work_started_at, time_spent_minutes } = caseData;
-    const colors = getStatusColor(status);
+    const colors = getStatusColor(status, caseData.case_type);
     const fullAddress = formatAddress(adress);
     const timeSpan = formatTimeSpan(start_date!, due_date);
     
@@ -142,14 +160,16 @@ export default function TechnicianSchedule() {
   const fetchScheduledCases = useCallback(async (technicianId: string) => { 
     setLoading(true); 
     try { 
-      // UPPDATERING: Använder select('*') för robust datahämtning.
-      const [privateResult, businessResult] = await Promise.all([ 
+      // UPPDATERING: Hämtar även avtalsärenden från cases-tabellen
+      const [privateResult, businessResult, contractResult] = await Promise.all([ 
         supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`), 
-        supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`), 
+        supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('cases').select('*, customer:customers(*)').eq('assigned_technician_id', technicianId).in('status', ['scheduled', 'in_progress', 'completed'])
       ]); 
 
       if (privateResult.error) throw privateResult.error;
       if (businessResult.error) throw businessResult.error;
+      if (contractResult.error) throw contractResult.error;
       
       const privateCases = (privateResult.data || []).map(c => ({
         ...c, 
@@ -165,7 +185,44 @@ export default function TechnicianSchedule() {
         technician_role: c.secondary_assignee_id === technicianId ? 'secondary' : c.tertiary_assignee_id === technicianId ? 'tertiary' : 'primary' 
       }));
 
-      const allCases = [...privateCases, ...businessCases];
+      // Anpassa avtalsärenden till BeGoneCaseRow-format
+      const contractCases = (contractResult.data || []).map(c => {
+        const customer = c.customer || {};
+        return {
+          ...c,
+          // Mappa fields korrekt från cases-tabellen
+          start_date: c.scheduled_start || c.scheduled_date,
+          due_date: c.scheduled_end || c.scheduled_date,
+          primary_assignee_id: c.assigned_technician_id,
+          primary_assignee_name: c.assigned_technician_name,
+          primary_assignee_email: c.assigned_technician_email,
+          secondary_assignee_id: null,
+          secondary_assignee_name: null,
+          tertiary_assignee_id: null,
+          tertiary_assignee_name: null,
+          // Kontaktuppgifter
+          adress: customer.contact_address || c.address_formatted,
+          kontaktperson: customer.contact_person || c.contact_person,
+          telefon_kontaktperson: customer.contact_phone || c.contact_phone,
+          email: customer.contact_email || c.contact_email,
+          // Skadedjur och beskrivning
+          skadedjur: c.pest_type,
+          annat_skadedjur: c.other_pest_type,
+          // Status med avtalsprefiks
+          status: c.status === 'scheduled' ? 'Avtalsärende - Bokad' : 
+                  c.status === 'in_progress' ? 'Avtalsärende - Pågående' : 
+                  c.status === 'completed' ? 'Avtalsärende - Avslutat' : 'Avtalsärende - Öppen',
+          // Övriga fält
+          case_price: c.price,
+          case_type: 'contract' as const,
+          technician_role: 'primary' as const,
+          // Företagsinformation
+          bestallare: customer.company_name,
+          organization_number: customer.organization_number
+        };
+      });
+
+      const allCases = [...privateCases, ...businessCases, ...contractCases];
       setCases(allCases.filter(c => c.start_date) as ScheduleCaseType[]); 
     } catch(err) { 
       console.error(err) 

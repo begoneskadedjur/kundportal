@@ -71,23 +71,38 @@ export default function CoordinatorSchedule() {
               contractCase.status === 'completed' ? 'Avslutat' : 'Öppen',
       priority: contractCase.priority,
       // Prioritera customer-data över case-data för kontaktuppgifter
-      adress: customer?.contact_address || contractCase.address,
+      adress: customer?.contact_address || (contractCase as any).address_formatted,
       kontaktperson: customer?.contact_person || contractCase.contact_person,
       telefon: customer?.contact_phone || contractCase.contact_phone,
       email: customer?.contact_email || contractCase.contact_email,
+      
+      // VIKTIGT: Mappa korrekt datetime-fält från cases-tabellen
       start_date: contractCase.scheduled_start,
-      end_date: contractCase.scheduled_end,
+      due_date: contractCase.scheduled_end,
+      
+      // Tekniker-mappning från cases-tabellen  
       primary_assignee_id: contractCase.primary_technician_id,
+      primary_assignee_name: contractCase.primary_technician_name || null,
+      primary_assignee_email: contractCase.primary_technician_email || null,
       secondary_assignee_id: null,
+      secondary_assignee_name: null,
+      secondary_assignee_email: null,
       tertiary_assignee_id: null,
+      tertiary_assignee_name: null,
+      tertiary_assignee_email: null,
+      
       case_type: 'contract' as const,
       description: contractCase.description,
       price: contractCase.price,
       created_at: contractCase.created_at,
       updated_at: contractCase.updated_at,
-      // Lägg till saknade fält
+      
+      // Skadedjur från avtalsärenden
+      skadedjur: contractCase.pest_type,
+      annat_skadedjur: (contractCase as any).other_pest_type || null,
       pest_type: contractCase.pest_type,
-      other_pest_type: contractCase.other_pest_type,
+      other_pest_type: (contractCase as any).other_pest_type,
+      
       organization_number: customer?.organization_number || null,
       customer_id: contractCase.customer_id,
       // Beställare/kund info från customer

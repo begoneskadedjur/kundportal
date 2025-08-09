@@ -56,8 +56,18 @@ interface ScheduleTimelineProps {
   onUpdate?: () => void;
 }
 
-const getStatusColor = (status: string): { bg: string; text: string; border: string } => {
+const getStatusColor = (status: string, caseType?: string): { bg: string; text: string; border: string } => {
     const ls = status?.toLowerCase() || '';
+    
+    // Premium lila färgschema för avtalsärenden
+    if (ls.includes('avtalsärende') || caseType === 'contract') {
+        if (ls.includes('avslutat')) return { bg: 'bg-purple-700', text: 'text-white', border: 'border-purple-800' };
+        if (ls.includes('pågående')) return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
+        if (ls.includes('bokad')) return { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-600' };
+        return { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-600' }; // Default för avtalsärenden
+    }
+    
+    // Standard färgschema för ClickUp-ärenden
     if (ls.includes('avslutat')) return { bg: 'bg-green-600', text: 'text-white', border: 'border-green-700' };
     if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' };
     if (ls.includes('signerad')) return { bg: 'bg-[#20c58f]', text: 'text-white', border: 'border-emerald-600' };
@@ -99,7 +109,7 @@ const renderEventContent = (eventInfo: EventContentArg) => {
     }
     
     const caseData = props as BeGoneCaseRow;
-    const colors = getStatusColor(caseData.status);
+    const colors = getStatusColor(caseData.status, caseData.case_type);
     const formatTime = (date: Date | null) => date ? date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
     const startTime = formatTime(eventInfo.event.start);
     const endTime = formatTime(eventInfo.event.end);
@@ -113,10 +123,16 @@ const renderEventContent = (eventInfo: EventContentArg) => {
 
     const formattedAddress = formatAddress(caseData.adress);
 
+    // Special styling for contract cases
+    const isContractCase = caseData.case_type === 'contract';
+    const contractIndicator = isContractCase ? '👑 ' : '';
+    
     return (
-        <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm`}>
+        <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm ${isContractCase ? 'ring-1 ring-purple-400/30' : ''}`}>
             <div className="flex items-center justify-between mb-1">
-                <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>{eventInfo.event.title}</p>
+                <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>
+                    {contractIndicator}{eventInfo.event.title}
+                </p>
                 {timeSpan && (
                     <span className={`text-xs font-mono ${colors.text} font-bold`}>
                         {timeSpan}
@@ -186,19 +202,30 @@ export default function ScheduleTimeline({ technicians, cases, absences, onCaseC
 
   const calendarEvents = useMemo(() => {
     const caseEvents = cases.flatMap(c => {
-        if (!c.start_date || !c.due_date) return [];
+        // Hantera olika ärende-typer med flexibla datum-fält
+        const hasScheduleData = c.start_date || c.due_date || (c as any).scheduled_date;
+        if (!hasScheduleData) return [];
+        
+        // Beräkna start- och sluttider
+        const startTime = c.start_date || c.due_date || (c as any).scheduled_date;
+        const endTime = c.due_date || c.start_date || (c as any).scheduled_date;
+        
+        if (!startTime || !endTime) return [];
+        
         const assignees = [
             { id: c.primary_assignee_id, name: c.primary_assignee_name, role: 'primary' },
             { id: c.secondary_assignee_id, name: c.secondary_assignee_name, role: 'secondary' },
             { id: c.tertiary_assignee_id, name: c.tertiary_assignee_name, role: 'tertiary' }
         ].filter(a => a.id);
+        
         if (assignees.length === 0) return [];
+        
         return assignees.map(assignee => ({
             id: `${c.id}-${assignee.role}`,
             resourceId: assignee.id,
             title: c.title,
-            start: new Date(c.start_date!).toISOString(),
-            end: new Date(c.due_date!).toISOString(),
+            start: new Date(startTime).toISOString(),
+            end: new Date(endTime).toISOString(),
             extendedProps: { ...c, type: 'case' },
             backgroundColor: 'transparent',
             borderColor: 'transparent'

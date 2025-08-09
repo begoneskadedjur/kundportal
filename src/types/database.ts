@@ -1180,6 +1180,16 @@ export const isUnplannedCase = (caseData: BeGoneCaseRow): boolean => {
 }
 
 // Helper för att filtrera schemalagda ärenden
-export const isScheduledCase = (caseData: BeGoneCaseRow): boolean => {
-  return !!(caseData.start_date || caseData.due_date)
+export const isScheduledCase = (caseData: BeGoneCaseRow | any): boolean => {
+  // Hantera ClickUp-ärenden (private_cases/business_cases)
+  if (caseData.start_date || caseData.due_date) {
+    return true;
+  }
+  
+  // Hantera avtalsärenden (cases-tabellen) med scheduled_date
+  if (caseData.scheduled_date || caseData.scheduled_start || caseData.scheduled_end) {
+    return true;
+  }
+  
+  return false;
 }
