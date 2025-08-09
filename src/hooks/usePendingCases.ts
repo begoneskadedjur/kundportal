@@ -41,18 +41,26 @@ export const usePendingCases = (): UsePendingCasesReturn => {
         .order('created_at', { ascending: true }) // Oldest first within priority
       
       console.log('Fetching pending cases, found:', data?.length || 0) // Debug
+      console.log('First case data:', data?.[0]) // Debug customer structure
 
       if (error) throw error
 
       // Map the data to include customer info directly
-      const mappedData = (data || []).map(item => ({
-        ...item,
-        customer_name: item.customers?.company_name || 'Okänd kund',
-        customer_contact: item.customers?.contact_person,
-        customer_email: item.customers?.contact_email,
-        customer_phone: item.customers?.contact_phone,
-        customer_org_number: item.customers?.organization_number
-      }))
+      const mappedData = (data || []).map(item => {
+        // Debug: Check what we're getting
+        if (item.customers === null) {
+          console.log('Case without customer:', item.id, item.title)
+        }
+        
+        return {
+          ...item,
+          customer_name: item.customers?.company_name || 'Okänd kund',
+          customer_contact: item.customers?.contact_person,
+          customer_email: item.customers?.contact_email,
+          customer_phone: item.customers?.contact_phone,
+          customer_org_number: item.customers?.organization_number
+        }
+      })
 
       setPendingCases(mappedData)
     } catch (error: any) {
