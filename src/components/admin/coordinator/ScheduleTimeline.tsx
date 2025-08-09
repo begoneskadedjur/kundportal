@@ -127,11 +127,14 @@ const renderEventContent = (eventInfo: EventContentArg) => {
     const isContractCase = caseData.case_type === 'contract';
     const contractIndicator = isContractCase ? '👑 ' : '';
     
+    // Visa kundnamn istället för titel
+    const displayName = caseData.bestallare || caseData.kontaktperson || eventInfo.event.title;
+    
     return (
         <div className={`w-full h-full p-2 flex flex-col justify-center overflow-hidden ${colors.bg} border-l-4 ${colors.border} rounded-sm cursor-pointer hover:opacity-90 transition-all shadow-sm ${isContractCase ? 'ring-1 ring-purple-400/30' : ''}`}>
             <div className="flex items-center justify-between mb-1">
                 <p className={`font-bold text-xs leading-tight truncate ${colors.text}`}>
-                    {contractIndicator}{eventInfo.event.title}
+                    {contractIndicator}{displayName}
                 </p>
                 {timeSpan && (
                     <span className={`text-xs font-mono ${colors.text} font-bold`}>
