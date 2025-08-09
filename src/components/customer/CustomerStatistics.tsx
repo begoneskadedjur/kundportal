@@ -56,12 +56,13 @@ interface CaseData {
   id: string
   title: string
   status: string
-  pest_type: string
+  pest_type: string | null
   price: number | null
-  created_date: string | null
-  scheduled_date: string | null
+  created_at: string
+  scheduled_start: string | null
+  scheduled_end: string | null
   completed_date: string | null
-  address_formatted: string | null
+  address: string | null
 }
 
 type TimePeriod = '30d' | '3m' | '6m' | '1y' | 'all'
@@ -102,13 +103,14 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
             status,
             pest_type,
             price,
-            created_date,
-            scheduled_date,
+            created_at,
+            scheduled_start,
+            scheduled_end,
             completed_date,
-            address_formatted
+            address
           `)
           .eq('customer_id', customer.id)
-          .order('created_date', { ascending: false })
+          .order('created_at', { ascending: false })
 
         if (error) throw error
         setCases(data || [])
@@ -138,7 +140,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
     const cutoffDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000))
 
     return cases.filter(caseItem => {
-      const caseDate = new Date(caseItem.created_date || caseItem.scheduled_date || '')
+      const caseDate = new Date(caseItem.created_at || caseItem.scheduled_start || '')
       return caseDate >= cutoffDate
     })
   }, [cases, selectedPeriod])
@@ -157,14 +159,14 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
 
     // Calculate average response time (days between created and scheduled)
     const casesWithBothDates = filteredCases.filter(c => 
-      c.created_date && c.scheduled_date
+      c.created_at && c.scheduled_start
     )
     
     const avgResponseTime = casesWithBothDates.length > 0 
       ? Math.round(
           casesWithBothDates.reduce((sum, c) => {
-            const created = new Date(c.created_date!)
-            const scheduled = new Date(c.scheduled_date!)
+            const created = new Date(c.created_at)
+            const scheduled = new Date(c.scheduled_start!)
             const diffDays = (scheduled.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
             return sum + diffDays
           }, 0) / casesWithBothDates.length
@@ -215,7 +217,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
   // Monthly trend data for line chart
   const monthlyTrendData = useMemo(() => {
     const monthlyData = filteredCases.reduce((acc, c) => {
-      const date = new Date(c.created_date || c.scheduled_date || '')
+      const date = new Date(c.created_at || c.scheduled_start || '')
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       
       if (!acc[monthKey]) {

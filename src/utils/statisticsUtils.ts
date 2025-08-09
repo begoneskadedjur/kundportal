@@ -6,12 +6,13 @@ interface CaseData {
   id: string
   title: string
   status: string
-  pest_type: string
+  pest_type: string | null
   price: number | null
-  created_date: string | null
-  scheduled_date: string | null
+  created_at: string
+  scheduled_start: string | null
+  scheduled_end: string | null
   completed_date: string | null
-  address_formatted: string | null
+  address: string | null
 }
 
 interface Customer {
@@ -30,7 +31,7 @@ export const calculateResponseTime = (createdDate: string, scheduledDate: string
 // Get seasonal trends data
 export const getSeasonalTrends = (cases: CaseData[]) => {
   const seasonalData = cases.reduce((acc, caseItem) => {
-    const date = new Date(caseItem.created_date || caseItem.scheduled_date || '')
+    const date = new Date(caseItem.created_at || caseItem.scheduled_start || '')
     const month = date.getMonth()
     
     let season: string
@@ -52,7 +53,7 @@ export const getSeasonalTrends = (cases: CaseData[]) => {
 // Get top locations data
 export const getTopLocations = (cases: CaseData[], limit = 5) => {
   const locationCounts = cases.reduce((acc, caseItem) => {
-    const location = caseItem.address_formatted || 'Okänd adress'
+    const location = caseItem.address || 'Okänd adress'
     // Extract city/area from address (simplified)
     const city = location.split(',')[1]?.trim() || location.split(' ').slice(-2).join(' ')
     acc[city] = (acc[city] || 0) + 1
@@ -72,9 +73,9 @@ export const getTopLocations = (cases: CaseData[], limit = 5) => {
 export const calculateServiceMetrics = (cases: CaseData[]) => {
   const completedCases = cases.filter(c => isCompletedStatus(c.status))
   const avgCompletionTime = completedCases
-    .filter(c => c.created_date && c.completed_date)
+    .filter(c => c.created_at && c.completed_date)
     .reduce((acc, c) => {
-      const created = new Date(c.created_date!)
+      const created = new Date(c.created_at!)
       const completed = new Date(c.completed_date!)
       const days = (completed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
       return acc + days
@@ -172,7 +173,7 @@ export const exportStatisticsToPDF = (
       caseItem.title.substring(0, 25) + (caseItem.title.length > 25 ? '...' : ''),
       getCustomerStatusDisplay(caseItem.status),
       caseItem.pest_type || 'Okänt',
-      caseItem.created_date ? new Date(caseItem.created_date).toLocaleDateString('sv-SE') : 'N/A'
+      caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : 'N/A'
     ]
 
     rowData.forEach((data, index) => {
@@ -226,10 +227,10 @@ export const exportStatisticsToCSV = (
       getCustomerStatusDisplay(caseItem.status),
       caseItem.pest_type || 'Okänt',
       caseItem.price || 0,
-      caseItem.created_date || '',
-      caseItem.scheduled_date || '',
+      caseItem.created_at || '',
+      caseItem.scheduled_start || '',
       caseItem.completed_date || '',
-      `"${(caseItem.address_formatted || '').replace(/"/g, '""')}"`
+      `"${(caseItem.address || '').replace(/"/g, '""')}"`
     ].join(','))
   ].join('\n')
 
@@ -272,7 +273,7 @@ export const calculateTrend = (currentValue: number, previousValue: number) => {
 // Group cases by time period for trend analysis
 export const groupCasesByPeriod = (cases: CaseData[], periodType: 'month' | 'quarter' | 'year') => {
   return cases.reduce((acc, caseItem) => {
-    const date = new Date(caseItem.created_date || caseItem.scheduled_date || '')
+    const date = new Date(caseItem.created_at || caseItem.scheduled_start || '')
     let periodKey: string
 
     switch (periodType) {
