@@ -117,11 +117,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       
       // För contract cases, låt customer useEffect hantera kunddata
       if (type === 'contract' && initialCaseData.customer_id) {
-        // Sätt bara ärende-specifik data, inte kunddata
+        // Sätt bara ärende-specifik data, inte kunddata eller adress
         setFormData({
           title: initialCaseData.title,
           status: 'Bokat',
-          adress: formattedAddress,
           skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur,
           priority: initialCaseData.priority,
           description: initialCaseData.description
@@ -162,9 +161,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           e_post_kontaktperson: customer.contact_email,
           org_nr: customer.organization_number,
           bestallare: customer.company_name,
-          adress: customer.contact_address ? {
-            formatted_address: customer.contact_address
-          } : prev.adress,
+          adress: customer.contact_address || prev.adress,
           // Lägg även till faktura-fält om de finns
           e_post_faktura: customer.billing_email || customer.contact_email,
           faktura_adress: customer.billing_address || customer.contact_address
