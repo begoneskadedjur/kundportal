@@ -1,9 +1,12 @@
 // src/components/customer/PremiumServiceRequest.tsx - Service Request Modal
 import React, { useState } from 'react'
-import { X, AlertCircle, Calendar, MessageSquare, Phone, Mail, Upload, CheckCircle } from 'lucide-react'
+import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import toast from 'react-hot-toast'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 
 interface PremiumServiceRequestProps {
   isOpen: boolean
@@ -14,17 +17,24 @@ interface PremiumServiceRequestProps {
     contact_person: string
     contact_email: string
     contact_phone: string | null
+    contact_address: string | null
   }
+  onSuccess?: () => void
 }
 
 const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({ 
   isOpen, 
   onClose, 
-  customer 
+  customer,
+  onSuccess 
 }) => {
-  const [requestType, setRequestType] = useState<'urgent' | 'scheduled' | 'general'>('general')
+  const { profile } = useAuth()
+  const [serviceType, setServiceType] = useState<ServiceType>('inspection')
+  const [priority, setPriority] = useState<CasePriority>('normal')
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
+  const [pestType, setPestType] = useState('')
+  const [otherPestType, setOtherPestType] = useState('')
   const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -40,22 +50,60 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
       return
     }
 
+    if (!profile?.customer_id) {
+      toast.error('Kunde inte identifiera kundinformation')
+      return
+    }
+
     setSubmitting(true)
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    setSubmitting(false)
-    setSubmitted(true)
-    
-    // Reset after showing success
-    setTimeout(() => {
-      onClose()
-      setSubmitted(false)
-      setSubject('')
-      setDescription('')
-      setFiles([])
-    }, 2000)
+    try {
+      // Create the case in the database
+      const { data, error } = await supabase
+        .from('cases')
+        .insert({
+          customer_id: profile.customer_id,
+          title: subject,
+          description: description,
+          status: 'requested', // Always requested for customer-created cases
+          priority: priority,
+          service_type: serviceType,
+          pest_type: pestType || null,
+          other_pest_type: otherPestType || null,
+          contact_person: customer.contact_person,
+          contact_email: customer.contact_email,
+          contact_phone: customer.contact_phone,
+          address: customer.contact_address ? {
+            formatted_address: customer.contact_address
+          } : null,
+          // Files would need separate handling with storage
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setSubmitting(false)
+      setSubmitted(true)
+      
+      toast.success('Serviceförfrågan skickad!')
+      
+      // Reset and close after animation
+      setTimeout(() => {
+        onClose()
+        setSubmitted(false)
+        setSubject('')
+        setDescription('')
+        setPestType('')
+        setOtherPestType('')
+        setFiles([])
+        if (onSuccess) onSuccess()
+      }, 2000)
+    } catch (error: any) {
+      console.error('Error creating case:', error)
+      toast.error('Kunde inte skicka förfrågan. Försök igen.')
+      setSubmitting(false)
+    }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,23 +112,24 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
     }
   }
 
-  const requestTypeConfig = {
-    urgent: {
-      icon: <AlertCircle className="w-5 h-5" />,
-      label: 'Akut ärende',
-      color: 'text-red-500 bg-red-500/10 border-red-500/20 hover:border-red-500/40'
-    },
-    scheduled: {
-      icon: <Calendar className="w-5 h-5" />,
-      label: 'Planerat besök',
-      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40'
-    },
-    general: {
-      icon: <MessageSquare className="w-5 h-5" />,
-      label: 'Allmän förfrågan',
-      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40'
-    }
+  const serviceTypeIcons = {
+    routine: <Calendar className="w-5 h-5" />,
+    acute: <AlertCircle className="w-5 h-5" />,
+    inspection: <Search className="w-5 h-5" />,
+    other: <HelpCircle className="w-5 h-5" />
   }
+
+  const commonPestTypes = [
+    'Gnagare (råttor/möss)',
+    'Kackerlackor',
+    'Myror',
+    'Vägglöss',
+    'Flugor',
+    'Getingar',
+    'Silverfisk',
+    'Mal',
+    'Annat'
+  ]
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -104,8 +153,8 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="w-10 h-10 text-green-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Tack för er förfrågan!</h3>
-                <p className="text-slate-400">Vi återkommer inom kort.</p>
+                <h3 className="text-2xl font-bold text-white mb-2">Förfrågan skickad!</h3>
+                <p className="text-slate-400">Vi återkommer inom 24 timmar.</p>
               </div>
             </div>
           )}
@@ -114,7 +163,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           <div className="flex items-center justify-between p-6 border-b border-slate-700">
             <div>
               <h2 className="text-xl font-semibold text-white">Begär service</h2>
-              <p className="text-sm text-slate-400 mt-1">Vi hjälper er gärna med era behov</p>
+              <p className="text-sm text-slate-400 mt-1">Beskriv ert behov så återkommer vi med förslag</p>
             </div>
             <button
               onClick={onClose}
@@ -124,36 +173,128 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
             </button>
           </div>
 
+          {/* Important Notice */}
+          <div className="mx-6 mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="flex gap-3">
+              <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-blue-400 font-medium mb-1">Så här fungerar det:</p>
+                <ul className="text-xs text-slate-400 space-y-1">
+                  <li>• Ni beskriver ert behov och vi återkommer med förslag på tid</li>
+                  <li>• Normal svarstid: Inom 2-3 arbetsdagar</li>
+                  <li>• Brådskande ärenden: Inom 24 timmar</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Request Type Selection */}
+            {/* Service Type Selection */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">
-                Typ av ärende
+                Typ av service
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                {Object.entries(requestTypeConfig).map(([type, config]) => (
+              <div className="grid grid-cols-2 gap-3">
+                {(Object.entries(serviceTypeConfig) as [ServiceType, typeof serviceTypeConfig.routine][]).map(([type, config]) => (
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setRequestType(type as any)}
+                    onClick={() => setServiceType(type)}
                     className={`
-                      p-3 rounded-lg border transition-all
-                      ${requestType === type 
-                        ? config.color 
-                        : 'border-slate-700 hover:border-slate-600'
+                      p-4 rounded-lg border transition-all text-left
+                      ${serviceType === type 
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
+                        : 'border-slate-700 hover:border-slate-600 text-slate-400'
                       }
                     `}
                   >
-                    <div className={`flex flex-col items-center gap-2 ${
-                      requestType === type ? '' : 'text-slate-400'
-                    }`}>
-                      {config.icon}
-                      <span className="text-sm font-medium">{config.label}</span>
+                    <div className="flex items-start gap-3">
+                      {serviceTypeIcons[type]}
+                      <div>
+                        <div className="font-medium text-sm">{config.label}</div>
+                        <div className="text-xs mt-1 opacity-80">{config.description}</div>
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Priority Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-3">
+                Prioritet
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPriority('normal')}
+                  className={`
+                    p-3 rounded-lg border transition-all
+                    ${priority === 'normal' 
+                      ? 'bg-slate-700 border-slate-600 text-white' 
+                      : 'border-slate-700 hover:border-slate-600 text-slate-400'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Normal</span>
+                  </div>
+                  <p className="text-xs mt-1 opacity-80">2-3 arbetsdagar</p>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setPriority('urgent')}
+                  className={`
+                    p-3 rounded-lg border transition-all
+                    ${priority === 'urgent' 
+                      ? 'bg-red-500/10 border-red-500/20 text-red-500' 
+                      : 'border-slate-700 hover:border-slate-600 text-slate-400'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Brådskande</span>
+                  </div>
+                  <p className="text-xs mt-1 opacity-80">Inom 24 timmar</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Pest Type */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Typ av skadedjur (om känt)
+              </label>
+              <select
+                value={pestType}
+                onChange={(e) => {
+                  setPestType(e.target.value)
+                  if (e.target.value !== 'Annat') {
+                    setOtherPestType('')
+                  }
+                }}
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="">Välj eller osäker</option>
+                {commonPestTypes.map(pest => (
+                  <option key={pest} value={pest}>{pest}</option>
+                ))}
+              </select>
+              
+              {pestType === 'Annat' && (
+                <Input
+                  type="text"
+                  value={otherPestType}
+                  onChange={(e) => setOtherPestType(e.target.value)}
+                  placeholder="Beskriv skadedjuret"
+                  className="mt-2"
+                />
+              )}
             </div>
 
             {/* Subject */}
@@ -165,7 +306,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Beskriv kort vad ärendet gäller"
+                placeholder="Kort beskrivning av ärendet"
                 className="w-full"
                 required
               />
@@ -179,20 +320,20 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ge oss mer detaljer om ert behov..."
+                placeholder="Beskriv problemet, var det finns, hur länge det pågått, etc..."
                 rows={4}
                 className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
                 required
               />
               <p className="text-xs text-slate-500 mt-1">
-                Ju mer information ni ger oss, desto bättre kan vi hjälpa er.
+                Ju mer information ni ger, desto bättre kan vi förbereda rätt åtgärd.
               </p>
             </div>
 
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Bifoga filer (valfritt)
+                Bifoga bilder (valfritt)
               </label>
               <div className="relative">
                 <input
@@ -201,7 +342,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                   onChange={handleFileChange}
                   className="hidden"
                   id="file-upload"
-                  accept="image/*,.pdf,.doc,.docx"
+                  accept="image/*"
                 />
                 <label
                   htmlFor="file-upload"
@@ -210,26 +351,17 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                   <Upload className="w-5 h-5 text-slate-400" />
                   <span className="text-slate-400">
                     {files.length > 0 
-                      ? `${files.length} fil(er) valda` 
-                      : 'Klicka för att välja filer'}
+                      ? `${files.length} bild(er) valda` 
+                      : 'Klicka för att ladda upp bilder'}
                   </span>
                 </label>
               </div>
-              {files.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {files.map((file, index) => (
-                    <div key={index} className="text-xs text-slate-500">
-                      • {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Contact Method */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">
-                Hur vill ni bli kontaktade?
+                Föredragen kontaktmetod
               </label>
               <div className="flex gap-3">
                 <button
@@ -262,16 +394,6 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                   <span className="text-sm font-medium">Telefon</span>
                 </button>
               </div>
-              {contactMethod === 'email' && (
-                <p className="text-xs text-slate-500 mt-2">
-                  Vi kontaktar er på: {customer.contact_email}
-                </p>
-              )}
-              {contactMethod === 'phone' && customer.contact_phone && (
-                <p className="text-xs text-slate-500 mt-2">
-                  Vi ringer er på: {customer.contact_phone}
-                </p>
-              )}
             </div>
 
             {/* Actions */}

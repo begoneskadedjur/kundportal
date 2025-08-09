@@ -174,6 +174,10 @@ const CustomerPortal: React.FC = () => {
           isOpen={showServiceRequest}
           onClose={() => setShowServiceRequest(false)}
           customer={customer}
+          onSuccess={() => {
+            // Trigger refresh of timeline when new case is created
+            window.location.reload()
+          }}
         />
       )}
 
