@@ -1,10 +1,11 @@
 // 📁 src/components/admin/coordinator/CreateCaseModal.tsx
-// ⭐ VERSION 3.5 - FÖRBÄTTRAR UI/UX FÖR KNAPPAR OCH PRISSÄTTNING ⭐
+// ⭐ VERSION 4.0 - STÖD FÖR AVTALSKUNDER OCH TRE KUNDTYPER ⭐
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent } from 'lucide-react';
+import { Case } from '../../../types/cases';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 
@@ -60,8 +61,10 @@ interface CreateCaseModalProps {
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
-  const [caseType, setCaseType] = useState<'private' | 'business' | null>(null);
+  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
+  const [contractCustomers, setContractCustomers] = useState<any[]>([]);
+  const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
   const [timeSlotDuration, setTimeSlotDuration] = useState(60);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -81,11 +84,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSuggestions([]); setTeamSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
     setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
+    setSelectedContractCustomer(null);
   }, []);
+
+  // Hämta avtalskunder när modal öppnas
+  useEffect(() => {
+    const fetchContractCustomers = async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, company_name, organization_number, contact_person')
+        .order('company_name');
+      
+      if (!error && data) {
+        setContractCustomers(data);
+      }
+    };
+
+    if (isOpen) {
+      fetchContractCustomers();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && initialCaseData) {
-      const type = initialCaseData.case_type === 'private' ? 'private' : 'business';
+      const type = initialCaseData.case_type === 'private' ? 'private' : 
+                   initialCaseData.case_type === 'business' ? 'business' : 'contract';
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
       setFormData({ ...initialCaseData, status: 'Bokat', adress: formattedAddress });
@@ -101,8 +124,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [isOpen, initialCaseData, handleReset]);
 
-  const selectCaseType = (type: 'private' | 'business') => {
-    setCaseType(type); setFormData({ status: 'Bokat' }); setStep('form');
+  const selectCaseType = (type: 'private' | 'business' | 'contract') => {
+    setCaseType(type); 
+    if (type === 'contract' && contractCustomers.length === 0) {
+      toast.error('Inga avtalskunder hittades');
+      return;
+    }
+    setFormData({ status: 'Bokat' }); 
+    setStep('form');
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -221,24 +250,73 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault();
-    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda."); }
-    setLoading(true); setError(null);
+    if (!caseType || !formData.title || !formData.start_date || !formData.due_date || !formData.primary_assignee_id) { 
+      return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda."); 
+    }
+    if (caseType === 'contract' && !selectedContractCustomer) {
+      return toast.error('Du måste välja en avtalskund');
+    }
+    
+    setLoading(true); 
+    setError(null);
+    
     try {
-      const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
-      if (initialCaseData) {
-        const { error } = await supabase.from(tableName).update(formData).eq('id', initialCaseData.id);
-        if (error) throw error;
-        toast.success(`Ärendet "${formData.title}" har bokats in!`);
-      } else {
-        const { data, error } = await supabase.from(tableName).insert([{ ...formData, title: formData.title.trim(), clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }]).select('id');
-        if (error) throw error;
-        toast.success('Ärendet har skapats!');
+      if (caseType === 'contract') {
+        // Hantera avtalskundärenden
+        const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
+        const caseData = {
+          customer_id: selectedContractCustomer,
+          title: formData.title.trim(),
+          description: formData.description || '',
+          status: 'scheduled' as const,
+          priority: formData.priority || 'normal',
+          service_type: 'routine' as const,
+          pest_type: formData.pest_type || null,
+          scheduled_start: formData.start_date,
+          scheduled_end: formData.due_date,
+          primary_technician_id: formData.primary_assignee_id,
+          primary_technician_name: formData.primary_assignee_name || null,
+          contact_person: customer?.contact_person || null,
+          contact_email: formData.email || null,
+          contact_phone: formData.telefon || null,
+          address: formData.adress ? { formatted_address: formData.adress } : null,
+          price: formData.price || null,
+          case_number: `AVT-${Date.now().toString().slice(-6)}`
+        };
         
-        // Synka till ClickUp i bakgrunden om case skapades
-        if (data && data[0]?.id && caseType) {
-          syncAfterCreate(data[0].id, caseType);
+        if (initialCaseData && initialCaseData.case_type === 'contract') {
+          // Uppdatera befintligt avtalskundärende
+          const { error } = await supabase.from('cases').update(caseData).eq('id', initialCaseData.id);
+          if (error) throw error;
+        } else {
+          // Skapa nytt avtalskundärende
+          const { error } = await supabase.from('cases').insert([caseData]);
+          if (error) throw error;
+        }
+        toast.success(`Avtalskundärendet "${formData.title}" har bokats in!`);
+      } else {
+        // Hantera ClickUp-ärenden (private/business)
+        const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
+        if (initialCaseData && initialCaseData.case_type !== 'contract') {
+          const { error } = await supabase.from(tableName).update(formData).eq('id', initialCaseData.id);
+          if (error) throw error;
+          toast.success(`Ärendet "${formData.title}" har bokats in!`);
+        } else {
+          const { data, error } = await supabase.from(tableName).insert([{ 
+            ...formData, 
+            title: formData.title.trim(), 
+            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` 
+          }]).select('id');
+          if (error) throw error;
+          toast.success('Ärendet har skapats!');
+          
+          // Synka till ClickUp i bakgrunden om case skapades
+          if (data && data[0]?.id && caseType !== 'contract') {
+            syncAfterCreate(data[0].id, caseType);
+          }
         }
       }
+      
       setSubmitted(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1500);
     } catch (err: any) {
@@ -272,12 +350,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const showRotRutDetails = formData.r_rot_rut === 'ROT' || formData.r_rot_rut === 'RUT';
 
   return (
-      <Modal isOpen={isOpen} onClose={onClose} title={initialCaseData ? `Boka in: ${initialCaseData.title}` : (step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : 'Företag'}`)} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer}>
+      <Modal isOpen={isOpen} onClose={onClose} title={initialCaseData ? `Boka in: ${initialCaseData.title}` : (step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : caseType === 'business' ? 'Företag' : 'Avtalskund'}`)} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer}>
         <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
               <div className="flex flex-col md:flex-row gap-4">
-                  <button onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" /><h3 className="text-xl font-bold">Privatperson</h3></button>
-                  <button onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"><Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" /><h3 className="text-xl font-bold">Företag</h3></button>
+                  <button onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
+                    <User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" />
+                    <h3 className="text-xl font-bold">Privatperson</h3>
+                    <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
+                  </button>
+                  <button onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
+                    <Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" />
+                    <h3 className="text-xl font-bold">Företag</h3>
+                    <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
+                  </button>
+                  <button onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30">
+                    <FileCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-emerald-400" />
+                    <h3 className="text-xl font-bold">Avtalskund</h3>
+                    <p className="text-sm text-slate-400 mt-2">Återkommande tjänster</p>
+                    {contractCustomers.length > 0 && (
+                      <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
+                    )}
+                  </button>
               </div>
           )}
           {step === 'form' && (
@@ -286,6 +380,39 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3"><AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /><p className="text-red-400">{error}</p></div>)}
+              
+              {/* Avtalskund-väljare */}
+              {caseType === 'contract' && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Välj avtalskund *
+                  </label>
+                  <select
+                    value={selectedContractCustomer || ''}
+                    onChange={(e) => {
+                      setSelectedContractCustomer(e.target.value);
+                      const customer = contractCustomers.find(c => c.id === e.target.value);
+                      if (customer) {
+                        setFormData(prev => ({
+                          ...prev,
+                          kontaktperson: customer.contact_person,
+                          organization_number: customer.organization_number
+                        }));
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                    required
+                  >
+                    <option value="">Välj kund...</option>
+                    {contractCustomers.map(customer => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="p-4 sm:p-6 bg-slate-800/50 border border-slate-700 rounded-lg space-y-4 flex flex-col">
                   <h3 className="font-semibold text-white text-lg flex items-center gap-2"><Zap className="text-blue-400"/>Intelligent Bokning</h3>
