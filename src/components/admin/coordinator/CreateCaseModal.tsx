@@ -92,7 +92,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     const fetchContractCustomers = async () => {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, company_name, organization_number, contact_person')
+        .select('*')
         .order('company_name');
       
       console.log('Fetched contract customers:', data); // Debug
@@ -399,7 +399,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         setFormData(prev => ({
                           ...prev,
                           kontaktperson: customer.contact_person,
-                          organization_number: customer.organization_number
+                          telefon: customer.contact_phone,
+                          email: customer.contact_email,
+                          organization_number: customer.organization_number,
+                          adress: customer.contact_address ? {
+                            formatted_address: customer.contact_address
+                          } : prev.adress
                         }));
                       }
                     }}
