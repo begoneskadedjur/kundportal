@@ -70,10 +70,11 @@ export default function CoordinatorSchedule() {
               contractCase.status === 'in_progress' ? 'Pågående' : 
               contractCase.status === 'completed' ? 'Avslutat' : 'Öppen',
       priority: contractCase.priority,
-      adress: contractCase.address || customer?.contact_address,
-      kontaktperson: contractCase.contact_person || customer?.contact_person,
-      telefon: contractCase.contact_phone || customer?.contact_phone,
-      email: contractCase.contact_email || customer?.contact_email,
+      // Prioritera customer-data över case-data för kontaktuppgifter
+      adress: customer?.contact_address || contractCase.address,
+      kontaktperson: customer?.contact_person || contractCase.contact_person,
+      telefon: customer?.contact_phone || contractCase.contact_phone,
+      email: customer?.contact_email || contractCase.contact_email,
       start_date: contractCase.scheduled_start,
       end_date: contractCase.scheduled_end,
       primary_assignee_id: contractCase.primary_technician_id,

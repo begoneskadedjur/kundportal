@@ -15,6 +15,7 @@ interface PremiumServiceRequestProps {
   customer: {
     id: string
     company_name: string
+    organization_number: string | null
     contact_person: string
     contact_email: string
     contact_phone: string | null
@@ -122,7 +123,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
 
   // Använd standardiserad lista från clickupFieldMapper
   // Detta säkerställer kompatibilitet med CreateCaseModal
-  const pestTypes = [...PEST_TYPES, 'Annat']
+  const pestTypes = PEST_TYPES
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -267,7 +268,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 value={pestType}
                 onChange={(e) => {
                   setPestType(e.target.value)
-                  if (e.target.value !== 'Annat') {
+                  if (e.target.value !== 'Övrigt') {
                     setOtherPestType('')
                   }
                 }}
@@ -279,7 +280,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 ))}
               </select>
               
-              {pestType === 'Annat' && (
+              {pestType === 'Övrigt' && (
                 <Input
                   type="text"
                   value={otherPestType}

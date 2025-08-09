@@ -114,10 +114,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                    initialCaseData.case_type === 'business' ? 'business' : 'contract';
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
-      setFormData({ ...initialCaseData, status: 'Bokat', adress: formattedAddress });
+      // Mappa pest_type till skadedjur för contract cases
+      const mappedData = {
+        ...initialCaseData,
+        status: 'Bokat',
+        adress: formattedAddress,
+        skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur
+      };
+      setFormData(mappedData);
       setStep('form');
       const assignedCount = [initialCaseData.primary_assignee_id, initialCaseData.secondary_assignee_id, initialCaseData.tertiary_assignee_id].filter(Boolean).length;
       setNumberOfTechnicians(assignedCount > 0 ? assignedCount : 1);
+      
+      // Om det är ett contract case, sätt selectedContractCustomer
+      if (type === 'contract' && initialCaseData.customer_id) {
+        setSelectedContractCustomer(initialCaseData.customer_id);
+      }
     } else if (isOpen) {
       handleReset();
       if (technicians.length > 0) {
