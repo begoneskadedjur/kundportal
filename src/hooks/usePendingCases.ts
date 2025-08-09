@@ -50,6 +50,8 @@ export const usePendingCases = (): UsePendingCasesReturn => {
         // Debug: Check what we're getting
         if (item.customer === null) {
           console.log('Case without customer:', item.id, item.title)
+        } else {
+          console.log('Customer data for case:', item.customer) // Debug what customer data we get
         }
         
         return {

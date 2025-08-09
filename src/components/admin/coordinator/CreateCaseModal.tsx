@@ -95,6 +95,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         .select('id, company_name, organization_number, contact_person')
         .order('company_name');
       
+      console.log('Fetched contract customers:', data); // Debug
+      console.log('Error fetching customers:', error); // Debug
+      
       if (!error && data) {
         setContractCustomers(data);
       }
