@@ -36,9 +36,12 @@ const PendingRequestsNotifier: React.FC<PendingRequestsNotifierProps> = ({
     <>
       {/* Floating notification button */}
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => {
+          console.log('Notifier clicked, opening modal...');
+          setIsModalOpen(true);
+        }}
         className={`
-          fixed bottom-8 right-8 
+          fixed bottom-8 right-8 z-40
           bg-slate-800 hover:bg-slate-700 
           border border-slate-700 hover:border-emerald-500
           text-white rounded-full 
@@ -46,7 +49,7 @@ const PendingRequestsNotifier: React.FC<PendingRequestsNotifierProps> = ({
           shadow-lg hover:shadow-emerald-500/25 
           transition-all duration-300 
           flex items-center gap-3
-          group
+          group cursor-pointer
           ${isAnimating ? 'animate-bounce' : ''}
           ${urgentCount > 0 ? 'ring-2 ring-red-500/50 animate-pulse' : ''}
           ${className}

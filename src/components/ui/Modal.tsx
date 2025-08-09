@@ -1,5 +1,5 @@
 // src/components/ui/Modal.tsx - Förbättrad modal base komponent
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import Button from './Button'
 import Card from './Card'
@@ -8,7 +8,7 @@ import Portal from './Portal'
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  title: string
+  title: string | React.ReactNode
   subtitle?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   children: React.ReactNode

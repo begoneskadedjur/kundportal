@@ -67,7 +67,7 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
           </div>
         </div>
       }
-      size="max-w-3xl"
+      size="lg"
     >
       <div className="p-6">
         {loading ? (
