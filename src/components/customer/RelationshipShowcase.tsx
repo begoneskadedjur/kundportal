@@ -57,14 +57,22 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
           </div>
 
           <div className="space-y-3">
+            {/* Name */}
+            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+              <span className="text-sm text-slate-400 w-20 flex-shrink-0">Namn</span>
+              <span className="text-white font-medium text-right">
+                {accountManager || 'Ej tilldelad'}
+              </span>
+            </div>
+
             {/* Email */}
             {customer.account_manager_email && (
               <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
-                <span className="text-sm text-slate-400 min-w-0 flex-shrink-0 mr-3">E-post</span>
+                <span className="text-sm text-slate-400 w-20 flex-shrink-0">E-post</span>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <a 
                     href={`mailto:${customer.account_manager_email}`}
-                    className="text-emerald-400 hover:text-emerald-300 transition-colors truncate flex-1"
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors truncate flex-1 text-right"
                   >
                     {customer.account_manager_email}
                   </a>
@@ -82,14 +90,6 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
                 </div>
               </div>
             )}
-
-            {/* Name */}
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-sm text-slate-400">Namn</span>
-              <span className="text-white font-medium">
-                {accountManager || 'Ej tilldelad'}
-              </span>
-            </div>
 
             {/* Phone - if available in future */}
             {false && ( // Placeholder for future phone number
@@ -126,14 +126,14 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
           <div className="space-y-3">
             {/* Support Email */}
             <div className="flex items-center p-3 bg-slate-900/50 rounded-lg group hover:bg-slate-900/70 transition-colors">
-              <span className="text-sm text-slate-400 min-w-0 flex-shrink-0 mr-3">E-post</span>
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-sm text-slate-400 w-20 flex-shrink-0">E-post</span>
+              <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
                 <a 
                   href="mailto:info@begone.se"
-                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 flex-1 min-w-0"
+                  className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 text-right"
                 >
                   <Mail className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">info@begone.se</span>
+                  <span>info@begone.se</span>
                 </a>
                 <button
                   onClick={() => copyToClipboard('info@begone.se', 'E-post')}
@@ -151,7 +151,7 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
             {/* Phone */}
             <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg hover:bg-slate-900/70 transition-colors">
-              <span className="text-sm text-slate-400">Telefon</span>
+              <span className="text-sm text-slate-400 w-20 flex-shrink-0">Telefon</span>
               <a 
                 href="tel:0102804410"
                 className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
@@ -163,7 +163,7 @@ const RelationshipShowcase: React.FC<RelationshipShowcaseProps> = ({ customer })
 
             {/* Opening Hours */}
             <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-sm text-slate-400">Öppettider</span>
+              <span className="text-sm text-slate-400 w-20 flex-shrink-0">Öppettider</span>
               <div className="flex items-center gap-2 text-white">
                 <Clock className="w-3 h-3 text-slate-400" />
                 <div className="text-sm">

@@ -35,7 +35,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
       try {
         const { data, error } = await supabase
           .from('cases')
-          .select('status, next_scheduled_visit')
+          .select('status, scheduled_start, scheduled_end')
           .eq('customer_id', customer.id)
         
         if (error) throw error
@@ -44,14 +44,26 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         const activeCount = data?.filter(caseItem => !isCompletedStatus(caseItem.status)).length || 0
         setActiveCasesCount(activeCount)
 
-        // Find next scheduled visit (earliest upcoming date)
+        // Find next scheduled visit using scheduled_start (earliest upcoming date)
         const upcomingVisits = data
-          ?.filter(caseItem => caseItem.next_scheduled_visit)
-          ?.map(caseItem => new Date(caseItem.next_scheduled_visit!))
-          ?.filter(date => date > new Date())
-          ?.sort((a, b) => a.getTime() - b.getTime())
+          ?.filter(caseItem => caseItem.scheduled_start)
+          ?.map(caseItem => ({ 
+            start: new Date(caseItem.scheduled_start!), 
+            end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null 
+          }))
+          ?.filter(visit => visit.start > new Date())
+          ?.sort((a, b) => a.start.getTime() - b.start.getTime())
 
-        setNextVisit(upcomingVisits?.[0]?.toISOString() || null)
+        // Set the next visit with both start and end times
+        if (upcomingVisits && upcomingVisits.length > 0) {
+          const nextVisitData = upcomingVisits[0]
+          setNextVisit(JSON.stringify({ 
+            start: nextVisitData.start.toISOString(), 
+            end: nextVisitData.end?.toISOString() || null 
+          }))
+        } else {
+          setNextVisit(null)
+        }
       } catch (error) {
         console.error('Error fetching cases data:', error)
         setActiveCasesCount(0)
@@ -93,24 +105,38 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
   const formatNextVisitDate = (dateString: string | null) => {
     if (!dateString) return { value: 'Ej schemalagt', subtitle: 'Kontakta för bokning' }
     
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === 0) {
-      return { value: 'Idag', subtitle: date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) }
-    } else if (diffDays === 1) {
-      return { value: 'Imorgon', subtitle: date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) }
-    } else if (diffDays < 7) {
-      return { 
-        value: `${diffDays} dagar`, 
-        subtitle: date.toLocaleDateString('sv-SE', { weekday: 'long', month: 'short', day: 'numeric' })
+    try {
+      const visitData = JSON.parse(dateString)
+      const startDate = new Date(visitData.start)
+      const endDate = visitData.end ? new Date(visitData.end) : null
+      const now = new Date()
+      const diffDays = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      
+      // Format time range
+      const startTime = startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+      const endTime = endDate ? endDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : null
+      const timeRange = endTime ? `${startTime}-${endTime}` : startTime
+      
+      if (diffDays === 0) {
+        return { value: 'Idag', subtitle: timeRange }
+      } else if (diffDays === 1) {
+        return { value: 'Imorgon', subtitle: timeRange }
+      } else if (diffDays < 7) {
+        const dateStr = startDate.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+        return { 
+          value: `${dateStr}`, 
+          subtitle: timeRange
+        }
+      } else {
+        const dateStr = startDate.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+        return { 
+          value: dateStr, 
+          subtitle: timeRange
+        }
       }
-    } else {
-      return { 
-        value: date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }), 
-        subtitle: date.toLocaleDateString('sv-SE', { weekday: 'long' })
-      }
+    } catch (error) {
+      // Fallback for invalid JSON
+      return { value: 'Ej schemalagt', subtitle: 'Kontakta för bokning' }
     }
   }
 

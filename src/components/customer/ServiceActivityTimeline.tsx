@@ -375,7 +375,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                             </div>
                           )}
 
-                          {/* Price (if visible to customer and has value) */}
+                          {/* Price (if visible to customer and has value) - Only show if price > 0 */}
                           {caseItem.price && caseItem.price > 0 && caseItem.status === 'Avslutat' && (
                             <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
                               <span className="text-sm text-slate-400">Kostnad</span>
