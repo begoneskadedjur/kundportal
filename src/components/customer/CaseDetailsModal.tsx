@@ -416,8 +416,8 @@ export default function CaseDetailsModal({
                       )}
                     </div>
 
-                    {/* Pris */}
-                    {priceField && priceField.has_value && (
+                    {/* Pris - Only show if price > 0 */}
+                    {priceField && priceField.has_value && priceField.value > 0 && (
                       <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg">
                         <DollarSign className="w-5 h-5 text-green-400" />
                         <div>
