@@ -15,6 +15,8 @@ import ContractValueCard from '../../components/customer/ContractValueCard'
 import PremiumServiceRequest from '../../components/customer/PremiumServiceRequest'
 import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
+import CustomerPortalNavigation from '../../components/customer/CustomerPortalNavigation'
+import CustomerStatistics from '../../components/customer/CustomerStatistics'
 
 // Customer type matching new database structure
 type Customer = {
@@ -51,6 +53,7 @@ const CustomerPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
+  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics'>('dashboard')
 
   // Fetch customer data
   useEffect(() => {
@@ -122,7 +125,13 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
-  return (
+  // Statistics view component
+  const renderStatisticsView = () => (
+    <CustomerStatistics customer={customer} />
+  )
+
+  // Dashboard view component  
+  const renderDashboardView = () => (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Premium Welcome Hero */}
       <PremiumWelcomeHero 
@@ -196,6 +205,20 @@ const CustomerPortal: React.FC = () => {
           Begär service
         </span>
       </button>
+    </div>
+  )
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Navigation */}
+      <CustomerPortalNavigation
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        customerName={customer.company_name}
+      />
+
+      {/* Content based on current view */}
+      {currentView === 'dashboard' ? renderDashboardView() : renderStatisticsView()}
     </div>
   )
 }
