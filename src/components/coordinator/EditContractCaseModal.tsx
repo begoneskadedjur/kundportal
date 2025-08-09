@@ -261,7 +261,7 @@ export default function EditContractCaseModal({
                       value={formData.status}
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                       disabled={isCustomerView}
-                      className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
+                      className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >
                       <option value="requested">Begärd</option>
                       <option value="scheduled">Schemalagd</option>
@@ -388,7 +388,7 @@ export default function EditContractCaseModal({
                       value={formData.pest_type}
                       onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
                       disabled={isCustomerView}
-                      className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50"
+                      className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >
                       <option value="">Välj skadedjur...</option>
                       {PEST_TYPES.map(pest => (

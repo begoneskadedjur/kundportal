@@ -77,7 +77,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           priority: priority,
           service_type: serviceType,
           pest_type: pestType || null,
-          other_pest_type: otherPestType || null,
+          other_pest_type: pestType === 'Övrigt' ? otherPestType : null,
           contact_person: useAlternativeContact && alternativeContactPerson ? alternativeContactPerson : customer.contact_person,
           contact_email: useAlternativeContact && alternativeContactEmail ? alternativeContactEmail : customer.contact_email,
           contact_phone: useAlternativeContact && alternativeContactPhone ? alternativeContactPhone : customer.contact_phone,
@@ -269,7 +269,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               </div>
             </div>
 
-            {/* Pest Type */}
+            {/* Pest Type - samma som i CreateCaseModal */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Typ av skadedjur (om känt)
@@ -284,7 +284,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 }}
                 className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
-                <option value="">Välj eller osäker</option>
+                <option value="">Välj skadedjur...</option>
                 {pestTypes.map(pest => (
                   <option key={pest} value={pest}>{pest}</option>
                 ))}
