@@ -5,7 +5,7 @@ import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Case, CaseStatus, caseStatusConfig, serviceTypeConfig } from '../../types/cases'
+import { Case, CaseStatus, caseStatusConfig, serviceTypeConfig, normalizeStatus, getSafeStatusConfig } from '../../types/cases'
 import ServiceRequestStatus from './ServiceRequestStatus'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -62,7 +62,14 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
 
       if (error) throw error
       
-      setCases(data || [])
+      // Validate and clean case data using new normalize function
+      const validatedCases = (data || []).map(caseItem => {
+        // Normalize status to ensure it's always valid
+        caseItem.status = normalizeStatus(caseItem.status)
+        return caseItem
+      })
+      
+      setCases(validatedCases)
     } catch (error: any) {
       console.error('Error fetching cases:', error)
       toast.error('Kunde inte hämta ärenden')
@@ -205,15 +212,10 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
           <div className="space-y-6">
             {filteredCases.map((caseItem, index) => {
               const isExpanded = expandedCase === caseItem.id
-              // Add fallback for undefined status values
-              const config = caseStatusConfig[caseItem.status] || {
-                label: 'Okänd status',
-                color: 'slate',
-                bgColor: 'bg-slate-700',
-                borderColor: 'border-slate-600',
-                textColor: 'text-slate-300',
-                icon: 'Clock'
-              }
+              
+              // Use the new safe status handling
+              const safeStatus = normalizeStatus(caseItem.status)
+              const config = getSafeStatusConfig(safeStatus)
               const serviceType = caseItem.service_type ? serviceTypeConfig[caseItem.service_type] : null
               
               return (
@@ -224,11 +226,11 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     ${config.bgColor} ${config.borderColor} ${config.textColor} border transition-all duration-300
                     group-hover:scale-110
                   `}>
-                    {caseItem.status === 'requested' && <Clock className="w-5 h-5" />}
-                    {caseItem.status === 'scheduled' && <Calendar className="w-5 h-5" />}
-                    {caseItem.status === 'in_progress' && <Wrench className="w-5 h-5" />}
-                    {caseItem.status === 'completed' && <CheckCircle className="w-5 h-5" />}
-                    {caseItem.status === 'cancelled' && <XCircle className="w-5 h-5" />}
+                    {safeStatus === 'requested' && <Clock className="w-5 h-5" />}
+                    {safeStatus === 'scheduled' && <Calendar className="w-5 h-5" />}
+                    {safeStatus === 'in_progress' && <Wrench className="w-5 h-5" />}
+                    {safeStatus === 'completed' && <CheckCircle className="w-5 h-5" />}
+                    {safeStatus === 'cancelled' && <XCircle className="w-5 h-5" />}
                   </div>
 
                   {/* Content */}
@@ -244,7 +246,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                           <p className="text-xs text-slate-500">{formatDate(caseItem.created_at)}</p>
                         </div>
                         <ServiceRequestStatus 
-                          status={caseItem.status}
+                          status={safeStatus}
                           size="sm"
                           scheduledDate={caseItem.scheduled_start}
                           technicianName={caseItem.primary_technician_name}

@@ -9,6 +9,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
+import { normalizeStatus, CaseStatus } from '../../types/cases'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 
 interface EditContractCaseModalProps {
@@ -76,7 +77,7 @@ export default function EditContractCaseModal({
       setFormData({
         title: caseData.title || '',
         description: caseData.description || '',
-        status: caseData.status || 'requested',
+        status: normalizeStatus(caseData.status),
         contact_person: caseData.contact_person || caseData.kontaktperson || '',
         contact_phone: caseData.contact_phone || caseData.telefon_kontaktperson || '',
         contact_email: caseData.contact_email || caseData.email || '',
@@ -280,15 +281,15 @@ export default function EditContractCaseModal({
                     </label>
                     <select
                       value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: normalizeStatus(e.target.value) }))}
                       disabled={isCustomerView}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >
-                      <option value="requested">Begärd</option>
-                      <option value="scheduled">Schemalagd</option>
+                      <option value="requested">Väntar på schemaläggning</option>
+                      <option value="scheduled">Schemalagt</option>
                       <option value="in_progress">Pågående</option>
-                      <option value="completed">Avslutad</option>
-                      <option value="cancelled">Avbruten</option>
+                      <option value="completed">Slutfört</option>
+                      <option value="cancelled">Avbrutet</option>
                     </select>
                   </div>
                 </div>

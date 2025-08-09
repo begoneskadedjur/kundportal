@@ -139,6 +139,77 @@ export const caseStatusConfig = {
   }
 }
 
+// Type guard to ensure status is valid
+export const isValidCaseStatus = (status: any): status is CaseStatus => {
+  return typeof status === 'string' && status in caseStatusConfig
+}
+
+// Safe status getter with guaranteed fallback
+export const getSafeStatusConfig = (status: any) => {
+  if (isValidCaseStatus(status)) {
+    return caseStatusConfig[status]
+  }
+  
+  // Default fallback config for any invalid status
+  return {
+    label: `Okänd status (${status})`,
+    color: 'slate',
+    bgColor: 'bg-slate-500/10',
+    borderColor: 'border-slate-500/20',
+    textColor: 'text-slate-400',
+    icon: 'AlertCircle'
+  }
+}
+
+// Status normalization function to handle various input formats
+export const normalizeStatus = (status: any): CaseStatus => {
+  if (!status) return 'requested'
+  
+  const statusStr = String(status).toLowerCase().trim()
+  
+  // Direct matches
+  if (statusStr in caseStatusConfig) {
+    return statusStr as CaseStatus
+  }
+  
+  // Common variations and mappings
+  const statusMappings: { [key: string]: CaseStatus } = {
+    // Swedish variations
+    'begärd': 'requested',
+    'väntar': 'requested',
+    'ny': 'requested',
+    'new': 'requested',
+    'schemalagd': 'scheduled',
+    'schemalagt': 'scheduled',
+    'planerad': 'scheduled',
+    'planned': 'scheduled',
+    'booking': 'scheduled',
+    'bokat': 'scheduled',
+    'pågående': 'in_progress',
+    'påbörjad': 'in_progress',
+    'working': 'in_progress',
+    'active': 'in_progress',
+    'avslutad': 'completed',
+    'slutförd': 'completed',
+    'slutfört': 'completed',
+    'klar': 'completed',
+    'done': 'completed',
+    'finished': 'completed',
+    'avbruten': 'cancelled',
+    'avbrutet': 'cancelled',
+    'annullerad': 'cancelled',
+    'canceled': 'cancelled'
+  }
+  
+  if (statusStr in statusMappings) {
+    return statusMappings[statusStr]
+  }
+  
+  // Default fallback
+  console.warn(`Unknown status "${status}", defaulting to 'requested'`)
+  return 'requested'
+}
+
 // Service type configurations
 export const serviceTypeConfig = {
   routine: {

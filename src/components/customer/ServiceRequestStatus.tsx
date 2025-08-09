@@ -1,7 +1,7 @@
 // src/components/customer/ServiceRequestStatus.tsx - Visual Status Indicator
 import React from 'react'
 import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { CaseStatus, caseStatusConfig } from '../../types/cases'
+import { CaseStatus, caseStatusConfig, normalizeStatus, getSafeStatusConfig } from '../../types/cases'
 
 interface ServiceRequestStatusProps {
   status: CaseStatus
@@ -20,7 +20,9 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
   scheduledDate,
   technicianName
 }) => {
-  const config = caseStatusConfig[status]
+  // Use safe status handling
+  const normalizedStatus = normalizeStatus(status)
+  const config = getSafeStatusConfig(normalizedStatus)
   
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs',
@@ -35,7 +37,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
   }
 
   const getIcon = () => {
-    switch (status) {
+    switch (normalizedStatus) {
       case 'requested':
         return <Clock className={`${iconSizes[size]} animate-pulse`} />
       case 'scheduled':
@@ -74,7 +76,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       </div>
       
       {/* Additional info for scheduled status */}
-      {status === 'scheduled' && scheduledDate && (
+      {normalizedStatus === 'scheduled' && scheduledDate && (
         <div className="text-xs text-slate-400 ml-1">
           <div>{formatScheduledDate(scheduledDate)}</div>
           {technicianName && (
@@ -84,7 +86,7 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       )}
       
       {/* Response time for requested status */}
-      {status === 'requested' && (
+      {normalizedStatus === 'requested' && (
         <div className="text-xs text-amber-400/80 ml-1 animate-pulse">
           Svar inom 24h
         </div>
