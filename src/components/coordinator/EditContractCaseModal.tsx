@@ -9,7 +9,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
-// Status types now from database.ts
+import { DROPDOWN_STATUSES } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 
 interface EditContractCaseModalProps {
@@ -285,11 +285,10 @@ export default function EditContractCaseModal({
                       disabled={isCustomerView}
                       className="w-full px-3 py-2 bg-white/5 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 [&>option]:bg-slate-900 [&>option]:text-white"
                     >
-                      <option value="Öppen">Öppen</option>
-                      <option value="Bokad">Bokad</option>
-                      <option value="Pågående">Pågående</option>
-                      <option value="Avslutat">Avslutat</option>
-                      <option value="Stängt - slasklogg">Stängt</option>
+                      <option value="">Välj status...</option>
+                      {DROPDOWN_STATUSES.map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

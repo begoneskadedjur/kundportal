@@ -484,24 +484,26 @@ export type Database = {
   }
 }
 
-// 🎯 CLICKUP STATUS SYSTEM - Med kapitalisering för portal-visning
+// 🎯 CLICKUP STATUS SYSTEM - EXACT internal statuses (used in database, dropdowns, coordinator/technician views)
 export type ClickUpStatus = 
   | 'Öppen'
-  | 'Bokat'
+  | 'Bokad'  // Note: "Bokat" variant also exists in some places
+  | 'Offert skickad'
+  | 'Offert signerad - boka in'
   | 'Återbesök 1'
   | 'Återbesök 2'
   | 'Återbesök 3'
   | 'Återbesök 4'
   | 'Återbesök 5'
-  | 'Privatperson - review'
+  | 'Privatperson - review'  // NEVER show in dropdowns or to customers
+  | 'Stängt - slasklogg'
+  | 'Avslutat'
+  // Legacy/deprecated statuses that may exist in data:
+  | 'Bokat'  // Alternative spelling of Bokad
   | 'Bomkörning'
   | 'Generera saneringsrapport'
   | 'Ombokning'
-  | 'Offert skickad'
-  | 'Offert signerad - boka in'
   | 'Reklamation'
-  | 'Stängt - slasklogg'
-  | 'Avslutat'
 
 // 🆔 STATUS ID TILL NAMN MAPPNING - Med kapitalisering
 export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
@@ -584,6 +586,80 @@ export const getStatusType = (status: ClickUpStatus): string => {
 export const isCompletedStatus = (status: ClickUpStatus): boolean => {
   return status === 'Avslutat' || status === 'Stängt - slasklogg'
 }
+
+// 👥 CUSTOMER-FACING STATUS DISPLAY MAPPING
+// Maps internal statuses to customer-friendly display names
+export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
+  switch (status) {
+    case 'Öppen':
+      return 'Öppen'
+    case 'Bokad':
+    case 'Bokat':
+      return 'Bokad'
+    case 'Offert skickad':
+      return 'Offert skickad'
+    case 'Offert signerad - boka in':
+      return 'Offert Signerad'
+    case 'Återbesök 1':
+    case 'Återbesök 2':
+    case 'Återbesök 3':
+    case 'Återbesök 4':
+    case 'Återbesök 5':
+      return 'Pågående'
+    case 'Privatperson - review':
+      return 'Under granskning' // Should rarely be shown to customers
+    case 'Stängt - slasklogg':
+      return 'Avslutat utan åtgärd'
+    case 'Avslutat':
+      return 'Genomfört'
+    // Legacy statuses - handle gracefully
+    case 'Bomkörning':
+    case 'Generera saneringsrapport':
+    case 'Ombokning':
+    case 'Reklamation':
+      return 'Under behandling'
+    default:
+      return status // Fallback to original status
+  }
+}
+
+// 📋 DROPDOWN-FRIENDLY STATUSES (excludes customer-hidden statuses)
+export const DROPDOWN_STATUSES: ClickUpStatus[] = [
+  'Öppen',
+  'Bokad',
+  'Offert skickad',
+  'Offert signerad - boka in',
+  'Återbesök 1',
+  'Återbesök 2',
+  'Återbesök 3',
+  'Återbesök 4',
+  'Återbesök 5',
+  'Stängt - slasklogg',
+  'Avslutat'
+  // Note: 'Privatperson - review' is excluded from dropdowns
+]
+
+// 📊 ALL VALID STATUSES FOR FILTERING (includes all statuses)
+export const ALL_VALID_STATUSES: ClickUpStatus[] = [
+  'Öppen',
+  'Bokad',
+  'Bokat', // Alternative spelling
+  'Offert skickad',
+  'Offert signerad - boka in',
+  'Återbesök 1',
+  'Återbesök 2',
+  'Återbesök 3',
+  'Återbesök 4',
+  'Återbesök 5',
+  'Privatperson - review',
+  'Stängt - slasklogg',
+  'Avslutat',
+  // Legacy statuses
+  'Bomkörning',
+  'Generera saneringsrapport',
+  'Ombokning',
+  'Reklamation'
+]
 
 // 🆕 PEST TYPE INTEGRATION - Från clickupFieldMapper.ts
 export interface DropdownOption {

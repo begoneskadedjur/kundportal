@@ -35,8 +35,9 @@ export interface Absence {
   notes?: string;
 }
 
-const ALL_STATUSES = ['Öppen', 'Bokad', 'Bokat', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
-const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
+import { ALL_VALID_STATUSES } from '../../types/database';
+
+const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 export default function CoordinatorSchedule() {
   const navigate = useNavigate();
@@ -122,7 +123,7 @@ export default function CoordinatorSchedule() {
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
         supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
         supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('cases').select('*, customer:customers(*)').in('status', ['Öppen', 'Bokad', 'Bokat', 'Pågående', 'Avslutat']).order('created_at', { ascending: false }),
+        supabase.from('cases').select('*, customer:customers(*)').in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*')
       ]);
 

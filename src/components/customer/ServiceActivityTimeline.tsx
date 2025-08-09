@@ -1,6 +1,6 @@
 // src/components/customer/ServiceActivityTimeline.tsx - Service Activity Timeline
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, AlertCircle, Calendar, Filter, ChevronDown, Eye, Info, Wrench, XCircle } from 'lucide-react'
+import { Clock, CheckCircle, AlertCircle, Calendar, Filter, ChevronDown, Eye, Info, Wrench, XCircle, FileText, Star } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
@@ -110,7 +110,9 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
     { value: 'all', label: 'Alla ärenden' },
     { value: 'Öppen', label: 'Väntar på svar' },
     { value: 'Bokad', label: 'Schemalagda' },
-    { value: 'Pågående', label: 'Pågående' },
+    { value: 'Offert skickad', label: 'Offert skickad' },
+    { value: 'Offert signerad - boka in', label: 'Offert signerad' },
+    { value: 'Återbesök 1', label: 'Pågående' },
     { value: 'Avslutat', label: 'Slutförda' },
     { value: 'Stängt - slasklogg', label: 'Stängda' }
   ]
@@ -198,9 +200,14 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
 
         {/* Timeline */}
         <div className="relative">
-          {/* Vertical line */}
+          {/* Enhanced vertical line with glow effect */}
           {filteredCases.length > 0 && (
-            <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500/50 via-slate-700 to-transparent"></div>
+            <div className="absolute left-6 top-0 bottom-0 w-px">
+              {/* Main timeline line */}
+              <div className="w-full h-full bg-gradient-to-b from-purple-500/60 via-blue-500/40 via-slate-600/30 to-transparent"></div>
+              {/* Glow effect */}
+              <div className="absolute inset-0 w-px bg-gradient-to-b from-purple-500/20 via-blue-500/10 to-transparent blur-sm"></div>
+            </div>
           )}
 
           {/* Cases */}
@@ -220,22 +227,43 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
               
               return (
                 <div key={caseItem.id} className="relative flex gap-4 group">
-                  {/* Timeline dot */}
+                  {/* Timeline dot with glass morphism */}
                   <div className={`
                     relative z-10 w-12 h-12 rounded-full flex items-center justify-center
-                    ${config.bgColor} ${config.borderColor} ${config.textColor} border transition-all duration-300
-                    group-hover:scale-110
+                    bg-gradient-to-br from-slate-800/80 to-slate-900/90 backdrop-blur-sm
+                    border border-purple-500/20 shadow-lg transition-all duration-300
+                    group-hover:scale-110 group-hover:shadow-purple-500/20 group-hover:shadow-xl
+                    ${config.textColor}
                   `}>
-                    {status === 'Öppen' && <Clock className="w-5 h-5" />}
-                    {(status === 'Bokad' || status === 'Bokat') && <Calendar className="w-5 h-5" />}
-                    {status === 'Pågående' && <Wrench className="w-5 h-5" />}
-                    {status === 'Avslutat' && <CheckCircle className="w-5 h-5" />}
-                    {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5" />}
+                    {/* Subtle glow effect */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-500/5 to-transparent" />
+                    
+                    {/* Icon selection */}
+                    {status === 'Öppen' && <Clock className="w-5 h-5 animate-pulse relative z-10" />}
+                    {(status === 'Bokad' || status === 'Bokat') && <Calendar className="w-5 h-5 relative z-10" />}
+                    {status === 'Offert skickad' && <FileText className="w-5 h-5 relative z-10" />}
+                    {status === 'Offert signerad - boka in' && <Star className="w-5 h-5 text-purple-400 relative z-10" />}
+                    {(status === 'Återbesök 1' || status === 'Återbesök 2' || 
+                      status === 'Återbesök 3' || status === 'Återbesök 4' || 
+                      status === 'Återbesök 5') && <Wrench className="w-5 h-5 text-blue-400 animate-pulse relative z-10" />}
+                    {status === 'Privatperson - review' && <Eye className="w-5 h-5 relative z-10" />}
+                    {status === 'Avslutat' && <CheckCircle className="w-5 h-5 text-green-400 relative z-10" />}
+                    {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}
                   </div>
 
-                  {/* Content */}
+                  {/* Content with glass morphism */}
                   <div className="flex-1 pb-6">
-                    <div className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600 transition-all">
+                    <div className="relative overflow-hidden rounded-xl transition-all duration-300 group-hover:scale-[1.02]">
+                      {/* Glass morphism background */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/60 via-slate-900/70 to-slate-900/80 backdrop-blur-sm" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5" />
+                      
+                      {/* Border glow */}
+                      <div className="absolute inset-0 rounded-xl border border-purple-500/20 group-hover:border-purple-500/30 transition-colors" />
+                      <div className="absolute inset-0 rounded-xl border border-white/5" />
+                      
+                      {/* Content */}
+                      <div className="relative z-10 p-4">
                       {/* Header */}
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
@@ -361,6 +389,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     </div>
                   </div>
                 </div>
+              </div>
               )
             })}
           </div>

@@ -1,7 +1,7 @@
 // src/components/customer/ServiceRequestStatus.tsx - Visual Status Indicator
 import React from 'react'
-import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { ClickUpStatus, STATUS_CONFIG, getStatusColor } from '../../types/database'
+import { Clock, Calendar, Wrench, CheckCircle, XCircle, AlertCircle, FileText, Eye } from 'lucide-react'
+import { ClickUpStatus, STATUS_CONFIG, getStatusColor, getCustomerStatusDisplay } from '../../types/database'
 
 interface ServiceRequestStatusProps {
   status: ClickUpStatus | string
@@ -25,9 +25,12 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
   const statusInfo = STATUS_CONFIG[statusName]
   const statusColor = statusInfo ? statusInfo.color : '#87909e'
   
+  // Use customer-facing display name
+  const customerDisplayName = getCustomerStatusDisplay(statusName)
+  
   // Create config for backward compatibility
   const config = {
-    label: statusName,
+    label: customerDisplayName, // Use customer-friendly name
     color: statusColor,
     bgColor: `bg-[${statusColor}]/10`,
     borderColor: `border-[${statusColor}]/20`,
@@ -53,12 +56,28 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       case 'Bokad':
       case 'Bokat':
         return <Calendar className={iconSizes[size]} />
-      case 'Pågående':
+      case 'Offert skickad':
+        return <FileText className={iconSizes[size]} />
+      case 'Offert signerad - boka in':
+        return <CheckCircle className={iconSizes[size]} />
+      case 'Återbesök 1':
+      case 'Återbesök 2':
+      case 'Återbesök 3':
+      case 'Återbesök 4':
+      case 'Återbesök 5':
         return <Wrench className={`${iconSizes[size]} animate-spin-slow`} />
+      case 'Privatperson - review':
+        return <Eye className={iconSizes[size]} />
       case 'Avslutat':
         return <CheckCircle className={iconSizes[size]} />
       case 'Stängt - slasklogg':
         return <XCircle className={iconSizes[size]} />
+      // Legacy statuses
+      case 'Bomkörning':
+      case 'Generera saneringsrapport':
+      case 'Ombokning':
+      case 'Reklamation':
+        return <AlertCircle className={iconSizes[size]} />
       default:
         return <AlertCircle className={iconSizes[size]} />
     }
@@ -86,8 +105,10 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
         {showLabel && <span>{config.label}</span>}
       </div>
       
-      {/* Additional info for scheduled status */}
-      {(statusName === 'Bokad' || statusName === 'Bokat') && scheduledDate && (
+      {/* Additional info for scheduled/ongoing status */}
+      {(statusName === 'Bokad' || statusName === 'Bokat' || 
+        statusName === 'Återbesök 1' || statusName === 'Återbesök 2' || 
+        statusName === 'Återbesök 3' || statusName === 'Återbesök 4' || statusName === 'Återbesök 5') && scheduledDate && (
         <div className="text-xs text-slate-400 ml-1">
           <div>{formatScheduledDate(scheduledDate)}</div>
           {technicianName && (
@@ -100,6 +121,14 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       {statusName === 'Öppen' && (
         <div className="text-xs text-amber-400/80 ml-1 animate-pulse">
           Svar inom 24h
+        </div>
+      )}
+      
+      {/* Progress indicator for ongoing work */}
+      {(statusName === 'Återbesök 1' || statusName === 'Återbesök 2' || 
+        statusName === 'Återbesök 3' || statusName === 'Återbesök 4' || statusName === 'Återbesök 5') && (
+        <div className="text-xs text-blue-400/80 ml-1">
+          Arbete pågår
         </div>
       )}
     </div>
