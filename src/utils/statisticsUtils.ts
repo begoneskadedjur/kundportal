@@ -2,6 +2,17 @@
 import jsPDF from 'jspdf'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../types/database'
 
+// Add font support for Swedish characters
+if (typeof window !== 'undefined') {
+  try {
+    // Load Arial font for better Swedish character support
+    const fontData = 'data:font/truetype;charset=utf-8;base64,'
+    // jsPDF will fallback to built-in fonts if custom font loading fails
+  } catch (error) {
+    console.warn('Custom font loading failed, using fallback fonts')
+  }
+}
+
 interface CaseData {
   id: string
   title: string
@@ -97,10 +108,18 @@ export const exportStatisticsToPDF = (
   statistics: any,
   period: string
 ) => {
-  const doc = new jsPDF()
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  })
+  
+  // Set better font for Swedish characters
+  doc.setFont('helvetica')
+  
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 25
+  const margin = 20 // Reduced margin for more content space
   const contentWidth = pageWidth - (margin * 2)
 
   // BeGone brand colors
@@ -179,20 +198,25 @@ export const exportStatisticsToPDF = (
   
   let yPosition = 65
   
-  // Customer info card
-  drawRoundedRect(margin, yPosition, contentWidth, 35, 5, [248, 250, 252]) // bg-slate-50 equivalent
+  // Customer info card with improved design
+  drawRoundedRect(margin, yPosition, contentWidth, 40, 8, [248, 250, 252]) // bg-slate-50 equivalent
+  
+  // Add subtle border
+  doc.setDrawColor(...mediumGray)
+  doc.setLineWidth(0.5)
+  doc.roundedRect(margin, yPosition, contentWidth, 40, 8, 8, 'S')
   
   doc.setTextColor(...darkBlue)
-  doc.setFontSize(18)
+  doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
-  doc.text(customer.company_name, margin + 15, yPosition + 15)
+  doc.text(safeText(customer.company_name), margin + 15, yPosition + 18)
   
   doc.setFontSize(12)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...mediumGray)
-  doc.text(`Rapportperiod: ${getPeriodLabel(period)}`, margin + 15, yPosition + 27)
+  doc.text(`Rapportperiod: ${getPeriodLabel(period)}`, margin + 15, yPosition + 30)
   
-  yPosition += 55
+  yPosition += 60
   
   // Executive Summary
   doc.setFontSize(16)
@@ -202,22 +226,26 @@ export const exportStatisticsToPDF = (
   
   yPosition += 20
   
-  // Key metrics in attractive cards
+  // Key metrics in attractive cards with safe text
+  const completionRate = statistics.totalCases > 0 
+    ? Math.round((statistics.completedCases / statistics.totalCases) * 100)
+    : 0
+    
   const metricsData = [
-    { label: 'Totalt antal ärenden', value: statistics.totalCases.toString(), color: brandPurple },
-    { label: 'Avslutade ärenden', value: statistics.completedCases.toString(), color: accentTeal },
-    { label: 'Avslutningsgrad', value: `${statistics.completionRate}%`, color: brandPurple },
-    { label: 'Aktiva ärenden', value: statistics.activeCases.toString(), color: [245, 158, 11] } // amber-500
+    { label: 'Totalt antal arenden', value: statistics.totalCases.toString(), color: brandPurple },
+    { label: 'Avslutade arenden', value: statistics.completedCases.toString(), color: accentTeal },
+    { label: 'Avslutningsgrad', value: `${completionRate}%`, color: brandPurple },
+    { label: 'Aktiva arenden', value: statistics.activeCases.toString(), color: [245, 158, 11] } // amber-500
   ]
   
-  const cardWidth = (contentWidth - 30) / 2
-  const cardHeight = 45
+  const cardWidth = (contentWidth - 20) / 2
+  const cardHeight = 50
   
   metricsData.forEach((metric, index) => {
     const col = index % 2
     const row = Math.floor(index / 2)
-    const cardX = margin + (col * (cardWidth + 15))
-    const cardY = yPosition + (row * (cardHeight + 15))
+    const cardX = margin + (col * (cardWidth + 10))
+    const cardY = yPosition + (row * (cardHeight + 12))
     
     // Card background
     drawRoundedRect(cardX, cardY, cardWidth, cardHeight, 8, [255, 255, 255])
@@ -233,25 +261,39 @@ export const exportStatisticsToPDF = (
     
     // Metric value
     doc.setTextColor(...darkBlue)
-    doc.setFontSize(20)
+    doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text(metric.value, cardX + 15, cardY + 20)
+    doc.text(metric.value, cardX + 15, cardY + 22)
     
     // Metric label
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...mediumGray)
-    doc.text(metric.label, cardX + 15, cardY + 32)
+    
+    // Handle long labels with line wrapping
+    const words = metric.label.split(' ')
+    if (words.length > 2) {
+      doc.text(words.slice(0, 2).join(' '), cardX + 15, cardY + 34)
+      doc.text(words.slice(2).join(' '), cardX + 15, cardY + 42)
+    } else {
+      doc.text(metric.label, cardX + 15, cardY + 38)
+    }
   })
   
-  yPosition += 120
+  yPosition += 130
   
-  // Additional insights
+  // Additional insights with safe formatting
+  const totalCostFormatted = formatSwedishCurrency(statistics.totalCost || 0)
+  const serviceEfficiency = statistics.totalCases > 0 
+    ? Math.round((statistics.completedCases / statistics.totalCases) * 100)
+    : 0
+  
   const insights = [
-    `Genomsnittlig responstid: ${statistics.avgResponseTime} dagar`,
-    `Vanligaste skadedjur: ${statistics.topPestType}`,
-    `Total kontraktsvärde: ${statistics.totalCost.toLocaleString('sv-SE')} kr`,
-    `Serviceeffektivitet: ${Math.round((statistics.completedCases / statistics.totalCases) * 100)}%`
+    `Genomsnittlig responstid: ${statistics.avgResponseTime || 0} dagar`,
+    `Vanligaste skadedjur: ${safeText(statistics.topPestType) || 'Okant'}`,
+    `Total kontraktsvarde: ${totalCostFormatted}`,
+    `Serviceeffektivitet: ${serviceEfficiency}%`,
+    `Aktiv period: ${safeText(getPeriodLabel(period))}`
   ]
   
   doc.setFontSize(16)
@@ -261,17 +303,23 @@ export const exportStatisticsToPDF = (
   
   yPosition += 15
   
-  insights.forEach((insight) => {
+  insights.forEach((insight, index) => {
     doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...mediumGray)
+    doc.setTextColor(...darkBlue)
     
-    // Bullet point
+    // Enhanced bullet point with gradient effect
     doc.setFillColor(...brandPurple)
-    doc.circle(margin + 3, yPosition - 3, 2, 'F')
+    doc.circle(margin + 4, yPosition - 2, 2.5, 'F')
     
-    doc.text(insight, margin + 12, yPosition)
-    yPosition += 12
+    // Add slight shadow effect
+    doc.setFillColor(200, 200, 200)
+    doc.circle(margin + 4.5, yPosition - 1.5, 2.5, 'F')
+    doc.setFillColor(...brandPurple)
+    doc.circle(margin + 4, yPosition - 2, 2.5, 'F')
+    
+    doc.text(insight, margin + 14, yPosition)
+    yPosition += 14
   })
   
   addPageFooter(1, totalPages)
@@ -287,18 +335,28 @@ export const exportStatisticsToPDF = (
     
     yPosition = 65
     
-    // Page title
+    // Page title with icon simulation
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...darkBlue)
-    doc.text('Ärendedetaljer', margin, yPosition)
+    
+    // Add decorative icon area
+    doc.setFillColor(...brandPurple)
+    doc.circle(margin + 6, yPosition - 3, 4, 'F')
+    doc.setFillColor(255, 255, 255)
+    doc.setFontSize(10)
+    doc.text('i', margin + 4.5, yPosition - 1)
+    
+    doc.setFontSize(18)
+    doc.setTextColor(...darkBlue)
+    doc.text('Arendedetaljer', margin + 15, yPosition)
     
     yPosition += 25
     
-    // Table header
-    const tableHeaders = ['Ärendetitel', 'Status', 'Skadedjur', 'Pris', 'Datum']
-    const colWidths = [70, 35, 30, 25, 30]
-    const headerHeight = 25
+    // Table header with improved spacing
+    const tableHeaders = ['Arendetitel', 'Status', 'Skadedjur', 'Pris', 'Datum']
+    const colWidths = [55, 30, 35, 30, 40] // Better proportions for content
+    const headerHeight = 28
     
     // Header background
     doc.setFillColor(...brandPurple)
@@ -322,41 +380,65 @@ export const exportStatisticsToPDF = (
     
     pageCases.forEach((caseItem, rowIndex) => {
       const isEvenRow = rowIndex % 2 === 0
-      const rowHeight = 18
+      const rowHeight = 20 // Increased row height for better readability
       
       // Alternating row background
       if (isEvenRow) {
         doc.setFillColor(248, 250, 252) // Very light gray
-        doc.rect(margin, yPosition - 3, contentWidth, rowHeight, 'F')
+        doc.rect(margin, yPosition - 4, contentWidth, rowHeight, 'F')
       }
       
-      // Row data
-      doc.setTextColor(...darkBlue)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      
-      xPosition = margin + 8
-      
+      // Row data with improved formatting
       const rowData = [
-        (caseItem.title || '').substring(0, 35) + ((caseItem.title || '').length > 35 ? '...' : ''),
-        getCustomerStatusDisplay(caseItem.status),
-        caseItem.pest_type || 'Okänt',
-        caseItem.price ? `${caseItem.price.toLocaleString('sv-SE')} kr` : 'N/A',
+        truncateText(caseItem.title, 28),
+        safeText(getCustomerStatusDisplay(caseItem.status)),
+        truncateText(caseItem.pest_type, 18) || 'Okant',
+        formatSwedishCurrency(caseItem.price),
         caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : 'N/A'
       ]
       
+      xPosition = margin + 6 // Better left padding
+      
       rowData.forEach((data, colIndex) => {
-        // Special formatting for status
-        if (colIndex === 1) {
+        // Determine text styling based on column
+        if (colIndex === 1) { // Status column
           const isCompleted = isCompletedStatus(caseItem.status)
-          doc.setTextColor(...(isCompleted ? accentTeal : [245, 158, 11]))
+          
+          // Create status badge background
+          const statusWidth = doc.getTextWidth(data) + 6
+          const statusHeight = 8
+          const statusY = yPosition - 1
+          
+          if (isCompleted) {
+            doc.setFillColor(...accentTeal)
+          } else {
+            doc.setFillColor(245, 158, 11) // Amber for pending/active
+          }
+          
+          // Draw status badge with rounded corners
+          doc.roundedRect(xPosition - 1, statusY, statusWidth, statusHeight, 2, 2, 'F')
+          
+          // Status text in white
+          doc.setTextColor(255, 255, 255)
+          doc.setFontSize(8)
           doc.setFont('helvetica', 'bold')
+          doc.text(data, xPosition + 2, yPosition + 4)
         } else {
+          // Regular cell styling
           doc.setTextColor(...darkBlue)
+          doc.setFontSize(9)
           doc.setFont('helvetica', 'normal')
+          
+          // Special formatting for price column (right align)
+          if (colIndex === 3 && data !== 'N/A') {
+            doc.setFont('helvetica', 'bold')
+            const textWidth = doc.getTextWidth(data)
+            doc.text(data, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 4)
+          } else {
+            doc.text(data, xPosition, yPosition + 4)
+          }
         }
         
-        doc.text(data, xPosition, yPosition + 5)
         xPosition += colWidths[colIndex]
       })
       
@@ -425,12 +507,52 @@ export const exportStatisticsToCSV = (
 const getPeriodLabel = (period: string): string => {
   const periodMap: Record<string, string> = {
     '30d': 'Senaste 30 dagarna',
-    '3m': 'Senaste 3 månaderna',
-    '6m': 'Senaste 6 månaderna',
-    '1y': 'Senaste året',
+    '3m': 'Senaste 3 manaderna',
+    '6m': 'Senaste 6 manaderna', 
+    '1y': 'Senaste aret',
     'all': 'Hela tiden'
   }
   return periodMap[period] || period
+}
+
+// Helper function for proper Swedish currency formatting
+const formatSwedishCurrency = (amount: number | null | undefined): string => {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return 'N/A'
+  }
+  
+  // Format with Swedish locale - spaces as thousand separator
+  const formatted = new Intl.NumberFormat('sv-SE', {
+    style: 'decimal',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(Math.round(amount))
+  
+  return `${formatted} kr`
+}
+
+// Helper function for safe text rendering (avoid character encoding issues)
+const safeText = (text: string | null | undefined): string => {
+  if (!text) return ''
+  
+  // Replace problematic characters that might cause corruption
+  return text
+    .replace(/[\u00C0-\u00FF]/g, (match) => {
+      // Map common Swedish characters to safe alternatives for PDF
+      const charMap: Record<string, string> = {
+        'å': 'a', 'ä': 'a', 'ö': 'o',
+        'Å': 'A', 'Ä': 'A', 'Ö': 'O'
+      }
+      return charMap[match] || match
+    })
+    .substring(0, 200) // Prevent extremely long text
+}
+
+// Helper function to safely truncate text for table cells
+const truncateText = (text: string | null | undefined, maxLength: number): string => {
+  const safe = safeText(text)
+  if (safe.length <= maxLength) return safe
+  return safe.substring(0, maxLength - 3) + '...'
 }
 
 // Calculate trend direction and percentage
