@@ -182,28 +182,125 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       box-sizing: border-box;
     }
     
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       color: ${beGoneColors.darkGray};
-      background: white;
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
       line-height: 1.6;
+      font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+      font-variant-ligatures: common-ligatures;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-optical-sizing: auto;
     }
     
     .container {
       max-width: 210mm;
       margin: 0 auto;
       padding: 20mm;
+      position: relative;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(248, 250, 252, 0.3) 100%);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 2px 4px rgba(10, 19, 40, 0.05),
+        0 8px 24px rgba(10, 19, 40, 0.08),
+        0 32px 64px rgba(10, 19, 40, 0.12);
+      border-radius: 8px;
+      backdrop-filter: blur(20px);
+      overflow: hidden;
     }
     
-    /* Modern Header */
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, 
+        ${beGoneColors.primary} 0%, 
+        rgba(32, 197, 143, 0.8) 25%,
+        ${beGoneColors.accent} 50%, 
+        rgba(32, 197, 143, 0.8) 75%,
+        ${beGoneColors.primary} 100%
+      );
+      border-radius: 8px 8px 0 0;
+      box-shadow: 0 2px 8px rgba(32, 197, 143, 0.3);
+    }
+    
+    .container::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(circle at 20% 20%, rgba(32, 197, 143, 0.02) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(10, 19, 40, 0.01) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    /* Enterprise Header with Premium Styling */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 24px;
-      border-bottom: 2px solid ${beGoneColors.divider};
-      margin-bottom: 32px;
+      padding: 40px 0;
+      background: linear-gradient(135deg, 
+        rgba(248, 250, 252, 0.9) 0%, 
+        rgba(255, 255, 255, 0.95) 40%,
+        rgba(241, 245, 249, 0.8) 100%
+      );
+      border-bottom: 1px solid rgba(203, 213, 225, 0.3);
+      margin: -20mm -20mm 40px -20mm;
+      padding-left: 20mm;
+      padding-right: 20mm;
+      position: relative;
       page-break-inside: avoid;
+      backdrop-filter: blur(12px);
+      z-index: 2;
+    }
+    
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, 
+        rgba(32, 197, 143, 0.02) 0%, 
+        transparent 30%, 
+        rgba(10, 19, 40, 0.01) 70%, 
+        transparent 100%
+      );
+      pointer-events: none;
+    }
+    
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 20mm;
+      right: 20mm;
+      height: 4px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(32, 197, 143, 0.4) 10%,
+        ${beGoneColors.accent} 30%, 
+        ${beGoneColors.primary} 50%,
+        ${beGoneColors.accent} 70%,
+        rgba(32, 197, 143, 0.4) 90%,
+        transparent 100%
+      );
+      opacity: 0.8;
+      border-radius: 2px;
+      box-shadow: 0 2px 8px rgba(32, 197, 143, 0.2);
     }
     
     .logo {
@@ -213,22 +310,86 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
     }
     
     .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, ${beGoneColors.accent} 0%, ${beGoneColors.accentDark} 100%);
-      border-radius: 10px;
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, 
+        ${beGoneColors.accent} 0%, 
+        rgba(32, 197, 143, 0.9) 30%,
+        ${beGoneColors.accentDark} 70%,
+        rgba(16, 185, 129, 0.95) 100%
+      );
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-weight: bold;
-      font-size: 20px;
+      font-weight: 800;
+      font-size: 26px;
+      box-shadow: 
+        0 0 0 3px rgba(255, 255, 255, 0.1),
+        0 4px 12px rgba(32, 197, 143, 0.2),
+        0 8px 24px rgba(32, 197, 143, 0.15),
+        0 16px 48px rgba(32, 197, 143, 0.1);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .logo-icon::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, 
+        transparent 30%, 
+        rgba(255, 255, 255, 0.15) 45%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.15) 55%,
+        transparent 70%
+      );
+      transform: rotate(45deg) translateY(-20px);
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: shimmer 3s ease-in-out infinite;
+    }
+    
+    @keyframes shimmer {
+      0%, 100% { transform: rotate(45deg) translateY(-20px); opacity: 0; }
+      50% { transform: rotate(45deg) translateY(20px); opacity: 1; }
     }
     
     .logo-text {
-      font-size: 24px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
+      font-size: 32px;
+      font-weight: 900;
+      background: linear-gradient(135deg, 
+        ${beGoneColors.primary} 0%, 
+        rgba(10, 19, 40, 0.9) 30%,
+        ${beGoneColors.accent} 70%,
+        rgba(32, 197, 143, 0.8) 100%
+      );
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.03em;
+      position: relative;
+      filter: drop-shadow(0 2px 4px rgba(10, 19, 40, 0.1));
+    }
+    
+    .logo-text::after {
+      content: 'BeGone';
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.1) 0%, 
+        transparent 50%, 
+        rgba(255, 255, 255, 0.05) 100%
+      );
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      z-index: -1;
     }
     
     .report-meta {
@@ -249,18 +410,35 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       margin-top: 4px;
     }
     
-    /* Title Section */
+    /* Premium Title Section */
     .title-section {
-      margin-bottom: 32px;
-      padding: 20px 0;
-      border-bottom: 1px solid ${beGoneColors.divider};
+      margin-bottom: 48px;
+      padding: 32px 0;
+      text-align: center;
+      position: relative;
+    }
+    
+    .title-section::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 0%, ${beGoneColors.accent} 50%, transparent 100%);
     }
     
     .main-title {
-      font-size: 28px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
-      margin-bottom: 8px;
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(135deg, ${beGoneColors.primary} 0%, ${beGoneColors.accent} 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
     }
     
     .case-subtitle {
@@ -269,153 +447,355 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       font-weight: 500;
     }
     
-    /* KPI Cards - Modern metadata display */
+    /* Premium KPI Cards */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 24px;
+      margin-bottom: 48px;
       page-break-inside: avoid;
+      z-index: 2;
+      position: relative;
     }
     
     .kpi-card {
-      background: ${beGoneColors.lightestGray};
-      border: 1px solid ${beGoneColors.border};
-      border-radius: 12px;
-      padding: 16px;
-      transition: all 0.3s ease;
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(248, 250, 252, 0.9) 50%,
+        rgba(241, 245, 249, 0.8) 100%
+      );
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 28px;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       page-break-inside: avoid;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 2px 4px rgba(10, 19, 40, 0.05),
+        0 8px 24px rgba(10, 19, 40, 0.08),
+        0 16px 48px rgba(10, 19, 40, 0.06);
+    }
+    
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, 
+        rgba(32, 197, 143, 0.1) 0%, 
+        transparent 30%,
+        rgba(10, 19, 40, 0.02) 70%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      border-radius: 20px;
+    }
+    
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, 
+        transparent 0%,
+        ${beGoneColors.accent} 20%,
+        ${beGoneColors.primary} 50%,
+        ${beGoneColors.accent} 80%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 2px 8px rgba(32, 197, 143, 0.3);
     }
     
     .kpi-card:hover {
-      background: ${beGoneColors.lightGray};
-      border-color: ${beGoneColors.mediumGray};
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.98) 0%, 
+        rgba(248, 250, 252, 0.95) 50%,
+        rgba(241, 245, 249, 0.9) 100%
+      );
+      border-color: rgba(32, 197, 143, 0.4);
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.2),
+        0 4px 8px rgba(10, 19, 40, 0.08),
+        0 12px 32px rgba(10, 19, 40, 0.15),
+        0 24px 64px rgba(32, 197, 143, 0.1);
+    }
+    
+    .kpi-card:hover::before,
+    .kpi-card:hover::after {
+      opacity: 1;
     }
     
     .kpi-label {
       color: ${beGoneColors.mediumGray};
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+      opacity: 0.8;
     }
     
     .kpi-value {
-      font-size: 20px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
-      margin-bottom: 4px;
+      font-size: 28px;
+      font-weight: 900;
+      background: linear-gradient(135deg, 
+        ${beGoneColors.primary} 0%, 
+        rgba(10, 19, 40, 0.9) 20%,
+        ${beGoneColors.accent} 60%,
+        rgba(32, 197, 143, 0.9) 80%,
+        ${beGoneColors.primary} 100%
+      );
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      position: relative;
+      filter: drop-shadow(0 1px 2px rgba(10, 19, 40, 0.1));
+      transition: all 0.3s ease;
+    }
+    
+    .kpi-card:hover .kpi-value {
+      transform: scale(1.05);
+      filter: drop-shadow(0 2px 4px rgba(32, 197, 143, 0.2));
     }
     
     .kpi-subtitle {
       color: ${beGoneColors.mediumGray};
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.8;
     }
     
-    /* Section Headers - Modern style */
+    /* Premium Section Headers */
     .section {
-      margin-bottom: 32px;
+      margin-bottom: 48px;
       page-break-inside: avoid;
     }
     
     .section-title {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 700;
       color: ${beGoneColors.primary};
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       page-break-after: avoid;
+      position: relative;
+      padding-bottom: 12px;
+    }
+    
+    .section-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, ${beGoneColors.primary} 0%, ${beGoneColors.accent} 100%);
+      opacity: 0.6;
     }
     
     .section-title.accent {
       color: ${beGoneColors.accent};
     }
     
-    .section-icon {
-      font-size: 20px;
-      min-width: 20px;
-      line-height: 1;
+    .section-title.accent::after {
+      background: linear-gradient(90deg, ${beGoneColors.accent} 0%, ${beGoneColors.primary} 100%);
     }
     
-    /* Cards - Modern style */
+    .section-icon {
+      font-size: 22px;
+      min-width: 22px;
+      line-height: 1;
+      opacity: 0.8;
+    }
+    
+    /* Premium Cards */
     .card {
-      background: white;
-      border: 1px solid ${beGoneColors.border};
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(248, 250, 252, 0.9) 40%,
+        rgba(241, 245, 249, 0.85) 100%
+      );
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 36px;
+      margin-bottom: 32px;
       page-break-inside: avoid;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      transition: all 0.3s ease;
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 2px 4px rgba(10, 19, 40, 0.04),
+        0 8px 24px rgba(10, 19, 40, 0.06),
+        0 16px 48px rgba(10, 19, 40, 0.04);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 20px;
+      background: linear-gradient(135deg, 
+        rgba(32, 197, 143, 0.08) 0%, 
+        transparent 30%,
+        rgba(10, 19, 40, 0.03) 70%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    
+    .card::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      right: -1px;
+      bottom: -1px;
+      border-radius: 21px;
+      background: linear-gradient(135deg, 
+        rgba(32, 197, 143, 0.2) 0%, 
+        transparent 30%,
+        rgba(10, 19, 40, 0.1) 70%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: -1;
     }
     
     .card:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      border-color: ${beGoneColors.accent};
-      transform: translateY(-1px);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 4px 8px rgba(10, 19, 40, 0.08),
+        0 16px 48px rgba(10, 19, 40, 0.12),
+        0 24px 80px rgba(32, 197, 143, 0.08);
+      border-color: rgba(32, 197, 143, 0.4);
+      transform: translateY(-3px) scale(1.005);
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.98) 0%, 
+        rgba(248, 250, 252, 0.95) 40%,
+        rgba(241, 245, 249, 0.9) 100%
+      );
+    }
+    
+    .card:hover::before,
+    .card:hover::after {
+      opacity: 1;
     }
     
     .card.accent-border {
       border: 2px solid ${beGoneColors.accent};
-      background: linear-gradient(135deg, ${beGoneColors.lightestGray} 0%, white 100%);
+      background: linear-gradient(135deg, rgba(32, 197, 143, 0.02) 0%, white 100%);
+      box-shadow: 0 8px 24px rgba(32, 197, 143, 0.15);
     }
     
-    /* Info Grid */
+    /* Premium Info Grid */
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 24px;
     }
     
     .info-group {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      position: relative;
+      padding-left: 16px;
+    }
+    
+    .info-group::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 3px;
+      height: calc(100% - 8px);
+      background: linear-gradient(180deg, ${beGoneColors.accent} 0%, transparent 100%);
+      opacity: 0.3;
+      border-radius: 2px;
     }
     
     .info-label {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       color: ${beGoneColors.mediumGray};
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+      opacity: 0.8;
     }
     
     .info-value {
-      font-size: 14px;
+      font-size: 15px;
       color: ${beGoneColors.darkGray};
-      font-weight: 500;
+      font-weight: 600;
+      line-height: 1.4;
     }
     
-    /* Report Section - Enhanced modern style */
+    /* Premium Report Section */
     .report-section {
-      background: linear-gradient(135deg, ${beGoneColors.lightestGray} 0%, ${beGoneColors.lightGray} 100%);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 32px;
+      background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
       page-break-inside: avoid;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .report-section::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(32, 197, 143, 0.03) 0%, transparent 50%);
+      opacity: 0.6;
+      pointer-events: none;
     }
     
     .report-content {
-      background: white;
-      border: 1px solid ${beGoneColors.border};
-      border-radius: 12px;
-      padding: 24px;
-      min-height: 200px;
+      background: linear-gradient(135deg, white 0%, rgba(248, 250, 252, 0.9) 100%);
+      border: 1px solid rgba(203, 213, 225, 0.4);
+      border-radius: 16px;
+      padding: 32px;
+      min-height: 240px;
       page-break-inside: avoid;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 16px rgba(10, 19, 40, 0.08);
+      position: relative;
+      backdrop-filter: blur(4px);
     }
     
     .report-text {
-      font-size: 15px;
+      font-size: 16px;
       line-height: 1.8;
       color: ${beGoneColors.darkGray};
       white-space: pre-wrap;
       padding: 0;
+      font-weight: 400;
+      letter-spacing: 0.01em;
     }
     
     .no-report {
@@ -436,69 +816,162 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       color: ${beGoneColors.mediumGray};
     }
     
-    /* Cost Summary - KPI Style */
+    /* Premium Cost Summary */
     .cost-summary {
       text-align: center;
-      padding: 24px;
+      padding: 32px;
       page-break-inside: avoid;
+      position: relative;
+    }
+    
+    .cost-summary::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      background: radial-gradient(circle, rgba(32, 197, 143, 0.08) 0%, transparent 70%);
+      border-radius: 50%;
+      z-index: -1;
     }
     
     .cost-label {
-      font-size: 13px;
+      font-size: 12px;
       color: ${beGoneColors.mediumGray};
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      opacity: 0.8;
     }
     
     .cost-value {
-      font-size: 32px;
-      font-weight: 700;
-      color: ${beGoneColors.accent};
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, 
+        ${beGoneColors.accent} 0%, 
+        rgba(32, 197, 143, 0.9) 25%,
+        ${beGoneColors.primary} 50%,
+        rgba(10, 19, 40, 0.9) 75%,
+        ${beGoneColors.accent} 100%
+      );
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      position: relative;
+      filter: drop-shadow(0 2px 4px rgba(32, 197, 143, 0.15));
+      animation: subtle-pulse 4s ease-in-out infinite;
+    }
+    
+    @keyframes subtle-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
     }
     
     .cost-subtitle {
       color: ${beGoneColors.mediumGray};
-      font-size: 13px;
-      margin-top: 8px;
+      font-size: 14px;
+      margin-top: 12px;
+      font-weight: 500;
+      opacity: 0.8;
     }
     
-    /* Footer - Matching statistics style */
+    /* Premium Footer */
     .footer {
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 2px solid ${beGoneColors.divider};
+      margin-top: 72px;
+      padding: 48px 0 32px 0;
+      background: linear-gradient(135deg, 
+        rgba(248, 250, 252, 0.9) 0%, 
+        rgba(241, 245, 249, 0.85) 40%,
+        rgba(226, 232, 240, 0.7) 100%
+      );
+      border-top: 1px solid rgba(203, 213, 225, 0.3);
       text-align: center;
       page-break-inside: avoid;
+      position: relative;
+      margin-left: -20mm;
+      margin-right: -20mm;
+      padding-left: 20mm;
+      padding-right: 20mm;
+      margin-bottom: -20mm;
+      border-radius: 0 0 8px 8px;
+      backdrop-filter: blur(20px);
+      z-index: 2;
+    }
+    
+    .footer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 20mm;
+      right: 20mm;
+      height: 4px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(32, 197, 143, 0.3) 10%,
+        ${beGoneColors.accent} 25%, 
+        ${beGoneColors.primary} 50%, 
+        ${beGoneColors.accent} 75%,
+        rgba(32, 197, 143, 0.3) 90%,
+        transparent 100%
+      );
+      opacity: 0.6;
+      border-radius: 2px;
+      box-shadow: 0 2px 12px rgba(32, 197, 143, 0.2);
+    }
+    
+    .footer::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(circle at 30% 40%, rgba(32, 197, 143, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 70% 60%, rgba(10, 19, 40, 0.02) 0%, transparent 50%);
+      pointer-events: none;
     }
     
     .footer-logo {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
     
     .footer-text {
       color: ${beGoneColors.mediumGray};
-      font-size: 13px;
-      line-height: 1.6;
-      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      font-weight: 500;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
     }
     
     .footer-contact {
-      margin-top: 12px;
+      margin-top: 16px;
       color: ${beGoneColors.darkGray};
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 500;
     }
     
     .footer-contact a {
       color: ${beGoneColors.accent};
       text-decoration: none;
       font-weight: 600;
+      transition: color 0.2s ease;
+    }
+    
+    .footer-contact a:hover {
+      color: ${beGoneColors.primary};
     }
     
     /* Print Optimizations */
@@ -543,7 +1016,6 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
     <!-- Title Section -->
     <div class="title-section">
       <h1 class="main-title">${taskDetails.task_info.name}</h1>
-      <div class="case-subtitle">Professionell skadedjursrapport</div>
     </div>
     
     <!-- KPI Cards -->
@@ -714,7 +1186,7 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       </div>
       <div class="footer-text">
         Professionell skadedjursbekämpning sedan 2022<br>
-        Vi säkerställer en trygg och skadedjursfri miljö för er verksamhet
+        Vi säkerställer trygga och skadedjursfria miljöer för hem och verksamheter
       </div>
       <div class="footer-contact">
         <strong>Kontakt:</strong> info@begone.se | 010 280 44 10 | 
