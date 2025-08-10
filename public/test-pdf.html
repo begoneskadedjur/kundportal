@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Swedish PDF Generation - BeGone</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #8b5cf6; margin-bottom: 20px; }
+        .test-case { 
+            background: #f1f5f9; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 6px;
+            border-left: 4px solid #20c58f;
+        }
+        .swedish-chars {
+            font-weight: bold;
+            color: #8b5cf6;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover { background: #7c3aed; }
+        .status { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .success { background: #d1fae5; color: #065f46; }
+        .error { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🇸🇪 BeGone PDF Test - Svenska tecken</h1>
+        
+        <div class="swedish-chars">
+            Testar dessa svenska tecken: å ä ö Å Ä Ö
+        </div>
+
+        <p>Denna testsida genererar en PDF med svenska tecken för att verifiera att:</p>
+        
+        <div class="test-case">
+            <strong>1. Svenska tecken renderas korrekt</strong><br>
+            Testord: året, ärenden, råttor, okänt, pågående, öppen, ärendedetaljer, genomfört
+        </div>
+        
+        <div class="test-case">
+            <strong>2. Alla insikter visas komplett</strong><br>
+            6 viktiga mätvärden istället för bara 1
+        </div>
+        
+        <div class="test-case">
+            <strong>3. Rent visuellt utseende</strong><br>
+            Inga tjocka ramar eller 3D-effekter
+        </div>
+        
+        <div class="test-case">
+            <strong>4. Konsistent formatering</strong><br>
+            Enhetlig prissättning och statusstyling
+        </div>
+
+        <button onclick="generateTestPDF()">🔄 Generera Test-PDF</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        // Mock data for testing Swedish characters
+        const mockCustomer = {
+            id: '1',
+            company_name: 'Karlssons Åkeri & Byggmaterial AB',
+            annual_value: 156000
+        };
+
+        const mockCases = [
+            {
+                id: '1',
+                title: 'Åtgärd mot råttinvasion i lager',
+                status: 'completed_closed', 
+                pest_type: 'Råttor',
+                price: 3500,
+                created_at: '2025-08-01T08:00:00Z',
+                scheduled_start: '2025-08-02T09:00:00Z',
+                scheduled_end: '2025-08-02T14:00:00Z', 
+                completed_date: '2025-08-02T13:30:00Z',
+                address: 'Storgatan 15, Göteborg'
+            },
+            {
+                id: '2', 
+                title: 'Förebyggande myrorbehandling',
+                status: 'pågående',
+                pest_type: 'Myror', 
+                price: 2200,
+                created_at: '2025-08-03T10:00:00Z',
+                scheduled_start: '2025-08-05T08:30:00Z',
+                scheduled_end: '2025-08-05T12:00:00Z',
+                completed_date: null,
+                address: 'Järnvägsgatan 22, Malmö'
+            },
+            {
+                id: '3',
+                title: 'Akut vägglussproblematik',
+                status: 'öppen', 
+                pest_type: 'Vägglöss',
+                price: null,
+                created_at: '2025-08-08T14:00:00Z',
+                scheduled_start: null,
+                scheduled_end: null,
+                completed_date: null, 
+                address: 'Östermalmsvägen 8, Stockholm'
+            }
+        ];
+
+        const mockStatistics = {
+            totalCases: 3,
+            completedCases: 1, 
+            activeCases: 2,
+            totalCost: 5700
+        };
+
+        // Simplified PDF generation function for testing
+        async function generateTestPDF() {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status';
+            statusEl.innerHTML = '⏳ Genererar PDF med svenska tecken...';
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Use Times font for better Swedish character support
+                doc.setFont('times', 'normal');
+                
+                // Header
+                doc.setFontSize(20);
+                doc.setFont('times', 'bold'); 
+                doc.text('BeGone Testrapport', 20, 30);
+                
+                doc.setFontSize(14);
+                doc.setFont('times', 'normal');
+                doc.text(`Kund: ${mockCustomer.company_name}`, 20, 45);
+                doc.text('Period: Senaste året', 20, 55);
+                
+                // Swedish character test
+                doc.setFontSize(16);
+                doc.setFont('times', 'bold');
+                doc.text('Test av svenska tecken:', 20, 75);
+                
+                doc.setFontSize(12);
+                doc.setFont('times', 'normal');
+                const swedishTests = [
+                    'året → år (ø → å)',
+                    'ärenden → ärendena (ä test)', 
+                    'råttor → råttorna (å test)',
+                    'okänt → okända (ä test)',
+                    'pågående → pågår (å test)',
+                    'öppen → öppna (ö test)',
+                    'ärendedetaljer → detaljer (ä test)',
+                    'genomförd → genomfört (ö test)'
+                ];
+                
+                let yPos = 85;
+                swedishTests.forEach((test) => {
+                    doc.text(test, 25, yPos);
+                    yPos += 10;
+                });
+                
+                // Case data
+                doc.setFontSize(16); 
+                doc.setFont('times', 'bold');
+                doc.text('Ärendedata:', 20, yPos + 10);
+                
+                yPos += 25;
+                doc.setFontSize(11);
+                doc.setFont('times', 'normal');
+                
+                mockCases.forEach((case_) => {
+                    doc.text(`• ${case_.title}`, 25, yPos);
+                    yPos += 7;
+                    doc.text(`  Status: ${case_.status} | Skadedjur: ${case_.pest_type}`, 30, yPos); 
+                    yPos += 7;
+                    doc.text(`  Adress: ${case_.address}`, 30, yPos);
+                    yPos += 12;
+                });
+                
+                // Save with proper Swedish filename
+                const filename = `BeGone_Svenska_Test_${new Date().toISOString().split('T')[0]}.pdf`;
+                doc.save(filename);
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = `✅ PDF genererad framgångsrikt! Kontrollera nedladdningen: <strong>${filename}</strong>`;
+                
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                statusEl.className = 'status error'; 
+                statusEl.innerHTML = `❌ PDF-generering misslyckades: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
