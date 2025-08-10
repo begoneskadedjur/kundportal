@@ -576,11 +576,19 @@ export const exportStatisticsToPDF = (
       const isEvenRow = rowIndex % 2 === 0
       const rowHeight = 18 // Reduced for more compact design
       
-      // Subtle alternating row background
+      // Premium alternating row backgrounds with better contrast
       if (isEvenRow) {
-        doc.setFillColor(...warmGray) // Very light gray
-        doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F')
+        doc.setFillColor(248, 249, 252) // Subtle blue-gray
+        doc.roundedRect(margin, yPosition - 3, contentWidth, rowHeight, 2, 2, 'F')
+      } else {
+        doc.setFillColor(255, 255, 255) // Pure white
+        doc.roundedRect(margin, yPosition - 3, contentWidth, rowHeight, 2, 2, 'F')
       }
+      
+      // Add subtle row border for definition
+      doc.setDrawColor(240, 240, 245)
+      doc.setLineWidth(0.1)
+      doc.line(margin, yPosition + rowHeight - 3, margin + contentWidth, yPosition + rowHeight - 3)
       
       // Add subtle row separator
       if (rowIndex > 0) {
