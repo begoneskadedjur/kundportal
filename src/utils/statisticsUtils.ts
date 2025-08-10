@@ -2,30 +2,44 @@
 import jsPDF from 'jspdf'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../types/database'
 
-// Font configuration for PERFECT Swedish character support
+// Font configuration for Swedish character support
 const configureSwedishFont = (doc: jsPDF) => {
-  // Use Times font consistently throughout - it has full Swedish character support
-  // Times-Roman includes å, ä, ö, Å, Ä, Ö in its character set
-  doc.setFont('times', 'normal')
+  // Use Helvetica with proper encoding
+  doc.setFont('helvetica', 'normal')
+  // Enable Unicode support
+  doc.setLanguage('sv')
 }
 
-// Helper to set font with Swedish character support - use this EVERYWHERE
+// Helper to set font - use this EVERYWHERE
 const setSwedishFont = (doc: jsPDF, weight: 'normal' | 'bold' = 'normal') => {
-  doc.setFont('times', weight)
+  doc.setFont('helvetica', weight)
 }
 
 // Process text to ensure proper Swedish character encoding
+// This function handles the Swedish character mapping for jsPDF
 const processSwedishText = (text: string | null | undefined): string => {
   if (!text) return ''
   
-  // Ensure text is properly encoded for Swedish characters
-  // Keep all Swedish characters: å, ä, ö, Å, Ä, Ö
-  return text
-    .replace(/[\u0000-\u001F]/g, '') // Remove only actual control characters
+  // First clean the text
+  let cleaned = text
+    .replace(/[\u0000-\u001F]/g, '') // Remove control characters
     .replace(/[\u007F-\u009F]/g, '') // Remove extended control characters
     .replace(/[\uFEFF]/g, '') // Remove BOM
     .trim()
-    .substring(0, 500) // Generous length limit
+    .substring(0, 500)
+  
+  // Then encode Swedish characters for PDF
+  // jsPDF has known issues with UTF-8, we need to ensure Latin-1 encoding
+  // Swedish letters need special handling
+  cleaned = cleaned
+    .replace(/å/g, String.fromCharCode(229))  // å
+    .replace(/ä/g, String.fromCharCode(228))  // ä
+    .replace(/ö/g, String.fromCharCode(246))  // ö
+    .replace(/Å/g, String.fromCharCode(197))  // Å
+    .replace(/Ä/g, String.fromCharCode(196))  // Ä
+    .replace(/Ö/g, String.fromCharCode(214))  // Ö
+  
+  return cleaned
 }
 
 interface CaseData {

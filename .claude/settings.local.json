@@ -9,7 +9,9 @@
       "Bash(git commit:*)",
       "Bash(npm run lint)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git restore:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }
