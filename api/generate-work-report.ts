@@ -195,84 +195,174 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       padding: 20mm;
     }
     
-    /* Header */
+    /* Modern Header */
     .header {
-      background: linear-gradient(135deg, ${beGoneColors.primary} 0%, ${beGoneColors.charcoal} 100%);
-      margin: -20mm -20mm 0 -20mm;
-      padding: 30px;
-      text-align: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 24px;
+      border-bottom: 2px solid ${beGoneColors.divider};
+      margin-bottom: 32px;
       page-break-inside: avoid;
     }
     
-    .header h1 {
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, ${beGoneColors.accent} 0%, ${beGoneColors.accentDark} 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: white;
-      font-size: 32px;
+      font-weight: bold;
+      font-size: 20px;
+    }
+    
+    .logo-text {
+      font-size: 24px;
       font-weight: 700;
-      margin-bottom: 10px;
-      letter-spacing: -0.5px;
+      color: ${beGoneColors.primary};
     }
     
-    .header .subtitle {
-      color: ${beGoneColors.accent};
-      font-size: 14px;
-      font-weight: 500;
+    .report-meta {
+      text-align: right;
+    }
+    
+    .report-title {
+      color: ${beGoneColors.primary};
+      font-size: 18px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
     }
     
-    .accent-line {
-      height: 4px;
-      background: ${beGoneColors.accent};
-      margin-top: 30px;
-    }
-    
-    /* Metadata Section */
-    .metadata {
-      text-align: center;
-      padding: 20px 0;
+    .report-date {
       color: ${beGoneColors.mediumGray};
-      font-size: 12px;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    
+    /* Title Section */
+    .title-section {
+      margin-bottom: 32px;
+      padding: 20px 0;
       border-bottom: 1px solid ${beGoneColors.divider};
-      margin-bottom: 30px;
     }
     
-    .metadata p {
-      margin: 4px 0;
+    .main-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: ${beGoneColors.primary};
+      margin-bottom: 8px;
     }
     
-    /* Section Headers */
-    .section {
-      margin-bottom: 30px;
+    .case-subtitle {
+      font-size: 16px;
+      color: ${beGoneColors.mediumGray};
+      font-weight: 500;
+    }
+    
+    /* KPI Cards - Modern metadata display */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
       page-break-inside: avoid;
     }
     
-    .section-header {
-      background: ${beGoneColors.charcoal};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      page-break-after: avoid;
-    }
-    
-    .section-header.accent {
-      background: ${beGoneColors.accent};
-    }
-    
-    /* Cards */
-    .card {
+    .kpi-card {
       background: ${beGoneColors.lightestGray};
       border: 1px solid ${beGoneColors.border};
       border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
+      padding: 16px;
+      transition: all 0.3s ease;
       page-break-inside: avoid;
     }
     
-    .card.white {
+    .kpi-card:hover {
+      background: ${beGoneColors.lightGray};
+      border-color: ${beGoneColors.mediumGray};
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .kpi-label {
+      color: ${beGoneColors.mediumGray};
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    
+    .kpi-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: ${beGoneColors.primary};
+      margin-bottom: 4px;
+    }
+    
+    .kpi-subtitle {
+      color: ${beGoneColors.mediumGray};
+      font-size: 11px;
+    }
+    
+    /* Section Headers - Modern style */
+    .section {
+      margin-bottom: 32px;
+      page-break-inside: avoid;
+    }
+    
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: ${beGoneColors.primary};
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      page-break-after: avoid;
+    }
+    
+    .section-title.accent {
+      color: ${beGoneColors.accent};
+    }
+    
+    .section-icon {
+      font-size: 20px;
+      min-width: 20px;
+      line-height: 1;
+    }
+    
+    /* Cards - Modern style */
+    .card {
       background: white;
+      border: 1px solid ${beGoneColors.border};
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-color: ${beGoneColors.accent};
+      transform: translateY(-1px);
+    }
+    
+    .card.accent-border {
+      border: 2px solid ${beGoneColors.accent};
+      background: linear-gradient(135deg, ${beGoneColors.lightestGray} 0%, white 100%);
     }
     
     /* Info Grid */
@@ -301,83 +391,114 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
       font-weight: 500;
     }
     
-    /* Report Text */
+    /* Report Section - Enhanced modern style */
+    .report-section {
+      background: linear-gradient(135deg, ${beGoneColors.lightestGray} 0%, ${beGoneColors.lightGray} 100%);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 32px;
+      page-break-inside: avoid;
+    }
+    
     .report-content {
       background: white;
       border: 1px solid ${beGoneColors.border};
       border-radius: 12px;
       padding: 24px;
-      min-height: 150px;
+      min-height: 200px;
       page-break-inside: avoid;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .report-text {
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1.8;
       color: ${beGoneColors.darkGray};
       white-space: pre-wrap;
+      padding: 0;
     }
     
     .no-report {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
       font-style: italic;
       color: ${beGoneColors.mediumGray};
       text-align: center;
-      padding: 40px;
+      padding: 48px;
     }
     
-    /* Cost Summary */
+    .no-report-icon {
+      font-size: 48px;
+      opacity: 0.3;
+      color: ${beGoneColors.mediumGray};
+    }
+    
+    /* Cost Summary - KPI Style */
     .cost-summary {
-      background: white;
-      border: 2px solid ${beGoneColors.accent};
-      border-radius: 12px;
-      padding: 20px;
       text-align: center;
+      padding: 24px;
       page-break-inside: avoid;
     }
     
     .cost-label {
-      font-size: 14px;
-      color: ${beGoneColors.darkGray};
-      margin-bottom: 8px;
+      font-size: 13px;
+      color: ${beGoneColors.mediumGray};
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
     }
     
     .cost-value {
-      font-size: 28px;
+      font-size: 32px;
       font-weight: 700;
       color: ${beGoneColors.accent};
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
     
-    /* Footer */
+    .cost-subtitle {
+      color: ${beGoneColors.mediumGray};
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    
+    /* Footer - Matching statistics style */
     .footer {
-      margin-top: 60px;
-      padding-top: 30px;
+      margin-top: 48px;
+      padding-top: 24px;
       border-top: 2px solid ${beGoneColors.divider};
       text-align: center;
       page-break-inside: avoid;
     }
     
     .footer-logo {
-      font-size: 20px;
-      font-weight: 700;
-      color: ${beGoneColors.primary};
-      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
     }
     
     .footer-text {
-      font-size: 12px;
       color: ${beGoneColors.mediumGray};
-      margin-bottom: 12px;
+      font-size: 13px;
       line-height: 1.6;
+      margin-bottom: 12px;
     }
     
     .footer-contact {
-      font-size: 11px;
+      margin-top: 12px;
       color: ${beGoneColors.darkGray};
+      font-size: 13px;
     }
     
     .footer-contact a {
       color: ${beGoneColors.accent};
       text-decoration: none;
+      font-weight: 600;
     }
     
     /* Print Optimizations */
@@ -407,24 +528,50 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
 </head>
 <body>
   <div class="container">
-    <!-- Professional Header -->
+    <!-- Modern Header -->
     <div class="header">
-      <h1>SANERINGSRAPPORT</h1>
-      <div class="subtitle">BeGone Skadedjur & Sanering</div>
-      <div class="accent-line"></div>
+      <div class="logo">
+        <div class="logo-icon">B</div>
+        <div class="logo-text">BeGone</div>
+      </div>
+      <div class="report-meta">
+        <div class="report-title">SANERINGSRAPPORT</div>
+        <div class="report-date">${new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      </div>
     </div>
     
-    <!-- Metadata -->
-    <div class="metadata">
-      <p><strong>Rapport genererad:</strong> ${new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-      <p><strong>Ärende ID:</strong> ${taskDetails.task_id}</p>
-      ${addressText !== 'Adress ej angiven' ? `<p><strong>Arbetsplats:</strong> ${addressText}</p>` : ''}
+    <!-- Title Section -->
+    <div class="title-section">
+      <h1 class="main-title">${taskDetails.task_info.name}</h1>
+      <div class="case-subtitle">Professionell skadedjursrapport</div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Ärende ID</div>
+        <div class="kpi-value">${taskDetails.task_id}</div>
+        <div class="kpi-subtitle">Unikt ärende</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Status</div>
+        <div class="kpi-value">${taskDetails.task_info.status || 'Okänd'}</div>
+        <div class="kpi-subtitle">Aktuell status</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Skadedjur</div>
+        <div class="kpi-value">${pestText}</div>
+        <div class="kpi-subtitle">Behandlat skadedjur</div>
+      </div>
     </div>
     
     <!-- Kunduppgifter -->
     <div class="section">
-      <div class="section-header">KUNDUPPGIFTER</div>
-      <div class="card white">
+      <h2 class="section-title">
+        <span class="section-icon">👤</span>
+        Kunduppgifter
+      </h2>
+      <div class="card">
         <div class="info-grid">
           <div class="info-group">
             <div class="info-label">UPPDRAGSGIVARE</div>
@@ -458,8 +605,11 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
     
     <!-- Leverantörsuppgifter -->
     <div class="section">
-      <div class="section-header">LEVERANTÖRSUPPGIFTER</div>
-      <div class="card white">
+      <h2 class="section-title">
+        <span class="section-icon">🏢</span>
+        Leverantörsuppgifter
+      </h2>
+      <div class="card">
         <div class="info-grid">
           <div class="info-group">
             <div class="info-label">FÖRETAG</div>
@@ -493,7 +643,10 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
     
     <!-- Arbetsinformation -->
     <div class="section">
-      <div class="section-header accent">ARBETSINFORMATION</div>
+      <h2 class="section-title accent">
+        <span class="section-icon">🔧</span>
+        Arbetsinformation
+      </h2>
       <div class="card">
         <div class="info-grid">
           <div class="info-group">
@@ -518,32 +671,47 @@ const generateWorkReportHTML = (taskDetails: TaskDetails, customerInfo: Customer
     
     <!-- Detaljerad Saneringsrapport -->
     <div class="section">
-      <div class="section-header accent">DETALJERAD SANERINGSRAPPORT</div>
-      ${reportField && reportField.value ? `
+      <h2 class="section-title accent">
+        <span class="section-icon">📋</span>
+        Detaljerad saneringsrapport
+      </h2>
+      <div class="report-section">
         <div class="report-content">
-          <div class="report-text">${reportField.value}</div>
+          ${reportField && reportField.value ? `
+            <div class="report-text">${reportField.value}</div>
+          ` : `
+            <div class="no-report">
+              <div class="no-report-icon">📄</div>
+              <div>Ingen detaljerad rapport registrerad för detta ärende.</div>
+            </div>
+          `}
         </div>
-      ` : `
-        <div class="report-content">
-          <div class="no-report">Ingen detaljerad rapport registrerad för detta ärende.</div>
-        </div>
-      `}
+      </div>
     </div>
     
     <!-- Ekonomisk sammanfattning -->
     ${priceField && priceField.value ? `
     <div class="section">
-      <div class="section-header accent">EKONOMISK SAMMANFATTNING</div>
-      <div class="cost-summary">
-        <div class="cost-label">Totalkostnad för utförd sanering:</div>
-        <div class="cost-value">${priceText}</div>
+      <h2 class="section-title accent">
+        <span class="section-icon">💰</span>
+        Ekonomisk sammanfattning
+      </h2>
+      <div class="card accent-border">
+        <div class="cost-summary">
+          <div class="cost-label">Totalkostnad för utförd sanering</div>
+          <div class="cost-value">${priceText}</div>
+          <div class="cost-subtitle">Inkl. moms och arbete</div>
+        </div>
       </div>
     </div>
     ` : ''}
     
     <!-- Footer -->
     <div class="footer">
-      <div class="footer-logo">BeGone</div>
+      <div class="footer-logo">
+        <div class="logo-icon" style="width: 24px; height: 24px; font-size: 14px;">B</div>
+        <div class="logo-text" style="font-size: 18px;">BeGone</div>
+      </div>
       <div class="footer-text">
         Professionell skadedjursbekämpning sedan 2022<br>
         Vi säkerställer en trygg och skadedjursfri miljö för er verksamhet
