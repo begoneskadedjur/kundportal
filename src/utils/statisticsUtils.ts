@@ -148,7 +148,7 @@ export const exportStatisticsToPDF = (
   
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 20 // Reduced margin for more content space
+  const margin = 15 // Further reduced margin for optimal content space
   const contentWidth = pageWidth - (margin * 2)
 
   // BeGone brand colors (enhanced palette)
@@ -162,9 +162,13 @@ export const exportStatisticsToPDF = (
   const successGreen = [34, 197, 94] // Green for positive metrics
   const warningAmber = [245, 158, 11] // Amber for attention items
 
-  // Helper function to draw clean rounded rectangles WITHOUT thick borders
+  // Helper function to draw clean rounded rectangles with subtle styling
   const drawCleanRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[], borderColor?: number[]) => {
-    // Single clean rectangle with proper fill
+    // Subtle shadow effect first
+    doc.setFillColor(0, 0, 0, 0.03)
+    doc.roundedRect(x + 0.5, y + 0.5, width, height, radius, radius, 'F')
+    
+    // Main rectangle with clean fill
     if (fillColor) {
       doc.setFillColor(...fillColor)
       doc.roundedRect(x, y, width, height, radius, radius, 'F')
@@ -173,151 +177,150 @@ export const exportStatisticsToPDF = (
     // Optional subtle border (very thin)
     if (borderColor) {
       doc.setDrawColor(...borderColor)
-      doc.setLineWidth(0.3) // Ultra-thin border for professional look
+      doc.setLineWidth(0.2) // Ultra-thin border for professional look
       doc.roundedRect(x, y, width, height, radius, radius, 'S')
     }
   }
 
-  // Helper function to add premium header to each page
+  // Helper function to add compact premium header to each page
   const addPageHeader = () => {
+    const headerHeight = 40 // Reduced from 50
+    
     // Premium header background with subtle gradient
     doc.setFillColor(...brandPurple)
-    doc.rect(0, 0, pageWidth, 50, 'F')
+    doc.rect(0, 0, pageWidth, headerHeight, 'F')
     
     // Add gradient overlay effect
     doc.setFillColor(...softPurple)
-    doc.rect(0, 0, pageWidth, 25, 'F')
+    doc.rect(0, 0, pageWidth, headerHeight/2, 'F')
     
-    // Enhanced BeGone logo area with professional styling
+    // Enhanced BeGone logo area with professional styling (smaller)
+    const logoY = headerHeight/2
     doc.setFillColor(255, 255, 255)
-    doc.circle(margin + 18, 25, 15, 'F')
+    doc.circle(margin + 12, logoY, 10, 'F')
     
     // Logo shadow effect
     doc.setFillColor(0, 0, 0, 0.1)
-    doc.circle(margin + 19, 26, 15, 'F')
+    doc.circle(margin + 12.5, logoY + 0.5, 10, 'F')
     doc.setFillColor(255, 255, 255)
-    doc.circle(margin + 18, 25, 15, 'F')
+    doc.circle(margin + 12, logoY, 10, 'F')
     
     // BeGone logo text
     doc.setTextColor(...brandPurple)
-    doc.setFontSize(16)
+    doc.setFontSize(12) // Reduced
     setSwedishFont(doc, 'bold')
-    doc.text('BG', margin + 12, 30)
+    doc.text('BG', margin + 8, logoY + 3)
     
     // Add decorative elements around logo
     doc.setDrawColor(...accentTeal)
-    doc.setLineWidth(2)
-    doc.circle(margin + 18, 25, 15, 'S')
+    doc.setLineWidth(1.5)
+    doc.circle(margin + 12, logoY, 10, 'S')
 
-    // Main title with Swedish-safe typography
+    // Main title with Swedish-safe typography (more compact)
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(28)
+    doc.setFontSize(22) // Reduced from 28
     setSwedishFont(doc, 'bold')
-    doc.text(processSwedishText('BeGone'), margin + 42, 25)
+    doc.text(processSwedishText('BeGone'), margin + 28, logoY - 3)
     
-    doc.setFontSize(16)
+    doc.setFontSize(12) // Reduced from 16
     setSwedishFont(doc, 'normal')
-    doc.text(processSwedishText('Statistikrapport'), margin + 42, 35)
+    doc.text(processSwedishText('Statistikrapport'), margin + 28, logoY + 6)
     
     // Tagline
-    doc.setFontSize(10)
+    doc.setFontSize(8) // Reduced from 10
     doc.setTextColor(220, 220, 220)
-    doc.text(processSwedishText('Professionell skadedjurshantering'), margin + 42, 43)
+    doc.text(processSwedishText('Professionell skadedjurshantering'), margin + 28, logoY + 13)
 
     // Date stamp with Swedish formatting
-    doc.setFontSize(11)
+    doc.setFontSize(9) // Reduced from 11
     doc.setTextColor(255, 255, 255)
     setSwedishFont(doc, 'normal')
     const dateText = processSwedishText(`Genererad: ${new Date().toLocaleDateString('sv-SE')}`)
     const dateWidth = doc.getTextWidth(dateText)
-    doc.text(dateText, pageWidth - margin - dateWidth, 28)
+    doc.text(dateText, pageWidth - margin - dateWidth, logoY + 2)
     
     // Add decorative line under header
     doc.setDrawColor(...accentTeal)
-    doc.setLineWidth(3)
-    doc.line(0, 50, pageWidth, 50)
+    doc.setLineWidth(2)
+    doc.line(0, headerHeight, pageWidth, headerHeight)
   }
 
-  // Helper function to add premium footer
+  // Helper function to add compact premium footer
   const addPageFooter = (pageNumber: number, totalPages: number) => {
-    const footerY = pageHeight - 18
+    const footerY = pageHeight - 15 // Moved up from -18
+    const footerHeight = 15 // Reduced from 25
     
     // Premium footer background
     doc.setFillColor(...warmGray)
-    doc.rect(0, footerY - 8, pageWidth, 25, 'F')
+    doc.rect(0, footerY - 5, pageWidth, footerHeight, 'F')
     
     // Footer accent line
     doc.setDrawColor(...accentTeal)
-    doc.setLineWidth(2)
-    doc.line(0, footerY - 8, pageWidth, footerY - 8)
+    doc.setLineWidth(1)
+    doc.line(0, footerY - 5, pageWidth, footerY - 5)
     
     // Footer text with Swedish font
     doc.setTextColor(...mediumGray)
-    doc.setFontSize(9)
+    doc.setFontSize(8) // Reduced from 9
     setSwedishFont(doc, 'normal')
     doc.text(processSwedishText('BeGone Kundportal • Professionell skadedjurshantering'), margin, footerY)
     
     // Contact info
-    doc.setFontSize(8)
+    doc.setFontSize(7) // Reduced from 8
     doc.setTextColor(...mediumGray)
-    doc.text(processSwedishText('www.begone.se • info@begone.se'), margin, footerY + 8)
+    doc.text(processSwedishText('www.begone.se • info@begone.se'), margin, footerY + 6)
     
     // Page number styling
     setSwedishFont(doc, 'bold')
     doc.setTextColor(...brandPurple)
     const pageText = processSwedishText(`Sida ${pageNumber} av ${totalPages}`)
     const pageTextWidth = doc.getTextWidth(pageText)
-    doc.text(pageText, pageWidth - margin - pageTextWidth, footerY + 4)
+    doc.text(pageText, pageWidth - margin - pageTextWidth, footerY + 3)
   }
 
   // Calculate total pages needed with better pagination
-  const casesPerPage = 12 // Reduced for better readability with enhanced spacing
+  const casesPerPage = 15 // Increased capacity due to more compact design
   const totalPages = Math.ceil(cases.length / casesPerPage) + 1
 
   // PAGE 1: Executive Summary and Key Metrics
   addPageHeader()
   
-  let yPosition = 75 // More space after enhanced header
+  let yPosition = 65 // Optimized space after header
   
-  // Customer info card with clean design - NO borders, just clean styling
-  drawCleanRect(margin, yPosition, contentWidth, 45, 10, [255, 255, 255])
+  // Customer info card with clean design - optimized for space
+  const customerCardHeight = 35 // Reduced height
+  drawCleanRect(margin, yPosition, contentWidth, customerCardHeight, 8, [255, 255, 255], [...lightGray])
   
-  // Subtle shadow effect instead of border
-  doc.setFillColor(0, 0, 0, 0.05) // Very light shadow
-  doc.roundedRect(margin + 1, yPosition + 1, contentWidth, 45, 10, 10, 'F')
-  doc.setFillColor(255, 255, 255) // White background on top
-  doc.roundedRect(margin, yPosition, contentWidth, 45, 10, 10, 'F')
-  
-  // Top accent stripe only (much thinner)
+  // Top accent stripe (thin)
   doc.setFillColor(...accentTeal)
-  doc.roundedRect(margin, yPosition, contentWidth, 3, 10, 10, 'F')
+  doc.roundedRect(margin, yPosition, contentWidth, 2, 8, 8, 'F')
   
   doc.setTextColor(...darkBlue)
-  doc.setFontSize(20)
+  doc.setFontSize(16) // Reduced from 20
   setSwedishFont(doc, 'bold')
-  doc.text(processSwedishText(customer.company_name), margin + 15, yPosition + 22)
+  doc.text(processSwedishText(customer.company_name), margin + 12, yPosition + 18)
   
-  doc.setFontSize(12)
+  doc.setFontSize(10) // Reduced from 12
   setSwedishFont(doc, 'normal')
   doc.setTextColor(...mediumGray)
-  doc.text(processSwedishText(`Rapportperiod: ${getPeriodLabel(period)}`), margin + 15, yPosition + 35)
+  doc.text(processSwedishText(`Rapportperiod: ${getPeriodLabel(period)}`), margin + 12, yPosition + 28)
   
-  yPosition += 65
+  yPosition += 50 // Reduced from 65
   
-  // Executive Summary with clean icon
+  // Executive Summary with clean icon - more compact
   doc.setFillColor(...accentTeal)
-  doc.circle(margin + 6, yPosition - 2, 4, 'F')
+  doc.circle(margin + 5, yPosition - 2, 3, 'F')
   doc.setFillColor(255, 255, 255)
-  doc.setFontSize(8)
+  doc.setFontSize(6)
   setSwedishFont(doc, 'bold')
-  doc.text('✓', margin + 4.5, yPosition + 0.5)
+  doc.text('✓', margin + 3.5, yPosition - 0.5)
   
-  doc.setFontSize(18)
+  doc.setFontSize(15) // Reduced from 18
   setSwedishFont(doc, 'bold')
   doc.setTextColor(...darkBlue)
-  doc.text(processSwedishText('Sammanfattning'), margin + 15, yPosition)
+  doc.text(processSwedishText('Sammanfattning'), margin + 12, yPosition)
   
-  yPosition += 20
+  yPosition += 15 // Reduced spacing
   
   // Key metrics in attractive cards with safe text
   const completionRate = statistics.totalCases > 0 
@@ -331,47 +334,44 @@ export const exportStatisticsToPDF = (
     { label: 'Aktiva ärenden', value: statistics.activeCases.toString(), color: [245, 158, 11] } // amber-500
   ]
   
-  const cardWidth = (contentWidth - 20) / 2
-  const cardHeight = 50
+  const cardWidth = (contentWidth - 15) / 2
+  const cardHeight = 38 // Reduced height for more compact design
   
   metricsData.forEach((metric, index) => {
     const col = index % 2
     const row = Math.floor(index / 2)
-    const cardX = margin + (col * (cardWidth + 10))
-    const cardY = yPosition + (row * (cardHeight + 12))
+    const cardX = margin + (col * (cardWidth + 15))
+    const cardY = yPosition + (row * (cardHeight + 8))
     
-    // Clean card background with subtle shadow - NO thick borders
-    doc.setFillColor(0, 0, 0, 0.04) // Very subtle shadow
-    doc.roundedRect(cardX + 1, cardY + 1, cardWidth, cardHeight, 10, 10, 'F')
-    doc.setFillColor(255, 255, 255) // Clean white background
-    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 10, 10, 'F')
+    // Clean card with subtle styling - NO thick borders
+    drawCleanRect(cardX, cardY, cardWidth, cardHeight, 6, [255, 255, 255], [...lightGray])
     
-    // Simple top accent stripe only (thinner)
+    // Left accent bar instead of thick top border
     doc.setFillColor(...metric.color)
-    doc.roundedRect(cardX, cardY, cardWidth, 3, 10, 10, 'F')
+    doc.roundedRect(cardX, cardY, 2, cardHeight, 6, 6, 'F')
     
     // Metric value with proper Swedish font
     doc.setTextColor(...darkBlue)
-    doc.setFontSize(26)
+    doc.setFontSize(20) // Reduced from 26
     setSwedishFont(doc, 'bold')
-    doc.text(processSwedishText(metric.value), cardX + 15, cardY + 25)
+    doc.text(processSwedishText(metric.value), cardX + 12, cardY + 20)
     
     // Metric label with proper Swedish font
-    doc.setFontSize(9)
+    doc.setFontSize(8) // Reduced from 9
     setSwedishFont(doc, 'normal')
     doc.setTextColor(...mediumGray)
     
     // Handle long labels with better line wrapping
     const words = processSwedishText(metric.label).split(' ')
     if (words.length > 2) {
-      doc.text(words.slice(0, 2).join(' '), cardX + 15, cardY + 37)
-      doc.text(words.slice(2).join(' '), cardX + 15, cardY + 45)
+      doc.text(words.slice(0, 2).join(' '), cardX + 12, cardY + 30)
+      doc.text(words.slice(2).join(' '), cardX + 12, cardY + 36)
     } else {
-      doc.text(processSwedishText(metric.label), cardX + 15, cardY + 41)
+      doc.text(processSwedishText(metric.label), cardX + 12, cardY + 32)
     }
   })
   
-  yPosition += 140
+  yPosition += 100 // Reduced spacing after statistics cards
   
   // Calculate comprehensive insights data
   const totalCostFormatted = formatSwedishCurrency(statistics.totalCost || 0)
@@ -411,47 +411,53 @@ export const exportStatisticsToPDF = (
     `Behandlade ärenden: ${statistics.completedCases}/${statistics.totalCases}`
   ]
   
-  doc.setFontSize(16)
+  // Insights section title with icon
+  doc.setFillColor(...accentTeal)
+  doc.circle(margin + 5, yPosition - 2, 3, 'F')
+  doc.setFillColor(255, 255, 255)
+  doc.setFontSize(7)
+  setSwedishFont(doc, 'bold')
+  doc.text('!', margin + 3.5, yPosition + 0.5)
+  
+  doc.setFontSize(14) // Reduced from 16
   setSwedishFont(doc, 'bold')
   doc.setTextColor(...darkBlue)
-  doc.text(processSwedishText('Viktiga insikter'), margin, yPosition)
+  doc.text(processSwedishText('Viktiga insikter'), margin + 12, yPosition)
   
-  yPosition += 15
+  yPosition += 12 // Reduced spacing
   
-  // Enhanced insights section with cards - ALL insights displayed
+  // Enhanced insights section with properly sized cards - ALL insights displayed
   const insightsPerRow = 2
-  const insightCardWidth = (contentWidth - 15) / insightsPerRow
-  const insightCardHeight = 35
+  const insightCardWidth = (contentWidth - 10) / insightsPerRow
+  const insightCardHeight = 28 // Reduced height
+  const availableHeight = pageHeight - yPosition - 40 // Leave space for footer
+  const maxRows = Math.floor(availableHeight / (insightCardHeight + 6))
+  const visibleInsights = insights.slice(0, maxRows * insightsPerRow) // Ensure we don't overflow
   
-  insights.forEach((insight, index) => {
+  visibleInsights.forEach((insight, index) => {
     const col = index % insightsPerRow
     const row = Math.floor(index / insightsPerRow)
-    const cardX = margin + (col * (insightCardWidth + 15))
-    const cardY = yPosition + (row * (insightCardHeight + 10))
+    const cardX = margin + (col * (insightCardWidth + 10))
+    const cardY = yPosition + (row * (insightCardHeight + 6))
     
-    // Clean insight card background - NO thick borders
-    drawCleanRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, [255, 255, 255])
+    // Clean insight card background with subtle styling
+    drawCleanRect(cardX, cardY, insightCardWidth, insightCardHeight, 4, [255, 255, 255], [...lightGray])
     
-    // Subtle border instead of thick one
-    doc.setDrawColor(226, 232, 240) // Very light gray
-    doc.setLineWidth(0.5)
-    doc.roundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, 6, 'S')
-    
-    // Left accent bar
+    // Left accent bar (thinner)
     doc.setFillColor(...accentTeal)
-    doc.roundedRect(cardX, cardY, 3, insightCardHeight, 6, 6, 'F')
+    doc.roundedRect(cardX, cardY, 2, insightCardHeight, 4, 4, 'F')
     
-    // Clean icon (no thick borders)
+    // Clean small icon
     doc.setFillColor(...brandPurple)
-    doc.circle(cardX + 12, cardY + 12, 4, 'F')
+    doc.circle(cardX + 8, cardY + 10, 2.5, 'F')
     doc.setFillColor(255, 255, 255)
-    doc.setFontSize(8)
+    doc.setFontSize(6)
     setSwedishFont(doc, 'bold')
-    doc.text('i', cardX + 10.5, cardY + 14)
+    doc.text('i', cardX + 7, cardY + 11)
     
     // Insight text with Swedish-safe formatting
     doc.setTextColor(...darkBlue)
-    doc.setFontSize(10)
+    doc.setFontSize(8) // Reduced font size
     setSwedishFont(doc, 'normal')
     
     // Split insight into title and value for better formatting
@@ -460,28 +466,28 @@ export const exportStatisticsToPDF = (
       // Title
       setSwedishFont(doc, 'normal')
       doc.setTextColor(...mediumGray)
-      doc.text(processSwedishText(parts[0]), cardX + 22, cardY + 12)
+      doc.text(processSwedishText(parts[0]), cardX + 15, cardY + 8)
       
       // Value  
       setSwedishFont(doc, 'bold')
       doc.setTextColor(...darkBlue)
-      doc.setFontSize(11)
-      doc.text(processSwedishText(parts[1]), cardX + 22, cardY + 24)
+      doc.setFontSize(9)
+      doc.text(processSwedishText(parts[1]), cardX + 15, cardY + 18)
     } else {
       // Single line fallback
       const words = processSwedishText(insight).split(' ')
       if (words.length > 4) {
-        doc.text(words.slice(0, 4).join(' '), cardX + 22, cardY + 12)
-        doc.text(words.slice(4).join(' '), cardX + 22, cardY + 22)
+        doc.text(words.slice(0, 4).join(' '), cardX + 15, cardY + 8)
+        doc.text(words.slice(4).join(' '), cardX + 15, cardY + 16)
       } else {
-        doc.text(processSwedishText(insight), cardX + 22, cardY + 17)
+        doc.text(processSwedishText(insight), cardX + 15, cardY + 14)
       }
     }
   })
   
   // Update yPosition to account for insight cards
-  const totalRows = Math.ceil(insights.length / insightsPerRow)
-  yPosition += (totalRows * (insightCardHeight + 10)) + 5
+  const actualRows = Math.ceil(visibleInsights.length / insightsPerRow)
+  yPosition += (actualRows * (insightCardHeight + 6)) + 5
   
   addPageFooter(1, totalPages)
 
@@ -494,78 +500,73 @@ export const exportStatisticsToPDF = (
     currentPage++
     addPageHeader()
     
-    yPosition = 75 // Consistent with first page
+    yPosition = 65 // Consistent with first page
     
-    // Page title with proper Swedish font
-    doc.setFontSize(18)
+    // Page title with proper Swedish font - more compact
+    doc.setFontSize(15) // Reduced from 18
     setSwedishFont(doc, 'bold')
     doc.setTextColor(...darkBlue)
     
     // Clean decorative icon
     doc.setFillColor(...brandPurple)
-    doc.circle(margin + 6, yPosition - 3, 4, 'F')
+    doc.circle(margin + 5, yPosition - 2, 3, 'F')
     doc.setFillColor(255, 255, 255)
-    doc.setFontSize(10)
+    doc.setFontSize(8)
     setSwedishFont(doc, 'bold')
-    doc.text('i', margin + 4.5, yPosition - 1)
+    doc.text('i', margin + 3.5, yPosition - 0.5)
     
-    doc.setFontSize(18)
+    doc.setFontSize(15)
     setSwedishFont(doc, 'bold')
     doc.setTextColor(...darkBlue)
-    doc.text(processSwedishText('Ärendedetaljer'), margin + 15, yPosition)
+    doc.text(processSwedishText('Ärendedetaljer'), margin + 12, yPosition)
     
-    yPosition += 25
+    yPosition += 20 // Reduced spacing
     
     // Table header with improved spacing and proper Swedish characters
     const tableHeaders = ['Ärendetitel', 'Status', 'Skadedjur', 'Pris', 'Datum']
-    const colWidths = [55, 30, 35, 30, 40] // Better proportions for content
-    const headerHeight = 28
+    const colWidths = [60, 35, 40, 25, 30] // Better balanced proportions
+    const headerHeight = 18 // Reduced from 28
     
-    // Enhanced header background
-    doc.setFillColor(...brandPurple)
-    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight, 8, 8, 'F')
+    // Clean header background - subtle instead of overwhelming
+    drawCleanRect(margin, yPosition - 3, contentWidth, headerHeight, 4, [...brandPurple], [...mediumGray])
     
-    // Gradient overlay
-    doc.setFillColor(...softPurple)
-    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight/2, 8, 8, 'F')
-    
-    // Header text with Swedish font
+    // Header text with Swedish font - clean styling
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(10)
+    doc.setFontSize(9) // Slightly reduced
     setSwedishFont(doc, 'bold')
     
-    let xPosition = margin + 10
+    let xPosition = margin + 8 // Reduced padding
     tableHeaders.forEach((header, index) => {
       const processedHeader = processSwedishText(header)
       if (index === 3) { // Price column - right align
         const headerWidth = doc.getTextWidth(processedHeader)
-        doc.text(processedHeader, xPosition + colWidths[index] - headerWidth - 4, yPosition + 10)
+        doc.text(processedHeader, xPosition + colWidths[index] - headerWidth - 4, yPosition + 6)
       } else {
-        doc.text(processedHeader, xPosition, yPosition + 10)
+        doc.text(processedHeader, xPosition, yPosition + 6)
       }
       xPosition += colWidths[index]
     })
     
-    yPosition += headerHeight + 5
+    yPosition += headerHeight + 3 // Reduced spacing
     
     // Table rows with enhanced styling
     const pageCases = cases.slice(caseIndex, caseIndex + casesPerPage)
     
     pageCases.forEach((caseItem, rowIndex) => {
       const isEvenRow = rowIndex % 2 === 0
-      const rowHeight = 22 // Increased row height for better readability
+      const rowHeight = 18 // Reduced for more compact design
       
-      // Enhanced alternating row background
+      // Subtle alternating row background
       if (isEvenRow) {
         doc.setFillColor(...warmGray) // Very light gray
-        doc.roundedRect(margin, yPosition - 4, contentWidth, rowHeight, 3, 3, 'F')
+        doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F')
       }
       
       // Add subtle row separator
       if (rowIndex > 0) {
         doc.setDrawColor(...lightGray)
-        doc.setLineWidth(0.3)
-        doc.line(margin + 5, yPosition - 4, pageWidth - margin - 5, yPosition - 4)
+        doc.setLineWidth(0.2)
+        doc.line(margin + 5, yPosition - 2, pageWidth - margin - 5, yPosition - 2)
       }
       
       // Row data with improved formatting and proper Swedish characters
@@ -577,17 +578,17 @@ export const exportStatisticsToPDF = (
         caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : '—'
       ]
       
-      xPosition = margin + 10 // Consistent padding
+      xPosition = margin + 8 // Reduced padding to match header
       
       rowData.forEach((data, colIndex) => {
         // Determine text styling based on column
         if (colIndex === 1) { // Status column
           const isCompleted = isCompletedStatus(caseItem.status)
           
-          // Create enhanced status badge
-          const statusWidth = doc.getTextWidth(data) + 10
-          const statusHeight = 12
-          const statusY = yPosition - 3
+          // Create compact status badge
+          const statusWidth = doc.getTextWidth(data) + 8 // Reduced padding
+          const statusHeight = 10 // Reduced height
+          const statusY = yPosition - 2
           
           // Choose colors based on status
           if (isCompleted) {
@@ -619,13 +620,13 @@ export const exportStatisticsToPDF = (
           
           // Status text with Swedish font
           doc.setTextColor(255, 255, 255)
-          doc.setFontSize(8)
+          doc.setFontSize(7) // Reduced font size
           setSwedishFont(doc, 'bold')
-          doc.text(processSwedishText(data), xPosition + 5, yPosition + 3)
+          doc.text(processSwedishText(data), xPosition + 4, yPosition + 2)
         } else {
           // Cell styling with Swedish font
           doc.setTextColor(...darkBlue)
-          doc.setFontSize(9)
+          doc.setFontSize(8) // Reduced font size
           setSwedishFont(doc, 'normal')
           
           const processedData = processSwedishText(data)
@@ -635,27 +636,27 @@ export const exportStatisticsToPDF = (
             setSwedishFont(doc, 'bold')
             if (data !== '—' && data !== 'N/A') {
               const textWidth = doc.getTextWidth(processedData)
-              doc.text(processedData, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 5)
+              doc.text(processedData, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 4)
             } else {
               const textWidth = doc.getTextWidth(processedData)
               doc.setTextColor(...mediumGray)
-              doc.text(processedData, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 5)
+              doc.text(processedData, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 4)
             }
           } else {
-            doc.text(processedData, xPosition, yPosition + 5)
+            doc.text(processedData, xPosition, yPosition + 4)
           }
         }
         
         xPosition += colWidths[colIndex]
       })
       
-      yPosition += rowHeight + 2 // Extra spacing between rows
+      yPosition += rowHeight + 1 // Reduced spacing between rows
     })
     
     // Add subtle bottom border to table
     doc.setDrawColor(...brandPurple)
-    doc.setLineWidth(1)
-    doc.line(margin, yPosition + 5, pageWidth - margin, yPosition + 5)
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPosition + 3, pageWidth - margin, yPosition + 3)
     
     caseIndex += casesPerPage
     addPageFooter(currentPage, totalPages)
