@@ -649,9 +649,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('PDF buffer length:', pdf.length)
     console.log('PDF buffer constructor:', pdf.constructor.name)
     
+    // Debug: Check what pdf actually contains
+    if (pdf instanceof Uint8Array || pdf instanceof Buffer) {
+      console.log('PDF is a valid buffer/array')
+    } else {
+      console.error('PDF is not a buffer/array, it is:', pdf)
+    }
+    
+    // Ensure proper base64 conversion
     const pdfBase64 = Buffer.from(pdf).toString('base64')
     console.log('Base64 conversion successful, length:', pdfBase64.length)
     console.log('Base64 sample (first 100 chars):', pdfBase64.substring(0, 100))
+    
+    // Extra verification
+    if (pdfBase64.includes(',')) {
+      console.error('WARNING: Base64 contains commas, this is wrong!')
+      console.error('PDF toString() result:', pdf.toString().substring(0, 200))
+    }
     
     res.status(200).json({ 
       success: true, 

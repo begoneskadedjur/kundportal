@@ -224,9 +224,23 @@ const base64ToBlob = (base64: string, contentType: string) => {
     
     // Check if we received a comma-separated byte array instead of base64
     if (base64.includes(',') && !base64.includes('/') && !base64.includes('+')) {
-      console.error('Received comma-separated byte array instead of base64!')
-      console.error('This indicates the server is not properly converting PDF Buffer to base64')
-      throw new Error('Server returned byte array instead of base64 string')
+      console.warn('Received comma-separated byte array instead of base64, converting...')
+      // Convert comma-separated bytes string to Uint8Array
+      try {
+        const bytes = base64.split(',').map(b => {
+          const num = parseInt(b.trim(), 10)
+          if (isNaN(num) || num < 0 || num > 255) {
+            throw new Error(`Invalid byte value: ${b}`)
+          }
+          return num
+        })
+        const byteArray = new Uint8Array(bytes)
+        console.log('Successfully converted byte array to Blob, size:', byteArray.length)
+        return new Blob([byteArray], { type: contentType })
+      } catch (conversionError) {
+        console.error('Failed to convert byte array:', conversionError)
+        throw new Error('Server returned invalid byte array data')
+      }
     }
     
     // Remove any whitespace and data URL prefix if present
