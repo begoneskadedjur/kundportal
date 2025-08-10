@@ -122,107 +122,168 @@ export const exportStatisticsToPDF = (
   const margin = 20 // Reduced margin for more content space
   const contentWidth = pageWidth - (margin * 2)
 
-  // BeGone brand colors
+  // BeGone brand colors (enhanced palette)
   const brandPurple = [139, 92, 246] // #8b5cf6
   const darkBlue = [10, 19, 40] // #0a1328
   const lightGray = [226, 232, 240] // #e2e8f0
   const mediumGray = [100, 116, 139] // #64748b
   const accentTeal = [32, 197, 143] // #20c58f
+  const softPurple = [168, 142, 255] // Lighter purple for gradients
+  const warmGray = [248, 250, 252] // Very light background
+  const successGreen = [34, 197, 94] // Green for positive metrics
+  const warningAmber = [245, 158, 11] // Amber for attention items
 
-  // Helper function to draw a rounded rectangle
-  const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[]) => {
+  // Helper function to draw a rounded rectangle with optional shadow
+  const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[], withShadow = false) => {
+    if (withShadow) {
+      // Draw subtle shadow
+      doc.setFillColor(220, 220, 220)
+      doc.roundedRect(x + 1, y + 1, width, height, radius, radius, 'F')
+    }
+    
     if (fillColor) {
       doc.setFillColor(...fillColor)
     }
     doc.roundedRect(x, y, width, height, radius, radius, 'F')
   }
 
-  // Helper function to add header to each page
+  // Helper function to add premium header to each page
   const addPageHeader = () => {
-    // Header background gradient effect
+    // Premium header background with subtle gradient
     doc.setFillColor(...brandPurple)
-    doc.rect(0, 0, pageWidth, 45, 'F')
+    doc.rect(0, 0, pageWidth, 50, 'F')
     
-    // BeGone logo area (simulated)
+    // Add gradient overlay effect
+    doc.setFillColor(...softPurple)
+    doc.rect(0, 0, pageWidth, 25, 'F')
+    
+    // Enhanced BeGone logo area with professional styling
     doc.setFillColor(255, 255, 255)
-    doc.circle(margin + 15, 22, 12, 'F')
-    doc.setTextColor(...darkBlue)
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('BG', margin + 10, 27)
-
-    // Main title
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(24)
-    doc.setFont('helvetica', 'bold')
-    doc.text('BeGone', margin + 35, 22)
+    doc.circle(margin + 18, 25, 15, 'F')
     
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Statistikrapport', margin + 35, 32)
+    // Logo shadow effect
+    doc.setFillColor(0, 0, 0, 0.1)
+    doc.circle(margin + 19, 26, 15, 'F')
+    doc.setFillColor(255, 255, 255)
+    doc.circle(margin + 18, 25, 15, 'F')
+    
+    // BeGone logo text with better styling
+    doc.setTextColor(...brandPurple)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text('BG', margin + 12, 30)
+    
+    // Add decorative elements around logo
+    doc.setDrawColor(...accentTeal)
+    doc.setLineWidth(2)
+    doc.circle(margin + 18, 25, 15, 'S')
 
-    // Date stamp
-    doc.setFontSize(10)
+    // Main title with enhanced typography
     doc.setTextColor(255, 255, 255)
+    doc.setFontSize(28)
+    doc.setFont('helvetica', 'bold')
+    doc.text('BeGone', margin + 42, 25)
+    
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Statistikrapport', margin + 42, 35)
+    
+    // Tagline
+    doc.setFontSize(10)
+    doc.setTextColor(220, 220, 220)
+    doc.text('Professionell skadedjurshantering', margin + 42, 43)
+
+    // Date stamp with better formatting
+    doc.setFontSize(11)
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'normal')
     const dateText = `Genererad: ${new Date().toLocaleDateString('sv-SE')}`
     const dateWidth = doc.getTextWidth(dateText)
-    doc.text(dateText, pageWidth - margin - dateWidth, 25)
+    doc.text(dateText, pageWidth - margin - dateWidth, 28)
+    
+    // Add decorative line under header
+    doc.setDrawColor(...accentTeal)
+    doc.setLineWidth(3)
+    doc.line(0, 50, pageWidth, 50)
   }
 
-  // Helper function to add footer
+  // Helper function to add premium footer
   const addPageFooter = (pageNumber: number, totalPages: number) => {
-    const footerY = pageHeight - 15
+    const footerY = pageHeight - 18
     
-    // Footer line
-    doc.setDrawColor(...brandPurple)
-    doc.setLineWidth(1)
-    doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5)
+    // Premium footer background
+    doc.setFillColor(...warmGray)
+    doc.rect(0, footerY - 8, pageWidth, 25, 'F')
     
-    // Footer text
+    // Footer accent line
+    doc.setDrawColor(...accentTeal)
+    doc.setLineWidth(2)
+    doc.line(0, footerY - 8, pageWidth, footerY - 8)
+    
+    // Enhanced footer text
     doc.setTextColor(...mediumGray)
-    doc.setFontSize(8)
-    doc.text('BeGone Kundportal - Professionell skadedjurshantering', margin, footerY)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text('BeGone Kundportal • Professionell skadedjurshantering', margin, footerY)
     
-    // Page number
+    // Contact info
+    doc.setFontSize(8)
+    doc.setTextColor(...mediumGray)
+    doc.text('www.begone.se • info@begone.se', margin, footerY + 8)
+    
+    // Page number with better styling
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...brandPurple)
     const pageText = `Sida ${pageNumber} av ${totalPages}`
     const pageTextWidth = doc.getTextWidth(pageText)
-    doc.text(pageText, pageWidth - margin - pageTextWidth, footerY)
+    doc.text(pageText, pageWidth - margin - pageTextWidth, footerY + 4)
   }
 
-  // Calculate total pages needed
-  const casesPerPage = 15
+  // Calculate total pages needed with better pagination
+  const casesPerPage = 12 // Reduced for better readability with enhanced spacing
   const totalPages = Math.ceil(cases.length / casesPerPage) + 1
 
-  // PAGE 1: Summary and Key Metrics
+  // PAGE 1: Executive Summary and Key Metrics
   addPageHeader()
   
-  let yPosition = 65
+  let yPosition = 75 // More space after enhanced header
   
-  // Customer info card with improved design
-  drawRoundedRect(margin, yPosition, contentWidth, 40, 8, [248, 250, 252]) // bg-slate-50 equivalent
+  // Customer info card with premium design
+  drawRoundedRect(margin, yPosition, contentWidth, 45, 10, warmGray, true) // With shadow
   
-  // Add subtle border
-  doc.setDrawColor(...mediumGray)
-  doc.setLineWidth(0.5)
-  doc.roundedRect(margin, yPosition, contentWidth, 40, 8, 8, 'S')
+  // Add gradient-like border effect
+  doc.setDrawColor(...accentTeal)
+  doc.setLineWidth(2)
+  doc.roundedRect(margin, yPosition, contentWidth, 45, 10, 10, 'S')
+  
+  // Top accent stripe
+  doc.setFillColor(...accentTeal)
+  doc.roundedRect(margin, yPosition, contentWidth, 4, 10, 10, 'F')
   
   doc.setTextColor(...darkBlue)
   doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
-  doc.text(safeText(customer.company_name), margin + 15, yPosition + 18)
+  doc.text(customer.company_name, margin + 15, yPosition + 22)
   
   doc.setFontSize(12)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...mediumGray)
-  doc.text(`Rapportperiod: ${getPeriodLabel(period)}`, margin + 15, yPosition + 30)
+  doc.text(`Rapportperiod: ${getPeriodLabel(period)}`, margin + 15, yPosition + 35)
   
-  yPosition += 60
+  yPosition += 65
   
-  // Executive Summary
-  doc.setFontSize(16)
+  // Executive Summary with icon
+  doc.setFillColor(...accentTeal)
+  doc.circle(margin + 6, yPosition - 2, 4, 'F')
+  doc.setFillColor(255, 255, 255)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.text('✓', margin + 4.5, yPosition + 0.5) // Checkmark icon
+  
+  doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...darkBlue)
-  doc.text('Sammanfattning', margin, yPosition)
+  doc.text('Sammanfattning', margin + 15, yPosition)
   
   yPosition += 20
   
@@ -247,40 +308,43 @@ export const exportStatisticsToPDF = (
     const cardX = margin + (col * (cardWidth + 10))
     const cardY = yPosition + (row * (cardHeight + 12))
     
-    // Card background
-    drawRoundedRect(cardX, cardY, cardWidth, cardHeight, 8, [255, 255, 255])
+    // Card background with shadow
+    drawRoundedRect(cardX, cardY, cardWidth, cardHeight, 10, [255, 255, 255], true)
     
-    // Card border
+    // Card border with gradient effect
     doc.setDrawColor(...metric.color)
-    doc.setLineWidth(2)
-    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 8, 8, 'S')
+    doc.setLineWidth(1.5)
+    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 10, 10, 'S')
     
-    // Accent stripe
+    // Top accent stripe (full width)
     doc.setFillColor(...metric.color)
-    doc.roundedRect(cardX, cardY, 4, cardHeight, 8, 8, 'F')
+    doc.roundedRect(cardX, cardY, cardWidth, 5, 10, 10, 'F')
     
-    // Metric value
+    // Side accent stripe
+    doc.roundedRect(cardX, cardY + 5, 4, cardHeight - 5, 0, 0, 'F')
+    
+    // Metric value with better positioning
     doc.setTextColor(...darkBlue)
-    doc.setFontSize(22)
+    doc.setFontSize(26)
     doc.setFont('helvetica', 'bold')
-    doc.text(metric.value, cardX + 15, cardY + 22)
+    doc.text(metric.value, cardX + 15, cardY + 25)
     
-    // Metric label
-    doc.setFontSize(10)
+    // Metric label with improved formatting
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...mediumGray)
     
-    // Handle long labels with line wrapping
+    // Handle long labels with better line wrapping
     const words = metric.label.split(' ')
     if (words.length > 2) {
-      doc.text(words.slice(0, 2).join(' '), cardX + 15, cardY + 34)
-      doc.text(words.slice(2).join(' '), cardX + 15, cardY + 42)
+      doc.text(words.slice(0, 2).join(' '), cardX + 15, cardY + 37)
+      doc.text(words.slice(2).join(' '), cardX + 15, cardY + 45)
     } else {
-      doc.text(metric.label, cardX + 15, cardY + 38)
+      doc.text(metric.label, cardX + 15, cardY + 41)
     }
   })
   
-  yPosition += 130
+  yPosition += 140
   
   // Additional insights with safe formatting
   const totalCostFormatted = formatSwedishCurrency(statistics.totalCost || 0)
@@ -303,24 +367,71 @@ export const exportStatisticsToPDF = (
   
   yPosition += 15
   
+  // Enhanced insights section with cards
+  const insightsPerRow = 2
+  const insightCardWidth = (contentWidth - 15) / insightsPerRow
+  const insightCardHeight = 35
+  
   insights.forEach((insight, index) => {
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
+    const col = index % insightsPerRow
+    const row = Math.floor(index / insightsPerRow)
+    const cardX = margin + (col * (insightCardWidth + 15))
+    const cardY = yPosition + (row * (insightCardHeight + 10))
+    
+    // Insight card background with subtle gradient effect
+    doc.setFillColor(255, 255, 255)
+    drawRoundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, [255, 255, 255])
+    
+    // Card border with brand accent
+    doc.setDrawColor(...accentTeal)
+    doc.setLineWidth(1)
+    doc.roundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, 6, 'S')
+    
+    // Left accent bar
+    doc.setFillColor(...accentTeal)
+    doc.roundedRect(cardX, cardY, 3, insightCardHeight, 6, 6, 'F')
+    
+    // Icon placeholder (decorative circle)
+    doc.setFillColor(...brandPurple)
+    doc.circle(cardX + 12, cardY + 12, 4, 'F')
+    doc.setFillColor(255, 255, 255)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text('i', cardX + 10.5, cardY + 14)
+    
+    // Insight text with better formatting
     doc.setTextColor(...darkBlue)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
     
-    // Enhanced bullet point with gradient effect
-    doc.setFillColor(...brandPurple)
-    doc.circle(margin + 4, yPosition - 2, 2.5, 'F')
-    
-    // Add slight shadow effect
-    doc.setFillColor(200, 200, 200)
-    doc.circle(margin + 4.5, yPosition - 1.5, 2.5, 'F')
-    doc.setFillColor(...brandPurple)
-    doc.circle(margin + 4, yPosition - 2, 2.5, 'F')
-    
-    doc.text(insight, margin + 14, yPosition)
-    yPosition += 14
+    // Split insight into title and value for better formatting
+    const parts = insight.split(': ')
+    if (parts.length === 2) {
+      // Title
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...mediumGray)
+      doc.text(parts[0], cardX + 22, cardY + 12)
+      
+      // Value
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...darkBlue)
+      doc.setFontSize(11)
+      doc.text(parts[1], cardX + 22, cardY + 24)
+    } else {
+      // Single line fallback
+      const words = insight.split(' ')
+      if (words.length > 4) {
+        doc.text(words.slice(0, 4).join(' '), cardX + 22, cardY + 12)
+        doc.text(words.slice(4).join(' '), cardX + 22, cardY + 22)
+      } else {
+        doc.text(insight, cardX + 22, cardY + 17)
+      }
+    }
   })
+  
+  // Update yPosition to account for insight cards
+  const totalRows = Math.ceil(insights.length / insightsPerRow)
+  yPosition += (totalRows * (insightCardHeight + 10)) + 5
   
   addPageFooter(1, totalPages)
 
@@ -333,7 +444,7 @@ export const exportStatisticsToPDF = (
     currentPage++
     addPageHeader()
     
-    yPosition = 65
+    yPosition = 75 // Consistent with first page
     
     // Page title with icon simulation
     doc.setFontSize(18)
@@ -358,100 +469,168 @@ export const exportStatisticsToPDF = (
     const colWidths = [55, 30, 35, 30, 40] // Better proportions for content
     const headerHeight = 28
     
-    // Header background
+    // Enhanced header background
     doc.setFillColor(...brandPurple)
-    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight, 5, 5, 'F')
+    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight, 8, 8, 'F')
     
-    // Header text
+    // Gradient overlay
+    doc.setFillColor(...softPurple)
+    doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight/2, 8, 8, 'F')
+    
+    // Enhanced header text
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'bold')
     
-    let xPosition = margin + 8
+    let xPosition = margin + 10
     tableHeaders.forEach((header, index) => {
-      doc.text(header, xPosition, yPosition + 8)
+      if (index === 3) { // Price column - right align
+        const headerWidth = doc.getTextWidth(header)
+        doc.text(header, xPosition + colWidths[index] - headerWidth - 4, yPosition + 10)
+      } else {
+        doc.text(header, xPosition, yPosition + 10)
+      }
       xPosition += colWidths[index]
     })
     
     yPosition += headerHeight + 5
     
-    // Table rows
+    // Table rows with enhanced styling
     const pageCases = cases.slice(caseIndex, caseIndex + casesPerPage)
     
     pageCases.forEach((caseItem, rowIndex) => {
       const isEvenRow = rowIndex % 2 === 0
-      const rowHeight = 20 // Increased row height for better readability
+      const rowHeight = 22 // Increased row height for better readability
       
-      // Alternating row background
+      // Enhanced alternating row background
       if (isEvenRow) {
-        doc.setFillColor(248, 250, 252) // Very light gray
-        doc.rect(margin, yPosition - 4, contentWidth, rowHeight, 'F')
+        doc.setFillColor(...warmGray) // Very light gray
+        doc.roundedRect(margin, yPosition - 4, contentWidth, rowHeight, 3, 3, 'F')
       }
       
-      // Row data with improved formatting
+      // Add subtle row separator
+      if (rowIndex > 0) {
+        doc.setDrawColor(...lightGray)
+        doc.setLineWidth(0.3)
+        doc.line(margin + 5, yPosition - 4, pageWidth - margin - 5, yPosition - 4)
+      }
+      
+      // Row data with improved formatting and proper Swedish characters
       const rowData = [
-        truncateText(caseItem.title, 28),
-        safeText(getCustomerStatusDisplay(caseItem.status)),
-        truncateText(caseItem.pest_type, 18) || 'Okant',
+        truncateText(caseItem.title, 32), // More space for titles
+        getCustomerStatusDisplay(caseItem.status),
+        truncateText(caseItem.pest_type, 20) || 'Okänt',
         formatSwedishCurrency(caseItem.price),
-        caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : 'N/A'
+        caseItem.created_at ? new Date(caseItem.created_at).toLocaleDateString('sv-SE') : '—'
       ]
       
-      xPosition = margin + 6 // Better left padding
+      xPosition = margin + 10 // Consistent padding
       
       rowData.forEach((data, colIndex) => {
         // Determine text styling based on column
         if (colIndex === 1) { // Status column
           const isCompleted = isCompletedStatus(caseItem.status)
           
-          // Create status badge background
-          const statusWidth = doc.getTextWidth(data) + 6
-          const statusHeight = 8
-          const statusY = yPosition - 1
+          // Create enhanced status badge
+          const statusWidth = doc.getTextWidth(data) + 10
+          const statusHeight = 12
+          const statusY = yPosition - 3
           
+          // Choose colors based on status
           if (isCompleted) {
-            doc.setFillColor(...accentTeal)
+            doc.setFillColor(...successGreen)
+          } else if (caseItem.status.toLowerCase().includes('bokad')) {
+            doc.setFillColor(...warningAmber)
+          } else if (caseItem.status.toLowerCase().includes('pågående')) {
+            doc.setFillColor(59, 130, 246) // Blue for in progress
           } else {
-            doc.setFillColor(245, 158, 11) // Amber for pending/active
+            doc.setFillColor(...mediumGray)
           }
           
-          // Draw status badge with rounded corners
-          doc.roundedRect(xPosition - 1, statusY, statusWidth, statusHeight, 2, 2, 'F')
+          // Badge shadow
+          doc.setFillColor(0, 0, 0, 0.15)
+          doc.roundedRect(xPosition + 1, statusY + 1, statusWidth, statusHeight, 5, 5, 'F')
           
-          // Status text in white
+          // Main badge
+          if (isCompleted) {
+            doc.setFillColor(...successGreen)
+          } else if (caseItem.status.toLowerCase().includes('bokad')) {
+            doc.setFillColor(...warningAmber)
+          } else if (caseItem.status.toLowerCase().includes('pågående')) {
+            doc.setFillColor(59, 130, 246)
+          } else {
+            doc.setFillColor(...mediumGray)
+          }
+          
+          doc.roundedRect(xPosition, statusY, statusWidth, statusHeight, 5, 5, 'F')
+          
+          // Status text with better positioning
           doc.setTextColor(255, 255, 255)
           doc.setFontSize(8)
           doc.setFont('helvetica', 'bold')
-          doc.text(data, xPosition + 2, yPosition + 4)
+          doc.text(data, xPosition + 5, yPosition + 3)
         } else {
-          // Regular cell styling
+          // Enhanced cell styling
           doc.setTextColor(...darkBlue)
           doc.setFontSize(9)
           doc.setFont('helvetica', 'normal')
           
           // Special formatting for price column (right align)
-          if (colIndex === 3 && data !== 'N/A') {
+          if (colIndex === 3) {
             doc.setFont('helvetica', 'bold')
-            const textWidth = doc.getTextWidth(data)
-            doc.text(data, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 4)
+            if (data !== '—' && data !== 'N/A') {
+              const textWidth = doc.getTextWidth(data)
+              doc.text(data, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 5)
+            } else {
+              const textWidth = doc.getTextWidth(data)
+              doc.setTextColor(...mediumGray)
+              doc.text(data, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 5)
+            }
           } else {
-            doc.text(data, xPosition, yPosition + 4)
+            doc.text(data, xPosition, yPosition + 5)
           }
         }
         
         xPosition += colWidths[colIndex]
       })
       
-      yPosition += rowHeight
+      yPosition += rowHeight + 2 // Extra spacing between rows
     })
+    
+    // Add subtle bottom border to table
+    doc.setDrawColor(...brandPurple)
+    doc.setLineWidth(1)
+    doc.line(margin, yPosition + 5, pageWidth - margin, yPosition + 5)
     
     caseIndex += casesPerPage
     addPageFooter(currentPage, totalPages)
   }
 
-  // Save with professional filename
-  const filename = `BeGone_Rapport_${customer.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
-  doc.save(filename)
+  // Add document metadata for professionalism
+  doc.setProperties({
+    title: `BeGone Statistikrapport - ${customer.company_name}`,
+    subject: 'Skadedjurshantering Statistikrapport',
+    author: 'BeGone Kundportal',
+    keywords: 'skadedjur, statistik, rapport, begone',
+    creator: 'BeGone Kundportal',
+    producer: 'BeGone PDF Generator'
+  })
+
+  // Save with professional filename that preserves Swedish characters
+  const safeCompanyName = customer.company_name
+    .replace(/[^a-zA-Z0-9À-ſ\s]/g, '') // Allow Swedish characters
+    .replace(/\s+/g, '_')
+    .substring(0, 30) // Reasonable length limit
+  
+  const filename = `BeGone_Rapport_${safeCompanyName}_${new Date().toISOString().split('T')[0]}.pdf`
+  
+  try {
+    doc.save(filename)
+  } catch (error) {
+    console.error('PDF generation error:', error)
+    // Fallback with simpler filename
+    doc.save(`BeGone_Rapport_${new Date().toISOString().split('T')[0]}.pdf`)
+  }
 }
 
 // Export to CSV functionality
@@ -531,20 +710,16 @@ const formatSwedishCurrency = (amount: number | null | undefined): string => {
   return `${formatted} kr`
 }
 
-// Helper function for safe text rendering (avoid character encoding issues)
+// Helper function for safe text rendering (PRESERVE Swedish characters)
 const safeText = (text: string | null | undefined): string => {
   if (!text) return ''
   
-  // Replace problematic characters that might cause corruption
+  // Clean text without destroying Swedish characters - preserve å, ä, ö, Å, Ä, Ö
   return text
-    .replace(/[\u00C0-\u00FF]/g, (match) => {
-      // Map common Swedish characters to safe alternatives for PDF
-      const charMap: Record<string, string> = {
-        'å': 'a', 'ä': 'a', 'ö': 'o',
-        'Å': 'A', 'Ä': 'A', 'Ö': 'O'
-      }
-      return charMap[match] || match
-    })
+    .replace(/[\u0000-\u001F]/g, '') // Remove control characters only
+    .replace(/[\u007F-\u009F]/g, '') // Remove extended control characters
+    .replace(/[\uFEFF]/g, '') // Remove BOM
+    .trim()
     .substring(0, 200) // Prevent extremely long text
 }
 
@@ -552,7 +727,7 @@ const safeText = (text: string | null | undefined): string => {
 const truncateText = (text: string | null | undefined, maxLength: number): string => {
   const safe = safeText(text)
   if (safe.length <= maxLength) return safe
-  return safe.substring(0, maxLength - 3) + '...'
+  return safe.substring(0, maxLength - 1) + '…' // Use proper ellipsis character
 }
 
 // Calculate trend direction and percentage
