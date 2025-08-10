@@ -89,6 +89,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1y')
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   // Fetch cases data
   useEffect(() => {
@@ -377,7 +378,16 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
   }
 
   const exportToPDF = async () => {
-    await exportStatisticsToPDF(customer, filteredCases, statistics, selectedPeriod)
+    try {
+      setPdfLoading(true)
+      console.log('Starting PDF export...', { customer, cases: filteredCases.length, statistics, period: selectedPeriod })
+      await exportStatisticsToPDF(customer, filteredCases, statistics, selectedPeriod)
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      alert('Kunde inte generera PDF. Se konsolen för mer information.')
+    } finally {
+      setPdfLoading(false)
+    }
   }
 
   const exportToCSV = () => {
@@ -427,9 +437,19 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                   onClick={exportToPDF}
                   variant="secondary"
                   className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                  disabled={pdfLoading}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  PDF
+                  {pdfLoading ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      Genererar...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      PDF
+                    </>
+                  )}
                 </Button>
                 <Button
                   onClick={exportToCSV}

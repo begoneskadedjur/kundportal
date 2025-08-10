@@ -137,7 +137,27 @@ export const exportStatisticsToPDF = async (
   statistics: any,
   period: string
 ) => {
+  console.log('exportStatisticsToPDF called with:', { 
+    customer: customer.company_name, 
+    casesCount: cases.length, 
+    statistics,
+    period 
+  })
+  
   try {
+    // Check if we're in development or production
+    const isDevelopment = window.location.hostname === 'localhost'
+    console.log('Environment:', isDevelopment ? 'development' : 'production')
+    
+    // In development, fall back to legacy jsPDF method since serverless won't work
+    if (isDevelopment) {
+      console.log('Using legacy jsPDF in development')
+      exportStatisticsToPDFLegacy(customer, cases, statistics, period)
+      return
+    }
+    
+    console.log('Calling serverless function at /api/generate-pdf')
+    
     // Call serverless function
     const response = await fetch('/api/generate-pdf', {
       method: 'POST',
@@ -152,32 +172,40 @@ export const exportStatisticsToPDF = async (
       })
     })
 
+    console.log('Response status:', response.status)
+
     if (!response.ok) {
-      throw new Error('Failed to generate PDF')
+      const errorData = await response.text()
+      console.error('Server response:', errorData)
+      throw new Error(`Failed to generate PDF: ${response.status} ${response.statusText}`)
     }
 
     const data = await response.json()
+    console.log('PDF data received, size:', data.pdf ? data.pdf.length : 0)
+    
+    if (!data.pdf) {
+      throw new Error('No PDF data received from server')
+    }
     
     // Convert base64 to blob and download
     const pdfBlob = base64ToBlob(data.pdf, 'application/pdf')
     const url = URL.createObjectURL(pdfBlob)
     const link = document.createElement('a')
     link.href = url
-    link.download = data.filename
+    link.download = data.filename || `BeGone_Statistik_${new Date().toISOString().split('T')[0]}.pdf`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
-    // Show success message (assuming toast is available)
-    if (typeof (window as any).toast !== 'undefined') {
-      (window as any).toast.success('PDF genererad framgångsrikt!')
-    }
+    console.log('PDF download triggered:', data.filename)
+    
+    // Show success message
+    alert('PDF genererad framgångsrikt!')
   } catch (error) {
     console.error('PDF generation error:', error)
-    if (typeof (window as any).toast !== 'undefined') {
-      (window as any).toast.error('Kunde inte generera PDF')
-    }
+    alert(`Kunde inte generera PDF: ${error instanceof Error ? error.message : 'Okänt fel'}`)
+    throw error // Re-throw to handle in component
   }
 }
 
