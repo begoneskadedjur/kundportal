@@ -376,8 +376,8 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
     return colors[color as keyof typeof colors] || colors.emerald
   }
 
-  const exportToPDF = () => {
-    exportStatisticsToPDF(customer, filteredCases, statistics, selectedPeriod)
+  const exportToPDF = async () => {
+    await exportStatisticsToPDF(customer, filteredCases, statistics, selectedPeriod)
   }
 
   const exportToCSV = () => {

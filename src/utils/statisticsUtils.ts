@@ -130,8 +130,72 @@ export const calculateServiceMetrics = (cases: CaseData[]) => {
   }
 }
 
-// Export to PDF functionality with professional BeGone branding
-export const exportStatisticsToPDF = (
+// Export to PDF using Puppeteer serverless function
+export const exportStatisticsToPDF = async (
+  customer: Customer,
+  cases: CaseData[],
+  statistics: any,
+  period: string
+) => {
+  try {
+    // Call serverless function
+    const response = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        customer,
+        cases,
+        statistics,
+        period
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF')
+    }
+
+    const data = await response.json()
+    
+    // Convert base64 to blob and download
+    const pdfBlob = base64ToBlob(data.pdf, 'application/pdf')
+    const url = URL.createObjectURL(pdfBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = data.filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    // Show success message (assuming toast is available)
+    if (typeof (window as any).toast !== 'undefined') {
+      (window as any).toast.success('PDF genererad framgångsrikt!')
+    }
+  } catch (error) {
+    console.error('PDF generation error:', error)
+    if (typeof (window as any).toast !== 'undefined') {
+      (window as any).toast.error('Kunde inte generera PDF')
+    }
+  }
+}
+
+// Helper function to convert base64 to blob
+const base64ToBlob = (base64: string, contentType: string) => {
+  const byteCharacters = atob(base64)
+  const byteNumbers = new Array(byteCharacters.length)
+  
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  
+  const byteArray = new Uint8Array(byteNumbers)
+  return new Blob([byteArray], { type: contentType })
+}
+
+// Legacy PDF export function (kept for backward compatibility)
+export const exportStatisticsToPDFLegacy = (
   customer: Customer,
   cases: CaseData[],
   statistics: any,
