@@ -156,7 +156,7 @@ const generatePDFHTML = (data: any) => {
   }[period] || period
 
   // Generate table rows - show more rows to utilize space better
-  const tableRows = cases.slice(0, 15).map((caseItem: any) => `
+  const tableRows = cases.slice(0, 20).map((caseItem: any) => `
     <tr>
       <td>${caseItem.title}</td>
       <td><span class="status-badge">${getCustomerStatusDisplay(caseItem.status)}</span></td>
@@ -190,7 +190,7 @@ const generatePDFHTML = (data: any) => {
     .container {
       max-width: 800px;
       margin: 0 auto;
-      padding: 32px;
+      padding: 20px;
     }
     
     /* Header */
@@ -212,7 +212,7 @@ const generatePDFHTML = (data: any) => {
     .logo-icon {
       width: 40px;
       height: 40px;
-      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      background: #059669;
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -246,7 +246,7 @@ const generatePDFHTML = (data: any) => {
     
     /* Title Section */
     .title-section {
-      margin-bottom: 32px;
+      margin-bottom: 20px;
     }
     
     .main-title {
@@ -266,22 +266,21 @@ const generatePDFHTML = (data: any) => {
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 12px;
+      margin-bottom: 20px;
       page-break-inside: avoid;
     }
     
     .kpi-card {
-      background: #f8fafc;
+      background: white;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 16px;
-      transition: all 0.3s ease;
+      border-radius: 8px;
+      padding: 12px;
       page-break-inside: avoid;
     }
     
     .kpi-card:hover {
-      background: #f1f5f9;
+      background: #f8fafc;
       border-color: #cbd5e1;
     }
     
@@ -297,7 +296,7 @@ const generatePDFHTML = (data: any) => {
     .kpi-value {
       font-size: 28px;
       font-weight: 700;
-      color: #1e293b;
+      color: #0f172a;
       margin-bottom: 4px;
     }
     
@@ -308,10 +307,11 @@ const generatePDFHTML = (data: any) => {
     
     /* Insights Section */
     .insights-section {
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 32px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
       page-break-inside: avoid;
     }
     
@@ -327,8 +327,8 @@ const generatePDFHTML = (data: any) => {
     
     .insights-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -344,10 +344,10 @@ const generatePDFHTML = (data: any) => {
     .insight-card {
       background: white;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 14px;
+      border-radius: 8px;
+      padding: 12px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: start;
       page-break-inside: avoid;
       break-inside: avoid;
@@ -374,7 +374,7 @@ const generatePDFHTML = (data: any) => {
     .insight-value {
       font-size: 16px;
       font-weight: 700;
-      color: #8b5cf6;
+      color: #059669;
       margin-bottom: 4px;
       line-height: 1.2;
     }
@@ -387,7 +387,7 @@ const generatePDFHTML = (data: any) => {
     
     /* Table Section */
     .table-section {
-      margin-bottom: 32px;
+      margin-bottom: 24px;
       page-break-before: auto;
       page-break-inside: avoid;
     }
@@ -407,19 +407,19 @@ const generatePDFHTML = (data: any) => {
     }
     
     th {
-      padding: 10px 14px;
+      padding: 8px 12px;
       text-align: left;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 11px;
       color: #475569;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 2px solid #e2e8f0;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid #e2e8f0;
     }
     
     td {
-      padding: 10px 14px;
-      font-size: 13px;
+      padding: 8px 12px;
+      font-size: 12px;
       color: #1e293b;
       border-bottom: 1px solid #f1f5f9;
     }
@@ -448,9 +448,9 @@ const generatePDFHTML = (data: any) => {
     
     /* Footer */
     .footer {
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 2px solid #e2e8f0;
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
       text-align: center;
       page-break-inside: avoid;
     }
@@ -507,7 +507,7 @@ const generatePDFHTML = (data: any) => {
       }
       
       .container {
-        padding: 20px;
+        padding: 16px;
       }
       
       .kpi-card:hover {
@@ -525,8 +525,8 @@ const generatePDFHTML = (data: any) => {
       }
       
       .insights-grid {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       
       .insight-card, .kpi-card {
@@ -536,11 +536,11 @@ const generatePDFHTML = (data: any) => {
       
       /* Optimize spacing for print */
       .kpi-grid {
-        margin-bottom: 28px;
+        margin-bottom: 16px;
       }
       
       .insights-section {
-        margin-bottom: 28px;
+        margin-bottom: 16px;
       }
       
       /* Better table handling for print */
@@ -709,18 +709,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       waitUntil: 'networkidle0'
     })
 
-    // Generate PDF with optimized settings
+    // Generate PDF with optimized settings for smaller file size
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,
       displayHeaderFooter: false,
       margin: {
-        top: '15mm',
-        right: '15mm',
-        bottom: '15mm',
-        left: '15mm'
-      }
+        top: '12mm',
+        right: '12mm',
+        bottom: '12mm',
+        left: '12mm'
+      },
+      // Optimize for smaller file size
+      tagged: false,
+      omitBackground: false
     })
 
     await browser.close()
