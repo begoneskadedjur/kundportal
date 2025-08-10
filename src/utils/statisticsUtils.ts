@@ -181,10 +181,17 @@ export const exportStatisticsToPDF = async (
     }
 
     const data = await response.json()
+    console.log('Response data:', data)
     console.log('PDF data received, size:', data.pdf ? data.pdf.length : 0)
+    console.log('PDF data type:', typeof data.pdf)
+    console.log('PDF data sample:', data.pdf ? data.pdf.substring(0, 100) : 'none')
     
     if (!data.pdf) {
       throw new Error('No PDF data received from server')
+    }
+    
+    if (typeof data.pdf !== 'string') {
+      throw new Error(`Invalid PDF data type: ${typeof data.pdf}`)
     }
     
     // Convert base64 to blob and download
@@ -211,15 +218,34 @@ export const exportStatisticsToPDF = async (
 
 // Helper function to convert base64 to blob
 const base64ToBlob = (base64: string, contentType: string) => {
-  const byteCharacters = atob(base64)
-  const byteNumbers = new Array(byteCharacters.length)
-  
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  try {
+    // Remove any whitespace and data URL prefix if present
+    const cleanBase64 = base64
+      .replace(/^data:.*?;base64,/, '') // Remove data URL prefix
+      .replace(/\s/g, '') // Remove all whitespace
+    
+    console.log('Base64 length:', cleanBase64.length)
+    console.log('First 100 chars:', cleanBase64.substring(0, 100))
+    
+    // Validate base64 string
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+      throw new Error('Invalid base64 string')
+    }
+    
+    const byteCharacters = atob(cleanBase64)
+    const byteNumbers = new Array(byteCharacters.length)
+    
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers)
+    return new Blob([byteArray], { type: contentType })
+  } catch (error) {
+    console.error('Base64 decode error:', error)
+    console.error('Base64 string (first 200 chars):', base64?.substring(0, 200))
+    throw new Error(`Failed to decode base64: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
-  
-  const byteArray = new Uint8Array(byteNumbers)
-  return new Blob([byteArray], { type: contentType })
 }
 
 // Legacy PDF export function (kept for backward compatibility)
