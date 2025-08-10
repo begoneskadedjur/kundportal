@@ -207,11 +207,10 @@ export const exportStatisticsToPDF = async (
     
     console.log('PDF download triggered:', data.filename)
     
-    // Show success message
-    alert('PDF genererad framgångsrikt!')
+    // Success is now handled in the component with toast
   } catch (error) {
     console.error('PDF generation error:', error)
-    alert(`Kunde inte generera PDF: ${error instanceof Error ? error.message : 'Okänt fel'}`)
+    // Error is now handled in the component with toast
     throw error // Re-throw to handle in component
   }
 }

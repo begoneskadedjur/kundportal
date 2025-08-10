@@ -43,6 +43,7 @@ import {
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import StatisticsLoadingState from './StatisticsLoadingState'
+import toast from 'react-hot-toast'
 
 interface CustomerStatisticsProps {
   customer: {
@@ -378,20 +379,129 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
   }
 
   const exportToPDF = async () => {
+    // Validera att det finns data att exportera
+    if (filteredCases.length === 0) {
+      toast.error('Inga ärenden att exportera för vald tidsperiod', {
+        duration: 4000,
+        style: {
+          background: '#1e293b',
+          color: '#ef4444',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        }
+      })
+      return
+    }
+
     try {
       setPdfLoading(true)
       console.log('Starting PDF export...', { customer, cases: filteredCases.length, statistics, period: selectedPeriod })
       await exportStatisticsToPDF(customer, filteredCases, statistics, selectedPeriod)
+      
+      // Visa success-meddelande efter lyckad export
+      toast.success('PDF-rapport genererad och nedladdad!', {
+        duration: 4000,
+        style: {
+          background: '#1e293b',
+          color: '#10b981',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        },
+        icon: '✅'
+      })
     } catch (error) {
       console.error('PDF export failed:', error)
-      alert('Kunde inte generera PDF. Se konsolen för mer information.')
+      
+      // Visa användarvänligt felmeddelande baserat på feltyp
+      if (error instanceof Error) {
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          toast.error('Nätverksfel. Kontrollera internetanslutningen och försök igen.', {
+            duration: 6000,
+            style: {
+              background: '#1e293b',
+              color: '#ef4444',
+              borderRadius: '8px',
+              border: '1px solid #374151'
+            }
+          })
+        } else if (error.message.includes('timeout')) {
+          toast.error('Tidsgräns överskreds. Försök igen med en kortare tidsperiod.', {
+            duration: 6000,
+            style: {
+              background: '#1e293b',
+              color: '#ef4444',
+              borderRadius: '8px',
+              border: '1px solid #374151'
+            }
+          })
+        } else {
+          toast.error('Kunde inte generera PDF. Kontakta support om problemet kvarstår.', {
+            duration: 6000,
+            style: {
+              background: '#1e293b',
+              color: '#ef4444',
+              borderRadius: '8px',
+              border: '1px solid #374151'
+            }
+          })
+        }
+      } else {
+        toast.error('Ett oväntat fel uppstod. Försök igen senare.', {
+          duration: 6000,
+          style: {
+            background: '#1e293b',
+            color: '#ef4444',
+            borderRadius: '8px',
+            border: '1px solid #374151'
+          }
+        })
+      }
     } finally {
       setPdfLoading(false)
     }
   }
 
   const exportToCSV = () => {
-    exportStatisticsToCSV(customer, filteredCases, selectedPeriod)
+    // Validera att det finns data att exportera
+    if (filteredCases.length === 0) {
+      toast.error('Inga ärenden att exportera för vald tidsperiod', {
+        duration: 4000,
+        style: {
+          background: '#1e293b',
+          color: '#ef4444',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        }
+      })
+      return
+    }
+
+    try {
+      exportStatisticsToCSV(customer, filteredCases, selectedPeriod)
+      
+      // Visa success-meddelande
+      toast.success('CSV-fil nedladdad!', {
+        duration: 3000,
+        style: {
+          background: '#1e293b',
+          color: '#10b981',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        },
+        icon: '📊'
+      })
+    } catch (error) {
+      console.error('CSV export failed:', error)
+      toast.error('Kunde inte exportera CSV. Försök igen.', {
+        duration: 4000,
+        style: {
+          background: '#1e293b',
+          color: '#ef4444',
+          borderRadius: '8px',
+          border: '1px solid #374151'
+        }
+      })
+    }
   }
 
   if (loading) {
@@ -436,12 +546,14 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                 <Button
                   onClick={exportToPDF}
                   variant="secondary"
-                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
-                  disabled={pdfLoading}
+                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
+                  disabled={pdfLoading || filteredCases.length === 0}
+                  aria-label={pdfLoading ? "Genererar PDF-rapport" : "Ladda ner PDF-rapport"}
+                  title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som PDF"}
                 >
                   {pdfLoading ? (
                     <>
-                      <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      <LoadingSpinner size="sm" className="mr-2" />
                       Genererar...
                     </>
                   ) : (
@@ -454,7 +566,10 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                 <Button
                   onClick={exportToCSV}
                   variant="secondary"
-                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                  className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 transition-all duration-200"
+                  disabled={filteredCases.length === 0 || pdfLoading}
+                  aria-label="Ladda ner CSV-rapport"
+                  title={filteredCases.length === 0 ? "Inga ärenden att exportera" : "Exportera statistik som CSV"}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   CSV
