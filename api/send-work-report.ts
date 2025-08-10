@@ -1,45 +1,10 @@
 // api/send-work-report.ts - API för att skicka saneringsrapporter via email
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import nodemailer from 'nodemailer'
+import { generateWorkReportPDF, type TaskDetails, type CustomerInfo } from '../src/lib/pdf-generator'
 
 // Environment variables
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
-
-interface TaskDetails {
-  task_id: string;
-  task_info: {
-    name: string;
-    status: string;
-    description: string;
-    created: string;
-    updated: string;
-  };
-  assignees: Array<{
-    name: string;
-    email: string;
-  }>;
-  custom_fields: Array<{
-    id: string;
-    name: string;
-    type: string;
-    value: any;
-    has_value: boolean;
-    type_config?: {
-      options?: Array<{
-        id: string;
-        name: string;
-        color: string;
-        orderindex: number;
-      }>;
-    };
-  }>;
-}
-
-interface CustomerInfo {
-  company_name: string;
-  org_number: string;
-  contact_person: string;
-}
 
 // Hjälpfunktion för att formatera adresser
 const formatAddress = (addressValue: any): string => {
@@ -150,8 +115,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Generera PDF-rapport med Puppeteer
-    console.log('Generating PDF report with Puppeteer...')
-    const pdfBuffer = await generatePDFReportWithPuppeteer(taskDetails, customerInfo)
+    console.log('Generating PDF report with shared module...')
+    const pdfBuffer = await generateWorkReportPDF(taskDetails, customerInfo)
 
     // Skicka email med PDF bifogad
     console.log('Sending email with PDF attachment...')
@@ -177,53 +142,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({
       error: error.message || 'Ett fel uppstod vid skickande av saneringsrapport'
     })
-  }
-}
-
-// Generera PDF med Puppeteer via vår nya endpoint
-async function generatePDFReportWithPuppeteer(
-  taskDetails: TaskDetails, 
-  customerInfo: CustomerInfo
-): Promise<Buffer> {
-  try {
-    // Anropa vår Puppeteer-baserade PDF-generator endpoint
-    console.log('Calling Puppeteer PDF generator...')
-    
-    // Bygg URL för intern API-anrop (använd miljövariabel för produktion)
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-    
-    const response = await fetch(`${baseUrl}/api/generate-work-report`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        taskDetails,
-        customerInfo
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`PDF generation failed: ${response.statusText}`)
-    }
-    
-    const data = await response.json()
-    
-    if (!data.success || !data.pdf) {
-      throw new Error('Invalid response from PDF generator')
-    }
-    
-    // Konvertera base64 till Buffer
-    const pdfBuffer = Buffer.from(data.pdf, 'base64')
-    console.log('PDF generated successfully via Puppeteer, size:', pdfBuffer.length)
-    
-    return pdfBuffer
-    
-  } catch (error) {
-    console.error('Failed to generate PDF with Puppeteer:', error)
-    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
