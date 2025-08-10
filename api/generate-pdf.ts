@@ -155,8 +155,8 @@ const generatePDFHTML = (data: any) => {
     'all': 'Hela tiden'
   }[period] || period
 
-  // Generate table rows
-  const tableRows = cases.slice(0, 10).map((caseItem: any) => `
+  // Generate table rows - show more rows to utilize space better
+  const tableRows = cases.slice(0, 15).map((caseItem: any) => `
     <tr>
       <td>${caseItem.title}</td>
       <td><span class="status-badge">${getCustomerStatusDisplay(caseItem.status)}</span></td>
@@ -190,7 +190,7 @@ const generatePDFHTML = (data: any) => {
     .container {
       max-width: 800px;
       margin: 0 auto;
-      padding: 40px;
+      padding: 32px;
     }
     
     /* Header */
@@ -198,9 +198,9 @@ const generatePDFHTML = (data: any) => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 30px;
+      padding-bottom: 24px;
       border-bottom: 2px solid #e2e8f0;
-      margin-bottom: 40px;
+      margin-bottom: 32px;
     }
     
     .logo {
@@ -246,7 +246,7 @@ const generatePDFHTML = (data: any) => {
     
     /* Title Section */
     .title-section {
-      margin-bottom: 40px;
+      margin-bottom: 32px;
     }
     
     .main-title {
@@ -266,16 +266,18 @@ const generatePDFHTML = (data: any) => {
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 40px;
+      gap: 16px;
+      margin-bottom: 32px;
+      page-break-inside: avoid;
     }
     
     .kpi-card {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px;
       transition: all 0.3s ease;
+      page-break-inside: avoid;
     }
     
     .kpi-card:hover {
@@ -308,15 +310,16 @@ const generatePDFHTML = (data: any) => {
     .insights-section {
       background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
       border-radius: 16px;
-      padding: 30px;
-      margin-bottom: 40px;
+      padding: 24px;
+      margin-bottom: 32px;
+      page-break-inside: avoid;
     }
     
     .section-title {
       font-size: 20px;
       font-weight: 700;
       color: #1e293b;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -324,23 +327,36 @@ const generatePDFHTML = (data: any) => {
     
     .insights-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    /* Alternative compact layout for insights when space is limited */
+    @media (max-width: 800px) {
+      .insights-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
     }
     
     .insight-card {
       background: white;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 16px;
+      padding: 14px;
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: start;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     
     .insight-icon {
-      font-size: 24px;
+      font-size: 20px;
       line-height: 1;
+      min-width: 20px;
     }
     
     .insight-content {
@@ -348,27 +364,32 @@ const generatePDFHTML = (data: any) => {
     }
     
     .insight-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: #1e293b;
       margin-bottom: 2px;
+      line-height: 1.3;
     }
     
     .insight-value {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       color: #8b5cf6;
       margin-bottom: 4px;
+      line-height: 1.2;
     }
     
     .insight-description {
-      font-size: 12px;
+      font-size: 11px;
       color: #64748b;
+      line-height: 1.3;
     }
     
     /* Table Section */
     .table-section {
-      margin-bottom: 40px;
+      margin-bottom: 32px;
+      page-break-before: auto;
+      page-break-inside: avoid;
     }
     
     table {
@@ -378,6 +399,7 @@ const generatePDFHTML = (data: any) => {
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      page-break-inside: avoid;
     }
     
     thead {
@@ -385,10 +407,10 @@ const generatePDFHTML = (data: any) => {
     }
     
     th {
-      padding: 12px 16px;
+      padding: 10px 14px;
       text-align: left;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12px;
       color: #475569;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -396,8 +418,8 @@ const generatePDFHTML = (data: any) => {
     }
     
     td {
-      padding: 12px 16px;
-      font-size: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
       color: #1e293b;
       border-bottom: 1px solid #f1f5f9;
     }
@@ -426,10 +448,11 @@ const generatePDFHTML = (data: any) => {
     
     /* Footer */
     .footer {
-      margin-top: 60px;
-      padding-top: 30px;
+      margin-top: 48px;
+      padding-top: 24px;
       border-top: 2px solid #e2e8f0;
       text-align: center;
+      page-break-inside: avoid;
     }
     
     .footer-logo {
@@ -458,6 +481,25 @@ const generatePDFHTML = (data: any) => {
       font-weight: 600;
     }
     
+    /* Page Break Rules */
+    .title-section {
+      page-break-after: avoid;
+    }
+    
+    .insights-section {
+      page-break-before: avoid;
+    }
+    
+    .table-section {
+      page-break-before: auto;
+    }
+    
+    /* Ensure orphan/widow control */
+    h1, h2, .section-title {
+      orphans: 2;
+      widows: 2;
+    }
+    
     @media print {
       body {
         print-color-adjust: exact;
@@ -475,6 +517,43 @@ const generatePDFHTML = (data: any) => {
       
       tr:hover {
         background: transparent;
+      }
+      
+      /* Enhanced page break control for print */
+      .kpi-grid, .insights-section, .table-section {
+        page-break-inside: avoid;
+      }
+      
+      .insights-grid {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      
+      .insight-card, .kpi-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      
+      /* Optimize spacing for print */
+      .kpi-grid {
+        margin-bottom: 28px;
+      }
+      
+      .insights-section {
+        margin-bottom: 28px;
+      }
+      
+      /* Better table handling for print */
+      table {
+        page-break-inside: avoid;
+      }
+      
+      thead {
+        display: table-header-group;
+      }
+      
+      tbody {
+        display: table-row-group;
       }
     }
   </style>
@@ -630,15 +709,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       waitUntil: 'networkidle0'
     })
 
-    // Generate PDF
+    // Generate PDF with optimized settings
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
       margin: {
-        top: '20mm',
-        right: '20mm',
-        bottom: '20mm',
-        left: '20mm'
+        top: '15mm',
+        right: '15mm',
+        bottom: '15mm',
+        left: '15mm'
       }
     })
 
