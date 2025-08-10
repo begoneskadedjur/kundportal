@@ -2,14 +2,22 @@
 import jsPDF from 'jspdf'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../types/database'
 
-// Add font support for Swedish characters
-if (typeof window !== 'undefined') {
+// Font configuration for proper Swedish character support
+const configureSwedishFont = (doc: jsPDF) => {
+  // Use Times instead of Helvetica for better UTF-8/Swedish character support
+  // Times has better Unicode coverage than Helvetica in jsPDF
+  doc.setFont('times', 'normal')
+  
+  // Alternative: Add custom font if available
   try {
-    // Load Arial font for better Swedish character support
-    const fontData = 'data:font/truetype;charset=utf-8;base64,'
-    // jsPDF will fallback to built-in fonts if custom font loading fails
+    // DejaVu Sans has excellent Swedish character support
+    if ((doc as any).existsFileInVFS && (doc as any).existsFileInVFS('DejaVuSans.ttf')) {
+      doc.addFont('DejaVuSans.ttf', 'DejaVuSans', 'normal')
+      doc.setFont('DejaVuSans')
+    }
   } catch (error) {
-    console.warn('Custom font loading failed, using fallback fonts')
+    // Fallback to Times which handles Swedish better than Helvetica
+    doc.setFont('times', 'normal')
   }
 }
 
@@ -114,8 +122,8 @@ export const exportStatisticsToPDF = (
     format: 'a4'
   })
   
-  // Set better font for Swedish characters
-  doc.setFont('helvetica')
+  // Configure proper font for Swedish characters
+  configureSwedishFont(doc)
   
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -133,18 +141,20 @@ export const exportStatisticsToPDF = (
   const successGreen = [34, 197, 94] // Green for positive metrics
   const warningAmber = [245, 158, 11] // Amber for attention items
 
-  // Helper function to draw a rounded rectangle with optional shadow
-  const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[], withShadow = false) => {
-    if (withShadow) {
-      // Draw subtle shadow
-      doc.setFillColor(220, 220, 220)
-      doc.roundedRect(x + 1, y + 1, width, height, radius, radius, 'F')
-    }
-    
+  // Helper function to draw clean rounded rectangles WITHOUT thick borders
+  const drawCleanRect = (x: number, y: number, width: number, height: number, radius: number, fillColor?: number[], borderColor?: number[]) => {
+    // Single clean rectangle - no shadows or multiple layers
     if (fillColor) {
       doc.setFillColor(...fillColor)
+      doc.roundedRect(x, y, width, height, radius, radius, 'F')
     }
-    doc.roundedRect(x, y, width, height, radius, radius, 'F')
+    
+    // Optional clean border (single line)
+    if (borderColor) {
+      doc.setDrawColor(...borderColor)
+      doc.setLineWidth(0.5) // Thin, clean border
+      doc.roundedRect(x, y, width, height, radius, radius, 'S')
+    }
   }
 
   // Helper function to add premium header to each page
@@ -167,10 +177,10 @@ export const exportStatisticsToPDF = (
     doc.setFillColor(255, 255, 255)
     doc.circle(margin + 18, 25, 15, 'F')
     
-    // BeGone logo text with better styling
+    // BeGone logo text
     doc.setTextColor(...brandPurple)
     doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     doc.text('BG', margin + 12, 30)
     
     // Add decorative elements around logo
@@ -178,14 +188,14 @@ export const exportStatisticsToPDF = (
     doc.setLineWidth(2)
     doc.circle(margin + 18, 25, 15, 'S')
 
-    // Main title with enhanced typography
+    // Main title with Swedish-safe typography
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(28)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     doc.text('BeGone', margin + 42, 25)
     
     doc.setFontSize(16)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('times', 'normal')
     doc.text('Statistikrapport', margin + 42, 35)
     
     // Tagline
@@ -193,10 +203,10 @@ export const exportStatisticsToPDF = (
     doc.setTextColor(220, 220, 220)
     doc.text('Professionell skadedjurshantering', margin + 42, 43)
 
-    // Date stamp with better formatting
+    // Date stamp with Swedish formatting
     doc.setFontSize(11)
     doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('times', 'normal')
     const dateText = `Genererad: ${new Date().toLocaleDateString('sv-SE')}`
     const dateWidth = doc.getTextWidth(dateText)
     doc.text(dateText, pageWidth - margin - dateWidth, 28)
@@ -220,10 +230,10 @@ export const exportStatisticsToPDF = (
     doc.setLineWidth(2)
     doc.line(0, footerY - 8, pageWidth, footerY - 8)
     
-    // Enhanced footer text
+    // Footer text with Swedish font
     doc.setTextColor(...mediumGray)
     doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('times', 'normal')
     doc.text('BeGone Kundportal • Professionell skadedjurshantering', margin, footerY)
     
     // Contact info
@@ -231,8 +241,8 @@ export const exportStatisticsToPDF = (
     doc.setTextColor(...mediumGray)
     doc.text('www.begone.se • info@begone.se', margin, footerY + 8)
     
-    // Page number with better styling
-    doc.setFont('helvetica', 'bold')
+    // Page number styling
+    doc.setFont('times', 'bold')
     doc.setTextColor(...brandPurple)
     const pageText = `Sida ${pageNumber} av ${totalPages}`
     const pageTextWidth = doc.getTextWidth(pageText)
@@ -248,15 +258,10 @@ export const exportStatisticsToPDF = (
   
   let yPosition = 75 // More space after enhanced header
   
-  // Customer info card with premium design
-  drawRoundedRect(margin, yPosition, contentWidth, 45, 10, warmGray, true) // With shadow
+  // Customer info card with clean design
+  drawCleanRect(margin, yPosition, contentWidth, 45, 10, [255, 255, 255], accentTeal)
   
-  // Add gradient-like border effect
-  doc.setDrawColor(...accentTeal)
-  doc.setLineWidth(2)
-  doc.roundedRect(margin, yPosition, contentWidth, 45, 10, 10, 'S')
-  
-  // Top accent stripe
+  // Top accent stripe only
   doc.setFillColor(...accentTeal)
   doc.roundedRect(margin, yPosition, contentWidth, 4, 10, 10, 'F')
   
@@ -272,16 +277,16 @@ export const exportStatisticsToPDF = (
   
   yPosition += 65
   
-  // Executive Summary with icon
+  // Executive Summary with clean icon
   doc.setFillColor(...accentTeal)
   doc.circle(margin + 6, yPosition - 2, 4, 'F')
   doc.setFillColor(255, 255, 255)
   doc.setFontSize(8)
-  doc.setFont('helvetica', 'bold')
-  doc.text('✓', margin + 4.5, yPosition + 0.5) // Checkmark icon
+  doc.setFont('times', 'bold')
+  doc.text('✓', margin + 4.5, yPosition + 0.5)
   
   doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('times', 'bold')
   doc.setTextColor(...darkBlue)
   doc.text('Sammanfattning', margin + 15, yPosition)
   
@@ -308,30 +313,22 @@ export const exportStatisticsToPDF = (
     const cardX = margin + (col * (cardWidth + 10))
     const cardY = yPosition + (row * (cardHeight + 12))
     
-    // Card background with shadow
-    drawRoundedRect(cardX, cardY, cardWidth, cardHeight, 10, [255, 255, 255], true)
+    // Clean card background - NO shadows or thick borders
+    drawCleanRect(cardX, cardY, cardWidth, cardHeight, 10, [255, 255, 255])
     
-    // Card border with gradient effect
-    doc.setDrawColor(...metric.color)
-    doc.setLineWidth(1.5)
-    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 10, 10, 'S')
-    
-    // Top accent stripe (full width)
+    // Simple top accent stripe only
     doc.setFillColor(...metric.color)
     doc.roundedRect(cardX, cardY, cardWidth, 5, 10, 10, 'F')
     
-    // Side accent stripe
-    doc.roundedRect(cardX, cardY + 5, 4, cardHeight - 5, 0, 0, 'F')
-    
-    // Metric value with better positioning
+    // Metric value with proper font
     doc.setTextColor(...darkBlue)
     doc.setFontSize(26)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     doc.text(metric.value, cardX + 15, cardY + 25)
     
-    // Metric label with improved formatting
+    // Metric label with proper Swedish font
     doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('times', 'normal')
     doc.setTextColor(...mediumGray)
     
     // Handle long labels with better line wrapping
@@ -346,22 +343,46 @@ export const exportStatisticsToPDF = (
   
   yPosition += 140
   
-  // Additional insights with safe formatting
+  // Calculate comprehensive insights data
   const totalCostFormatted = formatSwedishCurrency(statistics.totalCost || 0)
   const serviceEfficiency = statistics.totalCases > 0 
     ? Math.round((statistics.completedCases / statistics.totalCases) * 100)
     : 0
   
+  // Get most common pest type from cases
+  const pestCounts = cases.reduce((acc, caseItem) => {
+    const pest = caseItem.pest_type || 'Okänt'
+    acc[pest] = (acc[pest] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  
+  const topPestType = Object.entries(pestCounts)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Okänt'
+  
+  // Calculate average response time properly
+  const responseTimes = cases
+    .filter(c => c.created_at && c.scheduled_start)
+    .map(c => {
+      const created = new Date(c.created_at!)
+      const scheduled = new Date(c.scheduled_start!)
+      return Math.max(0, (scheduled.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+    })
+  
+  const avgResponseTime = responseTimes.length > 0 
+    ? Math.round(responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length)
+    : 0
+  
   const insights = [
-    `Genomsnittlig responstid: ${statistics.avgResponseTime || 0} dagar`,
-    `Vanligaste skadedjur: ${safeText(statistics.topPestType) || 'Okant'}`,
-    `Total kontraktsvarde: ${totalCostFormatted}`,
+    `Genomsnittlig responstid: ${avgResponseTime} dagar`,
+    `Vanligaste skadedjur: ${topPestType}`,
+    `Total kontraktsvärde: ${totalCostFormatted}`,
     `Serviceeffektivitet: ${serviceEfficiency}%`,
-    `Aktiv period: ${safeText(getPeriodLabel(period))}`
+    `Aktiv period: ${getPeriodLabel(period)}`,
+    `Behandlade ärenden: ${statistics.completedCases}/${statistics.totalCases}`
   ]
   
   doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('times', 'bold')
   doc.setTextColor(...darkBlue)
   doc.text('Viktiga insikter', margin, yPosition)
   
@@ -378,42 +399,36 @@ export const exportStatisticsToPDF = (
     const cardX = margin + (col * (insightCardWidth + 15))
     const cardY = yPosition + (row * (insightCardHeight + 10))
     
-    // Insight card background with subtle gradient effect
-    doc.setFillColor(255, 255, 255)
-    drawRoundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, [255, 255, 255])
-    
-    // Card border with brand accent
-    doc.setDrawColor(...accentTeal)
-    doc.setLineWidth(1)
-    doc.roundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, 6, 'S')
+    // Clean insight card background
+    drawCleanRect(cardX, cardY, insightCardWidth, insightCardHeight, 6, [255, 255, 255], [220, 220, 220])
     
     // Left accent bar
     doc.setFillColor(...accentTeal)
     doc.roundedRect(cardX, cardY, 3, insightCardHeight, 6, 6, 'F')
     
-    // Icon placeholder (decorative circle)
+    // Clean icon (no thick borders)
     doc.setFillColor(...brandPurple)
     doc.circle(cardX + 12, cardY + 12, 4, 'F')
     doc.setFillColor(255, 255, 255)
     doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     doc.text('i', cardX + 10.5, cardY + 14)
     
-    // Insight text with better formatting
+    // Insight text with Swedish-safe formatting
     doc.setTextColor(...darkBlue)
     doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('times', 'normal')
     
     // Split insight into title and value for better formatting
     const parts = insight.split(': ')
     if (parts.length === 2) {
       // Title
-      doc.setFont('helvetica', 'normal')
+      doc.setFont('times', 'normal')
       doc.setTextColor(...mediumGray)
       doc.text(parts[0], cardX + 22, cardY + 12)
       
-      // Value
-      doc.setFont('helvetica', 'bold')
+      // Value  
+      doc.setFont('times', 'bold')
       doc.setTextColor(...darkBlue)
       doc.setFontSize(11)
       doc.text(parts[1], cardX + 22, cardY + 24)
@@ -446,21 +461,23 @@ export const exportStatisticsToPDF = (
     
     yPosition = 75 // Consistent with first page
     
-    // Page title with icon simulation
+    // Page title with proper Swedish font
     doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     doc.setTextColor(...darkBlue)
     
-    // Add decorative icon area
+    // Clean decorative icon
     doc.setFillColor(...brandPurple)
     doc.circle(margin + 6, yPosition - 3, 4, 'F')
     doc.setFillColor(255, 255, 255)
     doc.setFontSize(10)
+    doc.setFont('times', 'bold')
     doc.text('i', margin + 4.5, yPosition - 1)
     
     doc.setFontSize(18)
+    doc.setFont('times', 'bold')
     doc.setTextColor(...darkBlue)
-    doc.text('Arendedetaljer', margin + 15, yPosition)
+    doc.text('Ärendedetaljer', margin + 15, yPosition)
     
     yPosition += 25
     
@@ -477,10 +494,10 @@ export const exportStatisticsToPDF = (
     doc.setFillColor(...softPurple)
     doc.roundedRect(margin, yPosition - 5, contentWidth, headerHeight/2, 8, 8, 'F')
     
-    // Enhanced header text
+    // Header text with Swedish font
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(10)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('times', 'bold')
     
     let xPosition = margin + 10
     tableHeaders.forEach((header, index) => {
@@ -517,7 +534,7 @@ export const exportStatisticsToPDF = (
       
       // Row data with improved formatting and proper Swedish characters
       const rowData = [
-        truncateText(caseItem.title, 32), // More space for titles
+        truncateText(caseItem.title, 32),
         getCustomerStatusDisplay(caseItem.status),
         truncateText(caseItem.pest_type, 20) || 'Okänt',
         formatSwedishCurrency(caseItem.price),
@@ -564,20 +581,20 @@ export const exportStatisticsToPDF = (
           
           doc.roundedRect(xPosition, statusY, statusWidth, statusHeight, 5, 5, 'F')
           
-          // Status text with better positioning
+          // Status text with Swedish font
           doc.setTextColor(255, 255, 255)
           doc.setFontSize(8)
-          doc.setFont('helvetica', 'bold')
+          doc.setFont('times', 'bold')
           doc.text(data, xPosition + 5, yPosition + 3)
         } else {
-          // Enhanced cell styling
+          // Cell styling with Swedish font
           doc.setTextColor(...darkBlue)
           doc.setFontSize(9)
-          doc.setFont('helvetica', 'normal')
+          doc.setFont('times', 'normal')
           
           // Special formatting for price column (right align)
           if (colIndex === 3) {
-            doc.setFont('helvetica', 'bold')
+            doc.setFont('times', 'bold')
             if (data !== '—' && data !== 'N/A') {
               const textWidth = doc.getTextWidth(data)
               doc.text(data, xPosition + colWidths[colIndex] - textWidth - 4, yPosition + 5)
@@ -710,17 +727,19 @@ const formatSwedishCurrency = (amount: number | null | undefined): string => {
   return `${formatted} kr`
 }
 
-// Helper function for safe text rendering (PRESERVE Swedish characters)
+// Helper function for PERFECT Swedish text rendering
 const safeText = (text: string | null | undefined): string => {
   if (!text) return ''
   
-  // Clean text without destroying Swedish characters - preserve å, ä, ö, Å, Ä, Ö
+  // PRESERVE all Swedish characters: å, ä, ö, Å, Ä, Ö
+  // Only remove actual control characters, not Swedish letters
   return text
     .replace(/[\u0000-\u001F]/g, '') // Remove control characters only
-    .replace(/[\u007F-\u009F]/g, '') // Remove extended control characters
+    .replace(/[\u007F-\u009F]/g, '') // Remove extended control characters  
     .replace(/[\uFEFF]/g, '') // Remove BOM
     .trim()
-    .substring(0, 200) // Prevent extremely long text
+    // DO NOT remove Swedish characters - they are in the range \u00C0-\u00FF
+    .substring(0, 200)
 }
 
 // Helper function to safely truncate text for table cells
