@@ -665,11 +665,11 @@ const generatePDFHTML = (data: any) => {
         <div class="logo-text" style="font-size: 18px;">BeGone</div>
       </div>
       <div class="footer-text">
-        Professionell skadedjursbekämpning sedan 2020<br>
+        Professionell skadedjursbekämpning sedan 2022<br>
         Vi säkerställer en trygg och skadedjursfri miljö för er verksamhet
       </div>
       <div class="footer-contact">
-        <strong>Kontakt:</strong> support@begone.se | 08-123 456 78 | 
+        <strong>Kontakt:</strong> info@begone.se | 010 280 44 10 | 
         <a href="https://begone.se">www.begone.se</a>
       </div>
     </div>

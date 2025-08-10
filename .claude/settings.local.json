@@ -12,7 +12,8 @@
       "Bash(rm:*)",
       "Bash(git restore:*)",
       "Bash(git rm:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }
