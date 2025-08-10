@@ -1,7 +1,6 @@
 // src/hooks/useWorkReportGeneration.ts - Hook för saneringsrapport generation och email
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { generatePDFReport } from '../utils/pdfReportGenerator'
 import { supabase } from '../lib/supabase'
 
 interface TechnicianCase {
@@ -222,7 +221,39 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       setIsGenerating(true)
       
       const { taskDetails, customerInfo } = await createReportData()
-      await generatePDFReport(taskDetails, customerInfo)
+      
+      // Anropa Puppeteer-baserad PDF-generator
+      const response = await fetch('/api/generate-work-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          taskDetails,
+          customerInfo
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunde inte generera PDF')
+      }
+
+      const data = await response.json()
+      
+      if (!data.success || !data.pdf) {
+        throw new Error('Ogiltig respons från PDF-generator')
+      }
+
+      // Konvertera base64 till blob och ladda ner
+      const pdfBlob = base64ToBlob(data.pdf, 'application/pdf')
+      const url = URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
       
       toast.success('Rapport nedladdad!')
     } catch (error) {
@@ -232,6 +263,28 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Helper function to convert base64 to blob
+  const base64ToBlob = (base64: string, contentType: string) => {
+    // Check if the data is comma-separated bytes (fallback for server issue)
+    if (base64.includes(',') && /^\d+,\d+/.test(base64)) {
+      console.warn('Received comma-separated bytes instead of base64, converting...')
+      const bytes = base64.split(',').map(b => parseInt(b.trim(), 10))
+      const byteArray = new Uint8Array(bytes)
+      return new Blob([byteArray], { type: contentType })
+    }
+    
+    // Normal base64 conversion
+    const byteCharacters = atob(base64)
+    const byteNumbers = new Array(byteCharacters.length)
+    
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers)
+    return new Blob([byteArray], { type: contentType })
   }
 
   // Skicka rapport till ansvarig tekniker
