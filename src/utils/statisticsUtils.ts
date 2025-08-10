@@ -429,31 +429,51 @@ export const exportStatisticsToPDF = (
   // Enhanced insights section with properly sized cards - ALL insights displayed
   const insightsPerRow = 2
   const insightCardWidth = (contentWidth - 10) / insightsPerRow
-  const insightCardHeight = 28 // Reduced height
-  const availableHeight = pageHeight - yPosition - 40 // Leave space for footer
-  const maxRows = Math.floor(availableHeight / (insightCardHeight + 6))
-  const visibleInsights = insights.slice(0, maxRows * insightsPerRow) // Ensure we don't overflow
+  const insightCardHeight = 25 // Optimized height for better fit
+  
+  // FIX: Ensure we always show insights even on first page
+  // Calculate available space more accurately
+  const footerHeight = 35 // Space needed for footer
+  const availableHeight = pageHeight - yPosition - footerHeight
+  
+  // FIX: Ensure we show at least 4 insights (2 rows) minimum
+  const minRows = 2
+  const maxRows = Math.max(minRows, Math.floor(availableHeight / (insightCardHeight + 5)))
+  
+  // FIX: Take all insights if they fit, otherwise paginate properly
+  const maxInsights = maxRows * insightsPerRow
+  const visibleInsights = insights.slice(0, Math.min(insights.length, maxInsights))
   
   visibleInsights.forEach((insight, index) => {
     const col = index % insightsPerRow
     const row = Math.floor(index / insightsPerRow)
     const cardX = margin + (col * (insightCardWidth + 10))
-    const cardY = yPosition + (row * (insightCardHeight + 6))
+    const cardY = yPosition + (row * (insightCardHeight + 5))
     
-    // Clean insight card background with subtle styling
-    drawCleanRect(cardX, cardY, insightCardWidth, insightCardHeight, 4, [255, 255, 255], [...lightGray])
+    // Premium card with subtle shadow effect
+    doc.setFillColor(240, 240, 245) // Very light background
+    doc.roundedRect(cardX + 0.5, cardY + 0.5, insightCardWidth - 1, insightCardHeight - 1, 3, 3, 'F')
     
-    // Left accent bar (thinner)
-    doc.setFillColor(...accentTeal)
-    doc.roundedRect(cardX, cardY, 2, insightCardHeight, 4, 4, 'F')
+    // Clean card border
+    doc.setDrawColor(220, 220, 230)
+    doc.setLineWidth(0.2)
+    doc.roundedRect(cardX, cardY, insightCardWidth, insightCardHeight, 3, 3, 'S')
     
-    // Clean small icon
-    doc.setFillColor(...brandPurple)
-    doc.circle(cardX + 8, cardY + 10, 2.5, 'F')
+    // Elegant left accent (gradient effect simulation)
+    const accentColors = [
+      index % 2 === 0 ? brandPurple : accentTeal,
+      index % 2 === 0 ? accentTeal : brandPurple
+    ]
+    doc.setFillColor(...accentColors[0])
+    doc.roundedRect(cardX, cardY, 1.5, insightCardHeight, 3, 3, 'F')
+    
+    // Modern icon with better positioning
+    doc.setFillColor(...accentColors[1])
+    doc.circle(cardX + 7, cardY + 8, 2, 'F')
     doc.setFillColor(255, 255, 255)
-    doc.setFontSize(6)
+    doc.setFontSize(5)
     setSwedishFont(doc, 'bold')
-    doc.text('i', cardX + 7, cardY + 11)
+    doc.text('✓', cardX + 6, cardY + 9)
     
     // Insight text with Swedish-safe formatting
     doc.setTextColor(...darkBlue)
@@ -466,13 +486,13 @@ export const exportStatisticsToPDF = (
       // Title
       setSwedishFont(doc, 'normal')
       doc.setTextColor(...mediumGray)
-      doc.text(processSwedishText(parts[0]), cardX + 15, cardY + 8)
+      doc.text(processSwedishText(parts[0]), cardX + 12, cardY + 7)
       
-      // Value  
+      // Value with better prominence
       setSwedishFont(doc, 'bold')
       doc.setTextColor(...darkBlue)
-      doc.setFontSize(9)
-      doc.text(processSwedishText(parts[1]), cardX + 15, cardY + 18)
+      doc.setFontSize(10)
+      doc.text(processSwedishText(parts[1]), cardX + 12, cardY + 16)
     } else {
       // Single line fallback
       const words = processSwedishText(insight).split(' ')
