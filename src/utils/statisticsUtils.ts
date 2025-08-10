@@ -218,17 +218,29 @@ export const exportStatisticsToPDF = async (
 // Helper function to convert base64 to blob
 const base64ToBlob = (base64: string, contentType: string) => {
   try {
+    console.log('Input base64 type:', typeof base64)
+    console.log('Input base64 length:', base64.length)
+    console.log('First 200 chars of input:', base64.substring(0, 200))
+    
+    // Check if we received a comma-separated byte array instead of base64
+    if (base64.includes(',') && !base64.includes('/') && !base64.includes('+')) {
+      console.error('Received comma-separated byte array instead of base64!')
+      console.error('This indicates the server is not properly converting PDF Buffer to base64')
+      throw new Error('Server returned byte array instead of base64 string')
+    }
+    
     // Remove any whitespace and data URL prefix if present
     const cleanBase64 = base64
       .replace(/^data:.*?;base64,/, '') // Remove data URL prefix
       .replace(/\s/g, '') // Remove all whitespace
     
-    console.log('Base64 length:', cleanBase64.length)
+    console.log('Cleaned base64 length:', cleanBase64.length)
     console.log('First 100 chars:', cleanBase64.substring(0, 100))
     
     // Validate base64 string
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
-      throw new Error('Invalid base64 string')
+      console.error('Base64 validation failed - invalid characters found')
+      throw new Error('Invalid base64 string format')
     }
     
     const byteCharacters = atob(cleanBase64)
@@ -239,6 +251,7 @@ const base64ToBlob = (base64: string, contentType: string) => {
     }
     
     const byteArray = new Uint8Array(byteNumbers)
+    console.log('Successfully converted base64 to blob, size:', byteArray.length)
     return new Blob([byteArray], { type: contentType })
   } catch (error) {
     console.error('Base64 decode error:', error)

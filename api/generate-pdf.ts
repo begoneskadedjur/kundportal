@@ -644,8 +644,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await browser.close()
 
-    // Return PDF as base64
-    const pdfBase64 = pdf.toString('base64')
+    // Return PDF as base64 - properly handle Buffer conversion
+    console.log('PDF buffer type:', typeof pdf)
+    console.log('PDF buffer length:', pdf.length)
+    console.log('PDF buffer constructor:', pdf.constructor.name)
+    
+    const pdfBase64 = Buffer.from(pdf).toString('base64')
+    console.log('Base64 conversion successful, length:', pdfBase64.length)
+    console.log('Base64 sample (first 100 chars):', pdfBase64.substring(0, 100))
     
     res.status(200).json({ 
       success: true, 
