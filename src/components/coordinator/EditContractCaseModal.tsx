@@ -293,7 +293,8 @@ export default function EditContractCaseModal({
     const now = new Date().toISOString()
     setFormData(prev => ({ ...prev, work_started_at: now }))
     setIsTimerRunning(true)
-    setSessionMinutes(0)
+    // Don't reset sessionMinutes - keep counting from where we left off
+    // setSessionMinutes(0) - REMOVED to allow resuming
     
     // Save to database immediately
     if (caseData?.id) {
@@ -307,7 +308,8 @@ export default function EditContractCaseModal({
       }
     }
     
-    toast.success('Tidtagning startad')
+    const message = formData.time_spent_minutes > 0 ? 'Tidtagning återupptagen' : 'Tidtagning startad'
+    toast.success(message)
   }
 
   const handleStopTimer = async () => {
@@ -318,7 +320,7 @@ export default function EditContractCaseModal({
       time_spent_minutes: totalMinutes,
       work_started_at: null 
     }))
-    setSessionMinutes(0)
+    setSessionMinutes(0) // Reset session since we've saved the total
     
     // Save to database immediately
     if (caseData?.id) {
@@ -335,7 +337,7 @@ export default function EditContractCaseModal({
       }
     }
     
-    toast.success(`Tidtagning stoppad. Total tid: ${totalMinutes} minuter`)
+    toast.success(`Tidtagning pausad. Total tid: ${formatTime(totalMinutes)}`)
   }
 
   const handleResetTimer = async () => {
@@ -804,7 +806,7 @@ export default function EditContractCaseModal({
                   <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                     <div className="text-center mb-4">
                       <div className={`text-3xl font-bold font-mono mb-2 ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
-                        {isTimerRunning ? formatTime(sessionMinutes) : formatTime(formData.time_spent_minutes)}
+                        {formatTime(formData.time_spent_minutes + sessionMinutes)}
                       </div>
                       <div className="text-sm text-slate-400">
                         {isTimerRunning ? (
@@ -814,6 +816,11 @@ export default function EditContractCaseModal({
                           </span>
                         ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
                       </div>
+                      {isTimerRunning && sessionMinutes > 0 && (
+                        <div className="text-xs text-slate-500 mt-2">
+                          Denna session: {formatTime(sessionMinutes)}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
