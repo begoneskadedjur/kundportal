@@ -218,32 +218,46 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     return { taskDetails, customerInfo }
   }
 
-  // Automatisk sparning av rapport till databas och storage
+  // Automatisk sparning av rapport till databas och storage - ENDAST för avtalsärenden
   const saveReportToDatabase = async (pdfBase64: string, filename: string) => {
     try {
-      // Hämta customer_id om det finns
+      // ENDAST spara rapporter för avtalsärenden (contract cases)
+      if (caseData.case_type !== 'contract') {
+        console.log('Hoppar över sparning av rapport - inte ett avtalsärende')
+        return null
+      }
+
+      // För contract cases, hämta customer_id direkt från cases tabellen
       let customerId = null
-      if (caseData.case_type === 'business' && caseData.foretag) {
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('company_name', caseData.foretag)
-          .single()
-        
-        if (customer) {
-          customerId = customer.id
-        }
-      } else if (caseData.case_type === 'contract') {
-        // För contract cases, försök hitta kund via org_nr eller kontaktperson
-        if (caseData.org_nr) {
+      
+      // Först, försök hämta customer_id från cases tabellen
+      const { data: caseRecord } = await supabase
+        .from('cases')
+        .select('customer_id')
+        .eq('id', caseData.id)
+        .single()
+      
+      if (caseRecord?.customer_id) {
+        customerId = caseRecord.customer_id
+        console.log('Customer ID hittad från cases tabellen:', customerId)
+      } else {
+        // Fallback: försök hitta kund via contact_email
+        if (caseData.e_post_kontaktperson) {
           const { data: customer } = await supabase
             .from('customers')
             .select('id')
-            .eq('org_number', caseData.org_nr)
+            .eq('contact_email', caseData.e_post_kontaktperson)
             .single()
           
           if (customer) {
             customerId = customer.id
+            console.log('Customer ID hittad via email:', customerId)
+            
+            // Uppdatera cases med customer_id för framtida användning
+            await supabase
+              .from('cases')
+              .update({ customer_id: customer.id })
+              .eq('id', caseData.id)
           }
         }
       }

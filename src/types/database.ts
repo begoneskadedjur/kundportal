@@ -117,7 +117,7 @@ export type Database = {
       cases: {
         Row: {
           id: string
-          customer_id: string
+          customer_id: string | null  // Koppling till avtalskund
           clickup_task_id: string
           case_number: string
           title: string

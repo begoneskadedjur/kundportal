@@ -78,6 +78,7 @@ export default function EditContractCaseModal({
     title: '',
     description: '',
     status: 'Öppen',
+    customer_id: null as string | null,  // Koppling till avtalskund
     
     // Kontaktperson
     contact_person: '',
@@ -160,6 +161,7 @@ export default function EditContractCaseModal({
         title: caseData.title || '',
         description: caseData.description || '',
         status: caseData.status || 'Öppen',
+        customer_id: caseData.customer_id || null,  // Inkludera customer_id
         contact_person: caseData.contact_person || caseData.kontaktperson || '',
         contact_phone: caseData.contact_phone || caseData.telefon_kontaktperson || '',
         contact_email: caseData.contact_email || caseData.email || '',
@@ -474,9 +476,26 @@ export default function EditContractCaseModal({
       // Remove fields that don't exist in database
       delete cleanedFormData.reports
 
+      // Försök hitta och koppla customer_id om den saknas
+      let customerId = formData.customer_id
+      if (!customerId && formData.contact_email) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('contact_email', formData.contact_email)
+          .single()
+        
+        if (customer) {
+          customerId = customer.id
+        }
+      }
+
       const { error } = await supabase
         .from('cases')
-        .update(cleanedFormData)
+        .update({
+          ...cleanedFormData,
+          customer_id: customerId || null
+        })
         .eq('id', caseData.id)
 
       if (error) throw error
