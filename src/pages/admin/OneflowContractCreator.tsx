@@ -123,6 +123,7 @@ export default function OneflowContractCreator() {
           setWizardData(prev => ({
             ...prev,
             documentType: customerData.documentType || prefillType,
+            selectedTemplate: customerData.autoSelectTemplate && customerData.selectedTemplate ? customerData.selectedTemplate : '',
             partyType: customerData.partyType || 'company',
             Kontaktperson: customerData.Kontaktperson || '',
             'e-post-kontaktperson': customerData['e-post-kontaktperson'] || '',

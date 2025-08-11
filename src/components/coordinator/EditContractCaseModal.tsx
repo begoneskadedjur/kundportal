@@ -190,7 +190,7 @@ export default function EditContractCaseModal({
       })
       
       // Check if timer was running
-      if (caseData.work_started_at && !caseData.work_ended_at) {
+      if (caseData.work_started_at) {
         setIsTimerRunning(true)
         const startTime = new Date(caseData.work_started_at).getTime()
         const now = Date.now()
@@ -289,15 +289,28 @@ export default function EditContractCaseModal({
   }
 
   // Timer functions
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
     const now = new Date().toISOString()
     setFormData(prev => ({ ...prev, work_started_at: now }))
     setIsTimerRunning(true)
     setSessionMinutes(0)
+    
+    // Save to database immediately
+    if (caseData?.id) {
+      try {
+        await supabase
+          .from('cases')
+          .update({ work_started_at: now })
+          .eq('id', caseData.id)
+      } catch (error) {
+        console.error('Error starting timer:', error)
+      }
+    }
+    
     toast.success('Tidtagning startad')
   }
 
-  const handleStopTimer = () => {
+  const handleStopTimer = async () => {
     setIsTimerRunning(false)
     const totalMinutes = formData.time_spent_minutes + sessionMinutes
     setFormData(prev => ({ 
@@ -306,10 +319,26 @@ export default function EditContractCaseModal({
       work_started_at: null 
     }))
     setSessionMinutes(0)
+    
+    // Save to database immediately
+    if (caseData?.id) {
+      try {
+        await supabase
+          .from('cases')
+          .update({ 
+            time_spent_minutes: totalMinutes,
+            work_started_at: null 
+          })
+          .eq('id', caseData.id)
+      } catch (error) {
+        console.error('Error saving time:', error)
+      }
+    }
+    
     toast.success(`Tidtagning stoppad. Total tid: ${totalMinutes} minuter`)
   }
 
-  const handleResetTimer = () => {
+  const handleResetTimer = async () => {
     setIsTimerRunning(false)
     setSessionMinutes(0)
     setFormData(prev => ({ 
@@ -317,6 +346,22 @@ export default function EditContractCaseModal({
       work_started_at: null,
       time_spent_minutes: 0
     }))
+    
+    // Save to database immediately
+    if (caseData?.id) {
+      try {
+        await supabase
+          .from('cases')
+          .update({ 
+            time_spent_minutes: 0,
+            work_started_at: null 
+          })
+          .eq('id', caseData.id)
+      } catch (error) {
+        console.error('Error resetting time:', error)
+      }
+    }
+    
     toast.success('Tidtagning återställd')
   }
 
@@ -346,7 +391,7 @@ export default function EditContractCaseModal({
     const phone = formData.contact_phone || customerData?.phone || ''
     const address = formData.address || customerData?.service_address || ''
     const companyName = customerData?.company_name || formData.contact_person || ''
-    const orgNumber = customerData?.org_number || ''
+    const orgNumber = customerData?.organization_number || ''
     
     return {
       Kontaktperson: contactPerson,
@@ -368,7 +413,8 @@ export default function EditContractCaseModal({
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...oneflowData,
       documentType: 'offer',
-      selectedTemplate: 'Offertförslag – Exkl Moms (Företag)', // Default template
+      selectedTemplate: 'Offertförslag – Exkl Moms (Företag)', // Will auto-select this template
+      autoSelectTemplate: true, // Flag to trigger auto-selection
       targetStep: 2, // Go directly to template selection
       // Add technician info
       anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
@@ -426,13 +472,33 @@ export default function EditContractCaseModal({
 
       toast.success('Ärende uppdaterat!')
       onSuccess?.()
-      onClose()
+      handleClose()
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle closing with timer running
+  const handleClose = async () => {
+    // If timer is running, save current progress
+    if (isTimerRunning && caseData?.id) {
+      const totalMinutes = formData.time_spent_minutes + sessionMinutes
+      try {
+        await supabase
+          .from('cases')
+          .update({ 
+            time_spent_minutes: totalMinutes,
+            // Keep work_started_at so timer can resume
+          })
+          .eq('id', caseData.id)
+      } catch (error) {
+        console.error('Error saving time on close:', error)
+      }
+    }
+    onClose()
   }
 
   if (!isOpen) return null
@@ -448,7 +514,7 @@ export default function EditContractCaseModal({
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal */}
@@ -485,38 +551,6 @@ export default function EditContractCaseModal({
               {/* Action buttons */}
               {!isCustomerView && (
                 <div className="flex items-center gap-2">
-                  {/* Timer */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-medium text-white">
-                      {isTimerRunning ? formatTime(sessionMinutes) : formatTime(formData.time_spent_minutes)}
-                    </span>
-                    {!isTimerRunning ? (
-                      <button
-                        onClick={handleStartTimer}
-                        className="p-1 hover:bg-green-500/20 rounded text-green-400 transition-colors"
-                        title="Starta tidtagning"
-                      >
-                        <Play className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleStopTimer}
-                        className="p-1 hover:bg-red-500/20 rounded text-red-400 transition-colors"
-                        title="Stoppa tidtagning"
-                      >
-                        <Pause className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={handleResetTimer}
-                      className="p-1 hover:bg-slate-500/20 rounded text-slate-400 transition-colors"
-                      title="Återställ tid"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
-                  </div>
-
                   {/* Quote dropdown */}
                   <div className="relative">
                     <button
@@ -558,7 +592,7 @@ export default function EditContractCaseModal({
                   />
 
                   <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                   >
                     <X className="w-5 h-5 text-slate-400" />
@@ -753,25 +787,80 @@ export default function EditContractCaseModal({
                 />
               </div>
 
+              {/* Time tracking */}
+              {!isCustomerView && (
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-purple-400" />
+                    Tidtagning
+                  </h3>
+                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                    <div className="text-center mb-4">
+                      <div className={`text-3xl font-bold font-mono mb-2 ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
+                        {isTimerRunning ? formatTime(sessionMinutes) : formatTime(formData.time_spent_minutes)}
+                      </div>
+                      <div className="text-sm text-slate-400">
+                        {isTimerRunning ? (
+                          <span className="text-green-400 flex items-center justify-center gap-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                            Startad kl. {new Date(formData.work_started_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        ) : formData.time_spent_minutes > 0 ? 'Pausad' : 'Ej påbörjad'}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {isTimerRunning ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={handleStopTimer}
+                            className="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 rounded-lg text-orange-300 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Pause className="w-4 h-4" />
+                            Pausa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleStopTimer}
+                            className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Save className="w-4 h-4" />
+                            Slutför
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleStartTimer}
+                          className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-4 h-4" />
+                          {formData.time_spent_minutes > 0 ? 'Återuppta Arbete' : 'Starta Arbetstid'}
+                        </button>
+                      )}
+                      {formData.time_spent_minutes > 0 && !isTimerRunning && (
+                        <button
+                          type="button"
+                          onClick={handleResetTimer}
+                          className="w-full px-3 py-1.5 text-sm text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Nollställ arbetstid
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Cost summary */}
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <Star className="w-5 h-5 text-purple-400" />
                   Kostnad och material
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Total tid (minuter)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.time_spent_minutes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, time_spent_minutes: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
                       Materialkostnad (SEK)
@@ -805,7 +894,7 @@ export default function EditContractCaseModal({
           <div className="p-6 border-t border-purple-500/20">
             <div className="flex justify-end gap-3">
               <Button
-                onClick={onClose}
+                onClick={handleClose}
                 variant="secondary"
                 className="bg-slate-700 hover:bg-slate-600"
               >
