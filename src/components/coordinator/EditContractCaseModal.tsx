@@ -409,8 +409,7 @@ export default function EditContractCaseModal({
     const oneflowData = prepareCustomerDataForOneflow()
     if (!oneflowData) return
     
-    // Save customer data to sessionStorage for Oneflow
-    sessionStorage.setItem('prefill_customer_data', JSON.stringify({
+    const prefillData = {
       ...oneflowData,
       documentType: 'offer',
       selectedTemplate: '8598798', // Template ID for "Offertförslag – Exkl Moms (Företag)"
@@ -418,14 +417,20 @@ export default function EditContractCaseModal({
       // Add technician info
       anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
       'e-post-anstlld': profile?.email || '',
-      // Add default values for other required fields
+      // For offers, we still set these values (they won't be shown in UI but are needed for API compatibility)
       avtalslngd: '1',
       begynnelsedag: new Date().toISOString().split('T')[0],
       // Add case details for reference
       caseNumber: formData.case_number,
       caseTitle: formData.title,
       pestType: formData.pest_type
-    }))
+    }
+    
+    // Debug logging
+    console.log('Sending prefill data to Oneflow:', prefillData)
+    
+    // Save customer data to sessionStorage for Oneflow
+    sessionStorage.setItem('prefill_customer_data', JSON.stringify(prefillData))
     
     // Navigate to Oneflow contract creator
     const oneflowRoute = getOneflowRoute()

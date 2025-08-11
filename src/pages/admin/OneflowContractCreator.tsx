@@ -139,26 +139,52 @@ export default function OneflowContractCreator() {
             begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
           }))
           
-          // Om vi har all data förifylld (från avtalsärende), hoppa direkt till steg 6
-          if (customerData.autoSelectTemplate && 
-              customerData.selectedTemplate && 
-              customerData.Kontaktperson && 
-              customerData['e-post-kontaktperson']) {
-            // Vi har all data - hoppa till steg 6 (produktval)
-            setCurrentStep(6)
-          } else if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
-            // Använd specificerat steg
-            setCurrentStep(customerData.targetStep)
-          } else {
-            // Börja från steg 1
-            setCurrentStep(1)
-          }
+          // Debug-logging för att spåra prefill-processen
+          console.log('Prefill data received:', {
+            autoSelectTemplate: customerData.autoSelectTemplate,
+            selectedTemplate: customerData.selectedTemplate,
+            documentType: customerData.documentType,
+            hasContact: !!customerData.Kontaktperson,
+            hasEmail: !!customerData['e-post-kontaktperson']
+          })
           
-          sessionStorage.removeItem('prefill_customer_data') // Rensa efter användning
+          // Använd setTimeout för att säkerställa att state har uppdaterats innan steg-hoppning
+          setTimeout(() => {
+            // Om vi har autoSelectTemplate flagga och all nödvändig data, hoppa direkt till steg 6
+            if (customerData.autoSelectTemplate && 
+                customerData.selectedTemplate && 
+                customerData.Kontaktperson && 
+                customerData['e-post-kontaktperson']) {
+              console.log('Auto-selecting template and jumping to step 6:', customerData.selectedTemplate)
+              // Vi har all data - hoppa till steg 6 (produktval)
+              setCurrentStep(6)
+            } else if (customerData.autoSelectTemplate && customerData.selectedTemplate) {
+              // Om vi har template men inte all kontaktdata, gå till steg 2 med förvald mall
+              console.log('Auto-selecting template at step 2:', customerData.selectedTemplate)
+              setCurrentStep(2)
+            } else if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
+              // Använd specificerat steg
+              setCurrentStep(customerData.targetStep)
+            } else {
+              // Börja från steg 1
+              setCurrentStep(1)
+            }
+            
+            // Rensa sessionStorage efter användning
+            sessionStorage.removeItem('prefill_customer_data')
+          }, 100) // Vänta lite för att säkerställa state-uppdatering
           
           toast.success(`Kundinformation förifylld från ärende! (${prefillType === 'contract' ? 'Avtal' : 'Offert'})`, {
             duration: 4000,
             icon: prefillType === 'contract' ? '📄' : '💰'
+          })
+          
+          // Debug: Visa vad som laddades
+          console.log('Prefill completed:', {
+            documentType: customerData.documentType || prefillType,
+            selectedTemplate: customerData.selectedTemplate,
+            autoSelectTemplate: customerData.autoSelectTemplate,
+            hasCustomerData: !!(customerData.Kontaktperson && customerData['e-post-kontaktperson'])
           })
           
         } catch (error) {
@@ -210,7 +236,12 @@ export default function OneflowContractCreator() {
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
       // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
       if (currentStep === 2 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
-        nextStepNumber = 4
+        // Sätt partyType automatiskt baserat på vald offertmall
+        const template = OFFER_TEMPLATES.find(t => t.id === wizardData.selectedTemplate)
+        if (template && template.category) {
+          setWizardData(prev => ({ ...prev, partyType: template.category as 'company' | 'individual' }))
+        }
+        nextStepNumber = 4 // Hoppa över steg 3 (avtalspart)
       }
       
       setCurrentStep(nextStepNumber)
@@ -452,6 +483,13 @@ export default function OneflowContractCreator() {
               <p className="text-slate-400">
                 Välj vilken {wizardData.documentType === 'offer' ? 'offertmall' : 'avtalsmall'} du vill använda
               </p>
+              {wizardData.selectedTemplate && (
+                <div className="mt-4 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg inline-block">
+                  <p className="text-green-400 text-sm">
+                    ✓ Mall förvald från ärende: {availableTemplates.find(t => t.id === wizardData.selectedTemplate)?.name}
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
