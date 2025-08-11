@@ -413,12 +413,14 @@ export default function EditContractCaseModal({
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...oneflowData,
       documentType: 'offer',
-      selectedTemplate: 'Offertförslag – Exkl Moms (Företag)', // Will auto-select this template
-      autoSelectTemplate: true, // Flag to trigger auto-selection
-      targetStep: 2, // Go directly to template selection
+      selectedTemplate: '8598798', // Template ID for "Offertförslag – Exkl Moms (Företag)"
+      autoSelectTemplate: true, // Flag to trigger auto-selection and skip to step 6
       // Add technician info
       anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
       'e-post-anstlld': profile?.email || '',
+      // Add default values for other required fields
+      avtalslngd: '1',
+      begynnelsedag: new Date().toISOString().split('T')[0],
       // Add case details for reference
       caseNumber: formData.case_number,
       caseTitle: formData.title,

@@ -123,7 +123,7 @@ export default function OneflowContractCreator() {
           setWizardData(prev => ({
             ...prev,
             documentType: customerData.documentType || prefillType,
-            selectedTemplate: customerData.autoSelectTemplate && customerData.selectedTemplate ? customerData.selectedTemplate : '',
+            selectedTemplate: customerData.selectedTemplate || '',
             partyType: customerData.partyType || 'company',
             Kontaktperson: customerData.Kontaktperson || '',
             'e-post-kontaktperson': customerData['e-post-kontaktperson'] || '',
@@ -131,13 +131,26 @@ export default function OneflowContractCreator() {
             'utforande-adress': customerData['utforande-adress'] || '',
             foretag: customerData.foretag || '',
             'org-nr': customerData['org-nr'] || '',
+            // Lägg till tekniker-info om det finns
+            anstalld: customerData.anstalld || prev.anstalld,
+            'e-post-anstlld': customerData['e-post-anstlld'] || prev['e-post-anstlld'],
+            // Lägg till avtalslängd och startdatum om det finns
+            avtalslngd: customerData.avtalslngd || prev.avtalslngd,
+            begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
           }))
           
-          // Navigera till rätt steg om specifierat
-          if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
+          // Om vi har all data förifylld (från avtalsärende), hoppa direkt till steg 6
+          if (customerData.autoSelectTemplate && 
+              customerData.selectedTemplate && 
+              customerData.Kontaktperson && 
+              customerData['e-post-kontaktperson']) {
+            // Vi har all data - hoppa till steg 6 (produktval)
+            setCurrentStep(6)
+          } else if (customerData.targetStep && customerData.targetStep >= 1 && customerData.targetStep <= STEPS.length) {
+            // Använd specificerat steg
             setCurrentStep(customerData.targetStep)
           } else {
-            // Börja från steg 1 men med förvald dokumenttyp
+            // Börja från steg 1
             setCurrentStep(1)
           }
           
