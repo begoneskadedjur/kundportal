@@ -98,10 +98,11 @@ function buildDataFieldsForDocument(
     )
   }
   
-  // Lägg till case_id om det finns (för webhook-koppling)
-  if (caseId) {
-    fields.push({ custom_id: 'case_id', value: caseId })
-  }
+  // case_id fungerar inte i Oneflow-mallen för offerter
+  // Vi sparar istället case_id i databasen efter att kontraktet skapats
+  // if (caseId) {
+  //   fields.push({ custom_id: 'case_id', value: caseId })
+  // }
   
   return fields
 }
@@ -181,15 +182,11 @@ function convertProductsToOneflow(
         description: product.description,
         price_1: {
           base_amount: { amount: finalPriceString },
-          discount_amount: { amount: discountAmountString },
-          amount: { amount: finalPriceString },
-          discount_percent: discountPercentString
+          discount_amount: { amount: discountAmountString }
         },
         price_2: {
           base_amount: { amount: finalPriceString },
-          discount_amount: { amount: discountAmountString },
-          amount: { amount: finalPriceString },
-          discount_percent: discountPercentString
+          discount_amount: { amount: discountAmountString }
         },
         quantity: {
           type: oneflowQuantityType,
@@ -436,14 +433,24 @@ export default async function handler(
       process.env.SUPABASE_SERVICE_KEY!
     )
     
-    // Uppdatera kontraktet med creator info
+    // Uppdatera kontraktet med creator info och case-koppling
+    const updateData: any = {
+      created_by_email: creatorEmail,
+      created_by_name: creatorName,
+      created_by_role: creatorRole
+    }
+    
+    // Lägg till source_id och source_type om caseId finns
+    if (caseId) {
+      updateData.source_id = caseId
+      // Bestäm source_type baserat på case-typ (kan utökas med mer logik senare)
+      updateData.source_type = 'legacy_case' // Använd legacy_case för cases-tabellen
+      console.log(`🔗 Kopplar offert till ärende: ${caseId}`)
+    }
+    
     const { error: updateError } = await supabase
       .from('contracts')
-      .update({
-        created_by_email: creatorEmail,
-        created_by_name: creatorName,
-        created_by_role: creatorRole
-      })
+      .update(updateData)
       .eq('oneflow_contract_id', createdContract.id)
     
     if (updateError) {
