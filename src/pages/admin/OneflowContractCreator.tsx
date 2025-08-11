@@ -188,9 +188,15 @@ export default function OneflowContractCreator() {
         }
       }
       
-      // Om vi byter dokumenttyp, rensa vald mall
+      // Om vi byter dokumenttyp
       if (field === 'documentType') {
         updated.selectedTemplate = ''
+        
+        // Sätt default-värden för offerter (används inte i offertmallar men krävs av API)
+        if (value === 'offer') {
+          updated.avtalslngd = updated.avtalslngd || '1'
+          updated.begynnelsedag = updated.begynnelsedag || new Date().toISOString().split('T')[0]
+        }
       }
       
       return updated
@@ -230,7 +236,7 @@ export default function OneflowContractCreator() {
       case 1: return wizardData.documentType !== ''
       case 2: return wizardData.selectedTemplate !== ''
       case 3: return true // Partytype har default
-      case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && wizardData.avtalslngd
+      case 4: return wizardData.anstalld && wizardData['e-post-anstlld'] && (wizardData.documentType === 'offer' || wizardData.avtalslngd)
       case 5: return wizardData.Kontaktperson && wizardData['e-post-kontaktperson']
       case 6: return wizardData.selectedProducts.length >= 0 // Produkter (kan vara tom för enkla avtal)
       case 7: return wizardData.agreementText.length > 0
@@ -598,25 +604,28 @@ export default function OneflowContractCreator() {
                   placeholder="namn@begone.se"
                 />
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    label="Avtalslängd (år) *"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={wizardData.avtalslngd}
-                    onChange={e => updateWizardData('avtalslngd', e.target.value)}
-                    icon={<Calendar className="w-4 h-4" />}
-                  />
-                  
-                  <Input
-                    label="Startdatum *"
-                    type="date"
-                    value={wizardData.begynnelsedag}
-                    onChange={e => updateWizardData('begynnelsedag', e.target.value)}
-                    icon={<Calendar className="w-4 h-4" />}
-                  />
+                {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
+                {wizardData.documentType === 'contract' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Avtalslängd (år) *"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={wizardData.avtalslngd}
+                      onChange={e => updateWizardData('avtalslngd', e.target.value)}
+                      icon={<Calendar className="w-4 h-4" />}
+                    />
+                    
+                    <Input
+                      label="Startdatum *"
+                      type="date"
+                      value={wizardData.begynnelsedag}
+                      onChange={e => updateWizardData('begynnelsedag', e.target.value)}
+                      icon={<Calendar className="w-4 h-4" />}
+                    />
                   </div>
+                )}
                 </div>
               </div>
             </Card>
