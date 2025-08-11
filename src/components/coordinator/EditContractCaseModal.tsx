@@ -3,10 +3,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import { 
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
-  FileSignature, ChevronDown, Download, Send
+  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign
 } from 'lucide-react'
 import Button from '../ui/Button'
 import DatePicker from 'react-datepicker'
@@ -66,7 +68,10 @@ export default function EditContractCaseModal({
   caseData,
   isCustomerView = false
 }: EditContractCaseModalProps) {
+  const navigate = useNavigate()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [customerData, setCustomerData] = useState<any>(null)
   const [formData, setFormData] = useState({
     // Grundläggande information
     case_number: '',
@@ -204,6 +209,11 @@ export default function EditContractCaseModal({
         setFormData(prev => ({ ...prev, case_number: number }))
       })
     }
+    
+    // Fetch customer data if customer_id exists
+    if (isOpen && caseData?.customer_id) {
+      fetchCustomerData(caseData.customer_id)
+    }
   }, [isOpen, caseData])
 
   useEffect(() => {
@@ -239,6 +249,32 @@ export default function EditContractCaseModal({
       setTechnicians(data || [])
     } catch (error) {
       console.error('Error fetching technicians:', error)
+    }
+  }
+  
+  const fetchCustomerData = async (customerId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customerId)
+        .single()
+      
+      if (error) throw error
+      setCustomerData(data)
+      
+      // Update form with customer data if needed
+      if (data) {
+        setFormData(prev => ({
+          ...prev,
+          contact_person: prev.contact_person || data.contact_person || '',
+          contact_email: prev.contact_email || data.email || '',
+          contact_phone: prev.contact_phone || data.phone || '',
+          address: prev.address || data.service_address || ''
+        }))
+      }
+    } catch (error) {
+      console.error('Error fetching customer:', error)
     }
   }
 
@@ -284,30 +320,79 @@ export default function EditContractCaseModal({
     toast.success('Tidtagning återställd')
   }
 
-  // Quote generation
+  // Get Oneflow route based on user role
+  const getOneflowRoute = useCallback(() => {
+    const role = profile?.role || 'admin'
+    switch (role) {
+      case 'koordinator':
+        return '/koordinator/oneflow-contract-creator'
+      case 'technician':
+        return '/technician/oneflow-contract-creator'
+      default:
+        return '/admin/oneflow-contract-creator'
+    }
+  }, [profile?.role])
+  
+  // Prepare customer data for Oneflow
+  const prepareCustomerDataForOneflow = useCallback(() => {
+    if (!customerData && !formData.contact_person) {
+      toast.error('Kundinformation saknas')
+      return null
+    }
+    
+    // Use customer data if available, otherwise use form data
+    const contactPerson = formData.contact_person || customerData?.contact_person || ''
+    const email = formData.contact_email || customerData?.email || ''
+    const phone = formData.contact_phone || customerData?.phone || ''
+    const address = formData.address || customerData?.service_address || ''
+    const companyName = customerData?.company_name || formData.contact_person || ''
+    const orgNumber = customerData?.org_number || ''
+    
+    return {
+      Kontaktperson: contactPerson,
+      'e-post-kontaktperson': email,
+      'telefonnummer-kontaktperson': phone,
+      'utforande-adress': address,
+      foretag: companyName,
+      'org-nr': orgNumber,
+      partyType: orgNumber ? 'company' : 'individual'
+    }
+  }, [customerData, formData])
+  
+  // Quote generation via Oneflow
   const handleGenerateQuote = async () => {
-    try {
-      setLoading(true)
-      // Here you would integrate with your quote generation system
-      // For now, we'll just mark that a quote was generated
-      const now = new Date().toISOString()
-      setFormData(prev => ({ ...prev, quote_generated_at: now }))
-      
-      toast.success('Offert genererad!')
-      setShowQuoteDropdown(false)
-      
-      // Save the update to database
-      if (caseData?.id) {
-        await supabase
-          .from('cases')
-          .update({ quote_generated_at: now })
-          .eq('id', caseData.id)
-      }
-    } catch (error) {
-      console.error('Error generating quote:', error)
-      toast.error('Kunde inte generera offert')
-    } finally {
-      setLoading(false)
+    const oneflowData = prepareCustomerDataForOneflow()
+    if (!oneflowData) return
+    
+    // Save customer data to sessionStorage for Oneflow
+    sessionStorage.setItem('prefill_customer_data', JSON.stringify({
+      ...oneflowData,
+      documentType: 'offer',
+      selectedTemplate: 'Offertförslag – Exkl Moms (Företag)', // Default template
+      targetStep: 2, // Go directly to template selection
+      // Add technician info
+      anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
+      'e-post-anstlld': profile?.email || '',
+      // Add case details for reference
+      caseNumber: formData.case_number,
+      caseTitle: formData.title,
+      pestType: formData.pest_type
+    }))
+    
+    // Navigate to Oneflow contract creator
+    const oneflowRoute = getOneflowRoute()
+    navigate(`${oneflowRoute}?prefill=offer`)
+    
+    toast.success('Navigerar till offertskapning med kundinformation...')
+    setShowQuoteDropdown(false)
+    
+    // Mark quote as generated
+    const now = new Date().toISOString()
+    if (caseData?.id) {
+      await supabase
+        .from('cases')
+        .update({ quote_generated_at: now })
+        .eq('id', caseData.id)
     }
   }
 
@@ -444,24 +529,18 @@ export default function EditContractCaseModal({
                     </button>
                     
                     {showQuoteDropdown && (
-                      <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+                      <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
                         <button
                           onClick={handleGenerateQuote}
                           className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
                         >
-                          <FileSignature className="w-4 h-4" />
-                          Generera offert
+                          <DollarSign className="w-4 h-4" />
+                          Skapa offert via Oneflow
+                          <ChevronRight className="w-3 h-3 ml-auto opacity-60" />
                         </button>
-                        <button
-                          className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
-                          onClick={() => {
-                            toast.info('Skicka offert-funktion kommer snart')
-                            setShowQuoteDropdown(false)
-                          }}
-                        >
-                          <Send className="w-4 h-4" />
-                          Skicka offert
-                        </button>
+                        <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-700">
+                          Öppnar Oneflow med förifyllda kunduppgifter
+                        </div>
                       </div>
                     )}
                   </div>
