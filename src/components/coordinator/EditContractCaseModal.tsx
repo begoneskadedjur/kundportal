@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { 
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
-  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign
+  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb
 } from 'lucide-react'
 import Button from '../ui/Button'
 import DatePicker from 'react-datepicker'
@@ -794,6 +794,88 @@ export default function EditContractCaseModal({
                   className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   disabled={isCustomerView}
                 />
+              </div>
+
+              {/* Recommendations Section */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-amber-400" />
+                  Rekommendationer till kund
+                </h3>
+                
+                {/* Quick recommendations for common issues */}
+                {!isCustomerView && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Snabbval för vanliga rekommendationer
+                    </label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                            '• Rekommenderar förebyggande åtgärder för att undvika framtida problem.'
+                        }))}
+                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
+                      >
+                        Förebyggande
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                            '• Uppföljningsbesök rekommenderas inom 2-4 veckor.'
+                        }))}
+                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
+                      >
+                        Uppföljning
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                            '• Regelbundet underhåll krävs för att bibehålla skyddsnivån.'
+                        }))}
+                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
+                      >
+                        Underhåll
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                            '• Akuta åtgärder krävs - kontakta oss omedelbart vid förvärring.'
+                        }))}
+                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
+                      >
+                        Akut åtgärd
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <textarea
+                  value={formData.recommendations}
+                  onChange={(e) => setFormData(prev => ({ ...prev, recommendations: e.target.value }))}
+                  rows={4}
+                  placeholder="Beskriv rekommenderade åtgärder för kunden..."
+                  className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  disabled={isCustomerView}
+                />
+                
+                <p className="text-xs text-slate-500 mt-2">
+                  Dessa rekommendationer visas som åtgärdsförslag för kunden i deras ärende
+                </p>
+
+                {formData.recommendations && formData.recommendations.length > 200 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {formData.recommendations.length} tecken
+                  </p>
+                )}
               </div>
 
               {/* Time tracking */}

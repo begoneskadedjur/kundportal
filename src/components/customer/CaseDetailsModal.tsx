@@ -17,7 +17,8 @@ import {
   Mail,
   Phone,
   FileDown,
-  Flag
+  Flag,
+  Lightbulb
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
@@ -476,6 +477,44 @@ export default function CaseDetailsModal({
                           <p className="text-white whitespace-pre-wrap">
                             {reportField.value}
                           </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rekommendationer från tekniker - endast för avtalsärenden */}
+                    {caseData?.case_type === 'contract' && caseData?.recommendations && (
+                      <div className="space-y-3">
+                        <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-amber-400" />
+                          Rekommenderade åtgärder
+                        </h4>
+                        <div className="p-4 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-500/20 rounded-lg shrink-0">
+                              <AlertCircle className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div className="flex-1">
+                              <h5 className="text-white font-medium mb-2">Våra rekommendationer för dig</h5>
+                              <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                {caseData.recommendations}
+                              </p>
+                              
+                              {/* Call-to-action */}
+                              <div className="mt-4 pt-3 border-t border-amber-500/20">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm text-amber-300">
+                                    Har du frågor om dessa rekommendationer?
+                                  </p>
+                                  <button
+                                    onClick={() => window.open('tel:010-280-44-10', '_self')}
+                                    className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-300 hover:text-amber-200 transition-colors text-sm font-medium"
+                                  >
+                                    Ring oss
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}

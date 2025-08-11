@@ -477,7 +477,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       };
       
       if (tableName === 'private_cases' || tableName === 'business_cases') {
-        // ClickUp-synkade fält
+        // ClickUp-synkade fält - ALLA användare (inklusive tekniker) får uppdatera dessa
         updateData.kontaktperson = formData.kontaktperson;
         updateData.telefon_kontaktperson = formData.telefon_kontaktperson;
         updateData.e_post_kontaktperson = formData.e_post_kontaktperson;
