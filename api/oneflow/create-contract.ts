@@ -253,7 +253,8 @@ export default async function handler(
     documentType,
     senderEmail,
     senderName,
-    selectedProducts
+    selectedProducts,
+    caseId
   } = req.body as ContractRequestBody
 
   // 🆕 VALIDERA ANVÄNDAREN FÖRST
@@ -290,7 +291,7 @@ export default async function handler(
   console.log(`👤 Skapad av: ${creatorName} (${creatorEmail})`)
 
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
-  const data_fields = buildDataFieldsForDocument(contractData, documentType, body.caseId)
+  const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
   const parties = []
 
