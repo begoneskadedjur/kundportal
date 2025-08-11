@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { FileText, Download, Calendar, Search, Filter, History, X } from 'lucide-react'
+import { FileText, Download, Calendar, Search, Filter, History, X, TrendingUp, BarChart3 } from 'lucide-react'
 import { sanitationReportService, SanitationReport } from '../../services/sanitationReportService'
 import { useAuth } from '../../contexts/AuthContext'
+import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 
 const SanitationReports: React.FC = () => {
@@ -176,235 +177,261 @@ const SanitationReports: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-emerald-900/10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Header */}
+      <div className="bg-slate-800/50 backdrop-blur border-b border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <FileText className="w-7 h-7 text-blue-400" />
+                Saneringsrapporter
+              </h1>
+              <p className="text-slate-400 mt-1">
+                Alla era saneringsrapporter från genomförda behandlingar
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {/* Filter Selector */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-400" />
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value as any)}
+                  className="bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+                >
+                  <option value="all">Alla rapporter</option>
+                  <option value="30d">Senaste 30 dagarna</option>
+                  <option value="3m">Senaste 3 månaderna</option>
+                  <option value="6m">Senaste 6 månaderna</option>
+                  <option value="1y">Senaste året</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Saneringsrapporter
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Här hittar du alla dina saneringsrapporter från genomförda behandlingar
-          </p>
-        </div>
-
-        {/* Statistik-kort */}
+        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Totalt antal rapporter
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {reports.length}
-                </p>
-              </div>
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Senaste rapporten
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-                  {reports.length > 0 
-                    ? formatDate(reports[0].created_at)
-                    : 'Ingen rapport'
-                  }
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Totalt antal rapporter
+                  </p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                    {reports.length}
+                  </p>
+                </div>
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <FileText className="h-6 w-6 text-emerald-400" />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total storlek
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {formatFileSize(reports.reduce((sum, r) => sum + (r.file_size || 0), 0))}
-                </p>
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Senaste rapporten
+                  </p>
+                  <p className="text-lg font-semibold text-white mt-1">
+                    {reports.length > 0 
+                      ? formatDate(reports[0].created_at)
+                      : 'Ingen rapport'
+                    }
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <Calendar className="h-6 w-6 text-blue-400" />
+                </div>
               </div>
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <Download className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            </div>
+          </div>
+
+          <div className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute inset-0 bg-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-400">
+                    Total storlek
+                  </p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                    {formatFileSize(reports.reduce((sum, r) => sum + (r.file_size || 0), 0))}
+                  </p>
+                </div>
+                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                  <Download className="h-6 w-6 text-purple-400" />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filter och sök */}
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+        {/* Search and Filter */}
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Sök rapporter..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-600 rounded-lg bg-slate-700 text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 />
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-400" />
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value as any)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="all">Alla rapporter</option>
-                <option value="30d">Senaste 30 dagarna</option>
-                <option value="3m">Senaste 3 månaderna</option>
-                <option value="6m">Senaste 6 månaderna</option>
-                <option value="1y">Senaste året</option>
-              </select>
             </div>
           </div>
         </div>
 
-        {/* Rapportlista */}
+        {/* Reports List */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+            <div className="text-center">
+              <LoadingSpinner />
+              <p className="text-slate-400 mt-4">Laddar rapporter...</p>
+            </div>
           </div>
         ) : filteredReports.length === 0 ? (
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-12 border border-gray-200 dark:border-gray-700 text-center">
-            <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-12 text-center">
+            <FileText className="mx-auto h-16 w-16 text-slate-500 mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
               {searchTerm || dateFilter !== 'all' 
                 ? 'Inga rapporter hittades'
                 : 'Inga rapporter ännu'
               }
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-slate-400">
               {searchTerm || dateFilter !== 'all'
                 ? 'Prova att ändra dina sökkriterier'
-                : 'Dina saneringsrapporter kommer att visas här när de har genererats'
+                : 'Era saneringsrapporter kommer att visas här när de har genererats'
               }
             </p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-6">
             {filteredReports.map((report) => (
               <div
                 key={report.id}
-                className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+                className="group relative bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                        <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                          <FileText className="h-6 w-6 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">
+                            {report.file_name}
+                          </h3>
+                          <p className="text-sm text-slate-400">
+                            {formatDate(report.report_date || report.created_at)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {report.file_name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {formatDate(report.report_date || report.created_at)}
-                        </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                        {report.technician_name && (
+                          <div>
+                            <span className="font-medium text-slate-300">
+                              Tekniker:
+                            </span>{' '}
+                            <span className="text-slate-400">
+                              {report.technician_name}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {report.pest_type && (
+                          <div>
+                            <span className="font-medium text-slate-300">
+                              Skadedjur:
+                            </span>{' '}
+                            <span className="text-slate-400">
+                              {report.pest_type}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {report.address && (
+                          <div className="sm:col-span-2">
+                            <span className="font-medium text-slate-300">
+                              Adress:
+                            </span>{' '}
+                            <span className="text-slate-400">
+                              {report.address}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <span className="font-medium text-slate-300">
+                            Storlek:
+                          </span>{' '}
+                          <span className="text-slate-400">
+                            {formatFileSize(report.file_size)}
+                          </span>
+                        </div>
+                        
+                        {report.version && report.version > 1 && (
+                          <div>
+                            <span className="font-medium text-slate-300">
+                              Version:
+                            </span>{' '}
+                            <span className="text-slate-400">
+                              {report.version}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                      {report.technician_name && (
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            Tekniker:
-                          </span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {report.technician_name}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {report.pest_type && (
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            Skadedjur:
-                          </span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {report.pest_type}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {report.address && (
-                        <div className="sm:col-span-2">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            Adress:
-                          </span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {report.address}
-                          </span>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">
-                          Storlek:
-                        </span>{' '}
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {formatFileSize(report.file_size)}
-                        </span>
-                      </div>
-                      
-                      {report.version && report.version > 1 && (
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            Version:
-                          </span>{' '}
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {report.version}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 ml-4">
-                    {/* Visa historik-knapp om det finns fler än en version */}
-                    {report.version && report.version > 1 && (
-                      <button
-                        onClick={() => handleShowHistory(report.case_id)}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                        title="Visa rapporthistorik"
-                      >
-                        <History className="h-4 w-4" />
-                        <span className="hidden sm:inline">Historik</span>
-                      </button>
-                    )}
-                    
-                    <button
-                      onClick={() => handleDownload(report)}
-                      disabled={downloading === report.id}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {downloading === report.id ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span>Laddar...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-5 w-5" />
-                          <span>Ladda ner</span>
-                        </>
+                    <div className="flex items-center gap-3 ml-6">
+                      {/* Show history button if there are multiple versions */}
+                      {report.version && report.version > 1 && (
+                        <button
+                          onClick={() => handleShowHistory(report.case_id)}
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+                          title="Visa rapporthistorik"
+                        >
+                          <History className="h-4 w-4" />
+                          <span className="hidden sm:inline">Historik</span>
+                        </button>
                       )}
-                    </button>
+                      
+                      <button
+                        onClick={() => handleDownload(report)}
+                        disabled={downloading === report.id}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {downloading === report.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            <span>Laddar...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-5 w-5" />
+                            <span>Ladda ner</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -412,17 +439,18 @@ const SanitationReports: React.FC = () => {
           </div>
         )}
 
-        {/* Historik-modal */}
+        {/* History Modal */}
         {showHistory && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                <h3 className="text-xl font-semibold text-white flex items-center gap-3">
+                  <History className="w-6 h-6 text-purple-400" />
                   Rapporthistorik
                 </h3>
                 <button
                   onClick={closeHistory}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors duration-200"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -431,13 +459,16 @@ const SanitationReports: React.FC = () => {
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 {loadingHistory ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-                    <span className="ml-3 text-gray-600 dark:text-gray-400">Laddar historik...</span>
+                    <div className="text-center">
+                      <LoadingSpinner />
+                      <span className="block mt-3 text-slate-400">Laddar historik...</span>
+                    </div>
                   </div>
                 ) : historyData ? (
                   <div className="space-y-4">
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="mb-6">
+                      <p className="text-slate-400 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
                         Totalt {historyData.total_versions} versioner av denna rapport
                       </p>
                     </div>
@@ -445,47 +476,58 @@ const SanitationReports: React.FC = () => {
                     {historyData.history.map((historyReport, index) => (
                       <div
                         key={historyReport.id}
-                        className={`p-4 rounded-lg border-2 ${
+                        className={`group relative p-4 rounded-lg border transition-all duration-200 ${
                           historyReport.is_current
-                            ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20'
-                            : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50'
+                            ? 'border-emerald-500/50 bg-emerald-500/10'
+                            : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                              <h4 className="font-medium text-gray-900 dark:text-white">
-                                {historyReport.file_name}
-                              </h4>
-                              {historyReport.is_current && (
-                                <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs rounded-full font-medium">
-                                  Aktuell
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <span className="font-medium text-gray-700 dark:text-gray-300">Version:</span>{' '}
-                                <span className="text-gray-600 dark:text-gray-400">{historyReport.version || 1}</span>
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`p-2 rounded-lg ${
+                                historyReport.is_current 
+                                  ? 'bg-emerald-500/20 border border-emerald-500/30' 
+                                  : 'bg-slate-700 border border-slate-600'
+                              }`}>
+                                <FileText className={`h-5 w-5 ${
+                                  historyReport.is_current ? 'text-emerald-400' : 'text-slate-400'
+                                }`} />
                               </div>
                               <div>
-                                <span className="font-medium text-gray-700 dark:text-gray-300">Skapad:</span>{' '}
-                                <span className="text-gray-600 dark:text-gray-400">
+                                <h4 className="font-medium text-white">
+                                  {historyReport.file_name}
+                                </h4>
+                                {historyReport.is_current && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium mt-1">
+                                    <TrendingUp className="w-3 h-3" />
+                                    Aktuell version
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <span className="font-medium text-slate-300">Version:</span>{' '}
+                                <span className="text-slate-400 font-mono">{historyReport.version || 1}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-300">Skapad:</span>{' '}
+                                <span className="text-slate-400">
                                   {formatDate(historyReport.created_at)}
                                 </span>
                               </div>
                               <div>
-                                <span className="font-medium text-gray-700 dark:text-gray-300">Storlek:</span>{' '}
-                                <span className="text-gray-600 dark:text-gray-400">
+                                <span className="font-medium text-slate-300">Storlek:</span>{' '}
+                                <span className="text-slate-400 font-mono">
                                   {formatFileSize(historyReport.file_size)}
                                 </span>
                               </div>
                               {historyReport.replaced_at && (
                                 <div>
-                                  <span className="font-medium text-gray-700 dark:text-gray-300">Ersatt:</span>{' '}
-                                  <span className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium text-slate-300">Ersatt:</span>{' '}
+                                  <span className="text-slate-400">
                                     {formatDate(historyReport.replaced_at)}
                                   </span>
                                 </div>
@@ -496,7 +538,7 @@ const SanitationReports: React.FC = () => {
                           <button
                             onClick={() => handleDownload(historyReport)}
                             disabled={downloading === historyReport.id}
-                            className="ml-4 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="ml-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {downloading === historyReport.id ? (
                               <>
@@ -516,7 +558,10 @@ const SanitationReports: React.FC = () => {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-600 dark:text-gray-400">Kunde inte ladda historik</p>
+                    <div className="text-slate-500 mb-2">
+                      <X className="w-8 h-8 mx-auto" />
+                    </div>
+                    <p className="text-slate-400">Kunde inte ladda historik</p>
                   </div>
                 )}
               </div>
