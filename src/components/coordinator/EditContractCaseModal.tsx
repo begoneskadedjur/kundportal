@@ -150,8 +150,13 @@ export default function EditContractCaseModal({
     sendToTechnician,
     sendToContact,
     isGenerating,
+    canGenerateReport,
     hasTechnicianEmail,
-    hasContactEmail
+    hasContactEmail,
+    totalReports,
+    hasRecentReport,
+    currentReport,
+    getTimeSinceReport
   } = useWorkReportGeneration(reportData)
 
   useEffect(() => {
@@ -614,11 +619,13 @@ export default function EditContractCaseModal({
                     onDownload={downloadReport}
                     onSendToTechnician={sendToTechnician}
                     onSendToContact={sendToContact}
-                    isGenerating={isGenerating}
-                    hasTechnicianEmail={hasTechnicianEmail}
-                    hasContactEmail={hasContactEmail}
+                    disabled={!canGenerateReport || isGenerating}
                     technicianName={formData.primary_technician_name}
                     contactName={formData.contact_person}
+                    totalReports={totalReports}
+                    hasRecentReport={hasRecentReport}
+                    currentReport={currentReport}
+                    getTimeSinceReport={getTimeSinceReport}
                   />
 
                   <button

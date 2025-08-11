@@ -1,8 +1,8 @@
 // src/hooks/useWorkReportGeneration.ts - Hook för saneringsrapport generation och email
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
-import { sanitationReportService } from '../services/sanitationReportService'
+import { sanitationReportService, type SanitationReport } from '../services/sanitationReportService'
 import { useAuth } from '../contexts/AuthContext'
 
 interface TechnicianCase {
@@ -73,7 +73,33 @@ interface TaskDetails {
 
 export const useWorkReportGeneration = (caseData: TechnicianCase) => {
   const [isGenerating, setIsGenerating] = useState(false)
+  const [existingReports, setExistingReports] = useState<SanitationReport[]>([])
+  const [reportHistory, setReportHistory] = useState<{
+    current: SanitationReport | null
+    history: SanitationReport[]
+    total_versions: number
+  }>({ current: null, history: [], total_versions: 0 })
+  const [hasCheckedReports, setHasCheckedReports] = useState(false)
   const { profile } = useAuth()
+
+  // Hämta befintliga rapporter när komponenten laddas
+  useEffect(() => {
+    const fetchExistingReports = async () => {
+      if (caseData.id && !hasCheckedReports) {
+        // Hämta rapporthistorik för detta case
+        const { data } = await sanitationReportService.getReportHistory(caseData.id)
+        
+        if (data) {
+          setReportHistory(data)
+          setExistingReports(data.history)
+        }
+        
+        setHasCheckedReports(true)
+      }
+    }
+    
+    fetchExistingReports()
+  }, [caseData.id, hasCheckedReports])
 
   // Skapa rapport-data från befintlig case-data (ingen ClickUp API-anrop)
   const createReportData = async () => {
@@ -307,9 +333,48 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     }
   }
 
-  // Ladda ner PDF-rapport
-  const downloadReport = async () => {
+  // Kontrollera om rapport nyligen genererats
+  const hasRecentReport = () => {
+    if (!reportHistory.current) return false
+    
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
+    const reportDate = new Date(reportHistory.current.created_at || '')
+    
+    return reportDate > fourHoursAgo
+  }
+
+  // Formatera tid sedan rapport skapades
+  const getTimeSinceReport = (report: SanitationReport) => {
+    if (!report.created_at) return ''
+    
+    const created = new Date(report.created_at)
+    const now = new Date()
+    const diffMs = now.getTime() - created.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+    
+    if (diffDays > 0) return `${diffDays} dag${diffDays > 1 ? 'ar' : ''} sedan`
+    if (diffHours > 0) return `${diffHours} tim${diffHours > 1 ? 'mar' : 'me'} sedan`
+    if (diffMins > 0) return `${diffMins} minut${diffMins > 1 ? 'er' : ''} sedan`
+    return 'Nyss'
+  }
+
+  // Ladda ner PDF-rapport med varning för dubletter
+  const downloadReport = async (skipWarning = false) => {
     try {
+      // Varna om rapport nyligen genererats
+      if (!skipWarning && hasRecentReport() && reportHistory.current) {
+        const timeSince = getTimeSinceReport(reportHistory.current)
+        const confirmMessage = `En rapport genererades för ${timeSince}.\n` +
+          `Version ${reportHistory.current.version} av ${reportHistory.total_versions}.\n\n` +
+          'Vill du skapa en ny version av rapporten?'
+        
+        if (!window.confirm(confirmMessage)) {
+          return
+        }
+      }
+      
       setIsGenerating(true)
       
       const { taskDetails, customerInfo } = await createReportData()
@@ -339,7 +404,16 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       const filename = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
 
       // Spara automatiskt till databas och storage
-      await saveReportToDatabase(data.pdf, filename)
+      const savedReport = await saveReportToDatabase(data.pdf, filename)
+      
+      // Uppdatera lokal rapporthistorik
+      if (savedReport) {
+        const { data: updatedHistory } = await sanitationReportService.getReportHistory(caseData.id)
+        if (updatedHistory) {
+          setReportHistory(updatedHistory)
+          setExistingReports(updatedHistory.history)
+        }
+      }
 
       // Konvertera base64 till blob och ladda ner
       const pdfBlob = base64ToBlob(data.pdf, 'application/pdf')
@@ -384,8 +458,23 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     return new Blob([byteArray], { type: contentType })
   }
 
-  // Skicka rapport till ansvarig tekniker
-  const sendToTechnician = async () => {
+  // Skicka rapport till ansvarig tekniker med varning för dubletter
+  const sendToTechnician = async (skipWarning = false) => {
+    // Varna om rapport nyligen skickats
+    if (!skipWarning && reportHistory.current?.sent_to_technician) {
+      const timeSince = reportHistory.current.sent_to_technician_at 
+        ? getTimeSinceReport({ ...reportHistory.current, created_at: reportHistory.current.sent_to_technician_at })
+        : ''
+      
+      const confirmMessage = timeSince 
+        ? `En rapport skickades till tekniker för ${timeSince}.\nVill du skicka en ny version?`
+        : 'En rapport har redan skickats till tekniker.\nVill du skicka en ny version?'
+      
+      if (!window.confirm(confirmMessage)) {
+        return
+      }
+    }
+
     // Hämta tekniker-email från primary_assignee_id om assignee_email inte finns
     let technicianEmail = caseData.assignee_email
     let technicianName = caseData.assignee_name
@@ -461,8 +550,23 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     }
   }
 
-  // Skicka rapport till kontaktperson
-  const sendToContact = async () => {
+  // Skicka rapport till kontaktperson med varning för dubletter
+  const sendToContact = async (skipWarning = false) => {
+    // Varna om rapport nyligen skickats till kund
+    if (!skipWarning && reportHistory.current?.sent_to_customer) {
+      const timeSince = reportHistory.current.sent_to_customer_at 
+        ? getTimeSinceReport({ ...reportHistory.current, created_at: reportHistory.current.sent_to_customer_at })
+        : ''
+      
+      const confirmMessage = timeSince 
+        ? `En rapport skickades till kund för ${timeSince}.\nVill du skicka en ny version?`
+        : 'En rapport har redan skickats till kund.\nVill du skicka en ny version?'
+      
+      if (!window.confirm(confirmMessage)) {
+        return
+      }
+    }
+
     if (!caseData.e_post_kontaktperson) {
       toast.error('Ingen email-adress för kontaktperson')
       return
@@ -533,6 +637,13 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     hasTechnicianEmail: !!(caseData.assignee_email || caseData.primary_assignee_id),
     hasContactEmail: !!caseData.e_post_kontaktperson,
     technicianName: caseData.assignee_name || caseData.primary_assignee_name,
-    contactName: caseData.kontaktperson
+    contactName: caseData.kontaktperson,
+    // Ny rapporthistorik-data
+    existingReports,
+    reportHistory,
+    hasRecentReport: hasRecentReport(),
+    totalReports: reportHistory.total_versions,
+    currentReport: reportHistory.current,
+    getTimeSinceReport
   }
 }

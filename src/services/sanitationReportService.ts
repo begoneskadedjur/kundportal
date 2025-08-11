@@ -23,6 +23,11 @@ export interface SanitationReport {
   created_by?: string
   created_at?: string
   updated_at?: string
+  // Versionshantering
+  is_current?: boolean
+  version?: number
+  replaced_at?: string
+  replaced_by?: string
 }
 
 class SanitationReportService {
@@ -105,12 +110,18 @@ class SanitationReportService {
     status?: string
     from_date?: string
     to_date?: string
+    include_all_versions?: boolean  // Ny parameter för att hämta alla versioner
   }): Promise<{ data: SanitationReport[] | null; error: any }> {
     try {
       let query = supabase
         .from('sanitation_reports')
         .select('*')
         .order('created_at', { ascending: false })
+
+      // Som standard, hämta endast aktuella rapporter (om inte include_all_versions är true)
+      if (!filters?.include_all_versions) {
+        query = query.eq('is_current', true)
+      }
 
       if (filters) {
         if (filters.customer_id) {
@@ -159,6 +170,60 @@ class SanitationReportService {
       return { data, error }
     } catch (error) {
       console.error('Error in getReport:', error)
+      return { data: null, error }
+    }
+  }
+
+  /**
+   * Get report history for a specific case
+   */
+  async getReportHistory(case_id: string): Promise<{ 
+    data: {
+      current: SanitationReport | null
+      history: SanitationReport[]
+      total_versions: number
+    } | null
+    error: any 
+  }> {
+    try {
+      // Hämta alla versioner för detta case
+      const { data: allReports, error } = await supabase
+        .from('sanitation_reports')
+        .select('*')
+        .eq('case_id', case_id)
+        .order('version', { ascending: false })
+
+      if (error) {
+        return { data: null, error }
+      }
+
+      if (!allReports || allReports.length === 0) {
+        return { 
+          data: {
+            current: null,
+            history: [],
+            total_versions: 0
+          }, 
+          error: null 
+        }
+      }
+
+      // Hitta den aktuella versionen
+      const current = allReports.find(r => r.is_current) || null
+      
+      // Alla versioner (sorterade med senaste först)
+      const history = allReports
+
+      return {
+        data: {
+          current,
+          history,
+          total_versions: allReports.length
+        },
+        error: null
+      }
+    } catch (error) {
+      console.error('Error in getReportHistory:', error)
       return { data: null, error }
     }
   }

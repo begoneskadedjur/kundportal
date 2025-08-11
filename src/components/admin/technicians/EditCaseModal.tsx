@@ -743,6 +743,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                       disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
                       technicianName={reportGeneration.technicianName}
                       contactName={reportGeneration.contactName}
+                      totalReports={reportGeneration.totalReports}
+                      hasRecentReport={reportGeneration.hasRecentReport}
+                      currentReport={reportGeneration.currentReport}
+                      getTimeSinceReport={reportGeneration.getTimeSinceReport}
                     />
                   </div>
                 ) : (

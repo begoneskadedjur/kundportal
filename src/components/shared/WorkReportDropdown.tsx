@@ -1,6 +1,7 @@
 // src/components/shared/WorkReportDropdown.tsx - Professional report dropdown för EditCaseModal
 import { useState, useRef, useEffect } from 'react'
-import { FileCheck, Download, Send, Mail, ChevronDown, Loader2 } from 'lucide-react'
+import { FileCheck, Download, Send, Mail, ChevronDown, Loader2, AlertCircle, Clock } from 'lucide-react'
+import type { SanitationReport } from '../../services/sanitationReportService'
 
 interface WorkReportDropdownProps {
   onDownload: () => Promise<void>
@@ -9,6 +10,11 @@ interface WorkReportDropdownProps {
   disabled?: boolean
   technicianName?: string
   contactName?: string
+  // Nya props för rapporthistorik
+  totalReports?: number
+  hasRecentReport?: boolean
+  currentReport?: SanitationReport | null
+  getTimeSinceReport?: (report: SanitationReport) => string
 }
 
 type ActionType = 'download' | 'technician' | 'contact'
@@ -19,7 +25,11 @@ export default function WorkReportDropdown({
   onSendToContact,
   disabled = false,
   technicianName,
-  contactName
+  contactName,
+  totalReports = 0,
+  hasRecentReport = false,
+  currentReport = null,
+  getTimeSinceReport
 }: WorkReportDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState<ActionType | null>(null)
@@ -89,13 +99,20 @@ export default function WorkReportDropdown({
           flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200
           ${disabled || loading !== null
             ? 'bg-slate-700/50 border-slate-600 text-slate-500 cursor-not-allowed'
-            : 'bg-slate-800/50 border-slate-600 text-blue-400 hover:bg-slate-700/50 hover:border-slate-500 hover:text-blue-300'
+            : hasRecentReport
+              ? 'bg-slate-800/50 border-amber-500/50 text-amber-400 hover:bg-slate-700/50 hover:border-amber-500 hover:text-amber-300'
+              : 'bg-slate-800/50 border-slate-600 text-blue-400 hover:bg-slate-700/50 hover:border-slate-500 hover:text-blue-300'
           }
         `}
-        title="Generera och skicka saneringsrapport"
+        title={hasRecentReport 
+          ? `Rapport genererad nyligen - Version ${currentReport?.version || 1} av ${totalReports}`
+          : 'Generera och skicka saneringsrapport'
+        }
       >
         {loading !== null ? (
           <Loader2 className="h-4 w-4 animate-spin" />
+        ) : hasRecentReport ? (
+          <AlertCircle className="h-4 w-4" />
         ) : (
           <FileCheck className="h-4 w-4" />
         )}
@@ -104,7 +121,7 @@ export default function WorkReportDropdown({
           {loading === 'download' && 'Laddar ner...'}
           {loading === 'technician' && 'Skickar...'}
           {loading === 'contact' && 'Skickar...'}
-          {loading === null && 'Rapport'}
+          {loading === null && `Rapport${totalReports > 0 ? ` (${totalReports})` : ''}`}
         </span>
         
         {!disabled && loading === null && (
@@ -115,6 +132,29 @@ export default function WorkReportDropdown({
       {/* Dropdown Menu */}
       {isOpen && !disabled && (
         <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 overflow-hidden">
+          {/* Varning om befintlig rapport */}
+          {hasRecentReport && currentReport && getTimeSinceReport && (
+            <div className="p-3 bg-amber-500/10 border-b border-amber-500/20">
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-amber-400">
+                    Rapport genererad {getTimeSinceReport(currentReport)}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Version {currentReport.version} av {totalReports}
+                    {currentReport.sent_to_customer && (
+                      <span className="ml-1 text-green-400">• Skickad till kund</span>
+                    )}
+                    {currentReport.sent_to_technician && (
+                      <span className="ml-1 text-orange-400">• Skickad till tekniker</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="py-2">
             {dropdownItems.map((item) => {
               const Icon = item.icon

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { FileText, Download, Calendar, Search, Filter } from 'lucide-react'
+import { FileText, Download, Calendar, Search, Filter, History, X } from 'lucide-react'
 import { sanitationReportService, SanitationReport } from '../../services/sanitationReportService'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -11,6 +11,13 @@ const SanitationReports: React.FC = () => {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState<'all' | '30d' | '3m' | '6m' | '1y'>('all')
+  const [showHistory, setShowHistory] = useState<string | null>(null)
+  const [historyData, setHistoryData] = useState<{
+    current: SanitationReport | null
+    history: SanitationReport[]
+    total_versions: number
+  } | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const { profile } = useAuth()
 
   useEffect(() => {
@@ -118,6 +125,35 @@ const SanitationReports: React.FC = () => {
     } finally {
       setDownloading(null)
     }
+  }
+
+  const handleShowHistory = async (caseId: string) => {
+    try {
+      setLoadingHistory(true)
+      setShowHistory(caseId)
+      
+      const { data, error } = await sanitationReportService.getReportHistory(caseId)
+      
+      if (error) {
+        console.error('Error loading report history:', error)
+        toast.error('Kunde inte ladda rapporthistorik')
+        setShowHistory(null)
+        return
+      }
+
+      setHistoryData(data)
+    } catch (error) {
+      console.error('Error in handleShowHistory:', error)
+      toast.error('Ett fel uppstod vid laddning av historik')
+      setShowHistory(null)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const closeHistory = () => {
+    setShowHistory(null)
+    setHistoryData(null)
   }
 
   const formatDate = (dateString: string | undefined) => {
@@ -325,29 +361,166 @@ const SanitationReports: React.FC = () => {
                           {formatFileSize(report.file_size)}
                         </span>
                       </div>
+                      
+                      {report.version && report.version > 1 && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            Version:
+                          </span>{' '}
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {report.version}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDownload(report)}
-                    disabled={downloading === report.id}
-                    className="ml-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {downloading === report.id ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        <span>Laddar...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-5 w-5" />
-                        <span>Ladda ner</span>
-                      </>
+                  <div className="flex items-center gap-2 ml-4">
+                    {/* Visa historik-knapp om det finns fler än en version */}
+                    {report.version && report.version > 1 && (
+                      <button
+                        onClick={() => handleShowHistory(report.case_id)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        title="Visa rapporthistorik"
+                      >
+                        <History className="h-4 w-4" />
+                        <span className="hidden sm:inline">Historik</span>
+                      </button>
                     )}
-                  </button>
+                    
+                    <button
+                      onClick={() => handleDownload(report)}
+                      disabled={downloading === report.id}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {downloading === report.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Laddar...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-5 w-5" />
+                          <span>Ladda ner</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Historik-modal */}
+        {showHistory && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Rapporthistorik
+                </h3>
+                <button
+                  onClick={closeHistory}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                    <span className="ml-3 text-gray-600 dark:text-gray-400">Laddar historik...</span>
+                  </div>
+                ) : historyData ? (
+                  <div className="space-y-4">
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Totalt {historyData.total_versions} versioner av denna rapport
+                      </p>
+                    </div>
+
+                    {historyData.history.map((historyReport, index) => (
+                      <div
+                        key={historyReport.id}
+                        className={`p-4 rounded-lg border-2 ${
+                          historyReport.is_current
+                            ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20'
+                            : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {historyReport.file_name}
+                              </h4>
+                              {historyReport.is_current && (
+                                <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs rounded-full font-medium">
+                                  Aktuell
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <span className="font-medium text-gray-700 dark:text-gray-300">Version:</span>{' '}
+                                <span className="text-gray-600 dark:text-gray-400">{historyReport.version || 1}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700 dark:text-gray-300">Skapad:</span>{' '}
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {formatDate(historyReport.created_at)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700 dark:text-gray-300">Storlek:</span>{' '}
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {formatFileSize(historyReport.file_size)}
+                                </span>
+                              </div>
+                              {historyReport.replaced_at && (
+                                <div>
+                                  <span className="font-medium text-gray-700 dark:text-gray-300">Ersatt:</span>{' '}
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {formatDate(historyReport.replaced_at)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDownload(historyReport)}
+                            disabled={downloading === historyReport.id}
+                            className="ml-4 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {downloading === historyReport.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span className="hidden sm:inline">Laddar...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4" />
+                                <span className="hidden sm:inline">Ladda ner</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600 dark:text-gray-400">Kunde inte ladda historik</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
