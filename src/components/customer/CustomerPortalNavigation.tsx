@@ -1,12 +1,12 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
-import { BarChart3, Home, LogOut } from 'lucide-react'
+import { BarChart3, Home, LogOut, FileText } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../ui/Button'
 
 interface CustomerPortalNavigationProps {
-  currentView: 'dashboard' | 'statistics'
-  onViewChange: (view: 'dashboard' | 'statistics') => void
+  currentView: 'dashboard' | 'statistics' | 'reports'
+  onViewChange: (view: 'dashboard' | 'statistics' | 'reports') => void
   customerName: string
 }
 
@@ -68,6 +68,20 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
             >
               <BarChart3 className="w-4 h-4" />
               Statistik
+            </button>
+
+            <button
+              onClick={() => onViewChange('reports')}
+              className={`
+                px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
+                ${currentView === 'reports'
+                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }
+              `}
+            >
+              <FileText className="w-4 h-4" />
+              Rapporter
             </button>
           </div>
 

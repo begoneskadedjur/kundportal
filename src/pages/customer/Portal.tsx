@@ -17,6 +17,7 @@ import ServiceActivityTimeline from '../../components/customer/ServiceActivityTi
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
 import CustomerPortalNavigation from '../../components/customer/CustomerPortalNavigation'
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
+import SanitationReports from './SanitationReports'
 
 // Customer type matching new database structure
 type Customer = {
@@ -53,7 +54,7 @@ const CustomerPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports'>('dashboard')
 
   // Fetch customer data
   useEffect(() => {
@@ -128,6 +129,11 @@ const CustomerPortal: React.FC = () => {
   // Statistics view component
   const renderStatisticsView = () => (
     <CustomerStatistics customer={customer} />
+  )
+
+  // Reports view component
+  const renderReportsView = () => (
+    <SanitationReports />
   )
 
   // Dashboard view component  
@@ -218,7 +224,9 @@ const CustomerPortal: React.FC = () => {
       />
 
       {/* Content based on current view */}
-      {currentView === 'dashboard' ? renderDashboardView() : renderStatisticsView()}
+      {currentView === 'dashboard' && renderDashboardView()}
+      {currentView === 'statistics' && renderStatisticsView()}
+      {currentView === 'reports' && renderReportsView()}
     </div>
   )
 }

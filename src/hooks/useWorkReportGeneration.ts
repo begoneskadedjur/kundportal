@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { sanitationReportService } from '../services/sanitationReportService'
+import { useAuth } from '../contexts/AuthContext'
 
 interface TechnicianCase {
   id: string;
@@ -71,6 +73,7 @@ interface TaskDetails {
 
 export const useWorkReportGeneration = (caseData: TechnicianCase) => {
   const [isGenerating, setIsGenerating] = useState(false)
+  const { profile } = useAuth()
 
   // Skapa rapport-data från befintlig case-data (ingen ClickUp API-anrop)
   const createReportData = async () => {
@@ -215,6 +218,81 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     return { taskDetails, customerInfo }
   }
 
+  // Automatisk sparning av rapport till databas och storage
+  const saveReportToDatabase = async (pdfBase64: string, filename: string) => {
+    try {
+      // Hämta customer_id om det finns
+      let customerId = null
+      if (caseData.case_type === 'business' && caseData.foretag) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('company_name', caseData.foretag)
+          .single()
+        
+        if (customer) {
+          customerId = customer.id
+        }
+      } else if (caseData.case_type === 'contract') {
+        // För contract cases, försök hitta kund via org_nr eller kontaktperson
+        if (caseData.org_nr) {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('org_number', caseData.org_nr)
+            .single()
+          
+          if (customer) {
+            customerId = customer.id
+          }
+        }
+      }
+
+      // Hämta tekniker-id om tilldelad
+      let technicianId = null
+      if (caseData.primary_assignee_id) {
+        technicianId = caseData.primary_assignee_id
+      }
+
+      // Spara rapport
+      const { data: savedReport, error } = await sanitationReportService.saveReport(pdfBase64, {
+        case_id: caseData.id,
+        case_type: caseData.case_type === 'private' ? 'private_case' : 
+                  caseData.case_type === 'business' ? 'business_case' : 'contract',
+        customer_id: customerId,
+        file_name: filename,
+        technician_id: technicianId,
+        technician_name: caseData.primary_assignee_name || caseData.assignee_name,
+        pest_type: caseData.skadedjur,
+        address: typeof caseData.adress === 'string' ? caseData.adress : 
+                 caseData.adress?.formatted_address || 
+                 caseData.adress?.line_1,
+        report_metadata: {
+          contact_person: caseData.kontaktperson,
+          contact_email: caseData.e_post_kontaktperson,
+          contact_phone: caseData.telefon_kontaktperson,
+          price: caseData.case_price,
+          status: caseData.status,
+          description: caseData.description
+        },
+        created_by: profile?.user_id
+      })
+
+      if (error) {
+        console.error('Error saving report to database:', error)
+        toast.error('Kunde inte spara rapport i systemet')
+        return null
+      }
+
+      toast.success('Rapport sparad i systemet!')
+      return savedReport
+    } catch (error) {
+      console.error('Error in saveReportToDatabase:', error)
+      toast.error('Ett fel uppstod vid sparning av rapport')
+      return null
+    }
+  }
+
   // Ladda ner PDF-rapport
   const downloadReport = async () => {
     try {
@@ -244,12 +322,17 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
         throw new Error('Ogiltig respons från PDF-generator')
       }
 
+      const filename = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+
+      // Spara automatiskt till databas och storage
+      await saveReportToDatabase(data.pdf, filename)
+
       // Konvertera base64 till blob och ladda ner
       const pdfBlob = base64ToBlob(data.pdf, 'application/pdf')
       const url = URL.createObjectURL(pdfBlob)
       const link = document.createElement('a')
       link.href = url
-      link.download = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -338,6 +421,22 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
         throw new Error('Kunde inte skicka rapport')
       }
 
+      const data = await response.json()
+      
+      // Spara automatiskt till databas och storage när rapport skickas
+      if (data.pdf) {
+        const filename = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+        const savedReport = await saveReportToDatabase(data.pdf, filename)
+        
+        // Uppdatera status att rapporten har skickats till tekniker
+        if (savedReport?.id) {
+          await sanitationReportService.updateReportStatus(savedReport.id, {
+            sent_to_technician: true,
+            sent_to_technician_at: new Date().toISOString()
+          })
+        }
+      }
+
       toast.success(`Rapport skickad till ${technicianName || 'tekniker'}!`)
     } catch (error) {
       console.error('Error sending report to technician:', error)
@@ -376,6 +475,23 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
 
       if (!response.ok) {
         throw new Error('Kunde inte skicka rapport')
+      }
+
+      const data = await response.json()
+      
+      // Spara automatiskt till databas och storage när rapport skickas
+      if (data.pdf) {
+        const filename = data.filename || `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
+        const savedReport = await saveReportToDatabase(data.pdf, filename)
+        
+        // Uppdatera status att rapporten har skickats till kund
+        if (savedReport?.id) {
+          await sanitationReportService.updateReportStatus(savedReport.id, {
+            sent_to_customer: true,
+            sent_to_customer_at: new Date().toISOString(),
+            status: 'sent'
+          })
+        }
       }
 
       toast.success(`Rapport skickad till ${caseData.kontaktperson || 'kontaktperson'}!`)
