@@ -973,7 +973,7 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       business_type: businessType,
       industry_category: mapToIndustryCategory(businessType),
       customer_size: calculateCustomerSize(totalContractValue),
-      service_frequency: serviceFrequency
+      service_frequency: serviceFrequency,
       
       // Metadata
       source_type: 'oneflow' as const,

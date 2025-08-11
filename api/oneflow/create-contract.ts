@@ -174,17 +174,22 @@ function convertProductsToOneflow(
       // Sätt korrekt prisstruktur för Oneflow - KORREKT PRISFORMAT
       const finalPriceString = Math.round(basePrice).toString() // Slutpris efter rabatt i SEK
       const discountAmountString = discountAmount > 0 ? Math.round(discountAmount).toString() : "0"
+      const discountPercentString = (pricing?.discountPercent || 0).toString()
       
       return {
         name: product.name,
         description: product.description,
         price_1: {
           base_amount: { amount: finalPriceString },
-          discount_amount: { amount: discountAmountString }
+          discount_amount: { amount: discountAmountString },
+          amount: { amount: finalPriceString },
+          discount_percent: discountPercentString
         },
         price_2: {
           base_amount: { amount: finalPriceString },
-          discount_amount: { amount: discountAmountString }
+          discount_amount: { amount: discountAmountString },
+          amount: { amount: finalPriceString },
+          discount_percent: discountPercentString
         },
         quantity: {
           type: oneflowQuantityType,
