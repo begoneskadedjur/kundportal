@@ -425,7 +425,9 @@ export default function EditContractCaseModal({
       // Add case details for reference
       caseNumber: formData.case_number,
       caseTitle: formData.title,
-      pestType: formData.pest_type
+      pestType: formData.pest_type,
+      // Add case_id for webhook linking
+      case_id: caseData?.id
     }
     
     // Debug logging

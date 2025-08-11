@@ -51,6 +51,9 @@ interface WizardData {
   
   // Steg 8 - Slutsteg
   sendForSigning: boolean
+  
+  // Case linking
+  case_id?: string
 }
 
 const STEPS = [
@@ -137,6 +140,8 @@ export default function OneflowContractCreator() {
             // Lägg till avtalslängd och startdatum om det finns
             avtalslngd: customerData.avtalslngd || prev.avtalslngd,
             begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
+            // Lägg till case_id för webhook-koppling
+            case_id: customerData.case_id || undefined,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -324,6 +329,7 @@ export default function OneflowContractCreator() {
           sendForSigning: wizardData.sendForSigning, 
           partyType: wizardData.partyType,
           documentType: wizardData.documentType,
+          caseId: wizardData.case_id, // Skicka case_id för webhook-koppling
           // 🆕 SKICKA ANVÄNDARENS UPPGIFTER
           senderEmail: user?.email,
           senderName: wizardData.anstalld,

@@ -18,6 +18,8 @@ interface ContractRequestBody {
   // 🆕 NYTT: Dynamisk användare från frontend
   senderEmail?: string
   senderName?: string
+  // 🆕 NYTT: Case ID för koppling
+  caseId?: string
   // 🆕 NYTT: Produkter
   selectedProducts?: Array<{
     product: {
@@ -67,34 +69,41 @@ const FIELD_MAPPING = {
 // 🆕 BYGG DATAFÄLT BASERAT PÅ DOKUMENTTYP
 function buildDataFieldsForDocument(
   contractData: Record<string, string>, 
-  documentType: 'offer' | 'contract'
+  documentType: 'offer' | 'contract',
+  caseId?: string
 ): Array<{ custom_id: string; value: string }> {
+  const fields: Array<{ custom_id: string; value: string }> = []
+  
   if (documentType === 'contract') {
     // För avtal, använd befintlig struktur
-    return Object.entries(contractData).map(([custom_id, value]) => ({ custom_id, value }))
+    fields.push(...Object.entries(contractData).map(([custom_id, value]) => ({ custom_id, value })))
+  } else {
+    // För offerter, mappa fält till offertspecifika namn
+    const mapping = FIELD_MAPPING.contract_to_offer
+    
+    Object.entries(contractData).forEach(([contractField, value]) => {
+      const offerField = mapping[contractField as keyof typeof mapping]
+      
+      if (offerField && offerField !== '' && value) {
+        fields.push({ custom_id: offerField, value })
+      }
+    })
+    
+    // Lägg till offertspecifika fält med standardvärden
+    const currentDate = new Date().toISOString().split('T')[0]
+    fields.push(
+      { custom_id: 'offert-skapad', value: currentDate },
+      { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' }
+      // Faktura-referens och märkning lämnas tomma så kunden kan fylla i
+    )
   }
   
-  // För offerter, mappa fält till offertspecifika namn
-  const mappedFields: Array<{ custom_id: string; value: string }> = []
-  const mapping = FIELD_MAPPING.contract_to_offer
+  // Lägg till case_id om det finns (för webhook-koppling)
+  if (caseId) {
+    fields.push({ custom_id: 'case_id', value: caseId })
+  }
   
-  Object.entries(contractData).forEach(([contractField, value]) => {
-    const offerField = mapping[contractField as keyof typeof mapping]
-    
-    if (offerField && offerField !== '' && value) {
-      mappedFields.push({ custom_id: offerField, value })
-    }
-  })
-  
-  // Lägg till offertspecifika fält med standardvärden
-  const currentDate = new Date().toISOString().split('T')[0]
-  mappedFields.push(
-    { custom_id: 'offert-skapad', value: currentDate },
-    { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' }
-    // Faktura-referens och märkning lämnas tomma så kunden kan fylla i
-  )
-  
-  return mappedFields
+  return fields
 }
 
 
@@ -281,7 +290,7 @@ export default async function handler(
   console.log(`👤 Skapad av: ${creatorName} (${creatorEmail})`)
 
   // 🆕 ANVÄND NY FÄLTMAPPNING BASERAD PÅ DOKUMENTTYP
-  const data_fields = buildDataFieldsForDocument(contractData, documentType)
+  const data_fields = buildDataFieldsForDocument(contractData, documentType, body.caseId)
 
   const parties = []
 

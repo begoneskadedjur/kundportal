@@ -143,6 +143,14 @@ export type Database = {
           assigned_technician_name: string | null
           assigned_technician_email: string | null
           assigned_technician_id: string | null // FK till technicians
+          // Offert- och rapportfält
+          quote_generated_at: string | null
+          report_generated_at: string | null
+          quote_status: 'pending' | 'sent' | 'signed' | 'rejected' | 'expired' | null
+          quote_sent_at: string | null
+          quote_signed_at: string | null
+          quote_rejected_at: string | null
+          oneflow_contract_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>

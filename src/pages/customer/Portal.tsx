@@ -18,6 +18,7 @@ import PartnershipValueSection from '../../components/customer/PartnershipValueS
 import CustomerPortalNavigation from '../../components/customer/CustomerPortalNavigation'
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
 import SanitationReports from './SanitationReports'
+import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
 
 // Customer type matching new database structure
 type Customer = {
@@ -55,11 +56,14 @@ const CustomerPortal: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
   const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports'>('dashboard')
+  const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
+  const [dismissedNotification, setDismissedNotification] = useState(false)
 
   // Fetch customer data
   useEffect(() => {
     if (profile?.customer_id) {
       fetchCustomerData()
+      fetchPendingQuotes()
     } else if (profile) {
       setError('Ingen kundkoppling hittades')
       setLoading(false)
@@ -87,9 +91,31 @@ const CustomerPortal: React.FC = () => {
     }
   }
 
+  const fetchPendingQuotes = async () => {
+    try {
+      // Hämta alla ärenden med väntande offerter för denna kund
+      const { data, error } = await supabase
+        .from('cases')
+        .select('id, case_number, title, quote_sent_at, oneflow_contract_id')
+        .eq('customer_id', profile!.customer_id)
+        .eq('quote_status', 'sent')
+        .not('oneflow_contract_id', 'is', null)
+
+      if (error) {
+        console.error('Error fetching pending quotes:', error)
+        return
+      }
+
+      setPendingQuotes(data || [])
+    } catch (error) {
+      console.error('Error in fetchPendingQuotes:', error)
+    }
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchCustomerData()
+    await fetchPendingQuotes()
     setRefreshing(false)
   }
 
@@ -145,6 +171,14 @@ const CustomerPortal: React.FC = () => {
         onRefresh={handleRefresh}
         refreshing={refreshing}
       />
+
+      {/* Pending Quote Notification - Only show if there are pending quotes and not dismissed */}
+      {pendingQuotes.length > 0 && !dismissedNotification && (
+        <PendingQuoteNotification 
+          quotes={pendingQuotes}
+          onDismiss={() => setDismissedNotification(true)}
+        />
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
