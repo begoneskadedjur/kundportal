@@ -1085,6 +1085,81 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             await saveOrUpdateContract(contractData)
             console.log('✅ Kontrakt sparat med status pending - syns nu i contracts-overview')
             
+            // NYTT: Identifiera och koppla kund för offerten
+            if (contractData.type === 'offer' && contractData.company_name) {
+              let customerId = null
+              
+              console.log('🔍 Söker efter befintlig kund för:', {
+                company: contractData.company_name,
+                email: contractData.contact_email,
+                org: contractData.organization_number
+              })
+              
+              // Sök efter befintlig kund
+              // 1. Baserat på organisationsnummer
+              if (contractData.organization_number) {
+                const { data: customerByOrg } = await supabase
+                  .from('customers')
+                  .select('id')
+                  .eq('organization_number', contractData.organization_number)
+                  .single()
+                
+                if (customerByOrg) {
+                  customerId = customerByOrg.id
+                  console.log('✅ Kund hittad via org.nr:', customerId)
+                }
+              }
+              
+              // 2. Om inte hittat, sök på email
+              if (!customerId && contractData.contact_email) {
+                const { data: customerByEmail } = await supabase
+                  .from('customers')
+                  .select('id')
+                  .eq('contact_email', contractData.contact_email)
+                  .single()
+                
+                if (customerByEmail) {
+                  customerId = customerByEmail.id
+                  console.log('✅ Kund hittad via email:', customerId)
+                }
+              }
+              
+              // 3. Om inte hittat, sök på företagsnamn
+              if (!customerId && contractData.company_name) {
+                const { data: customerByName } = await supabase
+                  .from('customers')
+                  .select('id')
+                  .eq('company_name', contractData.company_name)
+                  .single()
+                
+                if (customerByName) {
+                  customerId = customerByName.id
+                  console.log('✅ Kund hittad via företagsnamn:', customerId)
+                }
+              }
+              
+              // Uppdatera kontraktet med customer_id
+              if (customerId) {
+                const { error: customerLinkError } = await supabase
+                  .from('contracts')
+                  .update({ 
+                    customer_id: customerId,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('oneflow_contract_id', contractId)
+                
+                if (customerLinkError) {
+                  console.error('⚠️ Kunde inte koppla kund:', customerLinkError)
+                } else {
+                  console.log('✅ Offert kopplat till kund:', customerId)
+                }
+              } else {
+                console.log('⚠️ Ingen befintlig kund hittades för:', contractData.company_name)
+                // För offerter: Vi skapar INTE ny kund här
+                // Kund skapas endast när avtal signeras
+              }
+            }
+            
             // Koppla offert till ärende om case_id finns i data fields
             const caseIdField = contractDetails.data_fields?.find(field => 
               field.custom_id === 'case_id' || 
