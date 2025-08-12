@@ -28,7 +28,7 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Card from '../../../components/ui/Card'
 
-type WizardStep = 'organization' | 'sites' | 'billing' | 'users' | 'confirmation'
+type WizardStep = 'organization' | 'sites' | 'users' | 'billing' | 'confirmation'
 
 interface OrganizationFormData {
   name: string
@@ -61,8 +61,8 @@ interface UserInvite {
 const STEPS = [
   { key: 'organization', label: 'Organisation', icon: Building2 },
   { key: 'sites', label: 'Anläggningar', icon: MapPin },
-  { key: 'billing', label: 'Fakturering', icon: Receipt },
   { key: 'users', label: 'Användare', icon: Users },
+  { key: 'billing', label: 'Fakturering', icon: Receipt },
   { key: 'confirmation', label: 'Bekräftelse', icon: Check }
 ]
 
@@ -193,10 +193,9 @@ export default function MultisiteRegistration() {
         return !!organizationData.billing_address
       
       case 'users':
-        // Users are optional, but if added, must have at least one verksamhetschef
-        if (userInvites.length > 0) {
-          return userInvites.some(invite => invite.role === 'verksamhetschef');
-        }
+        // Users step is always valid since users are optional
+        // Verksamhetschef is created automatically from organization primary contact
+        // Site managers are created from site contacts if provided
         return true
       
       default:
@@ -237,14 +236,9 @@ export default function MultisiteRegistration() {
         return true
       
       case 'users':
-        // Optional step, but if users are added, validate that at least one verksamhetschef exists
-        if (userInvites.length > 0) {
-          const hasVerksamhetschef = userInvites.some(invite => invite.role === 'verksamhetschef');
-          if (!hasVerksamhetschef) {
-            toast.error('Om användare läggs till måste minst en ha rollen Verksamhetschef');
-            return false;
-          }
-        }
+        // Users step is always valid since it's optional
+        // Verksamhetschef is created automatically from organization primary contact
+        // Additional users can be added but are not required
         return true
       
       default:
@@ -255,7 +249,7 @@ export default function MultisiteRegistration() {
   const handleNext = () => {
     if (!validateCurrentStep()) return
     
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'billing', 'users', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'billing', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1])
@@ -263,7 +257,7 @@ export default function MultisiteRegistration() {
   }
 
   const handlePrevious = () => {
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'billing', 'users', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'billing', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1])
@@ -616,20 +610,57 @@ export default function MultisiteRegistration() {
                 <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-yellow-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Bjud in användare</h2>
-                <p className="text-slate-400">Lägg till ytterligare användare som ska ha tillgång till portalen (valfritt)</p>
+                <h2 className="text-2xl font-bold text-white mb-2">Koppla användare till anläggningar</h2>
+                <p className="text-slate-400">Lägg till användare och koppla dem till de anläggningar som skapades i föregående steg</p>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mt-4">
                   <p className="text-blue-300 text-sm">
-                    <strong>Observera:</strong> Verksamhetschef skapas automatiskt från organisationens primära kontakt. 
-                    Platsansvariga skapas automatiskt från anläggningarnas kontakter. Här kan du lägga till extra användare vid behov.
+                    <strong>Automatiskt skapade roller:</strong><br/>
+                    • <strong>Verksamhetschef:</strong> Skapas från organisationens primära kontakt ({organizationData.primary_contact_email})<br/>
+                    • <strong>Platsansvariga:</strong> Skapas från anläggningarnas kontaktpersoner (om angivna)<br/><br/>
+                    Här kan du lägga till <strong>ytterligare användare</strong> och <strong>regionchefer</strong> som ska ha tillgång till flera anläggningar.
                   </p>
+                </div>
+              </div>
+              
+              {/* Show existing sites first */}
+              <div className="space-y-3 mb-6">
+                <h3 className="text-lg font-semibold text-white">Översikt anläggningar och ansvariga</h3>
+                <div className="grid gap-3">
+                  {sites.map((site, index) => (
+                    <div key={index} className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <MapPin className="w-5 h-5 text-purple-400" />
+                          <div>
+                            <span className="text-white font-medium">{site.site_name}</span>
+                            <span className="text-slate-400 text-sm ml-2">({site.region})</span>
+                            {site.is_primary && (
+                              <span className="ml-2 px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">
+                                Primär
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {site.contact_email ? (
+                            <div className="text-sm">
+                              <span className="text-green-400">✓ Platsansvarig:</span>
+                              <div className="text-slate-300">{site.contact_email}</div>
+                            </div>
+                          ) : (
+                            <span className="text-amber-400 text-sm">Ingen platsansvarig angiven</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               
               {/* Existing invites */}
               {userInvites.length > 0 && (
                 <div className="space-y-3 mb-6">
-                  <h3 className="text-lg font-semibold text-white">Användare att bjuda in</h3>
+                  <h3 className="text-lg font-semibold text-white">Ytterligare användare att bjuda in</h3>
                   {userInvites.map((invite, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-3">
@@ -646,7 +677,7 @@ export default function MultisiteRegistration() {
                               invite.role === 'regionchef' ? 'bg-purple-500/20 text-purple-300' :
                               'bg-green-500/20 text-green-300'
                             }`}>
-                              {invite.role === 'verksamhetschef' ? 'Verksamhetschef' :
+                              {invite.role === 'verksamhetschef' ? 'Verksamhetschef (Extra)' :
                                invite.role === 'regionchef' ? 'Regionchef' :
                                'Platsansvarig (Extra)'}
                             </span>
@@ -681,7 +712,7 @@ export default function MultisiteRegistration() {
               <div className="p-6 bg-slate-800/30 rounded-lg border border-slate-700">
                 <h4 className="text-lg font-semibold text-slate-300 mb-4 flex items-center gap-2">
                   <UserPlus className="w-5 h-5" />
-                  Lägg till användare
+                  Lägg till ytterligare användare
                 </h4>
                 <div className="space-y-4">
                   {/* Basic user info */}
@@ -711,7 +742,7 @@ export default function MultisiteRegistration() {
                         }}
                         className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
-                        <option value="verksamhetschef">Verksamhetschef</option>
+                        <option value="verksamhetschef">Verksamhetschef (Extra)</option>
                         <option value="regionchef">Regionchef</option>
                         <option value="platsansvarig">Platsansvarig (Extra)</option>
                       </select>
@@ -725,9 +756,9 @@ export default function MultisiteRegistration() {
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <Building2 className="w-4 h-4 text-blue-400" />
-                        <span className="font-medium text-blue-300">Verksamhetschef</span>
+                        <span className="font-medium text-blue-300">Verksamhetschef (Extra)</span>
                       </div>
-                      <p>Högsta behörighet inom organisationen. Kan hantera alla anläggningar och användare.</p>
+                      <p>Ytterligare verksamhetschef med högsta behörighet inom organisationen.</p>
                     </div>
                     <div className={`p-3 rounded-lg ${
                       newInvite.role === 'regionchef' ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-slate-800/50'
@@ -887,7 +918,7 @@ export default function MultisiteRegistration() {
                           <div>
                             <span className="font-medium">{invite.name}</span>
                             <span className="ml-2 text-sm">
-                              ({invite.role === 'verksamhetschef' ? 'Verksamhetschef' :
+                              ({invite.role === 'verksamhetschef' ? 'Verksamhetschef (Extra)' :
                                 invite.role === 'regionchef' ? 'Regionschef' :
                                 'Platsansvarig (Extra)'})
                             </span>
