@@ -97,7 +97,8 @@ export default function MultisiteRegistration() {
   const [newInvite, setNewInvite] = useState<UserInvite>({
     email: '',
     name: '',
-    role: 'quality_manager'
+    role: 'verksamhetsansvarig',
+    sites: []
   })
 
   const currentStepIndex = STEPS.findIndex(s => s.key === currentStep)
@@ -148,11 +149,29 @@ export default function MultisiteRegistration() {
       return
     }
 
+    // Validate site selection based on role
+    if (newInvite.role === 'regionansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) {
+      toast.error('Regionschef måste kopplas till minst en anläggning')
+      return
+    }
+
+    if (newInvite.role === 'enhetsansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) {
+      toast.error('Platsansvarig måste kopplas till en anläggning')
+      return
+    }
+
+    // Check for duplicate emails
+    if (userInvites.some(invite => invite.email === newInvite.email)) {
+      toast.error('En användare med denna e-post har redan lagts till')
+      return
+    }
+
     setUserInvites([...userInvites, newInvite])
     setNewInvite({
       email: '',
       name: '',
-      role: 'quality_manager'
+      role: 'verksamhetsansvarig',
+      sites: []
     })
     toast.success('Användare tillagd till inbjudningslistan')
   }
@@ -174,7 +193,11 @@ export default function MultisiteRegistration() {
         return !!organizationData.billing_address
       
       case 'users':
-        return true // Users are optional
+        // Users are optional, but if added, must have at least one verksamhetsansvarig
+        if (userInvites.length > 0) {
+          return userInvites.some(invite => invite.role === 'verksamhetsansvarig');
+        }
+        return true
       
       default:
         return true
@@ -214,7 +237,14 @@ export default function MultisiteRegistration() {
         return true
       
       case 'users':
-        // Users are optional
+        // Optional step, but if users are added, validate that at least one verksamhetsansvarig exists
+        if (userInvites.length > 0) {
+          const hasVerksamhetsansvarig = userInvites.some(invite => invite.role === 'verksamhetsansvarig');
+          if (!hasVerksamhetsansvarig) {
+            toast.error('Om användare läggs till måste minst en ha rollen Verksamhetschef');
+            return false;
+          }
+        }
         return true
       
       default:
@@ -368,15 +398,20 @@ export default function MultisiteRegistration() {
                   icon={<Building2 className="w-4 h-4" />}
                 />
                 
-                <Input
-                  label="Primär kontakt e-post *"
-                  type="email"
-                  value={organizationData.primary_contact_email}
-                  onChange={(e) => setOrganizationData({ ...organizationData, primary_contact_email: e.target.value })}
-                  placeholder="kontakt@example.com"
-                  icon={<Mail className="w-4 h-4" />}
-                  required
-                />
+                <div>
+                  <Input
+                    label="Primär kontakt e-post *"
+                    type="email"
+                    value={organizationData.primary_contact_email}
+                    onChange={(e) => setOrganizationData({ ...organizationData, primary_contact_email: e.target.value })}
+                    placeholder="kontakt@example.com"
+                    icon={<Mail className="w-4 h-4" />}
+                    required
+                  />
+                  <p className="text-sm text-slate-400 mt-1">
+                    Denna e-post skapar en användare med rollen Verksamhetsansvarig för hela organisationen.
+                  </p>
+                </div>
                 
                 <Input
                   label="Primär kontakt telefon"
@@ -464,18 +499,26 @@ export default function MultisiteRegistration() {
                     placeholder="Storgatan 1, 211 42 Malmö"
                   />
                   <Input
-                    label="Kontaktperson"
-                    value={newSite.contact_person}
-                    onChange={(e) => setNewSite({ ...newSite, contact_person: e.target.value })}
-                    placeholder="Anna Andersson"
-                  />
-                  <Input
-                    label="Kontakt e-post"
+                    label="Platsansvarigs e-post"
                     type="email"
                     value={newSite.contact_email}
                     onChange={(e) => setNewSite({ ...newSite, contact_email: e.target.value })}
-                    placeholder="anna@example.com"
+                    placeholder="platsansvarig@example.com"
+                    icon={<Mail className="w-4 h-4" />}
                   />
+                  <Input
+                    label="Telefonnummer"
+                    type="tel"
+                    value={newSite.contact_phone}
+                    onChange={(e) => setNewSite({ ...newSite, contact_phone: e.target.value })}
+                    placeholder="070-XXX XX XX"
+                    icon={<Phone className="w-4 h-4" />}
+                  />
+                </div>
+                <div className="md:col-span-2 -mt-2">
+                  <p className="text-sm text-slate-400">
+                    Här skapas en användare med rollen Platsansvarig som kopplas direkt till denna anläggning.
+                  </p>
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
@@ -574,7 +617,13 @@ export default function MultisiteRegistration() {
                   <Users className="w-8 h-8 text-yellow-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Bjud in användare</h2>
-                <p className="text-slate-400">Lägg till användare som ska ha tillgång till portalen (valfritt)</p>
+                <p className="text-slate-400">Lägg till ytterligare användare som ska ha tillgång till portalen (valfritt)</p>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mt-4">
+                  <p className="text-blue-300 text-sm">
+                    <strong>Observera:</strong> Verksamhetsansvarig skapas automatiskt från organisationens primära kontakt. 
+                    Platsansvariga skapas automatiskt från anläggningarnas kontakter. Här kan du lägga till extra användare vid behov.
+                  </p>
+                </div>
               </div>
               
               {/* Existing invites */}
@@ -584,13 +633,37 @@ export default function MultisiteRegistration() {
                   {userInvites.map((invite, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-3">
-                        <User className="w-5 h-5 text-slate-400" />
+                        {/* Role-specific icons */}
+                        {invite.role === 'verksamhetsansvarig' && <Building2 className="w-5 h-5 text-blue-400" />}
+                        {invite.role === 'regionansvarig' && <MapPin className="w-5 h-5 text-purple-400" />}
+                        {invite.role === 'enhetsansvarig' && <User className="w-5 h-5 text-green-400" />}
                         <div>
                           <span className="text-white font-medium">{invite.name}</span>
                           <span className="text-slate-400 text-sm ml-2">{invite.email}</span>
-                          <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">
-                            {invite.role.replace('_', ' ')}
-                          </span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${
+                              invite.role === 'verksamhetsansvarig' ? 'bg-blue-500/20 text-blue-300' :
+                              invite.role === 'regionansvarig' ? 'bg-purple-500/20 text-purple-300' :
+                              'bg-green-500/20 text-green-300'
+                            }`}>
+                              {invite.role === 'verksamhetsansvarig' ? 'Verksamhetschef' :
+                               invite.role === 'regionansvarig' ? 'Regionschef' :
+                               'Platsansvarig (Extra)'}
+                            </span>
+                            {invite.role === 'regionansvarig' && invite.sites && invite.sites.length > 0 && (
+                              <span className="text-xs text-slate-400">
+                                Regioner: {invite.sites.map(siteId => {
+                                  const site = sites.find(s => s.site_name === siteId);
+                                  return site ? site.region : siteId;
+                                }).join(', ')}
+                              </span>
+                            )}
+                            {invite.role === 'enhetsansvarig' && invite.sites && invite.sites.length > 0 && (
+                              <span className="text-xs text-slate-400">
+                                Anläggning: {invite.sites[0]}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <button
@@ -610,41 +683,135 @@ export default function MultisiteRegistration() {
                   <UserPlus className="w-5 h-5" />
                   Lägg till användare
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    label="Namn"
-                    value={newInvite.name}
-                    onChange={(e) => setNewInvite({ ...newInvite, name: e.target.value })}
-                    placeholder="Anna Andersson"
-                  />
-                  <Input
-                    label="E-post"
-                    type="email"
-                    value={newInvite.email}
-                    onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
-                    placeholder="anna@example.com"
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Roll</label>
-                    <select
-                      value={newInvite.role}
-                      onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as MultisiteUserRoleType })}
-                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="verksamhetsansvarig">Verksamhetsansvarig</option>
-                      <option value="regionansvarig">Regionansvarig</option>
-                      <option value="enhetsansvarig">Enhetsansvarig</option>
-                    </select>
+                <div className="space-y-4">
+                  {/* Basic user info */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input
+                      label="Namn"
+                      value={newInvite.name}
+                      onChange={(e) => setNewInvite({ ...newInvite, name: e.target.value })}
+                      placeholder="Anna Andersson"
+                      icon={<User className="w-4 h-4" />}
+                    />
+                    <Input
+                      label="E-postadress"
+                      type="email"
+                      value={newInvite.email}
+                      onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
+                      placeholder="anna@example.com"
+                      icon={<Mail className="w-4 h-4" />}
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Roll</label>
+                      <select
+                        value={newInvite.role}
+                        onChange={(e) => {
+                          const role = e.target.value as MultisiteUserRoleType;
+                          setNewInvite({ ...newInvite, role, sites: [] });
+                        }}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="verksamhetsansvarig">Verksamhetschef</option>
+                        <option value="regionansvarig">Regionschef</option>
+                        <option value="enhetsansvarig">Platsansvarig (Extra)</option>
+                      </select>
+                    </div>
                   </div>
+                  
+                  {/* Role descriptions */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
+                    <div className={`p-3 rounded-lg ${
+                      newInvite.role === 'verksamhetsansvarig' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-slate-800/50'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Building2 className="w-4 h-4 text-blue-400" />
+                        <span className="font-medium text-blue-300">Verksamhetschef</span>
+                      </div>
+                      <p>Högsta behörighet inom organisationen. Kan hantera alla anläggningar och användare.</p>
+                    </div>
+                    <div className={`p-3 rounded-lg ${
+                      newInvite.role === 'regionansvarig' ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-slate-800/50'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <MapPin className="w-4 h-4 text-purple-400" />
+                        <span className="font-medium text-purple-300">Regionschef</span>
+                      </div>
+                      <p>Ansvarig för utvalda anläggningar inom specifika regioner.</p>
+                    </div>
+                    <div className={`p-3 rounded-lg ${
+                      newInvite.role === 'enhetsansvarig' ? 'bg-green-500/10 border border-green-500/20' : 'bg-slate-800/50'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="w-4 h-4 text-green-400" />
+                        <span className="font-medium text-green-300">Platsansvarig (Extra)</span>
+                      </div>
+                      <p>Ytterligare ansvarig för en specifik anläggning.</p>
+                    </div>
+                  </div>
+                  
+                  {/* Dynamic site selection based on role */}
+                  {newInvite.role === 'regionansvarig' && sites.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-3">
+                        Välj anläggningar (kan välja flera)
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        {sites.map((site, index) => (
+                          <label key={index} className="flex items-center gap-2 p-2 hover:bg-slate-700/30 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newInvite.sites?.includes(site.site_name) || false}
+                              onChange={(e) => {
+                                const currentSites = newInvite.sites || [];
+                                if (e.target.checked) {
+                                  setNewInvite({ ...newInvite, sites: [...currentSites, site.site_name] });
+                                } else {
+                                  setNewInvite({ ...newInvite, sites: currentSites.filter(s => s !== site.site_name) });
+                                }
+                              }}
+                              className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-slate-300">{site.site_name}</span>
+                            <span className="text-xs text-slate-500">({site.region})</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {newInvite.role === 'enhetsansvarig' && sites.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Välj anläggning
+                      </label>
+                      <select
+                        value={newInvite.sites?.[0] || ''}
+                        onChange={(e) => setNewInvite({ ...newInvite, sites: e.target.value ? [e.target.value] : [] })}
+                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-green-500"
+                      >
+                        <option value="">Välj en anläggning</option>
+                        {sites.map((site, index) => (
+                          <option key={index} value={site.site_name}>
+                            {site.site_name} ({site.region})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-4 text-right">
+                
+                <div className="mt-6 text-right">
                   <Button
                     onClick={handleAddUserInvite}
                     variant="secondary"
                     className="flex items-center gap-2"
+                    disabled={!newInvite.name || !newInvite.email || 
+                      (newInvite.role === 'regionansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) ||
+                      (newInvite.role === 'enhetsansvarig' && (!newInvite.sites || newInvite.sites.length === 0))
+                    }
                   >
                     <Plus className="w-4 h-4" />
-                    Lägg till
+                    Lägg till användare
                   </Button>
                 </div>
               </div>
@@ -714,9 +881,24 @@ export default function MultisiteRegistration() {
                     <ul className="space-y-2 text-sm">
                       {userInvites.map((invite, index) => (
                         <li key={index} className="text-white flex items-center gap-2">
-                          <User className="w-4 h-4 text-slate-400" />
-                          {invite.name} - {invite.role.replace('_', ' ')}
-                          <span className="text-slate-400">({invite.email})</span>
+                          {invite.role === 'verksamhetsansvarig' && <Building2 className="w-4 h-4 text-blue-400" />}
+                          {invite.role === 'regionansvarig' && <MapPin className="w-4 h-4 text-purple-400" />}
+                          {invite.role === 'enhetsansvarig' && <User className="w-4 h-4 text-green-400" />}
+                          <div>
+                            <span className="font-medium">{invite.name}</span>
+                            <span className="ml-2 text-sm">
+                              ({invite.role === 'verksamhetsansvarig' ? 'Verksamhetschef' :
+                                invite.role === 'regionansvarig' ? 'Regionschef' :
+                                'Platsansvarig (Extra)'})
+                            </span>
+                            <span className="text-slate-400 ml-2">({invite.email})</span>
+                            {invite.sites && invite.sites.length > 0 && (
+                              <div className="text-xs text-slate-500 ml-6">
+                                {invite.role === 'regionansvarig' ? 'Anläggningar: ' : 'Anläggning: '}
+                                {invite.sites.join(', ')}
+                              </div>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>

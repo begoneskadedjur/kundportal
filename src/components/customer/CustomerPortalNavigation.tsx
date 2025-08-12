@@ -53,9 +53,9 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
                 <Building2 className="w-4 h-4" />
                 Multisite-portal
                 <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {multisiteRole === 'verksamhetsansvarig' ? 'Verksamhet' : 
-                   multisiteRole === 'regionansvarig' ? 'Region' : 
-                   'Enhet'}
+                  {multisiteRole === 'verksamhetschef' ? 'Verksamhet' : 
+                   multisiteRole === 'regionschef' ? 'Region' : 
+                   'Plats'}
                 </span>
               </a>
             )}

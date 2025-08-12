@@ -32,12 +32,12 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
   // Get role display name in Swedish
   const getRoleDisplayName = (role: MultisiteUserRoleType): string => {
     switch (role) {
-      case 'verksamhetsansvarig':
-        return 'Verksamhetsansvarig'
-      case 'regionansvarig':
-        return 'Regionansvarig'
-      case 'enhetsansvarig':
-        return 'Enhetsansvarig'
+      case 'verksamhetschef':
+        return 'Verksamhetschef'
+      case 'regionschef':
+        return 'Regionschef'
+      case 'platsansvarig':
+        return 'Platsansvarig'
       default:
         return role
     }

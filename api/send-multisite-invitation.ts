@@ -292,9 +292,9 @@ function getMultisiteInvitationEmailTemplate({
   tempPassword?: string
 }) {
   const roleNames: { [key: string]: string } = {
-    'verksamhetsansvarig': 'Verksamhetsansvarig',
-    'regionansvarig': 'Regionansvarig',
-    'enhetsansvarig': 'Enhetsansvarig'
+    'verksamhetschef': 'Verksamhetschef',
+    'regionschef': 'Regionschef',
+    'platsansvarig': 'Platsansvarig'
   }
 
   const roleName = roleNames[role] || role

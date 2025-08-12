@@ -23,21 +23,22 @@ export interface OrganizationSite {
   contact_person: string | null
   contact_email: string | null
   contact_phone: string | null
+  site_manager_email: string | null
   is_primary: boolean
   is_active: boolean
   created_at: string
   updated_at: string
 }
 
-export type MultisiteUserRoleType = 'verksamhetsansvarig' | 'regionansvarig' | 'enhetsansvarig'
+export type MultisiteUserRoleType = 'verksamhetschef' | 'regionschef' | 'platsansvarig'
 
 export interface MultisiteUserRole {
   id: string
   user_id: string
   organization_id: string
   role_type: MultisiteUserRoleType
-  site_ids: string[] | null // För enhetsansvariga
-  region: string | null // För regionansvariga
+  site_ids: string[] | null // För platsansvariga och regionschefer
+  region: string | null // För regionschefer
   is_active: boolean
   created_at: string
   updated_at: string
@@ -177,7 +178,7 @@ export interface MultisitePermissions {
 
 export function getPermissionsForRole(role: MultisiteUserRoleType): MultisitePermissions {
   switch (role) {
-    case 'verksamhetsansvarig':
+    case 'verksamhetschef':
       return {
         canViewAllSites: true,
         canCreateSites: true,
@@ -189,28 +190,28 @@ export function getPermissionsForRole(role: MultisiteUserRoleType): MultisitePer
         canViewTrafficLight: true,
         canRequestService: true,
       }
-    case 'regionansvarig':
+    case 'regionschef':
       return {
-        canViewAllSites: false, // Endast region
+        canViewAllSites: false, // Endast deras regioner/anläggningar
         canCreateSites: false,
-        canManageUsers: true, // Begränsad
+        canManageUsers: true, // Begränsad till deras regioner
         canInviteQualityManagers: false,
         canInviteRegionalManagers: false,
-        canInviteSiteManagers: true, // För deras region
-        canEditSiteDetails: true, // För deras region
-        canViewTrafficLight: true, // För deras region
+        canInviteSiteManagers: true, // För deras regioner
+        canEditSiteDetails: true, // För deras regioner
+        canViewTrafficLight: true, // För deras regioner
         canRequestService: true,
       }
-    case 'enhetsansvarig':
+    case 'platsansvarig':
       return {
-        canViewAllSites: false, // Endast deras enhet
+        canViewAllSites: false, // Endast deras anläggning
         canCreateSites: false,
         canManageUsers: false,
         canInviteQualityManagers: false,
         canInviteRegionalManagers: false,
         canInviteSiteManagers: false,
         canEditSiteDetails: false,
-        canViewTrafficLight: true, // För deras enhet
+        canViewTrafficLight: true, // För deras anläggning
         canRequestService: true,
       }
     default:
