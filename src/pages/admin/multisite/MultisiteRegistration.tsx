@@ -161,6 +161,27 @@ export default function MultisiteRegistration() {
     setUserInvites(userInvites.filter((_, i) => i !== index))
   }
 
+  // Silent validation for UI state (no toast messages)
+  const isCurrentStepValid = (): boolean => {
+    switch (currentStep) {
+      case 'organization':
+        return !!(organizationData.name && organizationData.primary_contact_email)
+      
+      case 'sites':
+        return sites.length > 0 && sites.some(s => s.is_primary)
+      
+      case 'billing':
+        return !!organizationData.billing_address
+      
+      case 'users':
+        return true // Users are optional
+      
+      default:
+        return true
+    }
+  }
+
+  // Validation with user feedback (shows toast messages)
   const validateCurrentStep = (): boolean => {
     switch (currentStep) {
       case 'organization':
@@ -823,12 +844,17 @@ export default function MultisiteRegistration() {
             <p className="text-sm text-slate-400">
               Steg {currentStepIndex + 1} av {STEPS.length}
             </p>
+            {!isCurrentStepValid() && currentStep !== 'confirmation' && (
+              <p className="text-xs text-amber-400 mt-1">
+                Fyll i obligatoriska fält för att fortsätta
+              </p>
+            )}
           </div>
 
           {currentStep !== 'confirmation' ? (
             <Button
               onClick={handleNext}
-              disabled={!validateCurrentStep()}
+              disabled={!isCurrentStepValid()}
               className="flex items-center gap-2"
             >
               Nästa
