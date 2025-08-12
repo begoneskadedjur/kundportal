@@ -310,11 +310,10 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="max-w-4xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Registrera Multisite-organisation" size="xl">
       <div className="bg-slate-900 rounded-xl overflow-hidden">
         {/* Header with steps */}
         <div className="bg-gradient-to-r from-purple-900/50 to-purple-600/30 p-6 border-b border-purple-500/20">
-          <h2 className="text-2xl font-bold text-white mb-4">Registrera Multisite-organisation</h2>
           
           {/* Step indicators */}
           <div className="flex items-center justify-between">

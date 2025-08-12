@@ -305,14 +305,19 @@ export default function CoordinatorDashboard() {
               description="Skapa professionella serviceavtal och offertförslag direkt från ärendedata med Oneflow-integration."
               tag="Tillgänglig"
             />
-            <CoordinatorDashboardCard
-              onClick={() => setMultisiteWizardOpen(true)}
-              icon={UserPlus}
-              title="Multisite-kund"
-              description="Registrera ny organisation med flera anläggningar och sites."
-              tag="Ny"
-              iconColor="text-green-500"
-            />
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-purple-500/50 transition-all cursor-pointer hover:shadow-xl hover:shadow-purple-500/10"
+                 onClick={() => setMultisiteWizardOpen(true)}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-green-500/10 rounded-lg">
+                  <UserPlus className="w-6 h-6 text-green-500" />
+                </div>
+                <span className="px-2 py-1 text-xs font-medium text-green-400 bg-green-500/10 rounded-full">
+                  Ny
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Multisite-kund</h3>
+              <p className="text-sm text-slate-400">Registrera ny organisation med flera anläggningar och sites.</p>
+            </div>
             <CoordinatorDashboardCard
               href="/koordinator/sok-arenden"
               icon={FileSearch}
