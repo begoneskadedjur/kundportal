@@ -93,20 +93,29 @@ const CustomerPortal: React.FC = () => {
 
   const fetchPendingQuotes = async () => {
     try {
-      // Hämta alla ärenden med väntande offerter för denna kund
+      // Hämta alla väntande offerter från den nya unified vyn
+      // Detta inkluderar både legacy cases och nya contracts
       const { data, error } = await supabase
-        .from('cases')
-        .select('id, case_number, title, quote_sent_at, oneflow_contract_id')
+        .from('customer_pending_quotes')
+        .select('quote_id, customer_id, case_number, title, quote_sent_at, oneflow_contract_id, source_type, created_at')
         .eq('customer_id', profile!.customer_id)
-        .eq('quote_status', 'sent')
-        .not('oneflow_contract_id', 'is', null)
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching pending quotes:', error)
         return
       }
 
-      setPendingQuotes(data || [])
+      // Mappa data till rätt format för PendingQuoteNotification komponenten
+      const mappedQuotes = (data || []).map(quote => ({
+        id: quote.quote_id,
+        case_number: quote.case_number,
+        title: quote.title,
+        quote_sent_at: quote.quote_sent_at,
+        oneflow_contract_id: quote.oneflow_contract_id
+      }))
+
+      setPendingQuotes(mappedQuotes)
     } catch (error) {
       console.error('Error in fetchPendingQuotes:', error)
     }

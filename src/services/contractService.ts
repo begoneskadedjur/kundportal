@@ -798,6 +798,35 @@ export class ContractService {
       throw error
     }
   }
+
+  // Hämta väntande offerter för en kund (från den nya vyn)
+  static async getCustomerPendingQuotes(customerId?: string) {
+    try {
+      console.log('📋 Hämtar kundens väntande offerter...')
+      
+      let query = supabase
+        .from('customer_pending_quotes')
+        .select('*')
+        
+      if (customerId) {
+        query = query.eq('customer_id', customerId)
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('❌ Fel vid hämtning av väntande offerter:', error)
+        throw new Error(`Kunde inte hämta offerter: ${error.message}`)
+      }
+      
+      console.log(`✅ Hämtade ${data?.length || 0} väntande offerter`)
+      return data || []
+      
+    } catch (error) {
+      console.error('💥 ContractService.getCustomerPendingQuotes fel:', error)
+      throw error
+    }
+  }
 }
 
 // Hjälpfunktioner för kontrakt

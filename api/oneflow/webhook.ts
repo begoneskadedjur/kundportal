@@ -1134,6 +1134,20 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               console.log('✅ Offerstatus uppdaterad till signerad i ärende')
             }
             
+            // Uppdatera contracts-tabellen också (för offerter som blir signerade)
+            const { error: contractUpdateError } = await supabase
+              .from('contracts')
+              .update({
+                status: 'signed',
+                updated_at: new Date().toISOString()
+              })
+              .eq('oneflow_contract_id', contractId)
+              .eq('type', 'offer') // Endast för offerter
+            
+            if (!contractUpdateError) {
+              console.log('✅ Offertstatus uppdaterad till signerad i contracts')
+            }
+            
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)
           }
