@@ -259,6 +259,14 @@ function App() {
               } 
             />
             <Route 
+              path="/koordinator/multisite/register" 
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <MultisiteRegistration />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/koordinator/schema" 
               element={
                 <ProtectedRoute requiredRole="koordinator">

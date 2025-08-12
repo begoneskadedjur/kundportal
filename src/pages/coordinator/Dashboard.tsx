@@ -7,10 +7,9 @@ import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKp
 import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
 import GeographicOverview from '../../components/admin/coordinator/GeographicOverview';
 import { BeGoneCaseRow, Technician } from '../../types/database';
-import MultisiteRegistrationWizard from '../../components/admin/multisite/MultisiteRegistrationWizard';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus, Building2, TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
@@ -45,7 +44,6 @@ export default function CoordinatorDashboard() {
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
   const [currentAbsences, setCurrentAbsences] = useState<any[]>([]);
-  const [multisiteWizardOpen, setMultisiteWizardOpen] = useState(false);
 
   useEffect(() => {
     // Funktion för att hämta all nödvändig data från Supabase
@@ -305,19 +303,27 @@ export default function CoordinatorDashboard() {
               description="Skapa professionella serviceavtal och offertförslag direkt från ärendedata med Oneflow-integration."
               tag="Tillgänglig"
             />
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-purple-500/50 transition-all cursor-pointer hover:shadow-xl hover:shadow-purple-500/10"
-                 onClick={() => setMultisiteWizardOpen(true)}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-green-500/10 rounded-lg">
-                  <UserPlus className="w-6 h-6 text-green-500" />
-                </div>
-                <span className="px-2 py-1 text-xs font-medium text-green-400 bg-green-500/10 rounded-full">
-                  Ny
-                </span>
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Multisite-kund</h3>
-              <p className="text-sm text-slate-400">Registrera ny organisation med flera anläggningar och sites.</p>
-            </div>
+            <CoordinatorDashboardCard
+              href="/koordinator/multisite/register"
+              icon={UserPlus}
+              title="Registrera Organisation"
+              description="Registrera ny multisite-organisation med flera anläggningar och sites."
+              tag="Ny"
+            />
+            <CoordinatorDashboardCard
+              href="/admin/multisite/organizations"
+              icon={Building2}
+              title="Organisationsöversikt"
+              description="Visa och hantera alla registrerade organisationer och deras anläggningar."
+              tag="Hantering"
+            />
+            <CoordinatorDashboardCard
+              href="/admin/multisite/traffic-light"
+              icon={TrendingUp}
+              title="Trafikljusöversikt"
+              description="Övervakningssystem för att bedöma organisationers prestanda och status."
+              tag="Analys"
+            />
             <CoordinatorDashboardCard
               href="/koordinator/sok-arenden"
               icon={FileSearch}
@@ -361,15 +367,6 @@ export default function CoordinatorDashboard() {
         }}
       />
       
-      {/* Multisite Registration Wizard */}
-      <MultisiteRegistrationWizard
-        isOpen={multisiteWizardOpen}
-        onClose={() => setMultisiteWizardOpen(false)}
-        onSuccess={() => {
-          setMultisiteWizardOpen(false)
-          // Could refresh data here if needed
-        }}
-      />
     </div>
   );
 }

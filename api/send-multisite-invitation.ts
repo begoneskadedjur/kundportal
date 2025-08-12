@@ -131,23 +131,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId = newAuthUser.user.id
       console.log('Created new auth user:', userId)
 
-      // Skapa multisite-profil
-      const { error: profileError } = await supabase
-        .from('multisite_user_profiles')
+      // Skapa profil i profiles-tabellen
+      const { error: profileCreateError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: userId,
+          email: email,
+          email_verified: true,
+          multisite_role: role,
+          organization_id: organizationId,
+          is_admin: false,
+          is_koordinator: false
+        })
+
+      if (profileCreateError) {
+        console.error('Profile creation error:', profileCreateError)
+        // Rensa upp auth user vid fel
+        await supabase.auth.admin.deleteUser(userId)
+        return res.status(500).json({ error: `Kunde inte skapa användarprofil: ${profileCreateError.message}` })
+      }
+
+      // Skapa multisite-roll
+      const { error: roleError } = await supabase
+        .from('multisite_user_roles')
         .insert({
           user_id: userId,
           organization_id: organizationId,
-          email: email,
-          name: name,
-          role: role,
+          role_type: role,
+          site_ids: [],
+          region: null,
           is_active: true
         })
 
-      if (profileError) {
-        console.error('Multisite profile creation error:', profileError)
-        // Rensa upp auth user vid fel
+      if (roleError) {
+        console.error('Multisite role creation error:', roleError)
+        // Rensa upp auth user och profil vid fel
         await supabase.auth.admin.deleteUser(userId)
-        return res.status(500).json({ error: `Kunde inte skapa multisite-profil: ${profileError.message}` })
+        return res.status(500).json({ error: `Kunde inte skapa multisite-roll: ${roleError.message}` })
       }
     }
 
