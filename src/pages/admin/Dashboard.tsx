@@ -43,7 +43,6 @@ import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueC
 import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
-import MultisiteRegistrationWizard from '../../components/admin/multisite/MultisiteRegistrationWizard'
 
 interface DashboardStats {
   totalCustomers: number
@@ -80,7 +79,6 @@ const AdminDashboard: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalType, setModalType] = useState<'customers' | 'revenue' | 'cases' | 'technicians'>('customers')
   const [modalTitle, setModalTitle] = useState('')
-  const [multisiteWizardOpen, setMultisiteWizardOpen] = useState(false)
 
   useEffect(() => {
     fetchDashboardStats()
@@ -490,20 +488,17 @@ const AdminDashboard: React.FC = () => {
                 staggerDelay={0.1}
                 initialDelay={1.4}
               >
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-purple-500/50 transition-all cursor-pointer hover:shadow-xl hover:shadow-purple-500/10"
-                     onClick={() => setMultisiteWizardOpen(true)}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 bg-green-500/10 rounded-lg">
-                      <UserPlus className="w-6 h-6 text-green-500" />
-                    </div>
-                    <span className="px-2 py-1 text-xs font-medium text-green-400 bg-green-500/10 rounded-full">
-                      Ny
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Registrera Organisation</h3>
-                  <p className="text-sm text-slate-400 mb-3">Ny multisite-kund wizard</p>
-                  <div className="text-sm font-medium text-slate-300">Steg-för-steg guide</div>
-                </div>
+                <AdminDashboardCard
+                  href="/admin/multisite/register"
+                  icon={UserPlus}
+                  title="Registrera Organisation"
+                  description="Ny multisite-kund wizard"
+                  stats="Steg-för-steg guide"
+                  tag="Ny"
+                  iconColor="text-green-500"
+                  disabled={false}
+                  delay={0.1}
+                />
                 
                 <AdminDashboardCard
                   href="/admin/multisite/organizations"
@@ -655,16 +650,6 @@ const AdminDashboard: React.FC = () => {
               legacyCases: 0
             }
           }
-        }}
-      />
-      
-      {/* Multisite Registration Wizard */}
-      <MultisiteRegistrationWizard
-        isOpen={multisiteWizardOpen}
-        onClose={() => setMultisiteWizardOpen(false)}
-        onSuccess={() => {
-          setMultisiteWizardOpen(false)
-          fetchDashboardStats() // Refresh stats after creating new organization
         }}
       />
     </div>
