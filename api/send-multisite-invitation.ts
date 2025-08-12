@@ -131,17 +131,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId = newAuthUser.user.id
       console.log('Created new auth user:', userId)
 
-      // Skapa profil i profiles-tabellen
+      // Skapa eller uppdatera profil i profiles-tabellen
+      // Använd upsert för att hantera om profilen redan existerar
       const { error: profileCreateError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           user_id: userId,
           email: email,
           email_verified: true,
           multisite_role: role,
           organization_id: organizationId,
           is_admin: false,
-          is_koordinator: false
+          is_koordinator: false,
+          role: 'customer', // Sätt standard roll för multisite-användare
+          is_active: true
+        }, {
+          onConflict: 'user_id'
         })
 
       if (profileCreateError) {
