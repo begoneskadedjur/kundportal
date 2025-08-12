@@ -1,7 +1,7 @@
 // src/components/customer/PendingQuoteNotification.tsx
 import React from 'react'
 import { motion } from 'framer-motion'
-import { FileText, X, ExternalLink, Clock, AlertCircle } from 'lucide-react'
+import { FileText, X, Mail, Clock, AlertCircle, Building2 } from 'lucide-react'
 
 interface Quote {
   id: string
@@ -9,6 +9,9 @@ interface Quote {
   title: string
   quote_sent_at: string
   oneflow_contract_id: string
+  source_type: 'case' | 'contract'
+  company_name?: string
+  products?: string
 }
 
 interface PendingQuoteNotificationProps {
@@ -20,10 +23,34 @@ const PendingQuoteNotification: React.FC<PendingQuoteNotificationProps> = ({
   quotes, 
   onDismiss 
 }) => {
-  const handleOpenQuote = (oneflowContractId: string) => {
-    // Öppna Oneflow-länken för att visa offerten
-    const oneflowUrl = `https://app.oneflow.com/contracts/${oneflowContractId}`
-    window.open(oneflowUrl, '_blank')
+  const handleEmailReminder = () => {
+    // Istället för OneFlow-länk, påminn om att kolla e-post
+    // Eventuellt kan vi lägga till en toast-notifikation här
+  }
+
+  const getQuoteDisplayInfo = (quote: Quote) => {
+    // Förbättrad logik för att visa bättre information
+    const isContract = quote.source_type === 'contract'
+    
+    // För contracts: använd företagsnamn + offertnummer
+    if (isContract) {
+      const quoteNumber = quote.case_number.includes('Offert #') 
+        ? quote.case_number 
+        : `Offert #${quote.id.slice(-6)}`
+      
+      return {
+        displayTitle: quote.company_name || 'BeGone Skadedjursbekämpning',
+        displayNumber: quoteNumber,
+        description: quote.products ? `Inkluderar: ${quote.products}` : 'Skadedjursbekämpning'
+      }
+    }
+    
+    // För cases: använd befintlig logik men förbättrad
+    return {
+      displayTitle: quote.title,
+      displayNumber: quote.case_number,
+      description: 'Skadedjursbekämpning'
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -61,7 +88,7 @@ const PendingQuoteNotification: React.FC<PendingQuoteNotificationProps> = ({
                   {quotes.length === 1 ? 'Väntande offert' : `${quotes.length} väntande offerter`}
                 </h3>
                 <p className="text-white/80 text-sm">
-                  Granska och signera för att komma igång
+                  Kontrollera er e-post för att signera
                 </p>
               </div>
             </div>
@@ -77,60 +104,70 @@ const PendingQuoteNotification: React.FC<PendingQuoteNotificationProps> = ({
 
         {/* Quote List */}
         <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
-          {quotes.map((quote) => (
-            <motion.div
-              key={quote.id}
-              whileHover={{ scale: 1.02 }}
-              className="bg-white/95 backdrop-blur rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all"
-              onClick={() => handleOpenQuote(quote.oneflow_contract_id)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-medium text-gray-900">
-                      {quote.case_number}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      • {formatDate(quote.quote_sent_at)}
-                    </span>
-                  </div>
-                  <h4 className="font-medium text-gray-800 mb-2">
-                    {quote.title}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-amber-600" />
-                    <span className="text-xs text-amber-700">
-                      Väntar på din signatur
-                    </span>
+          {quotes.map((quote) => {
+            const displayInfo = getQuoteDisplayInfo(quote)
+            
+            return (
+              <motion.div
+                key={quote.id}
+                whileHover={{ scale: 1.02 }}
+                className="bg-white/95 backdrop-blur rounded-lg p-4 hover:shadow-lg transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="w-4 h-4 text-orange-600" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {displayInfo.displayNumber}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        • {formatDate(quote.quote_sent_at)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mb-2">
+                      <Building2 className="w-4 h-4 text-gray-600" />
+                      <h4 className="font-medium text-gray-800">
+                        {displayInfo.displayTitle}
+                      </h4>
+                    </div>
+                    
+                    <p className="text-xs text-gray-600 mb-2">
+                      {displayInfo.description}
+                    </p>
+                    
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3 h-3 text-blue-600" />
+                      <span className="text-xs text-blue-700">
+                        Skickad till er e-post för signering
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <ExternalLink className="w-5 h-5 text-orange-600 flex-shrink-0 ml-3" />
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            )
+          })}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-3 bg-black/10 backdrop-blur-sm border-t border-white/10">
-          <button
-            onClick={() => {
-              if (quotes.length === 1) {
-                handleOpenQuote(quotes[0].oneflow_contract_id)
-              }
-            }}
-            className="w-full py-2 px-4 bg-white/20 hover:bg-white/30 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            {quotes.length === 1 ? 'Granska offert' : 'Visa alla offerter'}
-          </button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-2 text-white/90 text-sm">
+              <Mail className="w-4 h-4" />
+              <span>Kontrollera er e-post för att signera offerten</span>
+            </div>
+            <p className="text-xs text-white/70 text-center">
+              Offerten har skickats till er registrerade e-postadress
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Subtle reminder text */}
-      <p className="text-xs text-gray-400 text-center mt-2 px-4">
-        Klicka för att öppna i Oneflow
-      </p>
+      {/* Email reminder */}
+      <div className="text-xs text-gray-400 text-center mt-2 px-4 space-y-1">
+        <p>Hittar ni inte e-posten? Kontrollera er skräppost</p>
+        <p className="text-gray-500">eller kontakta oss på info@begone.se</p>
+      </div>
     </motion.div>
   )
 }

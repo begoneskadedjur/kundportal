@@ -97,7 +97,7 @@ const CustomerPortal: React.FC = () => {
       // Detta inkluderar både legacy cases och nya contracts
       const { data, error } = await supabase
         .from('customer_pending_quotes')
-        .select('quote_id, customer_id, case_number, title, quote_sent_at, oneflow_contract_id, source_type, created_at')
+        .select('quote_id, customer_id, case_number, title, quote_sent_at, oneflow_contract_id, source_type, created_at, company_name, products')
         .eq('customer_id', profile!.customer_id)
         .order('created_at', { ascending: false })
 
@@ -112,7 +112,10 @@ const CustomerPortal: React.FC = () => {
         case_number: quote.case_number,
         title: quote.title,
         quote_sent_at: quote.quote_sent_at,
-        oneflow_contract_id: quote.oneflow_contract_id
+        oneflow_contract_id: quote.oneflow_contract_id,
+        source_type: quote.source_type,
+        company_name: quote.company_name,
+        products: quote.products
       }))
 
       setPendingQuotes(mappedQuotes)
