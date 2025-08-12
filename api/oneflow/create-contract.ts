@@ -459,6 +459,81 @@ export default async function handler(
       console.log('✅ Creator info sparad i databasen')
     }
     
+    // NYTT: Identifiera och koppla kund för offerten
+    if (documentType === 'offer' || documentType === 'contract') {
+      let customerId = null
+      
+      console.log('🔍 Söker efter befintlig kund för:', {
+        company: recipient.company_name,
+        email: recipient.email,
+        org: recipient.organization_number
+      })
+      
+      // Sök efter befintlig kund
+      // 1. Baserat på organisationsnummer
+      if (recipient.organization_number) {
+        const { data: customerByOrg } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('organization_number', recipient.organization_number)
+          .single()
+        
+        if (customerByOrg) {
+          customerId = customerByOrg.id
+          console.log('✅ Kund hittad via org.nr:', customerId)
+        }
+      }
+      
+      // 2. Om inte hittat, sök på email
+      if (!customerId && recipient.email) {
+        const { data: customerByEmail } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('contact_email', recipient.email)
+          .single()
+        
+        if (customerByEmail) {
+          customerId = customerByEmail.id
+          console.log('✅ Kund hittad via email:', customerId)
+        }
+      }
+      
+      // 3. Om inte hittat, sök på företagsnamn
+      if (!customerId && recipient.company_name) {
+        const { data: customerByName } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('company_name', recipient.company_name)
+          .single()
+        
+        if (customerByName) {
+          customerId = customerByName.id
+          console.log('✅ Kund hittad via företagsnamn:', customerId)
+        }
+      }
+      
+      // Uppdatera kontraktet med customer_id
+      if (customerId) {
+        const { error: customerLinkError } = await supabase
+          .from('contracts')
+          .update({ 
+            customer_id: customerId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('oneflow_contract_id', createdContract.id)
+        
+        if (customerLinkError) {
+          console.error('⚠️ Kunde inte koppla kund:', customerLinkError)
+        } else {
+          console.log('✅ Offert/avtal kopplat till kund:', customerId)
+        }
+      } else {
+        console.log('⚠️ Ingen befintlig kund hittades för:', recipient.company_name)
+        // För offerter: Vi skapar INTE ny kund här
+        // Kund skapas endast när avtal signeras (i webhook.ts)
+      }
+    }
+    
     return res.status(200).json({ 
       contract: createdContract,
       sender: {
