@@ -100,14 +100,14 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .select('*')
         .eq('user_id', profile.user_id)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
-      if (roleError && roleError.code !== 'PGRST116') {
+      if (roleError) {
         throw roleError
       }
 
       if (!roleData) {
-        // User is not part of a multisite organization
+        // User is not part of a multisite organization - this is normal for admin/koordinatorer
         setLoading(false)
         return
       }
