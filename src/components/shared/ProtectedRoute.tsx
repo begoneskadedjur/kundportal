@@ -1,6 +1,7 @@
-// src/components/shared/ProtectedRoute.tsx - MED KOORDINATOR-STÖD
+// src/components/shared/ProtectedRoute.tsx - MED KOORDINATOR-STÖD OCH MULTISITE
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMultisite } from '../../contexts/MultisiteContext';
 import LoadingSpinner from './LoadingSpinner';
 
 type ProtectedRouteProps = {
@@ -10,10 +11,11 @@ type ProtectedRouteProps = {
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { profile, loading } = useAuth();
+  const { userRole: multisiteRole, loading: multisiteLoading } = useMultisite();
   const location = useLocation();
 
   // 1. Visa laddningsskärm som tidigare
-  if (loading) {
+  if (loading || multisiteLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <LoadingSpinner text="Verifierar behörighet..." />
@@ -80,7 +82,12 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         redirectPath = '/technician/dashboard';
         break;
       case 'customer':
-        redirectPath = '/customer';
+        // Check if user has multisite access
+        if (multisiteRole) {
+          redirectPath = '/multisite';
+        } else {
+          redirectPath = '/customer';
+        }
         break;
     }
     

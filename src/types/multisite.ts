@@ -2,7 +2,7 @@
 
 export interface MultisiteOrganization {
   id: string
-  name: string
+  organization_name: string
   organization_number: string | null
   billing_type: 'consolidated' | 'per_site'
   primary_contact_email: string | null

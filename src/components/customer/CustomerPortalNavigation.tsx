@@ -1,7 +1,8 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
-import { BarChart3, Home, LogOut, FileText } from 'lucide-react'
+import { BarChart3, Home, LogOut, FileText, Building2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useMultisite } from '../../contexts/MultisiteContext'
 import Button from '../ui/Button'
 
 interface CustomerPortalNavigationProps {
@@ -16,6 +17,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
   customerName
 }) => {
   const { signOut } = useAuth()
+  const { userRole: multisiteRole, organization } = useMultisite()
 
   const handleSignOut = async () => {
     await signOut()
@@ -42,6 +44,16 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
 
           {/* Navigation Tabs */}
           <div className="flex items-center gap-2">
+            {/* Multisite Portal Link (if user has access) */}
+            {multisiteRole && organization && (
+              <a
+                href="/multisite"
+                className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200"
+              >
+                <Building2 className="w-4 h-4" />
+                Multisite-portal
+              </a>
+            )}
             <button
               onClick={() => onViewChange('dashboard')}
               className={`

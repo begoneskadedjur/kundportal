@@ -53,8 +53,12 @@ import CustomerPortal from './pages/customer/Portal';
 import Cases from './pages/customer/Cases';
 import Schedule from './pages/customer/Schedule';
 
+// Multisite Portal
+import MultisitePortal from './pages/multisite/Portal';
+
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute';
+import MultisiteProtectedRoute from './components/shared/MultisiteProtectedRoute';
 
 // Global styles
 import './styles/globals.css';
@@ -364,6 +368,16 @@ function App() {
                 <ProtectedRoute requiredRole="customer">
                   <Schedule />
                 </ProtectedRoute>
+              } 
+            />
+
+            {/* Multisite Portal routes */}
+            <Route 
+              path="/multisite" 
+              element={
+                <MultisiteProtectedRoute>
+                  <MultisitePortal />
+                </MultisiteProtectedRoute>
               } 
             />
 
