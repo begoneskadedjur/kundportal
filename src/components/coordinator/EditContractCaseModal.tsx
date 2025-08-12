@@ -838,193 +838,405 @@ export default function EditContractCaseModal({
                 />
               </div>
 
-              {/* 🚦 Traffic Light System - Only for contract customers */}
-              {caseData.customer_id && !isCustomerView && (
+              {/* 🚦 Professional Assessment & Recommendations - Only for contract customers */}
+              {caseData.customer_id && (
                 <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span className="text-2xl">🚦</span>
-                    Bedömning & Trafikljusstatus
+                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-lg">
+                      <span className="text-2xl">🚦</span>
+                    </div>
+                    <div>
+                      <span className="text-white">Professionell Bedömning & Rekommendationer</span>
+                      <p className="text-sm text-slate-400 font-normal">Trafikljusstatus med åtgärdsförslag</p>
+                    </div>
                   </h3>
-                  
-                  {/* Pest Level (0-3) */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-300 mb-3">
-                      Skadedjursnivå (0-3)
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { value: 0, label: "Ingen förekomst", color: "bg-gray-500", emoji: "✅" },
-                        { value: 1, label: "Låg", color: "bg-green-500", emoji: "🟢" },
-                        { value: 2, label: "Måttlig", color: "bg-yellow-500", emoji: "🟡" },
-                        { value: 3, label: "Hög/Infestation", color: "bg-red-500", emoji: "🔴" }
-                      ].map(level => (
-                        <button
-                          key={level.value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, pest_level: level.value }))}
-                          className={`relative p-3 rounded-lg transition-all transform hover:scale-105 ${
-                            formData.pest_level === level.value 
-                              ? `${level.color} text-white shadow-lg ring-2 ring-white/50` 
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
-                        >
-                          <div className="text-2xl mb-1">{level.emoji}</div>
-                          <div className="font-bold text-lg">{level.value}</div>
-                          <div className="text-xs">{level.label}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Problem Rating (1-5) */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-300 mb-3">
-                      Övergripande problembild (1-5)
-                    </label>
-                    <div className="grid grid-cols-5 gap-2">
-                      {[
-                        { value: 1, label: "Utmärkt", color: "bg-green-600" },
-                        { value: 2, label: "Bra", color: "bg-green-500" },
-                        { value: 3, label: "Uppmärksamhet", color: "bg-yellow-500" },
-                        { value: 4, label: "Allvarligt", color: "bg-orange-500" },
-                        { value: 5, label: "Kritiskt", color: "bg-red-500" }
-                      ].map(rating => (
-                        <button
-                          key={rating.value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, problem_rating: rating.value }))}
-                          className={`relative p-3 rounded-lg transition-all transform hover:scale-105 ${
-                            formData.problem_rating === rating.value 
-                              ? `${rating.color} text-white shadow-lg ring-2 ring-white/50` 
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
-                        >
-                          <div className="font-bold text-xl mb-1">{rating.value}</div>
-                          <div className="text-xs">{rating.label}</div>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      1-2: Inga åtgärder krävs | 3: Övervakning krävs | 4-5: Kräver kundengagemang
-                    </p>
-                  </div>
-                  
-                  {/* Automatic Traffic Light Status */}
-                  {(formData.pest_level !== undefined || formData.problem_rating !== undefined) && (
-                    <div className="mt-4 p-4 rounded-lg bg-slate-900/50 border border-slate-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-400">Automatisk status:</span>
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${
-                          (formData.problem_rating >= 4 || formData.pest_level >= 3) 
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/50' 
-                            : (formData.problem_rating === 3 || formData.pest_level === 2)
-                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
-                            : 'bg-green-500/20 text-green-400 border border-green-500/50'
-                        }`}>
-                          <span className="text-xl">
-                            {(formData.problem_rating >= 4 || formData.pest_level >= 3) ? '🔴' 
-                              : (formData.problem_rating === 3 || formData.pest_level === 2) ? '🟡' : '🟢'}
-                          </span>
-                          {(formData.problem_rating >= 4 || formData.pest_level >= 3) 
-                            ? 'Kritisk - Åtgärd krävs omgående' 
-                            : (formData.problem_rating === 3 || formData.pest_level === 2)
-                            ? 'Varning - Övervakning krävs'
-                            : 'OK - Ingen omedelbar åtgärd'}
+
+                  {!isCustomerView ? (
+                    <>  
+                      {/* Assessment Grid */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        {/* Pest Level Assessment */}
+                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
+                          <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                            Skadedjursnivå (0-3)
+                          </label>
+                          <div className="grid grid-cols-4 gap-2">
+                            {[
+                              { value: 0, label: "Ingen", color: "bg-gray-500", emoji: "✅", desc: "Ingen förekomst" },
+                              { value: 1, label: "Låg", color: "bg-green-500", emoji: "🟢", desc: "Minimal aktivitet" },
+                              { value: 2, label: "Måttlig", color: "bg-yellow-500", emoji: "🟡", desc: "Synlig förekomst" },
+                              { value: 3, label: "Hög", color: "bg-red-500", emoji: "🔴", desc: "Infestation" }
+                            ].map(level => (
+                              <button
+                                key={level.value}
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, pest_level: level.value }))}
+                                className={`relative p-3 rounded-lg transition-all transform hover:scale-[1.02] ${
+                                  formData.pest_level === level.value 
+                                    ? `${level.color} text-white shadow-lg ring-2 ring-white/50 scale-[1.02]` 
+                                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                                }`}
+                              >
+                                <div className="text-xl mb-1">{level.emoji}</div>
+                                <div className="font-bold text-lg">{level.value}</div>
+                                <div className="text-xs leading-tight">{level.label}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Problem Rating Assessment */}
+                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
+                          <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                            Övergripande problembild (1-5)
+                          </label>
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {[
+                              { value: 1, label: "Utmärkt", color: "bg-green-600", desc: "Inga problem" },
+                              { value: 2, label: "Bra", color: "bg-green-500", desc: "Under kontroll" },
+                              { value: 3, label: "OK", color: "bg-yellow-500", desc: "Kräver övervakning" },
+                              { value: 4, label: "Allvarligt", color: "bg-orange-500", desc: "Åtgärd krävs" },
+                              { value: 5, label: "Kritiskt", color: "bg-red-500", desc: "Brådskande åtgärd" }
+                            ].map(rating => (
+                              <button
+                                key={rating.value}
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, problem_rating: rating.value }))}
+                                className={`relative p-2.5 rounded-lg transition-all transform hover:scale-[1.02] ${
+                                  formData.problem_rating === rating.value 
+                                    ? `${rating.color} text-white shadow-lg ring-2 ring-white/50 scale-[1.02]` 
+                                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                                }`}
+                              >
+                                <div className="font-bold text-lg mb-1">{rating.value}</div>
+                                <div className="text-xs leading-tight">{rating.label}</div>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                            1-2: Inga åtgärder • 3: Övervakning • 4-5: Kundengagemang krävs
+                          </p>
                         </div>
                       </div>
-                      {(formData.problem_rating >= 4 || formData.pest_level >= 3) && (
-                        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                          <p className="text-sm text-red-400">
-                            ⚠️ Denna bedömning indikerar att kundens engagemang krävs för att lösa problemet effektivt.
+
+                      {/* Dynamic Assessment Status */}
+                      {(formData.pest_level !== undefined || formData.problem_rating !== undefined) && (
+                        <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-slate-800/50 to-slate-900/50 border border-slate-700/50">
+                          <div className="flex items-start justify-between mb-3">
+                            <span className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
+                              Automatisk statusbedömning:
+                            </span>
+                            <div className={`flex items-center gap-3 px-4 py-2 rounded-full text-sm font-bold ${
+                              (formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/50' 
+                                : (formData.problem_rating === 3 || formData.pest_level === 2)
+                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
+                                : 'bg-green-500/20 text-green-400 border border-green-500/50'
+                            }`}>
+                              <span className="text-xl">
+                                {(formData.problem_rating >= 4 || formData.pest_level >= 3) ? '🔴' 
+                                  : (formData.problem_rating === 3 || formData.pest_level === 2) ? '🟡' : '🟢'}
+                              </span>
+                              <span>
+                                {(formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                                  ? 'KRITISK - Omedelbar åtgärd' 
+                                  : (formData.problem_rating === 3 || formData.pest_level === 2)
+                                  ? 'VARNING - Övervakning krävs'
+                                  : 'OK - Kontrollerad situation'}
+                              </span>
+                            </div>
+                          </div>
+                          {(formData.problem_rating >= 4 || formData.pest_level >= 3) && (
+                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                              <p className="text-sm text-red-400 flex items-start gap-2">
+                                <span className="text-base mt-0.5">⚠️</span>
+                                <span>Denna bedömning indikerar att kundens aktiva engagemang krävs för att lösa problemet effektivt.</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Context-Aware Quick Recommendations */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-amber-400" />
+                          Kontextanpassade rekommendationer
+                        </label>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {/* Context-aware recommendations based on assessment */}
+                          {(formData.problem_rating >= 4 || formData.pest_level >= 3) ? (
+                            // Critical status recommendations
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🔴 AKUT: Omedelbar åtgärd krävs - kontakta oss inom 24h vid förvärring.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 hover:text-red-200 transition-colors"
+                              >
+                                🚨 Akut åtgärd
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '📋 Kunden måste implementera föreslagna åtgärder omedelbart för att förhindra spridning.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 rounded-lg text-orange-300 hover:text-orange-200 transition-colors"
+                              >
+                                📋 Kundåtgärd
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🔄 Daglig uppföljning rekommenderas tills situationen är under kontroll.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 rounded-lg text-yellow-300 hover:text-yellow-200 transition-colors"
+                              >
+                                🔄 Daglig kontroll
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🛡️ Förstärkt skyddsplan krävs - vi föreslår omfattande åtgärdsprogram.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 transition-colors"
+                              >
+                                🛡️ Förstärkt skydd
+                              </button>
+                            </>
+                          ) : (formData.problem_rating === 3 || formData.pest_level === 2) ? (
+                            // Warning status recommendations
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🟡 ÖVERVAKNING: Situation kräver regelbunden uppföljning inom 1-2 veckor.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 rounded-lg text-yellow-300 hover:text-yellow-200 transition-colors"
+                              >
+                                🔍 Övervakning
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '📅 Uppföljningsbesök rekommenderas inom 2-4 veckor för kontroll.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-lg text-blue-300 hover:text-blue-200 transition-colors"
+                              >
+                                📅 Uppföljning
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🔧 Förebyggande åtgärder rekommenderas för att undvika framtida problem.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 hover:text-green-200 transition-colors"
+                              >
+                                🔧 Förebyggande
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '📋 Kunden bör vara uppmärksam på tidiga varningstecken och rapportera förändringar.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 transition-colors"
+                              >
+                                👁️ Tidig upptäckt
+                              </button>
+                            </>
+                          ) : (
+                            // Good status recommendations
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🟢 UTMÄRKT: Situationen är under kontroll - fortsätt med befintligt underhåll.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 hover:text-green-200 transition-colors"
+                              >
+                                ✅ Bibehåll status
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🛡️ Regelbundet underhåll krävs för att bibehålla den höga skyddsnivån.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-lg text-blue-300 hover:text-blue-200 transition-colors"
+                              >
+                                🛡️ Rutinunderhåll
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '📊 Rekommenderar säsongsbaserad kontroll för att upprätthålla skyddet.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 rounded-lg text-purple-300 hover:text-purple-200 transition-colors"
+                              >
+                                📊 Säsongskontroll
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
+                                    '🎯 Befintligt skyddsystem fungerar optimalt - inga ytterligare åtgärder just nu.'
+                                }))}
+                                className="px-3 py-2 text-sm bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-300 hover:text-amber-200 transition-colors"
+                              >
+                                🎯 Optimal status
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Professional Recommendations Text Area */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                          <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
+                          Detaljerade rekommendationer till kund
+                        </label>
+                        <textarea
+                          value={formData.recommendations}
+                          onChange={(e) => setFormData(prev => ({ ...prev, recommendations: e.target.value }))}
+                          rows={5}
+                          placeholder="Beskriv detaljerade, professionella rekommendationer baserat på bedömningen..."
+                          className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
+                        />
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs text-slate-500">
+                            Rekommendationerna baseras på trafikljusstatus och visas för kunden som professionella åtgärdsförslag
                           </p>
+                          {formData.recommendations && formData.recommendations.length > 200 && (
+                            <p className="text-xs text-slate-400">
+                              {formData.recommendations.length} tecken
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Customer View - Read-only display of assessment and recommendations
+                    <div className="space-y-6">
+                      {/* Assessment Results Display */}
+                      {(formData.pest_level !== undefined || formData.problem_rating !== undefined) && (
+                        <div className="bg-gradient-to-r from-slate-800/30 to-slate-900/30 border border-slate-700/50 rounded-lg p-4">
+                          <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                            Professionell bedömning av er situation
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {formData.pest_level !== undefined && (
+                              <div className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-lg">
+                                <div className="text-2xl">
+                                  {formData.pest_level === 0 ? '✅' : 
+                                   formData.pest_level === 1 ? '🟢' : 
+                                   formData.pest_level === 2 ? '🟡' : '🔴'}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-slate-300">Skadedjursnivå</p>
+                                  <p className="text-lg font-bold text-white">
+                                    {formData.pest_level === 0 ? 'Ingen förekomst' : 
+                                     formData.pest_level === 1 ? 'Låg nivå' : 
+                                     formData.pest_level === 2 ? 'Måttlig nivå' : 'Hög nivå/Infestation'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {formData.problem_rating !== undefined && (
+                              <div className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-lg">
+                                <div className="text-2xl font-bold text-white">{formData.problem_rating}</div>
+                                <div>
+                                  <p className="text-sm font-medium text-slate-300">Övergripande status</p>
+                                  <p className="text-lg font-bold text-white">
+                                    {formData.problem_rating === 1 ? 'Utmärkt' :
+                                     formData.problem_rating === 2 ? 'Bra' :
+                                     formData.problem_rating === 3 ? 'Kräver uppmärksamhet' :
+                                     formData.problem_rating === 4 ? 'Allvarligt' : 'Kritiskt'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Overall Status */}
+                          <div className={`p-3 rounded-lg border ${
+                            (formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                              ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                              : (formData.problem_rating === 3 || formData.pest_level === 2)
+                              ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                              : 'bg-green-500/10 border-green-500/30 text-green-400'
+                          }`}>
+                            <p className="font-semibold flex items-center gap-2">
+                              <span className="text-xl">
+                                {(formData.problem_rating >= 4 || formData.pest_level >= 3) ? '🔴' 
+                                  : (formData.problem_rating === 3 || formData.pest_level === 2) ? '🟡' : '🟢'}
+                              </span>
+                              {(formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                                ? 'Kritisk situation - Åtgärd krävs omgående' 
+                                : (formData.problem_rating === 3 || formData.pest_level === 2)
+                                ? 'Varning - Övervakning krävs'
+                                : 'OK - Situation under kontroll'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Recommendations Display */}
+                      {formData.recommendations && (
+                        <div className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/20 rounded-lg p-4">
+                          <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                            <Lightbulb className="w-4 h-4 text-amber-400" />
+                            Våra professionella rekommendationer för er
+                          </h4>
+                          <div className="prose prose-slate prose-sm max-w-none">
+                            <p className="text-slate-300 leading-relaxed whitespace-pre-line">
+                              {formData.recommendations}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {(!formData.pest_level && !formData.problem_rating && !formData.recommendations) && (
+                        <div className="text-center py-8">
+                          <div className="text-slate-500 mb-2">
+                            <span className="text-4xl">📋</span>
+                          </div>
+                          <p className="text-slate-400">Bedömning och rekommendationer kommer att visas här när tekniker har genomfört inspektionen.</p>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-
-              {/* Recommendations Section */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-amber-400" />
-                  Rekommendationer till kund
-                </h3>
-                
-                {/* Quick recommendations for common issues */}
-                {!isCustomerView && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Snabbval för vanliga rekommendationer
-                    </label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ 
-                          ...prev, 
-                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
-                            '• Rekommenderar förebyggande åtgärder för att undvika framtida problem.'
-                        }))}
-                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
-                      >
-                        Förebyggande
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ 
-                          ...prev, 
-                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
-                            '• Uppföljningsbesök rekommenderas inom 2-4 veckor.'
-                        }))}
-                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
-                      >
-                        Uppföljning
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ 
-                          ...prev, 
-                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
-                            '• Regelbundet underhåll krävs för att bibehålla skyddsnivån.'
-                        }))}
-                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
-                      >
-                        Underhåll
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ 
-                          ...prev, 
-                          recommendations: (prev.recommendations ? prev.recommendations + '\n\n' : '') + 
-                            '• Akuta åtgärder krävs - kontakta oss omedelbart vid förvärring.'
-                        }))}
-                        className="px-3 py-2 text-sm bg-slate-700/50 hover:bg-amber-500/20 border border-slate-600 hover:border-amber-500/50 rounded-lg text-slate-300 hover:text-amber-300 transition-colors"
-                      >
-                        Akut åtgärd
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <textarea
-                  value={formData.recommendations}
-                  onChange={(e) => setFormData(prev => ({ ...prev, recommendations: e.target.value }))}
-                  rows={4}
-                  placeholder="Beskriv rekommenderade åtgärder för kunden..."
-                  className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  disabled={isCustomerView}
-                />
-                
-                <p className="text-xs text-slate-500 mt-2">
-                  Dessa rekommendationer visas som åtgärdsförslag för kunden i deras ärende
-                </p>
-
-                {formData.recommendations && formData.recommendations.length > 200 && (
-                  <p className="text-xs text-slate-400 mt-1">
-                    {formData.recommendations.length} tecken
-                  </p>
-                )}
-              </div>
 
               {/* Time tracking */}
               {!isCustomerView && (

@@ -69,6 +69,13 @@ export interface Case {
   incidents_report: string | null
   recommendations: string | null
 
+  // Traffic Light Assessment (for contract customers)
+  pest_level: 0 | 1 | 2 | 3 | null  // 0=None, 1=Low, 2=Medium, 3=High
+  problem_rating: 1 | 2 | 3 | 4 | 5 | null  // 1=Excellent to 5=Critical
+  assessment_date: string | null
+  assessed_by: string | null
+  pest_level_trend: 'improving' | 'stable' | 'worsening' | null
+
   // Internal processes
   send_booking_confirmation: boolean
   send_offer: boolean

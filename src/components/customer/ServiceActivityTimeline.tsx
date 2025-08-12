@@ -9,11 +9,14 @@ import { Case, serviceTypeConfig } from '../../types/cases'
 import { STATUS_CONFIG, ClickUpStatus, getStatusColor } from '../../types/database'
 import ServiceRequestStatus from './ServiceRequestStatus'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import ProfessionalAssessment from './ProfessionalAssessment'
 import toast from 'react-hot-toast'
 
 interface ServiceActivityTimelineProps {
   customerId: string
 }
+
+// Interface for the component
 
 const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ customerId }) => {
   const { profile } = useAuth()
@@ -342,20 +345,16 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                             </div>
                           )}
 
-                          {/* Recommendations */}
-                          {caseItem.recommendations && (
-                            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                              <div className="flex items-start gap-2">
-                                <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                                <div>
-                                  <h5 className="text-xs font-medium text-blue-400 mb-1">Rekommendationer</h5>
-                                  <p className="text-sm text-slate-300">
-                                    {caseItem.recommendations}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                          {/* Professional Assessment & Recommendations */}
+                          <ProfessionalAssessment 
+                            assessment={{
+                              pest_level: caseItem.pest_level,
+                              problem_rating: caseItem.problem_rating,
+                              recommendations: caseItem.recommendations,
+                              assessment_date: caseItem.assessment_date,
+                              assessed_by: caseItem.assessed_by
+                            }}
+                          />
 
                           {/* Technician Info */}
                           {caseItem.primary_technician_name && (

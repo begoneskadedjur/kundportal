@@ -14,6 +14,7 @@ import RelationshipShowcase from '../../components/customer/RelationshipShowcase
 import ContractValueCard from '../../components/customer/ContractValueCard'
 import PremiumServiceRequest from '../../components/customer/PremiumServiceRequest'
 import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
+import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
 import CustomerPortalNavigation from '../../components/customer/CustomerPortalNavigation'
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
@@ -208,6 +209,11 @@ const CustomerPortal: React.FC = () => {
             {/* Contract Value Card */}
             <ContractValueCard 
               customer={customer}
+            />
+
+            {/* Service Assessment Summary */}
+            <ServiceAssessmentSummary 
+              customerId={customer.id}
             />
 
             {/* Service Activity Timeline */}
