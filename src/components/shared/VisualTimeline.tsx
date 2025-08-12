@@ -164,7 +164,8 @@ const VisualTimeline: React.FC<VisualTimelineProps> = ({
             {/* Pulse animation for the first item */}
             {isFirst && (
               <motion.div
-                className={`absolute left-4 top-3 w-8 h-8 ${config.color} rounded-full opacity-20`}
+                className={`absolute left-4 top-3 w-8 h-8 ${config.color} rounded-full`}
+                initial={{ opacity: 0.2, scale: 1 }}
                 animate={{
                   scale: [1, 1.5, 1],
                   opacity: [0.2, 0, 0.2]
@@ -174,6 +175,7 @@ const VisualTimeline: React.FC<VisualTimelineProps> = ({
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
+                style={{ opacity: 0.2 }}
               />
             )}
           </motion.div>

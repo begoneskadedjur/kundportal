@@ -1008,6 +1008,7 @@ export default function OneflowContractCreator() {
                 {isCreating ? (
                   <motion.div 
                     className="flex items-center gap-2"
+                    initial={{ opacity: 1 }}
                     animate={{ opacity: [1, 0.7, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                   >

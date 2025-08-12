@@ -66,6 +66,7 @@ const LiveStatusIndicator: React.FC<LiveStatusIndicatorProps> = ({
                     scale: [1, 1.2, 1],
                     opacity: [1, 0.8, 1]
                   } : {}}
+                  initial={{ opacity: 1, scale: 1 }}
                   transition={{
                     duration: 2,
                     repeat: service.status === 'online' ? Infinity : 0,
@@ -78,6 +79,7 @@ const LiveStatusIndicator: React.FC<LiveStatusIndicatorProps> = ({
                   <motion.div
                     className="absolute inset-0 w-3 h-3 rounded-full"
                     style={{ backgroundColor: config.color }}
+                    initial={{ opacity: 0.5, scale: 1 }}
                     animate={{
                       scale: [1, 2, 1],
                       opacity: [0.5, 0, 0.5]
