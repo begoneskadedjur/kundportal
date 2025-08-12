@@ -57,7 +57,8 @@ import Schedule from './pages/customer/Schedule';
 import MultisitePortal from './pages/multisite/Portal';
 
 // Shared components
-import ProtectedRoute from './components/shared/ProtectedRoute';
+import ProtectedRoute from './components/shared/ProtectedRoute'
+import AdminOrKoordinatorRoute from './components/shared/AdminOrKoordinatorRoute';
 import MultisiteProtectedRoute from './components/shared/MultisiteProtectedRoute';
 
 // Global styles
@@ -177,9 +178,9 @@ function App() {
             <Route 
               path="/admin/multisite/organizations" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <AdminOrKoordinatorRoute>
                   <OrganizationManagement />
-                </ProtectedRoute>
+                </AdminOrKoordinatorRoute>
               } 
             />
             <Route 
@@ -268,6 +269,14 @@ function App() {
                 <ProtectedRoute requiredRole="koordinator">
                   <MultisiteRegistration />
                 </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/multisite/organizations" 
+              element={
+                <AdminOrKoordinatorRoute>
+                  <OrganizationManagement />
+                </AdminOrKoordinatorRoute>
               } 
             />
             <Route 

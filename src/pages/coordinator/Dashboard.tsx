@@ -311,7 +311,7 @@ export default function CoordinatorDashboard() {
               tag="Ny"
             />
             <CoordinatorDashboardCard
-              href="/admin/multisite/organizations"
+              href="/koordinator/multisite/organizations"
               icon={Building2}
               title="Organisationsöversikt"
               description="Visa och hantera alla registrerade organisationer och deras anläggningar."
