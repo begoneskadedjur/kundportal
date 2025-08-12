@@ -28,7 +28,14 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ 3. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST
+  // 3. Specialhantering för multisite-användare som loggar in första gången
+  // Om användaren har multisite-roll men försöker komma åt customer-sidor
+  if (multisiteRole && requiredRole === 'customer' && !profile.customer_id) {
+    // Redirect multisite-only användare till multisite-portalen
+    return <Navigate to="/multisite" replace />;
+  }
+
+  // ✅ 4. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST
   let hasAccess = false;
   
   switch (profile.role) {

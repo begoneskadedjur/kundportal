@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react'
 import { LogOut, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useMultisite } from '../../contexts/MultisiteContext'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -51,6 +53,8 @@ type Customer = {
 
 const CustomerPortal: React.FC = () => {
   const { profile, signOut } = useAuth()
+  const { userRole, organization, loading: multisiteLoading } = useMultisite()
+  const navigate = useNavigate()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,16 +64,32 @@ const CustomerPortal: React.FC = () => {
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
+  // Check multisite access and redirect if needed
+  useEffect(() => {
+    // Vänta tills multisite-context har laddats
+    if (!multisiteLoading && profile) {
+      // Om användaren ENDAST har multisite-roll och ingen customer_id
+      if (userRole && organization && !profile.customer_id) {
+        navigate('/multisite')
+        return
+      }
+      
+      // Om användaren har både multisite och vanlig kundtillgång, stanna här
+      // men visa tydlig navigation till multisite
+    }
+  }, [multisiteLoading, userRole, organization, profile, navigate])
+
   // Fetch customer data
   useEffect(() => {
     if (profile?.customer_id) {
       fetchCustomerData()
       fetchPendingQuotes()
-    } else if (profile) {
+    } else if (profile && !multisiteLoading && !userRole) {
+      // Endast visa fel om användaren inte har multisite heller
       setError('Ingen kundkoppling hittades')
       setLoading(false)
     }
-  }, [profile])
+  }, [profile, multisiteLoading, userRole])
 
   const fetchCustomerData = async () => {
     try {

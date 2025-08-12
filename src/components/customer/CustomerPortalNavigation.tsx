@@ -44,14 +44,19 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
 
           {/* Navigation Tabs */}
           <div className="flex items-center gap-2">
-            {/* Multisite Portal Link (if user has access) */}
+            {/* Multisite Portal Link (if user has access) - More prominent styling */}
             {multisiteRole && organization && (
               <a
                 href="/multisite"
-                className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200"
+                className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg shadow-purple-500/25"
               >
                 <Building2 className="w-4 h-4" />
                 Multisite-portal
+                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                  {multisiteRole === 'verksamhetsansvarig' ? 'Verksamhet' : 
+                   multisiteRole === 'regionansvarig' ? 'Region' : 
+                   'Enhet'}
+                </span>
               </a>
             )}
             <button
