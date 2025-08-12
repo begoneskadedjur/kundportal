@@ -23,6 +23,11 @@ import TechnicianCommissions from './pages/admin/TechnicianCommissions';
 import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 
+// Multisite pages
+import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
+import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
+import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
+
 // ONEFLOW ROUTES
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
 import OneflowDiagnostics from './pages/admin/OneflowDiagnostics';
@@ -154,6 +159,33 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Multisite Management Routes */}
+            <Route 
+              path="/admin/multisite/organizations" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <OrganizationManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/multisite/traffic-light" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <TrafficLightOverview />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/multisite/billing" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <MultisiteBillingManagement />
+                </ProtectedRoute>
+              } 
+            />
+            
             {/* OneflowContractCreator - TILLGÄNGLIG FÖR ADMIN, KOORDINATOR OCH TEKNIKER */}
             <Route 
               path="/admin/oneflow-contract-creator" 
