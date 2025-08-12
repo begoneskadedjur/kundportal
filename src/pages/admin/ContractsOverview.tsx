@@ -323,10 +323,11 @@ const PipelineFilters: React.FC<{
   stats: any
 }> = ({ activeFilter, onFilterChange, stats }) => {
   const stages = [
-    { key: 'all', label: 'Alla', count: stats?.total_contracts || 0, color: 'bg-slate-600' },
+    { key: 'all', label: 'Alla', count: (stats?.total_contracts || 0) + (stats?.total_offers || 0), color: 'bg-slate-600' },
     { key: 'pending', label: 'Skickade', count: stats?.pending_contracts || 0, color: 'bg-blue-600' },
     { key: 'signed', label: 'Signerade', count: stats?.signed_contracts || 0, color: 'bg-green-600' },
     { key: 'active', label: 'Aktiva', count: stats?.active_contracts || 0, color: 'bg-emerald-600' },
+    { key: 'declined', label: 'Avvisade', count: stats?.declined_contracts || 0, color: 'bg-red-600' },
     { key: 'overdue', label: 'Försenade', count: stats?.overdue_count || 0, color: 'bg-orange-600' }
   ]
 
@@ -401,14 +402,21 @@ export default function ContractsOverview() {
       pending: { count: 0, value: 0 },
       signed: { count: 0, value: 0 },
       active: { count: 0, value: 0 },
-      overdue: { count: 0, value: 0 }
+      overdue: { count: 0, value: 0 },
+      declined: { count: 0, value: 0 }
     }
 
     filteredContracts.forEach(contract => {
       const status = contract.status as keyof typeof stages
       if (stages[status]) {
         stages[status].count++
-        stages[status].value += contract.total_value || 0
+        // Beräkna korrekt värde baserat på kontraktstyp och längd
+        let contractValue = contract.total_value || 0
+        if (contract.type === 'contract' && contract.contract_length) {
+          const years = parseInt(contract.contract_length)
+          contractValue = contractValue * years
+        }
+        stages[status].value += contractValue
       }
     })
 
@@ -569,30 +577,93 @@ export default function ContractsOverview() {
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Konvertering</p>
+                  <p className="text-xs text-slate-400">Konvertering/Signeringsgrad</p>
                   <p className="text-xl font-bold text-white">
-                    {stats?.contract_signing_rate || 0}%
+                    {stats?.overall_conversion_rate || 0}%
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Signeringsgrad
+                    {stats?.signed_contracts || 0} signerade av {((stats?.total_contracts || 0) + (stats?.total_offers || 0) - (stats?.declined_contracts || 0))} möjliga
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500 opacity-50" />
               </div>
             </Card>
 
+            <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Avvisade intäkter</p>
+                  <p className="text-xl font-bold text-red-400">
+                    {formatContractValue(stats?.declined_value || 0)}
+                  </p>
+                  <p className="text-xs text-red-300 mt-1">
+                    {stats?.declined_contracts || 0} avvisade deals
+                  </p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-red-500 opacity-50" />
+              </div>
+            </Card>
+          </div>
+          
+          {/* Extra KPI-rad för ytterligare insikter */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Snitt deal</p>
+                  <p className="text-xs text-slate-400">Snitt signerat deal</p>
                   <p className="text-xl font-bold text-white">
                     {formatContractValue(stats?.average_contract_value || 0)}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Per avtal
+                    Genomsnitt av signerade
                   </p>
                 </div>
                 <Target className="w-8 h-8 text-orange-500 opacity-50" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Väntande värde</p>
+                  <p className="text-xl font-bold text-blue-400">
+                    {formatContractValue(stats?.pending_value || 0)}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {stats?.pending_contracts || 0} väntande
+                  </p>
+                </div>
+                <Clock className="w-8 h-8 text-blue-500 opacity-50" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Win Rate</p>
+                  <p className="text-xl font-bold text-white">
+                    {Math.round(((stats?.signed_contracts || 0) / Math.max((stats?.signed_contracts || 0) + (stats?.declined_contracts || 0), 1)) * 100)}%
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Signerade vs avvisade
+                  </p>
+                </div>
+                <Award className="w-8 h-8 text-green-500 opacity-50" />
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Pipeline hälsa</p>
+                  <p className="text-xl font-bold text-white">
+                    {Math.round(((stats?.pending_contracts || 0) / Math.max((stats?.total_contracts || 0) + (stats?.total_offers || 0), 1)) * 100)}%
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Andel väntande deals
+                  </p>
+                </div>
+                <BarChart3 className="w-8 h-8 text-purple-500 opacity-50" />
               </div>
             </Card>
           </div>
@@ -836,11 +907,13 @@ export default function ContractsOverview() {
             <div className="space-y-2">
               {Object.entries(pipelineStats).map(([stage, data]) => (
                 <div key={stage} className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 capitalize">{stage}</span>
+                  <span className={`text-xs capitalize ${stage === 'declined' ? 'text-red-400' : 'text-slate-400'}`}>{stage}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-white">{data.count}</span>
                     <span className="text-xs text-slate-500">|</span>
-                    <span className="text-xs text-green-400">{formatContractValue(data.value)}</span>
+                    <span className={`text-xs ${stage === 'declined' ? 'text-red-400' : 'text-green-400'}`}>
+                      {formatContractValue(data.value)}
+                    </span>
                   </div>
                 </div>
               ))}

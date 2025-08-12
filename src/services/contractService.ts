@@ -40,17 +40,20 @@ export interface ContractStats {
   signed_contracts: number
   pending_contracts: number
   active_contracts: number
+  declined_contracts: number
   
   // Financial metrics
   total_value: number
   signed_value: number
   pending_value: number
+  declined_value: number
   average_contract_value: number
   average_offer_value: number
   
   // Performance metrics
   contract_signing_rate: number // Procent av kontrakt som signerats
   offer_conversion_rate: number  // Procent av offerter som blivit kontrakt
+  overall_conversion_rate: number // Total konverteringsgrad (signed / (total - declined))
   
   // Time-based analytics
   contracts_this_month: number
@@ -483,12 +486,14 @@ export class ContractService {
       const signedContracts = contracts.filter(c => c.status === 'signed')
       const pendingContracts = contracts.filter(c => c.status === 'pending')
       const activeContracts = contracts.filter(c => c.status === 'active')
+      const declinedContracts = contracts.filter(c => c.status === 'declined')
       
       const total_contracts = contractsOnly.length
       const total_offers = offersOnly.length
       const signed_contracts = signedContracts.length
       const pending_contracts = pendingContracts.length
       const active_contracts = activeContracts.length
+      const declined_contracts = declinedContracts.length
       
       // Finansiella metriker - korrekt beräkning av totala kontraktsvärden
       const total_value = contracts
@@ -523,6 +528,16 @@ export class ContractService {
           return sum + (c.total_value || 0)
         }, 0)
         
+      const declined_value = declinedContracts
+        .filter(c => c.total_value)
+        .reduce((sum, c) => {
+          if (c.type === 'contract' && c.contract_length) {
+            const years = parseInt(c.contract_length)
+            return sum + ((c.total_value || 0) * years)
+          }
+          return sum + (c.total_value || 0)
+        }, 0)
+        
       const average_contract_value = contractsOnly.length > 0 
         ? contractsOnly.filter(c => c.total_value).reduce((sum, c) => sum + (c.total_value || 0), 0) / contractsOnly.filter(c => c.total_value).length
         : 0
@@ -531,13 +546,21 @@ export class ContractService {
         ? offersOnly.filter(c => c.total_value).reduce((sum, c) => sum + (c.total_value || 0), 0) / offersOnly.filter(c => c.total_value).length
         : 0
 
-      // Performance metriker
+      // Performance metriker - korrigerade beräkningar
       const contract_signing_rate = total_contracts > 0 
         ? Math.round((signed_contracts / total_contracts) * 100) 
         : 0
 
       const offer_conversion_rate = total_offers > 0
         ? Math.round((contracts.filter(c => c.type === 'offer' && c.status === 'signed').length / total_offers) * 100)
+        : 0
+        
+      // Ny overall conversion rate: signerade kontrakt och offerter / (totalt - avvisade)
+      const total_deals = total_contracts + total_offers
+      const total_signed = signedContracts.length
+      const eligible_deals = total_deals - declined_contracts // Uteslut avvisade från nämnaren
+      const overall_conversion_rate = eligible_deals > 0 
+        ? Math.round((total_signed / eligible_deals) * 100)
         : 0
         
       // Tidsbaserad analys
@@ -712,17 +735,20 @@ export class ContractService {
         signed_contracts,
         pending_contracts,
         active_contracts,
+        declined_contracts,
         
         // Financial metrics
         total_value,
         signed_value,
         pending_value,
+        declined_value,
         average_contract_value,
         average_offer_value,
         
         // Performance metrics
         contract_signing_rate,
         offer_conversion_rate,
+        overall_conversion_rate,
         
         // Time-based analytics
         contracts_this_month,
