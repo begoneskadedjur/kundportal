@@ -97,7 +97,7 @@ export default function MultisiteRegistration() {
   const [newInvite, setNewInvite] = useState<UserInvite>({
     email: '',
     name: '',
-    role: 'verksamhetsansvarig',
+    role: 'verksamhetschef',
     sites: []
   })
 
@@ -150,12 +150,12 @@ export default function MultisiteRegistration() {
     }
 
     // Validate site selection based on role
-    if (newInvite.role === 'regionansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) {
+    if (newInvite.role === 'regionchef' && (!newInvite.sites || newInvite.sites.length === 0)) {
       toast.error('Regionschef måste kopplas till minst en anläggning')
       return
     }
 
-    if (newInvite.role === 'enhetsansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) {
+    if (newInvite.role === 'platsansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) {
       toast.error('Platsansvarig måste kopplas till en anläggning')
       return
     }
@@ -170,7 +170,7 @@ export default function MultisiteRegistration() {
     setNewInvite({
       email: '',
       name: '',
-      role: 'verksamhetsansvarig',
+      role: 'verksamhetschef',
       sites: []
     })
     toast.success('Användare tillagd till inbjudningslistan')
@@ -193,9 +193,9 @@ export default function MultisiteRegistration() {
         return !!organizationData.billing_address
       
       case 'users':
-        // Users are optional, but if added, must have at least one verksamhetsansvarig
+        // Users are optional, but if added, must have at least one verksamhetschef
         if (userInvites.length > 0) {
-          return userInvites.some(invite => invite.role === 'verksamhetsansvarig');
+          return userInvites.some(invite => invite.role === 'verksamhetschef');
         }
         return true
       
@@ -237,10 +237,10 @@ export default function MultisiteRegistration() {
         return true
       
       case 'users':
-        // Optional step, but if users are added, validate that at least one verksamhetsansvarig exists
+        // Optional step, but if users are added, validate that at least one verksamhetschef exists
         if (userInvites.length > 0) {
-          const hasVerksamhetsansvarig = userInvites.some(invite => invite.role === 'verksamhetsansvarig');
-          if (!hasVerksamhetsansvarig) {
+          const hasVerksamhetschef = userInvites.some(invite => invite.role === 'verksamhetschef');
+          if (!hasVerksamhetschef) {
             toast.error('Om användare läggs till måste minst en ha rollen Verksamhetschef');
             return false;
           }
@@ -409,7 +409,7 @@ export default function MultisiteRegistration() {
                     required
                   />
                   <p className="text-sm text-slate-400 mt-1">
-                    Denna e-post skapar en användare med rollen Verksamhetsansvarig för hela organisationen.
+                    Denna e-post skapar en användare med rollen Verksamhetschef för hela organisationen.
                   </p>
                 </div>
                 
@@ -620,7 +620,7 @@ export default function MultisiteRegistration() {
                 <p className="text-slate-400">Lägg till ytterligare användare som ska ha tillgång till portalen (valfritt)</p>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mt-4">
                   <p className="text-blue-300 text-sm">
-                    <strong>Observera:</strong> Verksamhetsansvarig skapas automatiskt från organisationens primära kontakt. 
+                    <strong>Observera:</strong> Verksamhetschef skapas automatiskt från organisationens primära kontakt. 
                     Platsansvariga skapas automatiskt från anläggningarnas kontakter. Här kan du lägga till extra användare vid behov.
                   </p>
                 </div>
@@ -634,23 +634,23 @@ export default function MultisiteRegistration() {
                     <div key={index} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-3">
                         {/* Role-specific icons */}
-                        {invite.role === 'verksamhetsansvarig' && <Building2 className="w-5 h-5 text-blue-400" />}
-                        {invite.role === 'regionansvarig' && <MapPin className="w-5 h-5 text-purple-400" />}
-                        {invite.role === 'enhetsansvarig' && <User className="w-5 h-5 text-green-400" />}
+                        {invite.role === 'verksamhetschef' && <Building2 className="w-5 h-5 text-blue-400" />}
+                        {invite.role === 'regionchef' && <MapPin className="w-5 h-5 text-purple-400" />}
+                        {invite.role === 'platsansvarig' && <User className="w-5 h-5 text-green-400" />}
                         <div>
                           <span className="text-white font-medium">{invite.name}</span>
                           <span className="text-slate-400 text-sm ml-2">{invite.email}</span>
                           <div className="flex items-center gap-2 mt-1">
                             <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              invite.role === 'verksamhetsansvarig' ? 'bg-blue-500/20 text-blue-300' :
-                              invite.role === 'regionansvarig' ? 'bg-purple-500/20 text-purple-300' :
+                              invite.role === 'verksamhetschef' ? 'bg-blue-500/20 text-blue-300' :
+                              invite.role === 'regionchef' ? 'bg-purple-500/20 text-purple-300' :
                               'bg-green-500/20 text-green-300'
                             }`}>
-                              {invite.role === 'verksamhetsansvarig' ? 'Verksamhetschef' :
-                               invite.role === 'regionansvarig' ? 'Regionschef' :
+                              {invite.role === 'verksamhetschef' ? 'Verksamhetschef' :
+                               invite.role === 'regionchef' ? 'Regionchef' :
                                'Platsansvarig (Extra)'}
                             </span>
-                            {invite.role === 'regionansvarig' && invite.sites && invite.sites.length > 0 && (
+                            {invite.role === 'regionchef' && invite.sites && invite.sites.length > 0 && (
                               <span className="text-xs text-slate-400">
                                 Regioner: {invite.sites.map(siteId => {
                                   const site = sites.find(s => s.site_name === siteId);
@@ -658,7 +658,7 @@ export default function MultisiteRegistration() {
                                 }).join(', ')}
                               </span>
                             )}
-                            {invite.role === 'enhetsansvarig' && invite.sites && invite.sites.length > 0 && (
+                            {invite.role === 'platsansvarig' && invite.sites && invite.sites.length > 0 && (
                               <span className="text-xs text-slate-400">
                                 Anläggning: {invite.sites[0]}
                               </span>
@@ -711,9 +711,9 @@ export default function MultisiteRegistration() {
                         }}
                         className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
-                        <option value="verksamhetsansvarig">Verksamhetschef</option>
-                        <option value="regionansvarig">Regionschef</option>
-                        <option value="enhetsansvarig">Platsansvarig (Extra)</option>
+                        <option value="verksamhetschef">Verksamhetschef</option>
+                        <option value="regionchef">Regionchef</option>
+                        <option value="platsansvarig">Platsansvarig (Extra)</option>
                       </select>
                     </div>
                   </div>
@@ -721,7 +721,7 @@ export default function MultisiteRegistration() {
                   {/* Role descriptions */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
                     <div className={`p-3 rounded-lg ${
-                      newInvite.role === 'verksamhetsansvarig' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-slate-800/50'
+                      newInvite.role === 'verksamhetschef' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-slate-800/50'
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <Building2 className="w-4 h-4 text-blue-400" />
@@ -730,7 +730,7 @@ export default function MultisiteRegistration() {
                       <p>Högsta behörighet inom organisationen. Kan hantera alla anläggningar och användare.</p>
                     </div>
                     <div className={`p-3 rounded-lg ${
-                      newInvite.role === 'regionansvarig' ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-slate-800/50'
+                      newInvite.role === 'regionchef' ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-slate-800/50'
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <MapPin className="w-4 h-4 text-purple-400" />
@@ -739,7 +739,7 @@ export default function MultisiteRegistration() {
                       <p>Ansvarig för utvalda anläggningar inom specifika regioner.</p>
                     </div>
                     <div className={`p-3 rounded-lg ${
-                      newInvite.role === 'enhetsansvarig' ? 'bg-green-500/10 border border-green-500/20' : 'bg-slate-800/50'
+                      newInvite.role === 'platsansvarig' ? 'bg-green-500/10 border border-green-500/20' : 'bg-slate-800/50'
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <User className="w-4 h-4 text-green-400" />
@@ -750,7 +750,7 @@ export default function MultisiteRegistration() {
                   </div>
                   
                   {/* Dynamic site selection based on role */}
-                  {newInvite.role === 'regionansvarig' && sites.length > 0 && (
+                  {newInvite.role === 'regionchef' && sites.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-3">
                         Välj anläggningar (kan välja flera)
@@ -779,7 +779,7 @@ export default function MultisiteRegistration() {
                     </div>
                   )}
                   
-                  {newInvite.role === 'enhetsansvarig' && sites.length > 0 && (
+                  {newInvite.role === 'platsansvarig' && sites.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         Välj anläggning
@@ -806,8 +806,8 @@ export default function MultisiteRegistration() {
                     variant="secondary"
                     className="flex items-center gap-2"
                     disabled={!newInvite.name || !newInvite.email || 
-                      (newInvite.role === 'regionansvarig' && (!newInvite.sites || newInvite.sites.length === 0)) ||
-                      (newInvite.role === 'enhetsansvarig' && (!newInvite.sites || newInvite.sites.length === 0))
+                      (newInvite.role === 'regionchef' && (!newInvite.sites || newInvite.sites.length === 0)) ||
+                      (newInvite.role === 'platsansvarig' && (!newInvite.sites || newInvite.sites.length === 0))
                     }
                   >
                     <Plus className="w-4 h-4" />
@@ -881,20 +881,20 @@ export default function MultisiteRegistration() {
                     <ul className="space-y-2 text-sm">
                       {userInvites.map((invite, index) => (
                         <li key={index} className="text-white flex items-center gap-2">
-                          {invite.role === 'verksamhetsansvarig' && <Building2 className="w-4 h-4 text-blue-400" />}
-                          {invite.role === 'regionansvarig' && <MapPin className="w-4 h-4 text-purple-400" />}
-                          {invite.role === 'enhetsansvarig' && <User className="w-4 h-4 text-green-400" />}
+                          {invite.role === 'verksamhetschef' && <Building2 className="w-4 h-4 text-blue-400" />}
+                          {invite.role === 'regionchef' && <MapPin className="w-4 h-4 text-purple-400" />}
+                          {invite.role === 'platsansvarig' && <User className="w-4 h-4 text-green-400" />}
                           <div>
                             <span className="font-medium">{invite.name}</span>
                             <span className="ml-2 text-sm">
-                              ({invite.role === 'verksamhetsansvarig' ? 'Verksamhetschef' :
-                                invite.role === 'regionansvarig' ? 'Regionschef' :
+                              ({invite.role === 'verksamhetschef' ? 'Verksamhetschef' :
+                                invite.role === 'regionchef' ? 'Regionschef' :
                                 'Platsansvarig (Extra)'})
                             </span>
                             <span className="text-slate-400 ml-2">({invite.email})</span>
                             {invite.sites && invite.sites.length > 0 && (
                               <div className="text-xs text-slate-500 ml-6">
-                                {invite.role === 'regionansvarig' ? 'Anläggningar: ' : 'Anläggning: '}
+                                {invite.role === 'regionchef' ? 'Anläggningar: ' : 'Anläggning: '}
                                 {invite.sites.join(', ')}
                               </div>
                             )}

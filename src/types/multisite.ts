@@ -30,15 +30,15 @@ export interface OrganizationSite {
   updated_at: string
 }
 
-export type MultisiteUserRoleType = 'verksamhetschef' | 'regionschef' | 'platsansvarig'
+export type MultisiteUserRoleType = 'verksamhetschef' | 'regionchef' | 'platsansvarig'
 
 export interface MultisiteUserRole {
   id: string
   user_id: string
   organization_id: string
   role_type: MultisiteUserRoleType
-  site_ids: string[] | null // För platsansvariga och regionschefer
-  region: string | null // För regionschefer
+  site_ids: string[] | null // För platsansvariga och regionchefer
+  region: string | null // För regionchefer
   is_active: boolean
   created_at: string
   updated_at: string
@@ -190,7 +190,7 @@ export function getPermissionsForRole(role: MultisiteUserRoleType): MultisitePer
         canViewTrafficLight: true,
         canRequestService: true,
       }
-    case 'regionschef':
+    case 'regionchef':
       return {
         canViewAllSites: false, // Endast deras regioner/anläggningar
         canCreateSites: false,

@@ -321,13 +321,13 @@ export default function OrganizationManagement() {
                       {orgUsers.length > 0 && (
                         <div className="mt-2 space-y-1">
                           <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'verksamhetsansvarig').length} Verksamhetsansvarig
+                            {orgUsers.filter(u => u.role_type === 'verksamhetschef').length} Verksamhetschef
                           </div>
                           <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'regionansvarig').length} Regionansvarig
+                            {orgUsers.filter(u => u.role_type === 'regionchef').length} Regionchef
                           </div>
                           <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'enhetsansvarig').length} Enhetsansvarig
+                            {orgUsers.filter(u => u.role_type === 'platsansvarig').length} Platsansvarig
                           </div>
                         </div>
                       )}

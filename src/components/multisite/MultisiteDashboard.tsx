@@ -110,9 +110,9 @@ const MultisiteDashboard: React.FC = () => {
                 Välkommen till {organization?.organization_name}
               </h1>
               <p className="text-slate-300">
-                {userRole?.role_type === 'verksamhetsansvarig' && 'Du har full tillgång till hela organisationen'}
-                {userRole?.role_type === 'regionansvarig' && `Du ansvarar för region ${userRole.region}`}
-                {userRole?.role_type === 'enhetsansvarig' && `Du ansvarar för ${accessibleSites.length} enhet${accessibleSites.length === 1 ? '' : 'er'}`}
+                {userRole?.role_type === 'verksamhetschef' && 'Du har full tillgång till hela organisationen'}
+                {userRole?.role_type === 'regionchef' && `Du ansvarar för region ${userRole.region}`}
+                {userRole?.role_type === 'platsansvarig' && `Du ansvarar för ${accessibleSites.length} enhet${accessibleSites.length === 1 ? '' : 'er'}`}
               </p>
             </div>
             <div className="text-right">

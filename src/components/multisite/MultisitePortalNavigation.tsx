@@ -34,8 +34,8 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
     switch (role) {
       case 'verksamhetschef':
         return 'Verksamhetschef'
-      case 'regionschef':
-        return 'Regionschef'
+      case 'regionchef':
+        return 'Regionchef'
       case 'platsansvarig':
         return 'Platsansvarig'
       default:

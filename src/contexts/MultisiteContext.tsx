@@ -133,9 +133,9 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .eq('is_active', true)
 
       // Apply role-based filtering
-      if (roleData.role_type === 'regional_manager' && roleData.region) {
+      if (roleData.role_type === 'regionchef' && roleData.region) {
         sitesQuery = sitesQuery.eq('region', roleData.region)
-      } else if (roleData.role_type === 'site_manager' && roleData.site_ids) {
+      } else if (roleData.role_type === 'platsansvarig' && roleData.site_ids) {
         sitesQuery = sitesQuery.in('id', roleData.site_ids)
       }
 
@@ -172,15 +172,15 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   const accessibleSites = sites.filter(site => {
     if (!userRole) return false
     
-    if (userRole.role_type === 'verksamhetsansvarig') {
+    if (userRole.role_type === 'verksamhetschef') {
       return true // Can access all sites
     }
     
-    if (userRole.role_type === 'regionansvarig') {
+    if (userRole.role_type === 'regionchef') {
       return site.region === userRole.region
     }
     
-    if (userRole.role_type === 'enhetsansvarig') {
+    if (userRole.role_type === 'platsansvarig') {
       return userRole.site_ids?.includes(site.id) || false
     }
     
@@ -200,11 +200,11 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   // Check if user can invite a specific role
   const canInviteRole = (roleType: MultisiteUserRoleType): boolean => {
     switch (roleType) {
-      case 'verksamhetsansvarig':
+      case 'verksamhetschef':
         return permissions.canInviteQualityManagers
-      case 'regionansvarig':
+      case 'regionchef':
         return permissions.canInviteRegionalManagers
-      case 'enhetsansvarig':
+      case 'platsansvarig':
         return permissions.canInviteSiteManagers
       default:
         return false

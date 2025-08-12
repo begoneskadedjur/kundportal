@@ -90,7 +90,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
   const [newInvite, setNewInvite] = useState<UserInvite>({
     email: '',
     name: '',
-    role: 'quality_manager'
+    role: 'verksamhetschef'
   })
 
   const steps: { key: WizardStep; label: string; icon: React.ElementType }[] = [
@@ -153,7 +153,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     setNewInvite({
       email: '',
       name: '',
-      role: 'quality_manager'
+      role: 'verksamhetschef'
     })
     toast.success('Användare tillagd till inbjudningslistan')
   }
@@ -607,9 +607,9 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                       onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as MultisiteUserRoleType })}
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
                     >
-                      <option value="verksamhetsansvarig">Verksamhetsansvarig</option>
-                      <option value="regionansvarig">Regionansvarig</option>
-                      <option value="enhetsansvarig">Enhetsansvarig</option>
+                      <option value="verksamhetschef">Verksamhetschef</option>
+                      <option value="regionchef">Regionchef</option>
+                      <option value="platsansvarig">Platsansvarig</option>
                     </select>
                   </div>
                   <Button
