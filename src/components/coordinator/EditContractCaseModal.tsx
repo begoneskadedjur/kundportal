@@ -121,7 +121,11 @@ export default function EditContractCaseModal({
     // Rapporter och offerter
     quote_generated_at: null as string | null,
     report_generated_at: null as string | null,
-    reports: [] as any[]
+    reports: [] as any[],
+    
+    // 🚦 Traffic Light System
+    pest_level: undefined as number | undefined,  // 0-3
+    problem_rating: undefined as number | undefined,  // 1-5
   })
 
   const [technicians, setTechnicians] = useState<any[]>([])
@@ -193,7 +197,10 @@ export default function EditContractCaseModal({
         work_started_at: caseData.work_started_at || null,
         quote_generated_at: caseData.quote_generated_at || null,
         report_generated_at: caseData.report_generated_at || null,
-        reports: caseData.reports || []
+        reports: caseData.reports || [],
+        // 🚦 Traffic Light System
+        pest_level: caseData.pest_level !== null ? caseData.pest_level : undefined,
+        problem_rating: caseData.problem_rating !== null ? caseData.problem_rating : undefined,
       })
       
       // Check if timer was running
@@ -476,6 +483,13 @@ export default function EditContractCaseModal({
         tertiary_technician_name: formData.tertiary_technician_name || null,
         scheduled_start: formData.scheduled_start?.toISOString() || null,
         scheduled_end: formData.scheduled_end?.toISOString() || null,
+        // 🚦 Traffic Light System
+        pest_level: formData.pest_level !== undefined ? formData.pest_level : null,
+        problem_rating: formData.problem_rating !== undefined ? formData.problem_rating : null,
+        assessment_date: (formData.pest_level !== undefined || formData.problem_rating !== undefined) 
+          ? new Date().toISOString() : null,
+        assessed_by: (formData.pest_level !== undefined || formData.problem_rating !== undefined)
+          ? profile?.email || null : null,
       }
 
       // Remove fields that don't exist in database
@@ -823,6 +837,112 @@ export default function EditContractCaseModal({
                   disabled={isCustomerView}
                 />
               </div>
+
+              {/* 🚦 Traffic Light System - Only for contract customers */}
+              {caseData.customer_id && !isCustomerView && (
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-2xl">🚦</span>
+                    Bedömning & Trafikljusstatus
+                  </h3>
+                  
+                  {/* Pest Level (0-3) */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-300 mb-3">
+                      Skadedjursnivå (0-3)
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { value: 0, label: "Ingen förekomst", color: "bg-gray-500", emoji: "✅" },
+                        { value: 1, label: "Låg", color: "bg-green-500", emoji: "🟢" },
+                        { value: 2, label: "Måttlig", color: "bg-yellow-500", emoji: "🟡" },
+                        { value: 3, label: "Hög/Infestation", color: "bg-red-500", emoji: "🔴" }
+                      ].map(level => (
+                        <button
+                          key={level.value}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, pest_level: level.value }))}
+                          className={`relative p-3 rounded-lg transition-all transform hover:scale-105 ${
+                            formData.pest_level === level.value 
+                              ? `${level.color} text-white shadow-lg ring-2 ring-white/50` 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">{level.emoji}</div>
+                          <div className="font-bold text-lg">{level.value}</div>
+                          <div className="text-xs">{level.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Problem Rating (1-5) */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-300 mb-3">
+                      Övergripande problembild (1-5)
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[
+                        { value: 1, label: "Utmärkt", color: "bg-green-600" },
+                        { value: 2, label: "Bra", color: "bg-green-500" },
+                        { value: 3, label: "Uppmärksamhet", color: "bg-yellow-500" },
+                        { value: 4, label: "Allvarligt", color: "bg-orange-500" },
+                        { value: 5, label: "Kritiskt", color: "bg-red-500" }
+                      ].map(rating => (
+                        <button
+                          key={rating.value}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, problem_rating: rating.value }))}
+                          className={`relative p-3 rounded-lg transition-all transform hover:scale-105 ${
+                            formData.problem_rating === rating.value 
+                              ? `${rating.color} text-white shadow-lg ring-2 ring-white/50` 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <div className="font-bold text-xl mb-1">{rating.value}</div>
+                          <div className="text-xs">{rating.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">
+                      1-2: Inga åtgärder krävs | 3: Övervakning krävs | 4-5: Kräver kundengagemang
+                    </p>
+                  </div>
+                  
+                  {/* Automatic Traffic Light Status */}
+                  {(formData.pest_level !== undefined || formData.problem_rating !== undefined) && (
+                    <div className="mt-4 p-4 rounded-lg bg-slate-900/50 border border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-400">Automatisk status:</span>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${
+                          (formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/50' 
+                            : (formData.problem_rating === 3 || formData.pest_level === 2)
+                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
+                            : 'bg-green-500/20 text-green-400 border border-green-500/50'
+                        }`}>
+                          <span className="text-xl">
+                            {(formData.problem_rating >= 4 || formData.pest_level >= 3) ? '🔴' 
+                              : (formData.problem_rating === 3 || formData.pest_level === 2) ? '🟡' : '🟢'}
+                          </span>
+                          {(formData.problem_rating >= 4 || formData.pest_level >= 3) 
+                            ? 'Kritisk - Åtgärd krävs omgående' 
+                            : (formData.problem_rating === 3 || formData.pest_level === 2)
+                            ? 'Varning - Övervakning krävs'
+                            : 'OK - Ingen omedelbar åtgärd'}
+                        </div>
+                      </div>
+                      {(formData.problem_rating >= 4 || formData.pest_level >= 3) && (
+                        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                          <p className="text-sm text-red-400">
+                            ⚠️ Denna bedömning indikerar att kundens engagemang krävs för att lösa problemet effektivt.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Recommendations Section */}
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">

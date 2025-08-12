@@ -76,6 +76,10 @@ export type Database = {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          
+          // 🏢 Multisite Support
+          organization_id: string | null  // FK till multisite_organizations
+          is_multisite: boolean
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
@@ -151,6 +155,13 @@ export type Database = {
           quote_signed_at: string | null
           quote_rejected_at: string | null
           oneflow_contract_id: string | null
+          // 🚦 Traffic Light System (endast för avtalskunder)
+          pest_level: 0 | 1 | 2 | 3 | null  // 0=None, 1=Low, 2=Medium, 3=High
+          problem_rating: 1 | 2 | 3 | 4 | 5 | null  // 1=Excellent to 5=Critical
+          site_id: string | null  // FK till organization_sites för multisite
+          assessment_date: string | null
+          assessed_by: string | null
+          pest_level_trend: 'improving' | 'stable' | 'worsening' | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
@@ -289,6 +300,12 @@ export type Database = {
           technician_id: string | null // FK till technicians
           role: string | null // 'admin' | 'customer' | 'technician'
           display_name: string | null // Visningsnamn för tekniker
+          
+          // 🏢 Multisite Support
+          organization_id: string | null  // FK till multisite_organizations
+          multisite_role: 'quality_manager' | 'regional_manager' | 'site_manager' | null
+          site_access: string[] | null  // Array av site IDs
+          region_access: string | null  // För regional managers
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
