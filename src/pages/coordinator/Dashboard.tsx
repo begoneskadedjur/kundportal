@@ -7,9 +7,10 @@ import CoordinatorKpiCard from '../../components/admin/coordinator/CoordinatorKp
 import KpiCaseListModal from '../../components/admin/coordinator/KpiCaseListModal';
 import GeographicOverview from '../../components/admin/coordinator/GeographicOverview';
 import { BeGoneCaseRow, Technician } from '../../types/database';
+import MultisiteRegistrationWizard from '../../components/admin/multisite/MultisiteRegistrationWizard';
 
 // Importera ikoner
-import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature } from 'lucide-react';
+import { CalendarDays, Wand2, Users, PieChart, Wrench, AlertTriangle, FileSearch, BarChart3, FileSignature, UserPlus } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat';
 
@@ -44,6 +45,7 @@ export default function CoordinatorDashboard() {
   const [allCases, setAllCases] = useState<BeGoneCaseRow[]>([]);
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
   const [currentAbsences, setCurrentAbsences] = useState<any[]>([]);
+  const [multisiteWizardOpen, setMultisiteWizardOpen] = useState(false);
 
   useEffect(() => {
     // Funktion för att hämta all nödvändig data från Supabase
@@ -304,6 +306,14 @@ export default function CoordinatorDashboard() {
               tag="Tillgänglig"
             />
             <CoordinatorDashboardCard
+              onClick={() => setMultisiteWizardOpen(true)}
+              icon={UserPlus}
+              title="Multisite-kund"
+              description="Registrera ny organisation med flera anläggningar och sites."
+              tag="Ny"
+              iconColor="text-green-500"
+            />
+            <CoordinatorDashboardCard
               href="/koordinator/sok-arenden"
               icon={FileSearch}
               title="Sök Ärenden"
@@ -343,6 +353,16 @@ export default function CoordinatorDashboard() {
         contextData={{
           kpiData,
           recentCases: modalData.cases
+        }}
+      />
+      
+      {/* Multisite Registration Wizard */}
+      <MultisiteRegistrationWizard
+        isOpen={multisiteWizardOpen}
+        onClose={() => setMultisiteWizardOpen(false)}
+        onSuccess={() => {
+          setMultisiteWizardOpen(false)
+          // Could refresh data here if needed
         }}
       />
     </div>

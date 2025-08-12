@@ -5,9 +5,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck, Building2 } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
+import SiteSelector from '../../shared/SiteSelector';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -65,6 +66,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [contractCustomers, setContractCustomers] = useState<any[]>([]);
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [timeSlotDuration, setTimeSlotDuration] = useState(60);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -85,6 +87,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
     setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
     setSelectedContractCustomer(null);
+    setSelectedSiteId(null);
   }, []);
 
   // Hämta avtalskunder när modal öppnas
@@ -303,15 +306,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error('Du måste välja en avtalskund');
     }
     
+    // Validera site för multisite-kunder
+    const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
+    if (caseType === 'contract' && customer?.is_multisite && !selectedSiteId) {
+      return toast.error('Du måste välja en anläggning för denna multisite-kund');
+    }
+    
     setLoading(true); 
     setError(null);
     
     try {
       if (caseType === 'contract') {
         // Hantera avtalskundärenden
-        const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
         const caseData = {
           customer_id: selectedContractCustomer,
+          site_id: customer?.is_multisite ? selectedSiteId : null,
           title: formData.title.trim(),
           description: formData.description || '',
           status: 'scheduled' as const,
@@ -437,6 +446,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     value={selectedContractCustomer || ''}
                     onChange={(e) => {
                       setSelectedContractCustomer(e.target.value);
+                      setSelectedSiteId(null); // Reset site when customer changes
                       // Data fylls nu i via useEffect när selectedContractCustomer ändras
                     }}
                     className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
@@ -450,6 +460,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     ))}
                   </select>
                 </div>
+              )}
+
+              {/* Site-väljare för multisite-kunder */}
+              {caseType === 'contract' && selectedContractCustomer && (
+                (() => {
+                  const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
+                  if (selectedCustomer?.is_multisite && selectedCustomer?.organization_id) {
+                    return (
+                      <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-purple-400" />
+                          Välj anläggning/site *
+                        </label>
+                        <SiteSelector
+                          organizationId={selectedCustomer.organization_id}
+                          value={selectedSiteId}
+                          onChange={setSelectedSiteId}
+                          required={true}
+                          placeholder="Välj anläggning..."
+                          className="w-full"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                          Välj vilken anläggning ärendet gäller för denna multisite-organisation
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
               )}
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

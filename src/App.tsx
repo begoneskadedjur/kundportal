@@ -2,6 +2,7 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { MultisiteProvider } from './contexts/MultisiteContext';
 import { Toaster } from 'react-hot-toast';
 
 // Auth pages
@@ -56,8 +57,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-slate-950">
-          <Routes>
+        <MultisiteProvider>
+          <div className="min-h-screen bg-slate-950">
+            <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/set-password" element={<SetPassword />} />
@@ -354,6 +356,7 @@ function App() {
             }}
           />
         </div>
+        </MultisiteProvider>
       </AuthProvider>
     </Router>
   );

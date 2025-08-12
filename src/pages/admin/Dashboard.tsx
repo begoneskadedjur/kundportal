@@ -21,7 +21,11 @@ import {
   UserCheck,
   Wallet,
   Settings,
-  Package
+  Package,
+  MapPin,
+  AlertCircle,
+  UserPlus,
+  Receipt
 } from 'lucide-react'
 
 import Card from '../../components/ui/Card'
@@ -39,6 +43,7 @@ import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueC
 import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
+import MultisiteRegistrationWizard from '../../components/admin/multisite/MultisiteRegistrationWizard'
 
 interface DashboardStats {
   totalCustomers: number
@@ -75,6 +80,7 @@ const AdminDashboard: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalType, setModalType] = useState<'customers' | 'revenue' | 'cases' | 'technicians'>('customers')
   const [modalTitle, setModalTitle] = useState('')
+  const [multisiteWizardOpen, setMultisiteWizardOpen] = useState(false)
 
   useEffect(() => {
     fetchDashboardStats()
@@ -472,6 +478,60 @@ const AdminDashboard: React.FC = () => {
               </StaggeredGrid>
             </div>
 
+            {/* Multisite Management */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="w-8 h-px bg-slate-700 flex-1" />
+                <span className="text-slate-300">Multisite-hantering</span>
+                <div className="w-8 h-px bg-slate-700 flex-1" />
+              </h2>
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                staggerDelay={0.1}
+                initialDelay={1.4}
+              >
+                <AdminDashboardCard
+                  onClick={() => setMultisiteWizardOpen(true)}
+                  icon={UserPlus}
+                  title="Registrera Organisation"
+                  description="Ny multisite-kund wizard"
+                  stats="Steg-för-steg guide"
+                  tag="Ny"
+                  iconColor="text-green-500"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/multisite/organizations"
+                  icon={Building2}
+                  title="Organisationer"
+                  description="Hantera multisite-organisationer"
+                  stats="0 organisationer"
+                  tag="Multisite"
+                  iconColor="text-purple-500"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/multisite/traffic-light"
+                  icon={AlertCircle}
+                  title="Trafikljusöversikt"
+                  description="Kvalitetsövervakning alla sites"
+                  stats="Real-time status"
+                  tag="Kvalitet"
+                  iconColor="text-yellow-500"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/multisite/billing"
+                  icon={Receipt}
+                  title="Multisite-fakturering"
+                  description="Konsoliderad & per-site"
+                  stats="Flexibel fakturering"
+                  tag="Finans"
+                  iconColor="text-blue-500"
+                />
+              </StaggeredGrid>
+            </div>
+
           </div>
 
           {/* System Overview */}
@@ -590,6 +650,16 @@ const AdminDashboard: React.FC = () => {
               legacyCases: 0
             }
           }
+        }}
+      />
+      
+      {/* Multisite Registration Wizard */}
+      <MultisiteRegistrationWizard
+        isOpen={multisiteWizardOpen}
+        onClose={() => setMultisiteWizardOpen(false)}
+        onSuccess={() => {
+          setMultisiteWizardOpen(false)
+          fetchDashboardStats() // Refresh stats after creating new organization
         }}
       />
     </div>
