@@ -610,9 +610,9 @@ export default function MultisiteRegistration() {
                       onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as MultisiteUserRoleType })}
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
                     >
-                      <option value="quality_manager">Quality Manager</option>
-                      <option value="regional_manager">Regional Manager</option>
-                      <option value="site_manager">Site Manager</option>
+                      <option value="verksamhetsansvarig">Verksamhetsansvarig</option>
+                      <option value="regionansvarig">Regionansvarig</option>
+                      <option value="enhetsansvarig">Enhetsansvarig</option>
                     </select>
                   </div>
                 </div>

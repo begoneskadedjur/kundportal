@@ -29,15 +29,15 @@ export interface OrganizationSite {
   updated_at: string
 }
 
-export type MultisiteUserRoleType = 'quality_manager' | 'regional_manager' | 'site_manager'
+export type MultisiteUserRoleType = 'verksamhetsansvarig' | 'regionansvarig' | 'enhetsansvarig'
 
 export interface MultisiteUserRole {
   id: string
   user_id: string
   organization_id: string
   role_type: MultisiteUserRoleType
-  site_ids: string[] | null // For site managers
-  region: string | null // For regional managers
+  site_ids: string[] | null // För enhetsansvariga
+  region: string | null // För regionansvariga
   is_active: boolean
   created_at: string
   updated_at: string
@@ -177,7 +177,7 @@ export interface MultisitePermissions {
 
 export function getPermissionsForRole(role: MultisiteUserRoleType): MultisitePermissions {
   switch (role) {
-    case 'quality_manager':
+    case 'verksamhetsansvarig':
       return {
         canViewAllSites: true,
         canCreateSites: true,
@@ -189,28 +189,28 @@ export function getPermissionsForRole(role: MultisiteUserRoleType): MultisitePer
         canViewTrafficLight: true,
         canRequestService: true,
       }
-    case 'regional_manager':
+    case 'regionansvarig':
       return {
-        canViewAllSites: false, // Only region
+        canViewAllSites: false, // Endast region
         canCreateSites: false,
-        canManageUsers: true, // Limited
+        canManageUsers: true, // Begränsad
         canInviteQualityManagers: false,
         canInviteRegionalManagers: false,
-        canInviteSiteManagers: true, // For their region
-        canEditSiteDetails: true, // For their region
-        canViewTrafficLight: true, // For their region
+        canInviteSiteManagers: true, // För deras region
+        canEditSiteDetails: true, // För deras region
+        canViewTrafficLight: true, // För deras region
         canRequestService: true,
       }
-    case 'site_manager':
+    case 'enhetsansvarig':
       return {
-        canViewAllSites: false, // Only their site
+        canViewAllSites: false, // Endast deras enhet
         canCreateSites: false,
         canManageUsers: false,
         canInviteQualityManagers: false,
         canInviteRegionalManagers: false,
         canInviteSiteManagers: false,
         canEditSiteDetails: false,
-        canViewTrafficLight: true, // For their site
+        canViewTrafficLight: true, // För deras enhet
         canRequestService: true,
       }
     default:

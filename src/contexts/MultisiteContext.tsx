@@ -172,15 +172,15 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   const accessibleSites = sites.filter(site => {
     if (!userRole) return false
     
-    if (userRole.role_type === 'quality_manager') {
+    if (userRole.role_type === 'verksamhetsansvarig') {
       return true // Can access all sites
     }
     
-    if (userRole.role_type === 'regional_manager') {
+    if (userRole.role_type === 'regionansvarig') {
       return site.region === userRole.region
     }
     
-    if (userRole.role_type === 'site_manager') {
+    if (userRole.role_type === 'enhetsansvarig') {
       return userRole.site_ids?.includes(site.id) || false
     }
     
@@ -200,11 +200,11 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   // Check if user can invite a specific role
   const canInviteRole = (roleType: MultisiteUserRoleType): boolean => {
     switch (roleType) {
-      case 'quality_manager':
+      case 'verksamhetsansvarig':
         return permissions.canInviteQualityManagers
-      case 'regional_manager':
+      case 'regionansvarig':
         return permissions.canInviteRegionalManagers
-      case 'site_manager':
+      case 'enhetsansvarig':
         return permissions.canInviteSiteManagers
       default:
         return false
