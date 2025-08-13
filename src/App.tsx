@@ -27,7 +27,8 @@ import ProductManagementPage from './pages/admin/ProductManagement';
 import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
 import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
 import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
-import MultisiteRegistration from './components/admin/multisite/MultisiteRegistrationWizard';
+import MultisiteRegistrationPage from './pages/admin/multisite/MultisiteRegistrationPage';
+import CoordinatorMultisiteRegistrationPage from './pages/coordinator/MultisiteRegistrationPage';
 
 // ONEFLOW ROUTES
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
@@ -171,7 +172,7 @@ function App() {
               path="/admin/multisite/register" 
               element={
                 <AdminOrKoordinatorRoute>
-                  <MultisiteRegistration />
+                  <MultisiteRegistrationPage />
                 </AdminOrKoordinatorRoute>
               } 
             />
@@ -268,7 +269,7 @@ function App() {
               path="/koordinator/multisite/register" 
               element={
                 <AdminOrKoordinatorRoute>
-                  <MultisiteRegistration />
+                  <CoordinatorMultisiteRegistrationPage />
                 </AdminOrKoordinatorRoute>
               } 
             />
