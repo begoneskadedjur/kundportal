@@ -89,6 +89,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Kunde inte uppdatera lösenord för befintlig användare' })
       }
 
+      // Uppdatera eller skapa profil för befintlig användare
+      const { error: profileUpsertError } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: userId,
+          email: email,
+          email_verified: true,
+          role: 'customer',
+          multisite_role: role, // Sätt multisite_role för check constraint
+          organization_id: organizationId,
+          is_active: true
+        }, {
+          onConflict: 'user_id'
+        })
+
+      if (profileUpsertError) {
+        console.error('Profile upsert error for existing user:', profileUpsertError)
+        return res.status(500).json({ error: 'Kunde inte uppdatera användarprofil' })
+      }
+
       // Kontrollera om användaren redan har en roll för denna organisation
       const { data: existingRole } = await supabase
         .from('multisite_user_roles')
@@ -168,6 +188,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           is_admin: false,
           is_koordinator: false,
           role: 'customer', // Sätt standard roll för multisite-användare
+          multisite_role: role, // VIKTIGT: Sätt multisite_role för att uppfylla check constraint
+          organization_id: organizationId,
           is_active: true
         }, {
           onConflict: 'user_id'
