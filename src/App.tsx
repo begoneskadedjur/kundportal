@@ -60,7 +60,8 @@ import Schedule from './pages/customer/Schedule';
 import VerksamhetschefDashboard from './pages/organisation/Verksamhetschef'
 import RegionchefDashboard from './pages/organisation/Regionchef'
 import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
-import OrganisationRedirect from './pages/organisation/Redirect';
+import OrganisationRedirect from './pages/organisation/Redirect'
+import VerksamhetschefSchema from './pages/organisation/verksamhetschef/Schema';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -449,6 +450,16 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <PlatsansvarigDashboard />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            
+            {/* Organisation sub-routes for verksamhetschef */}
+            <Route 
+              path="/organisation/verksamhetschef/schema" 
+              element={
+                <MultisiteProtectedRoute>
+                  <VerksamhetschefSchema />
                 </MultisiteProtectedRoute>
               } 
             />

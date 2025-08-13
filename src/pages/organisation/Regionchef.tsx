@@ -235,7 +235,7 @@ const RegionchefDashboard: React.FC = () => {
           </div>
         </Card>
       </div>
-    </div>
+    </OrganisationLayout>
   )
 }
 
