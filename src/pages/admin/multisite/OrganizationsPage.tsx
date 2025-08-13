@@ -44,7 +44,7 @@ interface Organization {
 
 export default function OrganizationsPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
@@ -163,7 +163,9 @@ export default function OrganizationsPage() {
   }
 
   const handleViewDetails = (orgId: string) => {
-    navigate(`/admin/multisite/organizations/${orgId}`)
+    // Navigate to the management page with the organization details
+    const basePath = profile?.role === 'admin' ? '/admin' : '/koordinator'
+    navigate(`${basePath}/multisite/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
 
   if (loading) {

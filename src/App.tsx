@@ -186,6 +186,14 @@ function App() {
               } 
             />
             <Route 
+              path="/admin/multisite/organizations-manage" 
+              element={
+                <AdminOrKoordinatorRoute>
+                  <OrganizationManagement />
+                </AdminOrKoordinatorRoute>
+              } 
+            />
+            <Route 
               path="/admin/multisite/traffic-light" 
               element={
                 <AdminOrKoordinatorRoute>
@@ -279,6 +287,14 @@ function App() {
               element={
                 <AdminOrKoordinatorRoute>
                   <CoordinatorOrganizationsPage />
+                </AdminOrKoordinatorRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/multisite/organizations-manage" 
+              element={
+                <AdminOrKoordinatorRoute>
+                  <OrganizationManagement />
                 </AdminOrKoordinatorRoute>
               } 
             />

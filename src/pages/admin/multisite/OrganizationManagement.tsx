@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { 
   MultisiteOrganization, 
@@ -38,6 +38,7 @@ import toast from 'react-hot-toast'
 
 export default function OrganizationManagement() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [organizations, setOrganizations] = useState<MultisiteOrganization[]>([])
   const [sites, setSites] = useState<Record<string, OrganizationSite[]>>({})
   const [users, setUsers] = useState<Record<string, MultisiteUserRole[]>>({})
@@ -51,6 +52,15 @@ export default function OrganizationManagement() {
   useEffect(() => {
     fetchOrganizations()
   }, [])
+
+  // Handle navigation from organizations list
+  useEffect(() => {
+    if (location.state?.selectedOrgId) {
+      setExpandedOrg(location.state.selectedOrgId)
+      // Clear the state to prevent it from persisting
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   const fetchOrganizations = async () => {
     setLoading(true)
