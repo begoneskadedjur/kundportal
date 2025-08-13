@@ -91,7 +91,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       case 'customer':
         // Check if user has multisite access
         if (multisiteRole) {
-          redirectPath = '/multisite';
+          redirectPath = '/organisation';
         } else {
           redirectPath = '/customer';
         }

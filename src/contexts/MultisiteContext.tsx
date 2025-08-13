@@ -99,6 +99,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     setError(null)
 
     try {
+      console.log('Fetching multisite role for user:', profile.user_id)
+      
       // Check if user has a multisite role
       const { data: roleData, error: roleError } = await supabase
         .from('multisite_user_roles')
@@ -107,11 +109,15 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .eq('is_active', true)
         .maybeSingle()
 
+      console.log('Multisite role query result:', { roleData, roleError })
+
       if (roleError) {
+        console.error('Error fetching multisite role:', roleError)
         throw roleError
       }
 
       if (!roleData) {
+        console.log('No multisite role found for user')
         // User is not part of a multisite organization - this is normal for admin/koordinatorer
         setLoading(false)
         return
