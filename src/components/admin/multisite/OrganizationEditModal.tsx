@@ -54,19 +54,20 @@ export default function OrganizationEditModal({
         return
       }
 
-      // Uppdatera organisation
+      // Uppdatera huvudkontor customer
       const { error } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .update({
-          name: formData.name.trim(),
+          company_name: formData.name.trim(),
           organization_number: formData.organization_number.trim() || null,
-          primary_contact_email: formData.primary_contact_email.trim() || null,
-          primary_contact_phone: formData.primary_contact_phone.trim() || null,
+          contact_email: formData.primary_contact_email.trim() || null,
+          contact_phone: formData.primary_contact_phone.trim() || null,
           billing_address: formData.billing_address.trim() || null,
-          billing_type: formData.billing_type,
+          billing_email: formData.primary_contact_email.trim() || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', organization.id)
+        .eq('organization_id', organization.id)
+        .eq('site_type', 'huvudkontor')
 
       if (error) throw error
 

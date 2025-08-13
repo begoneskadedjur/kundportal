@@ -125,26 +125,42 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
       setUserRole(roleData)
 
-      // Fetch organization
+      // Fetch organization (huvudkontor customer)
       const { data: orgData, error: orgError } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .select('*')
-        .eq('id', roleData.organization_id)
+        .eq('organization_id', roleData.organization_id)
+        .eq('site_type', 'huvudkontor')
         .eq('is_active', true)
         .single()
 
       if (orgError) throw orgError
-      setOrganization(orgData)
+      // Map customer fields to organization structure
+      const organization = {
+        id: orgData.organization_id,
+        name: orgData.company_name,
+        organization_name: orgData.company_name, // For backwards compatibility
+        organization_number: orgData.organization_number,
+        billing_type: 'consolidated' as const,
+        primary_contact_email: orgData.contact_email,
+        primary_contact_phone: orgData.contact_phone,
+        billing_address: orgData.billing_address,
+        is_active: orgData.is_active,
+        created_at: orgData.created_at,
+        updated_at: orgData.updated_at
+      }
+      setOrganization(organization)
       
       console.log('Organization fetched:', orgData)
 
-      // Fetch sites based on role
+      // Fetch sites based on role (enheter customers)
       console.log('Fetching sites for organization:', roleData.organization_id)
       
       let sitesQuery = supabase
-        .from('organization_sites')
+        .from('customers')
         .select('*')
         .eq('organization_id', roleData.organization_id)
+        .eq('site_type', 'enhet')
         .eq('is_active', true)
 
       // Apply role-based filtering
@@ -163,11 +179,30 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
       console.log('Sites query result:', { sitesData, sitesError })
       
       if (sitesError) throw sitesError
-      setSites(sitesData || [])
+      
+      // Map customer data to OrganizationSite structure
+      const sites = (sitesData || []).map(customer => ({
+        id: customer.id,
+        organization_id: customer.organization_id,
+        site_name: customer.site_name || customer.company_name,
+        site_code: customer.site_code,
+        address: customer.contact_address,
+        region: customer.region,
+        contact_person: customer.contact_person,
+        contact_email: customer.contact_email,
+        contact_phone: customer.contact_phone,
+        customer_id: customer.id, // Site IS the customer now
+        is_primary: false,
+        is_active: customer.is_active,
+        created_at: customer.created_at,
+        updated_at: customer.updated_at
+      }))
+      
+      setSites(sites)
 
       // Set default current site if only one available
-      if (sitesData && sitesData.length === 1) {
-        setCurrentSite(sitesData[0])
+      if (sites && sites.length === 1) {
+        setCurrentSite(sites[0])
       }
     } catch (err) {
       console.error('Error fetching multisite data:', err)
@@ -185,16 +220,17 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   // Fetch customer data when currentSite changes
   useEffect(() => {
     const fetchCustomerForSite = async () => {
-      if (!currentSite || !currentSite.customer_id) {
+      if (!currentSite) {
         setCurrentCustomer(null)
         return
       }
 
       try {
+        // Site IS the customer now, so we just need to fetch the full customer data
         const { data: customer, error } = await supabase
           .from('customers')
           .select('*')
-          .eq('id', currentSite.customer_id)
+          .eq('id', currentSite.id)
           .single()
 
         if (error) throw error

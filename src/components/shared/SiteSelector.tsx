@@ -44,15 +44,35 @@ export default function SiteSelector({
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('site_type', 'enhet')
         .eq('is_active', true)
         .order('region', { ascending: true })
         .order('site_name', { ascending: true })
 
       if (error) throw error
-      setSites(data || [])
+      
+      // Map customer data to OrganizationSite structure
+      const sites = (data || []).map(customer => ({
+        id: customer.id,
+        organization_id: customer.organization_id,
+        site_name: customer.site_name || customer.company_name,
+        site_code: customer.site_code,
+        address: customer.contact_address,
+        region: customer.region,
+        contact_person: customer.contact_person,
+        contact_email: customer.contact_email,
+        contact_phone: customer.contact_phone,
+        customer_id: customer.id,
+        is_primary: false,
+        is_active: customer.is_active,
+        created_at: customer.created_at,
+        updated_at: customer.updated_at
+      }))
+      
+      setSites(sites)
     } catch (error) {
       console.error('Error fetching sites:', error)
       toast.error('Kunde inte hämta anläggningar')

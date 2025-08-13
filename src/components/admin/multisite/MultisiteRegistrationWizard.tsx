@@ -276,42 +276,15 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
     setLoading(true)
     
     try {
-      // 1. Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('multisite_organizations')
-        .insert({
-          name: organizationData.name,
-          organization_number: organizationData.organization_number || null,
-          billing_type: organizationData.billing_type,
-          billing_address: organizationData.billing_address
-        })
-        .select()
-        .single()
-
-      if (orgError) throw orgError
-
-      // 2. Create sites
-      const sitesToInsert = sites.map(site => ({
-        organization_id: org.id,
-        site_name: site.site_name,
-        site_code: site.site_code || null,
-        address: site.address || null,
-        region: site.region,
-        is_primary: site.is_primary
-      }))
-
-      const { data: createdSites, error: sitesError } = await supabase
-        .from('organization_sites')
-        .insert(sitesToInsert)
-        .select()
-
-      if (sitesError) throw sitesError
-
-      // 3. Create customer record linked to organization
+      // Find the primary user (verksamhetschef)
       const verksamhetschef = roleAssignments.find(assignment => assignment.role === 'verksamhetschef')
       const primaryUser = users.find(user => user.id === verksamhetschef?.userId)
       
-      const { error: customerError } = await supabase
+      // 1. Generate organization ID
+      const organizationId = crypto.randomUUID()
+      
+      // 2. Create huvudkontor (main office) customer
+      const { data: hovedkontor, error: orgError } = await supabase
         .from('customers')
         .insert({
           company_name: organizationData.name,
@@ -320,25 +293,52 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           contact_phone: primaryUser?.phone || null,
           billing_email: primaryUser?.email || '',
           billing_address: organizationData.billing_address,
-          organization_id: org.id,
+          site_type: 'huvudkontor',
+          organization_id: organizationId,
           is_multisite: true,
+          contract_type: 'multisite',
           is_active: true
         })
+        .select()
+        .single()
 
-      if (customerError) throw customerError
+      if (orgError) throw orgError
+
+      // 3. Create enhet (unit) customers
+      const sitesToInsert = sites.map(site => ({
+        company_name: `${organizationData.name} - ${site.site_name}`,
+        site_name: site.site_name,
+        site_code: site.site_code || null,
+        contact_address: site.address || null,
+        contact_email: '',
+        region: site.region,
+        site_type: 'enhet' as const,
+        parent_customer_id: hovedkontor.id,
+        organization_id: organizationId,
+        is_multisite: true,
+        contract_type: 'multisite',
+        is_active: true
+      }))
+
+      const { data: createdSites, error: sitesError } = await supabase
+        .from('customers')
+        .insert(sitesToInsert)
+        .select()
+
+      if (sitesError) throw sitesError
 
       // 4. Create user accounts and role assignments
       if (roleAssignments.length > 0 && users.length > 0) {
         try {
-          // Map site names to actual site IDs
+          // Map site names to actual customer IDs (sites are now customers)
           const siteNameToIdMap = new Map()
           if (createdSites) {
-            createdSites.forEach((site: any) => {
-              siteNameToIdMap.set(site.site_name, site.id)
+            createdSites.forEach((customer: any) => {
+              siteNameToIdMap.set(customer.site_name, customer.id)
             })
           }
 
-          // Update role assignments with actual site IDs
+          // Update role assignments with actual customer IDs (as site_ids)
           const updatedRoleAssignments = roleAssignments.map(assignment => ({
             ...assignment,
             siteIds: assignment.siteIds?.map(siteName => siteNameToIdMap.get(siteName)).filter(Boolean) || null,
@@ -360,7 +360,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
               'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({
-              organizationId: org.id,
+              organizationId: organizationId,
               users: users,
               roleAssignments: updatedRoleAssignments
             })

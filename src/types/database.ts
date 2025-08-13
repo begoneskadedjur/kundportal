@@ -80,6 +80,13 @@ export type Database = {
           // 🏢 Multisite Support
           organization_id: string | null  // FK till multisite_organizations
           is_multisite: boolean
+          
+          // 🆕 Multisite hierarki
+          site_name: string | null  // Namnet på enheten/siten
+          site_code: string | null  // Unik kod för enheten
+          parent_customer_id: string | null  // FK till huvudorganisationens customer
+          region: string | null  // Region för enheten
+          site_type: 'huvudkontor' | 'enhet' | null  // Typ av multisite-enhet
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'

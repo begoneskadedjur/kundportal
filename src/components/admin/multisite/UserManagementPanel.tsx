@@ -63,14 +63,24 @@ export default function UserManagementPanel({
   const fetchOrganizationSites = async () => {
     try {
       const { data: sites, error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('site_type', 'enhet')
         .eq('is_active', true)
         .order('site_name')
 
       if (error) throw error
-      setOrganizationSites(sites || [])
+      
+      // Map customers to site structure for compatibility
+      const mappedSites = (sites || []).map(customer => ({
+        id: customer.id,
+        site_name: customer.site_name || customer.company_name,
+        site_code: customer.site_code,
+        region: customer.region
+      }))
+      
+      setOrganizationSites(mappedSites)
     } catch (error) {
       console.error('Error fetching organization sites:', error)
       toast.error('Kunde inte hämta anläggningar')

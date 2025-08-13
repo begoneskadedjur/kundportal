@@ -54,12 +54,12 @@ const VerksamhetschefDashboard: React.FC = () => {
     try {
       setLoading(true)
       
-      // Hämta alla customers som tillhör organisationen
-      // Vi antar att company_name innehåller organisationens namn eller att vi har contract_type = 'multisite'
+      // Hämta alla customers som tillhör organisationen (både huvudkontor och enheter)
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
+        .eq('organization_id', organization.id)
+        .in('site_type', ['huvudkontor', 'enhet'])
         .eq('is_active', true)
       
       if (customersError) throw customersError

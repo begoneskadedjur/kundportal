@@ -49,9 +49,10 @@ export default function SiteManagementPanel({
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('site_type', 'enhet')
         .order('site_name')
 
       if (error) throw error
@@ -75,23 +76,30 @@ export default function SiteManagementPanel({
       // Om detta är den första anläggningen, gör den till primär
       const isPrimary = sites.length === 0 || formData.is_primary
 
-      // Om den nya anläggningen ska vara primär, ta bort primär från andra
-      if (isPrimary && sites.some(s => s.is_primary)) {
-        await supabase
-          .from('organization_sites')
-          .update({ is_primary: false })
-          .eq('organization_id', organizationId)
-      }
+      // Hämta huvudkontor för att få organisationsnamn och id
+      const { data: huvudkontor } = await supabase
+        .from('customers')
+        .select('id, company_name')
+        .eq('organization_id', organizationId)
+        .eq('site_type', 'huvudkontor')
+        .single()
+
+      const orgName = huvudkontor?.company_name || 'Organisation'
 
       const { error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .insert({
-          organization_id: organizationId,
+          company_name: `${orgName} - ${formData.site_name.trim()}`,
           site_name: formData.site_name.trim(),
           site_code: formData.site_code.trim() || null,
-          address: formData.address.trim() || null,
+          contact_address: formData.address.trim() || null,
           region: formData.region.trim() || null,
-          is_primary: isPrimary,
+          site_type: 'enhet',
+          organization_id: organizationId,
+          parent_customer_id: huvudkontor?.id,
+          is_multisite: true,
+          contract_type: 'multisite',
+          contact_email: '',
           is_active: true
         })
 
@@ -122,22 +130,13 @@ export default function SiteManagementPanel({
 
     setLoading(true)
     try {
-      // Om denna anläggning ska vara primär, ta bort primär från andra
-      if (formData.is_primary && !editingSite.is_primary) {
-        await supabase
-          .from('organization_sites')
-          .update({ is_primary: false })
-          .eq('organization_id', organizationId)
-      }
-
       const { error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .update({
           site_name: formData.site_name.trim(),
           site_code: formData.site_code.trim() || null,
-          address: formData.address.trim() || null,
+          contact_address: formData.address.trim() || null,
           region: formData.region.trim() || null,
-          is_primary: formData.is_primary,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingSite.id)
@@ -168,7 +167,7 @@ export default function SiteManagementPanel({
 
     try {
       const { error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .delete()
         .eq('id', site.id)
 
@@ -186,7 +185,7 @@ export default function SiteManagementPanel({
   const handleToggleActive = async (site: OrganizationSite) => {
     try {
       const { error } = await supabase
-        .from('organization_sites')
+        .from('customers')
         .update({ is_active: !site.is_active })
         .eq('id', site.id)
 
@@ -207,7 +206,7 @@ export default function SiteManagementPanel({
       site_code: site.site_code || '',
       address: site.address || '',
       region: site.region || '',
-      is_primary: site.is_primary
+      is_primary: false // Removed is_primary as it's not used in new structure
     })
   }
 

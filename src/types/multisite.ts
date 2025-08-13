@@ -2,7 +2,8 @@
 
 export interface MultisiteOrganization {
   id: string
-  name: string  // Ändrat från organization_name för att matcha databasen
+  name: string  // company_name från customers
+  organization_name?: string // För bakåtkompatibilitet
   organization_number: string | null
   billing_type: 'consolidated' | 'per_site'
   primary_contact_email: string | null
@@ -14,18 +15,17 @@ export interface MultisiteOrganization {
 }
 
 export interface OrganizationSite {
-  id: string
+  id: string // Detta är nu customer.id
   organization_id: string
   site_name: string
   site_code: string | null
-  address: string | null
+  address: string | null // contact_address från customers
   region: string | null
   contact_person: string | null
   contact_email: string | null
   contact_phone: string | null
-  site_manager_email: string | null
-  customer_id?: string | null  // Link to customer for cases and data
-  is_primary: boolean
+  customer_id?: string | null  // Behålls för bakåtkompatibilitet, men är samma som id
+  is_primary: boolean // Behålls för bakåtkompatibilitet
   is_active: boolean
   created_at: string
   updated_at: string

@@ -65,15 +65,31 @@ export default function OrganizationManagement() {
   const fetchOrganizations = async () => {
     setLoading(true)
     try {
-      // Fetch organizations
-      const { data: orgs, error: orgsError } = await supabase
-        .from('multisite_organizations')
+      // Fetch organizations (huvudkontor customers)
+      const { data: huvudkontorData, error: orgsError } = await supabase
+        .from('customers')
         .select('*')
-        .order('name')
+        .eq('site_type', 'huvudkontor')
+        .eq('is_multisite', true)
+        .order('company_name')
 
       if (orgsError) throw orgsError
 
-      setOrganizations(orgs || [])
+      // Map customers to organization structure
+      const orgs = (huvudkontorData || []).map(customer => ({
+        id: customer.organization_id,
+        name: customer.company_name,
+        organization_number: customer.organization_number,
+        billing_type: 'consolidated' as const,
+        primary_contact_email: customer.contact_email,
+        primary_contact_phone: customer.contact_phone,
+        billing_address: customer.billing_address,
+        is_active: customer.is_active,
+        created_at: customer.created_at,
+        updated_at: customer.updated_at
+      }))
+
+      setOrganizations(orgs)
 
       // Fetch sites for each organization
       if (orgs && orgs.length > 0) {
@@ -81,14 +97,32 @@ export default function OrganizationManagement() {
         const usersData: Record<string, MultisiteUserRole[]> = {}
 
         for (const org of orgs) {
-          // Fetch sites
-          const { data: orgSites, error: sitesError } = await supabase
-            .from('organization_sites')
+          // Fetch sites (enhet customers)
+          const { data: enhetData, error: sitesError } = await supabase
+            .from('customers')
             .select('*')
             .eq('organization_id', org.id)
+            .eq('site_type', 'enhet')
             .order('site_name')
 
-          if (!sitesError && orgSites) {
+          if (!sitesError && enhetData) {
+            // Map customers to site structure
+            const orgSites = enhetData.map(customer => ({
+              id: customer.id,
+              organization_id: customer.organization_id,
+              site_name: customer.site_name || customer.company_name,
+              site_code: customer.site_code,
+              address: customer.contact_address,
+              region: customer.region,
+              contact_person: customer.contact_person,
+              contact_email: customer.contact_email,
+              contact_phone: customer.contact_phone,
+              customer_id: customer.id,
+              is_primary: false,
+              is_active: customer.is_active,
+              created_at: customer.created_at,
+              updated_at: customer.updated_at
+            }))
             sitesData[org.id] = orgSites
           }
 
@@ -120,10 +154,11 @@ export default function OrganizationManagement() {
     }
 
     try {
+      // Delete all customers for this organization (both huvudkontor and enheter)
       const { error } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .delete()
-        .eq('id', org.id)
+        .eq('organization_id', org.id)
 
       if (error) throw error
 
@@ -137,10 +172,11 @@ export default function OrganizationManagement() {
 
   const handleToggleActive = async (org: MultisiteOrganization) => {
     try {
+      // Update all customers for this organization
       const { error } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .update({ is_active: !org.is_active })
-        .eq('id', org.id)
+        .eq('organization_id', org.id)
 
       if (error) throw error
 
