@@ -75,25 +75,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       errors: []
     }
 
-    // Create email transporter once (outside loop)
-    let transporter = null
-    if (RESEND_API_KEY) {
-      try {
-        const nodemailer = require('nodemailer')
-        transporter = nodemailer.createTransporter({
-          host: 'smtp.resend.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: 'resend',
-            pass: RESEND_API_KEY
-          }
-        })
-      } catch (error) {
-        console.error('Failed to create email transporter:', error)
-        // Continue without email sending
-      }
-    }
+    // Check if we have Resend API key for sending emails
+    const canSendEmails = !!RESEND_API_KEY
 
     // Create each user
     for (const userData of users) {
@@ -279,8 +262,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.log(`Created new role for ${userData.email}`)
         }
 
-        // Send invitation email directly
-        if (transporter) {
+        // Send invitation email via Resend API
+        if (canSendEmails) {
           try {
             const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
             const isNewUser = !existingAuthUser
@@ -299,15 +282,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ? `Välkommen till Begone Multisite Portal - ${organizationName}`
               : `Ny organisation tillagd - ${organizationName}`
 
-            const mailOptions = {
-              from: 'Begone Kundportal <noreply@resend.dev>',
-              to: userData.email,
-              subject: subject,
-              html: emailHtml
-            }
+            // Use Resend API directly
+            const emailResponse = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${RESEND_API_KEY}`,
+              },
+              body: JSON.stringify({
+                from: 'Begone Kundportal <noreply@begone.se>',
+                to: [userData.email],
+                subject: subject,
+                html: emailHtml
+              }),
+            })
 
-            const info = await transporter.sendMail(mailOptions)
-            console.log(`Invitation email sent to ${userData.email}:`, info.messageId)
+            if (emailResponse.ok) {
+              const emailData = await emailResponse.json()
+              console.log(`Invitation email sent to ${userData.email} via Resend:`, emailData.id)
+            } else {
+              const error = await emailResponse.text()
+              console.error(`Failed to send email to ${userData.email}:`, error)
+            }
           } catch (emailError) {
             console.error(`Failed to send email to ${userData.email}:`, emailError)
             // Don't fail the whole process if email fails

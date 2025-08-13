@@ -168,21 +168,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 5. Skicka inbjudan email
+    // 5. Skicka inbjudan email via Resend API
     const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
     
-    // Använd require här för att undvika TypeScript-problem
-    const nodemailer = require('nodemailer')
-    const transporter = nodemailer.createTransporter({
-      host: 'smtp.resend.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'resend',
-        pass: RESEND_API_KEY
-      }
-    })
-
     const emailHtml = getMultisiteInvitationEmailTemplate({
       organization,
       recipientEmail: email,
@@ -197,20 +185,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? `Välkommen till Begone Multisite Portal - ${organizationName}`
       : `Ny organisation tillagd - ${organizationName}`
 
-    const mailOptions = {
-      from: 'Begone Kundportal <noreply@resend.dev>',
-      to: email,
-      subject: subject,
-      html: emailHtml
-    }
-
     try {
-      const info = await transporter.sendMail(mailOptions)
-      console.log('Multisite invitation email sent successfully:', {
-        to: email,
-        messageId: info.messageId,
-        response: info.response
+      // Använd Resend API direkt
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: 'Begone Kundportal <noreply@begone.se>',
+          to: [email],
+          subject: subject,
+          html: emailHtml
+        }),
       })
+
+      if (!emailResponse.ok) {
+        const error = await emailResponse.text()
+        console.error('Failed to send email via Resend:', error)
+        throw new Error('Failed to send email')
+      }
+
+      const emailData = await emailResponse.json()
+      console.log('Multisite invitation email sent via Resend:', emailData)
     } catch (emailError: any) {
       console.error('Failed to send multisite invitation email:', emailError)
       // Log but don't fail - user is created in database
