@@ -38,30 +38,49 @@ const PlatsansvarigDashboard: React.FC = () => {
   const [siteDetails, setSiteDetails] = useState<SiteDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
+  const [currentCustomer, setCurrentCustomer] = useState<any | null>(null)
   
   // Platsansvarig har bara tillgång till en enhet
   const currentSite = accessibleSites[0]
 
   useEffect(() => {
-    if (currentSite) {
-      fetchSiteDetails()
+    if (organization) {
+      fetchCustomerAndDetails()
     } else {
       setLoading(false)
     }
-  }, [currentSite])
+  }, [organization, userRole])
 
-  const fetchSiteDetails = async () => {
-    if (!currentSite) return
+  const fetchCustomerAndDetails = async () => {
+    if (!organization) return
     
     try {
       setLoading(true)
       
+      // Hämta customer för platsansvarig
+      // Vi antar att platsansvarig har en specifik enhet/customer
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+      
+      if (customerError || !customerData) {
+        console.error('Error fetching customer:', customerError)
+        setLoading(false)
+        return
+      }
+      
+      setCurrentCustomer(customerData)
+      
       // Hämta aktiva ärenden
       const { data: activeCases } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('id, title, status, priority, scheduled_date, technician_name')
-        .eq('site_id', currentSite.id)
-        .in('status', ['pending', 'in_progress', 'scheduled'])
+        .eq('customer_id', customerData.id)
+        .in('status', ['Öppen', 'Pågående', 'Schemalagd'])
         .order('priority', { ascending: false })
         .limit(10)
 
@@ -69,10 +88,10 @@ const PlatsansvarigDashboard: React.FC = () => {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const { data: completedToday } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('id')
-        .eq('site_id', currentSite.id)
-        .eq('status', 'completed')
+        .eq('customer_id', customerData.id)
+        .in('status', ['Avklarad', 'Stängd'])
         .gte('updated_at', today.toISOString())
 
       // Hämta avklarade denna vecka
@@ -80,10 +99,10 @@ const PlatsansvarigDashboard: React.FC = () => {
       weekStart.setDate(weekStart.getDate() - weekStart.getDay())
       weekStart.setHours(0, 0, 0, 0)
       const { data: completedWeek } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('id')
-        .eq('site_id', currentSite.id)
-        .eq('status', 'completed')
+        .eq('customer_id', customerData.id)
+        .in('status', ['Avklarad', 'Stängd'])
         .gte('updated_at', weekStart.toISOString())
 
       // Hämta avklarade denna månad
@@ -91,18 +110,18 @@ const PlatsansvarigDashboard: React.FC = () => {
       monthStart.setDate(1)
       monthStart.setHours(0, 0, 0, 0)
       const { data: completedMonth } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('id')
-        .eq('site_id', currentSite.id)
-        .eq('status', 'completed')
+        .eq('customer_id', customerData.id)
+        .in('status', ['Avklarad', 'Stängd'])
         .gte('updated_at', monthStart.toISOString())
 
       // Hämta kommande besök
       const { data: upcomingVisits } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('id, title, status, priority, scheduled_date, technician_name')
-        .eq('site_id', currentSite.id)
-        .eq('status', 'scheduled')
+        .eq('customer_id', customerData.id)
+        .eq('status', 'Schemalagd')
         .gte('scheduled_date', new Date().toISOString())
         .order('scheduled_date', { ascending: true })
         .limit(5)
@@ -114,9 +133,9 @@ const PlatsansvarigDashboard: React.FC = () => {
         completedThisMonth: completedMonth?.length || 0,
         upcomingVisits: upcomingVisits || [],
         contactInfo: {
-          contact_person: currentSite.contact_person,
-          contact_email: currentSite.contact_email,
-          contact_phone: currentSite.contact_phone
+          contact_person: customerData.contact_person,
+          contact_email: customerData.contact_email,
+          contact_phone: customerData.contact_phone
         }
       })
     } catch (error) {
@@ -134,7 +153,7 @@ const PlatsansvarigDashboard: React.FC = () => {
     )
   }
 
-  if (!currentSite) {
+  if (!currentCustomer) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <Card className="p-8 bg-slate-800/50 border-slate-700 max-w-md">
@@ -167,13 +186,13 @@ const PlatsansvarigDashboard: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                {currentSite.site_name}
+                {currentCustomer.company_name}
               </h1>
               <p className="text-green-200">
                 {organization?.organization_name} - Platsansvarig
               </p>
               <p className="text-slate-400 text-sm mt-2">
-                {currentSite.address}, {currentSite.postal_code} {currentSite.city}
+                {currentCustomer.address}, {currentCustomer.postal_code} {currentCustomer.city}
               </p>
             </div>
             <div className="text-right space-y-3">
@@ -304,8 +323,8 @@ const PlatsansvarigDashboard: React.FC = () => {
                              caseItem.priority === 'medium' ? 'Medium' : 'Låg prio'}
                           </span>
                           <span className="text-slate-400 text-sm">
-                            {caseItem.status === 'scheduled' ? 'Schemalagd' :
-                             caseItem.status === 'in_progress' ? 'Pågående' : 'Väntar'}
+                            {caseItem.status === 'Schemalagd' ? 'Schemalagd' :
+                             caseItem.status === 'Pågående' ? 'Pågående' : caseItem.status}
                           </span>
                         </div>
                       </div>
@@ -374,9 +393,9 @@ const PlatsansvarigDashboard: React.FC = () => {
           <OrganizationServiceRequest
             isOpen={showServiceRequestModal}
             onClose={() => setShowServiceRequestModal(false)}
-            selectedSiteId={currentSite?.id}
+            selectedSiteId={currentCustomer?.id}
             onSuccess={() => {
-              fetchSiteDetails() // Refresh data
+              fetchCustomerAndDetails() // Refresh data
             }}
           />
         )}

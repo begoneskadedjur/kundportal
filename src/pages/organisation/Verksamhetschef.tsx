@@ -11,15 +11,14 @@ import OrganisationLayout from '../../components/organisation/OrganisationLayout
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 
 interface SiteMetrics {
-  siteId: string
-  siteName: string
+  customerId: string
+  customerName: string
   region: string
   activeCases: number
   completedThisMonth: number
   pendingQuotes: number
   scheduledVisits: number
   trafficLight: 'green' | 'yellow' | 'red'
-  customerId?: string
 }
 
 interface UpcomingVisit {
@@ -39,28 +38,43 @@ const VerksamhetschefDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [selectedRegion, setSelectedRegion] = useState<string>('all')
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
+  const [customers, setCustomers] = useState<any[]>([])
 
   useEffect(() => {
-    if (sites.length > 0) {
-      fetchMetrics()
-      fetchUpcomingVisits()
+    if (organization) {
+      fetchCustomersAndMetrics()
     } else {
       setLoading(false)
     }
-  }, [sites])
+  }, [organization])
 
-  const fetchMetrics = async () => {
+  const fetchCustomersAndMetrics = async () => {
+    if (!organization) return
+    
     try {
       setLoading(true)
+      
+      // Hämta alla customers som tillhör organisationen
+      // Vi antar att company_name innehåller organisationens namn eller att vi har contract_type = 'multisite'
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*')
+        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
+        .eq('is_active', true)
+      
+      if (customersError) throw customersError
+      
+      setCustomers(customersData || [])
+      
       const metrics: SiteMetrics[] = []
       
-      for (const site of sites) {
-        // Hämta aktiva ärenden
+      for (const customer of customersData || []) {
+        // Hämta aktiva ärenden från cases-tabellen
         const { data: activeCases } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .in('status', ['pending', 'in_progress', 'scheduled'])
+          .eq('customer_id', customer.id)
+          .in('status', ['Öppen', 'Pågående', 'Schemalagd'])
 
         // Hämta avklarade denna månad
         const startOfMonth = new Date()
@@ -68,24 +82,24 @@ const VerksamhetschefDashboard: React.FC = () => {
         startOfMonth.setHours(0, 0, 0, 0)
         
         const { data: completedCases } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .eq('status', 'completed')
+          .eq('customer_id', customer.id)
+          .in('status', ['Avklarad', 'Stängd'])
           .gte('updated_at', startOfMonth.toISOString())
 
         // Hämta väntande offerter
         const { data: quotes } = await supabase
           .from('customer_pending_quotes')
           .select('quote_id')
-          .eq('site_id', site.id)
+          .eq('customer_id', customer.id)
 
         // Hämta schemalagda besök
         const { data: scheduledVisits } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .eq('status', 'scheduled')
+          .eq('customer_id', customer.id)
+          .eq('status', 'Schemalagd')
 
         // Beräkna trafikljus (baserat på faktisk data från ärenden)
         // Detta bör hämtas från faktiska rapporter när tekniker återrapporterar
@@ -95,19 +109,46 @@ const VerksamhetschefDashboard: React.FC = () => {
         if (activeCount > 10) trafficLight = 'red'
 
         metrics.push({
-          siteId: site.id,
-          siteName: site.site_name,
-          region: site.region || 'Okänd',
+          customerId: customer.id,
+          customerName: customer.company_name,
+          region: customer.city || 'Okänd',
           activeCases: activeCases?.length || 0,
           completedThisMonth: completedCases?.length || 0,
           pendingQuotes: quotes?.length || 0,
           scheduledVisits: scheduledVisits?.length || 0,
-          trafficLight,
-          customerId: site.customer_id
+          trafficLight
         })
       }
       
       setSiteMetrics(metrics)
+      
+      // Hämta kommande besök
+      if (customersData && customersData.length > 0) {
+        const customerIds = customersData.map(c => c.id)
+        const { data: visits } = await supabase
+          .from('cases')
+          .select('id, title, customer_id, scheduled_date, technician_name, status')
+          .in('customer_id', customerIds)
+          .eq('status', 'Schemalagd')
+          .gte('scheduled_date', new Date().toISOString())
+          .order('scheduled_date', { ascending: true })
+          .limit(10)
+        
+        if (visits) {
+          const visitsWithCustomerNames = visits.map(visit => {
+            const customer = customersData.find(c => c.id === visit.customer_id)
+            return {
+              id: visit.id,
+              title: visit.title || 'Ingen titel',
+              siteName: customer?.company_name || 'Okänd enhet',
+              scheduledDate: visit.scheduled_date,
+              technicianName: visit.technician_name,
+              status: visit.status
+            }
+          })
+          setUpcomingVisits(visitsWithCustomerNames)
+        }
+      }
     } catch (error) {
       console.error('Error fetching metrics:', error)
     } finally {
@@ -115,39 +156,9 @@ const VerksamhetschefDashboard: React.FC = () => {
     }
   }
 
-  const fetchUpcomingVisits = async () => {
-    try {
-      const siteIds = sites.map(s => s.id)
-      const { data: visits } = await supabase
-        .from('private_cases')
-        .select('id, title, site_id, scheduled_date, technician_name, status')
-        .in('site_id', siteIds)
-        .eq('status', 'scheduled')
-        .gte('scheduled_date', new Date().toISOString())
-        .order('scheduled_date', { ascending: true })
-        .limit(10)
-      
-      if (visits) {
-        const visitsWithSiteNames = visits.map(visit => {
-          const site = sites.find(s => s.id === visit.site_id)
-          return {
-            id: visit.id,
-            title: visit.title || 'Ingen titel',
-            siteName: site?.site_name || 'Okänd enhet',
-            scheduledDate: visit.scheduled_date,
-            technicianName: visit.technician_name,
-            status: visit.status
-          }
-        })
-        setUpcomingVisits(visitsWithSiteNames)
-      }
-    } catch (error) {
-      console.error('Error fetching upcoming visits:', error)
-    }
-  }
 
-  // Hämta unika regioner
-  const regions = Array.from(new Set(sites.map(s => s.region || 'Okänd')))
+  // Hämta unika regioner från customers
+  const regions = Array.from(new Set(siteMetrics.map(m => m.region)))
   
   // Filtrera metrics baserat på vald region
   const filteredMetrics = selectedRegion === 'all' 
@@ -293,36 +304,17 @@ const VerksamhetschefDashboard: React.FC = () => {
                     <p className="text-slate-500 text-sm mt-2">
                       Kontakta administratören för att lägga till enheter
                     </p>
-                    {sites.some(s => !s.customer_id) && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const response = await fetch('/api/link-sites-to-customers', {
-                              method: 'POST'
-                            })
-                            const data = await response.json()
-                            console.log('Linking result:', data)
-                            window.location.reload()
-                          } catch (error) {
-                            console.error('Error linking sites:', error)
-                          }
-                        }}
-                        className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                      >
-                        Koppla enheter till kunder
-                      </button>
-                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {filteredMetrics.map((metric) => (
                       <div
-                        key={metric.siteId}
+                        key={metric.customerId}
                         className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="font-semibold text-white">{metric.siteName}</h3>
+                            <h3 className="font-semibold text-white">{metric.customerName}</h3>
                             <p className="text-sm text-slate-400">{metric.region}</p>
                           </div>
                           <div className={`w-3 h-3 rounded-full ${
@@ -409,8 +401,7 @@ const VerksamhetschefDashboard: React.FC = () => {
             isOpen={showServiceRequestModal}
             onClose={() => setShowServiceRequestModal(false)}
             onSuccess={() => {
-              fetchMetrics()
-              fetchUpcomingVisits()
+              fetchCustomersAndMetrics()
             }}
           />
         )}

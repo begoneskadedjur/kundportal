@@ -11,8 +11,8 @@ import OrganisationLayout from '../../components/organisation/OrganisationLayout
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 
 interface SiteMetrics {
-  siteId: string
-  siteName: string
+  customerId: string
+  customerName: string
   city: string
   activeCases: number
   completedThisMonth: number
@@ -26,27 +26,49 @@ const RegionchefDashboard: React.FC = () => {
   const [siteMetrics, setSiteMetrics] = useState<SiteMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
+  const [customers, setCustomers] = useState<any[]>([])
 
   useEffect(() => {
-    if (accessibleSites.length > 0) {
-      fetchMetrics()
+    if (organization && userRole) {
+      fetchCustomersAndMetrics()
     } else {
       setLoading(false)
     }
-  }, [accessibleSites])
+  }, [organization, userRole])
 
-  const fetchMetrics = async () => {
+  const fetchCustomersAndMetrics = async () => {
+    if (!organization || !userRole) return
+    
     try {
       setLoading(true)
+      
+      // Hämta alla customers för denna region
+      let customersQuery = supabase
+        .from('customers')
+        .select('*')
+        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
+        .eq('is_active', true)
+      
+      // Filtrera på region om användaren är regionchef
+      if (userRole.region) {
+        customersQuery = customersQuery.eq('city', userRole.region)
+      }
+      
+      const { data: customersData, error: customersError } = await customersQuery
+      
+      if (customersError) throw customersError
+      
+      setCustomers(customersData || [])
+      
       const metrics: SiteMetrics[] = []
       
-      for (const site of accessibleSites) {
-        // Hämta aktiva ärenden
+      for (const customer of customersData || []) {
+        // Hämta aktiva ärenden från cases-tabellen
         const { data: activeCases } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .in('status', ['pending', 'in_progress', 'scheduled'])
+          .eq('customer_id', customer.id)
+          .in('status', ['Öppen', 'Pågående', 'Schemalagd'])
 
         // Hämta avklarade denna månad
         const startOfMonth = new Date()
@@ -54,18 +76,18 @@ const RegionchefDashboard: React.FC = () => {
         startOfMonth.setHours(0, 0, 0, 0)
         
         const { data: completedCases } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .eq('status', 'completed')
+          .eq('customer_id', customer.id)
+          .in('status', ['Avklarad', 'Stängd'])
           .gte('updated_at', startOfMonth.toISOString())
 
         // Hämta schemalagda besök
         const { data: scheduledVisits } = await supabase
-          .from('private_cases')
+          .from('cases')
           .select('id')
-          .eq('site_id', site.id)
-          .eq('status', 'scheduled')
+          .eq('customer_id', customer.id)
+          .eq('status', 'Schemalagd')
 
         // Beräkna trafikljus
         let trafficLight: 'green' | 'yellow' | 'red' = 'green'
@@ -73,9 +95,9 @@ const RegionchefDashboard: React.FC = () => {
         if ((activeCases?.length || 0) > 10) trafficLight = 'red'
 
         metrics.push({
-          siteId: site.id,
-          siteName: site.site_name,
-          city: site.city || 'Okänd stad',
+          customerId: customer.id,
+          customerName: customer.company_name,
+          city: customer.city || 'Okänd stad',
           activeCases: activeCases?.length || 0,
           completedThisMonth: completedCases?.length || 0,
           scheduledVisits: scheduledVisits?.length || 0,
@@ -222,13 +244,13 @@ const RegionchefDashboard: React.FC = () => {
               <div className="space-y-4">
                 {siteMetrics.map((metric) => (
                   <div
-                    key={metric.siteId}
+                    key={metric.customerId}
                     className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-white text-lg">{metric.siteName}</h3>
+                          <h3 className="font-semibold text-white text-lg">{metric.customerName}</h3>
                           <div className={`w-3 h-3 rounded-full ${
                             metric.trafficLight === 'green' ? 'bg-green-500' :
                             metric.trafficLight === 'yellow' ? 'bg-yellow-500' :
@@ -272,7 +294,7 @@ const RegionchefDashboard: React.FC = () => {
             isOpen={showServiceRequestModal}
             onClose={() => setShowServiceRequestModal(false)}
             onSuccess={() => {
-              fetchMetrics()
+              fetchCustomersAndMetrics()
             }}
           />
         )}
