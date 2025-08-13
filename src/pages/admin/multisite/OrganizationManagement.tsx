@@ -21,13 +21,19 @@ import {
   CheckCircle,
   XCircle,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Edit2,
+  Settings,
+  ChevronRight
 } from 'lucide-react'
 import { PageHeader } from '../../../components/shared'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import MultisiteRegistrationWizard from '../../../components/admin/multisite/MultisiteRegistrationWizard'
+import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
+import UserManagementPanel from '../../../components/admin/multisite/UserManagementPanel'
+import SiteManagementPanel from '../../../components/admin/multisite/SiteManagementPanel'
 import toast from 'react-hot-toast'
 
 export default function OrganizationManagement() {
@@ -39,6 +45,8 @@ export default function OrganizationManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrg, setSelectedOrg] = useState<MultisiteOrganization | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [editingOrg, setEditingOrg] = useState<MultisiteOrganization | null>(null)
+  const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrganizations()
@@ -245,6 +253,22 @@ export default function OrganizationManagement() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
+                          className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                          title="Visa detaljer"
+                        >
+                          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${
+                            expandedOrg === org.id ? 'rotate-90' : ''
+                          }`} />
+                        </button>
+                        <button
+                          onClick={() => setEditingOrg(org)}
+                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors"
+                          title="Redigera organisation"
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-400" />
+                        </button>
+                        <button
                           onClick={() => handleToggleActive(org)}
                           className={`p-2 rounded-lg transition-colors ${
                             org.is_active 
@@ -255,7 +279,6 @@ export default function OrganizationManagement() {
                         >
                           {org.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        {/* Redigera-knapp temporärt borttagen tills redigeringsfunktionalitet implementeras */}
                         <button
                           onClick={() => handleDeleteOrganization(org)}
                           className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
@@ -340,6 +363,57 @@ export default function OrganizationManagement() {
                       )}
                     </div>
                   </div>
+
+                  {/* Expanded Details Panel */}
+                  {expandedOrg === org.id && (
+                    <div className="border-t border-slate-700 bg-slate-950/50">
+                      <div className="p-6">
+                        {/* Tab Navigation */}
+                        <div className="flex gap-4 mb-6 border-b border-slate-700">
+                          <button
+                            onClick={() => setSelectedOrg(org)}
+                            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                              selectedOrg?.id === org.id 
+                                ? 'text-purple-400' 
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Användare
+                            {selectedOrg?.id === org.id && (
+                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setSelectedOrg(null)}
+                            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                              selectedOrg?.id !== org.id 
+                                ? 'text-purple-400' 
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Anläggningar
+                            {selectedOrg?.id !== org.id && (
+                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Tab Content */}
+                        {selectedOrg?.id === org.id ? (
+                          <UserManagementPanel
+                            organizationId={org.id}
+                            organizationName={org.name}
+                            onUpdate={fetchOrganizations}
+                          />
+                        ) : (
+                          <SiteManagementPanel
+                            organizationId={org.id}
+                            onUpdate={fetchOrganizations}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )
             })}
@@ -370,6 +444,18 @@ export default function OrganizationManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Organization Modal */}
+      {editingOrg && (
+        <OrganizationEditModal
+          organization={editingOrg}
+          onClose={() => setEditingOrg(null)}
+          onSuccess={() => {
+            fetchOrganizations()
+            setEditingOrg(null)
+          }}
+        />
       )}
     </div>
   )
