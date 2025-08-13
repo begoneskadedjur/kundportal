@@ -63,7 +63,6 @@ import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
 import OrganisationRedirect from './pages/organisation/Redirect'
 
 // Verksamhetschef sub-pages
-import VerksamhetschefSchema from './pages/organisation/verksamhetschef/Schema'
 import VerksamhetschefStatistik from './pages/organisation/verksamhetschef/Statistik'
 import VerksamhetschefArenden from './pages/organisation/verksamhetschef/Arenden'
 import VerksamhetschefRapporter from './pages/organisation/verksamhetschef/Rapporter';
@@ -460,14 +459,6 @@ function App() {
             />
             
             {/* Organisation sub-routes for verksamhetschef */}
-            <Route 
-              path="/organisation/verksamhetschef/schema" 
-              element={
-                <MultisiteProtectedRoute>
-                  <VerksamhetschefSchema />
-                </MultisiteProtectedRoute>
-              } 
-            />
             <Route 
               path="/organisation/verksamhetschef/statistik" 
               element={

@@ -40,12 +40,6 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
         path: `${basePath}/statistik`
       },
       {
-        id: 'schedule',
-        label: 'Schema',
-        icon: <Calendar className="w-5 h-5" />,
-        path: `${basePath}/schema`
-      },
-      {
         id: 'cases',
         label: 'Ärenden',
         icon: <AlertTriangle className="w-5 h-5" />,
