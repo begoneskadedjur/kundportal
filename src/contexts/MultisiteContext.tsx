@@ -124,17 +124,38 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
       }
 
       setUserRole(roleData)
+      console.log('User role set:', roleData)
 
       // Fetch organization (huvudkontor customer)
+      console.log('Fetching organization with:', { 
+        organization_id: roleData.organization_id,
+        site_type: 'huvudkontor',
+        is_active: true
+      })
+      
       const { data: orgData, error: orgError } = await supabase
         .from('customers')
         .select('*')
         .eq('organization_id', roleData.organization_id)
         .eq('site_type', 'huvudkontor')
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
-      if (orgError) throw orgError
+      if (orgError) {
+        console.error('Error fetching organization:', orgError)
+        console.log('Query params:', { 
+          organization_id: roleData.organization_id,
+          site_type: 'huvudkontor' 
+        })
+        throw orgError
+      }
+      
+      if (!orgData) {
+        console.error('No organization data found for:', roleData.organization_id)
+        setLoading(false)
+        return
+      }
+      
       // Map customer fields to organization structure
       const organization = {
         id: orgData.organization_id,
@@ -151,7 +172,7 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
       }
       setOrganization(organization)
       
-      console.log('Organization fetched:', orgData)
+      console.log('Organization fetched:', { orgData, organization })
 
       // Fetch sites based on role (enheter customers)
       console.log('Fetching sites for organization:', roleData.organization_id)
