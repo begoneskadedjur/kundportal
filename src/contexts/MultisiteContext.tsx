@@ -135,8 +135,12 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
       if (orgError) throw orgError
       setOrganization(orgData)
+      
+      console.log('Organization fetched:', orgData)
 
       // Fetch sites based on role
+      console.log('Fetching sites for organization:', roleData.organization_id)
+      
       let sitesQuery = supabase
         .from('organization_sites')
         .select('*')
@@ -145,8 +149,10 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
       // Apply role-based filtering
       if (roleData.role_type === 'regionchef' && roleData.region) {
+        console.log('Filtering sites for regionchef, region:', roleData.region)
         sitesQuery = sitesQuery.eq('region', roleData.region)
       } else if (roleData.role_type === 'platsansvarig' && roleData.site_ids) {
+        console.log('Filtering sites for platsansvarig, site_ids:', roleData.site_ids)
         sitesQuery = sitesQuery.in('id', roleData.site_ids)
       }
 
@@ -154,6 +160,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .order('region', { ascending: true })
         .order('site_name', { ascending: true })
 
+      console.log('Sites query result:', { sitesData, sitesError })
+      
       if (sitesError) throw sitesError
       setSites(sitesData || [])
 
@@ -222,6 +230,12 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     }
     
     return false
+  })
+  
+  console.log('Accessible sites calculated:', { 
+    totalSites: sites.length, 
+    accessibleSites: accessibleSites.length, 
+    userRoleType: userRole?.role_type 
   })
 
   // Check if user can access a specific site

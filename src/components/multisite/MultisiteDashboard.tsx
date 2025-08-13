@@ -19,9 +19,13 @@ interface DashboardMetrics {
 }
 
 const MultisiteDashboard: React.FC = () => {
-  const { organization, accessibleSites, userRole, currentSite } = useMultisite()
+  const { organization, accessibleSites, userRole, currentSite, sites } = useMultisite()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Debug logging
+  console.log('MultisiteDashboard - sites:', sites)
+  console.log('MultisiteDashboard - accessibleSites:', accessibleSites)
 
   useEffect(() => {
     fetchDashboardMetrics()

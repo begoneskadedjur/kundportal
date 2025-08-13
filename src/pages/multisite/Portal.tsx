@@ -50,6 +50,27 @@ const MultisitePortal: React.FC = () => {
     await refreshData()
     setRefreshing(false)
   }
+  
+  // Debug function to create test sites
+  const createTestSites = async () => {
+    try {
+      const response = await fetch('/api/debug-sites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const data = await response.json()
+      console.log('Test sites response:', data)
+      
+      if (response.ok) {
+        await refreshData()
+      }
+    } catch (error) {
+      console.error('Error creating test sites:', error)
+    }
+  }
 
   // Loading state
   if (loading) {
@@ -126,6 +147,21 @@ const MultisitePortal: React.FC = () => {
 
       {/* Site Selector */}
       <div className="container mx-auto px-4 pt-4">
+        {/* Debug button - remove this in production */}
+        {accessibleSites.length === 0 && (
+          <Card className="bg-amber-900/20 border-amber-700 mb-4">
+            <div className="p-4 flex items-center justify-between">
+              <p className="text-amber-300">Inga enheter hittades. Vill du skapa testdata?</p>
+              <Button 
+                onClick={createTestSites}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Skapa testenheter
+              </Button>
+            </div>
+          </Card>
+        )}
+        
         {accessibleSites.length > 0 && (
           <Card className="bg-slate-800/50 backdrop-blur border-slate-700 mb-6">
             <div className="p-4">
