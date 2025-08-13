@@ -61,7 +61,12 @@ import VerksamhetschefDashboard from './pages/organisation/Verksamhetschef'
 import RegionchefDashboard from './pages/organisation/Regionchef'
 import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
 import OrganisationRedirect from './pages/organisation/Redirect'
-import VerksamhetschefSchema from './pages/organisation/verksamhetschef/Schema';
+
+// Verksamhetschef sub-pages
+import VerksamhetschefSchema from './pages/organisation/verksamhetschef/Schema'
+import VerksamhetschefStatistik from './pages/organisation/verksamhetschef/Statistik'
+import VerksamhetschefArenden from './pages/organisation/verksamhetschef/Arenden'
+import VerksamhetschefRapporter from './pages/organisation/verksamhetschef/Rapporter';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -460,6 +465,30 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <VerksamhetschefSchema />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/verksamhetschef/statistik" 
+              element={
+                <MultisiteProtectedRoute>
+                  <VerksamhetschefStatistik />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/verksamhetschef/arenden" 
+              element={
+                <MultisiteProtectedRoute>
+                  <VerksamhetschefArenden />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/verksamhetschef/rapporter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <VerksamhetschefRapporter />
                 </MultisiteProtectedRoute>
               } 
             />

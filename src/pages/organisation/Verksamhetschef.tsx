@@ -279,6 +279,25 @@ const VerksamhetschefDashboard: React.FC = () => {
                     <p className="text-slate-500 text-sm mt-2">
                       Kontakta administratören för att lägga till enheter
                     </p>
+                    {sites.some(s => !s.customer_id) && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/link-sites-to-customers', {
+                              method: 'POST'
+                            })
+                            const data = await response.json()
+                            console.log('Linking result:', data)
+                            window.location.reload()
+                          } catch (error) {
+                            console.error('Error linking sites:', error)
+                          }
+                        }}
+                        className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                      >
+                        Koppla enheter till kunder
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
