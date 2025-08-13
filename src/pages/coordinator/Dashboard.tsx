@@ -304,28 +304,28 @@ export default function CoordinatorDashboard() {
               tag="Tillgänglig"
             />
             <CoordinatorDashboardCard
-              href="/koordinator/multisite/register"
+              href="/koordinator/organisation/register"
               icon={UserPlus}
               title="Registrera Organisation"
               description="Registrera ny multisite-organisation med flera anläggningar och sites."
               tag="Ny"
             />
             <CoordinatorDashboardCard
-              href="/koordinator/multisite/organizations"
+              href="/koordinator/organisation/organizations"
               icon={Building2}
               title="Organisationsöversikt"
               description="Visa och hantera alla registrerade organisationer och deras anläggningar."
               tag="Hantering"
             />
             <CoordinatorDashboardCard
-              href="/koordinator/multisite/traffic-light"
+              href="/koordinator/organisation/traffic-light"
               icon={TrendingUp}
               title="Trafikljusöversikt"
               description="Övervakningssystem för att bedöma organisationers prestanda och status."
               tag="Analys"
             />
             <CoordinatorDashboardCard
-              href="/koordinator/multisite/billing"
+              href="/koordinator/organisation/billing"
               icon={Receipt}
               title="Multisite-fakturering"
               description="Hantera fakturering för multisite-organisationer med konsoliderad eller per-site fakturering."

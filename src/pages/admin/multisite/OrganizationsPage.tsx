@@ -165,7 +165,7 @@ export default function OrganizationsPage() {
   const handleViewDetails = (orgId: string) => {
     // Navigate to the management page with the organization details
     const basePath = profile?.role === 'admin' ? '/admin' : '/koordinator'
-    navigate(`${basePath}/multisite/organizations-manage`, { state: { selectedOrgId: orgId } })
+    navigate(`${basePath}/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
 
   if (loading) {
@@ -197,7 +197,7 @@ export default function OrganizationsPage() {
             />
           </div>
           <Button
-            onClick={() => navigate('/admin/multisite/register')}
+            onClick={() => navigate('/admin/organisation/register')}
             variant="primary"
             className="flex items-center gap-2"
           >
@@ -259,7 +259,7 @@ export default function OrganizationsPage() {
             </p>
             {!searchTerm && (
               <Button
-                onClick={() => navigate('/admin/multisite/register')}
+                onClick={() => navigate('/admin/organisation/register')}
                 variant="primary"
                 className="flex items-center gap-2 mx-auto"
               >

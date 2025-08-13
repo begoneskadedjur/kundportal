@@ -32,7 +32,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   // Om användaren har multisite-roll men försöker komma åt customer-sidor
   if (multisiteRole && requiredRole === 'customer' && !profile.customer_id) {
     // Redirect multisite-only användare till multisite-portalen
-    return <Navigate to="/multisite" replace />;
+    return <Navigate to="/organisation" replace />;
   }
 
   // ✅ 4. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST

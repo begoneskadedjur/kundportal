@@ -283,7 +283,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })
 
             const subject = isNewUser 
-              ? `Välkommen till Begone Multisite Portal - ${organizationName}`
+              ? `Välkommen till Begone Organisationsportal - ${organizationName}`
               : `Ny organisation tillagd - ${organizationName}`
 
             // Use Resend API directly
@@ -410,7 +410,7 @@ function getMultisiteInvitationEmailTemplate({
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${isNewUser ? 'Välkommen till Begone Multisite Portal' : 'Ny organisation tillagd'}</title>
+    <title>${isNewUser ? 'Välkommen till Begone Organisationsportal' : 'Ny organisation tillagd'}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0f172a; color: #e2e8f0;">
     <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
@@ -424,7 +424,7 @@ function getMultisiteInvitationEmailTemplate({
                 </svg>
             </div>
             <h1 style="margin: 0; color: white; font-size: 1.75rem; font-weight: bold;">
-                ${isNewUser ? 'Välkommen till Begone Multisite Portal!' : 'Ny Organisation Tillagd'}
+                ${isNewUser ? 'Välkommen till Begone Organisationsportal!' : 'Ny Organisation Tillagd'}
             </h1>
             <p style="margin: 0.5rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem;">
                 ${organization.name}

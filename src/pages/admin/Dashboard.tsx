@@ -489,7 +489,7 @@ const AdminDashboard: React.FC = () => {
                 initialDelay={1.4}
               >
                 <AdminDashboardCard
-                  href="/admin/multisite/register"
+                  href="/admin/organisation/register"
                   icon={UserPlus}
                   title="Registrera Organisation"
                   description="Ny multisite-kund wizard"
@@ -501,7 +501,7 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/multisite/organizations"
+                  href="/admin/organisation/organizations"
                   icon={Building2}
                   title="Organisationer"
                   description="Hantera multisite-organisationer"
@@ -511,7 +511,7 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/multisite/traffic-light"
+                  href="/admin/organisation/traffic-light"
                   icon={AlertCircle}
                   title="Trafikljusöversikt"
                   description="Kvalitetsövervakning alla sites"
@@ -521,7 +521,7 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/multisite/billing"
+                  href="/admin/organisation/billing"
                   icon={Receipt}
                   title="Multisite-fakturering"
                   description="Konsoliderad & per-site"

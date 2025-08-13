@@ -70,7 +70,7 @@ const CustomerPortal: React.FC = () => {
     if (!multisiteLoading && profile) {
       // Om användaren ENDAST har multisite-roll och ingen customer_id
       if (userRole && organization && !profile.customer_id) {
-        navigate('/multisite')
+        navigate('/organisation')
         return
       }
       

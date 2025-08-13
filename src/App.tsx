@@ -169,9 +169,9 @@ function App() {
               } 
             />
             
-            {/* Multisite Management Routes - Admin */}
+            {/* Organisation Management Routes - Admin */}
             <Route 
-              path="/admin/multisite/register" 
+              path="/admin/organisation/register" 
               element={
                 <AdminOrKoordinatorRoute>
                   <MultisiteRegistrationPage />
@@ -179,7 +179,7 @@ function App() {
               } 
             />
             <Route 
-              path="/admin/multisite/organizations" 
+              path="/admin/organisation/organizations" 
               element={
                 <AdminOrKoordinatorRoute>
                   <AdminOrganizationsPage />
@@ -187,7 +187,7 @@ function App() {
               } 
             />
             <Route 
-              path="/admin/multisite/organizations-manage" 
+              path="/admin/organisation/organizations-manage" 
               element={
                 <AdminOrKoordinatorRoute>
                   <OrganizationManagement />
@@ -195,7 +195,7 @@ function App() {
               } 
             />
             <Route 
-              path="/admin/multisite/traffic-light" 
+              path="/admin/organisation/traffic-light" 
               element={
                 <AdminOrKoordinatorRoute>
                   <TrafficLightOverview />
@@ -203,7 +203,7 @@ function App() {
               } 
             />
             <Route 
-              path="/admin/multisite/billing" 
+              path="/admin/organisation/billing" 
               element={
                 <AdminOrKoordinatorRoute>
                   <MultisiteBillingManagement />
@@ -274,9 +274,9 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            {/* Multisite Management Routes - Koordinator */}
+            {/* Organisation Management Routes - Koordinator */}
             <Route 
-              path="/koordinator/multisite/register" 
+              path="/koordinator/organisation/register" 
               element={
                 <AdminOrKoordinatorRoute>
                   <CoordinatorMultisiteRegistrationPage />
@@ -284,7 +284,7 @@ function App() {
               } 
             />
             <Route 
-              path="/koordinator/multisite/organizations" 
+              path="/koordinator/organisation/organizations" 
               element={
                 <AdminOrKoordinatorRoute>
                   <CoordinatorOrganizationsPage />
@@ -292,7 +292,7 @@ function App() {
               } 
             />
             <Route 
-              path="/koordinator/multisite/organizations-manage" 
+              path="/koordinator/organisation/organizations-manage" 
               element={
                 <AdminOrKoordinatorRoute>
                   <OrganizationManagement />
@@ -300,7 +300,7 @@ function App() {
               } 
             />
             <Route 
-              path="/koordinator/multisite/traffic-light" 
+              path="/koordinator/organisation/traffic-light" 
               element={
                 <AdminOrKoordinatorRoute>
                   <TrafficLightOverview />
@@ -308,7 +308,7 @@ function App() {
               } 
             />
             <Route 
-              path="/koordinator/multisite/billing" 
+              path="/koordinator/organisation/billing" 
               element={
                 <AdminOrKoordinatorRoute>
                   <MultisiteBillingManagement />
@@ -416,9 +416,9 @@ function App() {
               } 
             />
 
-            {/* Multisite Portal routes */}
+            {/* Organisation Portal routes */}
             <Route 
-              path="/multisite" 
+              path="/organisation" 
               element={
                 <MultisiteProtectedRoute>
                   <MultisitePortal />
