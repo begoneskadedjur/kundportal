@@ -115,13 +115,14 @@ export default function UserManagementPanel({
           // Hämta inbjudningsstatus (ignorera fel)
           let invitationStatus: 'pending' | 'accepted' | 'expired' = 'accepted'
           try {
-            const { data: invitation } = await supabase
+            const { data: invitations } = await supabase
               .from('multisite_user_invitations')
               .select('accepted_at, expires_at')
               .eq('organization_id', organizationId)
               .eq('email', profile?.email || userMeta?.email || '')
-              .single()
+              .limit(1)
 
+            const invitation = invitations?.[0]
             if (invitation) {
               if (invitation.accepted_at) {
                 invitationStatus = 'accepted'

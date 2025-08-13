@@ -88,21 +88,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Användaren existerar men har inte tillgång till denna organisation
-      // Skapa ny multisite-profil för denna organisation
-      const { error: profileError } = await supabase
-        .from('multisite_user_profiles')
+      // Skapa ny roll i multisite_user_roles
+      const { error: roleError } = await supabase
+        .from('multisite_user_roles')
         .insert({
           user_id: userId,
           organization_id: organizationId,
-          email: email,
-          name: name,
-          role: role,
+          role_type: role,
           is_active: true
         })
 
-      if (profileError) {
-        console.error('Multisite profile creation error:', profileError)
-        return res.status(500).json({ error: 'Kunde inte skapa multisite-profil' })
+      if (roleError) {
+        console.error('Multisite role creation error:', roleError)
+        return res.status(500).json({ error: 'Kunde inte skapa användarroll' })
       }
 
     } else {
@@ -139,8 +137,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_id: userId,
           email: email,
           email_verified: true,
-          multisite_role: role,
-          organization_id: organizationId,
           is_admin: false,
           is_koordinator: false,
           role: 'customer', // Sätt standard roll för multisite-användare
