@@ -1,6 +1,6 @@
 // api/send-email-campaign.ts - API för att skicka e-postkampanjer till kunder
 import { VercelRequest, VercelResponse } from '@vercel/node'
-const nodemailer = require('nodemailer')
+import nodemailer from 'nodemailer'
 import { customEmailTemplate } from './email-templates'
 
 interface CampaignRecipient {

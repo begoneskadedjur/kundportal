@@ -1,6 +1,6 @@
 // api/send-work-report.ts - API för att skicka saneringsrapporter via email
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-const nodemailer = require('nodemailer')
+import nodemailer from 'nodemailer'
 import { generateWorkReportPDF, type TaskDetails, type CustomerInfo } from '../src/lib/pdf-generator'
 
 // Environment variables
