@@ -1,7 +1,7 @@
 // api/create-multisite-users.ts - Skapa multisite-användare
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-const nodemailer = require('nodemailer')
+import nodemailer from 'nodemailer'
 
 // Environment variables - Vercel uses different naming
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
