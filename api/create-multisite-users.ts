@@ -1,10 +1,12 @@
 // api/create-multisite-users.ts - Skapa multisite-användare
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import nodemailer from 'nodemailer'
 
 // Environment variables - Vercel uses different naming
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+const RESEND_API_KEY = process.env.RESEND_API_KEY
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
@@ -53,10 +55,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    // Get organization name for invitation emails
+    // Get organization details for invitation emails
     const { data: orgData, error: orgError } = await supabaseAdmin
       .from('multisite_organizations')
-      .select('name')
+      .select('*')
       .eq('id', organizationId)
       .single()
 
@@ -218,10 +220,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Add site_ids for regionchef and platsansvarig
-        if (roleAssignment.role === 'regionchef' && roleAssignment.siteIds) {
+        // Regionchef uses 'sites' field, platsansvarig uses 'siteIds'
+        if (roleAssignment.role === 'regionchef' && roleAssignment.sites) {
+          roleData.site_ids = roleAssignment.sites
+        } else if (roleAssignment.role === 'platsansvarig' && roleAssignment.siteIds) {
           roleData.site_ids = roleAssignment.siteIds
-        } else if (roleAssignment.role === 'platsansvarig' && roleAssignment.siteIds?.length > 0) {
-          roleData.site_ids = [roleAssignment.siteIds[0]] // Platsansvarig gets one site
         }
 
         if (existingRole) {
@@ -257,27 +260,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.log(`Created new role for ${userData.email}`)
         }
 
-        // Send invitation email via separate API
-        try {
-          const inviteResponse = await fetch(`${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/api/send-multisite-invitation`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              organizationId,
-              email: userData.email,
-              name: userData.name,
+        // Send invitation email directly
+        if (RESEND_API_KEY) {
+          try {
+            const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
+            const isNewUser = !existingAuthUser
+            
+            const emailHtml = getMultisiteInvitationEmailTemplate({
+              organization: orgData,
+              recipientEmail: userData.email,
+              recipientName: userData.name,
               role: roleAssignment.role,
-              organizationName: organizationName
+              loginLink,
+              isNewUser,
+              tempPassword: isNewUser ? tempPassword : undefined
             })
-          })
 
-          if (!inviteResponse.ok) {
-            console.error(`Failed to send invitation to ${userData.email}`)
+            const transporter = nodemailer.createTransporter({
+              host: 'smtp.resend.com',
+              port: 587,
+              secure: false,
+              auth: {
+                user: 'resend',
+                pass: RESEND_API_KEY
+              }
+            })
+
+            const subject = isNewUser 
+              ? `Välkommen till Begone Multisite Portal - ${organizationName}`
+              : `Ny organisation tillagd - ${organizationName}`
+
+            const mailOptions = {
+              from: 'Begone Kundportal <noreply@resend.dev>',
+              to: userData.email,
+              subject: subject,
+              html: emailHtml
+            }
+
+            const info = await transporter.sendMail(mailOptions)
+            console.log(`Invitation email sent to ${userData.email}:`, info.messageId)
+          } catch (emailError) {
+            console.error(`Failed to send email to ${userData.email}:`, emailError)
+            // Don't fail the whole process if email fails
           }
-        } catch (emailError) {
-          console.error(`Email error for ${userData.email}:`, emailError)
+        } else {
+          console.warn('RESEND_API_KEY not configured - skipping email invitations')
         }
 
         results.success.push({
@@ -340,4 +367,156 @@ function generateSecurePassword(): string {
   }
   
   return password
+}
+
+// Email template for multisite invitations
+function getMultisiteInvitationEmailTemplate({
+  organization,
+  recipientEmail,
+  recipientName,
+  role,
+  loginLink,
+  isNewUser,
+  tempPassword
+}: {
+  organization: any
+  recipientEmail: string
+  recipientName: string
+  role: string
+  loginLink: string
+  isNewUser: boolean
+  tempPassword?: string
+}) {
+  const roleNames: { [key: string]: string } = {
+    'verksamhetschef': 'Verksamhetschef',
+    'regionchef': 'Regionchef',
+    'platsansvarig': 'Platsansvarig'
+  }
+
+  const roleName = roleNames[role] || role
+
+  return `
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${isNewUser ? 'Välkommen till Begone Multisite Portal' : 'Ny organisation tillagd'}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0f172a; color: #e2e8f0;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+        
+        <!-- Header med gradient -->
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 2rem; text-align: center;">
+            <div style="background-color: rgba(255, 255, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </div>
+            <h1 style="margin: 0; color: white; font-size: 1.75rem; font-weight: bold;">
+                ${isNewUser ? 'Välkommen till Begone Multisite Portal!' : 'Ny Organisation Tillagd'}
+            </h1>
+            <p style="margin: 0.5rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem;">
+                ${organization.name}
+            </p>
+        </div>
+
+        <!-- Innehåll -->
+        <div style="padding: 2rem;">
+            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
+                Hej ${recipientName},
+            </p>
+
+            ${isNewUser ? `
+            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+                Du har blivit inbjuden att delta i Begone Skadedjur & Sanering AB:s multisite-portal för organisationen <strong style="color: #a855f7;">${organization.name}</strong>.
+            </p>
+
+            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+                Ett konto har skapats åt dig med rollen <strong style="color: #22c55e;">${roleName}</strong>. 
+                Du får nu tillgång till kvalitetsövervakning, rapporter och hantering för alla anläggningar i organisationen.
+            </p>
+            ` : `
+            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+                Du har blivit tillagd till multisite-organisationen <strong style="color: #a855f7;">${organization.name}</strong> 
+                med rollen <strong style="color: #22c55e;">${roleName}</strong>.
+            </p>
+
+            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+                Du kan nu logga in med ditt befintliga konto och få tillgång till denna organisations anläggningar och data.
+            </p>
+            `}
+
+            <!-- Inloggningsuppgifter om ny användare -->
+            ${isNewUser && tempPassword ? `
+            <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+                <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
+                    📧 Dina inloggningsuppgifter
+                </h3>
+                <div style="background-color: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 6px; font-family: monospace;">
+                    <p style="margin: 0.5rem 0; color: white;"><strong>E-post:</strong> ${recipientEmail}</p>
+                    <p style="margin: 0.5rem 0; color: white;"><strong>Lösenord:</strong> ${tempPassword}</p>
+                </div>
+                <p style="margin: 1rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">
+                    ⚠️ <strong>Viktigt:</strong> Ändra ditt lösenord när du loggar in första gången
+                </p>
+            </div>
+            ` : ''}
+
+            <!-- Organisations-info -->
+            <div style="background-color: #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+                <h3 style="color: #a855f7; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
+                    🏢 Organisationsinfo
+                </h3>
+                <div style="color: #cbd5e1;">
+                    <p style="margin: 0.5rem 0;"><strong>Organisation:</strong> ${organization.name}</p>
+                    ${organization.organization_number ? `<p style="margin: 0.5rem 0;"><strong>Org.nr:</strong> ${organization.organization_number}</p>` : ''}
+                    <p style="margin: 0.5rem 0;"><strong>Din roll:</strong> ${roleName}</p>
+                    <p style="margin: 0.5rem 0;"><strong>Faktureringstyp:</strong> ${organization.billing_type === 'consolidated' ? 'Konsoliderad' : 'Per anläggning'}</p>
+                </div>
+            </div>
+
+            <!-- Vad du kan göra -->
+            <div style="background-color: #1e40af; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
+                <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
+                    ✨ Vad du kan göra i portalen
+                </h3>
+                <ul style="color: rgba(255, 255, 255, 0.9); margin: 0; padding-left: 1.2rem;">
+                    <li style="margin: 0.5rem 0;">Övervaka kvalitetsindikatorer för alla anläggningar</li>
+                    <li style="margin: 0.5rem 0;">Se detaljerade rapporter och trender</li>
+                    <li style="margin: 0.5rem 0;">Hantera ärenden och uppföljning</li>
+                    <li style="margin: 0.5rem 0;">Få meddelanden om viktiga händelser</li>
+                    <li style="margin: 0.5rem 0;">Exportera data för analys</li>
+                </ul>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin: 2rem 0;">
+                <a href="${loginLink}" 
+                   style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); 
+                          color: white; 
+                          text-decoration: none; 
+                          padding: 1rem 2rem; 
+                          border-radius: 8px; 
+                          font-weight: bold; 
+                          display: inline-block; 
+                          font-size: 1.1rem;
+                          box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);">
+                    🚀 Logga in i portalen
+                </a>
+            </div>
+
+            <div style="border-top: 1px solid #475569; padding-top: 1.5rem; margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                <p>Länken är giltig i 7 dagar. Kontakta oss på <a href="mailto:info@begone.se" style="color: #a855f7;">info@begone.se</a> om du behöver hjälp.</p>
+                <p style="margin-top: 1rem;">
+                    Med vänliga hälsningar,<br>
+                    <strong style="color: #e2e8f0;">Begone Skadedjur & Sanering AB</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `
 }
