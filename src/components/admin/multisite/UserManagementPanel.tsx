@@ -112,23 +112,28 @@ export default function UserManagementPanel({
           const profile = profiles?.find(p => p.user_id === userRole.user_id)
           const userMeta = usersMetadata.find(u => u.user_id === userRole.user_id)
 
-          // Hämta inbjudningsstatus
-          const { data: invitation } = await supabase
-            .from('multisite_user_invitations')
-            .select('accepted_at, expires_at')
-            .eq('organization_id', organizationId)
-            .eq('email', profile?.email || userMeta?.email || '')
-            .single()
-
+          // Hämta inbjudningsstatus (ignorera fel)
           let invitationStatus: 'pending' | 'accepted' | 'expired' = 'accepted'
-          if (invitation) {
-            if (invitation.accepted_at) {
-              invitationStatus = 'accepted'
-            } else if (new Date(invitation.expires_at) < new Date()) {
-              invitationStatus = 'expired'
-            } else {
-              invitationStatus = 'pending'
+          try {
+            const { data: invitation } = await supabase
+              .from('multisite_user_invitations')
+              .select('accepted_at, expires_at')
+              .eq('organization_id', organizationId)
+              .eq('email', profile?.email || userMeta?.email || '')
+              .single()
+
+            if (invitation) {
+              if (invitation.accepted_at) {
+                invitationStatus = 'accepted'
+              } else if (new Date(invitation.expires_at) < new Date()) {
+                invitationStatus = 'expired'
+              } else {
+                invitationStatus = 'pending'
+              }
             }
+          } catch (err) {
+            // Ignorera fel från invitation query
+            console.log('Could not fetch invitation status')
           }
 
           return {
@@ -370,20 +375,18 @@ export default function UserManagementPanel({
             </div>
 
             <div className="flex items-center gap-2">
-              {(user.invitation_status === 'pending' || user.invitation_status === 'expired') && (
-                <button
-                  onClick={() => handleSendInvitation(user)}
-                  disabled={sendingInvite === user.id}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                  title={user.invitation_status === 'expired' ? 'Skicka ny inbjudan' : 'Återskicka inbjudan'}
-                >
-                  {sendingInvite === user.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 text-blue-400" />
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => handleSendInvitation(user)}
+                disabled={sendingInvite === user.id}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                title="Skicka inbjudan"
+              >
+                {sendingInvite === user.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                ) : (
+                  <Send className="w-4 h-4 text-blue-400" />
+                )}
+              </button>
               <button
                 onClick={() => handleDeleteUser(user)}
                 className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
