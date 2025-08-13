@@ -10,7 +10,6 @@ import {
   MapPin,
   Users,
   Plus,
-  Edit2,
   Trash2,
   Search,
   Filter,
@@ -242,13 +241,7 @@ export default function OrganizationManagement() {
                         >
                           {org.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        <button
-                          onClick={() => setSelectedOrg(org)}
-                          className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                          title="Redigera"
-                        >
-                          <Edit2 className="w-4 h-4 text-slate-400" />
-                        </button>
+                        {/* Redigera-knapp temporärt borttagen tills redigeringsfunktionalitet implementeras */}
                         <button
                           onClick={() => handleDeleteOrganization(org)}
                           className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"

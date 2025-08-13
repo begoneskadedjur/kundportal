@@ -2,7 +2,7 @@
 
 export interface MultisiteOrganization {
   id: string
-  organization_name: string
+  name: string  // Ändrat från organization_name för att matcha databasen
   organization_number: string | null
   billing_type: 'consolidated' | 'per_site'
   primary_contact_email: string | null

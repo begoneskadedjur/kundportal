@@ -369,19 +369,40 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           const userResult = await userResponse.json()
           
           if (!userResponse.ok) {
+            console.error('User creation API error:', userResult)
             throw new Error(userResult.error || 'Failed to create users')
           }
 
-          if (userResult.success) {
-            toast.success(`${userResult.summary.successful} användare skapade och inbjudningar skickade!`)
+          // Hantera resultatet baserat på summary
+          if (userResult.summary) {
+            const { successful, failed, total } = userResult.summary
             
-            if (userResult.summary.failed > 0) {
-              toast.error(`${userResult.summary.failed} användare kunde inte skapas. Kontrollera loggar.`)
-              console.error('Failed user creations:', userResult.results.filter((r: any) => !r.success))
+            if (successful > 0) {
+              toast.success(`${successful} av ${total} användare skapade och inbjudningar skickade!`)
+            }
+            
+            if (failed > 0) {
+              const errorDetails = userResult.results
+                ?.filter((r: any) => !r.success)
+                ?.map((r: any) => `${r.email}: ${r.error}`)
+                ?.join('\n')
+              
+              console.error('Failed user creations:', errorDetails)
+              toast.error(`${failed} användare kunde inte skapas. Se konsollen för detaljer.`)
+            }
+            
+            if (successful === 0 && failed > 0) {
+              // Om inga användare kunde skapas alls
+              throw new Error('Kunde inte skapa några användare. Kontrollera användaruppgifterna.')
             }
           } else {
-            toast.error('Vissa användare kunde inte skapas')
-            console.error('User creation results:', userResult.results)
+            // Fallback om summary inte finns
+            if (userResult.success) {
+              toast.success('Användare skapade!')
+            } else {
+              toast.error('Problem vid skapande av användare')
+              console.error('User creation results:', userResult)
+            }
           }
           
         } catch (error) {
