@@ -446,7 +446,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Button 
-              variant="secondary" 
+              variant="outline" 
               size="sm" 
               onClick={() => navigate(getNavigationPath())} 
               className="flex items-center gap-2"
@@ -700,7 +700,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                         type="checkbox"
                         checked={newSite.is_primary}
                         onChange={(e) => setNewSite({ ...newSite, is_primary: e.target.checked })}
-                        className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                        className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-green-500"
                       />
                       Primär anläggning (huvudkontor/centralt ansvar)
                     </label>
@@ -887,7 +887,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                                       : currentSites.filter(name => name !== site.site_name)
                                     handleRoleAssignment(user.id, 'regionchef', undefined, newSites)
                                   }}
-                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-green-500"
                                 />
                                 {site.site_name} ({site.region})
                               </label>
@@ -919,7 +919,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                                       : currentSiteIds.filter(id => id !== site.site_name)
                                     handleRoleAssignment(user.id, 'platsansvarig', newSiteIds)
                                   }}
-                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-green-500"
                                 />
                                 {site.site_name} ({site.region})
                               </label>
