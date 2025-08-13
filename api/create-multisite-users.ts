@@ -1,7 +1,7 @@
 // api/create-multisite-users.ts - Skapa multisite-användare
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import * as nodemailer from 'nodemailer'
+import nodemailer from 'nodemailer'
 
 // Environment variables - Vercel uses different naming
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -74,6 +74,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results = {
       success: [],
       errors: []
+    }
+
+    // Create email transporter once (outside loop)
+    let transporter = null
+    if (RESEND_API_KEY) {
+      try {
+        transporter = nodemailer.createTransporter({
+          host: 'smtp.resend.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: 'resend',
+            pass: RESEND_API_KEY
+          }
+        })
+      } catch (error) {
+        console.error('Failed to create email transporter:', error)
+        // Continue without email sending
+      }
     }
 
     // Create each user
@@ -261,7 +280,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Send invitation email directly
-        if (RESEND_API_KEY) {
+        if (transporter) {
           try {
             const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
             const isNewUser = !existingAuthUser
@@ -274,16 +293,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               loginLink,
               isNewUser,
               tempPassword: isNewUser ? tempPassword : undefined
-            })
-
-            const transporter = nodemailer.createTransporter({
-              host: 'smtp.resend.com',
-              port: 587,
-              secure: false,
-              auth: {
-                user: 'resend',
-                pass: RESEND_API_KEY
-              }
             })
 
             const subject = isNewUser 
