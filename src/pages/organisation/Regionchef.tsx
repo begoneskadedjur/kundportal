@@ -104,9 +104,9 @@ const RegionchefDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
+    <OrganisationLayout userRoleType="regionchef">
+      <div className="space-y-6">
+        {/* Header */}
         <div className="bg-gradient-to-r from-blue-900/20 to-cyan-900/20 rounded-2xl p-6 border border-blue-700/50">
           <h1 className="text-3xl font-bold text-white mb-2">
             {organization?.organization_name}
@@ -115,10 +115,9 @@ const RegionchefDashboard: React.FC = () => {
             Regionchef - {userRole?.region || 'Okänd region'}
           </p>
         </div>
-      </div>
 
-      {/* Översikt */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Översikt */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-6 bg-slate-800/50 border-slate-700">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -166,10 +165,27 @@ const RegionchefDashboard: React.FC = () => {
             </div>
           </div>
         </Card>
-      </div>
 
-      {/* Enheter i regionen */}
-      <div className="max-w-7xl mx-auto">
+        <Card className="p-6 bg-slate-800/50 border-slate-700">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+            </div>
+            <div>
+              <p className="text-slate-400 text-sm">Trafikljus</p>
+              <div className="flex gap-2 text-lg font-bold">
+                <span className="text-green-400">{siteMetrics.filter(m => m.trafficLight === 'green').length}</span>
+                <span className="text-yellow-400">{siteMetrics.filter(m => m.trafficLight === 'yellow').length}</span>
+                <span className="text-red-400">{siteMetrics.filter(m => m.trafficLight === 'red').length}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+        </div>
+
+        {/* Enheter i regionen */}
         <Card className="bg-slate-800/50 border-slate-700">
           <div className="p-6 border-b border-slate-700">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">

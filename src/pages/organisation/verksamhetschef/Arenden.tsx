@@ -11,6 +11,8 @@ import { AlertTriangle, MapPin, CheckCircle, Clock, Edit3 } from 'lucide-react'
 import ActiveCasesList from '../../../components/customer/ActiveCasesList'
 import ServiceActivityTimeline from '../../../components/customer/ServiceActivityTimeline'
 import EditContractCaseModal from '../../../components/coordinator/EditContractCaseModal'
+import CreateCaseModal from '../../../components/customer/CreateCaseModal'
+import Button from '../../../components/ui/Button'
 
 const VerksamhetschefArenden: React.FC = () => {
   const { organization, sites, loading: contextLoading } = useMultisite()
@@ -19,6 +21,7 @@ const VerksamhetschefArenden: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [selectedCase, setSelectedCase] = useState<any | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [allCases, setAllCases] = useState<any[]>([])
   
   useEffect(() => {
@@ -94,12 +97,25 @@ const VerksamhetschefArenden: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-2xl p-6 border border-purple-700/50">
-          <h1 className="text-2xl font-bold text-white mb-2">
-            Ärenden - {organization?.organization_name}
-          </h1>
-          <p className="text-purple-200">
-            Hantera och översee alla ärenden för organisationen
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Ärenden - {organization?.organization_name}
+              </h1>
+              <p className="text-purple-200">
+                Hantera och översee alla ärenden för organisationen
+              </p>
+            </div>
+            {customer && (
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Skapa nytt ärende
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Site selector */}
@@ -239,6 +255,20 @@ const VerksamhetschefArenden: React.FC = () => {
                 fetchAllCases()
               }
             }}
+          />
+        )}
+        
+        {/* Create Modal */}
+        {showCreateModal && customer && (
+          <CreateCaseModal
+            isOpen={showCreateModal}
+            onClose={() => {
+              setShowCreateModal(false)
+              if (selectedSiteId === 'all') {
+                fetchAllCases()
+              }
+            }}
+            customerId={customer.id}
           />
         )}
       </div>
