@@ -70,37 +70,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Found existing auth user:', existingAuthUser.id)
       userId = existingAuthUser.id
 
-      // Kontrollera om användaren redan har en multisite-profil för denna organisation
-      const { data: existingProfile } = await supabase
-        .from('multisite_user_profiles')
+      // Kontrollera om användaren redan har en roll för denna organisation
+      const { data: existingRole } = await supabase
+        .from('multisite_user_roles')
         .select('*')
         .eq('user_id', userId)
         .eq('organization_id', organizationId)
-        .single()
+        .maybeSingle()
 
-      if (existingProfile) {
-        console.log('User already has multisite profile for this organization')
-        return res.status(200).json({
-          success: true,
-          message: 'Användaren har redan tillgång till denna organisation',
-          type: 'already_exists'
-        })
-      }
+      if (existingRole) {
+        console.log('User already has role in organization, sending reminder email')
+        // Fortsätt till email-sändning nedan
+      } else {
+        // Användaren existerar men har inte denna roll i organisationen
+        // Skapa ny roll
+        const { error: roleError } = await supabase
+          .from('multisite_user_roles')
+          .insert({
+            user_id: userId,
+            organization_id: organizationId,
+            role_type: role,
+            is_active: true
+          })
 
-      // Användaren existerar men har inte tillgång till denna organisation
-      // Skapa ny roll i multisite_user_roles
-      const { error: roleError } = await supabase
-        .from('multisite_user_roles')
-        .insert({
-          user_id: userId,
-          organization_id: organizationId,
-          role_type: role,
-          is_active: true
-        })
-
-      if (roleError) {
-        console.error('Multisite role creation error:', roleError)
-        return res.status(500).json({ error: 'Kunde inte skapa användarroll' })
+        if (roleError) {
+          console.error('Multisite role creation error:', roleError)
+          return res.status(500).json({ error: 'Kunde inte skapa användarroll' })
+        }
+        console.log('Created new role for existing user')
       }
 
     } else {
