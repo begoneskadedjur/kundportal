@@ -26,8 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('=== SEND MULTISITE INVITATION API START ===')
     
-    const { organizationId, email, name, role, organizationName } = req.body
-    console.log('Multisite invitation request:', { organizationId, email, name, role, organizationName })
+    const { organizationId, email, name, role, organizationName, siteIds } = req.body
+    console.log('Multisite invitation request:', { organizationId, email, name, role, organizationName, siteIds })
 
     // 1. Validera inkommande data
     if (!organizationId || !email || !name || !role || !organizationName) {
@@ -124,6 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from('multisite_user_roles')
           .update({
             role_type: role,
+            site_ids: siteIds || [],  // Uppdatera site_ids
             is_active: true,
             updated_at: new Date().toISOString()
           })
@@ -141,6 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             user_id: userId,
             organization_id: organizationId,
             role_type: role,
+            site_ids: siteIds || [],  // Lägg till site_ids
             is_active: true
           })
 
@@ -209,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_id: userId,
           organization_id: organizationId,
           role_type: role,
-          site_ids: [],
+          site_ids: siteIds || [],  // Använd site_ids från request
           region: null,
           is_active: true
         })

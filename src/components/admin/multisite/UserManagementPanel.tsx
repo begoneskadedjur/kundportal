@@ -49,13 +49,33 @@ export default function UserManagementPanel({
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
-    role: 'platsansvarig' as MultisiteUserRoleType
+    role: 'platsansvarig' as MultisiteUserRoleType,
+    selectedSites: [] as string[]
   })
   const [selectedTab, setSelectedTab] = useState<'users' | 'invitations'>('users')
+  const [organizationSites, setOrganizationSites] = useState<any[]>([])
 
   useEffect(() => {
     fetchUsers()
+    fetchOrganizationSites()
   }, [organizationId])
+
+  const fetchOrganizationSites = async () => {
+    try {
+      const { data: sites, error } = await supabase
+        .from('organization_sites')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('site_name')
+
+      if (error) throw error
+      setOrganizationSites(sites || [])
+    } catch (error) {
+      console.error('Error fetching organization sites:', error)
+      toast.error('Kunde inte hämta anläggningar')
+    }
+  }
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -204,6 +224,16 @@ export default function UserManagementPanel({
       return
     }
 
+    // Validera att enheter är valda för regionchef och platsansvarig
+    if (newUser.role === 'regionchef' && newUser.selectedSites.length === 0) {
+      toast.error('Välj minst en enhet för regionchefen')
+      return
+    }
+    if (newUser.role === 'platsansvarig' && newUser.selectedSites.length !== 1) {
+      toast.error('Välj exakt en enhet för platsansvarig')
+      return
+    }
+
     setLoading(true)
     try {
       const response = await fetch('/api/send-multisite-invitation', {
@@ -216,7 +246,8 @@ export default function UserManagementPanel({
           organizationName,
           email: newUser.email,
           name: newUser.name,
-          role: newUser.role
+          role: newUser.role,
+          siteIds: newUser.selectedSites
         })
       })
 
@@ -228,7 +259,7 @@ export default function UserManagementPanel({
 
       toast.success('Användare tillagd och inbjudan skickad')
       setShowAddUser(false)
-      setNewUser({ email: '', name: '', role: 'platsansvarig' })
+      setNewUser({ email: '', name: '', role: 'platsansvarig', selectedSites: [] })
       fetchUsers()
       onUpdate()
     } catch (error: any) {
@@ -372,6 +403,22 @@ export default function UserManagementPanel({
                   </span>
                   {getStatusBadge(user.invitation_status)}
                 </div>
+                {/* Visa anläggningar för regionchef och platsansvarig */}
+                {user.site_ids && user.site_ids.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-slate-500 mb-1">Ansvarar för:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {user.site_ids.map(siteId => {
+                        const site = organizationSites.find(s => s.id === siteId)
+                        return site ? (
+                          <span key={siteId} className="px-2 py-1 bg-slate-700/50 rounded text-xs text-slate-300">
+                            {site.site_name}
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -445,7 +492,7 @@ export default function UserManagementPanel({
                 </label>
                 <select
                   value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as MultisiteUserRoleType })}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as MultisiteUserRoleType, selectedSites: [] })}
                   className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="verksamhetschef">Verksamhetschef</option>
@@ -453,12 +500,58 @@ export default function UserManagementPanel({
                   <option value="platsansvarig">Platsansvarig</option>
                 </select>
               </div>
+
+              {/* Enhetsväljare för Regionchef och Platsansvarig */}
+              {(newUser.role === 'regionchef' || newUser.role === 'platsansvarig') && organizationSites.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    {newUser.role === 'regionchef' ? 'Välj enheter *' : 'Välj enhet *'}
+                    <span className="text-xs text-slate-400 ml-2">
+                      {newUser.role === 'regionchef' ? '(flera val möjliga)' : '(välj en)'}
+                    </span>
+                  </label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto bg-slate-800/50 rounded-lg p-3">
+                    {organizationSites.map(site => (
+                      <label key={site.id} className="flex items-center gap-3 hover:bg-slate-700/50 p-2 rounded cursor-pointer">
+                        {newUser.role === 'regionchef' ? (
+                          <input
+                            type="checkbox"
+                            checked={newUser.selectedSites.includes(site.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewUser({ ...newUser, selectedSites: [...newUser.selectedSites, site.id] })
+                              } else {
+                                setNewUser({ ...newUser, selectedSites: newUser.selectedSites.filter(id => id !== site.id) })
+                              }
+                            }}
+                            className="w-4 h-4 text-purple-500 bg-slate-700 border-slate-500 rounded focus:ring-purple-500"
+                          />
+                        ) : (
+                          <input
+                            type="radio"
+                            name="site"
+                            checked={newUser.selectedSites[0] === site.id}
+                            onChange={() => setNewUser({ ...newUser, selectedSites: [site.id] })}
+                            className="w-4 h-4 text-purple-500 bg-slate-700 border-slate-500 focus:ring-purple-500"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="font-medium text-white">{site.site_name}</div>
+                          {site.address && (
+                            <div className="text-xs text-slate-400">{site.address}</div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
               <Button
                 onClick={() => {
                   setShowAddUser(false)
-                  setNewUser({ email: '', name: '', role: 'platsansvarig' })
+                  setNewUser({ email: '', name: '', role: 'platsansvarig', selectedSites: [] })
                 }}
                 variant="secondary"
                 size="sm"
