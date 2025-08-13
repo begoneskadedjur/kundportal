@@ -24,7 +24,8 @@ import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 
 // Multisite pages
-import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
+import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
+import CoordinatorOrganizationsPage from './pages/coordinator/multisite/OrganizationsPage';
 import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
 import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
 import MultisiteRegistrationPage from './pages/admin/multisite/MultisiteRegistrationPage';
@@ -180,7 +181,7 @@ function App() {
               path="/admin/multisite/organizations" 
               element={
                 <AdminOrKoordinatorRoute>
-                  <OrganizationManagement />
+                  <AdminOrganizationsPage />
                 </AdminOrKoordinatorRoute>
               } 
             />
@@ -277,7 +278,7 @@ function App() {
               path="/koordinator/multisite/organizations" 
               element={
                 <AdminOrKoordinatorRoute>
-                  <OrganizationManagement />
+                  <CoordinatorOrganizationsPage />
                 </AdminOrKoordinatorRoute>
               } 
             />

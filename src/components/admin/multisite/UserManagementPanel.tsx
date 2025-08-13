@@ -80,25 +80,44 @@ export default function UserManagementPanel({
 
         if (profilesError) throw profilesError
 
-        // Hämta användardetaljer från auth.users via admin API
+        // Hämta användardetaljer från backend API
+        let usersMetadata: any[] = []
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const response = await fetch('/api/multisite-users', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                action: 'getUsersInfo',
+                userIds,
+                organizationId
+              })
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              usersMetadata = data.users || []
+            }
+          }
+        } catch (error) {
+          console.log('Could not fetch users metadata:', error)
+        }
+
+        // Kombinera data
         const usersWithProfiles = await Promise.all(userRoles.map(async (userRole) => {
           const profile = profiles?.find(p => p.user_id === userRole.user_id)
-          
-          // Hämta metadata från auth.users
-          let userMetadata = null
-          try {
-            const { data: { user } } = await supabase.auth.admin.getUserById(userRole.user_id)
-            userMetadata = user?.user_metadata
-          } catch (error) {
-            console.log('Could not fetch user metadata:', error)
-          }
+          const userMeta = usersMetadata.find(u => u.user_id === userRole.user_id)
 
           // Hämta inbjudningsstatus
           const { data: invitation } = await supabase
             .from('multisite_user_invitations')
             .select('accepted_at, expires_at')
             .eq('organization_id', organizationId)
-            .eq('user_id', userRole.user_id)
+            .eq('email', profile?.email || userMeta?.email || '')
             .single()
 
           let invitationStatus: 'pending' | 'accepted' | 'expired' = 'accepted'
@@ -115,9 +134,9 @@ export default function UserManagementPanel({
           return {
             ...userRole,
             profile: {
-              email: profile?.email || userMetadata?.email,
-              name: userMetadata?.name || userMetadata?.organization_name || 'Okänd användare',
-              last_login: userMetadata?.last_sign_in_at
+              email: profile?.email || userMeta?.email,
+              name: userMeta?.name || 'Okänd användare',
+              last_login: userMeta?.last_sign_in_at
             },
             invitation_status: invitationStatus
           }

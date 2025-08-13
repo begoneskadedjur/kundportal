@@ -38,10 +38,6 @@ export default function SiteManagementPanel({
     site_code: '',
     address: '',
     region: '',
-    contact_person: '',
-    contact_email: '',
-    contact_phone: '',
-    site_manager_email: '',
     is_primary: false
   })
 
@@ -95,10 +91,6 @@ export default function SiteManagementPanel({
           site_code: formData.site_code.trim() || null,
           address: formData.address.trim() || null,
           region: formData.region.trim() || null,
-          contact_person: formData.contact_person.trim() || null,
-          contact_email: formData.contact_email.trim() || null,
-          contact_phone: formData.contact_phone.trim() || null,
-          site_manager_email: formData.site_manager_email.trim() || null,
           is_primary: isPrimary,
           is_active: true
         })
@@ -145,10 +137,6 @@ export default function SiteManagementPanel({
           site_code: formData.site_code.trim() || null,
           address: formData.address.trim() || null,
           region: formData.region.trim() || null,
-          contact_person: formData.contact_person.trim() || null,
-          contact_email: formData.contact_email.trim() || null,
-          contact_phone: formData.contact_phone.trim() || null,
-          site_manager_email: formData.site_manager_email.trim() || null,
           is_primary: formData.is_primary,
           updated_at: new Date().toISOString()
         })
@@ -219,10 +207,6 @@ export default function SiteManagementPanel({
       site_code: site.site_code || '',
       address: site.address || '',
       region: site.region || '',
-      contact_person: site.contact_person || '',
-      contact_email: site.contact_email || '',
-      contact_phone: site.contact_phone || '',
-      site_manager_email: site.site_manager_email || '',
       is_primary: site.is_primary
     })
   }
@@ -233,10 +217,6 @@ export default function SiteManagementPanel({
       site_code: '',
       address: '',
       region: '',
-      contact_person: '',
-      contact_email: '',
-      contact_phone: '',
-      site_manager_email: '',
       is_primary: false
     })
   }
@@ -336,33 +316,15 @@ export default function SiteManagementPanel({
               </div>
             </div>
 
-            {/* Contact Info */}
-            <div className="space-y-1 text-sm">
-              {site.address && (
-                <div className="flex items-center gap-2 text-slate-400">
+            {/* Address Info */}
+            {site.address && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
                   <Building className="w-3 h-3" />
                   <span className="truncate">{site.address}</span>
                 </div>
-              )}
-              {site.contact_person && (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <User className="w-3 h-3" />
-                  <span>{site.contact_person}</span>
-                </div>
-              )}
-              {site.contact_email && (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Mail className="w-3 h-3" />
-                  <span className="truncate">{site.contact_email}</span>
-                </div>
-              )}
-              {site.contact_phone && (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Phone className="w-3 h-3" />
-                  <span>{site.contact_phone}</span>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
 
@@ -432,66 +394,19 @@ export default function SiteManagementPanel({
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Region
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.region}
-                    onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                    placeholder="t.ex. Stockholm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Kontaktperson
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.contact_person}
-                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                    placeholder="För- och efternamn"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Kontakt e-post
-                  </label>
-                  <Input
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                    placeholder="kontakt@anlaggning.se"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Kontakt telefon
-                  </label>
-                  <Input
-                    type="tel"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    placeholder="+46 70 123 45 67"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Platsansvarig e-post
+                  Region
                 </label>
                 <Input
-                  type="email"
-                  value={formData.site_manager_email}
-                  onChange={(e) => setFormData({ ...formData, site_manager_email: e.target.value })}
-                  placeholder="platsansvarig@anlaggning.se"
+                  type="text"
+                  value={formData.region}
+                  onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                  placeholder="t.ex. Stockholm"
                 />
+                <p className="text-xs text-slate-500 mt-1">
+                  Kontaktpersoner hanteras via användare med rätt roll (Platsansvarig, Regionchef etc.)
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
