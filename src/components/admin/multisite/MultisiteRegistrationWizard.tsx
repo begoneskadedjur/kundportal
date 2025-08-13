@@ -353,7 +353,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           }
 
           // Call API to create users and roles
-          const userResponse = await fetch('/api/multisite/create-users', {
+          const userResponse = await fetch('/api/create-multisite-users', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
