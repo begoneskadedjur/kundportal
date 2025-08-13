@@ -26,6 +26,7 @@ import ProductManagementPage from './pages/admin/ProductManagement';
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
 import CoordinatorOrganizationsPage from './pages/coordinator/multisite/OrganizationsPage';
+import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
 import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
 import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
 import MultisiteRegistrationPage from './pages/admin/multisite/MultisiteRegistrationPage';
