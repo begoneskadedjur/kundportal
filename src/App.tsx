@@ -27,7 +27,7 @@ import ProductManagementPage from './pages/admin/ProductManagement';
 import OrganizationManagement from './pages/admin/multisite/OrganizationManagement';
 import TrafficLightOverview from './pages/admin/multisite/TrafficLightOverview';
 import MultisiteBillingManagement from './pages/admin/multisite/BillingManagement';
-import MultisiteRegistration from './pages/admin/multisite/MultisiteRegistration';
+import MultisiteRegistration from './components/admin/multisite/MultisiteRegistrationWizard';
 
 // ONEFLOW ROUTES
 import OneflowContractCreator from './pages/admin/OneflowContractCreator';
