@@ -12,15 +12,6 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
   const { profile, loading: authLoading } = useAuth();
   const { userRole, loading: multisiteLoading, organization } = useMultisite();
 
-  console.log('MultisiteProtectedRoute:', { 
-    profile: profile?.email,
-    role: profile?.role,
-    userRole,
-    organization,
-    authLoading,
-    multisiteLoading 
-  })
-
   // Show loading while checking authentication and multisite access
   if (authLoading || multisiteLoading) {
     return (
@@ -43,15 +34,8 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
 
   // For customer users, check if they have multisite access
   if (profile.role === 'customer' && userRole && organization) {
-    console.log('Customer has multisite access:', { userRole, organization })
     return <>{children}</>;
   }
-
-  console.log('No multisite access:', { 
-    role: profile.role, 
-    hasUserRole: !!userRole, 
-    hasOrganization: !!organization 
-  })
 
   // If user doesn't have multisite access, redirect based on their role
   let redirectPath = '/login';
@@ -70,6 +54,5 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
       break;
   }
 
-  console.warn(`Multisite access DENIED for role '${profile.role}'. User has no multisite role. Redirecting to '${redirectPath}'.`);
   return <Navigate to={redirectPath} replace />;
 }

@@ -99,8 +99,6 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     setError(null)
 
     try {
-      console.log('Fetching multisite role for user:', profile.user_id)
-      
       // Check if user has a multisite role
       const { data: roleData, error: roleError } = await supabase
         .from('multisite_user_roles')
@@ -109,30 +107,20 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .eq('is_active', true)
         .maybeSingle()
 
-      console.log('Multisite role query result:', { roleData, roleError })
-
       if (roleError) {
         console.error('Error fetching multisite role:', roleError)
         throw roleError
       }
 
       if (!roleData) {
-        console.log('No multisite role found for user')
         // User is not part of a multisite organization - this is normal for admin/koordinatorer
         setLoading(false)
         return
       }
 
       setUserRole(roleData)
-      console.log('User role set:', roleData)
 
       // Fetch organization (huvudkontor customer)
-      console.log('Fetching organization with:', { 
-        organization_id: roleData.organization_id,
-        site_type: 'huvudkontor',
-        is_active: true
-      })
-      
       const { data: orgData, error: orgError } = await supabase
         .from('customers')
         .select('*')
@@ -143,10 +131,6 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
       if (orgError) {
         console.error('Error fetching organization:', orgError)
-        console.log('Query params:', { 
-          organization_id: roleData.organization_id,
-          site_type: 'huvudkontor' 
-        })
         throw orgError
       }
       
@@ -171,11 +155,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         updated_at: orgData.updated_at
       }
       setOrganization(organization)
-      
-      console.log('Organization fetched:', { orgData, organization })
 
       // Fetch sites based on role (enheter customers)
-      console.log('Fetching sites for organization:', roleData.organization_id)
       
       let sitesQuery = supabase
         .from('customers')
@@ -186,18 +167,14 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
       // Apply role-based filtering
       if (roleData.role_type === 'regionchef' && roleData.region) {
-        console.log('Filtering sites for regionchef, region:', roleData.region)
         sitesQuery = sitesQuery.eq('region', roleData.region)
       } else if (roleData.role_type === 'platsansvarig' && roleData.site_ids) {
-        console.log('Filtering sites for platsansvarig, site_ids:', roleData.site_ids)
         sitesQuery = sitesQuery.in('id', roleData.site_ids)
       }
 
       const { data: sitesData, error: sitesError } = await sitesQuery
         .order('region', { ascending: true })
         .order('site_name', { ascending: true })
-
-      console.log('Sites query result:', { sitesData, sitesError })
       
       if (sitesError) throw sitesError
       
@@ -287,12 +264,6 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     }
     
     return false
-  })
-  
-  console.log('Accessible sites calculated:', { 
-    totalSites: sites.length, 
-    accessibleSites: accessibleSites.length, 
-    userRoleType: userRole?.role_type 
   })
 
   // Check if user can access a specific site
