@@ -5,7 +5,10 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
+import OrganisationLayout from '../../components/organisation/OrganisationLayout'
+import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 
 interface SiteMetrics {
   siteId: string
@@ -22,6 +25,7 @@ const RegionchefDashboard: React.FC = () => {
   const { organization, accessibleSites, userRole, loading: contextLoading } = useMultisite()
   const [siteMetrics, setSiteMetrics] = useState<SiteMetrics[]>([])
   const [loading, setLoading] = useState(true)
+  const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
 
   useEffect(() => {
     if (accessibleSites.length > 0) {
@@ -108,12 +112,23 @@ const RegionchefDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-900/20 to-cyan-900/20 rounded-2xl p-6 border border-blue-700/50">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {organization?.organization_name}
-          </h1>
-          <p className="text-blue-200">
-            Regionchef - {userRole?.region || 'Okänd region'}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {organization?.organization_name}
+              </h1>
+              <p className="text-blue-200">
+                Regionchef - {userRole?.region || 'Okänd region'}
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowServiceRequestModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Begär service
+            </Button>
+          </div>
         </div>
 
         {/* Översikt */}
@@ -250,6 +265,17 @@ const RegionchefDashboard: React.FC = () => {
             )}
           </div>
         </Card>
+        
+        {/* Service Request Modal */}
+        {showServiceRequestModal && (
+          <OrganizationServiceRequest
+            isOpen={showServiceRequestModal}
+            onClose={() => setShowServiceRequestModal(false)}
+            onSuccess={() => {
+              fetchMetrics()
+            }}
+          />
+        )}
       </div>
     </OrganisationLayout>
   )

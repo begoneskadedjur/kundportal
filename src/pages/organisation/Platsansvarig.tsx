@@ -5,8 +5,10 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
+import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 
 interface CaseDetails {
   id: string
@@ -35,6 +37,7 @@ const PlatsansvarigDashboard: React.FC = () => {
   const { organization, accessibleSites, userRole, loading: contextLoading } = useMultisite()
   const [siteDetails, setSiteDetails] = useState<SiteDetails | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
   
   // Platsansvarig har bara tillgång till en enhet
   const currentSite = accessibleSites[0]
@@ -173,7 +176,7 @@ const PlatsansvarigDashboard: React.FC = () => {
                 {currentSite.address}, {currentSite.postal_code} {currentSite.city}
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right space-y-3">
               {siteDetails?.contactInfo.contact_person && (
                 <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
                   <p className="text-xs text-slate-400 mb-1">Kontaktperson</p>
@@ -186,6 +189,14 @@ const PlatsansvarigDashboard: React.FC = () => {
                   )}
                 </div>
               )}
+              
+              <Button
+                onClick={() => setShowServiceRequestModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Begär service
+              </Button>
             </div>
           </div>
         </div>
@@ -357,6 +368,18 @@ const PlatsansvarigDashboard: React.FC = () => {
           </div>
         </Card>
         </div>
+        
+        {/* Service Request Modal */}
+        {showServiceRequestModal && (
+          <OrganizationServiceRequest
+            isOpen={showServiceRequestModal}
+            onClose={() => setShowServiceRequestModal(false)}
+            selectedSiteId={currentSite?.id}
+            onSuccess={() => {
+              fetchSiteDetails() // Refresh data
+            }}
+          />
+        )}
       </div>
     </OrganisationLayout>
   )

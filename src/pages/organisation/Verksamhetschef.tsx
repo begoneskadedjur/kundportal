@@ -5,8 +5,10 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
+import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 
 interface SiteMetrics {
   siteId: string
@@ -36,6 +38,7 @@ const VerksamhetschefDashboard: React.FC = () => {
   const [upcomingVisits, setUpcomingVisits] = useState<UpcomingVisit[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRegion, setSelectedRegion] = useState<string>('all')
+  const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
 
   useEffect(() => {
     if (sites.length > 0) {
@@ -178,12 +181,23 @@ const VerksamhetschefDashboard: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-2xl p-6 border border-purple-700/50">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {organization?.organization_name}
-          </h1>
-          <p className="text-purple-200">
-            Full översikt över alla enheter
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {organization?.organization_name}
+              </h1>
+              <p className="text-purple-200">
+                Full översikt över alla enheter
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowServiceRequestModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Begär service
+            </Button>
+          </div>
         </div>
 
         {/* Region Filter */}
@@ -388,6 +402,18 @@ const VerksamhetschefDashboard: React.FC = () => {
             </Card>
           </div>
         </div>
+        
+        {/* Service Request Modal */}
+        {showServiceRequestModal && (
+          <OrganizationServiceRequest
+            isOpen={showServiceRequestModal}
+            onClose={() => setShowServiceRequestModal(false)}
+            onSuccess={() => {
+              fetchMetrics()
+              fetchUpcomingVisits()
+            }}
+          />
+        )}
       </div>
     </OrganisationLayout>
   )

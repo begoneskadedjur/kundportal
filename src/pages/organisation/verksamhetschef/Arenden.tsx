@@ -11,7 +11,7 @@ import { AlertTriangle, MapPin, CheckCircle, Clock, Edit3 } from 'lucide-react'
 import ActiveCasesList from '../../../components/customer/ActiveCasesList'
 import ServiceActivityTimeline from '../../../components/customer/ServiceActivityTimeline'
 import EditContractCaseModal from '../../../components/coordinator/EditContractCaseModal'
-import CreateCaseModal from '../../../components/customer/CreateCaseModal'
+import OrganizationServiceRequest from '../../../components/organisation/OrganizationServiceRequest'
 import Button from '../../../components/ui/Button'
 
 const VerksamhetschefArenden: React.FC = () => {
@@ -21,7 +21,7 @@ const VerksamhetschefArenden: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [selectedCase, setSelectedCase] = useState<any | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
   const [allCases, setAllCases] = useState<any[]>([])
   
   useEffect(() => {
@@ -106,15 +106,13 @@ const VerksamhetschefArenden: React.FC = () => {
                 Hantera och översee alla ärenden för organisationen
               </p>
             </div>
-            {customer && (
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Skapa nytt ärende
-              </Button>
-            )}
+            <Button
+              onClick={() => setShowServiceRequestModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Begär service
+            </Button>
           </div>
         </div>
 
@@ -258,17 +256,19 @@ const VerksamhetschefArenden: React.FC = () => {
           />
         )}
         
-        {/* Create Modal */}
-        {showCreateModal && customer && (
-          <CreateCaseModal
-            isOpen={showCreateModal}
-            onClose={() => {
-              setShowCreateModal(false)
+        {/* Service Request Modal */}
+        {showServiceRequestModal && (
+          <OrganizationServiceRequest
+            isOpen={showServiceRequestModal}
+            onClose={() => setShowServiceRequestModal(false)}
+            selectedSiteId={selectedSiteId !== 'all' ? selectedSiteId : null}
+            onSuccess={() => {
               if (selectedSiteId === 'all') {
                 fetchAllCases()
+              } else {
+                // Refresh the current site's data if needed
               }
             }}
-            customerId={customer.id}
           />
         )}
       </div>
