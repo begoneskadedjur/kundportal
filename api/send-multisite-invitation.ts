@@ -1,7 +1,6 @@
 // api/send-multisite-invitation.ts - EMAIL INTEGRATION FÖR MULTISITE-ORGANISATIONER
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -172,6 +171,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 5. Skicka inbjudan email
     const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
     
+    // Använd require här för att undvika TypeScript-problem
+    const nodemailer = require('nodemailer')
     const transporter = nodemailer.createTransporter({
       host: 'smtp.resend.com',
       port: 587,
