@@ -1,7 +1,7 @@
 // api/create-customer.ts - FIXAD VERSION med korrekt email access
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
+const nodemailer = require('nodemailer')
 import { getWelcomeEmailTemplate, getAccessEmailTemplate } from './email-templates'
 
 // Environment variables

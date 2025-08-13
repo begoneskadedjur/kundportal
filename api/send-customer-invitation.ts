@@ -1,7 +1,7 @@
 // api/send-customer-invitation.ts - UPPDATERAD VERSION MED FIXAD NODEMAILER SYNTAX
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
+const nodemailer = require('nodemailer')
 import { getWelcomeEmailTemplate, getAccessEmailTemplate, getReminderEmailTemplate } from './email-templates'
 
 // Environment variables
