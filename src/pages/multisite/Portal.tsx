@@ -1,6 +1,6 @@
 // src/pages/multisite/Portal.tsx - Multisite Organization Portal
 import React, { useState, useEffect } from 'react'
-import { RefreshCw, AlertTriangle } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Building2 } from 'lucide-react'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -14,11 +14,35 @@ import MultisiteStatistics from '../../components/multisite/MultisiteStatistics'
 import MultisiteReports from '../../components/multisite/MultisiteReports'
 import TrafficLightSystem from '../../components/multisite/TrafficLightSystem'
 
+// Import customer components to reuse
+import ServiceExcellenceDashboard from '../../components/customer/ServiceExcellenceDashboard'
+import CustomerStatistics from '../../components/customer/CustomerStatistics'
+import ServiceActivityTimeline from '../../components/customer/ServiceActivityTimeline'
+import ActiveCasesList from '../../components/customer/ActiveCasesList'
+
 const MultisitePortal: React.FC = () => {
   const { profile } = useAuth()
-  const { organization, userRole, loading, error, refreshData } = useMultisite()
+  const { 
+    organization, 
+    userRole, 
+    loading, 
+    error, 
+    refreshData,
+    currentSite,
+    setCurrentSite,
+    currentCustomer,
+    accessibleSites 
+  } = useMultisite()
   const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports' | 'traffic-light'>('dashboard')
   const [refreshing, setRefreshing] = useState(false)
+
+  // Set default current site when accessible sites load
+  useEffect(() => {
+    if (!currentSite && accessibleSites.length > 0) {
+      // Set the first accessible site as current
+      setCurrentSite(accessibleSites[0])
+    }
+  }, [accessibleSites, currentSite, setCurrentSite])
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -62,16 +86,30 @@ const MultisitePortal: React.FC = () => {
 
   // Render view based on current selection
   const renderView = () => {
-    switch (currentView) {
-      case 'statistics':
-        return <MultisiteStatistics />
-      case 'reports':
-        return <MultisiteReports />
-      case 'traffic-light':
-        return <TrafficLightSystem />
-      default:
-        return <MultisiteDashboard />
+    // Om vi har valt en site och den har customer-data, visa customer-komponenter
+    if (currentSite && currentCustomer) {
+      switch (currentView) {
+        case 'statistics':
+          return <CustomerStatistics customer={currentCustomer} />
+        case 'reports':
+          return <MultisiteReports />
+        case 'traffic-light':
+          return <TrafficLightSystem />
+        default:
+          return (
+            <div className="space-y-6">
+              <ServiceExcellenceDashboard customer={currentCustomer} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ActiveCasesList customerId={currentCustomer.id} />
+                <ServiceActivityTimeline customerId={currentCustomer.id} />
+              </div>
+            </div>
+          )
+      }
     }
+    
+    // Om ingen site är vald, visa översikt
+    return <MultisiteDashboard />
   }
 
   return (
@@ -86,8 +124,44 @@ const MultisitePortal: React.FC = () => {
         refreshing={refreshing}
       />
 
+      {/* Site Selector */}
+      <div className="container mx-auto px-4 pt-4">
+        {accessibleSites.length > 0 && (
+          <Card className="bg-slate-800/50 backdrop-blur border-slate-700 mb-6">
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Building2 className="w-5 h-5 text-purple-400" />
+                  <label className="text-sm font-medium text-slate-300">Välj enhet:</label>
+                  <select
+                    value={currentSite?.id || ''}
+                    onChange={(e) => {
+                      const site = accessibleSites.find(s => s.id === e.target.value)
+                      setCurrentSite(site || null)
+                    }}
+                    className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Välj en enhet...</option>
+                    {accessibleSites.map(site => (
+                      <option key={site.id} value={site.id}>
+                        {site.site_name} {site.region ? `(${site.region})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {currentSite && (
+                  <div className="text-sm text-slate-400">
+                    {currentSite.address}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
+
       {/* Main Content */}
-      <div className="pt-4">
+      <div className="container mx-auto px-4">
         {renderView()}
       </div>
     </div>

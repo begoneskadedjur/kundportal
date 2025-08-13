@@ -22,6 +22,9 @@ interface MultisiteContextType {
   currentSite: OrganizationSite | null
   setCurrentSite: (site: OrganizationSite | null) => void
   
+  // Customer data for current site
+  currentCustomer: any | null
+  
   // Access control
   accessibleSites: OrganizationSite[]
   canAccessSite: (siteId: string) => boolean
@@ -53,6 +56,7 @@ const MultisiteContext = createContext<MultisiteContextType>({
   permissions: defaultPermissions,
   currentSite: null,
   setCurrentSite: () => {},
+  currentCustomer: null,
   accessibleSites: [],
   canAccessSite: () => false,
   canManageUsers: () => false,
@@ -80,6 +84,7 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
   const [sites, setSites] = useState<OrganizationSite[]>([])
   const [userRole, setUserRole] = useState<MultisiteUserRole | null>(null)
   const [currentSite, setCurrentSite] = useState<OrganizationSite | null>(null)
+  const [currentCustomer, setCurrentCustomer] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -163,6 +168,32 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     fetchMultisiteData()
   }, [fetchMultisiteData])
 
+  // Fetch customer data when currentSite changes
+  useEffect(() => {
+    const fetchCustomerForSite = async () => {
+      if (!currentSite || !currentSite.customer_id) {
+        setCurrentCustomer(null)
+        return
+      }
+
+      try {
+        const { data: customer, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', currentSite.customer_id)
+          .single()
+
+        if (error) throw error
+        setCurrentCustomer(customer)
+      } catch (error) {
+        console.error('Error fetching customer for site:', error)
+        setCurrentCustomer(null)
+      }
+    }
+
+    fetchCustomerForSite()
+  }, [currentSite])
+
   // Calculate permissions based on role
   const permissions = userRole 
     ? getPermissionsForRole(userRole.role_type)
@@ -218,6 +249,7 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     permissions,
     currentSite,
     setCurrentSite,
+    currentCustomer,
     accessibleSites,
     canAccessSite,
     canManageUsers,

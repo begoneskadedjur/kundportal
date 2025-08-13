@@ -24,6 +24,7 @@ export interface OrganizationSite {
   contact_email: string | null
   contact_phone: string | null
   site_manager_email: string | null
+  customer_id?: string | null  // Link to customer for cases and data
   is_primary: boolean
   is_active: boolean
   created_at: string
