@@ -93,11 +93,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let userId: string
         
         if (existingAuthUser) {
-          // User already exists, update their metadata instead
-          console.log(`User ${userData.email} already exists, updating metadata`)
+          // User already exists, update their metadata and password
+          console.log(`User ${userData.email} already exists, updating metadata and password`)
           userId = existingAuthUser.id
           
+          // Generate new password for existing user
+          tempPassword = generateSecurePassword()
+          
           const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+            password: tempPassword,
             user_metadata: {
               name: userData.name,
               phone: userData.phone,
@@ -275,7 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: roleAssignment.role,
               loginLink,
               isNewUser,
-              tempPassword: isNewUser ? tempPassword : undefined
+              tempPassword: tempPassword  // Always include password
             })
 
             const subject = isNewUser 
@@ -449,12 +453,13 @@ function getMultisiteInvitationEmailTemplate({
             </p>
 
             <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du kan nu logga in med ditt befintliga konto och få tillgång till denna organisations anläggningar och data.
+                För din säkerhet har vi genererat ett nytt temporärt lösenord. Använd de inloggningsuppgifter som finns nedan 
+                för att komma åt denna organisations anläggningar och data.
             </p>
             `}
 
-            <!-- Inloggningsuppgifter om ny användare -->
-            ${isNewUser && tempPassword ? `
+            <!-- Inloggningsuppgifter -->
+            ${tempPassword ? `
             <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
                 <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
                     📧 Dina inloggningsuppgifter

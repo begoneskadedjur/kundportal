@@ -69,6 +69,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Found existing auth user:', existingAuthUser.id)
       userId = existingAuthUser.id
 
+      // Generera nytt temporärt lösenord för befintlig användare
+      tempPassword = generateSecurePassword()
+      console.log('Generated new temporary password for existing user')
+
+      // Uppdatera användarens lösenord
+      const { error: passwordError } = await supabase.auth.admin.updateUserById(userId, {
+        password: tempPassword,
+        user_metadata: {
+          ...existingAuthUser.user_metadata,
+          organization_name: organizationName,
+          organization_id: organizationId,
+          role: role
+        }
+      })
+
+      if (passwordError) {
+        console.error('Failed to update password for existing user:', passwordError)
+        return res.status(500).json({ error: 'Kunde inte uppdatera lösenord för befintlig användare' })
+      }
+
       // Kontrollera om användaren redan har en roll för denna organisation
       const { data: existingRole } = await supabase
         .from('multisite_user_roles')
@@ -78,8 +98,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .maybeSingle()
 
       if (existingRole) {
-        console.log('User already has role in organization, sending reminder email')
-        // Fortsätt till email-sändning nedan
+        console.log('User already has role in organization, updating and sending email with new password')
+        // Uppdatera befintlig roll för att säkerställa att den är aktiv
+        const { error: updateRoleError } = await supabase
+          .from('multisite_user_roles')
+          .update({
+            role_type: role,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRole.id)
+
+        if (updateRoleError) {
+          console.error('Failed to update existing role:', updateRoleError)
+        }
       } else {
         // Användaren existerar men har inte denna roll i organisationen
         // Skapa ny roll
@@ -178,7 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       role: role,
       loginLink,
       isNewUser,
-      tempPassword
+      tempPassword  // Nu har även befintliga användare ett temporärt lösenord
     })
 
     const subject = isNewUser 
@@ -350,12 +382,13 @@ function getMultisiteInvitationEmailTemplate({
             </p>
 
             <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du kan nu logga in med ditt befintliga konto och få tillgång till denna organisations anläggningar och data.
+                För din säkerhet har vi genererat ett nytt temporärt lösenord. Använd de inloggningsuppgifter som finns nedan 
+                för att komma åt denna organisations anläggningar och data.
             </p>
             `}
 
-            <!-- Inloggningsuppgifter om ny användare -->
-            ${isNewUser && tempPassword ? `
+            <!-- Inloggningsuppgifter -->
+            ${tempPassword ? `
             <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
                 <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
                     📧 Dina inloggningsuppgifter
