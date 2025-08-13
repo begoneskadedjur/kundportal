@@ -56,8 +56,11 @@ import CustomerPortal from './pages/customer/Portal';
 import Cases from './pages/customer/Cases';
 import Schedule from './pages/customer/Schedule';
 
-// Multisite Portal
-import MultisitePortal from './pages/multisite/Portal';
+// Organisation Portal Pages
+import VerksamhetschefDashboard from './pages/organisation/Verksamhetschef'
+import RegionchefDashboard from './pages/organisation/Regionchef'
+import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
+import OrganisationRedirect from './pages/organisation/Redirect';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -421,7 +424,31 @@ function App() {
               path="/organisation" 
               element={
                 <MultisiteProtectedRoute>
-                  <MultisitePortal />
+                  <OrganisationRedirect />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/verksamhetschef" 
+              element={
+                <MultisiteProtectedRoute>
+                  <VerksamhetschefDashboard />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/regionchef" 
+              element={
+                <MultisiteProtectedRoute>
+                  <RegionchefDashboard />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/platsansvarig" 
+              element={
+                <MultisiteProtectedRoute>
+                  <PlatsansvarigDashboard />
                 </MultisiteProtectedRoute>
               } 
             />
