@@ -38,7 +38,8 @@ export interface MultisiteUserRole {
   organization_id: string
   role_type: MultisiteUserRoleType
   site_ids: string[] | null // För platsansvariga och regionchefer
-  region: string | null // För regionchefer
+  sites: string[] | null // För regionchefer - vilka anläggningar de ansvarar för
+  region: string | null // För regionchefer (kan behållas för bakåtkompatibilitet)
   is_active: boolean
   created_at: string
   updated_at: string

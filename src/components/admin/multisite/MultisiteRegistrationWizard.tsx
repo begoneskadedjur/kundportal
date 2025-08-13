@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import { 
   MultisiteOrganization, 
   OrganizationSite,
@@ -17,17 +19,15 @@ import {
   Plus,
   Trash2,
   Receipt,
-  Users
+  Users,
+  ArrowLeft
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 
 interface WizardProps {
-  isOpen: boolean
-  onClose: () => void
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 type WizardStep = 'organization' | 'sites' | 'users' | 'roles' | 'confirmation'
@@ -62,12 +62,25 @@ interface UserRoleAssignment {
   userId: string
   role: MultisiteUserRoleType
   siteIds?: string[] // För platsansvariga och regionchefer
-  region?: string // För regionchefer
+  sites?: string[] // För regionchefer - vilka anläggningar de ansvarar för
 }
 
-export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess }: WizardProps) {
+export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) {
+  const navigate = useNavigate()
+  const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>('organization')
   const [loading, setLoading] = useState(false)
+
+  // Determine the correct navigation path based on user role
+  const getNavigationPath = () => {
+    if (profile?.role === 'admin') {
+      return '/admin/multisite/organizations'
+    } else if (profile?.is_koordinator || profile?.role === 'koordinator') {
+      return '/koordinator/multisite/organizations'
+    }
+    // Fallback to admin if role is unclear
+    return '/admin/multisite/organizations'
+  }
   
   // Form data states
   const [organizationData, setOrganizationData] = useState<OrganizationFormData>({
@@ -126,9 +139,6 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
       site_code: '',
       address: '',
       region: '',
-      contact_person: '',
-      contact_email: '',
-      contact_phone: '',
       is_primary: false
     })
     toast.success('Anläggning tillagd')
@@ -171,9 +181,9 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     setRoleAssignments(roleAssignments.filter(assignment => assignment.userId !== userId))
   }
 
-  const handleRoleAssignment = (userId: string, role: MultisiteUserRoleType, siteIds?: string[], region?: string) => {
+  const handleRoleAssignment = (userId: string, role: MultisiteUserRoleType, siteIds?: string[], sites?: string[]) => {
     const existingIndex = roleAssignments.findIndex(assignment => assignment.userId === userId)
-    const newAssignment: UserRoleAssignment = { userId, role, siteIds, region }
+    const newAssignment: UserRoleAssignment = { userId, role, siteIds, sites }
     
     if (existingIndex >= 0) {
       const updated = [...roleAssignments]
@@ -270,7 +280,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
       const { data: org, error: orgError } = await supabase
         .from('multisite_organizations')
         .insert({
-          organization_name: organizationData.name,
+          name: organizationData.name,
           organization_number: organizationData.organization_number || null,
           billing_type: organizationData.billing_type,
           billing_address: organizationData.billing_address
@@ -317,39 +327,75 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
 
       if (customerError) throw customerError
 
-      // 4. Create user role assignments (would normally send emails here)
-      if (roleAssignments.length > 0) {
-        // Map site names to actual site IDs
-        const siteNameToIdMap = new Map()
-        if (createdSites) {
-          createdSites.forEach((site: any) => {
-            siteNameToIdMap.set(site.site_name, site.id)
-          })
-        }
-        
-        const roleInserts = roleAssignments.map(assignment => {
-          const user = users.find(u => u.id === assignment.userId)
-          const siteIds = assignment.siteIds?.map(siteName => siteNameToIdMap.get(siteName)).filter(Boolean) || null
-          
-          return {
-            user_email: user?.email, // For now, store email until user accounts are created
-            user_name: user?.name,
-            user_phone: user?.phone,
-            organization_id: org.id,
-            role_type: assignment.role,
-            site_ids: siteIds,
-            region: assignment.region
+      // 4. Create user accounts and role assignments
+      if (roleAssignments.length > 0 && users.length > 0) {
+        try {
+          // Map site names to actual site IDs
+          const siteNameToIdMap = new Map()
+          if (createdSites) {
+            createdSites.forEach((site: any) => {
+              siteNameToIdMap.set(site.site_name, site.id)
+            })
           }
-        })
-        
-        // In a real implementation, this would create user accounts and send invitation emails
-        console.log('Would create user roles:', roleInserts)
-        toast.success(`${roleAssignments.length} användarroller kommer skapas`)
+
+          // Update role assignments with actual site IDs
+          const updatedRoleAssignments = roleAssignments.map(assignment => ({
+            ...assignment,
+            siteIds: assignment.siteIds?.map(siteName => siteNameToIdMap.get(siteName)).filter(Boolean) || null,
+            sites: assignment.sites?.map(siteName => siteNameToIdMap.get(siteName)).filter(Boolean) || null
+          }))
+
+          // Get current session token for API authentication
+          const { data: { session } } = await supabase.auth.getSession()
+          
+          if (!session?.access_token) {
+            throw new Error('No valid session found')
+          }
+
+          // Call API to create users and roles
+          const userResponse = await fetch('/api/multisite/create-users', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              organizationId: org.id,
+              users: users,
+              roleAssignments: updatedRoleAssignments
+            })
+          })
+
+          const userResult = await userResponse.json()
+          
+          if (!userResponse.ok) {
+            throw new Error(userResult.error || 'Failed to create users')
+          }
+
+          if (userResult.success) {
+            toast.success(`${userResult.summary.successful} användare skapade och inbjudningar skickade!`)
+            
+            if (userResult.summary.failed > 0) {
+              toast.error(`${userResult.summary.failed} användare kunde inte skapas. Kontrollera loggar.`)
+              console.error('Failed user creations:', userResult.results.filter((r: any) => !r.success))
+            }
+          } else {
+            toast.error('Vissa användare kunde inte skapas')
+            console.error('User creation results:', userResult.results)
+          }
+          
+        } catch (error) {
+          console.error('Error creating users:', error)
+          toast.error('Kunde inte skapa användarkonton')
+        }
       }
 
       toast.success('Multisite-organisation skapad framgångsrikt!')
-      onSuccess()
-      handleReset()
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        navigate(getNavigationPath())
+      }
     } catch (error) {
       console.error('Error creating multisite organization:', error)
       toast.error('Kunde inte skapa organisation')
@@ -369,16 +415,39 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     setSites([])
     setUsers([])
     setRoleAssignments([])
-    onClose()
+    navigate(getNavigationPath())
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrera Multisite-organisation" size="xl">
-      <div className="bg-slate-900 rounded-xl overflow-hidden">
-        {/* Header with steps */}
-        <div className="bg-gradient-to-r from-purple-900/50 to-purple-600/30 p-6 border-b border-purple-500/20">
-          
-          {/* Step indicators */}
+    <div className="min-h-screen bg-slate-950">
+      {/* Header */}
+      <header className="bg-slate-900/50 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => navigate(getNavigationPath())} 
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Tillbaka
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-500/10 p-2 rounded-lg">
+                <Building2 className="w-6 h-6 text-purple-500" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Registrera Multisite-organisation</h1>
+                <p className="text-sm text-slate-400">Steg-för-steg guide för att skapa en ny multisite-organisation</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Progress Steps */}
+      <div className="bg-gradient-to-r from-purple-900/50 to-purple-600/30 border-b border-purple-500/20">
+        <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             {steps.map((step, index) => {
               const Icon = step.icon
@@ -409,9 +478,11 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
             })}
           </div>
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="min-h-[600px]">
           {/* Organization Step */}
           {currentStep === 'organization' && (
             <div className="space-y-6">
@@ -780,13 +851,32 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                       {currentRole === 'regionchef' && (
                         <div className="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-600">
                           <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Ansvarar för region:
+                            Ansvarar för anläggningar:
                           </label>
-                          <Input
-                            value={assignment?.region || ''}
-                            onChange={(e) => handleRoleAssignment(user.id, 'regionchef', undefined, e.target.value)}
-                            placeholder="t.ex. Stockholm, Göteborg..."
-                          />
+                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {sites.map((site) => (
+                              <label key={site.site_name} className="flex items-center gap-2 text-sm text-slate-300">
+                                <input
+                                  type="checkbox"
+                                  checked={assignment?.sites?.includes(site.site_name) || false}
+                                  onChange={(e) => {
+                                    const currentSites = assignment?.sites || []
+                                    const newSites = e.target.checked
+                                      ? [...currentSites, site.site_name]
+                                      : currentSites.filter(name => name !== site.site_name)
+                                    handleRoleAssignment(user.id, 'regionchef', undefined, newSites)
+                                  }}
+                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                                />
+                                {site.site_name} ({site.region})
+                              </label>
+                            ))}
+                          </div>
+                          {sites.length === 0 && (
+                            <p className="text-slate-400 text-sm">
+                              Inga anläggningar har lagts till ännu. Gå tillbaka till steg 2 för att lägga till anläggningar.
+                            </p>
+                          )}
                         </div>
                       )}
                       
@@ -822,7 +912,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                         <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                           <div className="text-blue-300 text-sm">
                             {currentRole === 'verksamhetschef' && 'Har full tillgång till alla anläggningar och kan hantera användare och inställningar.'}
-                            {currentRole === 'regionchef' && 'Kan hantera anläggningar i sin region och bjuda in platsansvariga.'}
+                            {currentRole === 'regionchef' && 'Kan hantera sina tilldelade anläggningar och bjuda in platsansvariga för dessa platser.'}
                             {currentRole === 'platsansvarig' && 'Har tillgång till sina tilldelade anläggningar och kan begära service.'}
                           </div>
                         </div>
@@ -940,10 +1030,12 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                                     {assignment.role === 'regionchef' && 'Regionchef'}
                                     {assignment.role === 'platsansvarig' && 'Platsansvarig'}
                                   </div>
-                                  {assignment.region && (
-                                    <div className="text-slate-400 text-xs mt-1">Region: {assignment.region}</div>
+                                  {assignment.sites && assignment.sites.length > 0 && assignment.role === 'regionchef' && (
+                                    <div className="text-slate-400 text-xs mt-1">
+                                      Anläggningar: {assignment.sites.join(', ')}
+                                    </div>
                                   )}
-                                  {assignment.siteIds && assignment.siteIds.length > 0 && (
+                                  {assignment.siteIds && assignment.siteIds.length > 0 && assignment.role === 'platsansvarig' && (
                                     <div className="text-slate-400 text-xs mt-1">
                                       {assignment.siteIds.length === 1 ? 'Anläggning' : 'Anläggningar'}: {assignment.siteIds.join(', ')}
                                     </div>
@@ -990,10 +1082,10 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
         </div>
 
         {/* Footer with navigation */}
-        <div className="p-6 border-t border-slate-700 flex items-center justify-between">
+        <div className="mt-8 pt-6 border-t border-slate-800 flex items-center justify-between">
           <Button
             onClick={handlePrevious}
-            variant="secondary"
+            variant="outline"
             disabled={currentStep === 'organization'}
             className="flex items-center gap-2"
           >
@@ -1001,10 +1093,16 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
             Föregående
           </Button>
           
+          <div className="text-center">
+            <p className="text-sm text-slate-400">
+              Steg {currentStepIndex + 1} av {steps.length}
+            </p>
+          </div>
+
           <div className="flex items-center gap-3">
             <Button
-              onClick={onClose}
-              variant="secondary"
+              onClick={() => navigate(getNavigationPath())}
+              variant="outline"
             >
               Avbryt
             </Button>
@@ -1014,6 +1112,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                 onClick={handleSubmit}
                 variant="primary"
                 loading={loading}
+                disabled={loading}
                 className="flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
@@ -1031,7 +1130,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
             )}
           </div>
         </div>
-      </div>
-    </Modal>
+      </main>
+    </div>
   )
 }
