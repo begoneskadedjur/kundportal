@@ -74,12 +74,12 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   // Determine the correct navigation path based on user role
   const getNavigationPath = () => {
     if (profile?.role === 'admin') {
-      return '/admin/multisite/organizations'
+      return '/admin/dashboard'
     } else if (profile?.is_koordinator || profile?.role === 'koordinator') {
-      return '/koordinator/multisite/organizations'
+      return '/coordinator'
     }
-    // Fallback to admin if role is unclear
-    return '/admin/multisite/organizations'
+    // Fallback to admin dashboard
+    return '/admin/dashboard'
   }
   
   // Form data states

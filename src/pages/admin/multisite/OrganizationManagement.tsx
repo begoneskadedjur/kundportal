@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { 
   MultisiteOrganization, 
@@ -19,7 +20,8 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react'
 import { PageHeader } from '../../../components/shared'
 import Card from '../../../components/ui/Card'
@@ -29,6 +31,7 @@ import MultisiteRegistrationWizard from '../../../components/admin/multisite/Mul
 import toast from 'react-hot-toast'
 
 export default function OrganizationManagement() {
+  const navigate = useNavigate()
   const [organizations, setOrganizations] = useState<MultisiteOrganization[]>([])
   const [sites, setSites] = useState<Record<string, OrganizationSite[]>>({})
   const [users, setUsers] = useState<Record<string, MultisiteUserRole[]>>({})
@@ -157,7 +160,17 @@ export default function OrganizationManagement() {
 
         {/* Action Bar */}
         <div className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex-1 max-w-md">
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => navigate('/admin/dashboard')}
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Tillbaka
+            </Button>
+            <div className="w-px h-8 bg-slate-700" />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
