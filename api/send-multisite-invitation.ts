@@ -177,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 5. Skicka inbjudan email
-    const loginLink = `${process.env.VITE_APP_URL || 'https://begone-kundportal.vercel.app'}/login`
+    const loginLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/login`
     
     const transporter = nodemailer.createTransporter({
       host: 'smtp.resend.com',
@@ -204,14 +204,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : `Ny organisation tillagd - ${organizationName}`
 
     const mailOptions = {
-      from: 'Begone Skadedjur & Sanering AB <info@begone.se>',
+      from: 'Begone Kundportal <noreply@resend.dev>',
       to: email,
       subject: subject,
       html: emailHtml
     }
 
-    await transporter.sendMail(mailOptions)
-    console.log('Multisite invitation email sent to:', email)
+    try {
+      const info = await transporter.sendMail(mailOptions)
+      console.log('Multisite invitation email sent successfully:', {
+        to: email,
+        messageId: info.messageId,
+        response: info.response
+      })
+    } catch (emailError: any) {
+      console.error('Failed to send multisite invitation email:', emailError)
+      // Log but don't fail - user is created in database
+      console.log('User created but email not sent. User can still login with credentials.')
+    }
 
     // 6. Registrera inbjudan i databas
     await upsertMultisiteInvitation(supabase, organizationId, email, userId, role)

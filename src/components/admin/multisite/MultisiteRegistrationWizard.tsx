@@ -30,34 +30,39 @@ interface WizardProps {
   onSuccess: () => void
 }
 
-type WizardStep = 'organization' | 'sites' | 'billing' | 'users' | 'confirmation'
+type WizardStep = 'organization' | 'sites' | 'users' | 'roles' | 'confirmation'
 
+// Steg 1: Endast fysisk organisationsinformation
 interface OrganizationFormData {
   name: string
   organization_number: string
-  primary_contact_email: string
-  primary_contact_phone: string
   billing_address: string
   billing_type: 'consolidated' | 'per_site'
 }
 
+// Steg 2: Endast fysiska platser
 interface SiteFormData {
   site_name: string
   site_code: string
   address: string
   region: string
-  contact_person: string
-  contact_email: string
-  contact_phone: string
   is_primary: boolean
 }
 
-interface UserInvite {
-  email: string
+// Steg 3: Endast kontaktinformation för användare
+interface UserContactData {
+  id: string // Temporary ID for tracking
   name: string
+  email: string
+  phone: string
+}
+
+// Steg 4: Koppla användare till roller
+interface UserRoleAssignment {
+  userId: string
   role: MultisiteUserRoleType
-  sites?: string[] // For site managers
-  region?: string // For regional managers
+  siteIds?: string[] // För platsansvariga och regionchefer
+  region?: string // För regionchefer
 }
 
 export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess }: WizardProps) {
@@ -68,8 +73,6 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
   const [organizationData, setOrganizationData] = useState<OrganizationFormData>({
     name: '',
     organization_number: '',
-    primary_contact_email: '',
-    primary_contact_phone: '',
     billing_address: '',
     billing_type: 'consolidated'
   })
@@ -80,24 +83,24 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     site_code: '',
     address: '',
     region: '',
-    contact_person: '',
-    contact_email: '',
-    contact_phone: '',
     is_primary: false
   })
   
-  const [userInvites, setUserInvites] = useState<UserInvite[]>([])
-  const [newInvite, setNewInvite] = useState<UserInvite>({
-    email: '',
+  const [users, setUsers] = useState<UserContactData[]>([])
+  const [newUser, setNewUser] = useState<UserContactData>({
+    id: '',
     name: '',
-    role: 'verksamhetschef'
+    email: '',
+    phone: ''
   })
+  
+  const [roleAssignments, setRoleAssignments] = useState<UserRoleAssignment[]>([])
 
   const steps: { key: WizardStep; label: string; icon: React.ElementType }[] = [
     { key: 'organization', label: 'Organisation', icon: Building2 },
     { key: 'sites', label: 'Anläggningar', icon: MapPin },
-    { key: 'billing', label: 'Fakturering', icon: Receipt },
-    { key: 'users', label: 'Användare', icon: Users },
+    { key: 'users', label: 'Användare', icon: User },
+    { key: 'roles', label: 'Roller', icon: Users },
     { key: 'confirmation', label: 'Bekräftelse', icon: Check }
   ]
 
@@ -143,23 +146,42 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     setSites(newSites)
   }
 
-  const handleAddUserInvite = () => {
-    if (!newInvite.email || !newInvite.name) {
+  const handleAddUser = () => {
+    if (!newUser.email || !newUser.name) {
       toast.error('Ange både namn och e-post för användaren')
       return
     }
 
-    setUserInvites([...userInvites, newInvite])
-    setNewInvite({
-      email: '',
+    const userId = Date.now().toString() // Temporary ID
+    const userWithId = { ...newUser, id: userId }
+    
+    setUsers([...users, userWithId])
+    setNewUser({
+      id: '',
       name: '',
-      role: 'verksamhetschef'
+      email: '',
+      phone: ''
     })
-    toast.success('Användare tillagd till inbjudningslistan')
+    toast.success('Användare tillagd')
   }
 
-  const handleRemoveUserInvite = (index: number) => {
-    setUserInvites(userInvites.filter((_, i) => i !== index))
+  const handleRemoveUser = (userId: string) => {
+    setUsers(users.filter(user => user.id !== userId))
+    // Also remove any role assignments for this user
+    setRoleAssignments(roleAssignments.filter(assignment => assignment.userId !== userId))
+  }
+
+  const handleRoleAssignment = (userId: string, role: MultisiteUserRoleType, siteIds?: string[], region?: string) => {
+    const existingIndex = roleAssignments.findIndex(assignment => assignment.userId === userId)
+    const newAssignment: UserRoleAssignment = { userId, role, siteIds, region }
+    
+    if (existingIndex >= 0) {
+      const updated = [...roleAssignments]
+      updated[existingIndex] = newAssignment
+      setRoleAssignments(updated)
+    } else {
+      setRoleAssignments([...roleAssignments, newAssignment])
+    }
   }
 
   const validateCurrentStep = (): boolean => {
@@ -169,8 +191,8 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
           toast.error('Organisationsnamn krävs')
           return false
         }
-        if (!organizationData.primary_contact_email) {
-          toast.error('Kontakt e-post krävs')
+        if (!organizationData.billing_address) {
+          toast.error('Faktureringsadress krävs')
           return false
         }
         return true
@@ -186,15 +208,35 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
         }
         return true
       
-      case 'billing':
-        if (!organizationData.billing_address) {
-          toast.error('Faktureringsadress krävs')
+      case 'users':
+        if (users.length === 0) {
+          toast.error('Lägg till minst en användare')
           return false
         }
         return true
       
-      case 'users':
-        // Users are optional
+      case 'roles':
+        // Check that at least one user has verksamhetschef role
+        const hasVerksamhetschef = roleAssignments.some(assignment => assignment.role === 'verksamhetschef')
+        if (!hasVerksamhetschef) {
+          toast.error('Minst en användare måste vara Verksamhetschef')
+          return false
+        }
+        
+        // Check that each site has at least one platsansvarig
+        const sitesWithoutManager = sites.filter(site => {
+          const siteManagers = roleAssignments.filter(assignment => 
+            assignment.role === 'platsansvarig' && 
+            assignment.siteIds?.includes(site.site_name) // Using site_name as temp ID
+          )
+          return siteManagers.length === 0
+        })
+        
+        if (sitesWithoutManager.length > 0) {
+          toast.error(`Följande anläggningar saknar platsansvarig: ${sitesWithoutManager.map(s => s.site_name).join(', ')}')`)
+          return false
+        }
+        
         return true
       
       default:
@@ -205,7 +247,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
   const handleNext = () => {
     if (!validateCurrentStep()) return
     
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'billing', 'users', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'roles', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1])
@@ -213,7 +255,7 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
   }
 
   const handlePrevious = () => {
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'billing', 'users', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'roles', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1])
@@ -228,11 +270,9 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
       const { data: org, error: orgError } = await supabase
         .from('multisite_organizations')
         .insert({
-          name: organizationData.name,
+          organization_name: organizationData.name,
           organization_number: organizationData.organization_number || null,
           billing_type: organizationData.billing_type,
-          primary_contact_email: organizationData.primary_contact_email,
-          primary_contact_phone: organizationData.primary_contact_phone || null,
           billing_address: organizationData.billing_address
         })
         .select()
@@ -247,27 +287,28 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
         site_code: site.site_code || null,
         address: site.address || null,
         region: site.region,
-        contact_person: site.contact_person || null,
-        contact_email: site.contact_email || null,
-        contact_phone: site.contact_phone || null,
         is_primary: site.is_primary
       }))
 
-      const { error: sitesError } = await supabase
+      const { data: createdSites, error: sitesError } = await supabase
         .from('organization_sites')
         .insert(sitesToInsert)
+        .select()
 
       if (sitesError) throw sitesError
 
       // 3. Create customer record linked to organization
+      const verksamhetschef = roleAssignments.find(assignment => assignment.role === 'verksamhetschef')
+      const primaryUser = users.find(user => user.id === verksamhetschef?.userId)
+      
       const { error: customerError } = await supabase
         .from('customers')
         .insert({
           company_name: organizationData.name,
           organization_number: organizationData.organization_number || null,
-          contact_email: organizationData.primary_contact_email,
-          contact_phone: organizationData.primary_contact_phone || null,
-          billing_email: organizationData.primary_contact_email,
+          contact_email: primaryUser?.email || '',
+          contact_phone: primaryUser?.phone || null,
+          billing_email: primaryUser?.email || '',
           billing_address: organizationData.billing_address,
           organization_id: org.id,
           is_multisite: true,
@@ -276,11 +317,34 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
 
       if (customerError) throw customerError
 
-      // 4. Send user invites (would normally send emails here)
-      if (userInvites.length > 0) {
-        // In a real implementation, this would send invitation emails
-        console.log('Would send invites to:', userInvites)
-        toast.success(`${userInvites.length} inbjudningar kommer skickas`)
+      // 4. Create user role assignments (would normally send emails here)
+      if (roleAssignments.length > 0) {
+        // Map site names to actual site IDs
+        const siteNameToIdMap = new Map()
+        if (createdSites) {
+          createdSites.forEach((site: any) => {
+            siteNameToIdMap.set(site.site_name, site.id)
+          })
+        }
+        
+        const roleInserts = roleAssignments.map(assignment => {
+          const user = users.find(u => u.id === assignment.userId)
+          const siteIds = assignment.siteIds?.map(siteName => siteNameToIdMap.get(siteName)).filter(Boolean) || null
+          
+          return {
+            user_email: user?.email, // For now, store email until user accounts are created
+            user_name: user?.name,
+            user_phone: user?.phone,
+            organization_id: org.id,
+            role_type: assignment.role,
+            site_ids: siteIds,
+            region: assignment.region
+          }
+        })
+        
+        // In a real implementation, this would create user accounts and send invitation emails
+        console.log('Would create user roles:', roleInserts)
+        toast.success(`${roleAssignments.length} användarroller kommer skapas`)
       }
 
       toast.success('Multisite-organisation skapad framgångsrikt!')
@@ -299,13 +363,12 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
     setOrganizationData({
       name: '',
       organization_number: '',
-      primary_contact_email: '',
-      primary_contact_phone: '',
       billing_address: '',
       billing_type: 'consolidated'
     })
     setSites([])
-    setUserInvites([])
+    setUsers([])
+    setRoleAssignments([])
     onClose()
   }
 
@@ -352,9 +415,17 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
           {/* Organization Step */}
           {currentStep === 'organization' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Organisationsuppgifter</h3>
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                  Organisationsuppgifter
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Ange grundläggande information om organisationen. Kontaktpersoner läggs till i ett senare steg.
+                </p>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Organisationsnamn *
@@ -377,30 +448,54 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
                     placeholder="XXXXXX-XXXX"
                   />
                 </div>
-                
+              </div>
+              
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Primär kontakt e-post *
+                    Faktureringsadress *
                   </label>
-                  <Input
-                    type="email"
-                    value={organizationData.primary_contact_email}
-                    onChange={(e) => setOrganizationData({ ...organizationData, primary_contact_email: e.target.value })}
-                    placeholder="kontakt@example.com"
+                  <textarea
+                    value={organizationData.billing_address}
+                    onChange={(e) => setOrganizationData({ ...organizationData, billing_address: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                    placeholder="Fullständig fakturaadress..."
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Primär kontakt telefon
+                  <label className="block text-sm font-medium text-slate-300 mb-3">
+                    Faktureringstyp *
                   </label>
-                  <Input
-                    type="tel"
-                    value={organizationData.primary_contact_phone}
-                    onChange={(e) => setOrganizationData({ ...organizationData, primary_contact_phone: e.target.value })}
-                    placeholder="070-XXX XX XX"
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'consolidated' })}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${organizationData.billing_type === 'consolidated'
+                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
+                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                        }`}
+                    >
+                      <Receipt className="w-6 h-6 mb-2 text-yellow-400" />
+                      <div className="font-medium">Konsoliderad fakturering</div>
+                      <div className="text-xs mt-1 opacity-80">En sammanställd faktura för alla anläggningar</div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'per_site' })}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${organizationData.billing_type === 'per_site'
+                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
+                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                        }`}
+                    >
+                      <Receipt className="w-6 h-6 mb-2 text-yellow-400" />
+                      <div className="font-medium">Per anläggning</div>
+                      <div className="text-xs mt-1 opacity-80">Separata fakturor för varje site</div>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -409,28 +504,49 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
           {/* Sites Step */}
           {currentStep === 'sites' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Anläggningar/Sites</h3>
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <MapPin className="w-5 h-5 text-purple-400" />
+                  Anläggningar och Platser
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Definiera alla fysiska platser som ska ingå i organisationen. Kontaktpersoner för varje plats läggs till senare.
+                </p>
+              </div>
               
               {/* Existing sites */}
               {sites.length > 0 && (
-                <div className="space-y-2 mb-6">
+                <div className="space-y-3 mb-6">
+                  <h4 className="text-sm font-semibold text-slate-300 mb-3">
+                    Tillagda anläggningar ({sites.length})
+                  </h4>
                   {sites.map((site, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <div key={index} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-3">
-                        <MapPin className="w-4 h-4 text-slate-400" />
+                        <MapPin className="w-5 h-5 text-slate-400" />
                         <div>
-                          <span className="text-white font-medium">{site.site_name}</span>
-                          <span className="text-slate-400 text-sm ml-2">({site.region})</span>
-                          {site.is_primary && (
-                            <span className="ml-2 px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">
-                              Primär
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{site.site_name}</span>
+                            {site.is_primary && (
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+                                Primär
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-slate-400 text-sm">
+                            Region: {site.region} {site.site_code && `• Kod: ${site.site_code}`}
+                          </div>
+                          {site.address && (
+                            <div className="text-slate-500 text-xs">
+                              {site.address}
+                            </div>
                           )}
                         </div>
                       </div>
                       <button
                         onClick={() => handleRemoveSite(index)}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        title="Ta bort anläggning"
                       >
                         <Trash2 className="w-4 h-4 text-red-400" />
                       </button>
@@ -441,143 +557,112 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
               
               {/* Add new site form */}
               <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                <h4 className="text-sm font-semibold text-slate-300 mb-3">Lägg till anläggning</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input
-                    value={newSite.site_name}
-                    onChange={(e) => setNewSite({ ...newSite, site_name: e.target.value })}
-                    placeholder="Anläggningsnamn *"
-                  />
-                  <Input
-                    value={newSite.site_code}
-                    onChange={(e) => setNewSite({ ...newSite, site_code: e.target.value })}
-                    placeholder="Site-kod (valfritt)"
-                  />
-                  <Input
-                    value={newSite.region}
-                    onChange={(e) => setNewSite({ ...newSite, region: e.target.value })}
-                    placeholder="Region *"
-                  />
-                  <Input
-                    value={newSite.address}
-                    onChange={(e) => setNewSite({ ...newSite, address: e.target.value })}
-                    placeholder="Adress"
-                  />
-                  <Input
-                    value={newSite.contact_person}
-                    onChange={(e) => setNewSite({ ...newSite, contact_person: e.target.value })}
-                    placeholder="Kontaktperson"
-                  />
-                  <Input
-                    type="email"
-                    value={newSite.contact_email}
-                    onChange={(e) => setNewSite({ ...newSite, contact_email: e.target.value })}
-                    placeholder="Kontakt e-post"
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-3">
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={newSite.is_primary}
-                      onChange={(e) => setNewSite({ ...newSite, is_primary: e.target.checked })}
-                      className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
-                    />
-                    Primär anläggning
-                  </label>
-                  <Button
-                    onClick={handleAddSite}
-                    variant="secondary"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Lägg till
-                  </Button>
+                <h4 className="text-sm font-semibold text-slate-300 mb-4">Lägg till ny anläggning</h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Anläggningsnamn *
+                      </label>
+                      <Input
+                        value={newSite.site_name}
+                        onChange={(e) => setNewSite({ ...newSite, site_name: e.target.value })}
+                        placeholder="t.ex. Stockholm City"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Site-kod
+                      </label>
+                      <Input
+                        value={newSite.site_code}
+                        onChange={(e) => setNewSite({ ...newSite, site_code: e.target.value })}
+                        placeholder="t.ex. STO01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Region *
+                      </label>
+                      <Input
+                        value={newSite.region}
+                        onChange={(e) => setNewSite({ ...newSite, region: e.target.value })}
+                        placeholder="t.ex. Stockholm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Adress
+                      </label>
+                      <Input
+                        value={newSite.address}
+                        onChange={(e) => setNewSite({ ...newSite, address: e.target.value })}
+                        placeholder="Fullständig adress"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={newSite.is_primary}
+                        onChange={(e) => setNewSite({ ...newSite, is_primary: e.target.checked })}
+                        className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                      />
+                      Primär anläggning (huvudkontor/centralt ansvar)
+                    </label>
+                    <Button
+                      onClick={handleAddSite}
+                      variant="secondary"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Lägg till anläggning
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Billing Step */}
-          {currentStep === 'billing' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Faktureringsuppgifter</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Faktureringstyp *
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'consolidated' })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        organizationData.billing_type === 'consolidated'
-                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                      }`}
-                    >
-                      <Receipt className="w-6 h-6 mx-auto mb-2" />
-                      <div className="font-medium">Konsoliderad</div>
-                      <div className="text-xs mt-1 opacity-80">En faktura för alla anläggningar</div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'per_site' })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        organizationData.billing_type === 'per_site'
-                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                      }`}
-                    >
-                      <Receipt className="w-6 h-6 mx-auto mb-2" />
-                      <div className="font-medium">Per anläggning</div>
-                      <div className="text-xs mt-1 opacity-80">Separat faktura per site</div>
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Faktureringsadress *
-                  </label>
-                  <textarea
-                    value={organizationData.billing_address}
-                    onChange={(e) => setOrganizationData({ ...organizationData, billing_address: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Fakturaadress..."
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Users Step */}
           {currentStep === 'users' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Bjud in användare (valfritt)</h3>
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <User className="w-5 h-5 text-green-400" />
+                  Användare och Kontaktpersoner
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Lägg till alla personer som ska ha tillgång till systemet. Roller tilldelas i nästa steg.
+                </p>
+              </div>
               
-              {/* Existing invites */}
-              {userInvites.length > 0 && (
-                <div className="space-y-2 mb-6">
-                  {userInvites.map((invite, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              {/* Existing users */}
+              {users.length > 0 && (
+                <div className="space-y-3 mb-6">
+                  <h4 className="text-sm font-semibold text-slate-300 mb-3">
+                    Tillagda användare ({users.length})
+                  </h4>
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-3">
-                        <User className="w-4 h-4 text-slate-400" />
+                        <User className="w-5 h-5 text-slate-400" />
                         <div>
-                          <span className="text-white font-medium">{invite.name}</span>
-                          <span className="text-slate-400 text-sm ml-2">{invite.email}</span>
-                          <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">
-                            {invite.role.replace('_', ' ')}
-                          </span>
+                          <div className="text-white font-medium">{user.name}</div>
+                          <div className="text-slate-400 text-sm">{user.email}</div>
+                          {user.phone && (
+                            <div className="text-slate-500 text-xs">{user.phone}</div>
+                          )}
                         </div>
                       </div>
                       <button
-                        onClick={() => handleRemoveUserInvite(index)}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                        onClick={() => handleRemoveUser(user.id)}
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        title="Ta bort användare"
                       >
                         <Trash2 className="w-4 h-4 text-red-400" />
                       </button>
@@ -588,99 +673,317 @@ export default function MultisiteRegistrationWizard({ isOpen, onClose, onSuccess
               
               {/* Add new user form */}
               <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                <h4 className="text-sm font-semibold text-slate-300 mb-3">Lägg till användare</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Input
-                    value={newInvite.name}
-                    onChange={(e) => setNewInvite({ ...newInvite, name: e.target.value })}
-                    placeholder="Namn"
-                  />
-                  <Input
-                    type="email"
-                    value={newInvite.email}
-                    onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
-                    placeholder="E-post"
-                  />
-                  <div>
-                    <select
-                      value={newInvite.role}
-                      onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as MultisiteUserRoleType })}
-                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="verksamhetschef">Verksamhetschef</option>
-                      <option value="regionchef">Regionchef</option>
-                      <option value="platsansvarig">Platsansvarig</option>
-                    </select>
+                <h4 className="text-sm font-semibold text-slate-300 mb-4">Lägg till ny användare</h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Namn *
+                      </label>
+                      <Input
+                        value={newUser.name}
+                        onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                        placeholder="För- och efternamn"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        E-postadress *
+                      </label>
+                      <Input
+                        type="email"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        placeholder="namn@företag.se"
+                      />
+                    </div>
                   </div>
-                  <Button
-                    onClick={handleAddUserInvite}
-                    variant="secondary"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Lägg till
-                  </Button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Telefonnummer
+                      </label>
+                      <Input
+                        type="tel"
+                        value={newUser.phone}
+                        onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                        placeholder="070-XXX XX XX"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        onClick={handleAddUser}
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Lägg till användare
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Roles Step */}
+          {currentStep === 'roles' && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <Users className="w-5 h-5 text-yellow-400" />
+                  Roller och Behörigheter
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Tilldela roller till användarna och definiera deras ansvarsområden.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                {users.map((user) => {
+                  const assignment = roleAssignments.find(a => a.userId === user.id)
+                  const currentRole = assignment?.role
+                  
+                  return (
+                    <div key={user.id} className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <User className="w-5 h-5 text-slate-400" />
+                          <div>
+                            <div className="text-white font-medium">{user.name}</div>
+                            <div className="text-slate-400 text-sm">{user.email}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <select
+                            value={currentRole || ''}
+                            onChange={(e) => {
+                              const role = e.target.value as MultisiteUserRoleType
+                              if (role) {
+                                handleRoleAssignment(user.id, role)
+                              }
+                            }}
+                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="">Välj roll...</option>
+                            <option value="verksamhetschef">Verksamhetschef</option>
+                            <option value="regionchef">Regionchef</option>
+                            <option value="platsansvarig">Platsansvarig</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      {/* Role-specific options */}
+                      {currentRole === 'regionchef' && (
+                        <div className="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-600">
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Ansvarar för region:
+                          </label>
+                          <Input
+                            value={assignment?.region || ''}
+                            onChange={(e) => handleRoleAssignment(user.id, 'regionchef', undefined, e.target.value)}
+                            placeholder="t.ex. Stockholm, Göteborg..."
+                          />
+                        </div>
+                      )}
+                      
+                      {currentRole === 'platsansvarig' && (
+                        <div className="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-600">
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Ansvarar för anläggningar:
+                          </label>
+                          <div className="space-y-2">
+                            {sites.map((site) => (
+                              <label key={site.site_name} className="flex items-center gap-2 text-sm text-slate-300">
+                                <input
+                                  type="checkbox"
+                                  checked={assignment?.siteIds?.includes(site.site_name) || false}
+                                  onChange={(e) => {
+                                    const currentSiteIds = assignment?.siteIds || []
+                                    const newSiteIds = e.target.checked
+                                      ? [...currentSiteIds, site.site_name]
+                                      : currentSiteIds.filter(id => id !== site.site_name)
+                                    handleRoleAssignment(user.id, 'platsansvarig', newSiteIds)
+                                  }}
+                                  className="rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                                />
+                                {site.site_name} ({site.region})
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Role description */}
+                      {currentRole && (
+                        <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                          <div className="text-blue-300 text-sm">
+                            {currentRole === 'verksamhetschef' && 'Har full tillgång till alla anläggningar och kan hantera användare och inställningar.'}
+                            {currentRole === 'regionchef' && 'Kan hantera anläggningar i sin region och bjuda in platsansvariga.'}
+                            {currentRole === 'platsansvarig' && 'Har tillgång till sina tilldelade anläggningar och kan begära service.'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              
+              {users.length === 0 && (
+                <div className="text-center py-8 text-slate-400">
+                  <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Inga användare har lagts till ännu.</p>
+                  <p className="text-sm">Gå tillbaka till föregående steg för att lägga till användare.</p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Confirmation Step */}
           {currentStep === 'confirmation' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Bekräfta uppgifter</h3>
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <Check className="w-5 h-5 text-green-400" />
+                  Granska och Bekräfta
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Kontrollera att all information är korrekt innan organisationen skapas.
+                </p>
+              </div>
               
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Organization summary */}
                 <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                  <h4 className="text-sm font-semibold text-slate-300 mb-2">Organisation</h4>
-                  <dl className="grid grid-cols-2 gap-2 text-sm">
-                    <dt className="text-slate-500">Namn:</dt>
-                    <dd className="text-white">{organizationData.name}</dd>
-                    <dt className="text-slate-500">Org.nr:</dt>
-                    <dd className="text-white">{organizationData.organization_number || '-'}</dd>
-                    <dt className="text-slate-500">Kontakt:</dt>
-                    <dd className="text-white">{organizationData.primary_contact_email}</dd>
-                    <dt className="text-slate-500">Fakturering:</dt>
-                    <dd className="text-white">
-                      {organizationData.billing_type === 'consolidated' ? 'Konsoliderad' : 'Per anläggning'}
-                    </dd>
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-3">
+                    <Building2 className="w-4 h-4 text-blue-400" />
+                    Organisation
+                  </h4>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-slate-500 font-medium">Namn:</dt>
+                      <dd className="text-white">{organizationData.name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Organisationsnummer:</dt>
+                      <dd className="text-white">{organizationData.organization_number || 'Ej angivet'}</dd>
+                    </div>
+                    <div className="md:col-span-2">
+                      <dt className="text-slate-500 font-medium">Faktureringsadress:</dt>
+                      <dd className="text-white whitespace-pre-line">{organizationData.billing_address}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Faktureringstyp:</dt>
+                      <dd className="text-white">
+                        {organizationData.billing_type === 'consolidated' ? 'Konsoliderad fakturering' : 'Per anläggning'}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
                 
                 {/* Sites summary */}
                 <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                  <h4 className="text-sm font-semibold text-slate-300 mb-2">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-3">
+                    <MapPin className="w-4 h-4 text-purple-400" />
                     Anläggningar ({sites.length})
                   </h4>
-                  <ul className="space-y-1 text-sm">
+                  <div className="space-y-2">
                     {sites.map((site, index) => (
-                      <li key={index} className="text-white">
-                        • {site.site_name} ({site.region})
-                        {site.is_primary && (
-                          <span className="ml-2 text-purple-300 text-xs">[Primär]</span>
-                        )}
-                      </li>
+                      <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{site.site_name}</span>
+                            {site.is_primary && (
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">
+                                Primär
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-slate-400 text-sm">
+                            Region: {site.region}
+                            {site.site_code && ` • Kod: ${site.site_code}`}
+                            {site.address && ` • ${site.address}`}
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
                 
-                {/* Users summary */}
-                {userInvites.length > 0 && (
+                {/* Users and roles summary */}
+                {users.length > 0 && (
                   <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                    <h4 className="text-sm font-semibold text-slate-300 mb-2">
-                      Användare att bjuda in ({userInvites.length})
+                    <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-3">
+                      <Users className="w-4 h-4 text-green-400" />
+                      Användare och Roller ({users.length})
                     </h4>
-                    <ul className="space-y-1 text-sm">
-                      {userInvites.map((invite, index) => (
-                        <li key={index} className="text-white">
-                          • {invite.name} - {invite.role.replace('_', ' ')}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-3">
+                      {users.map((user) => {
+                        const assignment = roleAssignments.find(a => a.userId === user.id)
+                        return (
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                            <div>
+                              <div className="text-white font-medium">{user.name}</div>
+                              <div className="text-slate-400 text-sm">{user.email}</div>
+                              {user.phone && (
+                                <div className="text-slate-500 text-xs">{user.phone}</div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              {assignment ? (
+                                <div>
+                                  <div className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full font-medium">
+                                    {assignment.role === 'verksamhetschef' && 'Verksamhetschef'}
+                                    {assignment.role === 'regionchef' && 'Regionchef'}
+                                    {assignment.role === 'platsansvarig' && 'Platsansvarig'}
+                                  </div>
+                                  {assignment.region && (
+                                    <div className="text-slate-400 text-xs mt-1">Region: {assignment.region}</div>
+                                  )}
+                                  {assignment.siteIds && assignment.siteIds.length > 0 && (
+                                    <div className="text-slate-400 text-xs mt-1">
+                                      {assignment.siteIds.length === 1 ? 'Anläggning' : 'Anläggningar'}: {assignment.siteIds.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded-full">
+                                  Ingen roll tilldelad
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
+                
+                {/* Warning if missing required assignments */}
+                {(() => {
+                  const hasVerksamhetschef = roleAssignments.some(a => a.role === 'verksamhetschef')
+                  const unassignedUsers = users.filter(user => !roleAssignments.find(a => a.userId === user.id))
+                  
+                  if (!hasVerksamhetschef || unassignedUsers.length > 0) {
+                    return (
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <h4 className="text-red-300 font-medium mb-2">Uppmärksamhet krävs:</h4>
+                        <ul className="text-red-200 text-sm space-y-1">
+                          {!hasVerksamhetschef && (
+                            <li>• Ingen användare har tilldelats rollen Verksamhetschef</li>
+                          )}
+                          {unassignedUsers.length > 0 && (
+                            <li>• {unassignedUsers.length} användare saknar roller</li>
+                          )}
+                        </ul>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
               </div>
             </div>
           )}

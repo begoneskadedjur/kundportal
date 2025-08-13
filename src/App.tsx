@@ -166,13 +166,13 @@ function App() {
               } 
             />
             
-            {/* Multisite Management Routes */}
+            {/* Multisite Management Routes - Admin */}
             <Route 
               path="/admin/multisite/register" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <AdminOrKoordinatorRoute>
                   <MultisiteRegistration />
-                </ProtectedRoute>
+                </AdminOrKoordinatorRoute>
               } 
             />
             <Route 
@@ -186,17 +186,17 @@ function App() {
             <Route 
               path="/admin/multisite/traffic-light" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <AdminOrKoordinatorRoute>
                   <TrafficLightOverview />
-                </ProtectedRoute>
+                </AdminOrKoordinatorRoute>
               } 
             />
             <Route 
               path="/admin/multisite/billing" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <AdminOrKoordinatorRoute>
                   <MultisiteBillingManagement />
-                </ProtectedRoute>
+                </AdminOrKoordinatorRoute>
               } 
             />
             
@@ -263,12 +263,13 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* Multisite Management Routes - Koordinator */}
             <Route 
               path="/koordinator/multisite/register" 
               element={
-                <ProtectedRoute requiredRole="koordinator">
+                <AdminOrKoordinatorRoute>
                   <MultisiteRegistration />
-                </ProtectedRoute>
+                </AdminOrKoordinatorRoute>
               } 
             />
             <Route 
@@ -276,6 +277,22 @@ function App() {
               element={
                 <AdminOrKoordinatorRoute>
                   <OrganizationManagement />
+                </AdminOrKoordinatorRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/multisite/traffic-light" 
+              element={
+                <AdminOrKoordinatorRoute>
+                  <TrafficLightOverview />
+                </AdminOrKoordinatorRoute>
+              } 
+            />
+            <Route 
+              path="/koordinator/multisite/billing" 
+              element={
+                <AdminOrKoordinatorRoute>
+                  <MultisiteBillingManagement />
                 </AdminOrKoordinatorRoute>
               } 
             />
