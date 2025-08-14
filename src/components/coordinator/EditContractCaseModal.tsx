@@ -406,7 +406,11 @@ export default function EditContractCaseModal({
     const email = formData.contact_email || customerData?.email || ''
     const phone = formData.contact_phone || customerData?.phone || ''
     const address = formData.address || customerData?.service_address || ''
-    const companyName = customerData?.company_name || formData.contact_person || ''
+    // För multisite, visa enhetsnamn tillsammans med företagsnamn
+    let companyName = customerData?.company_name || formData.contact_person || ''
+    if (customerData?.is_multisite && customerData?.site_name) {
+      companyName = `${customerData.company_name} - ${customerData.site_name}`
+    }
     const orgNumber = customerData?.organization_number || ''
     
     return {

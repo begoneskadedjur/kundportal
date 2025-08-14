@@ -455,7 +455,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     <option value="">Välj kund...</option>
                     {contractCustomers.map(customer => (
                       <option key={customer.id} value={customer.id}>
-                        {customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
+                        {customer.is_multisite && customer.site_name 
+                          ? `${customer.company_name} - ${customer.site_name}` 
+                          : customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
                       </option>
                     ))}
                   </select>

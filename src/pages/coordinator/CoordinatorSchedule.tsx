@@ -66,10 +66,18 @@ export default function CoordinatorSchedule() {
     // Hämta customer data om den finns
     const customer = contractCase.customer || (contractCase as any).customer_data;
     
+    // För multisite-kunder, inkludera enhetsnamn i titeln
+    let displayTitle = contractCase.title;
+    if (customer?.is_multisite && customer?.site_name) {
+      displayTitle = `${contractCase.title} - ${customer.site_name}`;
+    } else if (customer?.is_multisite && customer?.company_name) {
+      displayTitle = `${contractCase.title} - ${customer.company_name}`;
+    }
+    
     return {
       id: contractCase.id,
       case_id: contractCase.case_number,
-      title: contractCase.title,
+      title: displayTitle,
       status: contractCase.status, // Använd status direkt från databasen
       priority: contractCase.priority,
       // Prioritera customer-data över case-data för kontaktuppgifter
