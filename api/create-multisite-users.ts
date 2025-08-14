@@ -55,10 +55,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get organization details for invitation emails
+    // Nu hämtar vi från customers-tabellen där huvudkontoret finns
     const { data: orgData, error: orgError } = await supabaseAdmin
-      .from('multisite_organizations')
+      .from('customers')
       .select('*')
-      .eq('id', organizationId)
+      .eq('organization_id', organizationId)
+      .eq('site_type', 'huvudkontor')
+      .eq('is_multisite', true)
       .single()
 
     if (orgError || !orgData) {
@@ -68,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    const organizationName = orgData.name
+    const organizationName = orgData.company_name
 
     const results = {
       success: [],

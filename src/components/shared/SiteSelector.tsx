@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { OrganizationSite } from '../../types/multisite'
+import { getCustomerDisplayName } from '../../utils/multisiteHelpers'
 import { Building2, MapPin, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -48,6 +49,7 @@ export default function SiteSelector({
         .select('*')
         .eq('organization_id', organizationId)
         .eq('site_type', 'enhet')
+        .eq('is_multisite', true) // Säkerställ multisite-kunder
         .eq('is_active', true)
         .order('region', { ascending: true })
         .order('site_name', { ascending: true })

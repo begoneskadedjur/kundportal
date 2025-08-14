@@ -4,6 +4,7 @@ import { Building2, Calendar, AlertTriangle, CheckCircle, Clock, Phone } from 'l
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getCustomerDisplayName, isMultisiteCustomer } from '../../utils/multisiteHelpers'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -68,10 +69,18 @@ const PlatsansvarigDashboard: React.FC = () => {
         .from('customers')
         .select('*')
         .eq('id', currentSite.id)
+        .eq('is_multisite', true) // Säkerställ multisite-kund
         .single()
       
       if (customerError || !customerData) {
         console.error('Error fetching customer:', customerError)
+        setLoading(false)
+        return
+      }
+      
+      // Verifiera att det är en multisite-kund
+      if (!isMultisiteCustomer(customerData)) {
+        console.error('Customer is not a multisite customer')
         setLoading(false)
         return
       }

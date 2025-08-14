@@ -43,10 +43,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 3. Kontrollera om organisationen existerar
+    // Nu hämtar vi från customers-tabellen där huvudkontoret finns
     const { data: organization, error: orgError } = await supabase
-      .from('multisite_organizations')
+      .from('customers')
       .select('*')
-      .eq('id', organizationId)
+      .eq('organization_id', organizationId)
+      .eq('site_type', 'huvudkontor')
+      .eq('is_multisite', true)
       .single()
 
     if (orgError || !organization) {
@@ -54,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Organisation inte hittad' })
     }
 
-    console.log('Organization found:', organization.name)
+    console.log('Organization found:', organization.company_name)
 
     // 4. Kontrollera om användaren redan existerar
     console.log('Checking for existing auth user...')
@@ -380,7 +383,7 @@ function getMultisiteInvitationEmailTemplate({
                 ${isNewUser ? 'Välkommen till Begone Organisationsportal!' : 'Ny Organisation Tillagd'}
             </h1>
             <p style="margin: 0.5rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem;">
-                ${organization.name}
+                ${organization.company_name}
             </p>
         </div>
 
@@ -392,7 +395,7 @@ function getMultisiteInvitationEmailTemplate({
 
             ${isNewUser ? `
             <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du har blivit inbjuden att delta i Begone Skadedjur & Sanering AB:s multisite-portal för organisationen <strong style="color: #a855f7;">${organization.name}</strong>.
+                Du har blivit inbjuden att delta i Begone Skadedjur & Sanering AB:s multisite-portal för organisationen <strong style="color: #a855f7;">${organization.company_name}</strong>.
             </p>
 
             <p style="line-height: 1.6; margin-bottom: 1.5rem;">
@@ -401,7 +404,7 @@ function getMultisiteInvitationEmailTemplate({
             </p>
             ` : `
             <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du har blivit tillagd till multisite-organisationen <strong style="color: #a855f7;">${organization.name}</strong> 
+                Du har blivit tillagd till multisite-organisationen <strong style="color: #a855f7;">${organization.company_name}</strong> 
                 med rollen <strong style="color: #22c55e;">${roleName}</strong>.
             </p>
 
@@ -433,7 +436,7 @@ function getMultisiteInvitationEmailTemplate({
                     🏢 Organisationsinfo
                 </h3>
                 <div style="color: #cbd5e1;">
-                    <p style="margin: 0.5rem 0;"><strong>Organisation:</strong> ${organization.name}</p>
+                    <p style="margin: 0.5rem 0;"><strong>Organisation:</strong> ${organization.company_name}</p>
                     ${organization.organization_number ? `<p style="margin: 0.5rem 0;"><strong>Org.nr:</strong> ${organization.organization_number}</p>` : ''}
                     <p style="margin: 0.5rem 0;"><strong>Din roll:</strong> ${roleName}</p>
                     <p style="margin: 0.5rem 0;"><strong>Faktureringstyp:</strong> ${organization.billing_type === 'consolidated' ? 'Konsoliderad' : 'Per anläggning'}</p>

@@ -9,6 +9,12 @@ import {
   MultisitePermissions,
   getPermissionsForRole 
 } from '../types/multisite'
+import { 
+  isMultisiteCustomer, 
+  getOrganizationHierarchy, 
+  canUserAccessSite,
+  formatOrganizationData 
+} from '../utils/multisiteHelpers'
 import toast from 'react-hot-toast'
 
 interface MultisiteContextType {
@@ -135,14 +141,19 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
       }
       
       if (!orgData) {
-        console.error('No organization data found for:', roleData.organization_id)
+        console.warn('No huvudkontor found for organization:', roleData.organization_id)
+        // Don't crash - graceful degradation
+        setOrganization(null)
+        setSites([])
         setLoading(false)
         return
       }
       
       // Map customer fields to organization structure
+      // VIKTIGT: id ska vara huvudkontorets customer.id, inte organization_id
       const organization = {
-        id: orgData.organization_id,
+        id: orgData.id, // Använd huvudkontorets customer.id
+        organization_id: orgData.organization_id, // Behåll organization_id separat
         name: orgData.company_name,
         organization_name: orgData.company_name, // For backwards compatibility
         organization_number: orgData.organization_number,
@@ -176,7 +187,13 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .order('region', { ascending: true })
         .order('site_name', { ascending: true })
       
-      if (sitesError) throw sitesError
+      if (sitesError) {
+        console.error('Error fetching sites:', sitesError)
+        // Don't throw - graceful degradation
+        setSites([])
+        setLoading(false)
+        return
+      }
       
       // Map customer data to OrganizationSite structure
       const sites = (sitesData || []).map(customer => ({
@@ -268,7 +285,17 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
 
   // Check if user can access a specific site
   const canAccessSite = (siteId: string): boolean => {
-    return accessibleSites.some(site => site.id === siteId)
+    if (!userRole) return false
+    
+    // Använd hjälpfunktionen för grundläggande access
+    const hasBasicAccess = canUserAccessSite(userRole, siteId)
+    
+    // För regionchefer, kontrollera också att siten finns i deras tillgängliga sites
+    if (userRole.role_type === 'regionchef' || userRole.role_type === 'regional_manager') {
+      return hasBasicAccess && accessibleSites.some(site => site.id === siteId)
+    }
+    
+    return hasBasicAccess
   }
 
   // Check if user can manage users

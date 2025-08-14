@@ -4,6 +4,7 @@ import { Building2, MapPin, AlertTriangle, CheckCircle, TrendingUp, Users } from
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getCustomerDisplayName, isMultisiteCustomer } from '../../utils/multisiteHelpers'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
@@ -37,17 +38,23 @@ const RegionchefDashboard: React.FC = () => {
   }, [organization, userRole])
 
   const fetchCustomersAndMetrics = async () => {
-    if (!organization || !userRole) return
+    if (!organization || !organization.organization_id || !userRole) {
+      console.warn('No organization or user role data available')
+      setLoading(false)
+      return
+    }
     
     try {
       setLoading(true)
       
       // Hämta endast enheter för denna organisation och region
+      // VIKTIGT: Kontrollera is_multisite för att inte påverka vanliga kunder
       let customersQuery = supabase
         .from('customers')
         .select('*')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', organization.organization_id) // Använd organization_id
         .eq('site_type', 'enhet')
+        .eq('is_multisite', true) // Säkerställ multisite-kunder
         .eq('is_active', true)
       
       // Filtrera på region om användaren är regionchef
@@ -57,54 +64,59 @@ const RegionchefDashboard: React.FC = () => {
       
       const { data: customersData, error: customersError } = await customersQuery
       
-      if (customersError) throw customersError
+      if (customersError) {
+        console.error('Error fetching customers:', customersError)
+        throw customersError
+      }
       
       setCustomers(customersData || [])
       
-      const metrics: SiteMetrics[] = []
+      if (!customersData || customersData.length === 0) {
+        setSiteMetrics([])
+        setLoading(false)
+        return
+      }
       
-      for (const customer of customersData || []) {
-        // Hämta aktiva ärenden från cases-tabellen
-        const { data: activeCases } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('customer_id', customer.id)
-          .in('status', ['Öppen', 'Pågående', 'Schemalagd'])
-
-        // Hämta avklarade denna månad
-        const startOfMonth = new Date()
-        startOfMonth.setDate(1)
-        startOfMonth.setHours(0, 0, 0, 0)
+      // Optimerat: Hämta all data i batch
+      const customerIds = customersData.map(c => c.id)
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      
+      // Parallell query för bättre prestanda
+      const { data: casesData } = await supabase
+        .from('cases')
+        .select('id, customer_id, status, updated_at, scheduled_date')
+        .in('customer_id', customerIds)
+      
+      // Bearbeta data per customer
+      const metrics: SiteMetrics[] = customersData.map(customer => {
+        const customerCases = casesData?.filter(c => c.customer_id === customer.id) || []
+        const activeCases = customerCases.filter(c => 
+          ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+        )
+        const completedThisMonth = customerCases.filter(c => 
+          ['Avklarad', 'Stängd'].includes(c.status) &&
+          new Date(c.updated_at) >= startOfMonth
+        )
+        const scheduledCases = customerCases.filter(c => c.status === 'Schemalagd')
         
-        const { data: completedCases } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('customer_id', customer.id)
-          .in('status', ['Avklarad', 'Stängd'])
-          .gte('updated_at', startOfMonth.toISOString())
-
-        // Hämta schemalagda besök
-        const { data: scheduledVisits } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('customer_id', customer.id)
-          .eq('status', 'Schemalagd')
-
         // Beräkna trafikljus
         let trafficLight: 'green' | 'yellow' | 'red' = 'green'
-        if ((activeCases?.length || 0) > 5) trafficLight = 'yellow'
-        if ((activeCases?.length || 0) > 10) trafficLight = 'red'
-
-        metrics.push({
+        const activeCount = activeCases.length
+        if (activeCount > 5 && activeCount <= 10) trafficLight = 'yellow'
+        if (activeCount > 10) trafficLight = 'red'
+        
+        return {
           customerId: customer.id,
-          customerName: customer.company_name,
+          customerName: getCustomerDisplayName(customer),
           city: customer.city || 'Okänd stad',
-          activeCases: activeCases?.length || 0,
-          completedThisMonth: completedCases?.length || 0,
-          scheduledVisits: scheduledVisits?.length || 0,
+          activeCases: activeCases.length,
+          completedThisMonth: completedThisMonth.length,
+          scheduledVisits: scheduledCases.length,
           trafficLight
-        })
-      }
+        }
+      })
       
       setSiteMetrics(metrics)
     } catch (error) {
