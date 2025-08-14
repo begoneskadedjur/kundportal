@@ -162,7 +162,6 @@ const VerksamhetschefDashboard: React.FC = () => {
         })
         setUpcomingVisits(visitsWithCustomerNames)
       }
-      }
     } catch (error) {
       console.error('Error fetching metrics:', error)
     } finally {
