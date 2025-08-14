@@ -66,10 +66,10 @@ import RegionchefDashboard from './pages/organisation/Regionchef'
 import PlatsansvarigDashboard from './pages/organisation/Platsansvarig'
 import OrganisationRedirect from './pages/organisation/Redirect'
 
-// Verksamhetschef sub-pages
-import VerksamhetschefStatistik from './pages/organisation/verksamhetschef/Statistik'
-import VerksamhetschefArenden from './pages/organisation/verksamhetschef/Arenden'
-import VerksamhetschefRapporter from './pages/organisation/verksamhetschef/Rapporter';
+// Shared organisation pages
+import OrganisationArenden from './pages/organisation/shared/Arenden';
+import OrganisationStatistik from './pages/organisation/shared/Statistik';
+import OrganisationRapporter from './pages/organisation/shared/Rapporter';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -478,7 +478,7 @@ function App() {
               path="/organisation/verksamhetschef/statistik" 
               element={
                 <MultisiteProtectedRoute>
-                  <VerksamhetschefStatistik />
+                  <OrganisationStatistik />
                 </MultisiteProtectedRoute>
               } 
             />
@@ -486,7 +486,7 @@ function App() {
               path="/organisation/verksamhetschef/arenden" 
               element={
                 <MultisiteProtectedRoute>
-                  <VerksamhetschefArenden />
+                  <OrganisationArenden />
                 </MultisiteProtectedRoute>
               } 
             />
@@ -494,7 +494,59 @@ function App() {
               path="/organisation/verksamhetschef/rapporter" 
               element={
                 <MultisiteProtectedRoute>
-                  <VerksamhetschefRapporter />
+                  <OrganisationRapporter />
+                </MultisiteProtectedRoute>
+              } 
+            />
+
+            {/* Organisation sub-routes for regionchef */}
+            <Route 
+              path="/organisation/regionchef/statistik" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationStatistik />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/regionchef/arenden" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationArenden />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/regionchef/rapporter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationRapporter />
+                </MultisiteProtectedRoute>
+              } 
+            />
+
+            {/* Organisation sub-routes for platsansvarig */}
+            <Route 
+              path="/organisation/platsansvarig/statistik" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationStatistik />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/platsansvarig/arenden" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationArenden />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/platsansvarig/rapporter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationRapporter />
                 </MultisiteProtectedRoute>
               } 
             />

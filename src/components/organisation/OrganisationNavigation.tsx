@@ -22,47 +22,34 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
   const { signOut } = useAuth()
   const { organization } = useMultisite()
 
-  // Definiera tabs baserat på roll
+  // Definiera tabs - alla roller har tillgång till alla sidor
   const getTabs = (): NavigationTab[] => {
     const basePath = `/organisation/${userRoleType}`
     
-    // Verksamhetschef har alla tabs
-    if (userRoleType === 'verksamhetschef') {
-      return [
-        {
-          id: 'dashboard',
-          label: 'Översikt',
-          icon: <Home className="w-5 h-5" />,
-          path: basePath
-        },
-        {
-          id: 'statistics',
-          label: 'Statistik',
-          icon: <BarChart3 className="w-5 h-5" />,
-          path: `${basePath}/statistik`
-        },
-        {
-          id: 'cases',
-          label: 'Ärenden',
-          icon: <AlertTriangle className="w-5 h-5" />,
-          path: `${basePath}/arenden`
-        },
-        {
-          id: 'reports',
-          label: 'Rapporter',
-          icon: <FileText className="w-5 h-5" />,
-          path: `${basePath}/rapporter`
-        }
-      ]
-    }
-    
-    // Regionchef och platsansvarig har bara översikt för nu
     return [
       {
         id: 'dashboard',
         label: 'Översikt',
         icon: <Home className="w-5 h-5" />,
         path: basePath
+      },
+      {
+        id: 'statistics',
+        label: 'Statistik',
+        icon: <BarChart3 className="w-5 h-5" />,
+        path: `${basePath}/statistik`
+      },
+      {
+        id: 'cases',
+        label: 'Ärenden',
+        icon: <AlertTriangle className="w-5 h-5" />,
+        path: `${basePath}/arenden`
+      },
+      {
+        id: 'reports',
+        label: 'Rapporter',
+        icon: <FileText className="w-5 h-5" />,
+        path: `${basePath}/rapporter`
       }
     ]
   }
