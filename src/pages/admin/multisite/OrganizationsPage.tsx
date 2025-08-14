@@ -15,22 +15,28 @@ import {
   Search,
   Filter,
   ChevronRight,
+  ChevronDown,
   Mail,
   Phone,
   Calendar,
   TrendingUp,
   Loader2,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserPlus,
+  Shield,
+  UserCheck
 } from 'lucide-react'
 import Input from '../../../components/ui/Input'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
+import UserModal from '../../../components/admin/multisite/UserModal'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface Organization {
   id: string
   name: string
   organization_number: string
+  organization_id?: string
   billing_address: string
   billing_email: string
   billing_method: 'consolidated' | 'per_site'
@@ -42,15 +48,32 @@ interface Organization {
   total_value?: number
 }
 
+interface OrganizationUser {
+  id: string
+  user_id: string
+  organization_id: string
+  role_type: string
+  is_active: boolean
+  created_at: string
+  email?: string
+  name?: string
+  phone?: string
+  site_ids?: string[]
+}
+
 export default function OrganizationsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
+  const [organizationUsers, setOrganizationUsers] = useState<Record<string, OrganizationUser[]>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null)
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
 
   useEffect(() => {
     fetchOrganizations()
@@ -111,6 +134,7 @@ export default function OrganizationsPage() {
             is_active: org.is_active !== false,
             created_at: org.created_at,
             updated_at: org.updated_at,
+            organization_id: org.organization_id,
             sites_count: sitesCount || 0,
             users_count: usersCount || 0,
             total_value: org.total_contract_value || 0
@@ -219,6 +243,102 @@ export default function OrganizationsPage() {
     navigate(`${basePath}/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
 
+  const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
+    try {
+      // Hämta användare med roller
+      const { data: users, error } = await supabase
+        .from('multisite_user_roles')
+        .select(`
+          *,
+          profiles!multisite_user_roles_user_id_fkey (
+            email,
+            full_name
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Formatera användardata
+      const formattedUsers = (users || []).map(user => ({
+        ...user,
+        email: user.profiles?.email || 'Okänd email',
+        name: user.profiles?.full_name || 'Okänt namn'
+      }))
+
+      setOrganizationUsers(prev => ({
+        ...prev,
+        [orgId]: formattedUsers
+      }))
+    } catch (error) {
+      console.error('Error fetching organization users:', error)
+      toast.error('Kunde inte hämta användare')
+    }
+  }
+
+  const handleToggleExpand = async (org: Organization) => {
+    if (expandedOrgId === org.id) {
+      setExpandedOrgId(null)
+    } else {
+      setExpandedOrgId(org.id)
+      // Hämta användare om vi inte redan har dem
+      if (!organizationUsers[org.id] && org.organization_id) {
+        await fetchOrganizationUsers(org.id, org.organization_id)
+      }
+    }
+  }
+
+  const handleAddUser = (org: Organization) => {
+    setSelectedOrg(org)
+    setEditingUser(null)
+    setShowUserModal(true)
+  }
+
+  const handleEditUser = (org: Organization, user: OrganizationUser) => {
+    setSelectedOrg(org)
+    setEditingUser(user)
+    setShowUserModal(true)
+  }
+
+  const handleDeleteUser = async (orgId: string, userId: string) => {
+    if (!confirm('Är du säker på att du vill ta bort denna användare?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('multisite_user_roles')
+        .delete()
+        .eq('id', userId)
+
+      if (error) throw error
+
+      toast.success('Användare borttagen')
+      
+      // Uppdatera lokal state
+      setOrganizationUsers(prev => ({
+        ...prev,
+        [orgId]: prev[orgId].filter(u => u.id !== userId)
+      }))
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      toast.error('Kunde inte ta bort användare')
+    }
+  }
+
+  const getRoleName = (roleType: string) => {
+    const roleNames: Record<string, string> = {
+      'verksamhetschef': 'Verksamhetschef',
+      'quality_manager': 'Verksamhetschef',
+      'regionchef': 'Regionchef',
+      'regional_manager': 'Regionchef',
+      'platsansvarig': 'Platsansvarig',
+      'site_manager': 'Platsansvarig'
+    }
+    return roleNames[roleType] || roleType
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -324,14 +444,16 @@ export default function OrganizationsPage() {
             {filteredOrganizations.map((org) => (
               <Card 
                 key={org.id} 
-                className={`p-6 hover:bg-slate-800/50 transition-colors cursor-pointer ${
-                  !org.is_active ? 'opacity-60' : ''
-                }`}
-                onClick={() => handleViewDetails(org.id)}
+                className={`${!org.is_active ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
+                {/* Klickbar header-sektion */}
+                <div 
+                  className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  onClick={() => handleToggleExpand(org)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
                       <div className={`p-2 rounded-lg ${
                         org.is_active 
                           ? 'bg-purple-500/20 text-purple-400' 
@@ -385,14 +507,25 @@ export default function OrganizationsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleToggleActive(org)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        org.is_active 
-                          ? 'hover:bg-slate-700 text-slate-400' 
-                          : 'hover:bg-green-500/20 text-green-400'
-                      }`}
+                  <div className="flex items-center gap-2">
+                    {/* Expand/Collapse ikon */}
+                    <div className="p-2 text-slate-400">
+                      {expandedOrgId === org.id ? (
+                        <ChevronDown className="w-5 h-5" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5" />
+                      )}
+                    </div>
+                    
+                    {/* Åtgärdsknappar */}
+                    <div onClick={(e) => e.stopPropagation()} className="flex gap-1">
+                      <button
+                        onClick={() => handleToggleActive(org)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          org.is_active 
+                            ? 'hover:bg-slate-700 text-slate-400' 
+                            : 'hover:bg-green-500/20 text-green-400'
+                        }`}
                       title={org.is_active ? 'Inaktivera' : 'Aktivera'}
                     >
                       {org.is_active ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
@@ -411,9 +544,102 @@ export default function OrganizationsPage() {
                     >
                       <Trash2 className="w-5 h-5 text-red-400" />
                     </button>
-                    <ChevronRight className="w-5 h-5 text-slate-400 ml-2" />
+                    </div>
                   </div>
                 </div>
+                </div>
+
+                {/* Expanderad användarsektion */}
+                {expandedOrgId === org.id && (
+                  <div className="border-t border-slate-700 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Users className="w-5 h-5 text-purple-400" />
+                        Användare
+                      </h4>
+                      <Button
+                        onClick={() => handleAddUser(org)}
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Lägg till användare
+                      </Button>
+                    </div>
+
+                    {/* Användarlista */}
+                    {organizationUsers[org.id] ? (
+                      organizationUsers[org.id].length > 0 ? (
+                        <div className="space-y-3">
+                          {organizationUsers[org.id].map(user => (
+                            <div
+                              key={user.id}
+                              className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500/20 rounded-lg">
+                                  <UserCheck className="w-4 h-4 text-purple-400" />
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium">{user.name}</p>
+                                  <p className="text-sm text-slate-400">{user.email}</p>
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <Shield className="w-4 h-4 text-blue-400" />
+                                  <span className="text-sm text-blue-400">
+                                    {getRoleName(user.role_type)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditUser(org, user)}
+                                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                                  title="Redigera"
+                                >
+                                  <Edit2 className="w-4 h-4 text-slate-400" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(org.id, user.id)}
+                                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                                  title="Ta bort"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-400" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                          <p className="text-slate-400">Inga användare registrerade</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Klicka på "Lägg till användare" för att bjuda in användare
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto" />
+                        <p className="text-slate-400 mt-2">Laddar användare...</p>
+                      </div>
+                    )}
+
+                    {/* Visa/Hantera-knapp */}
+                    <div className="mt-4 pt-4 border-t border-slate-700">
+                      <Button
+                        onClick={() => handleViewDetails(org.id)}
+                        variant="outline"
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        Visa fullständig organisationshantering
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
@@ -433,6 +659,27 @@ export default function OrganizationsPage() {
             setSelectedOrg(null)
             fetchOrganizations()
           }}
+        />
+      )}
+
+      {/* User Modal */}
+      {showUserModal && selectedOrg && (
+        <UserModal
+          isOpen={showUserModal}
+          onClose={() => {
+            setShowUserModal(false)
+            setEditingUser(null)
+          }}
+          onSuccess={() => {
+            setShowUserModal(false)
+            setEditingUser(null)
+            if (selectedOrg.organization_id) {
+              fetchOrganizationUsers(selectedOrg.id, selectedOrg.organization_id)
+            }
+          }}
+          organizationId={selectedOrg.id}
+          organizationName={selectedOrg.name}
+          existingUser={editingUser}
         />
       )}
     </div>
