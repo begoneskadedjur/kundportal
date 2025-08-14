@@ -73,10 +73,12 @@ export default function OrganizationsPage() {
   const fetchOrganizations = async () => {
     setLoading(true)
     try {
-      // Hämta organisationer
+      // Hämta organisationer (huvudkontor från customers)
       const { data: orgs, error: orgsError } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .select('*')
+        .eq('site_type', 'huvudkontor')
+        .eq('is_multisite', true)
         .order('created_at', { ascending: false })
 
       if (orgsError) throw orgsError
@@ -84,21 +86,31 @@ export default function OrganizationsPage() {
       // Hämta statistik för varje organisation
       if (orgs && orgs.length > 0) {
         const orgsWithStats = await Promise.all(orgs.map(async (org) => {
-          // Hämta antal sites
+          // Hämta antal sites (enheter från customers)
           const { count: sitesCount } = await supabase
-            .from('organization_sites')
+            .from('customers')
             .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.id)
+            .eq('organization_id', org.organization_id)
+            .eq('site_type', 'enhet')
+            .eq('is_multisite', true)
             .eq('is_active', true)
 
           // Hämta antal användare
           const { count: usersCount } = await supabase
             .from('multisite_user_roles')
             .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.id)
+            .eq('organization_id', org.organization_id)
 
           return {
-            ...org,
+            id: org.id,
+            name: org.company_name,
+            organization_number: org.organization_number || '',
+            billing_address: org.billing_address || org.contact_address || '',
+            billing_email: org.billing_email || org.contact_email || '',
+            billing_method: 'consolidated' as const,
+            is_active: org.is_active !== false,
+            created_at: org.created_at,
+            updated_at: org.updated_at,
             sites_count: sitesCount || 0,
             users_count: usersCount || 0,
             total_value: org.total_contract_value || 0
@@ -126,9 +138,10 @@ export default function OrganizationsPage() {
 
     try {
       const { error } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .delete()
         .eq('id', org.id)
+        .eq('site_type', 'huvudkontor')
 
       if (error) throw error
 
@@ -143,7 +156,7 @@ export default function OrganizationsPage() {
   const handleToggleActive = async (org: Organization) => {
     try {
       const { error } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .update({ is_active: !org.is_active })
         .eq('id', org.id)
 

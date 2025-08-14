@@ -64,8 +64,8 @@ const VerksamhetschefArenden: React.FC = () => {
       
       const { data: cases, error } = await supabase
         .from('private_cases')
-        .select('*, site:organization_sites(*)')
-        .in('site_id', siteIds)
+        .select('*')
+        .in('customer_id', siteIds) // Använd customer_id istället för site_id
         .order('created_at', { ascending: false })
         .limit(50)
       
