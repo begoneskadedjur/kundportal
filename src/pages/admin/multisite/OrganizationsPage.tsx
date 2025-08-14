@@ -336,16 +336,24 @@ export default function OrganizationsPage() {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      // Använd vår egen API med Resend för snyggare e-postmallar
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email })
       })
 
-      if (error) throw error
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Kunde inte skicka återställningsmail')
+      }
 
       toast.success(`Lösenordsåterställning skickad till ${email}`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending password reset:', error)
-      toast.error('Kunde inte skicka lösenordsåterställning')
+      toast.error(error.message || 'Kunde inte skicka lösenordsåterställning')
     }
   }
 

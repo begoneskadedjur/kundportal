@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import * as crypto from 'crypto-js'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -16,20 +18,37 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [isValidToken, setIsValidToken] = useState(false)
   const [checkingToken, setCheckingToken] = useState(true)
+  const [userEmail, setUserEmail] = useState('')
+  const [userId, setUserId] = useState('')
 
   useEffect(() => {
-    // Kontrollera om användaren har en giltig återställningstoken
+    // Kontrollera token från URL
     const checkResetToken = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error || !session) {
+        const token = searchParams.get('token')
+        const email = searchParams.get('email')
+
+        if (!token || !email) {
+          // Kolla om det är en Supabase magic link session
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (!error && session) {
+            setIsValidToken(true)
+            setUserEmail(session.user.email || '')
+            setUserId(session.user.id)
+            setCheckingToken(false)
+            return
+          }
+
           toast.error('Ogiltig eller utgången återställningslänk')
           setTimeout(() => navigate('/login'), 3000)
           return
         }
 
+        // Vi kan inte verifiera token på klientsidan utan admin-privilegier
+        // Så vi litar på att token är giltigt och verifierar det när användaren försöker uppdatera lösenordet
         setIsValidToken(true)
+        setUserEmail(decodeURIComponent(email))
       } catch (error) {
         console.error('Error checking reset token:', error)
         toast.error('Något gick fel')
@@ -40,7 +59,7 @@ export default function ResetPassword() {
     }
 
     checkResetToken()
-  }, [navigate])
+  }, [navigate, searchParams])
 
   const validatePassword = (password: string) => {
     if (password.length < 8) {
@@ -76,11 +95,35 @@ export default function ResetPassword() {
 
     setLoading(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
+      const token = searchParams.get('token')
+      const email = searchParams.get('email')
 
-      if (error) throw error
+      if (token && email) {
+        // Använd vår API för att verifiera token och uppdatera lösenord
+        const response = await fetch('/api/verify-reset-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token,
+            email: decodeURIComponent(email),
+            newPassword
+          })
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Kunde inte uppdatera lösenordet')
+        }
+      } else {
+        // Fallback för Supabase magic links
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword
+        })
+
+        if (error) throw error
+      }
 
       toast.success('Lösenordet har uppdaterats!')
       
