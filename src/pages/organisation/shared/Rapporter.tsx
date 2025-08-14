@@ -84,9 +84,9 @@ const OrganisationRapporter: React.FC = () => {
           break
       }
       
-      // Hämta cases
+      // Hämta cases från cases tabellen (inte private_cases)
       const { data: cases, error: casesError } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('*')
         .in('customer_id', siteIds)
         .gte('created_at', startDate.toISOString())
@@ -94,12 +94,16 @@ const OrganisationRapporter: React.FC = () => {
       
       if (casesError) throw casesError
       
-      // Generera rapportdata
+      // Generera rapportdata med svenska statusvärden
       const siteReports = targetSites.map(site => {
         const siteCases = cases?.filter(c => c.customer_id === site.id) || []
-        const completedCases = siteCases.filter(c => c.status === 'completed')
-        const activeCases = siteCases.filter(c => c.status === 'in_progress')
-        const pendingCases = siteCases.filter(c => c.status === 'pending')
+        const completedCases = siteCases.filter(c => 
+          c.status === 'Slutförd' || c.status === 'Stängd'
+        )
+        const activeCases = siteCases.filter(c => 
+          c.status === 'Pågående' || c.status === 'Schemalagd'
+        )
+        const pendingCases = siteCases.filter(c => c.status === 'Öppen')
         
         return {
           siteName: site.site_name,
@@ -115,11 +119,15 @@ const OrganisationRapporter: React.FC = () => {
         }
       })
       
-      // Sammanfattning
+      // Sammanfattning med svenska statusvärden
       const totalCases = cases?.length || 0
-      const totalCompleted = cases?.filter(c => c.status === 'completed').length || 0
-      const totalActive = cases?.filter(c => c.status === 'in_progress').length || 0
-      const totalPending = cases?.filter(c => c.status === 'pending').length || 0
+      const totalCompleted = cases?.filter(c => 
+        c.status === 'Slutförd' || c.status === 'Stängd'
+      ).length || 0
+      const totalActive = cases?.filter(c => 
+        c.status === 'Pågående' || c.status === 'Schemalagd'
+      ).length || 0
+      const totalPending = cases?.filter(c => c.status === 'Öppen').length || 0
       
       setReportData({
         period: getPeriodLabel(selectedPeriod),

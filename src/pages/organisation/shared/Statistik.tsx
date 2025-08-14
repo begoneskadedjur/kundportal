@@ -64,19 +64,23 @@ const OrganisationStatistik: React.FC = () => {
       
       const siteIds = targetSites.map(s => s.id)
       
-      // Hämta cases statistik
+      // Hämta cases statistik från cases tabellen (inte private_cases)
       const { data: cases, error: casesError } = await supabase
-        .from('private_cases')
+        .from('cases')
         .select('status, created_at, customer_id')
         .in('customer_id', siteIds)
       
       if (casesError) throw casesError
       
-      // Beräkna statistik
+      // Beräkna statistik med svenska statusvärden
       const totalCases = cases?.length || 0
-      const completedCases = cases?.filter(c => c.status === 'completed').length || 0
-      const activeCases = cases?.filter(c => c.status === 'in_progress').length || 0
-      const pendingCases = cases?.filter(c => c.status === 'pending').length || 0
+      const completedCases = cases?.filter(c => 
+        c.status === 'Slutförd' || c.status === 'Stängd'
+      ).length || 0
+      const activeCases = cases?.filter(c => 
+        c.status === 'Pågående' || c.status === 'Schemalagd'
+      ).length || 0
+      const pendingCases = cases?.filter(c => c.status === 'Öppen').length || 0
       
       // Månadsvis trend
       const monthlyData = []
@@ -92,7 +96,9 @@ const OrganisationStatistik: React.FC = () => {
         monthlyData.push({
           month: month.toLocaleDateString('sv-SE', { month: 'short' }),
           ärenden: monthCases?.length || 0,
-          avklarade: monthCases?.filter(c => c.status === 'completed').length || 0
+          avklarade: monthCases?.filter(c => 
+            c.status === 'Slutförd' || c.status === 'Stängd'
+          ).length || 0
         })
       }
       
@@ -100,7 +106,7 @@ const OrganisationStatistik: React.FC = () => {
       const statusData = [
         { name: 'Avklarade', value: completedCases, color: '#10b981' },
         { name: 'Pågående', value: activeCases, color: '#f59e0b' },
-        { name: 'Väntande', value: pendingCases, color: '#6b7280' }
+        { name: 'Öppna', value: pendingCases, color: '#3b82f6' }
       ]
       
       // Site-baserad statistik
@@ -109,8 +115,12 @@ const OrganisationStatistik: React.FC = () => {
         return {
           name: site.site_name,
           ärenden: siteCases?.length || 0,
-          avklarade: siteCases?.filter(c => c.status === 'completed').length || 0,
-          pågående: siteCases?.filter(c => c.status === 'in_progress').length || 0
+          avklarade: siteCases?.filter(c => 
+            c.status === 'Slutförd' || c.status === 'Stängd'
+          ).length || 0,
+          pågående: siteCases?.filter(c => 
+            c.status === 'Pågående' || c.status === 'Schemalagd'
+          ).length || 0
         }
       })
       
