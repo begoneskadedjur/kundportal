@@ -1,6 +1,6 @@
 // src/components/organisation/OrganisationNavigation.tsx - Gemensam navigation för organisationsportalen
 import React from 'react'
-import { Home, BarChart3, Calendar, AlertTriangle, FileText, Settings, LogOut } from 'lucide-react'
+import { Home, BarChart3, Calendar, AlertTriangle, FileText, Settings, LogOut, User } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
@@ -121,8 +121,16 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
           {/* User menu */}
           <div className="flex items-center gap-3">
             <button
+              onClick={() => navigate('/profile')}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              title="Min profil"
+            >
+              <User className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => navigate(`/organisation/${userRoleType}/installningar`)}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              title="Inställningar"
             >
               <Settings className="w-5 h-5" />
             </button>
