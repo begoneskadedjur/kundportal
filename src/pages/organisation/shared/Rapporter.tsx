@@ -8,6 +8,7 @@ import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
 import { FileText, Download, Calendar, Filter, MapPin, TrendingUp, Users, AlertTriangle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
+import OrganisationSanitationReports from '../../../components/organisation/OrganisationSanitationReports'
 
 const OrganisationRapporter: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
@@ -587,6 +588,11 @@ const OrganisationRapporter: React.FC = () => {
             </div>
           </Card>
         )}
+        
+        {/* Saneringsrapporter sektion */}
+        <div className="mt-8">
+          <OrganisationSanitationReports userRoleType={userRoleType} />
+        </div>
       </div>
     </OrganisationLayout>
   )
