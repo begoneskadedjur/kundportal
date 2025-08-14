@@ -96,11 +96,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .or('is_multisite.is.null,is_multisite.eq.false') // Visa bara huvudkunder, inte multisite-enheter
+        // Hämta ALLA kunder, både huvudkunder och multisite-enheter
         .order('company_name');
-      
-      console.log('Fetched contract customers:', data); // Debug
-      console.log('Error fetching customers:', error); // Debug
       
       if (!error && data) {
         setContractCustomers(data);
@@ -119,9 +116,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       setCaseType(type);
       const formattedAddress = formatCaseAddress(initialCaseData.adress);
       
-      // För contract cases, låt customer useEffect hantera kunddata
+      // För contract cases, sätt bara grundläggande ärendedata
+      // Låt nästa useEffect hantera kund-identifiering
       if (type === 'contract' && initialCaseData.customer_id) {
-        // Sätt bara ärende-specifik data, inte kunddata eller adress
         setFormData({
           title: initialCaseData.title,
           status: 'Bokat',
@@ -129,7 +126,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           priority: initialCaseData.priority,
           description: initialCaseData.description
         });
-        setSelectedContractCustomer(initialCaseData.customer_id);
+        // Vänta med att sätta customer tills vi vet om det är multisite
       } else {
         // För private/business cases, använd all data
         const mappedData = {
@@ -153,29 +150,71 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [isOpen, initialCaseData, handleReset]);
 
-  // Separat useEffect för att fylla i kunddata när selectedContractCustomer ändras
+  // Identifiera och hantera multisite vs vanliga kunder när data är laddad
+  useEffect(() => {
+    if (initialCaseData?.customer_id && contractCustomers.length > 0 && initialCaseData.case_type === 'contract') {
+      const customer = contractCustomers.find(c => c.id === initialCaseData.customer_id);
+      
+      if (customer) {
+        if (customer.is_multisite && customer.parent_customer_id) {
+          // Det är en multisite-enhet - sätt huvudkund och enhet
+          console.log('Multisite enhet detekterad:', customer.company_name, 'Huvudkund:', customer.parent_customer_id);
+          setSelectedContractCustomer(customer.parent_customer_id);
+          setSelectedSiteId(customer.id); // Enhets-ID
+        } else if (!customer.parent_customer_id) {
+          // Vanlig kund eller multisite-huvudkund
+          console.log('Vanlig kund eller huvudkund:', customer.company_name);
+          setSelectedContractCustomer(customer.id);
+          setSelectedSiteId(null);
+        }
+      }
+    }
+  }, [initialCaseData, contractCustomers]);
+
+  // Separat useEffect för att fylla i kunddata när selectedContractCustomer eller selectedSiteId ändras
   useEffect(() => {
     if (selectedContractCustomer && contractCustomers.length > 0) {
       const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-      if (customer) {
+      
+      // Om en site är vald för multisite-kund, använd sitens data där det finns
+      let dataSource = customer;
+      if (selectedSiteId) {
+        const site = contractCustomers.find(c => c.id === selectedSiteId);
+        if (site) {
+          // Prioritera site-data, men fallback till huvudkunddata
+          dataSource = {
+            ...customer,
+            contact_person: site.contact_person || customer?.contact_person,
+            contact_phone: site.contact_phone || customer?.contact_phone,
+            contact_email: site.contact_email || customer?.contact_email,
+            contact_address: site.contact_address || customer?.contact_address,
+            billing_email: site.billing_email || customer?.billing_email,
+            billing_address: site.billing_address || customer?.billing_address,
+            company_name: customer?.company_name, // Behåll huvudkundens namn
+            organization_number: customer?.organization_number
+          };
+        }
+      }
+      
+      if (dataSource) {
         setFormData(prev => ({
           ...prev,
-          kontaktperson: customer.contact_person,
-          telefon_kontaktperson: customer.contact_phone,
-          e_post_kontaktperson: customer.contact_email,
-          org_nr: customer.organization_number,
-          bestallare: customer.company_name,
-          adress: customer.contact_address || customer.service_address || prev.adress,
+          kontaktperson: dataSource.contact_person,
+          telefon_kontaktperson: dataSource.contact_phone,
+          e_post_kontaktperson: dataSource.contact_email,
+          org_nr: dataSource.organization_number,
+          bestallare: dataSource.company_name,
+          adress: dataSource.contact_address || dataSource.service_address || prev.adress,
           // Lägg även till faktura-fält om de finns
-          e_post_faktura: customer.billing_email || customer.contact_email,
-          faktura_adress: customer.billing_address || customer.contact_address,
+          e_post_faktura: dataSource.billing_email || dataSource.contact_email,
+          faktura_adress: dataSource.billing_address || dataSource.contact_address,
           // Lägg till fler fält för bättre integration
-          telefon: customer.contact_phone, // För ärendet självt
-          email: customer.contact_email,   // För ärendet självt
+          telefon: dataSource.contact_phone, // För ärendet självt
+          email: dataSource.contact_email,   // För ärendet självt
         }));
       }
     }
-  }, [selectedContractCustomer, contractCustomers]);
+  }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
 
   const selectCaseType = (type: 'private' | 'business' | 'contract') => {
     setCaseType(type); 
@@ -464,13 +503,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     required
                   >
                     <option value="">Välj kund...</option>
-                    {contractCustomers.map(customer => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.is_multisite && customer.site_name 
-                          ? `${customer.company_name} - ${customer.site_name}` 
-                          : customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
-                      </option>
-                    ))}
+                    {contractCustomers
+                      .filter(c => !c.parent_customer_id) // Visa bara huvudkunder, inte multisite-enheter
+                      .map(customer => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.company_name} {customer.organization_number ? `(${customer.organization_number})` : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}

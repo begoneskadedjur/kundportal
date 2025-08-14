@@ -767,8 +767,10 @@ export type BusinessCasesRow = Database['public']['Tables']['business_cases']['R
 export type BusinessCasesInsert = Database['public']['Tables']['business_cases']['Insert']
 export type BusinessCasesUpdate = Database['public']['Tables']['business_cases']['Update']
 
-// Union type för flexibel hantering
-export type BeGoneCaseRow = PrivateCasesRow | BusinessCasesRow
+// Union type för flexibel hantering med extra fält för koordinatorvyn
+export type BeGoneCaseRow = (PrivateCasesRow | BusinessCasesRow) & {
+  parent_customer_id?: string | null  // För multisite-enheter
+}
 
 // Befintliga hjälptyper
 export type Customer = Database['public']['Tables']['customers']['Row']

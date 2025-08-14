@@ -118,7 +118,9 @@ export default function CoordinatorSchedule() {
       // Beställare/kund info från customer
       bestallare: customer?.company_name || null,
       faktura_email: customer?.billing_email || customer?.contact_email || null,
-      faktura_adress: customer?.billing_address || customer?.contact_address || null
+      faktura_adress: customer?.billing_address || customer?.contact_address || null,
+      // Inkludera parent_customer_id för multisite-enheter
+      parent_customer_id: customer?.parent_customer_id || null
     } as BeGoneCaseRow;
   };
 
