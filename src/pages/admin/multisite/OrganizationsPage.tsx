@@ -25,7 +25,8 @@ import {
   XCircle,
   UserPlus,
   Shield,
-  UserCheck
+  UserCheck,
+  Key
 } from 'lucide-react'
 import Input from '../../../components/ui/Input'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
@@ -245,29 +246,28 @@ export default function OrganizationsPage() {
 
   const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
     try {
-      // Hämta användare med roller
+      // Hämta användare från den nya viewen som kombinerar all data
       const { data: users, error } = await supabase
-        .from('multisite_user_roles')
+        .from('multisite_users_complete')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // Hämta profilinformation för varje användare
-      const formattedUsers = await Promise.all((users || []).map(async (user) => {
-        // Hämta profildata separat
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email, full_name')
-          .eq('id', user.user_id)
-          .single()
-
-        return {
-          ...user,
-          email: profile?.email || 'Okänd email',
-          name: profile?.full_name || 'Okänt namn'
-        }
+      // Formatera användardata
+      const formattedUsers = (users || []).map(user => ({
+        id: user.id,
+        user_id: user.user_id,
+        organization_id: user.organization_id,
+        role_type: user.role_type,
+        site_ids: user.site_ids,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        email: user.email || 'Okänd email',
+        name: user.display_name || 'Okänt namn',
+        phone: user.phone || null,
+        last_sign_in_at: user.last_sign_in_at
       }))
 
       setOrganizationUsers(prev => ({
@@ -327,6 +327,25 @@ export default function OrganizationsPage() {
     } catch (error) {
       console.error('Error deleting user:', error)
       toast.error('Kunde inte ta bort användare')
+    }
+  }
+
+  const handleResetPassword = async (email: string, userName: string) => {
+    if (!confirm(`Vill du skicka lösenordsåterställning till ${userName}?`)) {
+      return
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) throw error
+
+      toast.success(`Lösenordsåterställning skickad till ${email}`)
+    } catch (error) {
+      console.error('Error sending password reset:', error)
+      toast.error('Kunde inte skicka lösenordsåterställning')
     }
   }
 
@@ -596,6 +615,13 @@ export default function OrganizationsPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleResetPassword(user.email, user.name)}
+                                  className="p-2 hover:bg-purple-500/20 rounded-lg transition-colors"
+                                  title="Skicka lösenordsåterställning"
+                                >
+                                  <Key className="w-4 h-4 text-purple-400" />
+                                </button>
                                 <button
                                   onClick={() => handleEditUser(org, user)}
                                   className="p-2 hover:bg-slate-700 rounded-lg transition-colors"

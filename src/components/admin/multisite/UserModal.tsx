@@ -150,7 +150,7 @@ export default function UserModal({
         if (fullName !== existingUser.name) {
           const { error: profileError } = await supabase
             .from('profiles')
-            .update({ full_name: fullName })
+            .update({ display_name: fullName })
             .eq('id', existingUser.user_id)
 
           if (profileError) {
