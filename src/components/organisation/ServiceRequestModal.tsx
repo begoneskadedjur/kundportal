@@ -10,6 +10,42 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 
+// Generate case number for multisite cases
+const generateCaseNumber = async (): Promise<string> => {
+  try {
+    const today = new Date()
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+    
+    // Get the latest case number for today
+    const { data, error } = await supabase
+      .from('cases')
+      .select('case_number')
+      .like('case_number', `CASE-${dateStr}-%`)
+      .order('case_number', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw error
+    }
+
+    let nextNumber = 1
+    
+    if (data?.case_number) {
+      const match = data.case_number.match(/CASE-\d{8}-(\d+)/)
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1
+      }
+    }
+
+    return `CASE-${dateStr}-${String(nextNumber).padStart(3, '0')}`
+  } catch (error) {
+    console.error('Error generating case number:', error)
+    // Fallback to timestamp-based number
+    return `CASE-${Date.now()}`
+  }
+}
+
 interface ServiceRequestModalProps {
   isOpen: boolean
   onClose: () => void
@@ -127,11 +163,15 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
     setSubmitting(true)
     
     try {
+      // Generate case number
+      const caseNumber = await generateCaseNumber()
+      
       // Create the case in the database - using customer_id from the selected site
       const { data, error } = await supabase
         .from('cases')
         .insert({
           customer_id: selectedCustomerId, // This links to the multisite unit's customer_id
+          case_number: caseNumber, // Required field
           title: subject,
           description: description,
           status: 'Öppen', // Always 'Öppen' for customer-initiated cases
