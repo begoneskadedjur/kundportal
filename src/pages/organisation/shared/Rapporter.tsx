@@ -8,14 +8,6 @@ import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
 import { FileText, Download, Calendar, Filter, MapPin, TrendingUp, Users, AlertTriangle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
-
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => void
-  }
-}
 
 const OrganisationRapporter: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
@@ -184,71 +176,171 @@ const OrganisationRapporter: React.FC = () => {
     }
   }
   
-  const downloadPDFReport = () => {
-    if (!reportData) return
+  const downloadPDFReport = async () => {
+    if (!reportData || !organization) return
     
-    const doc = new jsPDF()
-    
-    // Header
-    doc.setFontSize(20)
-    doc.text(`${organization?.organization_name} - Rapport`, 14, 15)
-    
-    doc.setFontSize(12)
-    doc.text(`Period: ${reportData.period}`, 14, 25)
-    doc.text(`${reportData.startDate} - ${reportData.endDate}`, 14, 32)
-    
-    // Sammanfattning
-    doc.setFontSize(14)
-    doc.text('Sammanfattning', 14, 45)
-    
-    doc.setFontSize(10)
-    doc.text(`Totalt antal ärenden: ${reportData.summary.totalCases}`, 14, 55)
-    doc.text(`Avklarade: ${reportData.summary.totalCompleted}`, 14, 62)
-    doc.text(`Pågående: ${reportData.summary.totalActive}`, 14, 69)
-    doc.text(`Väntande: ${reportData.summary.totalPending}`, 14, 76)
-    doc.text(`Avklaringsgrad: ${reportData.summary.overallCompletionRate}%`, 14, 83)
-    
-    // Enhetsrapporter
-    if (reportData.siteReports.length > 0) {
-      doc.setFontSize(14)
-      doc.text('Enhetsrapporter', 14, 100)
+    try {
+      setLoading(true)
       
-      const tableData = reportData.siteReports.map((site: any) => [
-        site.siteName,
-        site.region || '-',
-        site.totalCases.toString(),
-        site.completedCases.toString(),
-        site.activeCases.toString(),
-        site.pendingCases.toString(),
-        `${site.completionRate}%`,
-        site.avgResolutionTime
-      ])
+      // Hämta ärendedata för rapporten
+      const targetSites = selectedSiteId === 'all' 
+        ? availableSites 
+        : availableSites.filter(s => s.id === selectedSiteId)
       
-      doc.autoTable({
-        startY: 110,
-        head: [['Enhet', 'Region', 'Totalt', 'Avklarat', 'Pågående', 'Väntande', 'Avklaringsgrad', 'Snitt lösningstid']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [71, 85, 105] },
-        styles: { fontSize: 9 }
+      const siteIds = targetSites.map(s => s.id)
+      
+      // Beräkna datumintervall
+      const endDate = new Date()
+      let startDate = new Date()
+      
+      switch (selectedPeriod) {
+        case 'week':
+          startDate.setDate(startDate.getDate() - 7)
+          break
+        case 'month':
+          startDate.setMonth(startDate.getMonth() - 1)
+          break
+        case 'quarter':
+          startDate.setMonth(startDate.getMonth() - 3)
+          break
+        case 'year':
+          startDate.setFullYear(startDate.getFullYear() - 1)
+          break
+      }
+      
+      // Hämta ärendedata
+      const { data: cases, error: casesError } = await supabase
+        .from('cases')
+        .select('*')
+        .in('customer_id', siteIds)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .order('created_at', { ascending: false })
+      
+      if (casesError) throw casesError
+      
+      // Beräkna statistik
+      const totalCases = cases?.length || 0
+      const completedCases = cases?.filter(c => 
+        ['Slutförd', 'Stängd', 'Avklarad', 'Genomförd'].includes(c.status)
+      ).length || 0
+      const activeCases = cases?.filter(c => 
+        ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+      ).length || 0
+      
+      // Beräkna genomsnittlig responstid
+      let avgResponseTime = 0
+      const casesWithScheduledDate = cases?.filter(c => c.scheduled_start) || []
+      if (casesWithScheduledDate.length > 0) {
+        const totalResponseDays = casesWithScheduledDate.reduce((sum, c) => {
+          const created = new Date(c.created_at)
+          const scheduled = new Date(c.scheduled_start)
+          const days = Math.ceil((scheduled.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+          return sum + Math.max(0, days)
+        }, 0)
+        avgResponseTime = Math.round(totalResponseDays / casesWithScheduledDate.length)
+      }
+      
+      // Räkna skadedjurstyper
+      const pestTypeCounts: Record<string, number> = {}
+      cases?.forEach(c => {
+        if (c.pest_type) {
+          pestTypeCounts[c.pest_type] = (pestTypeCounts[c.pest_type] || 0) + 1
+        }
       })
+      const topPestType = Object.entries(pestTypeCounts)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null
+      
+      // Beräkna total kostnad
+      const totalCost = cases?.reduce((sum, c) => sum + (c.price || 0), 0) || 0
+      
+      // Förbered data för multisite PDF
+      const pdfData = {
+        organization: {
+          organization_id: organization.organization_id,
+          organization_name: organization.organization_name
+        },
+        sites: targetSites.map(site => {
+          const siteCases = cases?.filter(c => c.customer_id === site.id) || []
+          const siteActiveCases = siteCases.filter(c => 
+            ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+          ).length
+          const siteCompletedCases = siteCases.filter(c => 
+            ['Slutförd', 'Stängd', 'Avklarad', 'Genomförd'].includes(c.status)
+          ).length
+          const siteTotalCost = siteCases.reduce((sum, c) => sum + (c.price || 0), 0)
+          
+          return {
+            site_name: site.site_name,
+            region: site.region,
+            activeCases: siteActiveCases,
+            completedCases: siteCompletedCases,
+            totalCost: siteTotalCost
+          }
+        }),
+        cases: cases?.slice(0, 15).map(c => ({
+          title: c.title || 'Ingen titel',
+          site_name: targetSites.find(s => s.id === c.customer_id)?.site_name || 'Okänd enhet',
+          status: c.status,
+          pest_type: c.pest_type,
+          scheduled_start: c.scheduled_start,
+          price: c.price
+        })) || [],
+        statistics: {
+          totalCases,
+          completedCases,
+          activeCases,
+          completionRate: totalCases > 0 ? Math.round((completedCases / totalCases) * 100) : 0,
+          avgResponseTime,
+          totalCost,
+          topPestType,
+          pestTypeCounts,
+          totalSites: targetSites.length
+        },
+        period: selectedPeriod === 'week' ? '30d' : 
+                selectedPeriod === 'month' ? '30d' :
+                selectedPeriod === 'quarter' ? '3m' :
+                selectedPeriod === 'year' ? '1y' : 'all',
+        roleType: userRoleType
+      }
+      
+      // Anropa Puppeteer PDF-genererings-endpoint
+      const response = await fetch('/api/generate-multisite-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pdfData)
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+      
+      const result = await response.json()
+      
+      if (result.success && result.pdf) {
+        // Konvertera base64 till blob och ladda ner
+        const pdfBlob = await fetch(`data:application/pdf;base64,${result.pdf}`)
+          .then(res => res.blob())
+        
+        const url = URL.createObjectURL(pdfBlob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = result.filename || `BeGone_Organisationsrapport_${new Date().toISOString().split('T')[0]}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error('PDF generation failed')
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Kunde inte generera PDF-rapport. Försök igen senare.')
+    } finally {
+      setLoading(false)
     }
-    
-    // Footer
-    const pageCount = doc.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(8)
-      doc.text(
-        `Sida ${i} av ${pageCount} - Genererad ${new Date().toLocaleDateString('sv-SE')}`,
-        doc.internal.pageSize.width / 2,
-        doc.internal.pageSize.height - 10,
-        { align: 'center' }
-      )
-    }
-    
-    // Ladda ner
-    doc.save(`rapport-${organization?.organization_name}-${new Date().toISOString().split('T')[0]}.pdf`)
   }
   
   const downloadCSVReport = () => {
@@ -459,7 +551,8 @@ const OrganisationRapporter: React.FC = () => {
                 <div className="flex gap-4">
                   <Button
                     onClick={downloadPDFReport}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    disabled={loading}
+                    className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Ladda ner som PDF
