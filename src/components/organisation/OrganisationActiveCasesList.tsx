@@ -95,7 +95,7 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
       // Fetch active cases
       const { data: activeData, error: activeError } = await supabase
         .from('cases')
-        .select('id, title, status, priority, scheduled_date, technician_name')
+        .select('id, title, status, priority, scheduled_start, primary_technician_name')
         .in('customer_id', customerIds)
         .in('status', ['Öppen', 'Pågående', 'Schemalagd'] as ClickUpStatus[])
         .order('priority', { ascending: false })
@@ -106,11 +106,11 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
       // Fetch upcoming scheduled cases
       const { data: upcomingData, error: upcomingError } = await supabase
         .from('cases')
-        .select('id, title, status, priority, scheduled_date, technician_name')
+        .select('id, title, status, priority, scheduled_start, primary_technician_name')
         .in('customer_id', customerIds)
         .eq('status', 'Schemalagd' as ClickUpStatus)
-        .gte('scheduled_date', new Date().toISOString())
-        .order('scheduled_date', { ascending: true })
+        .gte('scheduled_start', new Date().toISOString())
+        .order('scheduled_start', { ascending: true })
         .limit(5)
 
       if (upcomingError && upcomingError.code !== '400') throw upcomingError
@@ -211,10 +211,10 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
                              caseItem.priority === 'high' ? 'Hög prioritet' : 'Normal'}
                           </span>
                         </div>
-                        {caseItem.technician_name && (
+                        {caseItem.primary_technician_name && (
                           <>
                             <div className="w-1 h-1 bg-slate-600 rounded-full"></div>
-                            <span className="text-xs text-slate-400">{caseItem.technician_name}</span>
+                            <span className="text-xs text-slate-400">{caseItem.primary_technician_name}</span>
                           </>
                         )}
                       </div>
@@ -252,11 +252,11 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
                     <div>
                       <h4 className="font-medium text-white">{caseItem.title}</h4>
                       <p className="text-sm text-blue-400 mt-1">
-                        {formatScheduledDate(caseItem.scheduled_date)}
+                        {formatScheduledDate(caseItem.scheduled_start)}
                       </p>
-                      {caseItem.technician_name && (
+                      {caseItem.primary_technician_name && (
                         <p className="text-xs text-slate-500 mt-1">
-                          Tekniker: {caseItem.technician_name}
+                          Tekniker: {caseItem.primary_technician_name}
                         </p>
                       )}
                     </div>

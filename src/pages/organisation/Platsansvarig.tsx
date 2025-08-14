@@ -77,7 +77,7 @@ const PlatsansvarigDashboard: React.FC = () => {
       // Hämta alla cases för statistik
       const { data: allCases } = await supabase
         .from('cases')
-        .select('id, status, updated_at, scheduled_date')
+        .select('id, status, updated_at, scheduled_start')
         .eq('customer_id', customerData.id)
       
       if (allCases) {
@@ -99,8 +99,8 @@ const PlatsansvarigDashboard: React.FC = () => {
           ).length,
           upcomingVisits: allCases.filter(c => 
             c.status === 'Schemalagd' &&
-            c.scheduled_date &&
-            new Date(c.scheduled_date) >= now
+            c.scheduled_start &&
+            new Date(c.scheduled_start) >= now
           ).length
         }
         setCaseStats(stats)
