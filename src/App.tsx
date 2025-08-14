@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import Login from './pages/auth/Login';
 import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -86,6 +87,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Admin routes */}
             <Route 
