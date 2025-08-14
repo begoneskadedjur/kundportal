@@ -11,6 +11,42 @@ import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { ClickUpStatus } from '../../types/database'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 
+// Generate case number for organization cases
+const generateCaseNumber = async (): Promise<string> => {
+  try {
+    const today = new Date()
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+    
+    // Get the latest case number for today
+    const { data, error } = await supabase
+      .from('cases')
+      .select('case_number')
+      .like('case_number', `CASE-${dateStr}-%`)
+      .order('case_number', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw error
+    }
+
+    let nextNumber = 1
+    
+    if (data?.case_number) {
+      const match = data.case_number.match(/CASE-\d{8}-(\d+)/)
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1
+      }
+    }
+
+    return `CASE-${dateStr}-${String(nextNumber).padStart(3, '0')}`
+  } catch (error) {
+    console.error('Error generating case number:', error)
+    // Fallback to timestamp-based number
+    return `CASE-${Date.now()}`
+  }
+}
+
 interface OrganizationServiceRequestProps {
   isOpen: boolean
   onClose: () => void
@@ -100,38 +136,48 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
     try {
       const chosenSite = sites.find(s => s.id === chosenSiteId)
       
-      // Skapa ärendet i 'cases' tabellen för organisationskunder
+      // Generate case number
+      const caseNumber = await generateCaseNumber()
       
+      // Skapa ärendet i 'cases' tabellen för organisationskunder
       const { data, error } = await supabase
         .from('cases')
         .insert({
           customer_id: customer.id,
-          site_id: chosenSiteId,
-          clickup_task_id: `org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          case_number: `ORG-${Date.now().toString().slice(-6)}`,
+          case_number: caseNumber, // Required field
           title: subject,
           description: description,
-          status: 'Öppen' as ClickUpStatus,
+          status: 'Öppen', // Svenska status
           priority: priority,
-          pest_type: pestType || 'Ej specificerat',
-          location_details: chosenSite?.address || customer.contact_address || '',
-          created_date: new Date().toISOString(),
-          // Adressinformation
-          address_formatted: chosenSite?.address || customer.contact_address || null,
-          case_type: serviceType,
-          // Metadata för organisationsärenden i description
-          technician_report: JSON.stringify({
+          service_type: serviceType,
+          pest_type: pestType || null,
+          other_pest_type: pestType === 'Övrigt' ? otherPestType : null,
+          // Kontaktinformation
+          contact_person: useAlternativeContact && alternativeContactPerson 
+            ? alternativeContactPerson 
+            : customer?.contact_person || '',
+          contact_email: useAlternativeContact && alternativeContactEmail 
+            ? alternativeContactEmail 
+            : customer?.contact_email || '',
+          contact_phone: useAlternativeContact && alternativeContactPhone 
+            ? alternativeContactPhone 
+            : customer?.contact_phone || '',
+          // Alternativ kontakt om används
+          alternative_contact_person: useAlternativeContact ? alternativeContactPerson : null,
+          alternative_contact_phone: useAlternativeContact ? alternativeContactPhone : null,
+          alternative_contact_email: useAlternativeContact ? alternativeContactEmail : null,
+          // Address som JSONB objekt
+          address: (chosenSite?.address || customer.contact_address) ? {
+            formatted_address: chosenSite?.address || customer.contact_address
+          } : null,
+          // Metadata för organisationsärenden (kan läggas i notes eller custom field om det finns)
+          notes: JSON.stringify({
             created_by_organization_user: profile?.id,
             organization_role: userRole?.role_type,
             organization_id: organization?.id,
+            site_id: chosenSiteId,
             source: 'organization_portal',
-            alternative_contact: useAlternativeContact ? {
-              person: alternativeContactPerson,
-              phone: alternativeContactPhone,
-              email: alternativeContactEmail
-            } : null,
-            contact_method: contactMethod,
-            other_pest_type: pestType === 'Övrigt' ? otherPestType : null
+            contact_method: contactMethod
           })
         })
         .select()
