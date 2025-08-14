@@ -42,16 +42,17 @@ const RegionchefDashboard: React.FC = () => {
     try {
       setLoading(true)
       
-      // Hämta alla customers för denna region
+      // Hämta endast enheter för denna organisation och region
       let customersQuery = supabase
         .from('customers')
         .select('*')
-        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
+        .eq('organization_id', organization.id)
+        .eq('site_type', 'enhet')
         .eq('is_active', true)
       
       // Filtrera på region om användaren är regionchef
       if (userRole.region) {
-        customersQuery = customersQuery.eq('city', userRole.region)
+        customersQuery = customersQuery.eq('region', userRole.region)
       }
       
       const { data: customersData, error: customersError } = await customersQuery

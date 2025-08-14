@@ -54,12 +54,12 @@ const VerksamhetschefDashboard: React.FC = () => {
     try {
       setLoading(true)
       
-      // Hämta alla customers som tillhör organisationen (både huvudkontor och enheter)
+      // Hämta endast enheter som tillhör organisationen (inte huvudkontor)
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
         .eq('organization_id', organization.id)
-        .in('site_type', ['huvudkontor', 'enhet'])
+        .eq('site_type', 'enhet')
         .eq('is_active', true)
       
       if (customersError) throw customersError

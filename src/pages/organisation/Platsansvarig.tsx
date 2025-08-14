@@ -57,14 +57,17 @@ const PlatsansvarigDashboard: React.FC = () => {
     try {
       setLoading(true)
       
-      // Hämta customer för platsansvarig
-      // Vi antar att platsansvarig har en specifik enhet/customer
+      // Hämta customer för platsansvarig baserat på tillgängliga sites
+      if (!currentSite) {
+        console.error('No accessible site for platsansvarig')
+        setLoading(false)
+        return
+      }
+      
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('*')
-        .or(`company_name.ilike.%${organization.organization_name}%,contract_type.eq.multisite`)
-        .eq('is_active', true)
-        .limit(1)
+        .eq('id', currentSite.id)
         .single()
       
       if (customerError || !customerData) {
