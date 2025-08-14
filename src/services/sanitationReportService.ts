@@ -113,6 +113,8 @@ class SanitationReportService {
     include_all_versions?: boolean  // Ny parameter för att hämta alla versioner
   }): Promise<{ data: SanitationReport[] | null; error: any }> {
     try {
+      console.log('sanitationReportService.getReports called with filters:', filters)
+      
       let query = supabase
         .from('sanitation_reports')
         .select('*')
@@ -121,6 +123,7 @@ class SanitationReportService {
       // Som standard, hämta endast aktuella rapporter (om inte include_all_versions är true)
       if (!filters?.include_all_versions) {
         query = query.eq('is_current', true)
+        console.log('Filtering for is_current = true')
       }
 
       if (filters) {
@@ -148,6 +151,11 @@ class SanitationReportService {
       }
 
       const { data, error } = await query
+      
+      console.log('Query result:', { dataLength: data?.length, error })
+      if (data) {
+        console.log('First report:', data[0])
+      }
 
       return { data, error }
     } catch (error) {

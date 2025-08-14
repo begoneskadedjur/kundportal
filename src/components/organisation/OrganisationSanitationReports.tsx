@@ -118,12 +118,18 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
       const allReports: SanitationReport[] = []
       
       for (const custId of customerIds) {
+        console.log('Fetching reports for customer:', custId)
         const { data, error } = await sanitationReportService.getReports({
           customer_id: custId
         })
         
+        console.log('Reports response:', { data, error })
+        
         if (!error && data) {
+          console.log(`Found ${data.length} reports for customer ${custId}`)
           allReports.push(...data)
+        } else if (error) {
+          console.error('Error fetching reports for customer', custId, error)
         }
       }
       
