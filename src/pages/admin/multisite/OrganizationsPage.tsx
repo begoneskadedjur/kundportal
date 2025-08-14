@@ -248,23 +248,26 @@ export default function OrganizationsPage() {
       // Hämta användare med roller
       const { data: users, error } = await supabase
         .from('multisite_user_roles')
-        .select(`
-          *,
-          profiles!multisite_user_roles_user_id_fkey (
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // Formatera användardata
-      const formattedUsers = (users || []).map(user => ({
-        ...user,
-        email: user.profiles?.email || 'Okänd email',
-        name: user.profiles?.full_name || 'Okänt namn'
+      // Hämta profilinformation för varje användare
+      const formattedUsers = await Promise.all((users || []).map(async (user) => {
+        // Hämta profildata separat
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', user.user_id)
+          .single()
+
+        return {
+          ...user,
+          email: profile?.email || 'Okänd email',
+          name: profile?.full_name || 'Okänt namn'
+        }
       }))
 
       setOrganizationUsers(prev => ({
