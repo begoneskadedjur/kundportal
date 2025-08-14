@@ -1,5 +1,5 @@
 // src/components/organisation/OrganisationSanitationReports.tsx - Saneringsrapporter för organisationer
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { FileText, Download, Calendar, Search, Filter, History, X, TrendingUp, BarChart3, MapPin, Building2 } from 'lucide-react'
 import { sanitationReportService, SanitationReport } from '../../services/sanitationReportService'
 import { useMultisite } from '../../contexts/MultisiteContext'
@@ -51,15 +51,19 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
 
   useEffect(() => {
     loadReports()
-  }, [customerId, siteIds, organization])
+  }, [customerId, siteIds, organization, availableSites])
 
   useEffect(() => {
     filterReports()
   }, [reports, searchTerm, dateFilter, selectedSite])
 
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     try {
       setLoading(true)
+      
+      console.log('loadReports - availableSites:', availableSites)
+      console.log('loadReports - organization:', organization)
+      console.log('loadReports - userRoleType:', userRoleType)
       
       // Bygg lista av customer_ids att hämta rapporter för
       let customerIds: string[] = []
@@ -97,7 +101,9 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
           } else {
             // För region/platsansvarig, använd accessibleSites direkt
             // accessibleSites är redan filtrerat korrekt av MultisiteContext
+            console.log('Using availableSites for customer IDs:', availableSites)
             customerIds = availableSites.map(s => s.id)
+            console.log('Mapped customer IDs:', customerIds)
           }
         }
       }
@@ -135,7 +141,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
     } finally {
       setLoading(false)
     }
-  }
+  }, [customerId, siteIds, organization, availableSites, userRoleType])
 
   const filterReports = () => {
     let filtered = [...reports]
