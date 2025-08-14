@@ -12,7 +12,7 @@ import { useLocation } from 'react-router-dom'
 import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import EditContractCaseModal from '../../../components/coordinator/EditContractCaseModal'
-import OrganizationServiceRequest from '../../../components/organisation/OrganizationServiceRequest'
+import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import Button from '../../../components/ui/Button'
 
 const OrganisationArenden: React.FC = () => {
@@ -299,7 +299,7 @@ const OrganisationArenden: React.FC = () => {
         
         {/* Service Request Modal */}
         {showServiceRequestModal && (
-          <OrganizationServiceRequest
+          <ServiceRequestModal
             isOpen={showServiceRequestModal}
             onClose={() => setShowServiceRequestModal(false)}
             selectedSiteId={selectedSiteId !== 'all' ? selectedSiteId : null}
@@ -307,7 +307,7 @@ const OrganisationArenden: React.FC = () => {
               if (selectedSiteId === 'all') {
                 fetchAllCases()
               } else {
-                // Refresh the current site's data if needed
+                fetchCustomerForSite() // Refresh the current site's data
               }
             }}
           />

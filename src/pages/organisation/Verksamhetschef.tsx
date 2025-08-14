@@ -9,7 +9,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
-import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
+import ServiceRequestModal from '../../components/organisation/ServiceRequestModal'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
 
 interface SiteMetrics {
@@ -418,7 +418,7 @@ const VerksamhetschefDashboard: React.FC = () => {
         
         {/* Service Request Modal */}
         {showServiceRequestModal && (
-          <OrganizationServiceRequest
+          <ServiceRequestModal
             isOpen={showServiceRequestModal}
             onClose={() => setShowServiceRequestModal(false)}
             onSuccess={() => {
