@@ -83,7 +83,7 @@ const PlatsansvarigDashboard: React.FC = () => {
       if (allCases) {
         const stats = {
           activeCases: allCases.filter(c => 
-            ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+            ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
           ).length,
           completedToday: allCases.filter(c => 
             ['Avslutat', 'Stängt - slasklogg'].includes(c.status) &&
@@ -98,7 +98,7 @@ const PlatsansvarigDashboard: React.FC = () => {
             new Date(c.updated_at) >= monthStart
           ).length,
           upcomingVisits: allCases.filter(c => 
-            c.status === 'Schemalagd' &&
+            (c.status === 'Bokad' || c.status === 'Bokat') &&
             c.scheduled_start &&
             new Date(c.scheduled_start) >= now
           ).length

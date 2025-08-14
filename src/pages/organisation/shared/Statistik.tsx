@@ -78,7 +78,7 @@ const OrganisationStatistik: React.FC = () => {
         c.status === 'Slutförd' || c.status === 'Stängd'
       ).length || 0
       const activeCases = cases?.filter(c => 
-        c.status === 'Pågående' || c.status === 'Schemalagd'
+        c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')
       ).length || 0
       const pendingCases = cases?.filter(c => c.status === 'Öppen').length || 0
       
@@ -119,7 +119,7 @@ const OrganisationStatistik: React.FC = () => {
             c.status === 'Slutförd' || c.status === 'Stängd'
           ).length || 0,
           pågående: siteCases?.filter(c => 
-            c.status === 'Pågående' || c.status === 'Schemalagd'
+            c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')
           ).length || 0
         }
       })

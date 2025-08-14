@@ -97,7 +97,7 @@ const OrganisationActiveCasesList: React.FC<OrganisationActiveCasesListProps> = 
         .from('cases')
         .select('id, title, status, priority, scheduled_start, primary_technician_name')
         .in('customer_id', customerIds)
-        .in('status', ['Öppen', 'Pågående', 'Schemalagd'] as ClickUpStatus[])
+        .in('status', ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'] as ClickUpStatus[])
         .order('priority', { ascending: false })
         .limit(10)
 

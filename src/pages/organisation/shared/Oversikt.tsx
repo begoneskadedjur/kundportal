@@ -73,7 +73,7 @@ const OrganisationOversikt: React.FC = () => {
       const totalCases = cases?.length || 0
       const openCases = cases?.filter(c => c.status === 'Öppen').length || 0
       const inProgressCases = cases?.filter(c => 
-        c.status === 'Pågående' || c.status === 'Schemalagd'
+        c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')
       ).length || 0
       const completedCases = cases?.filter(c => 
         c.status === 'Slutförd' || c.status === 'Stängd'

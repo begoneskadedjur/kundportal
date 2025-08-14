@@ -96,6 +96,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .or('is_multisite.is.null,is_multisite.eq.false') // Visa bara huvudkunder, inte multisite-enheter
         .order('company_name');
       
       console.log('Fetched contract customers:', data); // Debug
@@ -164,10 +165,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           e_post_kontaktperson: customer.contact_email,
           org_nr: customer.organization_number,
           bestallare: customer.company_name,
-          adress: customer.contact_address || prev.adress,
+          adress: customer.contact_address || customer.service_address || prev.adress,
           // Lägg även till faktura-fält om de finns
           e_post_faktura: customer.billing_email || customer.contact_email,
-          faktura_adress: customer.billing_address || customer.contact_address
+          faktura_adress: customer.billing_address || customer.contact_address,
+          // Lägg till fler fält för bättre integration
+          telefon: customer.contact_phone, // För ärendet självt
+          email: customer.contact_email,   // För ärendet självt
         }));
       }
     }
@@ -318,24 +322,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     try {
       if (caseType === 'contract') {
         // Hantera avtalskundärenden
+        // Om multisite, använd sitens customer_id istället för huvudkundens
+        let actualCustomerId = selectedContractCustomer;
+        if (customer?.is_multisite && selectedSiteId) {
+          // selectedSiteId är faktiskt customer_id för siten från SiteSelector
+          actualCustomerId = selectedSiteId;
+        }
+        
         const caseData = {
-          customer_id: selectedContractCustomer,
+          customer_id: actualCustomerId, // Använd rätt customer_id (site eller huvudkund)
           site_id: customer?.is_multisite ? selectedSiteId : null,
           title: formData.title.trim(),
           description: formData.description || '',
-          status: 'scheduled' as const,
+          status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
           service_type: 'routine' as const,
-          pest_type: formData.pest_type || null,
+          pest_type: formData.skadedjur || null, // Använd skadedjur från formData
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
           primary_technician_name: formData.primary_assignee_name || null,
-          contact_person: customer?.contact_person || null,
-          contact_email: formData.email || null,
-          contact_phone: formData.telefon || null,
+          contact_person: formData.kontaktperson || customer?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
-          price: formData.price || null,
+          price: formData.pris || null,
           case_number: `AVT-${Date.now().toString().slice(-6)}`
         };
         

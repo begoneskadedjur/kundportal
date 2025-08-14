@@ -109,7 +109,7 @@ const VerksamhetschefDashboard: React.FC = () => {
           .from('cases')
           .select('id, title, customer_id, scheduled_date, technician_name, status')
           .in('customer_id', customerIds)
-          .eq('status', 'Schemalagd')
+          .in('status', ['Bokad', 'Bokat'])
           .gte('scheduled_date', new Date().toISOString())
           .order('scheduled_date', { ascending: true })
           .limit(10)
@@ -119,13 +119,13 @@ const VerksamhetschefDashboard: React.FC = () => {
       const metrics: SiteMetrics[] = customersData.map(customer => {
         const customerCases = casesData.data?.filter(c => c.customer_id === customer.id) || []
         const activeCases = customerCases.filter(c => 
-          ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+          ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
         )
         const completedThisMonth = customerCases.filter(c => 
           ['Avklarad', 'Stängd'].includes(c.status) &&
           new Date(c.updated_at) >= startOfMonth
         )
-        const scheduledCases = customerCases.filter(c => c.status === 'Schemalagd')
+        const scheduledCases = customerCases.filter(c => c.status === 'Bokad' || c.status === 'Bokat')
         const customerQuotes = quotesData.data?.filter(q => q.customer_id === customer.id) || []
         
         // Beräkna trafikljus

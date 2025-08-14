@@ -211,7 +211,7 @@ const OrganisationArenden: React.FC = () => {
                             <div className="flex items-center gap-3 mt-2">
                               <span className={`px-2 py-1 rounded text-xs ${
                                 caseItem.status === 'Slutförd' || caseItem.status === 'Stängd' ? 'bg-green-500/20 text-green-400' :
-                                caseItem.status === 'Pågående' || caseItem.status === 'Schemalagd' ? 'bg-amber-500/20 text-amber-400' :
+                                caseItem.status === 'Bokad' || caseItem.status === 'Bokat' || caseItem.status.startsWith('Återbesök') ? 'bg-amber-500/20 text-amber-400' :
                                 caseItem.status === 'Öppen' ? 'bg-blue-500/20 text-blue-400' :
                                 'bg-slate-500/20 text-slate-400'
                               }`}>
@@ -248,7 +248,7 @@ const OrganisationArenden: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">Pågående</span>
                   <span className="text-xl font-bold text-amber-400">
-                    {allCases.filter(c => c.status === 'Pågående' || c.status === 'Schemalagd').length}
+                    {allCases.filter(c => c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')).length}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

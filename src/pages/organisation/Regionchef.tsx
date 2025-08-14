@@ -94,13 +94,13 @@ const RegionchefDashboard: React.FC = () => {
       const metrics: SiteMetrics[] = customersData.map(customer => {
         const customerCases = casesData?.filter(c => c.customer_id === customer.id) || []
         const activeCases = customerCases.filter(c => 
-          ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+          ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
         )
         const completedThisMonth = customerCases.filter(c => 
           ['Avklarad', 'Stängd'].includes(c.status) &&
           new Date(c.updated_at) >= startOfMonth
         )
-        const scheduledCases = customerCases.filter(c => c.status === 'Schemalagd')
+        const scheduledCases = customerCases.filter(c => c.status === 'Bokad' || c.status === 'Bokat')
         
         // Beräkna trafikljus
         let trafficLight: 'green' | 'yellow' | 'red' = 'green'

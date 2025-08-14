@@ -101,7 +101,7 @@ const OrganisationRapporter: React.FC = () => {
           c.status === 'Slutförd' || c.status === 'Stängd'
         )
         const activeCases = siteCases.filter(c => 
-          c.status === 'Pågående' || c.status === 'Schemalagd'
+          c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')
         )
         const pendingCases = siteCases.filter(c => c.status === 'Öppen')
         
@@ -125,7 +125,7 @@ const OrganisationRapporter: React.FC = () => {
         c.status === 'Slutförd' || c.status === 'Stängd'
       ).length || 0
       const totalActive = cases?.filter(c => 
-        c.status === 'Pågående' || c.status === 'Schemalagd'
+        c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')
       ).length || 0
       const totalPending = cases?.filter(c => c.status === 'Öppen').length || 0
       
@@ -233,7 +233,7 @@ const OrganisationRapporter: React.FC = () => {
         ['Slutförd', 'Stängd', 'Avklarad', 'Genomförd'].includes(c.status)
       ).length || 0
       const activeCases = cases?.filter(c => 
-        ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+        ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
       ).length || 0
       
       // Beräkna genomsnittlig responstid
@@ -271,7 +271,7 @@ const OrganisationRapporter: React.FC = () => {
         sites: targetSites.map(site => {
           const siteCases = cases?.filter(c => c.customer_id === site.id) || []
           const siteActiveCases = siteCases.filter(c => 
-            ['Öppen', 'Pågående', 'Schemalagd'].includes(c.status)
+            ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
           ).length
           const siteCompletedCases = siteCases.filter(c => 
             ['Slutförd', 'Stängd', 'Avklarad', 'Genomförd'].includes(c.status)
