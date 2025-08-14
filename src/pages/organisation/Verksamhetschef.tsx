@@ -10,6 +10,7 @@ import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
+import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
 
 interface SiteMetrics {
   customerId: string
@@ -407,6 +408,13 @@ const VerksamhetschefDashboard: React.FC = () => {
             </Card>
           </div>
         </div>
+
+        {/* Servicehistorik för hela organisationen */}
+        {customers.length > 0 && (
+          <OrganisationServiceActivityTimeline 
+            organizationId={organization?.organization_id}
+          />
+        )}
         
         {/* Service Request Modal */}
         {showServiceRequestModal && (
