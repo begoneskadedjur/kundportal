@@ -10,7 +10,7 @@ type ProtectedRouteProps = {
 };
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { profile, loading } = useAuth();
+  const { profile, loading, user } = useAuth();
   const { userRole: multisiteRole, loading: multisiteLoading } = useMultisite();
   const location = useLocation();
 
@@ -26,6 +26,15 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   // 2. Om ingen profil finns, omdirigera alltid till login
   if (!profile) {
     return <Navigate to="/login" replace />;
+  }
+
+  // 3. Kontrollera om användaren måste byta lösenord (första inloggning)
+  // Tillåt endast /profile sidan om användaren har temp_password flagga
+  const mustChangePassword = user?.user_metadata?.temp_password === true || 
+                            user?.user_metadata?.must_change_password === true;
+  
+  if (mustChangePassword && location.pathname !== '/profile') {
+    return <Navigate to="/profile" replace />;
   }
 
   // 3. Specialhantering för multisite-användare som loggar in första gången

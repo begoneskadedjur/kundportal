@@ -11,6 +11,9 @@ import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 
+// Shared pages
+import UserProfile from './pages/shared/UserProfile';
+
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
 import Customers from './pages/admin/Customers';
@@ -396,6 +399,16 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Shared routes - accessible by all authenticated users */}
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <UserProfile />
                 </ProtectedRoute>
               } 
             />

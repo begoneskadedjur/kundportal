@@ -170,7 +170,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: name,
           organization_name: organizationName,
           organization_id: organizationId,
-          role: role
+          role: role,
+          temp_password: true,
+          must_change_password: true
         }
       })
 

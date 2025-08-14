@@ -193,15 +193,15 @@ function getPasswordResetEmailTemplate({
 
         <!-- Innehåll -->
         <div style="padding: 2rem;">
-            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
+            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; color: #e2e8f0;">
                 Hej ${userName},
             </p>
 
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+            <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
                 Vi har mottagit en begäran om att återställa lösenordet för ditt konto${organizationName ? ` hos <strong style="color: #a855f7;">${organizationName}</strong>` : ''}.
             </p>
 
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
+            <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
                 Klicka på knappen nedan för att skapa ett nytt lösenord. Länken är giltig i <strong style="color: #fbbf24;">1 timme</strong> av säkerhetsskäl.
             </p>
 
