@@ -7,9 +7,9 @@ import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Card from '../../../components/ui/Card'
 import { AlertTriangle, MapPin, CheckCircle, Clock, Edit3 } from 'lucide-react'
 
-// Återanvänd befintliga customer-komponenter
-import ActiveCasesList from '../../../components/customer/ActiveCasesList'
-import ServiceActivityTimeline from '../../../components/customer/ServiceActivityTimeline'
+// Återanvänd befintliga customer-komponenter och organisation-komponenter
+import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
+import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import EditContractCaseModal from '../../../components/coordinator/EditContractCaseModal'
 import OrganizationServiceRequest from '../../../components/organisation/OrganizationServiceRequest'
 import Button from '../../../components/ui/Button'
@@ -226,8 +226,8 @@ const VerksamhetschefArenden: React.FC = () => {
           </div>
         ) : customer ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ActiveCasesList customerId={customer.id} />
-            <ServiceActivityTimeline customerId={customer.id} />
+            <OrganisationActiveCasesList customerId={customer.id} />
+            <OrganisationServiceActivityTimeline customerId={customer.id} />
           </div>
         ) : (
           <Card className="bg-slate-800/50 border-slate-700 p-6">
