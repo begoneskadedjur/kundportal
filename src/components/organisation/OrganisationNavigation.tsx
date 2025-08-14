@@ -26,36 +26,57 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
   const getTabs = (): NavigationTab[] => {
     const basePath = `/organisation/${userRoleType}`
     
+    // Verksamhetschef har alla tabs
+    if (userRoleType === 'verksamhetschef') {
+      return [
+        {
+          id: 'dashboard',
+          label: 'Översikt',
+          icon: <Home className="w-5 h-5" />,
+          path: basePath
+        },
+        {
+          id: 'statistics',
+          label: 'Statistik',
+          icon: <BarChart3 className="w-5 h-5" />,
+          path: `${basePath}/statistik`
+        },
+        {
+          id: 'cases',
+          label: 'Ärenden',
+          icon: <AlertTriangle className="w-5 h-5" />,
+          path: `${basePath}/arenden`
+        },
+        {
+          id: 'reports',
+          label: 'Rapporter',
+          icon: <FileText className="w-5 h-5" />,
+          path: `${basePath}/rapporter`
+        }
+      ]
+    }
+    
+    // Regionchef och platsansvarig har bara översikt för nu
     return [
       {
         id: 'dashboard',
         label: 'Översikt',
         icon: <Home className="w-5 h-5" />,
         path: basePath
-      },
-      {
-        id: 'statistics',
-        label: 'Statistik',
-        icon: <BarChart3 className="w-5 h-5" />,
-        path: `${basePath}/statistik`
-      },
-      {
-        id: 'cases',
-        label: 'Ärenden',
-        icon: <AlertTriangle className="w-5 h-5" />,
-        path: `${basePath}/arenden`
-      },
-      {
-        id: 'reports',
-        label: 'Rapporter',
-        icon: <FileText className="w-5 h-5" />,
-        path: `${basePath}/rapporter`
       }
     ]
   }
 
   const tabs = getTabs()
-  const currentTab = tabs.find(tab => location.pathname === tab.path) || tabs[0]
+  // Hitta aktiv tab genom att kolla om pathname börjar med tab path
+  const currentTab = tabs.find(tab => {
+    // För dashboard, matcha exakt
+    if (tab.id === 'dashboard') {
+      return location.pathname === tab.path
+    }
+    // För andra tabs, matcha om pathname börjar med tab path
+    return location.pathname.startsWith(tab.path)
+  }) || tabs[0]
 
   const handleSignOut = async () => {
     await signOut()
