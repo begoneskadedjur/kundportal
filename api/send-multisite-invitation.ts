@@ -439,7 +439,7 @@ function getMultisiteInvitationEmailTemplate({
                     <p style="margin: 0.5rem 0;"><strong>Organisation:</strong> ${organization.company_name}</p>
                     ${organization.organization_number ? `<p style="margin: 0.5rem 0;"><strong>Org.nr:</strong> ${organization.organization_number}</p>` : ''}
                     <p style="margin: 0.5rem 0;"><strong>Din roll:</strong> ${roleName}</p>
-                    <p style="margin: 0.5rem 0;"><strong>Faktureringstyp:</strong> ${organization.billing_type === 'consolidated' ? 'Konsoliderad' : 'Per anläggning'}</p>
+                    <p style="margin: 0.5rem 0;"><strong>Faktureringstyp:</strong> Konsoliderad</p>
                 </div>
             </div>
 

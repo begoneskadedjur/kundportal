@@ -50,23 +50,42 @@ export default function BillingManagement() {
   const fetchBillingData = async () => {
     setLoading(true)
     try {
-      // Fetch organizations with billing info
+      // Fetch organizations with billing info (huvudkontor från customers)
       const { data: orgs, error: orgsError } = await supabase
-        .from('multisite_organizations')
+        .from('customers')
         .select('*')
+        .eq('site_type', 'huvudkontor')
+        .eq('is_multisite', true)
         .eq('is_active', true)
-        .order('name')
+        .order('company_name')
 
       if (orgsError) throw orgsError
 
       const billingInfo: BillingData[] = []
 
       for (const org of orgs || []) {
-        // Fetch sites
+        // Map customer to organization structure
+        const mappedOrg: MultisiteOrganization = {
+          id: org.id,
+          organization_id: org.organization_id,
+          name: org.company_name,
+          organization_number: org.organization_number,
+          billing_type: 'consolidated' as const,
+          primary_contact_email: org.contact_email,
+          primary_contact_phone: org.contact_phone,
+          billing_address: org.billing_address,
+          is_active: org.is_active,
+          created_at: org.created_at,
+          updated_at: org.updated_at
+        }
+
+        // Fetch sites (enheter från customers)
         const { data: sites, error: sitesError } = await supabase
-          .from('organization_sites')
+          .from('customers')
           .select('*')
-          .eq('organization_id', org.id)
+          .eq('organization_id', org.organization_id)
+          .eq('site_type', 'enhet')
+          .eq('is_multisite', true)
           .eq('is_active', true)
 
         if (sitesError) throw sitesError
@@ -76,7 +95,7 @@ export default function BillingManagement() {
         const { data: cases, error: casesError } = await supabase
           .from('cases')
           .select('price')
-          .in('site_id', (sites || []).map(s => s.id))
+          .in('customer_id', (sites || []).map(s => s.id))
           .not('price', 'is', null)
 
         if (casesError) throw casesError
@@ -86,8 +105,23 @@ export default function BillingManagement() {
         const paidAmount = totalAmount * 0.7 // Simulated paid
 
         billingInfo.push({
-          organization: org,
-          sites: sites || [],
+          organization: mappedOrg,
+          sites: (sites || []).map(site => ({
+            id: site.id,
+            organization_id: site.organization_id,
+            site_name: site.site_name || site.company_name,
+            site_code: site.site_code,
+            address: site.contact_address,
+            region: site.region,
+            contact_person: site.contact_person,
+            contact_email: site.contact_email,
+            contact_phone: site.contact_phone,
+            customer_id: site.id,
+            is_primary: false,
+            is_active: site.is_active,
+            created_at: site.created_at,
+            updated_at: site.updated_at
+          })),
           totalAmount,
           pendingAmount,
           paidAmount,

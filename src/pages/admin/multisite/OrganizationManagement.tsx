@@ -77,7 +77,8 @@ export default function OrganizationManagement() {
 
       // Map customers to organization structure
       const orgs = (huvudkontorData || []).map(customer => ({
-        id: customer.organization_id,
+        id: customer.id, // Använd customer.id som huvudidentifierare
+        organization_id: customer.organization_id, // Behåll organization_id separat
         name: customer.company_name,
         organization_number: customer.organization_number,
         billing_type: 'consolidated' as const,
@@ -101,8 +102,9 @@ export default function OrganizationManagement() {
           const { data: enhetData, error: sitesError } = await supabase
             .from('customers')
             .select('*')
-            .eq('organization_id', org.id)
+            .eq('organization_id', org.organization_id) // Använd organization_id
             .eq('site_type', 'enhet')
+            .eq('is_multisite', true) // Säkerställ multisite
             .order('site_name')
 
           if (!sitesError && enhetData) {
@@ -130,7 +132,7 @@ export default function OrganizationManagement() {
           const { data: orgUsers, error: usersError } = await supabase
             .from('multisite_user_roles')
             .select('*')
-            .eq('organization_id', org.id)
+            .eq('organization_id', org.organization_id) // Använd organization_id
 
           if (!usersError && orgUsers) {
             usersData[org.id] = orgUsers

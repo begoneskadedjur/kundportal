@@ -66,12 +66,14 @@ export default function TrafficLightOverview() {
 
       setTrafficLights(lights || [])
 
-      // Fetch organizations
+      // Fetch organizations (huvudkontor från customers)
       const { data: orgs, error: orgsError } = await supabase
-        .from('multisite_organizations')
-        .select('id, name')
+        .from('customers')
+        .select('id, company_name, organization_id')
+        .eq('site_type', 'huvudkontor')
+        .eq('is_multisite', true)
         .eq('is_active', true)
-        .order('name')
+        .order('company_name')
 
       if (orgsError) throw orgsError
       setOrganizations(orgs || [])
