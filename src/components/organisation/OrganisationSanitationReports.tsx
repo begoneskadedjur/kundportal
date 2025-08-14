@@ -95,11 +95,9 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
           if (userRoleType === 'verksamhetschef') {
             customerIds = orgSites.map(s => s.id)
           } else {
-            // För region/platsansvarig, använd endast tillgängliga sites
-            const accessibleIds = availableSites.map(s => s.customer_id).filter(Boolean)
-            customerIds = orgSites
-              .filter(s => accessibleIds.includes(s.id))
-              .map(s => s.id)
+            // För region/platsansvarig, använd accessibleSites direkt
+            // accessibleSites är redan filtrerat korrekt av MultisiteContext
+            customerIds = availableSites.map(s => s.id)
           }
         }
       }
