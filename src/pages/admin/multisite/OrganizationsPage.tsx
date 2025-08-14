@@ -137,15 +137,53 @@ export default function OrganizationsPage() {
     }
 
     try {
-      const { error } = await supabase
+      // Först måste vi hämta organization_id från huvudkontoret
+      const { data: huvudkontor, error: hkError } = await supabase
+        .from('customers')
+        .select('organization_id')
+        .eq('id', org.id)
+        .eq('site_type', 'huvudkontor')
+        .single()
+
+      if (hkError || !huvudkontor) {
+        throw new Error('Kunde inte hitta organisation')
+      }
+
+      const organizationId = huvudkontor.organization_id
+
+      // 1. Ta bort alla enheter först (de har parent_customer_id som pekar på huvudkontoret)
+      const { error: sitesError } = await supabase
+        .from('customers')
+        .delete()
+        .eq('organization_id', organizationId)
+        .eq('site_type', 'enhet')
+
+      if (sitesError) {
+        console.error('Error deleting sites:', sitesError)
+        throw new Error('Kunde inte ta bort enheter')
+      }
+
+      // 2. Ta bort alla användare/roller
+      const { error: rolesError } = await supabase
+        .from('multisite_user_roles')
+        .delete()
+        .eq('organization_id', organizationId)
+
+      if (rolesError) {
+        console.error('Error deleting user roles:', rolesError)
+        // Fortsätt ändå, detta är inte kritiskt
+      }
+
+      // 3. Nu kan vi ta bort huvudkontoret
+      const { error: deleteError } = await supabase
         .from('customers')
         .delete()
         .eq('id', org.id)
         .eq('site_type', 'huvudkontor')
 
-      if (error) throw error
+      if (deleteError) throw deleteError
 
-      toast.success('Organisation borttagen')
+      toast.success('Organisation och alla relaterade data borttagna')
       fetchOrganizations()
     } catch (error) {
       console.error('Error deleting organization:', error)

@@ -156,15 +156,41 @@ export default function OrganizationManagement() {
     }
 
     try {
-      // Delete all customers for this organization (both huvudkontor and enheter)
-      const { error } = await supabase
+      // Vi måste ta bort i rätt ordning pga foreign key constraints
+      
+      // 1. Först ta bort alla enheter (de har parent_customer_id som pekar på huvudkontoret)
+      const { error: sitesError } = await supabase
         .from('customers')
         .delete()
-        .eq('organization_id', org.id)
+        .eq('organization_id', org.organization_id)
+        .eq('site_type', 'enhet')
 
-      if (error) throw error
+      if (sitesError) {
+        console.error('Error deleting sites:', sitesError)
+        throw new Error('Kunde inte ta bort enheter')
+      }
 
-      toast.success('Organisation borttagen')
+      // 2. Ta bort alla användare/roller
+      const { error: rolesError } = await supabase
+        .from('multisite_user_roles')
+        .delete()
+        .eq('organization_id', org.organization_id)
+
+      if (rolesError) {
+        console.error('Error deleting user roles:', rolesError)
+        // Fortsätt ändå, detta är inte kritiskt
+      }
+
+      // 3. Nu kan vi ta bort huvudkontoret
+      const { error: deleteError } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', org.id)
+        .eq('site_type', 'huvudkontor')
+
+      if (deleteError) throw deleteError
+
+      toast.success('Organisation och alla relaterade data borttagna')
       fetchOrganizations()
     } catch (error) {
       console.error('Error deleting organization:', error)
