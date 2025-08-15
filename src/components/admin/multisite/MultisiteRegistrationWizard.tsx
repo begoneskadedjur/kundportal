@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -20,17 +20,27 @@ import {
   Trash2,
   Receipt,
   Users,
-  ArrowLeft
+  ArrowLeft,
+  Package,
+  Calendar,
+  DollarSign,
+  FileText,
+  Briefcase,
+  UserCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import ProductSelector from '../ProductSelector'
+import { SelectedProduct } from '../../../types/products'
+import { calculateContractEndDate } from '../../../types/database'
+import { formatCurrency } from '../../../utils/formatters'
 
 interface WizardProps {
   onSuccess?: () => void
 }
 
-type WizardStep = 'organization' | 'sites' | 'users' | 'roles' | 'confirmation'
+type WizardStep = 'organization' | 'contract' | 'sites' | 'billing' | 'users' | 'roles' | 'confirmation'
 
 // Steg 1: Endast fysisk organisationsinformation
 interface OrganizationFormData {
@@ -38,15 +48,34 @@ interface OrganizationFormData {
   organization_number: string
   billing_address: string
   billing_type: 'consolidated' | 'per_site'
+  billing_email: string
 }
 
-// Steg 2: Endast fysiska platser
+// Nytt steg: Avtalsinformation
+interface ContractFormData {
+  contract_type: string
+  contract_start_date: string
+  contract_length: string // '12', '24', '36', '60' månader
+  contract_end_date: string // Beräknas automatiskt
+  annual_value: number
+  agreement_text: string
+  service_details: string
+  product_summary: string
+  assigned_account_manager: string
+  account_manager_email: string
+  sales_person: string
+  sales_person_email: string
+  selectedProducts: SelectedProduct[]
+}
+
+// Steg 3: Endast fysiska platser
 interface SiteFormData {
   site_name: string
   site_code: string
   address: string
   region: string
   is_primary: boolean
+  organization_number?: string // För per-site fakturering
 }
 
 // Steg 3: Endast kontaktinformation för användare
@@ -70,6 +99,8 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>('organization')
   const [loading, setLoading] = useState(false)
+  const [employees, setEmployees] = useState<{id: string, email: string, full_name?: string}[]>([])
+  const [contractTypes, setContractTypes] = useState<{id: string, name: string}[]>([])
 
   // Determine the correct navigation path based on user role
   const getNavigationPath = () => {
@@ -87,7 +118,24 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
     name: '',
     organization_number: '',
     billing_address: '',
-    billing_type: 'consolidated'
+    billing_type: 'consolidated',
+    billing_email: ''
+  })
+  
+  const [contractData, setContractData] = useState<ContractFormData>({
+    contract_type: '',
+    contract_start_date: new Date().toISOString().split('T')[0],
+    contract_length: '36', // Default 3 år
+    contract_end_date: '',
+    annual_value: 0,
+    agreement_text: '',
+    service_details: '',
+    product_summary: '',
+    assigned_account_manager: '',
+    account_manager_email: '',
+    sales_person: '',
+    sales_person_email: '',
+    selectedProducts: []
   })
   
   const [sites, setSites] = useState<SiteFormData[]>([])
@@ -109,9 +157,70 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   
   const [roleAssignments, setRoleAssignments] = useState<UserRoleAssignment[]>([])
 
+  // Hämta anställda och avtalstyper vid mount
+  useEffect(() => {
+    fetchEmployees()
+    fetchContractTypes()
+  }, [])
+
+  // Automatisk beräkning av slutdatum
+  useEffect(() => {
+    if (contractData.contract_start_date && contractData.contract_length) {
+      const months = parseInt(contractData.contract_length)
+      if (months > 0) {
+        const endDate = calculateContractEndDate(contractData.contract_start_date, months)
+        setContractData(prev => ({ ...prev, contract_end_date: endDate }))
+      }
+    }
+  }, [contractData.contract_start_date, contractData.contract_length])
+
+  // Beräkna total årspremie från valda produkter
+  useEffect(() => {
+    if (contractData.selectedProducts.length > 0) {
+      const totalAnnualValue = contractData.selectedProducts.reduce((sum, product) => {
+        return sum + (product.price * product.quantity)
+      }, 0)
+      setContractData(prev => ({ ...prev, annual_value: totalAnnualValue }))
+    }
+  }, [contractData.selectedProducts])
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('is_active', true)
+        .order('email')
+
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+      toast.error('Kunde inte hämta anställda')
+    }
+  }
+
+  const fetchContractTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contract_types')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('display_order')
+
+      if (error) throw error
+      setContractTypes(data || [])
+    } catch (error) {
+      console.error('Error fetching contract types:', error)
+      toast.error('Kunde inte hämta avtalstyper')
+    }
+  }
+
   const steps: { key: WizardStep; label: string; icon: React.ElementType }[] = [
     { key: 'organization', label: 'Organisation', icon: Building2 },
+    { key: 'contract', label: 'Avtal', icon: FileText },
     { key: 'sites', label: 'Anläggningar', icon: MapPin },
+    { key: 'billing', label: 'Fakturering', icon: Receipt },
     { key: 'users', label: 'Användare', icon: User },
     { key: 'roles', label: 'Roller', icon: Users },
     { key: 'confirmation', label: 'Bekräftelse', icon: Check }
@@ -205,6 +314,29 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           toast.error('Faktureringsadress krävs')
           return false
         }
+        if (!organizationData.billing_email) {
+          toast.error('Fakturerings-email krävs')
+          return false
+        }
+        return true
+      
+      case 'contract':
+        if (!contractData.contract_type) {
+          toast.error('Välj avtalstyp')
+          return false
+        }
+        if (contractData.selectedProducts.length === 0) {
+          toast.error('Välj minst en produkt')
+          return false
+        }
+        if (!contractData.assigned_account_manager) {
+          toast.error('Välj account manager')
+          return false
+        }
+        if (!contractData.sales_person) {
+          toast.error('Välj säljare')
+          return false
+        }
         return true
       
       case 'sites':
@@ -215,6 +347,17 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
         if (!sites.some(s => s.is_primary)) {
           toast.error('En anläggning måste vara markerad som primär')
           return false
+        }
+        return true
+      
+      case 'billing':
+        // Om per-site fakturering, kontrollera att alla sites har org.nr
+        if (organizationData.billing_type === 'per_site') {
+          const sitesWithoutOrgNr = sites.filter(s => !s.organization_number)
+          if (sitesWithoutOrgNr.length > 0) {
+            toast.error(`Organisationsnummer saknas för: ${sitesWithoutOrgNr.map(s => s.site_name).join(', ')}`)
+            return false
+          }
         }
         return true
       
@@ -257,7 +400,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   const handleNext = () => {
     if (!validateCurrentStep()) return
     
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'roles', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'contract', 'sites', 'billing', 'users', 'roles', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1])
@@ -265,7 +408,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   }
 
   const handlePrevious = () => {
-    const stepOrder: WizardStep[] = ['organization', 'sites', 'users', 'roles', 'confirmation']
+    const stepOrder: WizardStep[] = ['organization', 'contract', 'sites', 'billing', 'users', 'roles', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1])
@@ -283,7 +426,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
       // 1. Generate organization ID
       const organizationId = crypto.randomUUID()
       
-      // 2. Create huvudkontor (main office) customer
+      // 2. Create huvudkontor (main office) customer med all avtalsinformation
       const { data: hovedkontor, error: orgError } = await supabase
         .from('customers')
         .insert({
@@ -291,12 +434,25 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           organization_number: organizationData.organization_number || null,
           contact_email: primaryUser?.email || '',
           contact_phone: primaryUser?.phone || null,
-          billing_email: primaryUser?.email || '',
+          billing_email: organizationData.billing_email || primaryUser?.email || '',
           billing_address: organizationData.billing_address,
           site_type: 'huvudkontor',
           organization_id: organizationId,
           is_multisite: true,
-          contract_type: 'multisite',
+          contract_type: contractData.contract_type || 'multisite',
+          contract_start_date: contractData.contract_start_date,
+          contract_end_date: contractData.contract_end_date,
+          contract_length: `${contractData.contract_length} månader`,
+          annual_value: contractData.annual_value,
+          total_contract_value: contractData.annual_value * (parseInt(contractData.contract_length) / 12),
+          agreement_text: contractData.agreement_text,
+          service_details: contractData.service_details,
+          product_summary: contractData.product_summary,
+          products: contractData.selectedProducts,
+          assigned_account_manager: contractData.assigned_account_manager,
+          account_manager_email: contractData.account_manager_email,
+          sales_person: contractData.sales_person,
+          sales_person_email: contractData.sales_person_email,
           is_active: true
         })
         .select()
@@ -304,7 +460,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
 
       if (orgError) throw orgError
 
-      // 3. Create enhet (unit) customers
+      // 3. Create enhet (unit) customers med eventuella egna org.nr för fakturering
       const sitesToInsert = sites.map(site => ({
         company_name: `${organizationData.name} - ${site.site_name}`,
         site_name: site.site_name,
@@ -315,8 +471,9 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
         site_type: 'enhet' as const,
         parent_customer_id: hovedkontor.id,
         organization_id: organizationId,
+        organization_number: site.organization_number || null, // För per-site fakturering
         is_multisite: true,
-        contract_type: 'multisite',
+        contract_type: contractData.contract_type || 'multisite',
         is_active: true
       }))
 
@@ -431,7 +588,23 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
       name: '',
       organization_number: '',
       billing_address: '',
-      billing_type: 'consolidated'
+      billing_type: 'consolidated',
+      billing_email: ''
+    })
+    setContractData({
+      contract_type: '',
+      contract_start_date: new Date().toISOString().split('T')[0],
+      contract_length: '36',
+      contract_end_date: '',
+      annual_value: 0,
+      agreement_text: '',
+      service_details: '',
+      product_summary: '',
+      assigned_account_manager: '',
+      account_manager_email: '',
+      sales_person: '',
+      sales_person_email: '',
+      selectedProducts: []
     })
     setSites([])
     setUsers([])
@@ -589,6 +762,220 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     </button>
                   </div>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Fakturerings-email *
+                  </label>
+                  <Input
+                    type="email"
+                    value={organizationData.billing_email}
+                    onChange={(e) => setOrganizationData({ ...organizationData, billing_email: e.target.value })}
+                    placeholder="faktura@företag.se"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contract Step */}
+          {currentStep === 'contract' && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <FileText className="w-5 h-5 text-green-400" />
+                  Avtalsinformation
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Definiera avtalsvillkor, välj produkter och tilldela ansvariga personer.
+                </p>
+              </div>
+              
+              {/* Produktväljare */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-slate-300 mb-3">Välj produkter</h4>
+                <ProductSelector
+                  selectedProducts={contractData.selectedProducts}
+                  onSelectionChange={(products) => setContractData({ ...contractData, selectedProducts: products })}
+                  customerType="private"
+                  className="mb-4"
+                />
+              </div>
+              
+              {/* Avtalsinformation */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Avtalstyp *
+                  </label>
+                  <select
+                    value={contractData.contract_type}
+                    onChange={(e) => setContractData({ ...contractData, contract_type: e.target.value })}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                  >
+                    <option value="">Välj avtalstyp...</option>
+                    {contractTypes.map(type => (
+                      <option key={type.id} value={type.id}>{type.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Avtalslängd *
+                  </label>
+                  <select
+                    value={contractData.contract_length}
+                    onChange={(e) => setContractData({ ...contractData, contract_length: e.target.value })}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="12">1 år</option>
+                    <option value="24">2 år</option>
+                    <option value="36">3 år</option>
+                    <option value="60">5 år</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Startdatum *
+                  </label>
+                  <Input
+                    type="date"
+                    value={contractData.contract_start_date}
+                    onChange={(e) => setContractData({ ...contractData, contract_start_date: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Slutdatum (beräknas automatiskt)
+                  </label>
+                  <Input
+                    type="date"
+                    value={contractData.contract_end_date}
+                    disabled
+                    className="bg-slate-900/50 cursor-not-allowed"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Årspremie
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={formatCurrency(contractData.annual_value)}
+                      disabled
+                      className="pl-10 bg-slate-900/50 cursor-not-allowed font-mono"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Beräknas från valda produkter</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Totalt avtalsvärde
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={formatCurrency(contractData.annual_value * (parseInt(contractData.contract_length) / 12))}
+                      disabled
+                      className="pl-10 bg-slate-900/50 cursor-not-allowed font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Personal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Account Manager *
+                  </label>
+                  <select
+                    value={contractData.assigned_account_manager}
+                    onChange={(e) => {
+                      const employee = employees.find(emp => emp.email === e.target.value)
+                      setContractData({ 
+                        ...contractData, 
+                        assigned_account_manager: employee?.full_name || employee?.email || '',
+                        account_manager_email: employee?.email || ''
+                      })
+                    }}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                  >
+                    <option value="">Välj account manager...</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.email}>
+                        {emp.full_name || emp.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Säljare *
+                  </label>
+                  <select
+                    value={contractData.sales_person}
+                    onChange={(e) => {
+                      const employee = employees.find(emp => emp.email === e.target.value)
+                      setContractData({ 
+                        ...contractData, 
+                        sales_person: employee?.full_name || employee?.email || '',
+                        sales_person_email: employee?.email || ''
+                      })
+                    }}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                  >
+                    <option value="">Välj säljare...</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.email}>
+                        {emp.full_name || emp.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {/* Avtalstexter */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Avtalsomfattning
+                  </label>
+                  <textarea
+                    value={contractData.agreement_text}
+                    onChange={(e) => setContractData({ ...contractData, agreement_text: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Beskriv vad avtalet omfattar..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Servicedetaljer
+                  </label>
+                  <textarea
+                    value={contractData.service_details}
+                    onChange={(e) => setContractData({ ...contractData, service_details: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Detaljerad beskrivning av tjänster..."
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -719,6 +1106,101 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
             </div>
           )}
 
+          {/* Billing Step */}
+          {currentStep === 'billing' && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
+                  <Receipt className="w-5 h-5 text-yellow-400" />
+                  Faktureringsuppgifter
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  {organizationData.billing_type === 'consolidated' 
+                    ? 'Konsoliderad fakturering - en gemensam faktura för alla anläggningar.'
+                    : 'Individuell fakturering - separata fakturor per anläggning. Ange organisationsnummer för varje enhet.'}
+                </p>
+              </div>
+              
+              {/* Visa faktureringstyp som valdes i steg 1 */}
+              <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-300 mb-1">Faktureringstyp</h4>
+                    <p className="text-white">
+                      {organizationData.billing_type === 'consolidated' 
+                        ? 'Konsoliderad fakturering' 
+                        : 'Fakturering per anläggning'}
+                    </p>
+                  </div>
+                  <Receipt className="w-6 h-6 text-yellow-400" />
+                </div>
+              </div>
+              
+              {/* Om per-site fakturering, visa fält för org.nr per site */}
+              {organizationData.billing_type === 'per_site' && (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-slate-300">Organisationsnummer per anläggning</h4>
+                  <p className="text-sm text-slate-400">
+                    Ange organisationsnummer för varje anläggning som ska faktureras separat.
+                  </p>
+                  
+                  {sites.map((site, index) => (
+                    <div key={index} className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-3">
+                            <MapPin className="w-4 h-4 text-slate-400" />
+                            <span className="text-white font-medium">{site.site_name}</span>
+                            {site.is_primary && (
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">
+                                Primär
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Organisationsnummer *
+                              </label>
+                              <Input
+                                value={site.organization_number || ''}
+                                onChange={(e) => {
+                                  const updatedSites = [...sites]
+                                  updatedSites[index] = { ...site, organization_number: e.target.value }
+                                  setSites(updatedSites)
+                                }}
+                                placeholder="XXXXXX-XXXX"
+                                required={organizationData.billing_type === 'per_site'}
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <p className="text-sm text-slate-400">
+                                Region: {site.region}
+                                {site.site_code && ` • Kod: ${site.site_code}`}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Sammanfattning av faktureringsuppgifter */}
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <h4 className="text-blue-300 font-medium mb-2">Faktureringssammanfattning</h4>
+                <ul className="text-blue-200 text-sm space-y-1">
+                  <li>• Faktureringsadress: {organizationData.billing_address}</li>
+                  <li>• Fakturerings-email: {organizationData.billing_email}</li>
+                  <li>• Huvudorganisationsnummer: {organizationData.organization_number || 'Ej angivet'}</li>
+                  {organizationData.billing_type === 'per_site' && (
+                    <li>• Antal separata fakturor: {sites.length}</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* Users Step */}
           {currentStep === 'users' && (
@@ -993,6 +1475,67 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                       </dd>
                     </div>
                   </dl>
+                </div>
+                
+                {/* Contract summary */}
+                <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-3">
+                    <FileText className="w-4 h-4 text-green-400" />
+                    Avtalsinformation
+                  </h4>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-slate-500 font-medium">Avtalstyp:</dt>
+                      <dd className="text-white">
+                        {contractTypes.find(t => t.id === contractData.contract_type)?.name || contractData.contract_type}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Avtalslängd:</dt>
+                      <dd className="text-white">{parseInt(contractData.contract_length) / 12} år</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Startdatum:</dt>
+                      <dd className="text-white">{contractData.contract_start_date}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Slutdatum:</dt>
+                      <dd className="text-white">{contractData.contract_end_date}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Årspremie:</dt>
+                      <dd className="text-white font-mono">{formatCurrency(contractData.annual_value)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Totalt avtalsvärde:</dt>
+                      <dd className="text-white font-mono">
+                        {formatCurrency(contractData.annual_value * (parseInt(contractData.contract_length) / 12))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Account Manager:</dt>
+                      <dd className="text-white">{contractData.assigned_account_manager}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500 font-medium">Säljare:</dt>
+                      <dd className="text-white">{contractData.sales_person}</dd>
+                    </div>
+                  </dl>
+                  
+                  {/* Visa valda produkter */}
+                  {contractData.selectedProducts.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                      <dt className="text-slate-500 font-medium text-sm mb-2">Valda produkter ({contractData.selectedProducts.length}):</dt>
+                      <div className="space-y-1">
+                        {contractData.selectedProducts.map((product, idx) => (
+                          <div key={idx} className="flex justify-between text-xs">
+                            <span className="text-slate-300">{product.name} x{product.quantity}</span>
+                            <span className="text-slate-400 font-mono">{formatCurrency(product.price * product.quantity)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Sites summary */}
