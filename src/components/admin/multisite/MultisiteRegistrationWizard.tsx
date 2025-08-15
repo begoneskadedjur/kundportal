@@ -108,7 +108,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   const { profile } = useAuth()
   const [currentStep, setCurrentStep] = useState<WizardStep>('organization')
   const [loading, setLoading] = useState(false)
-  const [employees, setEmployees] = useState<{id: string, email: string, full_name?: string}[]>([])
+  const [employees, setEmployees] = useState<{id: string, email: string, display_name?: string}[]>([])
   const [contractTypes, setContractTypes] = useState<{id: string, name: string}[]>([])
 
   // Determine the correct navigation path based on user role
@@ -227,7 +227,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name')
+        .select('id, email, display_name')
         .eq('is_active', true)
         .order('email')
 
@@ -1077,7 +1077,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                       const employee = employees.find(emp => emp.email === e.target.value)
                       setContractData({ 
                         ...contractData, 
-                        assigned_account_manager: employee?.full_name || employee?.email || '',
+                        assigned_account_manager: employee?.display_name || employee?.email || '',
                         account_manager_email: employee?.email || ''
                       })
                     }}
@@ -1087,7 +1087,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     <option value="">Välj account manager...</option>
                     {employees.map(emp => (
                       <option key={emp.id} value={emp.email}>
-                        {emp.full_name || emp.email}
+                        {emp.display_name || emp.email}
                       </option>
                     ))}
                   </select>
@@ -1103,7 +1103,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                       const employee = employees.find(emp => emp.email === e.target.value)
                       setContractData({ 
                         ...contractData, 
-                        sales_person: employee?.full_name || employee?.email || '',
+                        sales_person: employee?.display_name || employee?.email || '',
                         sales_person_email: employee?.email || ''
                       })
                     }}
@@ -1113,7 +1113,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     <option value="">Välj säljare...</option>
                     {employees.map(emp => (
                       <option key={emp.id} value={emp.email}>
-                        {emp.full_name || emp.email}
+                        {emp.display_name || emp.email}
                       </option>
                     ))}
                   </select>
