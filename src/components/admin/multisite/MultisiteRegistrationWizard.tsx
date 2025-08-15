@@ -24,7 +24,6 @@ import {
   ArrowLeft,
   Package,
   Calendar,
-  DollarSign,
   FileText,
   Briefcase,
   UserCheck,
@@ -226,13 +225,19 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   const fetchEmployees = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email, display_name')
+        .from('technicians')
+        .select('id, name, email')
         .eq('is_active', true)
-        .order('email')
+        .order('name')
 
       if (error) throw error
-      setEmployees(data || [])
+      // Mappa till rätt format för dropdown
+      const mappedEmployees = data?.map(tech => ({
+        id: tech.id,
+        email: tech.email || '',
+        display_name: tech.name
+      })) || []
+      setEmployees(mappedEmployees)
     } catch (error) {
       console.error('Error fetching employees:', error)
       toast.error('Kunde inte hämta anställda')
@@ -998,6 +1003,8 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     type="date"
                     value={contractData.contract_start_date}
                     onChange={(e) => setContractData({ ...contractData, contract_start_date: e.target.value })}
+                    className="[&::-webkit-calendar-picker-indicator]:invert"
+                    placeholder="ÅÅÅÅ-MM-DD"
                     required
                   />
                 </div>
@@ -1010,7 +1017,8 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     type="date"
                     value={contractData.contract_end_date}
                     disabled
-                    className="bg-slate-900/50 cursor-not-allowed"
+                    className="bg-slate-900/50 cursor-not-allowed [&::-webkit-calendar-picker-indicator]:invert"
+                    placeholder="ÅÅÅÅ-MM-DD"
                   />
                 </div>
                 
@@ -1018,15 +1026,12 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Årspremie
                   </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      type="text"
-                      value={formatCurrency(contractData.annual_value)}
-                      disabled
-                      className="pl-10 bg-slate-900/50 cursor-not-allowed font-mono"
-                    />
-                  </div>
+                  <Input
+                    type="text"
+                    value={formatCurrency(contractData.annual_value)}
+                    disabled
+                    className="bg-slate-900/50 cursor-not-allowed font-mono"
+                  />
                   <p className="text-xs text-slate-400 mt-1">
                     Beräknas från valda produkter
                     {(() => {
@@ -1043,15 +1048,12 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Totalt avtalsvärde
                   </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      type="text"
-                      value={formatCurrency(contractData.annual_value * (parseInt(contractData.contract_length) / 12))}
-                      disabled
-                      className="pl-10 bg-slate-900/50 cursor-not-allowed font-mono"
-                    />
-                  </div>
+                  <Input
+                    type="text"
+                    value={formatCurrency(contractData.annual_value * (parseInt(contractData.contract_length) / 12))}
+                    disabled
+                    className="bg-slate-900/50 cursor-not-allowed font-mono"
+                  />
                 </div>
               </div>
               
