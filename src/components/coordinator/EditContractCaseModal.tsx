@@ -8,7 +8,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { 
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
-  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb
+  FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
+  Building, Building2
 } from 'lucide-react'
 import Button from '../ui/Button'
 import DatePicker from 'react-datepicker'
@@ -275,16 +276,38 @@ export default function EditContractCaseModal({
         .single()
       
       if (error) throw error
-      setCustomerData(data)
+      
+      // Om det är en multisite-enhet utan eget org.nr, hämta från huvudkunden
+      let finalCustomerData = data
+      if (data && data.is_multisite && data.parent_customer_id && !data.organization_number) {
+        // Hämta huvudkundens data för organisationsnummer
+        const { data: parentData, error: parentError } = await supabase
+          .from('customers')
+          .select('organization_number, company_name')
+          .eq('id', data.parent_customer_id)
+          .single()
+        
+        if (!parentError && parentData) {
+          // Använd huvudkundens org.nr om enheten inte har eget
+          finalCustomerData = {
+            ...data,
+            organization_number: data.organization_number || parentData.organization_number,
+            parent_organization_number: parentData.organization_number,
+            parent_company_name: parentData.company_name
+          }
+        }
+      }
+      
+      setCustomerData(finalCustomerData)
       
       // Update form with customer data if needed
-      if (data) {
+      if (finalCustomerData) {
         setFormData(prev => ({
           ...prev,
-          contact_person: prev.contact_person || data.contact_person || '',
-          contact_email: prev.contact_email || data.email || '',
-          contact_phone: prev.contact_phone || data.phone || '',
-          address: prev.address || data.service_address || ''
+          contact_person: prev.contact_person || finalCustomerData.contact_person || '',
+          contact_email: prev.contact_email || finalCustomerData.contact_email || '',
+          contact_phone: prev.contact_phone || finalCustomerData.contact_phone || '',
+          address: prev.address || finalCustomerData.contact_address || ''
         }))
       }
     } catch (error) {
@@ -403,15 +426,35 @@ export default function EditContractCaseModal({
     
     // Use customer data if available, otherwise use form data
     const contactPerson = formData.contact_person || customerData?.contact_person || ''
-    const email = formData.contact_email || customerData?.email || ''
-    const phone = formData.contact_phone || customerData?.phone || ''
-    const address = formData.address || customerData?.service_address || ''
-    // För multisite, visa enhetsnamn tillsammans med företagsnamn
+    const email = formData.contact_email || customerData?.contact_email || ''
+    const phone = formData.contact_phone || customerData?.contact_phone || ''
+    const address = formData.address || customerData?.contact_address || ''
+    
+    // För multisite, hantera företagsnamn och organisationsnummer korrekt
     let companyName = customerData?.company_name || formData.contact_person || ''
-    if (customerData?.is_multisite && customerData?.site_name) {
-      companyName = `${customerData.company_name} - ${customerData.site_name}`
+    let orgNumber = customerData?.organization_number || ''
+    
+    if (customerData?.is_multisite) {
+      // Visa alltid enhetsnamn tillsammans med företagsnamn för multisite
+      if (customerData?.site_name) {
+        companyName = customerData.company_name.includes(customerData.site_name) 
+          ? customerData.company_name 
+          : `${customerData.company_name} - ${customerData.site_name}`
+      }
+      
+      // Använd organisationsnummer (antingen enhetens eget eller huvudkundens)
+      // Detta är redan hanterat i fetchCustomerData
+      orgNumber = customerData?.organization_number || ''
+      
+      // Lägg till debug-loggning för multisite
+      console.log('Multisite customer data:', {
+        site_name: customerData.site_name,
+        company_name: customerData.company_name,
+        organization_number: customerData.organization_number,
+        parent_organization_number: customerData.parent_organization_number,
+        is_multisite: customerData.is_multisite
+      })
     }
-    const orgNumber = customerData?.organization_number || ''
     
     return {
       Kontaktperson: contactPerson,
@@ -420,7 +463,11 @@ export default function EditContractCaseModal({
       'utforande-adress': address,
       foretag: companyName,
       'org-nr': orgNumber,
-      partyType: orgNumber ? 'company' : 'individual'
+      partyType: orgNumber ? 'company' : 'individual',
+      // Lägg till extra metadata för Oneflow
+      is_multisite: customerData?.is_multisite || false,
+      site_name: customerData?.site_name || '',
+      parent_company: customerData?.parent_company_name || ''
     }
   }, [customerData, formData])
   
@@ -660,6 +707,46 @@ export default function EditContractCaseModal({
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-6">
+              {/* Customer information - visa för avtalskunder */}
+              {customerData && (
+                <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-xl p-6 border border-purple-500/30 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Building className="w-5 h-5 text-purple-400" />
+                    Kundinformation
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-purple-300 mb-1">Företag</label>
+                      <p className="text-white font-medium">
+                        {customerData.is_multisite && customerData.site_name 
+                          ? `${customerData.company_name}${customerData.company_name.includes(customerData.site_name) ? '' : ` - ${customerData.site_name}`}`
+                          : customerData.company_name}
+                      </p>
+                      {customerData.is_multisite && customerData.parent_company_name && (
+                        <p className="text-xs text-purple-300 mt-1">Del av: {customerData.parent_company_name}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-purple-300 mb-1">Organisationsnummer</label>
+                      <p className="text-white font-medium">
+                        {customerData.organization_number || 'Ej angivet'}
+                      </p>
+                      {customerData.is_multisite && !customerData.organization_number && customerData.parent_organization_number && (
+                        <p className="text-xs text-purple-300 mt-1">Använder huvudorganisationens nr</p>
+                      )}
+                    </div>
+                  </div>
+                  {customerData.is_multisite && (
+                    <div className="mt-3 pt-3 border-t border-purple-500/20">
+                      <span className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm">
+                        <Building2 className="w-3 h-3" />
+                        Multisite-organisation
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Basic information */}
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
