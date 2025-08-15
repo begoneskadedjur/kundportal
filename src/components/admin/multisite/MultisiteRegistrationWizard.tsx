@@ -697,19 +697,15 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     transition={{ duration: 0.2 }}
                   >
                     <motion.div 
-                      className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                        isActive ? 'bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-purple-400 shadow-lg shadow-purple-500/30' : 
-                        isCompleted ? 'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border-green-400 shadow-lg shadow-green-500/30' : 
+                      className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
+                        isActive ? 'bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-purple-400 shadow-lg' : 
+                        isCompleted ? 'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border-green-400 shadow-lg' : 
                         'bg-slate-800/50 border-slate-600 backdrop-blur-sm'
                       }`}
                       animate={isActive ? { 
-                        boxShadow: [
-                          '0 0 0 0 rgba(168, 85, 247, 0.4)',
-                          '0 0 0 10px rgba(168, 85, 247, 0)',
-                          '0 0 0 0 rgba(168, 85, 247, 0)'
-                        ]
+                        boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)'
                       } : {}}
-                      transition={{ duration: 2, repeat: Infinity }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     >
                       {isCompleted ? (
                         <motion.div
@@ -761,7 +757,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                 </p>
               </div>
               
-              <Card className="p-8 bg-slate-800/30 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+              <Card className="p-8 bg-slate-800/30 backdrop-blur-xl border-slate-700/50 shadow-xl">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
                     <label className="block text-sm font-semibold text-slate-300 mb-3">
@@ -813,14 +809,11 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                         type="button"
                         onClick={() => setOrganizationData({ ...organizationData, billing_type: 'consolidated' })}
                         className={`p-6 rounded-xl border-2 transition-all text-left relative overflow-hidden ${organizationData.billing_type === 'consolidated'
-                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg shadow-purple-500/30'
+                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg'
                             : 'bg-slate-800/30 backdrop-blur-sm border-slate-600/50 text-slate-300 hover:border-slate-500/70'
                           }`}
                         whileHover={{ 
-                          scale: 1.02, 
-                          boxShadow: organizationData.billing_type === 'consolidated' 
-                            ? '0 25px 50px -12px rgba(168, 85, 247, 0.4)' 
-                            : '0 25px 50px -12px rgba(148, 163, 184, 0.2)'
+                          scale: 1.02
                         }}
                         whileTap={{ scale: 0.98 }}
                         transition={{ duration: 0.2 }}
@@ -846,14 +839,11 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                         type="button"
                         onClick={() => setOrganizationData({ ...organizationData, billing_type: 'per_site' })}
                         className={`p-6 rounded-xl border-2 transition-all text-left relative overflow-hidden ${organizationData.billing_type === 'per_site'
-                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg shadow-purple-500/30'
+                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg'
                             : 'bg-slate-800/30 backdrop-blur-sm border-slate-600/50 text-slate-300 hover:border-slate-500/70'
                           }`}
                         whileHover={{ 
-                          scale: 1.02, 
-                          boxShadow: organizationData.billing_type === 'per_site' 
-                            ? '0 25px 50px -12px rgba(168, 85, 247, 0.4)' 
-                            : '0 25px 50px -12px rgba(148, 163, 184, 0.2)'
+                          scale: 1.02
                         }}
                         whileTap={{ scale: 0.98 }}
                         transition={{ duration: 0.2 }}
