@@ -35,6 +35,12 @@ import ProductSelector from '../ProductSelector'
 import { SelectedProduct } from '../../../types/products'
 import { calculateContractEndDate } from '../../../types/database'
 import { formatCurrency } from '../../../utils/formatters'
+import { 
+  calculatePriceSummary, 
+  calculateVolumeDiscount, 
+  calculateSeasonalDiscount,
+  formatPrice 
+} from '../../../utils/pricingCalculator'
 
 interface WizardProps {
   onSuccess?: () => void
@@ -174,13 +180,43 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
     }
   }, [contractData.contract_start_date, contractData.contract_length])
 
-  // Beräkna total årspremie från valda produkter
+  // Beräkna total årspremie från valda produkter med rabatter
   useEffect(() => {
     if (contractData.selectedProducts.length > 0) {
-      const totalAnnualValue = contractData.selectedProducts.reduce((sum, product) => {
-        return sum + (product.price * product.quantity)
-      }, 0)
-      setContractData(prev => ({ ...prev, annual_value: totalAnnualValue }))
+      // Använd samma prisberäkning som för vanliga kunder
+      const priceSummary = calculatePriceSummary(
+        contractData.selectedProducts, 
+        'company' // Multisite är alltid företagskunder
+      )
+      
+      // Beräkna volym- och säsongsrabatter
+      const volumeDiscount = calculateVolumeDiscount(contractData.selectedProducts, 'company')
+      const seasonalDiscount = calculateSeasonalDiscount(contractData.selectedProducts, 'company')
+      
+      // Total årspremie efter alla rabatter (men före moms)
+      const totalAnnualValue = priceSummary.subtotal - volumeDiscount - seasonalDiscount
+      
+      // Uppdatera product_summary med information om rabatter
+      let productSummary = `${contractData.selectedProducts.length} produkter/tjänster`
+      if (volumeDiscount > 0) {
+        const totalQty = contractData.selectedProducts.reduce((sum, p) => sum + p.quantity, 0)
+        productSummary += ` | Volymrabatt (${totalQty} st): -${formatPrice(volumeDiscount)}`
+      }
+      if (seasonalDiscount > 0) {
+        productSummary += ` | Säsongsrabatt: -${formatPrice(seasonalDiscount)}`
+      }
+      
+      setContractData(prev => ({ 
+        ...prev, 
+        annual_value: totalAnnualValue,
+        product_summary: productSummary
+      }))
+    } else {
+      setContractData(prev => ({ 
+        ...prev, 
+        annual_value: 0,
+        product_summary: ''
+      }))
     }
   }, [contractData.selectedProducts])
 
@@ -798,9 +834,58 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                 <ProductSelector
                   selectedProducts={contractData.selectedProducts}
                   onSelectionChange={(products) => setContractData({ ...contractData, selectedProducts: products })}
-                  customerType="private"
+                  customerType="company" // Multisite är alltid företagskunder
                   className="mb-4"
                 />
+                
+                {/* Visa prissammanfattning om produkter är valda */}
+                {contractData.selectedProducts.length > 0 && (
+                  <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <h5 className="text-sm font-semibold text-slate-300 mb-3">Prissammanfattning</h5>
+                    {(() => {
+                      const priceSummary = calculatePriceSummary(contractData.selectedProducts, 'company')
+                      const volumeDiscount = calculateVolumeDiscount(contractData.selectedProducts, 'company')
+                      const seasonalDiscount = calculateSeasonalDiscount(contractData.selectedProducts, 'company')
+                      const totalQty = contractData.selectedProducts.reduce((sum, p) => sum + p.quantity, 0)
+                      
+                      return (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between text-slate-400">
+                            <span>Grundpris ({totalQty} tjänster):</span>
+                            <span className="font-mono">{formatPrice(priceSummary.subtotal)}</span>
+                          </div>
+                          
+                          {volumeDiscount > 0 && (
+                            <div className="flex justify-between text-green-400">
+                              <span>Volymrabatt:
+                                {totalQty >= 10 && ' (15%)'}
+                                {totalQty >= 5 && totalQty < 10 && ' (10%)'}
+                                {totalQty >= 3 && totalQty < 5 && ' (5%)'}
+                              </span>
+                              <span className="font-mono">-{formatPrice(volumeDiscount)}</span>
+                            </div>
+                          )}
+                          
+                          {seasonalDiscount > 0 && (
+                            <div className="flex justify-between text-blue-400">
+                              <span>Säsongsrabatt (vinter):</span>
+                              <span className="font-mono">-{formatPrice(seasonalDiscount)}</span>
+                            </div>
+                          )}
+                          
+                          <div className="border-t border-slate-600 pt-2 flex justify-between font-semibold text-white">
+                            <span>Årspremie (exkl. moms):</span>
+                            <span className="font-mono">{formatPrice(contractData.annual_value)}</span>
+                          </div>
+                          
+                          <div className="text-xs text-slate-500 pt-1">
+                            * Moms tillkommer med 25% för företagskunder
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
               </div>
               
               {/* Avtalsinformation */}
@@ -875,7 +960,16 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                       className="pl-10 bg-slate-900/50 cursor-not-allowed font-mono"
                     />
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">Beräknas från valda produkter</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Beräknas från valda produkter
+                    {(() => {
+                      const totalQty = contractData.selectedProducts.reduce((sum, p) => sum + p.quantity, 0)
+                      if (totalQty >= 10) return ' (15% volymrabatt inkluderad)'
+                      if (totalQty >= 5) return ' (10% volymrabatt inkluderad)'
+                      if (totalQty >= 3) return ' (5% volymrabatt inkluderad)'
+                      return ''
+                    })()}
+                  </p>
                 </div>
                 
                 <div>
@@ -1522,18 +1616,57 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     </div>
                   </dl>
                   
-                  {/* Visa valda produkter */}
+                  {/* Visa valda produkter med rabatter */}
                   {contractData.selectedProducts.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-700">
-                      <dt className="text-slate-500 font-medium text-sm mb-2">Valda produkter ({contractData.selectedProducts.length}):</dt>
+                      <dt className="text-slate-500 font-medium text-sm mb-2">
+                        Valda produkter ({contractData.selectedProducts.length}):
+                      </dt>
                       <div className="space-y-1">
-                        {contractData.selectedProducts.map((product, idx) => (
-                          <div key={idx} className="flex justify-between text-xs">
-                            <span className="text-slate-300">{product.name} x{product.quantity}</span>
-                            <span className="text-slate-400 font-mono">{formatCurrency(product.price * product.quantity)}</span>
-                          </div>
-                        ))}
+                        {contractData.selectedProducts.map((product, idx) => {
+                          const pricing = product.product?.pricing?.company || { basePrice: product.price }
+                          const unitPrice = pricing.discountPercent 
+                            ? pricing.basePrice * (1 - pricing.discountPercent / 100)
+                            : pricing.basePrice
+                          return (
+                            <div key={idx} className="flex justify-between text-xs">
+                              <span className="text-slate-300">
+                                {product.name || product.product?.name} x{product.quantity}
+                              </span>
+                              <span className="text-slate-400 font-mono">
+                                {formatPrice(unitPrice * product.quantity)}
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
+                      
+                      {/* Visa rabatter om de finns */}
+                      {(() => {
+                        const volumeDiscount = calculateVolumeDiscount(contractData.selectedProducts, 'company')
+                        const seasonalDiscount = calculateSeasonalDiscount(contractData.selectedProducts, 'company')
+                        const totalQty = contractData.selectedProducts.reduce((sum, p) => sum + p.quantity, 0)
+                        
+                        if (volumeDiscount > 0 || seasonalDiscount > 0) {
+                          return (
+                            <div className="mt-2 pt-2 border-t border-slate-700/50 text-xs">
+                              {volumeDiscount > 0 && (
+                                <div className="flex justify-between text-green-400">
+                                  <span>Volymrabatt ({totalQty} tjänster):</span>
+                                  <span className="font-mono">-{formatPrice(volumeDiscount)}</span>
+                                </div>
+                              )}
+                              {seasonalDiscount > 0 && (
+                                <div className="flex justify-between text-blue-400">
+                                  <span>Säsongsrabatt:</span>
+                                  <span className="font-mono">-{formatPrice(seasonalDiscount)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                   )}
                 </div>
