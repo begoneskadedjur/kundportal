@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { 
@@ -26,11 +27,13 @@ import {
   DollarSign,
   FileText,
   Briefcase,
-  UserCheck
+  UserCheck,
+  CheckCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Card from '../../ui/Card'
 import ProductSelector from '../ProductSelector'
 import { SelectedProduct } from '../../../types/products'
 import { calculateContractEndDate } from '../../../types/database'
@@ -259,7 +262,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
     { key: 'billing', label: 'Fakturering', icon: Receipt },
     { key: 'users', label: 'Användare', icon: User },
     { key: 'roles', label: 'Roller', icon: Users },
-    { key: 'confirmation', label: 'Bekräftelse', icon: Check }
+    { key: 'confirmation', label: 'Bekräftelse', icon: CheckCircle }
   ]
 
   const currentStepIndex = steps.findIndex(s => s.key === currentStep)
@@ -649,13 +652,13 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
       {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800">
+      <header className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Button 
-              variant="outline" 
+              variant="secondary" 
               size="sm" 
               onClick={() => navigate(getNavigationPath())} 
               className="flex items-center gap-2"
@@ -663,8 +666,8 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
               <ArrowLeft className="w-4 h-4" /> Tillbaka
             </Button>
             <div className="flex items-center gap-3">
-              <div className="bg-purple-500/10 p-2 rounded-lg">
-                <Building2 className="w-6 h-6 text-purple-500" />
+              <div className="bg-gradient-to-br from-purple-500/20 to-indigo-500/20 p-3 rounded-xl border border-purple-500/20 backdrop-blur-sm">
+                <Building2 className="w-6 h-6 text-purple-400" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">Registrera Multisite-organisation</h1>
@@ -675,9 +678,9 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
         </div>
       </header>
 
-      {/* Progress Steps */}
-      <div className="bg-gradient-to-r from-purple-900/50 to-purple-600/30 border-b border-purple-500/20">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* Enhanced Progress Steps */}
+      <div className="bg-gradient-to-r from-purple-900/50 via-indigo-900/50 to-purple-600/30 border-b border-purple-500/20 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex items-center justify-between">
             {steps.map((step, index) => {
               const Icon = step.icon
@@ -686,21 +689,45 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
               
               return (
                 <div key={step.key} className="flex items-center flex-1">
-                  <div className={`flex items-center gap-2 ${
-                    isActive ? 'text-purple-300' : isCompleted ? 'text-green-400' : 'text-slate-500'
-                  }`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                      isActive ? 'bg-purple-500/20 border-purple-400' : 
-                      isCompleted ? 'bg-green-500/20 border-green-400' : 
-                      'bg-slate-800 border-slate-600'
-                    }`}>
-                      {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                    </div>
-                    <span className="text-sm font-medium hidden sm:inline">{step.label}</span>
-                  </div>
+                  <motion.div 
+                    className={`flex items-center gap-3 cursor-pointer ${
+                      isActive ? 'text-purple-300' : isCompleted ? 'text-green-400' : 'text-slate-500'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <motion.div 
+                      className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                        isActive ? 'bg-gradient-to-br from-purple-500/30 to-indigo-500/30 border-purple-400 shadow-lg shadow-purple-500/30' : 
+                        isCompleted ? 'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border-green-400 shadow-lg shadow-green-500/30' : 
+                        'bg-slate-800/50 border-slate-600 backdrop-blur-sm'
+                      }`}
+                      animate={isActive ? { 
+                        boxShadow: [
+                          '0 0 0 0 rgba(168, 85, 247, 0.4)',
+                          '0 0 0 10px rgba(168, 85, 247, 0)',
+                          '0 0 0 0 rgba(168, 85, 247, 0)'
+                        ]
+                      } : {}}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      {isCompleted ? (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                        >
+                          <Check className="w-6 h-6" />
+                        </motion.div>
+                      ) : (
+                        <Icon className="w-6 h-6" />
+                      )}
+                    </motion.div>
+                    <span className="text-sm font-semibold hidden sm:inline">{step.label}</span>
+                  </motion.div>
                   {index < steps.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-3 ${
-                      isCompleted ? 'bg-green-500/50' : 'bg-slate-700'
+                    <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-500 ${
+                      isCompleted ? 'bg-gradient-to-r from-green-500/50 to-green-400/30' : 'bg-slate-700/50'
                     }`} />
                   )}
                 </div>
@@ -712,118 +739,168 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="min-h-[600px]">
+        <div className="min-h-[600px] overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{
+                duration: 0.4,
+                ease: "easeInOut"
+              }}
+            >
           {/* Organization Step */}
           {currentStep === 'organization' && (
-            <div className="space-y-6">
-              <div className="mb-6">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-                  <Building2 className="w-5 h-5 text-blue-400" />
-                  Organisationsuppgifter
-                </h3>
-                <p className="text-slate-400 text-sm">
+            <div className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-3">Organisationsuppgifter</h2>
+                <p className="text-slate-400 text-lg">
                   Ange grundläggande information om organisationen. Kontaktpersoner läggs till i ett senare steg.
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Organisationsnamn *
-                  </label>
-                  <Input
-                    value={organizationData.name}
-                    onChange={(e) => setOrganizationData({ ...organizationData, name: e.target.value })}
-                    placeholder="t.ex. Espresso House Sverige AB"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Organisationsnummer
-                  </label>
-                  <Input
-                    value={organizationData.organization_number}
-                    onChange={(e) => setOrganizationData({ ...organizationData, organization_number: e.target.value })}
-                    placeholder="XXXXXX-XXXX"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Faktureringsadress *
-                  </label>
-                  <textarea
-                    value={organizationData.billing_address}
-                    onChange={(e) => setOrganizationData({ ...organizationData, billing_address: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
-                    placeholder="Fullständig fakturaadress..."
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">
-                    Faktureringstyp *
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'consolidated' })}
-                      className={`p-4 rounded-lg border-2 transition-all text-left ${organizationData.billing_type === 'consolidated'
-                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                        }`}
-                    >
-                      <Receipt className="w-6 h-6 mb-2 text-yellow-400" />
-                      <div className="font-medium">Konsoliderad fakturering</div>
-                      <div className="text-xs mt-1 opacity-80">En sammanställd faktura för alla anläggningar</div>
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setOrganizationData({ ...organizationData, billing_type: 'per_site' })}
-                      className={`p-4 rounded-lg border-2 transition-all text-left ${organizationData.billing_type === 'per_site'
-                          ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                        }`}
-                    >
-                      <Receipt className="w-6 h-6 mb-2 text-yellow-400" />
-                      <div className="font-medium">Per anläggning</div>
-                      <div className="text-xs mt-1 opacity-80">Separata fakturor för varje site</div>
-                    </button>
+              <Card className="p-8 bg-slate-800/30 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                      Organisationsnamn *
+                    </label>
+                    <Input
+                      value={organizationData.name}
+                      onChange={(e) => setOrganizationData({ ...organizationData, name: e.target.value })}
+                      placeholder="t.ex. Espresso House Sverige AB"
+                      required
+                      icon={<Building2 className="w-4 h-4" />}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                      Organisationsnummer
+                    </label>
+                    <Input
+                      value={organizationData.organization_number}
+                      onChange={(e) => setOrganizationData({ ...organizationData, organization_number: e.target.value })}
+                      placeholder="XXXXXX-XXXX"
+                      icon={<FileText className="w-4 h-4" />}
+                    />
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Fakturerings-email *
-                  </label>
-                  <Input
-                    type="email"
-                    value={organizationData.billing_email}
-                    onChange={(e) => setOrganizationData({ ...organizationData, billing_email: e.target.value })}
-                    placeholder="faktura@företag.se"
-                    required
-                  />
+              
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                      Faktureringsadress *
+                    </label>
+                    <textarea
+                      value={organizationData.billing_address}
+                      onChange={(e) => setOrganizationData({ ...organizationData, billing_address: e.target.value })}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-slate-800/50 backdrop-blur-sm border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-300"
+                      placeholder="Fullständig fakturaadress..."
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-4">
+                      Faktureringstyp *
+                    </label>
+                    <div className="grid grid-cols-2 gap-6">
+                      <motion.button
+                        type="button"
+                        onClick={() => setOrganizationData({ ...organizationData, billing_type: 'consolidated' })}
+                        className={`p-6 rounded-xl border-2 transition-all text-left relative overflow-hidden ${organizationData.billing_type === 'consolidated'
+                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg shadow-purple-500/30'
+                            : 'bg-slate-800/30 backdrop-blur-sm border-slate-600/50 text-slate-300 hover:border-slate-500/70'
+                          }`}
+                        whileHover={{ 
+                          scale: 1.02, 
+                          boxShadow: organizationData.billing_type === 'consolidated' 
+                            ? '0 25px 50px -12px rgba(168, 85, 247, 0.4)' 
+                            : '0 25px 50px -12px rgba(148, 163, 184, 0.2)'
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Receipt className="w-8 h-8 text-yellow-400" />
+                        </div>
+                        <div className="font-semibold text-center mb-2">Konsoliderad fakturering</div>
+                        <div className="text-xs text-center opacity-80">En sammanställd faktura för alla anläggningar</div>
+                        {organizationData.billing_type === 'consolidated' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                            className="absolute top-4 right-4"
+                          >
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                          </motion.div>
+                        )}
+                      </motion.button>
+                      
+                      <motion.button
+                        type="button"
+                        onClick={() => setOrganizationData({ ...organizationData, billing_type: 'per_site' })}
+                        className={`p-6 rounded-xl border-2 transition-all text-left relative overflow-hidden ${organizationData.billing_type === 'per_site'
+                            ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-400 text-purple-300 shadow-lg shadow-purple-500/30'
+                            : 'bg-slate-800/30 backdrop-blur-sm border-slate-600/50 text-slate-300 hover:border-slate-500/70'
+                          }`}
+                        whileHover={{ 
+                          scale: 1.02, 
+                          boxShadow: organizationData.billing_type === 'per_site' 
+                            ? '0 25px 50px -12px rgba(168, 85, 247, 0.4)' 
+                            : '0 25px 50px -12px rgba(148, 163, 184, 0.2)'
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Receipt className="w-8 h-8 text-yellow-400" />
+                        </div>
+                        <div className="font-semibold text-center mb-2">Per anläggning</div>
+                        <div className="text-xs text-center opacity-80">Separata fakturor för varje site</div>
+                        {organizationData.billing_type === 'per_site' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
+                            className="absolute top-4 right-4"
+                          >
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                          </motion.div>
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">
+                      Fakturerings-email *
+                    </label>
+                    <Input
+                      type="email"
+                      value={organizationData.billing_email}
+                      onChange={(e) => setOrganizationData({ ...organizationData, billing_email: e.target.value })}
+                      placeholder="faktura@företag.se"
+                      required
+                      icon={<Mail className="w-4 h-4" />}
+                    />
+                  </div>
                 </div>
-              </div>
+              </Card>
             </div>
           )}
 
           {/* Contract Step */}
           {currentStep === 'contract' && (
-            <div className="space-y-6">
-              <div className="mb-6">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-                  <FileText className="w-5 h-5 text-green-400" />
-                  Avtalsinformation
-                </h3>
-                <p className="text-slate-400 text-sm">
+            <div className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-3">Avtalsinformation</h2>
+                <p className="text-slate-400 text-lg">
                   Definiera avtalsvillkor, välj produkter och tilldela ansvariga personer.
                 </p>
               </div>
@@ -1076,13 +1153,10 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
 
           {/* Sites Step */}
           {currentStep === 'sites' && (
-            <div className="space-y-6">
-              <div className="mb-6">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-                  <MapPin className="w-5 h-5 text-purple-400" />
-                  Anläggningar och Platser
-                </h3>
-                <p className="text-slate-400 text-sm">
+            <div className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-3">Anläggningar och Platser</h2>
+                <p className="text-slate-400 text-lg">
                   Definiera alla fysiska platser som ska ingå i organisationen. Kontaktpersoner för varje plats läggs till senare.
                 </p>
               </div>
@@ -1776,10 +1850,17 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
               </div>
             </div>
           )}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Footer with navigation */}
-        <div className="mt-8 pt-6 border-t border-slate-800 flex items-center justify-between">
+        <motion.div 
+          className="mt-12 pt-8 border-t border-slate-700/50 flex items-center justify-between"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
           <Button
             onClick={handlePrevious}
             variant="outline"
@@ -1791,12 +1872,12 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           </Button>
           
           <div className="text-center">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-400 font-medium">
               Steg {currentStepIndex + 1} av {steps.length}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Button
               onClick={() => navigate(getNavigationPath())}
               variant="outline"
@@ -1810,9 +1891,10 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                 variant="primary"
                 loading={loading}
                 disabled={loading}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                size="lg"
               >
-                <Check className="w-4 h-4" />
+                <CheckCircle className="w-5 h-5" />
                 Skapa organisation
               </Button>
             ) : (
@@ -1820,13 +1902,14 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                 onClick={handleNext}
                 variant="primary"
                 className="flex items-center gap-2"
+                size="lg"
               >
                 Nästa
                 <ChevronRight className="w-4 h-4" />
               </Button>
             )}
           </div>
-        </div>
+        </motion.div>
       </main>
     </div>
   )
