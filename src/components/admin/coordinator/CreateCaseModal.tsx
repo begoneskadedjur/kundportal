@@ -67,6 +67,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [contractCustomers, setContractCustomers] = useState<any[]>([]);
   const [selectedContractCustomer, setSelectedContractCustomer] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [multisiteRoles, setMultisiteRoles] = useState<any[]>([]);
   const [timeSlotDuration, setTimeSlotDuration] = useState(60);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -90,7 +91,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSelectedSiteId(null);
   }, []);
 
-  // Hämta avtalskunder när modal öppnas
+  // Hämta avtalskunder och multisite-roller när modal öppnas
   useEffect(() => {
     const fetchContractCustomers = async () => {
       const { data, error } = await supabase
@@ -104,8 +105,48 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     };
 
+    const fetchMultisiteRoles = async () => {
+      // Hämta multisite-roller för platsansvariga
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('multisite_user_roles')
+        .select(`
+          *,
+          profiles!inner(email, display_name)
+        `)
+        .eq('role_type', 'platsansvarig')
+        .eq('is_active', true);
+
+      if (!rolesError && rolesData) {
+        // Berika med användarinfo från auth.users för telefon och namn
+        const enrichedRoles = await Promise.all(rolesData.map(async (role) => {
+          try {
+            // Hämta från auth.users via SQL eftersom admin API inte är tillgänglig i frontend
+            const { data: userData } = await supabase
+              .rpc('get_user_metadata', { user_id: role.user_id });
+            
+            return {
+              ...role,
+              user_name: userData?.raw_user_meta_data?.name || role.profiles?.display_name,
+              user_phone: userData?.raw_user_meta_data?.phone,
+              user_email: role.profiles?.email || userData?.email
+            };
+          } catch (err) {
+            // Fallback om vi inte kan hämta auth.users data
+            return {
+              ...role,
+              user_name: role.profiles?.display_name,
+              user_phone: null,
+              user_email: role.profiles?.email
+            };
+          }
+        }));
+        setMultisiteRoles(enrichedRoles);
+      }
+    };
+
     if (isOpen) {
       fetchContractCustomers();
+      fetchMultisiteRoles();
     }
   }, [isOpen]);
 
@@ -195,18 +236,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (selectedSiteId) {
         const site = contractCustomers.find(c => c.id === selectedSiteId);
         if (site) {
-          // Prioritera site-data, men fallback till huvudkunddata
+          // Hitta platsansvarig för denna enhet
+          const siteManager = multisiteRoles.find(role => 
+            role.site_ids?.includes(selectedSiteId)
+          );
+          
+          // Använd platsansvarigs uppgifter om de finns, annars site-data, annars huvudkunddata
           dataSource = {
             ...customer,
-            contact_person: site.contact_person || customer?.contact_person,
-            contact_phone: site.contact_phone || customer?.contact_phone,
-            contact_email: site.contact_email || customer?.contact_email,
+            contact_person: siteManager?.user_name || site.contact_person || customer?.contact_person,
+            contact_phone: siteManager?.user_phone || site.contact_phone || customer?.contact_phone,
+            contact_email: siteManager?.user_email || site.contact_email || customer?.contact_email,
             contact_address: site.contact_address || customer?.contact_address,
             billing_email: site.billing_email || customer?.billing_email,
             billing_address: site.billing_address || customer?.billing_address,
-            company_name: customer?.company_name, // Behåll huvudkundens namn
-            organization_number: customer?.organization_number
+            company_name: site.company_name || customer?.company_name, // Använd sitens namn om det finns
+            organization_number: site.organization_number || customer?.organization_number // Använd sitens org.nr om det finns
           };
+          
+          console.log('Site manager found:', siteManager?.user_name, 'for site:', site.site_name);
         }
       }
       
@@ -228,7 +276,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }));
       }
     }
-  }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
+  }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles]);
 
   const selectCaseType = (type: 'private' | 'business' | 'contract') => {
     setCaseType(type); 
