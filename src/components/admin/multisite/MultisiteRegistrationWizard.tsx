@@ -373,11 +373,11 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           toast.error('Välj minst en produkt')
           return false
         }
-        if (!contractData.assigned_account_manager) {
+        if (!contractData.assigned_account_manager && !contractData.account_manager_email) {
           toast.error('Välj account manager')
           return false
         }
-        if (!contractData.sales_person) {
+        if (!contractData.sales_person && !contractData.sales_person_email) {
           toast.error('Välj säljare')
           return false
         }
@@ -1064,7 +1064,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     Account Manager *
                   </label>
                   <select
-                    value={contractData.assigned_account_manager}
+                    value={contractData.account_manager_email || ''}
                     onChange={(e) => {
                       const employee = employees.find(emp => emp.email === e.target.value)
                       setContractData({ 
@@ -1090,7 +1090,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     Säljare *
                   </label>
                   <select
-                    value={contractData.sales_person}
+                    value={contractData.sales_person_email || ''}
                     onChange={(e) => {
                       const employee = employees.find(emp => emp.email === e.target.value)
                       setContractData({ 
