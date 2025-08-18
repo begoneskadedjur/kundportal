@@ -246,44 +246,58 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       let dataSource = customer;
       if (selectedSiteId) {
         const site = contractCustomers.find(c => c.id === selectedSiteId);
-        if (site) {
-          // Hitta platsansvarig för denna enhet
-          const siteManager = multisiteRoles.find(role => 
-            role.site_ids?.includes(selectedSiteId)
-          );
-          
-          // Använd platsansvarigs uppgifter om de finns, annars site-data, annars huvudkunddata
-          dataSource = {
-            ...customer,
-            contact_person: siteManager?.user_name || site.contact_person || customer?.contact_person,
-            contact_phone: siteManager?.user_phone || site.contact_phone || customer?.contact_phone,
-            contact_email: siteManager?.user_email || site.contact_email || customer?.contact_email,
-            contact_address: site.contact_address || customer?.contact_address,
-            billing_email: site.billing_email || customer?.billing_email,
-            billing_address: site.billing_address || customer?.billing_address,
-            company_name: site.company_name || customer?.company_name, // Använd sitens namn om det finns
-            organization_number: site.organization_number || customer?.organization_number // Använd sitens org.nr om det finns
-          };
-          
-          console.log('Site manager found:', siteManager?.user_name, 'for site:', site.site_name);
+        if (!site) {
+          console.error('Selected site not found:', selectedSiteId);
+          return;
         }
+        
+        // Hitta platsansvarig för denna enhet
+        const siteManager = multisiteRoles.find(role => 
+          role.site_ids?.includes(selectedSiteId)
+        );
+        
+        // VIKTIGT: Använd SITE som bas, inte customer
+        // Detta säkerställer att vi får rätt kontaktinfo från enheten
+        dataSource = {
+          ...site, // Använd SITE som bas istället för customer
+          // Överskrid bara med platsansvarigs data om den finns
+          contact_person: siteManager?.user_name || site.contact_person,
+          contact_phone: siteManager?.user_phone || site.contact_phone,
+          contact_email: siteManager?.user_email || site.contact_email,
+          // Behåll vissa fält från huvudkund om de saknas på site
+          billing_email: site.billing_email || customer?.billing_email,
+          billing_address: site.billing_address || customer?.billing_address,
+          // Säkerställ att vi använder sitens egna uppgifter
+          company_name: site.company_name,
+          organization_number: site.organization_number,
+          contact_address: site.contact_address
+        };
+        
+        console.log('Site data being used:', {
+          site_name: site.site_name,
+          site_manager: siteManager?.user_name,
+          contact_person: dataSource.contact_person,
+          contact_phone: dataSource.contact_phone,
+          contact_email: dataSource.contact_email,
+          org_nr: dataSource.organization_number
+        });
       }
       
       if (dataSource) {
         setFormData(prev => ({
           ...prev,
-          kontaktperson: dataSource.contact_person,
-          telefon_kontaktperson: dataSource.contact_phone,
-          e_post_kontaktperson: dataSource.contact_email,
-          org_nr: dataSource.organization_number,
-          bestallare: dataSource.company_name,
+          kontaktperson: dataSource.contact_person || '',
+          telefon_kontaktperson: dataSource.contact_phone || '',
+          e_post_kontaktperson: dataSource.contact_email || '',
+          org_nr: dataSource.organization_number || '',
+          bestallare: dataSource.company_name || '',
           adress: dataSource.contact_address || dataSource.service_address || prev.adress,
           // Lägg även till faktura-fält om de finns
-          e_post_faktura: dataSource.billing_email || dataSource.contact_email,
-          faktura_adress: dataSource.billing_address || dataSource.contact_address,
+          e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
+          faktura_adress: dataSource.billing_address || dataSource.contact_address || '',
           // Lägg till fler fält för bättre integration
-          telefon: dataSource.contact_phone, // För ärendet självt
-          email: dataSource.contact_email,   // För ärendet självt
+          telefon: dataSource.contact_phone || '', // För ärendet självt
+          email: dataSource.contact_email || '',   // För ärendet självt
         }));
       }
     }
