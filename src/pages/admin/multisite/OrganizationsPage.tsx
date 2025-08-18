@@ -47,6 +47,19 @@ interface Organization {
   sites_count?: number
   users_count?: number
   total_value?: number
+  // Avtalsinfo
+  contract_type?: string
+  contract_end_date?: string
+  annual_value?: number
+  monthly_value?: number
+  account_manager?: string
+  account_manager_email?: string
+  sales_person?: string
+  sales_person_email?: string
+  // Enheter
+  sites?: any[]
+  contact_phone?: string
+  contact_person?: string
 }
 
 interface OrganizationUser {
@@ -119,6 +132,16 @@ export default function OrganizationsPage() {
             .eq('is_multisite', true)
             .eq('is_active', true)
 
+          // Hämta enheter med fullständig info
+          const { data: sites } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('organization_id', org.organization_id)
+            .eq('site_type', 'enhet')
+            .eq('is_multisite', true)
+            .order('region', { ascending: true })
+            .order('site_name', { ascending: true })
+
           // Hämta antal användare
           const { count: usersCount } = await supabase
             .from('multisite_user_roles')
@@ -138,7 +161,21 @@ export default function OrganizationsPage() {
             organization_id: org.organization_id,
             sites_count: sitesCount || 0,
             users_count: usersCount || 0,
-            total_value: org.total_contract_value || 0
+            total_value: org.total_contract_value || 0,
+            // Avtalsinfo
+            contract_type: org.contract_type,
+            contract_end_date: org.contract_end_date,
+            annual_value: org.annual_value || 0,
+            monthly_value: org.monthly_value || 0,
+            account_manager: org.assigned_account_manager,
+            account_manager_email: org.account_manager_email,
+            sales_person: org.sales_person,
+            sales_person_email: org.sales_person_email,
+            // Kontaktinfo
+            contact_phone: org.contact_phone,
+            contact_person: org.contact_person,
+            // Enheter
+            sites: sites || []
           }
         }))
 
@@ -537,6 +574,61 @@ export default function OrganizationsPage() {
                     </div>
                   </div>
 
+                  {/* Avtalsinfo */}
+                  {(org.annual_value > 0 || org.account_manager || org.contract_end_date) && (
+                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        {org.annual_value > 0 && (
+                          <div>
+                            <span className="text-slate-400">Årspremie:</span>
+                            <p className="text-white font-medium">
+                              {new Intl.NumberFormat('sv-SE', { 
+                                style: 'currency', 
+                                currency: 'SEK' 
+                              }).format(org.annual_value)}
+                            </p>
+                          </div>
+                        )}
+                        {org.contract_end_date && (
+                          <div>
+                            <span className="text-slate-400">Avtalet löper ut:</span>
+                            <p className="text-white font-medium">
+                              {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
+                            </p>
+                          </div>
+                        )}
+                        {org.account_manager && (
+                          <div>
+                            <span className="text-slate-400">Account Manager:</span>
+                            <p className="text-white font-medium">{org.account_manager}</p>
+                            {org.account_manager_email && (
+                              <a 
+                                href={`mailto:${org.account_manager_email}`} 
+                                className="text-xs text-blue-400 hover:underline"
+                              >
+                                {org.account_manager_email}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        {org.sales_person && (
+                          <div>
+                            <span className="text-slate-400">Säljare:</span>
+                            <p className="text-white font-medium">{org.sales_person}</p>
+                            {org.sales_person_email && (
+                              <a 
+                                href={`mailto:${org.sales_person_email}`} 
+                                className="text-xs text-blue-400 hover:underline"
+                              >
+                                {org.sales_person_email}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     {/* Expand/Collapse ikon */}
                     <div className="p-2 text-slate-400">
@@ -613,13 +705,32 @@ export default function OrganizationsPage() {
                                 </div>
                                 <div>
                                   <p className="text-white font-medium">{user.name}</p>
-                                  <p className="text-sm text-slate-400">{user.email}</p>
+                                  <div className="flex items-center gap-3 text-sm">
+                                    <p className="text-slate-400">{user.email}</p>
+                                    {user.phone && (
+                                      <>
+                                        <span className="text-slate-600">•</span>
+                                        <a 
+                                          href={`tel:${user.phone}`}
+                                          className="text-slate-400 hover:text-blue-400 flex items-center gap-1"
+                                        >
+                                          <Phone className="w-3 h-3" />
+                                          {user.phone}
+                                        </a>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-2 ml-4">
                                   <Shield className="w-4 h-4 text-blue-400" />
                                   <span className="text-sm text-blue-400">
                                     {getRoleName(user.role_type)}
                                   </span>
+                                  {user.site_ids && user.site_ids.length > 0 && (
+                                    <span className="text-xs text-slate-500 ml-2">
+                                      ({user.site_ids.length} {user.site_ids.length === 1 ? 'enhet' : 'enheter'})
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -661,6 +772,82 @@ export default function OrganizationsPage() {
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto" />
                         <p className="text-slate-400 mt-2">Laddar användare...</p>
+                      </div>
+                    )}
+
+                    {/* Sites/Enheter sektion */}
+                    {org.sites && org.sites.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-slate-700">
+                        <h4 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                          <MapPin className="w-5 h-5 text-blue-400" />
+                          Anläggningar ({org.sites.length})
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {org.sites.map(site => (
+                            <div key={site.id} className="p-4 bg-slate-800/50 rounded-lg">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <h5 className="font-medium text-white">{site.site_name || site.company_name}</h5>
+                                  {site.site_code && (
+                                    <span className="text-xs text-slate-500">Kod: {site.site_code}</span>
+                                  )}
+                                </div>
+                                {site.region && (
+                                  <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">
+                                    {site.region}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-2 text-sm">
+                                {site.contact_person && (
+                                  <div className="flex items-center gap-2 text-slate-300">
+                                    <UserCheck className="w-4 h-4 text-slate-400" />
+                                    <span>{site.contact_person}</span>
+                                  </div>
+                                )}
+                                {site.contact_phone && (
+                                  <div className="flex items-center gap-2 text-slate-400">
+                                    <Phone className="w-4 h-4" />
+                                    <a 
+                                      href={`tel:${site.contact_phone}`} 
+                                      className="hover:text-blue-400 transition-colors"
+                                    >
+                                      {site.contact_phone}
+                                    </a>
+                                  </div>
+                                )}
+                                {site.contact_email && (
+                                  <div className="flex items-center gap-2 text-slate-400">
+                                    <Mail className="w-4 h-4" />
+                                    <a 
+                                      href={`mailto:${site.contact_email}`} 
+                                      className="hover:text-blue-400 transition-colors truncate"
+                                      title={site.contact_email}
+                                    >
+                                      {site.contact_email}
+                                    </a>
+                                  </div>
+                                )}
+                                {site.contact_address && (
+                                  <div className="flex items-start gap-2 text-slate-400">
+                                    <MapPin className="w-4 h-4 mt-0.5" />
+                                    <span className="text-xs">{site.contact_address}</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {site.organization_number && (
+                                <div className="mt-2 pt-2 border-t border-slate-700">
+                                  <span className="text-xs text-slate-500">
+                                    Org.nr: {site.organization_number} (Per-site fakturering)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
