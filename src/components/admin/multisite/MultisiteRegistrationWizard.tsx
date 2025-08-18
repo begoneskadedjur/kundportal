@@ -505,21 +505,45 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
       if (orgError) throw orgError
 
       // 3. Create enhet (unit) customers med eventuella egna org.nr för fakturering
-      const sitesToInsert = sites.map(site => ({
-        company_name: `${organizationData.name} - ${site.site_name}`,
-        site_name: site.site_name,
-        site_code: site.site_code || null,
-        contact_address: site.address || null,
-        contact_email: '',
-        region: site.region,
-        site_type: 'enhet' as const,
-        parent_customer_id: hovedkontor.id,
-        organization_id: organizationId,
-        organization_number: site.organization_number || null, // För per-site fakturering
-        is_multisite: true,
-        contract_type: contractData.contract_type || 'multisite',
-        is_active: true
-      }))
+      const sitesToInsert = sites.map(site => {
+        // Hitta platsansvarig för denna site
+        const siteManagerAssignment = roleAssignments.find(ra => 
+          ra.role === 'platsansvarig' && 
+          ra.siteIds?.includes(site.site_name)
+        );
+        
+        // Hämta användaruppgifter för platsansvarig
+        let siteContactPerson = null;
+        let siteContactPhone = null;
+        let siteContactEmail = '';
+        
+        if (siteManagerAssignment) {
+          const siteManager = users.find(u => u.id === siteManagerAssignment.userId);
+          if (siteManager) {
+            siteContactPerson = siteManager.name;
+            siteContactPhone = siteManager.phone;
+            siteContactEmail = siteManager.email;
+          }
+        }
+        
+        return {
+          company_name: `${organizationData.name} - ${site.site_name}`,
+          site_name: site.site_name,
+          site_code: site.site_code || null,
+          contact_address: site.address || null,
+          contact_person: siteContactPerson,
+          contact_email: siteContactEmail,
+          contact_phone: siteContactPhone,
+          region: site.region,
+          site_type: 'enhet' as const,
+          parent_customer_id: hovedkontor.id,
+          organization_id: organizationId,
+          organization_number: site.organization_number || null, // För per-site fakturering
+          is_multisite: true,
+          contract_type: contractData.contract_type || 'multisite',
+          is_active: true
+        };
+      });
 
       const { data: createdSites, error: sitesError } = await supabase
         .from('customers')

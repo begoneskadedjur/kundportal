@@ -171,6 +171,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: 'customer',
               multisite_role: roleAssignment.role,
               organization_id: organizationId,
+              display_name: userData.name,
+              phone: userData.phone,
               is_active: true
             })
             .eq('user_id', userId)
@@ -195,6 +197,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: 'customer',
               multisite_role: roleAssignment.role,
               organization_id: organizationId,
+              display_name: userData.name,
+              phone: userData.phone,
               is_active: true
             })
 
