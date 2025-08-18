@@ -106,21 +106,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     };
 
     const fetchMultisiteRoles = async () => {
-      // Hämta multisite-roller för platsansvariga
+      // Hämta multisite-roller först
       const { data: rolesData, error: rolesError } = await supabase
         .from('multisite_user_roles')
-        .select(`
-          *,
-          profiles(email, display_name)
-        `)
+        .select('*')
         .eq('role_type', 'platsansvarig')
         .eq('is_active', true);
 
       if (!rolesError && rolesData) {
-        // Berika med användarinfo från auth.users för telefon och namn
+        // Hämta profiles separat för varje roll
         const enrichedRoles = await Promise.all(rolesData.map(async (role) => {
+          // Hämta profil separat
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('email, display_name')
+            .eq('user_id', role.user_id)
+            .single();
+          
           try {
-            // Hämta från auth.users via SQL eftersom admin API inte är tillgänglig i frontend
+            // Hämta metadata från auth.users
             const { data: userData, error: rpcError } = await supabase
               .rpc('get_user_metadata', { user_id: role.user_id });
             
@@ -130,17 +134,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             
             return {
               ...role,
-              user_name: userData?.raw_user_meta_data?.name || role.profiles?.display_name,
+              profiles: profileData,
+              user_name: userData?.raw_user_meta_data?.name || profileData?.display_name,
               user_phone: userData?.raw_user_meta_data?.phone,
-              user_email: role.profiles?.email || userData?.email
+              user_email: profileData?.email || userData?.email
             };
           } catch (err) {
             // Fallback om vi inte kan hämta auth.users data
             return {
               ...role,
-              user_name: role.profiles?.display_name,
+              profiles: profileData,
+              user_name: profileData?.display_name,
               user_phone: null,
-              user_email: role.profiles?.email
+              user_email: profileData?.email
             };
           }
         }));
