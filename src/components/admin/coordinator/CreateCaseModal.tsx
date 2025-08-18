@@ -111,7 +111,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         .from('multisite_user_roles')
         .select(`
           *,
-          profiles!inner(email, display_name)
+          profiles(email, display_name)
         `)
         .eq('role_type', 'platsansvarig')
         .eq('is_active', true);
@@ -121,8 +121,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const enrichedRoles = await Promise.all(rolesData.map(async (role) => {
           try {
             // Hämta från auth.users via SQL eftersom admin API inte är tillgänglig i frontend
-            const { data: userData } = await supabase
+            const { data: userData, error: rpcError } = await supabase
               .rpc('get_user_metadata', { user_id: role.user_id });
+            
+            if (rpcError) {
+              console.error('RPC error for user:', role.user_id, rpcError);
+            }
             
             return {
               ...role,
@@ -140,6 +144,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             };
           }
         }));
+        console.log('Enriched multisite roles:', enrichedRoles);
         setMultisiteRoles(enrichedRoles);
       }
     };
