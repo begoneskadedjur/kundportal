@@ -361,6 +361,9 @@ function getMultisiteInvitationEmailTemplate({
   }
 
   const roleName = roleNames[role] || role
+  // Säker null-checking för att undvika undefined
+  const companyName = organization?.company_name || 'Din organisation'
+  const orgNumber = organization?.organization_number || ''
 
   return `
 <!DOCTYPE html>
@@ -370,120 +373,184 @@ function getMultisiteInvitationEmailTemplate({
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${isNewUser ? 'Välkommen till Begone Organisationsportal' : 'Ny organisation tillagd'}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0f172a; color: #e2e8f0;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-        
-        <!-- Header med gradient -->
-        <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 2rem; text-align: center;">
-            <div style="background-color: rgba(255, 255, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
-                </svg>
-            </div>
-            <h1 style="margin: 0; color: white; font-size: 1.75rem; font-weight: bold;">
-                ${isNewUser ? 'Välkommen till Begone Organisationsportal!' : 'Ny Organisation Tillagd'}
-            </h1>
-            <p style="margin: 0.5rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem;">
-                ${organization.company_name}
-            </p>
-        </div>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f8fafc;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border: 1px solid #e5e7eb;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #2563eb; padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                                BeGone Skadedjur & Sanering AB
+                            </h1>
+                            <p style="margin: 15px 0 0; color: #ffffff; font-size: 16px; opacity: 0.95;">
+                                ${isNewUser ? 'Välkommen till Organisationsportalen' : 'Ny Organisation Tillagd'}
+                            </p>
+                            <p style="margin: 10px 0 0; color: #ffffff; font-size: 20px; font-weight: bold;">
+                                ${companyName}
+                            </p>
+                        </td>
+                    </tr>
 
-        <!-- Innehåll -->
-        <div style="padding: 2rem;">
-            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
-                Hej ${recipientName},
-            </p>
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="margin: 0 0 20px; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Hej ${recipientName},
+                            </p>
 
-            ${isNewUser ? `
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du har blivit inbjuden att delta i Begone Skadedjur & Sanering AB:s multisite-portal för organisationen <strong style="color: #a855f7;">${organization.company_name}</strong>.
-            </p>
+                            ${isNewUser ? `
+                            <p style="margin: 0 0 20px; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Du har blivit inbjuden att delta i Begone Skadedjur & Sanering AB:s multisite-portal för organisationen <strong style="color: #2563eb;">${companyName}</strong>.
+                            </p>
 
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Ett konto har skapats åt dig med rollen <strong style="color: #22c55e;">${roleName}</strong>. 
-                Du får nu tillgång till kvalitetsövervakning, rapporter och hantering för alla anläggningar i organisationen.
-            </p>
-            ` : `
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                Du har blivit tillagd till multisite-organisationen <strong style="color: #a855f7;">${organization.company_name}</strong> 
-                med rollen <strong style="color: #22c55e;">${roleName}</strong>.
-            </p>
+                            <p style="margin: 0 0 30px; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Ett konto har skapats åt dig med rollen <strong style="color: #059669;">${roleName}</strong>. 
+                                Du får nu tillgång till kvalitetsövervakning, rapporter och hantering för alla anläggningar i organisationen.
+                            </p>
+                            ` : `
+                            <p style="margin: 0 0 20px; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                Du har blivit tillagd till multisite-organisationen <strong style="color: #2563eb;">${companyName}</strong> 
+                                med rollen <strong style="color: #059669;">${roleName}</strong>.
+                            </p>
 
-            <p style="line-height: 1.6; margin-bottom: 1.5rem;">
-                För din säkerhet har vi genererat ett nytt temporärt lösenord. Använd de inloggningsuppgifter som finns nedan 
-                för att komma åt denna organisations anläggningar och data.
-            </p>
-            `}
+                            <p style="margin: 0 0 30px; color: #1f2937; font-size: 16px; line-height: 1.6;">
+                                För din säkerhet har vi genererat ett nytt temporärt lösenord. Använd de inloggningsuppgifter som finns nedan 
+                                för att komma åt denna organisations anläggningar och data.
+                            </p>
+                            `}
 
-            <!-- Inloggningsuppgifter -->
-            ${tempPassword ? `
-            <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-                <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
-                    📧 Dina inloggningsuppgifter
-                </h3>
-                <div style="background-color: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 6px; font-family: monospace;">
-                    <p style="margin: 0.5rem 0; color: white;"><strong>E-post:</strong> ${recipientEmail}</p>
-                    <p style="margin: 0.5rem 0; color: white;"><strong>Lösenord:</strong> ${tempPassword}</p>
-                </div>
-                <p style="margin: 1rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">
-                    ⚠️ <strong>Viktigt:</strong> Ändra ditt lösenord när du loggar in första gången
-                </p>
-            </div>
-            ` : ''}
+                            <!-- Inloggningsuppgifter -->
+                            ${tempPassword ? `
+                            <table role="presentation" style="width: 100%; margin: 30px 0; border: 2px solid #dc2626; background-color: #fef2f2;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="margin: 0 0 15px; color: #dc2626; font-size: 18px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                                            Inloggningsuppgifter
+                                        </h3>
+                                        <table role="presentation" style="width: 100%; background-color: #ffffff; border: 1px solid #fecaca;">
+                                            <tr>
+                                                <td style="padding: 15px; font-family: 'Courier New', monospace;">
+                                                    <p style="margin: 0 0 10px; color: #1f2937; font-size: 14px;">
+                                                        <strong>E-post:</strong> ${recipientEmail}
+                                                    </p>
+                                                    <p style="margin: 0; color: #1f2937; font-size: 14px;">
+                                                        <strong>Lösenord:</strong> ${tempPassword}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 15px 0 0; color: #dc2626; font-size: 14px; font-weight: bold;">
+                                            VIKTIGT: Ändra ditt lösenord när du loggar in första gången
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            ` : ''}
 
-            <!-- Organisations-info -->
-            <div style="background-color: #334155; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-                <h3 style="color: #a855f7; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
-                    🏢 Organisationsinfo
-                </h3>
-                <div style="color: #cbd5e1;">
-                    <p style="margin: 0.5rem 0;"><strong>Organisation:</strong> ${organization.company_name}</p>
-                    ${organization.organization_number ? `<p style="margin: 0.5rem 0;"><strong>Org.nr:</strong> ${organization.organization_number}</p>` : ''}
-                    <p style="margin: 0.5rem 0;"><strong>Din roll:</strong> ${roleName}</p>
-                    <p style="margin: 0.5rem 0;"><strong>Faktureringstyp:</strong> Konsoliderad</p>
-                </div>
-            </div>
+                            <!-- Organisations-info -->
+                            <table role="presentation" style="width: 100%; margin: 30px 0; background-color: #f8fafc; border: 1px solid #e5e7eb;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px; font-weight: bold; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
+                                            ORGANISATIONSINFO
+                                        </h3>
+                                        <table role="presentation" style="width: 100%;">
+                                            <tr>
+                                                <td style="padding: 5px 0;">
+                                                    <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                                                        <strong style="color: #1f2937;">Organisation:</strong> ${companyName}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                            ${orgNumber ? `
+                                            <tr>
+                                                <td style="padding: 5px 0;">
+                                                    <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                                                        <strong style="color: #1f2937;">Org.nr:</strong> ${orgNumber}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            <tr>
+                                                <td style="padding: 5px 0;">
+                                                    <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                                                        <strong style="color: #1f2937;">Din roll:</strong> ${roleName}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0;">
+                                                    <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                                                        <strong style="color: #1f2937;">Faktureringstyp:</strong> Konsoliderad
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <!-- Vad du kan göra -->
-            <div style="background-color: #1e40af; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-                <h3 style="color: white; margin: 0 0 1rem; font-size: 1.1rem; font-weight: bold;">
-                    ✨ Vad du kan göra i portalen
-                </h3>
-                <ul style="color: rgba(255, 255, 255, 0.9); margin: 0; padding-left: 1.2rem;">
-                    <li style="margin: 0.5rem 0;">Övervaka kvalitetsindikatorer för alla anläggningar</li>
-                    <li style="margin: 0.5rem 0;">Se detaljerade rapporter och trender</li>
-                    <li style="margin: 0.5rem 0;">Hantera ärenden och uppföljning</li>
-                    <li style="margin: 0.5rem 0;">Få meddelanden om viktiga händelser</li>
-                    <li style="margin: 0.5rem 0;">Exportera data för analys</li>
-                </ul>
-            </div>
+                            <!-- Vad du kan göra -->
+                            <table role="presentation" style="width: 100%; margin: 30px 0; background-color: #eff6ff; border: 1px solid #bfdbfe;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px; font-weight: bold; border-left: 4px solid #2563eb; padding-left: 15px;">
+                                            VAD DU KAN GÖRA I PORTALEN
+                                        </h3>
+                                        <table role="presentation" style="width: 100%; margin-left: 20px;">
+                                            <tr><td style="padding: 5px 0; color: #4b5563; font-size: 15px;">• Övervaka kvalitetsindikatorer för alla anläggningar</td></tr>
+                                            <tr><td style="padding: 5px 0; color: #4b5563; font-size: 15px;">• Se detaljerade rapporter och trender</td></tr>
+                                            <tr><td style="padding: 5px 0; color: #4b5563; font-size: 15px;">• Hantera ärenden och uppföljning</td></tr>
+                                            <tr><td style="padding: 5px 0; color: #4b5563; font-size: 15px;">• Få meddelanden om viktiga händelser</td></tr>
+                                            <tr><td style="padding: 5px 0; color: #4b5563; font-size: 15px;">• Exportera data för analys</td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <!-- CTA Button -->
-            <div style="text-align: center; margin: 2rem 0;">
-                <a href="${loginLink}" 
-                   style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); 
-                          color: white; 
-                          text-decoration: none; 
-                          padding: 1rem 2rem; 
-                          border-radius: 8px; 
-                          font-weight: bold; 
-                          display: inline-block; 
-                          font-size: 1.1rem;
-                          box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);">
-                    🚀 Logga in i portalen
-                </a>
-            </div>
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%; margin: 40px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <table role="presentation">
+                                            <tr>
+                                                <td style="background-color: #2563eb; padding: 15px 40px; text-align: center;">
+                                                    <a href="${loginLink}" 
+                                                       style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+                                                        LOGGA IN I PORTALEN
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <div style="border-top: 1px solid #475569; padding-top: 1.5rem; margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">
-                <p>Länken är giltig i 7 dagar. Kontakta oss på <a href="mailto:info@begone.se" style="color: #a855f7;">info@begone.se</a> om du behöver hjälp.</p>
-                <p style="margin-top: 1rem;">
-                    Med vänliga hälsningar,<br>
-                    <strong style="color: #e2e8f0;">Begone Skadedjur & Sanering AB</strong>
-                </p>
-            </div>
-        </div>
-    </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px;">
+                                Länken är giltig i 7 dagar. Kontakta oss på 
+                                <a href="mailto:info@begone.se" style="color: #2563eb; text-decoration: none;">info@begone.se</a> 
+                                om du behöver hjälp.
+                            </p>
+                            <p style="margin: 15px 0 0; color: #6b7280; font-size: 14px;">
+                                Med vänliga hälsningar,<br>
+                                <strong style="color: #1f2937; font-size: 16px;">Begone Skadedjur & Sanering AB</strong>
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
   `

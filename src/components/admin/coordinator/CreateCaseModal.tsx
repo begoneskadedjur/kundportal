@@ -156,14 +156,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const customer = contractCustomers.find(c => c.id === initialCaseData.customer_id);
       
       if (customer) {
-        if (customer.is_multisite && customer.parent_customer_id) {
+        if (customer.is_multisite && (customer.parent_customer_id || customer.organization_id)) {
           // Det är en multisite-enhet - sätt huvudkund och enhet
-          console.log('Multisite enhet detekterad:', customer.company_name, 'Huvudkund:', customer.parent_customer_id);
-          setSelectedContractCustomer(customer.parent_customer_id);
+          console.log('Multisite enhet detekterad:', customer.company_name);
+          
+          // För multi-site: använd parent_customer_id om det finns, annars hitta huvudkontoret via organization_id
+          if (customer.parent_customer_id) {
+            console.log('Använder parent_customer_id:', customer.parent_customer_id);
+            setSelectedContractCustomer(customer.parent_customer_id);
+          } else if (customer.organization_id) {
+            // Hitta huvudkontoret (site_type === 'huvudkontor')
+            const huvudkontor = contractCustomers.find(c => 
+              c.organization_id === customer.organization_id && 
+              c.site_type === 'huvudkontor'
+            );
+            console.log('Hittade huvudkontor via organization_id:', huvudkontor?.company_name);
+            setSelectedContractCustomer(huvudkontor?.id || customer.id);
+          }
+          
           setSelectedSiteId(customer.id); // Enhets-ID
-        } else if (!customer.parent_customer_id) {
-          // Vanlig kund eller multisite-huvudkund
-          console.log('Vanlig kund eller huvudkund:', customer.company_name);
+        } else if (!customer.parent_customer_id && !customer.organization_id) {
+          // Vanlig kund (inte multi-site)
+          console.log('Vanlig kund:', customer.company_name);
           setSelectedContractCustomer(customer.id);
           setSelectedSiteId(null);
         }
