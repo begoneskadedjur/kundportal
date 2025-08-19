@@ -86,6 +86,17 @@ interface CompactOrganizationTableProps {
   getDaysUntilContractEnd: (endDate: string | undefined) => number | null
 }
 
+// Mappning för contract_types från databasen
+const CONTRACT_TYPE_MAPPING: Record<string, string> = {
+  '242dff01-ecf7-4de1-ab5f-7fad11cb8812': 'Skadedjursavtal',
+  '21ed7bc7-e767-48e3-b981-4305b1ae7141': 'Betongstationer',
+  '37eeca21-f8b3-45f7-810a-7f616f84e71e': 'Mekaniska råttfällor',
+  '73c7c42b-a302-4da2-abf2-8d6080045bc8': 'Fågelavtal',
+  'bc612355-b6ce-4ca8-82cd-4f82a8538b71': 'Avloppsfällor',
+  'e3a610c9-15b9-42fe-8085-d0a7e17d4465': 'Betesstationer',
+  '3d749768-63be-433f-936d-be070edf4876': 'Avrop - 2.490kr'
+}
+
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   organizations,
   organizationUsers,
@@ -150,20 +161,26 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         color: 'text-red-400 font-medium' 
       }
     } else if (daysLeft <= 30) {
+      // Visa i dagar om mindre än 30 dagar
       return { 
         text: `${daysLeft} dagar`, 
         color: 'text-amber-400 font-medium' 
       }
-    } else if (daysLeft <= 90) {
-      return { 
-        text: `${daysLeft} dagar`, 
-        color: 'text-yellow-400' 
+    } else {
+      // Konvertera till månader
+      const monthsLeft = Math.round(daysLeft / 30)
+      
+      if (daysLeft <= 90) {
+        return { 
+          text: `${monthsLeft} mån`, 
+          color: 'text-yellow-400' 
+        }
       }
-    }
-    
-    return { 
-      text: `${daysLeft} dagar`, 
-      color: 'text-slate-300' 
+      
+      return { 
+        text: `${monthsLeft} mån`, 
+        color: 'text-slate-300' 
+      }
     }
   }
 
@@ -190,6 +207,29 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
     return roleNames[roleType] || roleType
   }
 
+  // Hjälpfunktion för att hämta avtalsnamn
+  const getContractTypeName = (contractType: string | undefined) => {
+    if (!contractType) return null
+    
+    // Kolla först om det är en UUID från contract_types tabellen
+    if (CONTRACT_TYPE_MAPPING[contractType]) {
+      return CONTRACT_TYPE_MAPPING[contractType]
+    }
+    
+    // Fallback till OneFlow templates
+    const template = getTemplateById(contractType)
+    if (template) {
+      return template.name
+    }
+    
+    // Om det redan är ett namn (inte UUID), returnera det
+    if (!contractType.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return contractType
+    }
+    
+    return contractType
+  }
+
   const handleViewDetails = (orgId: string) => {
     navigate(`/admin/organisation/organizations-manage`, { state: { selectedOrgId: orgId } })
   }
@@ -204,10 +244,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           <div className="col-span-3">Organisation</div>
           <div className="col-span-1 text-center">Enheter</div>
           <div className="col-span-1 text-center">Användare</div>
-          <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-2 text-right">Årspremie</div>
-          <div className="col-span-1 text-right">Avtal</div>
+          <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-1 text-center">Längd</div>
+          <div className="col-span-1 text-right">Löper ut</div>
           <div className="col-span-2 text-center">Åtgärder</div>
         </div>
       </div>
@@ -287,19 +327,14 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   {org.users_count || 0}
                 </div>
 
-                {/* Totalt värde */}
-                <div className="col-span-2 text-right text-sm font-medium text-white">
-                  {formatCurrency(org.total_value)}
-                </div>
-
                 {/* Årspremie */}
                 <div className="col-span-2 text-right text-sm text-slate-300">
                   {formatCurrency(org.annual_value)}
                 </div>
 
-                {/* Avtal */}
-                <div className={`col-span-1 text-right text-sm ${contractStatus.color}`}>
-                  {contractStatus.text}
+                {/* Totalt värde */}
+                <div className="col-span-2 text-right text-sm font-medium text-white">
+                  {formatCurrency(org.total_value)}
                 </div>
 
                 {/* Avtalslängd */}
@@ -307,6 +342,11 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   {org.contract_length ? 
                     (typeof org.contract_length === 'number' ? `${org.contract_length} mån` : org.contract_length) 
                     : '-'}
+                </div>
+
+                {/* Löper ut */}
+                <div className={`col-span-1 text-right text-sm ${contractStatus.color}`}>
+                  {contractStatus.text}
                 </div>
 
                 {/* Åtgärder */}
@@ -408,7 +448,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         )}
                         {org.contract_type && (
                           <div className="text-slate-400">
-                            <span className="text-slate-500">Avtalstyp:</span> {getTemplateById(org.contract_type)?.name || org.contract_type}
+                            <span className="text-slate-500">Avtalstyp:</span> {getContractTypeName(org.contract_type)}
                           </div>
                         )}
                       </div>
