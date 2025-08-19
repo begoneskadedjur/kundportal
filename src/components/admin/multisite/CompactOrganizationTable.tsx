@@ -261,10 +261,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           <div className="col-span-2">Organisation</div>
           <div className="col-span-1 text-center">Enheter</div>
           <div className="col-span-1 text-center">Användare</div>
-          <div className="col-span-3 text-right">Årspremie</div>
+          <div className="col-span-2 text-right">Årspremie</div>
           <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-1 text-center">Längd</div>
-          <div className="col-span-1 text-right">Löper ut</div>
+          <div className="col-span-2 text-right">Löper ut</div>
           <div className="col-span-2 text-center">Åtgärder</div>
         </div>
       </div>
@@ -345,7 +345,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 </div>
 
                 {/* Årspremie */}
-                <div className="col-span-3 text-right text-sm text-slate-300">
+                <div className="col-span-2 text-right text-sm text-slate-300">
                   {formatCurrency(org.annual_value)}
                 </div>
 
@@ -362,7 +362,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 </div>
 
                 {/* Löper ut */}
-                <div className={`col-span-1 text-right text-sm ${contractStatus.color}`}>
+                <div className={`col-span-2 text-right text-sm ${contractStatus.color}`}>
                   {contractStatus.text}
                 </div>
 
