@@ -51,6 +51,7 @@ interface Organization {
   // Avtalsinfo
   contract_type?: string
   contract_end_date?: string
+  contract_length?: number
   annual_value?: number
   monthly_value?: number
   account_manager?: string
@@ -254,6 +255,7 @@ export default function OrganizationsPage() {
             // Avtalsinfo
             contract_type: org.contract_type,
             contract_end_date: org.contract_end_date,
+            contract_length: org.contract_length,
             annual_value: org.annual_value || 0,
             monthly_value: org.monthly_value || 0,
             account_manager: org.assigned_account_manager,

@@ -22,6 +22,8 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import { useNavigate } from 'react-router-dom'
+import { getTemplateById } from '../../../constants/oneflowTemplates'
+import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 
 interface Organization {
   id: string
@@ -39,6 +41,7 @@ interface Organization {
   total_value?: number
   contract_type?: string
   contract_end_date?: string
+  contract_length?: number
   annual_value?: number
   monthly_value?: number
   account_manager?: string
@@ -100,6 +103,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   const navigate = useNavigate()
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
+  const [showRecommendationsModal, setShowRecommendationsModal] = useState(false)
+  const [selectedOrgForModal, setSelectedOrgForModal] = useState<Organization | null>(null)
 
   // Hjälpfunktion för bekräftelsestatus
   const getAcknowledgmentStatus = (org: Organization) => {
@@ -190,10 +195,11 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   }
 
   return (
-    <div className="w-full">
+    <>
+      <div className="w-full">
       {/* Tabellhuvud */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-t-lg">
-        <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+        <div className="grid grid-cols-14 gap-2 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
           <div className="col-span-1">Status</div>
           <div className="col-span-3">Organisation</div>
           <div className="col-span-1 text-center">Enheter</div>
@@ -201,7 +207,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-2 text-right">Årspremie</div>
           <div className="col-span-1 text-right">Avtal</div>
-          <div className="col-span-1 text-center">Åtgärder</div>
+          <div className="col-span-1 text-center">Längd</div>
+          <div className="col-span-2 text-center">Åtgärder</div>
         </div>
       </div>
 
@@ -219,7 +226,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
               {/* Kompakt rad */}
               <div
                 className={`
-                  grid grid-cols-12 gap-2 px-4 py-2.5 items-center
+                  grid grid-cols-14 gap-2 px-4 py-2.5 items-center
                   border-l-4 ${ackStatus.borderColor}
                   ${isHovered ? 'bg-slate-800/30' : ''}
                   ${!org.is_active ? 'opacity-60' : ''}
@@ -230,7 +237,19 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 onClick={() => onToggleExpand(org)}
               >
                 {/* Status */}
-                <div className="col-span-1 flex items-center gap-1" title={ackStatus.tooltip}>
+                <div 
+                  className={`col-span-1 flex items-center gap-1 ${
+                    org.unacknowledgedCount > 0 ? 'cursor-pointer hover:opacity-80' : ''
+                  }`}
+                  title={ackStatus.tooltip}
+                  onClick={(e) => {
+                    if (org.unacknowledgedCount > 0) {
+                      e.stopPropagation()
+                      setSelectedOrgForModal(org)
+                      setShowRecommendationsModal(true)
+                    }
+                  }}
+                >
                   {ackStatus.icon}
                   {ackStatus.text && (
                     <span className={`text-xs font-medium ${ackStatus.color}`}>
@@ -283,9 +302,14 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   {contractStatus.text}
                 </div>
 
+                {/* Avtalslängd */}
+                <div className="col-span-1 text-center text-sm text-slate-300">
+                  {org.contract_length ? `${org.contract_length} mån` : '-'}
+                </div>
+
                 {/* Åtgärder */}
                 <div 
-                  className="col-span-1 flex justify-center"
+                  className="col-span-2 flex justify-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="relative">
@@ -382,7 +406,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         )}
                         {org.contract_type && (
                           <div className="text-slate-400">
-                            <span className="text-slate-500">Avtalstyp:</span> {org.contract_type}
+                            <span className="text-slate-500">Avtalstyp:</span> {getTemplateById(org.contract_type)?.name || org.contract_type}
                           </div>
                         )}
                       </div>
@@ -478,6 +502,20 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         })}
       </div>
     </div>
+
+    {/* Modal för obekräftade rekommendationer */}
+    {showRecommendationsModal && selectedOrgForModal && (
+      <UnacknowledgedRecommendationsModal
+        isOpen={showRecommendationsModal}
+        onClose={() => {
+          setShowRecommendationsModal(false)
+          setSelectedOrgForModal(null)
+        }}
+        organizationId={selectedOrgForModal.organization_id}
+        organizationName={selectedOrgForModal.name}
+      />
+    )}
+    </>
   )
 }
 
