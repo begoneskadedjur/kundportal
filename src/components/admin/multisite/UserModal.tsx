@@ -161,6 +161,7 @@ export default function UserModal({
         toast.success('Användare uppdaterad')
       } else {
         // Skapa ny användare genom API
+        const userId = crypto.randomUUID()
         const response = await fetch('/api/create-multisite-users', {
           method: 'POST',
           headers: {
@@ -169,8 +170,13 @@ export default function UserModal({
           body: JSON.stringify({
             organizationId: orgData.organization_id,
             users: [{
+              id: userId,
               email,
               name: fullName,
+              phone: ''
+            }],
+            roleAssignments: [{
+              userId: userId,
               role: roleType,
               siteIds: (roleType === 'platsansvarig' || roleType === 'regionchef') ? selectedSites : undefined
             }]
