@@ -5,7 +5,7 @@ import { AlertTriangle } from 'lucide-react'
 interface TrafficLightBadgeProps {
   pestLevel?: number | null
   problemRating?: number | null
-  size?: 'small' | 'medium' | 'large'
+  size?: 'small' | 'medium' | 'large' | 'xl'
   showTooltip?: boolean
   className?: string
 }
@@ -45,21 +45,24 @@ const TrafficLightBadge: React.FC<TrafficLightBadgeProps> = ({
       text: 'text-green-400',
       icon: '🟢',
       label: 'OK',
-      fullLabel: 'OK - Kontrollerad situation'
+      fullLabel: 'OK - Kontrollerad situation',
+      animation: ''
     },
     yellow: {
       container: 'bg-yellow-500/20 border-yellow-500/50',
       text: 'text-yellow-400',
       icon: '🟡',
       label: 'Varning',
-      fullLabel: 'VARNING - Övervakning krävs'
+      fullLabel: 'VARNING - Övervakning krävs',
+      animation: ''
     },
     red: {
       container: 'bg-red-500/20 border-red-500/50',
       text: 'text-red-400',
       icon: '🔴',
       label: 'Kritisk',
-      fullLabel: 'KRITISK - Omedelbar åtgärd'
+      fullLabel: 'KRITISK - Omedelbar åtgärd',
+      animation: 'animate-pulse'
     }
   }
 
@@ -67,7 +70,8 @@ const TrafficLightBadge: React.FC<TrafficLightBadgeProps> = ({
   const sizeStyles = {
     small: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
     medium: 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',
-    large: 'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-base font-semibold shadow-lg'
+    large: 'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-base font-semibold shadow-lg',
+    xl: 'inline-flex items-center gap-3 px-6 py-3 rounded-2xl text-lg font-bold shadow-xl border-2'
   }
 
   const currentStyle = statusStyles[status]
@@ -100,15 +104,20 @@ const TrafficLightBadge: React.FC<TrafficLightBadgeProps> = ({
   return (
     <div className="relative inline-block">
       <div
-        className={`${sizeStyle} ${currentStyle.container} ${currentStyle.text} border transition-all duration-200 ${className}`}
+        className={`${sizeStyle} ${currentStyle.container} ${currentStyle.text} border transition-all duration-200 ${currentStyle.animation} ${className}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <span className={size === 'small' ? 'text-sm' : size === 'medium' ? 'text-base' : 'text-xl'}>
+        <span className={
+          size === 'small' ? 'text-sm' : 
+          size === 'medium' ? 'text-base' : 
+          size === 'large' ? 'text-xl' :
+          'text-2xl'
+        }>
           {currentStyle.icon}
         </span>
         {size !== 'small' && (
-          <span className={size === 'large' ? 'font-semibold' : ''}>{currentStyle.label}</span>
+          <span className={size === 'large' || size === 'xl' ? 'font-semibold' : ''}>{currentStyle.label}</span>
         )}
       </div>
 

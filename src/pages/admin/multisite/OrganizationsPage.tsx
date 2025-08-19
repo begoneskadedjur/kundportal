@@ -637,118 +637,122 @@ export default function OrganizationsPage() {
                 key={org.id} 
                 className={`${!org.is_active ? 'opacity-60' : ''}`}
               >
-                {/* Klickbar header-sektion med ny layout */}
+                {/* Klickbar header-sektion med förbättrad layout */}
                 <div 
-                  className="p-6 hover:bg-slate-800/30 transition-all duration-200 cursor-pointer"
+                  className="p-4 sm:p-6 lg:p-8 hover:bg-slate-800/30 transition-all duration-200 cursor-pointer"
                   onClick={() => handleToggleExpand(org)}
                 >
-                  {/* Huvudlayout: Vänster + Höger kolumn */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
-                    {/* VÄNSTER KOLUMN - Huvudinformation & Status */}
-                    <div className="lg:col-span-2 space-y-4">
-                      {/* Organisation Header */}
-                      <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-xl ${
-                          org.is_active 
-                            ? 'bg-purple-500/20 text-purple-400' 
-                            : 'bg-slate-700 text-slate-400'
-                        }`}>
-                          <Building2 className="w-6 h-6" />
+                  {/* STATUS BANNER - Högsta prioritet längst upp */}
+                  <div className="mb-6">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                      {/* Extra stor trafikljusstatus som visuell ankare - responsive size */}
+                      {(org.worstPestLevel !== null || org.worstProblemRating !== null) && (
+                        <TrafficLightBadge
+                          pestLevel={org.worstPestLevel}
+                          problemRating={org.worstProblemRating}
+                          size="xl"
+                          className="ring-2 ring-white/10"
+                        />
+                      )}
+                      
+                      {/* Kritiska ärenden - Stor och prominent, responsive text */}
+                      {org.criticalCasesCount > 0 && (
+                        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-2 sm:py-3 bg-red-500/20 border-2 border-red-500/60 rounded-xl animate-pulse shadow-lg">
+                          <div className="w-3 h-3 bg-red-400 rounded-full animate-ping"></div>
+                          <span className="text-sm sm:text-base font-bold text-red-300">
+                            {org.criticalCasesCount} KRITISKA ÄRENDEN
+                          </span>
                         </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-xl font-semibold text-white truncate">
-                              {org.name}
-                            </h3>
-                            {!org.is_active && (
-                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium">
-                                Inaktiv
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-400 font-mono">
-                            Org.nr: {org.organization_number}
-                          </p>
+                      )}
+                      
+                      {/* Obekräftade rekommendationer - Hög prioritet, responsive */}
+                      {org.unacknowledgedCount > 0 && (
+                        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-amber-500/20 border-2 border-amber-500/60 rounded-xl">
+                          <AlertTriangle className="w-4 sm:w-5 h-4 sm:h-5 text-amber-400" />
+                          <span className="text-xs sm:text-sm font-semibold text-amber-300">
+                            <span className="hidden sm:inline">{org.unacknowledgedCount} obekräftade rekommendationer</span>
+                            <span className="sm:hidden">{org.unacknowledgedCount} obekräftade</span>
+                          </span>
                         </div>
-                      </div>
+                      )}
+                      
+                      {/* Varningar - Synliga men mindre kritiska */}
+                      {org.warningCasesCount > 0 && (
+                        <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                          <span className="text-xs sm:text-sm font-medium text-yellow-400">
+                            {org.warningCasesCount} varningar
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Inaktiv status */}
+                      {!org.is_active && (
+                        <div className="px-3 sm:px-4 py-2 bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg text-xs sm:text-sm font-medium">
+                          INAKTIV ORGANISATION
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Status & Varningar - Prominent placering */}
-                      <div className="flex flex-wrap items-center gap-3">
-                        {/* Trafikljusstatus med större storlek */}
-                        {(org.worstPestLevel !== null || org.worstProblemRating !== null) && (
-                          <TrafficLightBadge
-                            pestLevel={org.worstPestLevel}
-                            problemRating={org.worstProblemRating}
-                            size="large"
-                          />
-                        )}
-                        
-                        {/* Kritiska ärenden med pulsande effekt */}
-                        {org.criticalCasesCount > 0 && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg animate-pulse">
-                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                            <span className="text-sm font-medium text-red-400">
-                              {org.criticalCasesCount} kritiska ärenden
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Varningar */}
-                        {org.warningCasesCount > 0 && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
-                            <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                            <span className="text-sm font-medium text-yellow-400">
-                              {org.warningCasesCount} varningar
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Obekräftade rekommendationer */}
-                        {org.unacknowledgedCount > 0 && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg">
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
-                            <span className="text-sm font-medium text-amber-400">
-                              {org.unacknowledgedCount} obekräftade
-                            </span>
-                          </div>
-                        )}
+                  {/* ORGANISATIONS-IDENTITET - Ren och tydlig */}
+                  <div className="mb-6">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className={`p-3 sm:p-4 rounded-xl ${
+                        org.is_active 
+                          ? 'bg-purple-500/20 text-purple-400' 
+                          : 'bg-slate-700 text-slate-400'
+                      }`}>
+                        <Building2 className="w-6 sm:w-7 h-6 sm:h-7" />
                       </div>
-
-                      {/* Grundläggande statistik */}
-                      <div className="flex items-center gap-6 text-sm">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <MapPin className="w-4 h-4 text-blue-400" />
-                          <span className="font-medium">{org.sites_count || 0}</span>
-                          <span className="text-slate-400">anläggningar</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <Users className="w-4 h-4 text-green-400" />
-                          <span className="font-medium">{org.users_count || 0}</span>
-                          <span className="text-slate-400">användare</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Mail className="w-4 h-4" />
-                          <span className="truncate">{org.billing_email}</span>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 leading-tight">
+                          {org.name}
+                        </h3>
+                        <p className="text-sm sm:text-base text-slate-300 font-mono mb-4">
+                          <span className="hidden sm:inline">Organisationsnummer: </span>
+                          <span className="sm:hidden">Org.nr: </span>
+                          {org.organization_number}
+                        </p>
+                        
+                        {/* Grundläggande statistik med ikoner - responsive layout */}
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm sm:text-base">
+                          <div className="flex items-center gap-2 text-slate-200">
+                            <MapPin className="w-4 sm:w-5 h-4 sm:h-5 text-blue-400" />
+                            <span className="font-semibold">{org.sites_count || 0}</span>
+                            <span className="text-slate-400 hidden sm:inline">anläggningar</span>
+                            <span className="text-slate-400 sm:hidden">enheter</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200">
+                            <Users className="w-4 sm:w-5 h-4 sm:h-5 text-green-400" />
+                            <span className="font-semibold">{org.users_count || 0}</span>
+                            <span className="text-slate-400">användare</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-400 w-full sm:w-auto">
+                            <Mail className="w-4 sm:w-5 h-4 sm:h-5" />
+                            <span className="truncate text-xs sm:text-sm">{org.billing_email}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* HÖGER KOLUMN - Affärsdata */}
-                    <div className="space-y-4">
+                  {/* AFFÄRSDATA - Tydligt avgränsad sektion */}
+                  <div className="border-t border-slate-700 pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Avtalsinfo */}
                       {(org.annual_value > 0 || org.contract_end_date) && (
-                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                          <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" />
+                        <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                          <h4 className="text-base font-semibold text-emerald-400 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5" />
                             Avtalsinfo
                           </h4>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {org.annual_value > 0 && (
                               <div>
-                                <p className="text-xs text-slate-400">Årspremie</p>
-                                <p className="text-white font-semibold text-lg">
+                                <p className="text-sm text-slate-400">Årspremie</p>
+                                <p className="text-white font-bold text-xl">
                                   {new Intl.NumberFormat('sv-SE', { 
                                     style: 'currency', 
                                     currency: 'SEK',
@@ -759,8 +763,8 @@ export default function OrganizationsPage() {
                             )}
                             {org.contract_end_date && (
                               <div>
-                                <p className="text-xs text-slate-400">Utgångsdatum</p>
-                                <p className="text-white font-medium">
+                                <p className="text-sm text-slate-400">Avtalsutgång</p>
+                                <p className="text-white font-semibold">
                                   {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
                                 </p>
                               </div>
@@ -769,92 +773,99 @@ export default function OrganizationsPage() {
                         </div>
                       )}
 
-                      {/* Account Management */}
-                      {(org.account_manager || org.sales_person) && (
-                        <div className="space-y-3">
-                          {org.account_manager && (
-                            <div className="p-3 bg-slate-800/50 rounded-lg">
-                              <p className="text-xs text-slate-400 mb-1">Account Manager</p>
-                              <p className="text-white font-medium">{org.account_manager}</p>
-                              {org.account_manager_email && (
-                                <a 
-                                  href={`mailto:${org.account_manager_email}`}
-                                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {org.account_manager_email}
-                                </a>
-                              )}
-                            </div>
-                          )}
-                          
-                          {org.sales_person && (
-                            <div className="p-3 bg-slate-800/50 rounded-lg">
-                              <p className="text-xs text-slate-400 mb-1">Säljare</p>
-                              <p className="text-white font-medium">{org.sales_person}</p>
-                              {org.sales_person_email && (
-                                <a 
-                                  href={`mailto:${org.sales_person_email}`}
-                                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {org.sales_person_email}
-                                </a>
-                              )}
-                            </div>
-                          )}
+                      {/* Account Manager */}
+                      {org.account_manager && (
+                        <div className="p-5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                          <h4 className="text-base font-semibold text-blue-400 mb-4 flex items-center gap-2">
+                            <UserCheck className="w-5 h-5" />
+                            Account Manager
+                          </h4>
+                          <div>
+                            <p className="text-white font-semibold text-lg">{org.account_manager}</p>
+                            {org.account_manager_email && (
+                              <a 
+                                href={`mailto:${org.account_manager_email}`}
+                                className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {org.account_manager_email}
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
-
-                      {/* Metadata */}
-                      <div className="text-xs text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3 h-3" />
-                          <span>Skapad {new Date(org.created_at).toLocaleDateString('sv-SE')}</span>
+                      
+                      {/* Säljare */}
+                      {org.sales_person && (
+                        <div className="p-5 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                          <h4 className="text-base font-semibold text-purple-400 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5" />
+                            Säljare
+                          </h4>
+                          <div>
+                            <p className="text-white font-semibold text-lg">{org.sales_person}</p>
+                            {org.sales_person_email && (
+                              <a 
+                                href={`mailto:${org.sales_person_email}`}
+                                className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {org.sales_person_email}
+                              </a>
+                            )}
+                          </div>
                         </div>
+                      )}
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="mt-4 text-sm text-slate-500">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>Registrerad {new Date(org.created_at).toLocaleDateString('sv-SE')}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Action Bar - Expand/Collapse och åtgärder */}
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-700">
-                    <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex items-center justify-between mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-700">
+                    <div className="flex items-center gap-2 sm:gap-3 text-slate-400">
                       {expandedOrgId === org.id ? (
-                        <ChevronDown className="w-5 h-5" />
+                        <ChevronDown className="w-5 sm:w-6 h-5 sm:h-6" />
                       ) : (
-                        <ChevronRight className="w-5 h-5" />
+                        <ChevronRight className="w-5 sm:w-6 h-5 sm:h-6" />
                       )}
-                      <span className="text-sm">
+                      <span className="text-sm sm:text-base font-medium">
                         {expandedOrgId === org.id ? 'Dölj detaljer' : 'Visa detaljer'}
                       </span>
                     </div>
                     
-                    {/* Åtgärdsknappar */}
-                    <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
+                    {/* Åtgärdsknappar - responsive sizing */}
+                    <div onClick={(e) => e.stopPropagation()} className="flex gap-2 sm:gap-3">
                       <button
                         onClick={() => handleToggleActive(org)}
-                        className={`p-2 rounded-lg transition-all duration-200 ${
+                        className={`p-2 sm:p-3 rounded-lg transition-all duration-200 ${
                           org.is_active 
                             ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-300' 
                             : 'hover:bg-green-500/20 text-green-400 hover:text-green-300'
                         }`}
                         title={org.is_active ? 'Inaktivera organisation' : 'Aktivera organisation'}
                       >
-                        {org.is_active ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                        {org.is_active ? <XCircle className="w-5 sm:w-6 h-5 sm:h-6" /> : <CheckCircle className="w-5 sm:w-6 h-5 sm:h-6" />}
                       </button>
                       <button
                         onClick={() => handleEditOrganization(org)}
-                        className="p-2 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 rounded-lg transition-all duration-200"
+                        className="p-2 sm:p-3 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 rounded-lg transition-all duration-200"
                         title="Redigera organisation"
                       >
-                        <Edit2 className="w-5 h-5" />
+                        <Edit2 className="w-5 sm:w-6 h-5 sm:h-6" />
                       </button>
                       <button
                         onClick={() => handleDeleteOrganization(org)}
-                        className="p-2 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all duration-200"
+                        className="p-2 sm:p-3 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all duration-200"
                         title="Ta bort organisation"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-5 sm:w-6 h-5 sm:h-6" />
                       </button>
                     </div>
                   </div>
