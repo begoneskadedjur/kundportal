@@ -114,9 +114,9 @@ export default function UserModal({
       return
     }
 
-    // För platsansvarig måste minst en enhet väljas
-    if (roleType === 'platsansvarig' && selectedSites.length === 0) {
-      toast.error('Vänligen välj minst en enhet för platsansvarig')
+    // För platsansvarig och regionchef måste minst en enhet väljas
+    if ((roleType === 'platsansvarig' || roleType === 'regionchef') && selectedSites.length === 0) {
+      toast.error(`Vänligen välj minst en enhet för ${roleType === 'regionchef' ? 'regionchef' : 'platsansvarig'}`)
       return
     }
 
@@ -139,7 +139,7 @@ export default function UserModal({
           .from('multisite_user_roles')
           .update({
             role_type: roleType,
-            site_ids: roleType === 'platsansvarig' ? selectedSites : null,
+            site_ids: (roleType === 'platsansvarig' || roleType === 'regionchef') ? selectedSites : null,
             updated_at: new Date().toISOString()
           })
           .eq('id', existingUser.id)
@@ -172,7 +172,7 @@ export default function UserModal({
               email,
               name: fullName,
               role: roleType,
-              siteIds: roleType === 'platsansvarig' ? selectedSites : undefined
+              siteIds: (roleType === 'platsansvarig' || roleType === 'regionchef') ? selectedSites : undefined
             }]
           })
         })
@@ -278,13 +278,13 @@ export default function UserModal({
             </select>
             <p className="text-xs text-slate-500 mt-1">
               {roleType === 'verksamhetschef' && 'Har full översikt över hela organisationen'}
-              {roleType === 'regionchef' && 'Kan hantera flera enheter inom sin region'}
+              {roleType === 'regionchef' && 'Ansvarar för utvalda enheter inom sin region'}
               {roleType === 'platsansvarig' && 'Ansvarar för specifika enheter'}
             </p>
           </div>
 
-          {/* Enheter (endast för platsansvarig) */}
-          {roleType === 'platsansvarig' && (
+          {/* Enheter (för platsansvarig och regionchef) */}
+          {(roleType === 'platsansvarig' || roleType === 'regionchef') && (
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 <MapPin className="w-4 h-4 inline mr-2" />
