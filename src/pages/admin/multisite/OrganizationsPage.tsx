@@ -102,17 +102,38 @@ export default function OrganizationsPage() {
   }, [])
 
   useEffect(() => {
-    // Filtrera organisationer baserat på sökterm
-    if (searchTerm) {
-      const filtered = organizations.filter(org => 
-        org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        org.organization_number.includes(searchTerm) ||
-        org.billing_email.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      setFilteredOrganizations(filtered)
-    } else {
-      setFilteredOrganizations(organizations)
-    }
+    // Filtrera och sortera organisationer
+    let filtered = searchTerm
+      ? organizations.filter(org => 
+          org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          org.organization_number.includes(searchTerm) ||
+          org.billing_email.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : [...organizations]
+
+    // Smart sortering: Kritiska först, sedan varningar, sedan resten
+    filtered.sort((a, b) => {
+      // Prioritet 1: Kritiska ärenden
+      if (a.criticalCasesCount > 0 && b.criticalCasesCount === 0) return -1
+      if (b.criticalCasesCount > 0 && a.criticalCasesCount === 0) return 1
+      
+      // Prioritet 2: Obekräftade rekommendationer
+      if (a.unacknowledgedCount > 0 && b.unacknowledgedCount === 0) return -1
+      if (b.unacknowledgedCount > 0 && a.unacknowledgedCount === 0) return 1
+      
+      // Prioritet 3: Varningar
+      if (a.warningCasesCount > 0 && b.warningCasesCount === 0) return -1
+      if (b.warningCasesCount > 0 && a.warningCasesCount === 0) return 1
+      
+      // Prioritet 4: Inaktiva sist
+      if (a.is_active && !b.is_active) return -1
+      if (!a.is_active && b.is_active) return 1
+      
+      // Slutligen: Alphabetisk sortering på namn
+      return a.name.localeCompare(b.name, 'sv-SE')
+    })
+
+    setFilteredOrganizations(filtered)
   }, [searchTerm, organizations])
 
   const fetchOrganizations = async () => {
@@ -486,25 +507,65 @@ export default function OrganizationsPage() {
         />
 
         {/* Actions Bar */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Sök organisation, org.nr eller e-post..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        <div className="mb-8 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Sök organisation, org.nr eller e-post..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              onClick={() => navigate('/admin/organisation/register')}
+              variant="primary"
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Ny Organisation
+            </Button>
           </div>
-          <Button
-            onClick={() => navigate('/admin/organisation/register')}
-            variant="primary"
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Ny Organisation
-          </Button>
+
+          {/* Snabbfilter för prioriterade organisationer */}
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm text-slate-400 py-2">Snabbfilter:</span>
+            <button 
+              className="px-3 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+              onClick={() => {
+                const criticalOrgs = organizations.filter(org => org.criticalCasesCount > 0)
+                setFilteredOrganizations(criticalOrgs)
+              }}
+            >
+              🔴 {organizations.filter(org => org.criticalCasesCount > 0).length} med kritiska ärenden
+            </button>
+            <button 
+              className="px-3 py-1 text-xs bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors"
+              onClick={() => {
+                const unconfirmedOrgs = organizations.filter(org => org.unacknowledgedCount > 0)
+                setFilteredOrganizations(unconfirmedOrgs)
+              }}
+            >
+              ⚠️ {organizations.filter(org => org.unacknowledgedCount > 0).length} med obekräftade
+            </button>
+            <button 
+              className="px-3 py-1 text-xs bg-slate-700 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+              onClick={() => {
+                const inactiveOrgs = organizations.filter(org => !org.is_active)
+                setFilteredOrganizations(inactiveOrgs)
+              }}
+            >
+              🚫 {organizations.filter(org => !org.is_active).length} inaktiva
+            </button>
+            <button 
+              className="px-3 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-400 rounded-lg hover:bg-slate-500 transition-colors"
+              onClick={() => setFilteredOrganizations(organizations)}
+            >
+              Visa alla
+            </button>
+          </div>
         </div>
 
         {/* Statistics Cards */}
@@ -576,192 +637,227 @@ export default function OrganizationsPage() {
                 key={org.id} 
                 className={`${!org.is_active ? 'opacity-60' : ''}`}
               >
-                {/* Klickbar header-sektion */}
+                {/* Klickbar header-sektion med ny layout */}
                 <div 
-                  className="p-6 hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="p-6 hover:bg-slate-800/30 transition-all duration-200 cursor-pointer"
                   onClick={() => handleToggleExpand(org)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg ${
-                        org.is_active 
-                          ? 'bg-purple-500/20 text-purple-400' 
-                          : 'bg-slate-700 text-slate-400'
-                      }`}>
-                        <Building2 className="w-5 h-5" />
+                  {/* Huvudlayout: Vänster + Höger kolumn */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* VÄNSTER KOLUMN - Huvudinformation & Status */}
+                    <div className="lg:col-span-2 space-y-4">
+                      {/* Organisation Header */}
+                      <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-xl ${
+                          org.is_active 
+                            ? 'bg-purple-500/20 text-purple-400' 
+                            : 'bg-slate-700 text-slate-400'
+                        }`}>
+                          <Building2 className="w-6 h-6" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="text-xl font-semibold text-white truncate">
+                              {org.name}
+                            </h3>
+                            {!org.is_active && (
+                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium">
+                                Inaktiv
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-400 font-mono">
+                            Org.nr: {org.organization_number}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                          {org.name}
-                          {!org.is_active && (
-                            <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full">
-                              Inaktiv
+
+                      {/* Status & Varningar - Prominent placering */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Trafikljusstatus med större storlek */}
+                        {(org.worstPestLevel !== null || org.worstProblemRating !== null) && (
+                          <TrafficLightBadge
+                            pestLevel={org.worstPestLevel}
+                            problemRating={org.worstProblemRating}
+                            size="large"
+                          />
+                        )}
+                        
+                        {/* Kritiska ärenden med pulsande effekt */}
+                        {org.criticalCasesCount > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg animate-pulse">
+                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                            <span className="text-sm font-medium text-red-400">
+                              {org.criticalCasesCount} kritiska ärenden
                             </span>
-                          )}
-                        </h3>
-                        <p className="text-sm text-slate-400">
-                          Org.nr: {org.organization_number}
-                        </p>
+                          </div>
+                        )}
+                        
+                        {/* Varningar */}
+                        {org.warningCasesCount > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
+                            <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                            <span className="text-sm font-medium text-yellow-400">
+                              {org.warningCasesCount} varningar
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Obekräftade rekommendationer */}
+                        {org.unacknowledgedCount > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            <span className="text-sm font-medium text-amber-400">
+                              {org.unacknowledgedCount} obekräftade
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Grundläggande statistik */}
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <MapPin className="w-4 h-4 text-blue-400" />
+                          <span className="font-medium">{org.sites_count || 0}</span>
+                          <span className="text-slate-400">anläggningar</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <Users className="w-4 h-4 text-green-400" />
+                          <span className="font-medium">{org.users_count || 0}</span>
+                          <span className="text-slate-400">användare</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Mail className="w-4 h-4" />
+                          <span className="truncate">{org.billing_email}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Trafikljusstatus och bekräftelser */}
-                    <div className="flex items-center gap-4 mb-4">
-                      {(org.worstPestLevel !== null || org.worstProblemRating !== null) && (
-                        <TrafficLightBadge
-                          pestLevel={org.worstPestLevel}
-                          problemRating={org.worstProblemRating}
-                          size="medium"
-                        />
-                      )}
-                      
-                      {org.criticalCasesCount > 0 && (
-                        <span className="text-sm text-red-400">
-                          🔴 {org.criticalCasesCount} kritiska
-                        </span>
-                      )}
-                      
-                      {org.warningCasesCount > 0 && (
-                        <span className="text-sm text-yellow-400">
-                          🟡 {org.warningCasesCount} varningar
-                        </span>
-                      )}
-                      
-                      {org.unacknowledgedCount > 0 && (
-                        <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg px-2 py-1 text-amber-400 text-xs flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          {org.unacknowledgedCount} obekräftade rekommendationer
+                    {/* HÖGER KOLUMN - Affärsdata */}
+                    <div className="space-y-4">
+                      {/* Avtalsinfo */}
+                      {(org.annual_value > 0 || org.contract_end_date) && (
+                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                          <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" />
+                            Avtalsinfo
+                          </h4>
+                          <div className="space-y-2">
+                            {org.annual_value > 0 && (
+                              <div>
+                                <p className="text-xs text-slate-400">Årspremie</p>
+                                <p className="text-white font-semibold text-lg">
+                                  {new Intl.NumberFormat('sv-SE', { 
+                                    style: 'currency', 
+                                    currency: 'SEK',
+                                    minimumFractionDigits: 0
+                                  }).format(org.annual_value)}
+                                </p>
+                              </div>
+                            )}
+                            {org.contract_end_date && (
+                              <div>
+                                <p className="text-xs text-slate-400">Utgångsdatum</p>
+                                <p className="text-white font-medium">
+                                  {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <MapPin className="w-4 h-4" />
-                        <span>{org.sites_count || 0} anläggningar</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <Users className="w-4 h-4" />
-                        <span>{org.users_count || 0} användare</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <TrendingUp className="w-4 h-4" />
-                        <span>
-                          {org.billing_method === 'consolidated' 
-                            ? 'Konsoliderad fakturering' 
-                            : 'Per-site fakturering'}
-                        </span>
-                      </div>
-                    </div>
+                      {/* Account Management */}
+                      {(org.account_manager || org.sales_person) && (
+                        <div className="space-y-3">
+                          {org.account_manager && (
+                            <div className="p-3 bg-slate-800/50 rounded-lg">
+                              <p className="text-xs text-slate-400 mb-1">Account Manager</p>
+                              <p className="text-white font-medium">{org.account_manager}</p>
+                              {org.account_manager_email && (
+                                <a 
+                                  href={`mailto:${org.account_manager_email}`}
+                                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {org.account_manager_email}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          
+                          {org.sales_person && (
+                            <div className="p-3 bg-slate-800/50 rounded-lg">
+                              <p className="text-xs text-slate-400 mb-1">Säljare</p>
+                              <p className="text-white font-medium">{org.sales_person}</p>
+                              {org.sales_person_email && (
+                                <a 
+                                  href={`mailto:${org.sales_person_email}`}
+                                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {org.sales_person_email}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Mail className="w-4 h-4" />
-                        <span>{org.billing_email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Calendar className="w-4 h-4" />
-                        <span>Skapad {new Date(org.created_at).toLocaleDateString('sv-SE')}</span>
+                      {/* Metadata */}
+                      <div className="text-xs text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3 h-3" />
+                          <span>Skapad {new Date(org.created_at).toLocaleDateString('sv-SE')}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Avtalsinfo */}
-                  {(org.annual_value > 0 || org.account_manager || org.contract_end_date) && (
-                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        {org.annual_value > 0 && (
-                          <div>
-                            <span className="text-slate-400">Årspremie:</span>
-                            <p className="text-white font-medium">
-                              {new Intl.NumberFormat('sv-SE', { 
-                                style: 'currency', 
-                                currency: 'SEK' 
-                              }).format(org.annual_value)}
-                            </p>
-                          </div>
-                        )}
-                        {org.contract_end_date && (
-                          <div>
-                            <span className="text-slate-400">Avtalet löper ut:</span>
-                            <p className="text-white font-medium">
-                              {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
-                            </p>
-                          </div>
-                        )}
-                        {org.account_manager && (
-                          <div>
-                            <span className="text-slate-400">Account Manager:</span>
-                            <p className="text-white font-medium">{org.account_manager}</p>
-                            {org.account_manager_email && (
-                              <a 
-                                href={`mailto:${org.account_manager_email}`} 
-                                className="text-xs text-blue-400 hover:underline"
-                              >
-                                {org.account_manager_email}
-                              </a>
-                            )}
-                          </div>
-                        )}
-                        {org.sales_person && (
-                          <div>
-                            <span className="text-slate-400">Säljare:</span>
-                            <p className="text-white font-medium">{org.sales_person}</p>
-                            {org.sales_person_email && (
-                              <a 
-                                href={`mailto:${org.sales_person_email}`} 
-                                className="text-xs text-blue-400 hover:underline"
-                              >
-                                {org.sales_person_email}
-                              </a>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    {/* Expand/Collapse ikon */}
-                    <div className="p-2 text-slate-400">
+                  {/* Action Bar - Expand/Collapse och åtgärder */}
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-700">
+                    <div className="flex items-center gap-2 text-slate-400">
                       {expandedOrgId === org.id ? (
                         <ChevronDown className="w-5 h-5" />
                       ) : (
                         <ChevronRight className="w-5 h-5" />
                       )}
+                      <span className="text-sm">
+                        {expandedOrgId === org.id ? 'Dölj detaljer' : 'Visa detaljer'}
+                      </span>
                     </div>
                     
                     {/* Åtgärdsknappar */}
-                    <div onClick={(e) => e.stopPropagation()} className="flex gap-1">
+                    <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
                       <button
                         onClick={() => handleToggleActive(org)}
-                        className={`p-2 rounded-lg transition-colors ${
+                        className={`p-2 rounded-lg transition-all duration-200 ${
                           org.is_active 
-                            ? 'hover:bg-slate-700 text-slate-400' 
-                            : 'hover:bg-green-500/20 text-green-400'
+                            ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-300' 
+                            : 'hover:bg-green-500/20 text-green-400 hover:text-green-300'
                         }`}
-                      title={org.is_active ? 'Inaktivera' : 'Aktivera'}
-                    >
-                      {org.is_active ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-                    </button>
-                    <button
-                      onClick={() => handleEditOrganization(org)}
-                      className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                      title="Redigera"
-                    >
-                      <Edit2 className="w-5 h-5 text-blue-400" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteOrganization(org)}
-                      className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
-                      title="Ta bort"
-                    >
-                      <Trash2 className="w-5 h-5 text-red-400" />
-                    </button>
+                        title={org.is_active ? 'Inaktivera organisation' : 'Aktivera organisation'}
+                      >
+                        {org.is_active ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={() => handleEditOrganization(org)}
+                        className="p-2 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 rounded-lg transition-all duration-200"
+                        title="Redigera organisation"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrganization(org)}
+                        className="p-2 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all duration-200"
+                        title="Ta bort organisation"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
-                </div>
                 </div>
 
                 {/* Expanderad användarsektion */}

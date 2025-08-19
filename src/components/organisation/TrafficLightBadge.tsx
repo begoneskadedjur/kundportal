@@ -67,7 +67,7 @@ const TrafficLightBadge: React.FC<TrafficLightBadgeProps> = ({
   const sizeStyles = {
     small: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
     medium: 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',
-    large: 'inline-flex items-center gap-2 px-4 py-2 rounded-full text-base font-medium'
+    large: 'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-base font-semibold shadow-lg'
   }
 
   const currentStyle = statusStyles[status]
@@ -104,11 +104,11 @@ const TrafficLightBadge: React.FC<TrafficLightBadgeProps> = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <span className={size === 'small' ? 'text-sm' : size === 'medium' ? 'text-base' : 'text-lg'}>
+        <span className={size === 'small' ? 'text-sm' : size === 'medium' ? 'text-base' : 'text-xl'}>
           {currentStyle.icon}
         </span>
         {size !== 'small' && (
-          <span>{currentStyle.label}</span>
+          <span className={size === 'large' ? 'font-semibold' : ''}>{currentStyle.label}</span>
         )}
       </div>
 
