@@ -304,7 +304,9 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
 
                 {/* Avtalslängd */}
                 <div className="col-span-1 text-center text-sm text-slate-300">
-                  {org.contract_length ? `${org.contract_length} mån` : '-'}
+                  {org.contract_length ? 
+                    (typeof org.contract_length === 'number' ? `${org.contract_length} mån` : org.contract_length) 
+                    : '-'}
                 </div>
 
                 {/* Åtgärder */}
