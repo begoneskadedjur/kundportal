@@ -18,7 +18,9 @@ import {
   UserPlus,
   Key,
   UserCheck,
-  Shield
+  Shield,
+  Building2,
+  Plus
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import { useNavigate } from 'react-router-dom'
@@ -71,9 +73,22 @@ interface OrganizationUser {
   site_ids?: string[]
 }
 
+interface Site {
+  id: string
+  site_name: string
+  site_code: string
+  region: string
+  contact_person?: string
+  contact_email?: string
+  contact_phone?: string
+  billing_email?: string
+  is_active: boolean
+}
+
 interface CompactOrganizationTableProps {
   organizations: Organization[]
   organizationUsers: Record<string, OrganizationUser[]>
+  organizationSites: Record<string, Site[]>
   onToggleExpand: (org: Organization) => void
   onToggleActive: (org: Organization) => void
   onEdit: (org: Organization) => void
@@ -82,6 +97,9 @@ interface CompactOrganizationTableProps {
   onEditUser: (org: Organization, user: OrganizationUser) => void
   onDeleteUser: (orgId: string, userId: string) => void
   onResetPassword: (email: string, userName: string) => void
+  onAddSite: (org: Organization) => void
+  onEditSite: (org: Organization, site: Site) => void
+  onDeleteSite: (orgId: string, siteId: string) => void
   expandedOrgId: string | null
   getDaysUntilContractEnd: (endDate: string | undefined) => number | null
 }
@@ -100,6 +118,7 @@ const CONTRACT_TYPE_MAPPING: Record<string, string> = {
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   organizations,
   organizationUsers,
+  organizationSites,
   onToggleExpand,
   onToggleActive,
   onEdit,
@@ -108,6 +127,9 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onEditUser,
   onDeleteUser,
   onResetPassword,
+  onAddSite,
+  onEditSite,
+  onDeleteSite,
   expandedOrgId,
   getDaysUntilContractEnd
 }) => {
@@ -470,6 +492,70 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Enheter */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-blue-400" />
+                        Enheter ({organizationSites[org.id]?.length || 0})
+                      </h4>
+                      <Button
+                        onClick={() => onAddSite(org)}
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Lägg till enhet
+                      </Button>
+                    </div>
+
+                    {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {organizationSites[org.id].map(site => (
+                          <div
+                            key={site.id}
+                            className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-blue-500/20 rounded">
+                                <MapPin className="w-3 h-3 text-blue-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm text-white font-medium truncate">
+                                  {site.site_name} ({site.site_code})
+                                </p>
+                                <p className="text-xs text-slate-400 truncate">
+                                  {site.region} • {site.contact_email}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => onEditSite(org, site)}
+                                className="p-1 hover:bg-slate-700 rounded transition-colors"
+                                title="Redigera"
+                              >
+                                <Edit2 className="w-3 h-3 text-slate-400" />
+                              </button>
+                              <button
+                                onClick={() => onDeleteSite(org.id, site.id)}
+                                className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                                title="Ta bort"
+                              >
+                                <Trash2 className="w-3 h-3 text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-4">
+                        Inga enheter registrerade
+                      </p>
+                    )}
                   </div>
 
                   {/* Användare */}

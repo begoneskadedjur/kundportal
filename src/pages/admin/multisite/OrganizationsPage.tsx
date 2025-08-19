@@ -31,6 +31,7 @@ import {
 import Input from '../../../components/ui/Input'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserModal from '../../../components/admin/multisite/UserModal'
+import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -83,12 +84,25 @@ interface OrganizationUser {
   site_ids?: string[]
 }
 
+interface OrganizationSite {
+  id: string
+  site_name: string
+  site_code: string
+  region: string
+  contact_person?: string
+  contact_email?: string
+  contact_phone?: string
+  billing_email?: string
+  is_active: boolean
+}
+
 export default function OrganizationsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
   const [organizationUsers, setOrganizationUsers] = useState<Record<string, OrganizationUser[]>>({})
+  const [organizationSites, setOrganizationSites] = useState<Record<string, OrganizationSite[]>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
@@ -96,6 +110,8 @@ export default function OrganizationsPage() {
   const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null)
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
+  const [showSiteModal, setShowSiteModal] = useState(false)
+  const [editingSite, setEditingSite] = useState<OrganizationSite | null>(null)
 
   // Hjälpfunktion för att beräkna dagar kvar på avtal
   const getDaysUntilContractEnd = (endDate: string | undefined) => {
@@ -419,9 +435,14 @@ export default function OrganizationsPage() {
       setExpandedOrgId(null)
     } else {
       setExpandedOrgId(org.id)
-      // Hämta användare om vi inte redan har dem
-      if (!organizationUsers[org.id] && org.organization_id) {
-        await fetchOrganizationUsers(org.id, org.organization_id)
+      // Hämta användare och enheter om vi inte redan har dem
+      if (org.organization_id) {
+        if (!organizationUsers[org.id]) {
+          await fetchOrganizationUsers(org.id, org.organization_id)
+        }
+        if (!organizationSites[org.id]) {
+          await fetchOrganizationSites(org.id, org.organization_id)
+        }
       }
     }
   }
@@ -461,6 +482,85 @@ export default function OrganizationsPage() {
     } catch (error) {
       console.error('Error deleting user:', error)
       toast.error('Kunde inte ta bort användare')
+    }
+  }
+
+  const fetchOrganizationSites = async (orgId: string, organizationId: string) => {
+    try {
+      const { data: sites, error } = await supabase
+        .from('customers')
+        .select('id, site_name, site_code, region, contact_person, contact_email, contact_phone, billing_email, is_active')
+        .eq('organization_id', organizationId)
+        .eq('site_type', 'enhet')
+        .eq('is_multisite', true)
+        .order('site_name', { ascending: true })
+
+      if (error) throw error
+
+      const formattedSites = (sites || []).map(site => ({
+        id: site.id,
+        site_name: site.site_name || '',
+        site_code: site.site_code || '',
+        region: site.region || '',
+        contact_person: site.contact_person || undefined,
+        contact_email: site.contact_email || undefined,
+        contact_phone: site.contact_phone || undefined,
+        billing_email: site.billing_email || undefined,
+        is_active: site.is_active
+      }))
+
+      setOrganizationSites(prev => ({
+        ...prev,
+        [orgId]: formattedSites
+      }))
+    } catch (error) {
+      console.error('Error fetching organization sites:', error)
+      toast.error('Kunde inte hämta enheter')
+    }
+  }
+
+  const handleAddSite = (org: Organization) => {
+    setSelectedOrg(org)
+    setEditingSite(null)
+    setShowSiteModal(true)
+  }
+
+  const handleEditSite = (org: Organization, site: OrganizationSite) => {
+    setSelectedOrg(org)
+    setEditingSite(site)
+    setShowSiteModal(true)
+  }
+
+  const handleDeleteSite = async (orgId: string, siteId: string) => {
+    if (!confirm('Är du säker på att du vill ta bort denna enhet?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', siteId)
+
+      if (error) throw error
+
+      toast.success('Enhet borttagen')
+      
+      // Uppdatera lokal state
+      setOrganizationSites(prev => ({
+        ...prev,
+        [orgId]: prev[orgId].filter(s => s.id !== siteId)
+      }))
+      
+      // Uppdatera sites_count i organisations-listan
+      setOrganizations(prev => prev.map(org => 
+        org.id === orgId 
+          ? { ...org, sites_count: (org.sites_count || 1) - 1 }
+          : org
+      ))
+    } catch (error) {
+      console.error('Error deleting site:', error)
+      toast.error('Kunde inte ta bort enhet')
     }
   }
 
@@ -647,6 +747,7 @@ export default function OrganizationsPage() {
           <CompactOrganizationTable
             organizations={filteredOrganizations}
             organizationUsers={organizationUsers}
+            organizationSites={organizationSites}
             onToggleExpand={handleToggleExpand}
             onToggleActive={handleToggleActive}
             onEdit={handleEditOrganization}
@@ -655,6 +756,9 @@ export default function OrganizationsPage() {
             onEditUser={handleEditUser}
             onDeleteUser={handleDeleteUser}
             onResetPassword={handleResetPassword}
+            onAddSite={handleAddSite}
+            onEditSite={handleEditSite}
+            onDeleteSite={handleDeleteSite}
             expandedOrgId={expandedOrgId}
             getDaysUntilContractEnd={getDaysUntilContractEnd}
           />
@@ -695,6 +799,30 @@ export default function OrganizationsPage() {
           organizationId={selectedOrg.id}
           organizationName={selectedOrg.name}
           existingUser={editingUser}
+        />
+      )}
+
+      {/* Site Modal */}
+      {showSiteModal && selectedOrg && (
+        <SiteModal
+          isOpen={showSiteModal}
+          onClose={() => {
+            setShowSiteModal(false)
+            setEditingSite(null)
+          }}
+          onSuccess={() => {
+            setShowSiteModal(false)
+            setEditingSite(null)
+            if (selectedOrg.organization_id) {
+              fetchOrganizationSites(selectedOrg.id, selectedOrg.organization_id)
+            }
+            // Uppdatera sites_count
+            fetchOrganizations()
+          }}
+          organizationId={selectedOrg.organization_id || ''}
+          organizationName={selectedOrg.name}
+          parentCustomerId={selectedOrg.id}
+          existingSite={editingSite}
         />
       )}
     </div>
