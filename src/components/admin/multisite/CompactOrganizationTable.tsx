@@ -153,7 +153,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   const getContractStatus = (org: Organization) => {
     const daysLeft = getDaysUntilContractEnd(org.contract_end_date)
     
-    if (!daysLeft) return { text: '-', color: 'text-slate-400' }
+    if (!daysLeft || !org.contract_end_date) return { text: '-', color: 'text-slate-400' }
     
     if (daysLeft < 0) {
       return { 
@@ -166,19 +166,36 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         text: `${daysLeft} dagar`, 
         color: 'text-amber-400 font-medium' 
       }
-    } else {
-      // Konvertera till månader
-      const monthsLeft = Math.round(daysLeft / 30)
+    } else if (daysLeft <= 90) {
+      // Beräkna exakta månader för kort tid
+      const today = new Date()
+      const endDate = new Date(org.contract_end_date)
       
-      if (daysLeft <= 90) {
-        return { 
-          text: `${monthsLeft} mån`, 
-          color: 'text-yellow-400' 
+      let months = 0
+      const tempDate = new Date(today)
+      
+      while (tempDate < endDate) {
+        tempDate.setMonth(tempDate.getMonth() + 1)
+        if (tempDate <= endDate) {
+          months++
         }
       }
       
       return { 
-        text: `${monthsLeft} mån`, 
+        text: `${months} mån`, 
+        color: 'text-yellow-400' 
+      }
+    } else {
+      // Visa datum för längre tid
+      const endDate = new Date(org.contract_end_date)
+      const formattedDate = endDate.toLocaleDateString('sv-SE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+      
+      return { 
+        text: formattedDate, 
         color: 'text-slate-300' 
       }
     }
@@ -241,10 +258,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
       <div className="bg-slate-800/50 border border-slate-700 rounded-t-lg">
         <div className="grid grid-cols-14 gap-2 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
           <div className="col-span-1">Status</div>
-          <div className="col-span-3">Organisation</div>
+          <div className="col-span-2">Organisation</div>
           <div className="col-span-1 text-center">Enheter</div>
           <div className="col-span-1 text-center">Användare</div>
-          <div className="col-span-2 text-right">Årspremie</div>
+          <div className="col-span-3 text-right">Årspremie</div>
           <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-1 text-center">Längd</div>
           <div className="col-span-1 text-right">Löper ut</div>
@@ -299,7 +316,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 </div>
 
                 {/* Organisation */}
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <div className="flex items-center gap-2">
                     {isExpanded ? (
                       <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -328,7 +345,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 </div>
 
                 {/* Årspremie */}
-                <div className="col-span-2 text-right text-sm text-slate-300">
+                <div className="col-span-3 text-right text-sm text-slate-300">
                   {formatCurrency(org.annual_value)}
                 </div>
 
