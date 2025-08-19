@@ -172,7 +172,8 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
           {/* Header med sammanfattning */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Ärendestatus med trafikljus</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Professionell bedömning av era ärenden</h3>
+              <p className="text-sm text-slate-400 mb-3">Våra tekniker bedömer situationen vid varje besök</p>
               <div className="flex items-center gap-4 text-sm">
                 {statusCounts.red > 0 && (
                   <span className="text-red-400">
@@ -197,6 +198,37 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
                 {statusCounts.unacknowledged} obekräftad{statusCounts.unacknowledged !== 1 ? 'e' : ''}
               </div>
             )}
+          </div>
+
+          {/* Förklaring av statussystemet */}
+          <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 mb-6">
+            <p className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+              Vad betyder bedömningarna?
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">🟢</span>
+                <div>
+                  <p className="font-medium text-green-400">OK - Kontrollerad situation</p>
+                  <p className="text-slate-500">Inga eller minimal aktivitet, situationen är under kontroll</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg">🟡</span>
+                <div>
+                  <p className="font-medium text-yellow-400">Varning - Övervakning krävs</p>
+                  <p className="text-slate-500">Måttlig aktivitet, kräver uppmärksamhet och uppföljning</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg">🔴</span>
+                <div>
+                  <p className="font-medium text-red-400">Kritisk - Åtgärd krävs</p>
+                  <p className="text-slate-500">Hög aktivitet, omedelbar åtgärd rekommenderas</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Lista med ärenden */}

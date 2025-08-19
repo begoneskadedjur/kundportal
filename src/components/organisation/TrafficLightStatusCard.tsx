@@ -128,15 +128,20 @@ const TrafficLightStatusCard: React.FC<TrafficLightStatusCardProps> = ({
       {/* Trafikljusstatus */}
       <div className={`p-4 rounded-lg border ${currentStyle.container} mb-6`}>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Automatisk statusbedömning:</span>
+          <span className="text-sm font-medium text-slate-400">Teknikerns professionella bedömning:</span>
           <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${currentStyle.text}`}>
             <span className="text-xl">{currentStyle.icon}</span>
             <span>{currentStyle.label}</span>
           </div>
         </div>
 
+        {/* Förklarande text */}
+        <p className="text-xs text-slate-500 mb-3">
+          Baserat på inspektion och expertis har vår tekniker bedömt situationen enligt nedan:
+        </p>
+
         {/* Detaljerad bedömning */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {caseData.pest_level !== null && caseData.pest_level !== undefined && (
             <div className="bg-slate-800/40 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
