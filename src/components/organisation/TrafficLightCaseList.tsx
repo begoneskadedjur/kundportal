@@ -172,7 +172,7 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
           {/* Header med sammanfattning */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Professionell bedömning av era ärenden</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Bedömning av era ärenden</h3>
               <p className="text-sm text-slate-400 mb-3">Våra tekniker bedömer situationen vid varje besök</p>
               <div className="flex items-center gap-4 text-sm">
                 {statusCounts.red > 0 && (

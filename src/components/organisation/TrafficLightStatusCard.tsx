@@ -128,7 +128,7 @@ const TrafficLightStatusCard: React.FC<TrafficLightStatusCardProps> = ({
       {/* Trafikljusstatus */}
       <div className={`p-4 rounded-lg border ${currentStyle.container} mb-6`}>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Teknikerns professionella bedömning:</span>
+          <span className="text-sm font-medium text-slate-400">Teknikerns bedömning:</span>
           <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${currentStyle.text}`}>
             <span className="text-xl">{currentStyle.icon}</span>
             <span>{currentStyle.label}</span>

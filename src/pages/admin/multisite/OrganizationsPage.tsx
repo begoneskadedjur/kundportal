@@ -32,6 +32,8 @@ import Input from '../../../components/ui/Input'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserModal from '../../../components/admin/multisite/UserModal'
 import { useAuth } from '../../../contexts/AuthContext'
+import TrafficLightBadge from '../../../components/organisation/TrafficLightBadge'
+import { AlertTriangle } from 'lucide-react'
 
 interface Organization {
   id: string
@@ -60,6 +62,12 @@ interface Organization {
   sites?: any[]
   contact_phone?: string
   contact_person?: string
+  // Trafikljusdata
+  worstPestLevel?: number | null
+  worstProblemRating?: number | null
+  unacknowledgedCount?: number
+  criticalCasesCount?: number
+  warningCasesCount?: number
 }
 
 interface OrganizationUser {
@@ -148,6 +156,55 @@ export default function OrganizationsPage() {
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', org.organization_id)
 
+          // Hämta trafikljusdata för alla enheter i organisationen
+          let worstPestLevel: number | null = null
+          let worstProblemRating: number | null = null
+          let unacknowledgedCount = 0
+          let criticalCasesCount = 0
+          let warningCasesCount = 0
+
+          if (sites && sites.length > 0) {
+            const siteIds = sites.map(s => s.id)
+            
+            // Hämta alla cases för organisationens enheter
+            const { data: cases } = await supabase
+              .from('cases')
+              .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
+              .in('customer_id', siteIds)
+
+            if (cases) {
+              cases.forEach(caseItem => {
+                // Uppdatera värsta nivåer
+                if (caseItem.pest_level !== null) {
+                  if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
+                    worstPestLevel = caseItem.pest_level
+                  }
+                }
+                
+                if (caseItem.problem_rating !== null) {
+                  if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
+                    worstProblemRating = caseItem.problem_rating
+                  }
+                }
+
+                // Räkna kritiska och varningar
+                const pest = caseItem.pest_level ?? -1
+                const problem = caseItem.problem_rating ?? -1
+                
+                if (pest >= 3 || problem >= 4) {
+                  criticalCasesCount++
+                } else if (pest === 2 || problem === 3) {
+                  warningCasesCount++
+                }
+
+                // Räkna obekräftade rekommendationer
+                if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
+                  unacknowledgedCount++
+                }
+              })
+            }
+          }
+
           return {
             id: org.id,
             name: org.company_name,
@@ -175,7 +232,13 @@ export default function OrganizationsPage() {
             contact_phone: org.contact_phone,
             contact_person: org.contact_person,
             // Enheter
-            sites: sites || []
+            sites: sites || [],
+            // Trafikljusdata
+            worstPestLevel,
+            worstProblemRating,
+            unacknowledgedCount,
+            criticalCasesCount,
+            warningCasesCount
           }
         }))
 
@@ -541,6 +604,36 @@ export default function OrganizationsPage() {
                           Org.nr: {org.organization_number}
                         </p>
                       </div>
+                    </div>
+
+                    {/* Trafikljusstatus och bekräftelser */}
+                    <div className="flex items-center gap-4 mb-4">
+                      {(org.worstPestLevel !== null || org.worstProblemRating !== null) && (
+                        <TrafficLightBadge
+                          pestLevel={org.worstPestLevel}
+                          problemRating={org.worstProblemRating}
+                          size="medium"
+                        />
+                      )}
+                      
+                      {org.criticalCasesCount > 0 && (
+                        <span className="text-sm text-red-400">
+                          🔴 {org.criticalCasesCount} kritiska
+                        </span>
+                      )}
+                      
+                      {org.warningCasesCount > 0 && (
+                        <span className="text-sm text-yellow-400">
+                          🟡 {org.warningCasesCount} varningar
+                        </span>
+                      )}
+                      
+                      {org.unacknowledgedCount > 0 && (
+                        <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg px-2 py-1 text-amber-400 text-xs flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          {org.unacknowledgedCount} obekräftade rekommendationer
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
