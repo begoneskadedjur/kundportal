@@ -998,7 +998,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   >
                     <option value="">Välj avtalstyp...</option>
                     {contractTypes.map(type => (
-                      <option key={type.id} value={type.id}>{type.name}</option>
+                      <option key={type.id} value={type.name}>{type.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1671,7 +1671,7 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                     <div>
                       <dt className="text-slate-500 font-medium">Avtalstyp:</dt>
                       <dd className="text-white">
-                        {contractTypes.find(t => t.id === contractData.contract_type)?.name || contractData.contract_type}
+                        {contractData.contract_type || 'Ej vald'}
                       </dd>
                     </div>
                     <div>

@@ -7,7 +7,7 @@ import { formatCurrency } from '../../utils/formatters';
 import {
   ArrowLeft, FileText, Eye, Check, X, Clock, Search, RotateCcw,
   ChevronDown, ChevronUp, User, Building2, History, UserIcon,
-  Calendar, ChevronRight, Filter
+  Calendar, ChevronRight, Filter, FileCheck, Building
 } from 'lucide-react';
 
 import Button from '../../components/ui/Button';
@@ -21,7 +21,7 @@ import { PageHeader } from '../../components/shared';
 interface BillingAuditEntry {
   id: string;
   case_id: string;
-  case_type: 'private' | 'business';
+  case_type: 'private' | 'business' | 'contract';
   action: string;
   old_value: string;
   new_value: string;
@@ -30,9 +30,24 @@ interface BillingAuditEntry {
   metadata?: any;
 }
 
+interface CustomerInfo {
+  id: string;
+  company_name: string;
+  organization_number?: string | null;
+  billing_email?: string | null;
+  billing_address?: string | null;
+  is_multisite?: boolean;
+  site_type?: string | null;
+  site_name?: string | null;
+  organization_id?: string | null;
+  contract_type?: string | null;
+  product_summary?: string | null;
+}
+
 interface EnhancedBillingCase extends BillingCase {
   billing_updated_by?: string;
   billing_updated_by_id?: string;
+  customer?: CustomerInfo;
 }
 
 type DateFilterType = 'today' | 'week' | 'month' | 'custom';
@@ -57,6 +72,30 @@ const STATUS_COLORS = {
   'sent': 'text-blue-400',
   'paid': 'text-green-400',
   'skip': 'text-gray-400'
+};
+
+// Mappning för UUID-baserade contract types från äldre data
+const CONTRACT_TYPE_MAPPING: Record<string, string> = {
+  '242dff01-ecf7-4de1-ab5f-7fad11cb8812': 'Skadedjursavtal',
+  '21ed7bc7-e767-48e3-b981-4305b1ae7141': 'Betongstationer',
+  '37eeca21-f8b3-45f7-810a-7f616f84e71e': 'Mekaniska råttfällor',
+  '3d749768-63be-433f-936d-be070edf4876': 'Avrop - 2.490kr',
+  'e3a610c9-15b9-42fe-8085-d0a7e17d4465': 'Betesstationer',
+  'bc612355-b6ce-4ca8-82cd-4f82a8538b71': 'Avloppsfällor',
+  '73c7c42b-a302-4da2-abf2-8d6080045bc8': 'Fågelavtal'
+};
+
+// Helper för att visa rätt contract type
+const getContractTypeDisplay = (contractType: string | null | undefined): string => {
+  if (!contractType) return 'Avtal';
+  
+  // Om det redan är läsbart (inte UUID)
+  if (!contractType.includes('-')) {
+    return contractType;
+  }
+  
+  // Mappa UUID till läsbart namn
+  return CONTRACT_TYPE_MAPPING[contractType] || 'Serviceavtal';
 };
 
 // Helper functions för datum
@@ -416,17 +455,48 @@ const BillingManagement: React.FC = () => {
       const privateSelectQuery = `${commonFields}, personnummer, r_fastighetsbeteckning`;
       const businessSelectQuery = `${commonFields}, markning_faktura, e_post_faktura, bestallare, org_nr`;
 
-      const [privateResult, businessResult] = await Promise.all([
+      // Hämta avtalskunder från cases-tabellen med customer info
+      const contractSelectQuery = `
+        id, case_number, title, price, completed_date, primary_technician_name, pest_type, description, work_report,
+        contact_person, contact_email, contact_phone,
+        billing_status, billing_updated_at, billing_updated_by_id,
+        customer:customers!inner (
+          id, company_name, organization_number, 
+          billing_email, billing_address,
+          is_multisite, site_type, site_name,
+          organization_id, contract_type, product_summary
+        )
+      `;
+
+      const [privateResult, businessResult, contractResult] = await Promise.all([
         supabase.from('private_cases').select(privateSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
-        supabase.from('business_cases').select(businessSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null)
+        supabase.from('business_cases').select(businessSelectQuery).eq('status', 'Avslutat').not('pris', 'is', null),
+        supabase.from('cases').select(contractSelectQuery).eq('status', 'Avslutat').not('price', 'is', null)
       ]);
 
       if (privateResult.error) throw new Error(`Private cases: ${privateResult.error.message}`);
       if (businessResult.error) throw new Error(`Business cases: ${businessResult.error.message}`);
+      if (contractResult.error) throw new Error(`Contract cases: ${contractResult.error.message}`);
 
       const allCases: EnhancedBillingCase[] = [
         ...(privateResult.data || []).map(c => ({ ...c, type: 'private' as const, billing_status: c.billing_status || 'pending' })),
-        ...(businessResult.data || []).map(c => ({ ...c, type: 'business' as const, billing_status: c.billing_status || 'pending' }))
+        ...(businessResult.data || []).map(c => ({ ...c, type: 'business' as const, billing_status: c.billing_status || 'pending' })),
+        ...(contractResult.data || []).map(c => ({ 
+          ...c, 
+          type: 'contract' as const, 
+          billing_status: c.billing_status || 'pending',
+          // Mappa fältnamn från cases-tabellen till det förväntade formatet
+          pris: c.price,
+          primary_assignee_name: c.primary_technician_name,
+          skadedjur: c.pest_type,
+          adress: c.customer?.billing_address,
+          rapport: c.work_report,
+          kontaktperson: c.contact_person || c.customer?.company_name,
+          e_post_kontaktperson: c.contact_email || c.customer?.billing_email,
+          telefon_kontaktperson: c.contact_phone,
+          // Behåll customer-objektet för ytterligare information
+          customer: c.customer
+        }))
       ];
 
       setCases(allCases);
@@ -437,7 +507,7 @@ const BillingManagement: React.FC = () => {
     }
   };
 
-  const updateBillingStatus = async (caseId: string, type: 'private' | 'business', status: Exclude<BillingStatus, 'all'>) => {
+  const updateBillingStatus = async (caseId: string, type: 'private' | 'business' | 'contract', status: Exclude<BillingStatus, 'all'>) => {
     setProcessingIds(prev => new Set(prev).add(caseId));
     
     try {
@@ -453,13 +523,29 @@ const BillingManagement: React.FC = () => {
         billing_updated_by_id: userId
       };
 
-      const table = type === 'private' ? 'private_cases' : 'business_cases';
-      const { data, error } = await supabase
-        .from(table)
-        .update(updateData)
-        .eq('id', caseId)
-        .select()
-        .single();
+      let table: string;
+      let result;
+      
+      if (type === 'contract') {
+        // För contract cases, behöver vi också lägga till billing_updated_by om det saknas
+        table = 'cases';
+        result = await supabase
+          .from(table)
+          .update(updateData)
+          .eq('id', caseId)
+          .select()
+          .single();
+      } else {
+        table = type === 'private' ? 'private_cases' : 'business_cases';
+        result = await supabase
+          .from(table)
+          .update(updateData)
+          .eq('id', caseId)
+          .select()
+          .single();
+      }
+
+      const { data, error } = result;
 
       if (error) throw error;
 
@@ -675,6 +761,15 @@ const BillingManagement: React.FC = () => {
 
   // UI Helper functions
   const getDisplayName = (case_: EnhancedBillingCase) => {
+    if (case_.type === 'contract') {
+      const customer = case_.customer;
+      if (customer?.is_multisite) {
+        // För multi-site: visa enhetsnamn eller företagsnamn
+        return customer.site_name || customer.company_name || case_.kontaktperson || "Multi-site kund";
+      }
+      // För vanlig avtalskund: visa företagsnamn
+      return customer?.company_name || case_.kontaktperson || "Avtalskund";
+    }
     return case_.type === 'business' 
       ? (case_.title || case_.kontaktperson || "Företagskund")
       : (case_.kontaktperson || case_.title || "Privatkund");
@@ -833,17 +928,36 @@ const BillingManagement: React.FC = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          case_.type === 'private' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                          case_.type === 'private' ? 'bg-purple-500/20' : 
+                          case_.type === 'business' ? 'bg-blue-500/20' :
+                          case_.type === 'contract' && case_.customer?.is_multisite ? 'bg-orange-500/20' :
+                          'bg-green-500/20'
                         }`}>
                           {case_.type === 'private' ? (
                             <User className="w-4 h-4 text-purple-400" />
-                          ) : (
+                          ) : case_.type === 'business' ? (
                             <Building2 className="w-4 h-4 text-blue-400" />
+                          ) : case_.type === 'contract' && case_.customer?.is_multisite ? (
+                            <Building className="w-4 h-4 text-orange-400" />
+                          ) : (
+                            <FileCheck className="w-4 h-4 text-green-400" />
                           )}
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">
-                            {case_.case_number || 'Okänt nr'}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white">
+                              {case_.case_number || 'Okänt nr'}
+                            </span>
+                            {/* Kundtyp badge */}
+                            {case_.type === 'contract' && (
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                case_.customer?.is_multisite 
+                                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                  : 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              }`}>
+                                {case_.customer?.is_multisite ? 'Multi-site' : 'Avtal'}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-400 truncate max-w-xs">
                             {case_.title}
@@ -857,8 +971,58 @@ const BillingManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm text-slate-300">
-                        {getDisplayName(case_)}
+                      <div className="relative group">
+                        <div className="text-sm text-slate-300 cursor-help">
+                          {getDisplayName(case_)}
+                          {case_.type === 'contract' && case_.customer?.contract_type && (
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {getContractTypeDisplay(case_.customer.contract_type)}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Hover tooltip för avtalskunder */}
+                        {case_.type === 'contract' && case_.customer && (
+                          <div className="absolute z-10 invisible group-hover:visible bg-slate-800 border border-slate-700 rounded-lg p-3 mt-1 w-64 shadow-xl">
+                            <div className="space-y-2 text-xs">
+                              {case_.customer.company_name && (
+                                <div>
+                                  <span className="text-slate-400">Företag:</span>
+                                  <span className="text-white ml-2">{case_.customer.company_name}</span>
+                                </div>
+                              )}
+                              {case_.customer.organization_number && (
+                                <div>
+                                  <span className="text-slate-400">Org.nr:</span>
+                                  <span className="text-white ml-2">{case_.customer.organization_number}</span>
+                                </div>
+                              )}
+                              {case_.customer.billing_email && (
+                                <div>
+                                  <span className="text-slate-400">Faktura-email:</span>
+                                  <span className="text-white ml-2">{case_.customer.billing_email}</span>
+                                </div>
+                              )}
+                              {case_.customer.billing_address && (
+                                <div>
+                                  <span className="text-slate-400">Faktureringsadress:</span>
+                                  <span className="text-white ml-2 block">{case_.customer.billing_address}</span>
+                                </div>
+                              )}
+                              {case_.customer.is_multisite && (
+                                <div className="pt-2 border-t border-slate-700">
+                                  <span className="text-orange-400 font-medium">Multi-site organisation</span>
+                                  {case_.customer.site_type === 'huvudkontor' && (
+                                    <span className="text-slate-400 ml-2">(Huvudkontor)</span>
+                                  )}
+                                  {case_.customer.site_type === 'enhet' && case_.customer.site_name && (
+                                    <span className="text-slate-400 ml-2">(Enhet: {case_.customer.site_name})</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 text-left whitespace-nowrap">
