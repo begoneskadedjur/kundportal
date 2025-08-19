@@ -256,7 +256,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
       <div className="w-full">
       {/* Tabellhuvud */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-t-lg">
-        <div className="grid grid-cols-14 gap-2 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
+        <div className="grid grid-cols-12 gap-3 px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
           <div className="col-span-1">Status</div>
           <div className="col-span-2">Organisation</div>
           <div className="col-span-1 text-center">Enheter</div>
@@ -264,8 +264,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           <div className="col-span-2 text-right">Årspremie</div>
           <div className="col-span-2 text-right">Totalt värde</div>
           <div className="col-span-1 text-center">Längd</div>
-          <div className="col-span-2 text-right">Löper ut</div>
-          <div className="col-span-2 text-center">Åtgärder</div>
+          <div className="col-span-1 text-right">Löper ut</div>
+          <div className="col-span-1 text-center">Åtgärder</div>
         </div>
       </div>
 
@@ -283,7 +283,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
               {/* Kompakt rad */}
               <div
                 className={`
-                  grid grid-cols-14 gap-2 px-4 py-2.5 items-center
+                  grid grid-cols-12 gap-3 px-4 py-2.5 items-center
                   border-l-4 ${ackStatus.borderColor}
                   ${isHovered ? 'bg-slate-800/30' : ''}
                   ${!org.is_active ? 'opacity-60' : ''}
@@ -362,13 +362,13 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 </div>
 
                 {/* Löper ut */}
-                <div className={`col-span-2 text-right text-sm ${contractStatus.color}`}>
+                <div className={`col-span-1 text-right text-sm ${contractStatus.color}`}>
                   {contractStatus.text}
                 </div>
 
                 {/* Åtgärder */}
                 <div 
-                  className="col-span-2 flex justify-center"
+                  className="col-span-1 flex justify-center"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="relative">
