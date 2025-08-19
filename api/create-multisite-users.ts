@@ -290,8 +290,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })
 
             const subject = isNewUser 
-              ? `Välkommen till Begone Organisationsportal - ${organization.company_name}`
-              : `Ny organisation tillagd - ${organization.company_name}`
+              ? `Välkommen till Begone Organisationsportal - ${organizationName}`
+              : `Ny organisation tillagd - ${organizationName}`
 
             // Use Resend API directly
             const emailResponse = await fetch('https://api.resend.com/emails', {
