@@ -97,6 +97,18 @@ export default function OrganizationsPage() {
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
 
+  // Hjälpfunktion för att beräkna dagar kvar på avtal
+  const getDaysUntilContractEnd = (endDate: string | undefined) => {
+    if (!endDate) return null
+    
+    const today = new Date()
+    const contractEnd = new Date(endDate)
+    const diffTime = contractEnd.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    return diffDays
+  }
+
   useEffect(() => {
     fetchOrganizations()
   }, [])
@@ -697,40 +709,40 @@ export default function OrganizationsPage() {
 
                   {/* ORGANISATIONS-IDENTITET - Ren och tydlig */}
                   <div className="mb-6">
-                    <div className="flex items-start gap-3 sm:gap-4">
-                      <div className={`p-3 sm:p-4 rounded-xl ${
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-xl ${
                         org.is_active 
                           ? 'bg-purple-500/20 text-purple-400' 
                           : 'bg-slate-700 text-slate-400'
                       }`}>
-                        <Building2 className="w-6 sm:w-7 h-6 sm:h-7" />
+                        <Building2 className="w-5 h-5" />
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 leading-tight">
+                        <h3 className="text-base sm:text-lg font-bold text-white mb-1 leading-tight">
                           {org.name}
                         </h3>
-                        <p className="text-sm sm:text-base text-slate-300 font-mono mb-4">
+                        <p className="text-xs sm:text-sm text-slate-300 font-mono mb-2">
                           <span className="hidden sm:inline">Organisationsnummer: </span>
                           <span className="sm:hidden">Org.nr: </span>
                           {org.organization_number}
                         </p>
                         
                         {/* Grundläggande statistik med ikoner - responsive layout */}
-                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm sm:text-base">
-                          <div className="flex items-center gap-2 text-slate-200">
-                            <MapPin className="w-4 sm:w-5 h-4 sm:h-5 text-blue-400" />
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+                          <div className="flex items-center gap-1.5 text-slate-200">
+                            <MapPin className="w-4 h-4 text-blue-400" />
                             <span className="font-semibold">{org.sites_count || 0}</span>
                             <span className="text-slate-400 hidden sm:inline">anläggningar</span>
                             <span className="text-slate-400 sm:hidden">enheter</span>
                           </div>
-                          <div className="flex items-center gap-2 text-slate-200">
-                            <Users className="w-4 sm:w-5 h-4 sm:h-5 text-green-400" />
+                          <div className="flex items-center gap-1.5 text-slate-200">
+                            <Users className="w-4 h-4 text-green-400" />
                             <span className="font-semibold">{org.users_count || 0}</span>
                             <span className="text-slate-400">användare</span>
                           </div>
-                          <div className="flex items-center gap-2 text-slate-400 w-full sm:w-auto">
-                            <Mail className="w-4 sm:w-5 h-4 sm:h-5" />
+                          <div className="flex items-center gap-1.5 text-slate-400 w-full sm:w-auto">
+                            <Mail className="w-4 h-4" />
                             <span className="truncate text-xs sm:text-sm">{org.billing_email}</span>
                           </div>
                         </div>
@@ -739,20 +751,20 @@ export default function OrganizationsPage() {
                   </div>
 
                   {/* AFFÄRSDATA - Tydligt avgränsad sektion */}
-                  <div className="border-t border-slate-700 pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="border-t border-slate-700 pt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {/* Avtalsinfo */}
                       {(org.annual_value > 0 || org.contract_end_date) && (
-                        <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                          <h4 className="text-base font-semibold text-emerald-400 mb-4 flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5" />
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                          <h4 className="text-sm font-semibold text-emerald-400 mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-4 h-4" />
                             Avtalsinfo
                           </h4>
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {org.annual_value > 0 && (
                               <div>
-                                <p className="text-sm text-slate-400">Årspremie</p>
-                                <p className="text-white font-bold text-xl">
+                                <p className="text-xs text-slate-400">Årspremie</p>
+                                <p className="text-white font-bold text-base">
                                   {new Intl.NumberFormat('sv-SE', { 
                                     style: 'currency', 
                                     currency: 'SEK',
@@ -761,31 +773,53 @@ export default function OrganizationsPage() {
                                 </p>
                               </div>
                             )}
-                            {org.contract_end_date && (
-                              <div>
-                                <p className="text-sm text-slate-400">Avtalsutgång</p>
-                                <p className="text-white font-semibold">
-                                  {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
-                                </p>
-                              </div>
-                            )}
+                            {org.contract_end_date && (() => {
+                              const daysLeft = getDaysUntilContractEnd(org.contract_end_date)
+                              const isExpiringSoon = daysLeft !== null && daysLeft <= 30
+                              const isExpired = daysLeft !== null && daysLeft < 0
+                              
+                              return (
+                                <div>
+                                  <p className="text-xs text-slate-400">Avtalsutgång</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-white font-semibold text-sm">
+                                      {new Date(org.contract_end_date).toLocaleDateString('sv-SE')}
+                                    </p>
+                                    {daysLeft !== null && (
+                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        isExpired 
+                                          ? 'bg-red-500/20 text-red-400'
+                                          : isExpiringSoon 
+                                          ? 'bg-amber-500/20 text-amber-400'
+                                          : 'bg-green-500/20 text-green-400'
+                                      }`}>
+                                        {isExpired 
+                                          ? `Utgått för ${Math.abs(daysLeft)} dagar sedan`
+                                          : `${daysLeft} dagar kvar`
+                                        }
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
                       )}
 
                       {/* Account Manager */}
                       {org.account_manager && (
-                        <div className="p-5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                          <h4 className="text-base font-semibold text-blue-400 mb-4 flex items-center gap-2">
-                            <UserCheck className="w-5 h-5" />
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                          <h4 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-1.5">
+                            <UserCheck className="w-4 h-4" />
                             Account Manager
                           </h4>
                           <div>
-                            <p className="text-white font-semibold text-lg">{org.account_manager}</p>
+                            <p className="text-white font-semibold text-sm">{org.account_manager}</p>
                             {org.account_manager_email && (
                               <a 
                                 href={`mailto:${org.account_manager_email}`}
-                                className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {org.account_manager_email}
@@ -797,17 +831,17 @@ export default function OrganizationsPage() {
                       
                       {/* Säljare */}
                       {org.sales_person && (
-                        <div className="p-5 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                          <h4 className="text-base font-semibold text-purple-400 mb-4 flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5" />
+                        <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                          <h4 className="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-4 h-4" />
                             Säljare
                           </h4>
                           <div>
-                            <p className="text-white font-semibold text-lg">{org.sales_person}</p>
+                            <p className="text-white font-semibold text-sm">{org.sales_person}</p>
                             {org.sales_person_email && (
                               <a 
                                 href={`mailto:${org.sales_person_email}`}
-                                className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {org.sales_person_email}
@@ -819,23 +853,23 @@ export default function OrganizationsPage() {
                     </div>
 
                     {/* Metadata */}
-                    <div className="mt-4 text-sm text-slate-500">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
+                    <div className="mt-2 text-xs text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3" />
                         <span>Registrerad {new Date(org.created_at).toLocaleDateString('sv-SE')}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Action Bar - Expand/Collapse och åtgärder */}
-                  <div className="flex items-center justify-between mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-700">
-                    <div className="flex items-center gap-2 sm:gap-3 text-slate-400">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+                    <div className="flex items-center gap-2 text-slate-400">
                       {expandedOrgId === org.id ? (
-                        <ChevronDown className="w-5 sm:w-6 h-5 sm:h-6" />
+                        <ChevronDown className="w-5 h-5" />
                       ) : (
-                        <ChevronRight className="w-5 sm:w-6 h-5 sm:h-6" />
+                        <ChevronRight className="w-5 h-5" />
                       )}
-                      <span className="text-sm sm:text-base font-medium">
+                      <span className="text-sm font-medium">
                         {expandedOrgId === org.id ? 'Dölj detaljer' : 'Visa detaljer'}
                       </span>
                     </div>
