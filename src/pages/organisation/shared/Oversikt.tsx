@@ -11,6 +11,7 @@ import { useLocation } from 'react-router-dom'
 import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
+import TrafficLightAggregatedView from '../../../components/organisation/TrafficLightAggregatedView'
 
 const OrganisationOversikt: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
@@ -216,6 +217,13 @@ const OrganisationOversikt: React.FC = () => {
             </Card>
           </div>
         ) : null}
+
+        {/* Traffic Light Aggregated View */}
+        <TrafficLightAggregatedView
+          organizationId={organization?.organization_id}
+          siteIds={getCustomerIds()}
+          userRole={userRoleType}
+        />
 
         {/* Cases Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

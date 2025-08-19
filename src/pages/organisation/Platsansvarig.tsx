@@ -12,6 +12,7 @@ import OrganisationLayout from '../../components/organisation/OrganisationLayout
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 import OrganisationActiveCasesList from '../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
+import TrafficLightCaseList from '../../components/organisation/TrafficLightCaseList'
 
 const PlatsansvarigDashboard: React.FC = () => {
   const { profile } = useAuth()
@@ -134,15 +135,6 @@ const PlatsansvarigDashboard: React.FC = () => {
     )
   }
 
-  // Beräkna trafikljusstatus för enheten
-  const getTrafficLightStatus = () => {
-    const activeCount = caseStats.activeCases
-    if (activeCount > 10) return 'red'
-    if (activeCount > 5) return 'yellow'
-    return 'green'
-  }
-
-  const trafficLight = getTrafficLightStatus()
 
   return (
     <OrganisationLayout userRoleType="platsansvarig">
@@ -187,7 +179,7 @@ const PlatsansvarigDashboard: React.FC = () => {
         </div>
 
         {/* Statistik */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-6 bg-slate-800/50 border-slate-700">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-amber-500/20 rounded-lg">
@@ -235,28 +227,13 @@ const PlatsansvarigDashboard: React.FC = () => {
               </div>
             </div>
           </Card>
-
-          <Card className="p-6 bg-slate-800/50 border-slate-700">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-4 h-4 rounded-full ${
-                trafficLight === 'green' ? 'bg-green-500' :
-                trafficLight === 'yellow' ? 'bg-yellow-500' :
-                'bg-red-500'
-              }`} />
-              <div>
-                <p className="text-slate-400 text-sm">Trafikljus</p>
-                <p className={`text-lg font-bold ${
-                  trafficLight === 'green' ? 'text-green-400' :
-                  trafficLight === 'yellow' ? 'text-yellow-400' :
-                  'text-red-400'
-                }`}>
-                  {trafficLight === 'green' ? 'Grönt' :
-                   trafficLight === 'yellow' ? 'Gult' : 'Rött'}
-                </p>
-              </div>
-            </div>
-          </Card>
         </div>
+
+        {/* Trafikljus ärendestatus */}
+        <TrafficLightCaseList 
+          customerId={currentCustomer.id} 
+          onCaseUpdate={fetchCustomerAndStats}
+        />
 
         {/* Använd de nya komponenterna för ärenden */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
