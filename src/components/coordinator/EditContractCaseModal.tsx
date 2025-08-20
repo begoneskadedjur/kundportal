@@ -634,7 +634,6 @@ export default function EditContractCaseModal({
         }
         .react-datepicker {
           z-index: 10000 !important;
-          position: fixed !important;
         }
         .react-datepicker__portal {
           z-index: 10000 !important;

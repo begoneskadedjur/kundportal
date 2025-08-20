@@ -664,7 +664,6 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         }
         .react-datepicker {
           z-index: 10000 !important;
-          position: fixed !important;
         }
         .react-datepicker__portal {
           z-index: 10000 !important;
