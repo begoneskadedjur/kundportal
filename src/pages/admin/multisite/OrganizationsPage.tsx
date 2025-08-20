@@ -773,7 +773,7 @@ export default function OrganizationsPage() {
             setShowEditModal(false)
             setSelectedOrg(null)
           }}
-          onUpdate={() => {
+          onSuccess={() => {
             setShowEditModal(false)
             setSelectedOrg(null)
             fetchOrganizations()

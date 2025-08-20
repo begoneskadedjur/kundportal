@@ -16,7 +16,13 @@ import Input from '../../ui/Input'
 import toast from 'react-hot-toast'
 
 interface OrganizationEditModalProps {
-  organization: MultisiteOrganization
+  organization: MultisiteOrganization & { 
+    organization_id?: string
+    billing_method?: 'consolidated' | 'per_site'
+    contact_email?: string
+    contact_phone?: string
+    billing_email?: string
+  }
   onClose: () => void
   onSuccess: () => void
 }
@@ -27,13 +33,23 @@ export default function OrganizationEditModal({
   onSuccess
 }: OrganizationEditModalProps) {
   const [loading, setLoading] = useState(false)
+  
+  // Konvertera billing_method till billing_type format
+  const getBillingType = () => {
+    // Hantera både billing_type och billing_method
+    if (organization.billing_type) return organization.billing_type
+    if ((organization as any).billing_method === 'consolidated') return 'consolidated'
+    if ((organization as any).billing_method === 'per_site') return 'per_site'
+    return 'consolidated' // default
+  }
+  
   const [formData, setFormData] = useState({
     name: organization.name,
     organization_number: organization.organization_number || '',
-    primary_contact_email: organization.primary_contact_email || '',
-    primary_contact_phone: organization.primary_contact_phone || '',
+    primary_contact_email: organization.primary_contact_email || (organization as any).contact_email || (organization as any).billing_email || '',
+    primary_contact_phone: organization.primary_contact_phone || (organization as any).contact_phone || '',
     billing_address: organization.billing_address || '',
-    billing_type: organization.billing_type
+    billing_type: getBillingType()
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +70,9 @@ export default function OrganizationEditModal({
         return
       }
 
-      // Uppdatera huvudkontor customer
+      // Uppdatera huvudkontor customer - använd organization_id om det finns, annars id
+      const orgId = organization.organization_id || organization.id
+      
       const { error } = await supabase
         .from('customers')
         .update({
@@ -64,9 +82,10 @@ export default function OrganizationEditModal({
           contact_phone: formData.primary_contact_phone.trim() || null,
           billing_address: formData.billing_address.trim() || null,
           billing_email: formData.primary_contact_email.trim() || null,
+          billing_type: formData.billing_type,
           updated_at: new Date().toISOString()
         })
-        .eq('organization_id', organization.id)
+        .eq('organization_id', orgId)
         .eq('site_type', 'huvudkontor')
 
       if (error) throw error
