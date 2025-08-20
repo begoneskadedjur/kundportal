@@ -467,9 +467,10 @@ const BillingManagement: React.FC = () => {
         billing_status, billing_updated_at, billing_updated_by_id,
         customer:customers!inner (
           id, company_name, organization_number, 
-          billing_email, billing_address,
-          is_multisite, site_type, site_name,
-          organization_id, contract_type, product_summary
+          billing_email, billing_address, contact_address,
+          is_multisite, site_type, site_name, site_code,
+          organization_id, contract_type, product_summary,
+          contact_person, region
         )
       `;
 

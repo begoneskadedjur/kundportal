@@ -308,8 +308,15 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                     
                     <div className="bg-slate-800/30 p-4 rounded-lg">
                       <p className="text-sm text-slate-400 mb-1">Enhetskod</p>
-                      <p className="text-white font-medium">{case_.customer?.site_code || '-'}</p>
+                      <p className="text-white font-medium">{case_.customer?.site_code || 'Ej angiven'}</p>
                     </div>
+                    
+                    {case_.customer?.region && (
+                      <div className="bg-slate-800/30 p-4 rounded-lg">
+                        <p className="text-sm text-slate-400 mb-1">Region</p>
+                        <p className="text-white font-medium">{case_.customer.region}</p>
+                      </div>
+                    )}
                     
                     {!isConsolidated && (
                       <>
@@ -330,13 +337,13 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                         
                         <div className="bg-slate-800/30 p-4 rounded-lg">
                           <p className="text-sm text-slate-400 mb-1">Faktura-email</p>
-                          <p className="text-white font-medium">{case_.customer?.billing_email || '-'}</p>
+                          <p className="text-white font-medium">{case_.customer?.billing_email || case_.customer?.contact_email || case_.contact_email || '-'}</p>
                         </div>
                         
                         <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
                           <p className="text-sm text-slate-400 mb-1">Faktureringsadress</p>
                           <p className="text-white font-medium whitespace-pre-line">
-                            {case_.customer?.billing_address || case_.customer?.contact_address || '-'}
+                            {case_.customer?.billing_address || case_.customer?.contact_address || 'Ingen adress angiven'}
                           </p>
                         </div>
                       </>
@@ -361,7 +368,7 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                   <div className="bg-slate-800/30 p-4 rounded-lg">
                     <p className="text-sm text-slate-400 mb-1">Avslutad datum</p>
                     <p className="text-white font-medium">
-                      {case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : '-'}
+                      {case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : 'Ej avslutat'}
                     </p>
                   </div>
                   
@@ -382,10 +389,10 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                     </div>
                   )}
                   
-                  {case_.work_report && (
+                  {(case_.work_report || case_.rapport) && (
                     <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
                       <p className="text-sm text-slate-400 mb-1">Arbetsrapport</p>
-                      <p className="text-white">{case_.work_report}</p>
+                      <p className="text-white whitespace-pre-wrap">{case_.work_report || case_.rapport}</p>
                     </div>
                   )}
                 </div>
