@@ -635,9 +635,24 @@ export default function EditContractCaseModal({
         .react-datepicker {
           z-index: 10000 !important;
           position: fixed !important;
+          display: flex !important;
         }
         .react-datepicker__portal {
           z-index: 10000 !important;
+        }
+        .react-datepicker__time-container {
+          float: right !important;
+          border-left: 1px solid #334155 !important;
+          width: auto !important;
+        }
+        .react-datepicker__time-container--with-today-button {
+          float: right !important;
+        }
+        .react-datepicker__time {
+          background: #1e293b !important;
+        }
+        .react-datepicker__time-list-item--selected {
+          background: #3b82f6 !important;
         }
       `
       document.head.appendChild(portalStyles)
@@ -822,6 +837,7 @@ export default function EditContractCaseModal({
                       timeFormat="HH:mm"
                       timeIntervals={15}
                       dateFormat="yyyy-MM-dd HH:mm"
+                      timeCaption="Tid"
                       placeholderText="Välj från-tid..."
                       isClearable
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
@@ -842,6 +858,7 @@ export default function EditContractCaseModal({
                       timeFormat="HH:mm"
                       timeIntervals={15}
                       dateFormat="yyyy-MM-dd HH:mm"
+                      timeCaption="Tid"
                       placeholderText="Välj till-tid..."
                       isClearable
                       minDate={formData.scheduled_start || undefined}
