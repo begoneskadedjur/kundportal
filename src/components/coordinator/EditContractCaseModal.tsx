@@ -623,6 +623,34 @@ export default function EditContractCaseModal({
     onClose()
   }
 
+  // Fix React-DatePicker z-index conflicts
+  useEffect(() => {
+    if (isOpen && caseData) {
+      const portalStyles = document.createElement('style')
+      portalStyles.id = 'edit-contract-case-modal-portal-styles'
+      portalStyles.textContent = `
+        .react-datepicker-popper {
+          z-index: 10000 !important;
+        }
+        .react-datepicker {
+          z-index: 10000 !important;
+          position: fixed !important;
+        }
+        .react-datepicker__portal {
+          z-index: 10000 !important;
+        }
+      `
+      document.head.appendChild(portalStyles)
+      
+      return () => {
+        const existingStyles = document.getElementById('edit-contract-case-modal-portal-styles')
+        if (existingStyles && document.head.contains(existingStyles)) {
+          document.head.removeChild(existingStyles)
+        }
+      }
+    }
+  }, [isOpen, caseData])
+
   if (!isOpen) return null
 
   const formatTime = (minutes: number) => {
