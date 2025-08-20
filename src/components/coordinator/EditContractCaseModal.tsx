@@ -643,11 +643,14 @@ export default function EditContractCaseModal({
       portalStyles.id = 'edit-contract-case-modal-portal-styles'
       portalStyles.textContent = `
         .react-datepicker-popper {
-          z-index: 99999 !important;
+          z-index: 10000 !important;
         }
         .react-datepicker {
-          z-index: 50000 !important;
+          z-index: 10000 !important;
           display: flex !important;
+        }
+        .react-datepicker__portal {
+          z-index: 10000 !important;
         }
         .react-datepicker__portal {
           z-index: 50000 !important;
@@ -903,10 +906,6 @@ export default function EditContractCaseModal({
                       timeCaption="Tid"
                       placeholderText="Välj från-tid..."
                       isClearable
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
-                      calendarClassName="bg-slate-900"
-                      wrapperClassName="w-full"
-                      popperPlacement="bottom-start"
                     />
                   </div>
                   <div>
@@ -925,10 +924,6 @@ export default function EditContractCaseModal({
                       placeholderText="Välj till-tid..."
                       isClearable
                       minDate={formData.scheduled_start || undefined}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
-                      calendarClassName="bg-slate-900"
-                      wrapperClassName="w-full"
-                      popperPlacement="bottom-start"
                     />
                   </div>
                 </div>
