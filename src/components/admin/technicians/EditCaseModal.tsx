@@ -503,7 +503,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.r_servicebil = formData.r_servicebil || null;
       } 
       else if (tableName === 'business_cases') { updateData.org_nr = formData.org_nr; } 
-      else if (tableName === 'cases') { updateData.price = formData.case_price; }
+      else if (tableName === 'cases') { 
+        updateData.price = formData.case_price;
+        // Automatically set completed_date when status changes to "Avslutat"
+        if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+          updateData.completed_date = new Date().toISOString();
+        } else if (formData.status !== 'Avslutat') {
+          updateData.completed_date = null;
+        }
+      }
 
       // Debug logging för att identifiera problemet
       console.log('[EditCaseModal] Updating case with data:', {

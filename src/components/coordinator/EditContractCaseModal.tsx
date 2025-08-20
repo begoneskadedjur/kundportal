@@ -127,6 +127,9 @@ export default function EditContractCaseModal({
     // 🚦 Traffic Light System
     pest_level: undefined as number | undefined,  // 0-3
     problem_rating: undefined as number | undefined,  // 1-5
+    
+    // Completion tracking
+    completed_date: null as string | null,
   })
 
   const [technicians, setTechnicians] = useState<any[]>([])
@@ -202,6 +205,8 @@ export default function EditContractCaseModal({
         // 🚦 Traffic Light System
         pest_level: caseData.pest_level !== null ? caseData.pest_level : undefined,
         problem_rating: caseData.problem_rating !== null ? caseData.problem_rating : undefined,
+        // Completion tracking
+        completed_date: caseData.completed_date || null,
       })
       
       // Check if timer was running
@@ -541,6 +546,10 @@ export default function EditContractCaseModal({
           ? new Date().toISOString() : null,
         assessed_by: (formData.pest_level !== undefined || formData.problem_rating !== undefined)
           ? profile?.email || null : null,
+        // Automatically set completed_date when status changes to "Avslutat"
+        completed_date: (formData.status === 'Avslutat' && caseData.status !== 'Avslutat')
+          ? new Date().toISOString()
+          : (formData.status !== 'Avslutat' ? null : caseData.completed_date || null)
       }
 
       // Remove fields that don't exist in database
