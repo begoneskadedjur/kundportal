@@ -623,7 +623,7 @@ export default function EditContractCaseModal({
     onClose()
   }
 
-  // Fix React-DatePicker z-index conflicts
+  // Fix React-DatePicker z-index conflicts and time layout
   useEffect(() => {
     if (isOpen && caseData) {
       const portalStyles = document.createElement('style')
@@ -634,9 +634,59 @@ export default function EditContractCaseModal({
         }
         .react-datepicker {
           z-index: 10000 !important;
+          display: flex !important;
         }
         .react-datepicker__portal {
           z-index: 10000 !important;
+        }
+        .react-datepicker__time-container {
+          float: right !important;
+          border-left: 1px solid #aeaeae !important;
+          width: 85px !important;
+        }
+        .react-datepicker__time-container--with-today-button {
+          display: inline !important;
+          border: 1px solid #aeaeae !important;
+          border-radius: 0.3rem !important;
+          position: absolute !important;
+          right: -87px !important;
+          top: 0 !important;
+          height: 100% !important;
+        }
+        .react-datepicker__time {
+          background: white !important;
+        }
+        .react-datepicker__time-box {
+          width: 85px !important;
+        }
+        .react-datepicker-wrapper {
+          display: block !important;
+          width: 100% !important;
+        }
+        .react-datepicker__input-container {
+          display: block !important;
+          width: 100% !important;
+        }
+        .react-datepicker__input-container input {
+          width: 100% !important;
+          padding: 0.5rem 1rem !important;
+          background-color: rgb(30 41 59 / 0.5) !important;
+          border: 1px solid rgb(51 65 85) !important;
+          border-radius: 0.5rem !important;
+          color: white !important;
+          outline: none !important;
+        }
+        .react-datepicker__input-container input:focus {
+          border-color: rgb(168 85 247) !important;
+          ring: 2px solid rgb(168 85 247 / 0.2) !important;
+        }
+        .react-datepicker__header {
+          background-color: #f0f0f0 !important;
+          border-bottom: 1px solid #aeaeae !important;
+        }
+        .react-datepicker__time-list-item--selected {
+          background-color: rgb(168 85 247) !important;
+          color: white !important;
         }
       `
       document.head.appendChild(portalStyles)
@@ -666,8 +716,6 @@ export default function EditContractCaseModal({
         onClick={handleClose}
       />
 
-      {/* DatePicker Portal Container */}
-      <div id="datepicker-portal" className="fixed z-[10000]" />
 
       {/* Modal */}
       <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl">
@@ -827,7 +875,6 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
-                      portalId="datepicker-portal"
                     />
                   </div>
                   <div>
@@ -849,7 +896,6 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
-                      portalId="datepicker-portal"
                     />
                   </div>
                 </div>
