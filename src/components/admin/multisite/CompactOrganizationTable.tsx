@@ -313,7 +313,13 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 `}
                 onMouseEnter={() => setHoveredOrgId(org.id)}
                 onMouseLeave={() => setHoveredOrgId(null)}
-                onClick={() => onToggleExpand(org)}
+                onClick={() => {
+                  onToggleExpand(org)
+                  // Stäng åtgärdsmenyn om kortet kollapsas
+                  if (expandedOrgId === org.id) {
+                    setShowActionsForOrg(null)
+                  }
+                }}
               >
                 {/* Status */}
                 <div 
@@ -398,6 +404,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       onClick={(e) => {
                         e.stopPropagation()
                         setShowActionsForOrg(showActions ? null : org.id)
+                        // Expandera kortet automatiskt om det inte redan är expanderat
+                        if (!showActions && expandedOrgId !== org.id) {
+                          onToggleExpand(org)
+                        }
                       }}
                       className="p-1 hover:bg-slate-700 rounded transition-colors"
                     >
