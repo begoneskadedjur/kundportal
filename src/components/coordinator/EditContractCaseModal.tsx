@@ -327,6 +327,19 @@ export default function EditContractCaseModal({
   }
 
   const handleDateChange = (date: Date | null, fieldName: 'scheduled_start' | 'scheduled_end') => {
+    // Om ett datum väljs utan tid, sätt standardtid till 08:00
+    if (date) {
+      const currentValue = formData[fieldName]
+      // Kolla om användaren just valt ett nytt datum (inte bara ändrat tid)
+      if (!currentValue || 
+          (currentValue && new Date(currentValue).toDateString() !== date.toDateString())) {
+        // Om tiden är 00:00 (vilket betyder att användaren just valt datum utan tid)
+        if (date.getHours() === 0 && date.getMinutes() === 0) {
+          date.setHours(8, 0, 0, 0) // Sätt tid till 08:00
+        }
+      }
+    }
+    
     setFormData(prev => ({ 
       ...prev, 
       [fieldName]: date 
@@ -630,14 +643,14 @@ export default function EditContractCaseModal({
       portalStyles.id = 'edit-contract-case-modal-portal-styles'
       portalStyles.textContent = `
         .react-datepicker-popper {
-          z-index: 10000 !important;
+          z-index: 50000 !important;
         }
         .react-datepicker {
-          z-index: 10000 !important;
+          z-index: 50000 !important;
           display: flex !important;
         }
         .react-datepicker__portal {
-          z-index: 10000 !important;
+          z-index: 50000 !important;
         }
         .react-datepicker__time-container {
           float: right !important;
@@ -651,13 +664,31 @@ export default function EditContractCaseModal({
           position: absolute !important;
           right: -87px !important;
           top: 0 !important;
-          height: 100% !important;
         }
         .react-datepicker__time {
           background: white !important;
         }
         .react-datepicker__time-box {
           width: 85px !important;
+        }
+        .react-datepicker__time-list {
+          max-height: 200px !important;
+          overflow-y: auto !important;
+          scrollbar-width: thin !important;
+          scrollbar-color: #cbd5e1 #f1f5f9 !important;
+        }
+        .react-datepicker__time-list::-webkit-scrollbar {
+          width: 6px !important;
+        }
+        .react-datepicker__time-list::-webkit-scrollbar-track {
+          background: #f1f5f9 !important;
+        }
+        .react-datepicker__time-list::-webkit-scrollbar-thumb {
+          background: #cbd5e1 !important;
+          border-radius: 3px !important;
+        }
+        .react-datepicker__time-list::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8 !important;
         }
         .react-datepicker-wrapper {
           display: block !important;
@@ -875,6 +906,7 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
+                      popperPlacement="bottom-start"
                     />
                   </div>
                   <div>
@@ -896,6 +928,7 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
+                      popperPlacement="bottom-start"
                     />
                   </div>
                 </div>
