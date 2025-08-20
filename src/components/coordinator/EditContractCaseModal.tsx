@@ -650,28 +650,7 @@ export default function EditContractCaseModal({
           display: flex !important;
         }
         .react-datepicker__portal {
-          z-index: 99999 !important;
-        }
-        .react-datepicker__portal .react-datepicker__day--selected,
-        .react-datepicker__portal .react-datepicker__day--keyboard-selected {
-          background-color: rgb(168 85 247) !important;
-        }
-        .react-datepicker__portal .react-datepicker {
-          background-color: #1e293b !important;
-          border: 1px solid #475569 !important;
-        }
-        .react-datepicker__portal .react-datepicker__header {
-          background-color: #334155 !important;
-          border-bottom: 1px solid #475569 !important;
-        }
-        .react-datepicker__portal .react-datepicker__day-name,
-        .react-datepicker__portal .react-datepicker__day,
-        .react-datepicker__portal .react-datepicker__current-month,
-        .react-datepicker__portal .react-datepicker__time-name {
-          color: #e2e8f0 !important;
-        }
-        .react-datepicker__portal .react-datepicker__day:hover {
-          background-color: rgb(168 85 247 / 0.3) !important;
+          z-index: 50000 !important;
         }
         .react-datepicker__time-container {
           float: right !important;
@@ -924,7 +903,6 @@ export default function EditContractCaseModal({
                       timeCaption="Tid"
                       placeholderText="Välj från-tid..."
                       isClearable
-                      withPortal
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
@@ -946,7 +924,6 @@ export default function EditContractCaseModal({
                       timeCaption="Tid"
                       placeholderText="Välj till-tid..."
                       isClearable
-                      withPortal
                       minDate={formData.scheduled_start || undefined}
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
