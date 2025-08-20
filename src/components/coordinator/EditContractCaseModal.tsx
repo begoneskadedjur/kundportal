@@ -635,24 +635,9 @@ export default function EditContractCaseModal({
         .react-datepicker {
           z-index: 10000 !important;
           position: fixed !important;
-          display: flex !important;
         }
         .react-datepicker__portal {
           z-index: 10000 !important;
-        }
-        .react-datepicker__time-container {
-          float: right !important;
-          border-left: 1px solid #334155 !important;
-          width: auto !important;
-        }
-        .react-datepicker__time-container--with-today-button {
-          float: right !important;
-        }
-        .react-datepicker__time {
-          background: #1e293b !important;
-        }
-        .react-datepicker__time-list-item--selected {
-          background: #3b82f6 !important;
         }
       `
       document.head.appendChild(portalStyles)
