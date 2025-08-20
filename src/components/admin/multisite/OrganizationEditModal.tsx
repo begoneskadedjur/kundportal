@@ -90,6 +90,22 @@ export default function OrganizationEditModal({
 
       if (error) throw error
 
+      // Uppdatera även alla enheter med samma billing_type
+      const { error: unitsError } = await supabase
+        .from('customers')
+        .update({
+          billing_type: formData.billing_type,
+          updated_at: new Date().toISOString()
+        })
+        .eq('organization_id', orgId)
+        .eq('site_type', 'enhet')
+        .eq('is_multisite', true)
+      
+      if (unitsError) {
+        console.error('Error updating units billing_type:', unitsError)
+        // Vi visar inte fel för enheter, men loggar det
+      }
+
       toast.success('Organisation uppdaterad')
       onSuccess()
       onClose()
