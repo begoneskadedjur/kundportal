@@ -25,6 +25,9 @@ import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 // Tekniker-dropdown
 import TechnicianDropdown from '../TechnicianDropdown'
 
+// Datum-hjälpfunktioner för svensk tidszon
+import { toSwedishISOString } from '../../../utils/dateHelpers'
+
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
 interface TechnicianCase {
@@ -507,7 +510,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
         updateData.price = formData.case_price;
         // Automatically set completed_date when status changes to "Avslutat"
         if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
-          updateData.completed_date = new Date().toISOString();
+          updateData.completed_date = toSwedishISOString(new Date());
         } else if (formData.status !== 'Avslutat') {
           updateData.completed_date = null;
         }

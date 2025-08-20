@@ -20,6 +20,7 @@ import { DROPDOWN_STATUSES } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useWorkReportGeneration } from '../../hooks/useWorkReportGeneration'
+import { toSwedishISOString } from '../../utils/dateHelpers'
 
 interface EditContractCaseModalProps {
   isOpen: boolean
@@ -548,7 +549,7 @@ export default function EditContractCaseModal({
           ? profile?.email || null : null,
         // Automatically set completed_date when status changes to "Avslutat"
         completed_date: (formData.status === 'Avslutat' && caseData.status !== 'Avslutat')
-          ? new Date().toISOString()
+          ? toSwedishISOString(new Date())
           : (formData.status !== 'Avslutat' ? null : caseData.completed_date || null)
       }
 
