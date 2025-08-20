@@ -667,6 +667,9 @@ export default function EditContractCaseModal({
         onClick={handleClose}
       />
 
+      {/* DatePicker Portal Container */}
+      <div id="datepicker-portal" className="fixed z-[10000]" />
+
       {/* Modal */}
       <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl">
         {/* Glass morphism background */}
@@ -824,6 +827,7 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
+                      portalId="datepicker-portal"
                     />
                   </div>
                   <div>
@@ -844,6 +848,7 @@ export default function EditContractCaseModal({
                       className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
                       calendarClassName="bg-slate-900"
                       wrapperClassName="w-full"
+                      portalId="datepicker-portal"
                     />
                   </div>
                 </div>
