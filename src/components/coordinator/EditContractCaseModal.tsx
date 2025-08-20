@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import Button from '../ui/Button'
 import DatePicker from 'react-datepicker'
+import { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
@@ -21,6 +23,9 @@ import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useWorkReportGeneration } from '../../hooks/useWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
+
+// Registrera svensk lokalisering för DatePicker
+registerLocale('sv', sv)
 
 interface EditContractCaseModalProps {
   isOpen: boolean
@@ -321,6 +326,13 @@ export default function EditContractCaseModal({
     }
   }
 
+  const handleDateChange = (date: Date | null, fieldName: 'scheduled_start' | 'scheduled_end') => {
+    setFormData(prev => ({ 
+      ...prev, 
+      [fieldName]: date 
+    }))
+  }
+
   const handleTechnicianChange = (role: 'primary' | 'secondary' | 'tertiary', technicianId: string) => {
     const technician = technicians.find(t => t.id === technicianId)
     
@@ -538,8 +550,8 @@ export default function EditContractCaseModal({
         primary_technician_name: formData.primary_technician_name || null,
         secondary_technician_name: formData.secondary_technician_name || null,
         tertiary_technician_name: formData.tertiary_technician_name || null,
-        scheduled_start: formData.scheduled_start?.toISOString() || null,
-        scheduled_end: formData.scheduled_end?.toISOString() || null,
+        scheduled_start: formData.scheduled_start ? toSwedishISOString(formData.scheduled_start) : null,
+        scheduled_end: formData.scheduled_end ? toSwedishISOString(formData.scheduled_end) : null,
         // 🚦 Traffic Light System
         pest_level: formData.pest_level !== undefined ? formData.pest_level : null,
         problem_rating: formData.problem_rating !== undefined ? formData.problem_rating : null,
@@ -756,6 +768,66 @@ export default function EditContractCaseModal({
                   )}
                 </div>
               )}
+
+              {/* Schemaläggning */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-400" />
+                  Schemaläggning - Ankomsttid
+                </h3>
+                <p className="text-sm text-slate-400 mb-4">
+                  Tekniker anländer till kunden inom detta tidsintervall
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Från tid
+                    </label>
+                    <DatePicker
+                      selected={formData.scheduled_start}
+                      onChange={(date) => handleDateChange(date, 'scheduled_start')}
+                      locale="sv"
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="yyyy-MM-dd HH:mm"
+                      placeholderText="Välj från-tid..."
+                      isClearable
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
+                      calendarClassName="bg-slate-900"
+                      wrapperClassName="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Till tid
+                    </label>
+                    <DatePicker
+                      selected={formData.scheduled_end}
+                      onChange={(date) => handleDateChange(date, 'scheduled_end')}
+                      locale="sv"
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="yyyy-MM-dd HH:mm"
+                      placeholderText="Välj till-tid..."
+                      isClearable
+                      minDate={formData.scheduled_start || undefined}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
+                      calendarClassName="bg-slate-900"
+                      wrapperClassName="w-full"
+                    />
+                  </div>
+                </div>
+                {formData.scheduled_start && formData.scheduled_end && (
+                  <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-sm text-blue-300">
+                      <Clock className="inline w-4 h-4 mr-1" />
+                      Tekniker anländer: {formData.scheduled_start.toLocaleDateString('sv-SE')} mellan {formData.scheduled_start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} - {formData.scheduled_end.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* Basic information */}
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
