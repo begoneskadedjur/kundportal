@@ -14,6 +14,7 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
+import { MultisiteBillingModal } from '../../components/admin/billing/MultisiteBillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
 import { PageHeader } from '../../components/shared';
 
@@ -426,6 +427,10 @@ const BillingManagement: React.FC = () => {
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [selectedCase, setSelectedCase] = useState<EnhancedBillingCase | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Multi-site modal state
+  const [selectedMultisiteCase, setSelectedMultisiteCase] = useState<EnhancedBillingCase | null>(null);
+  const [isMultisiteModalOpen, setIsMultisiteModalOpen] = useState(false);
 
   // Case history modal state
   const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
@@ -755,8 +760,14 @@ const BillingManagement: React.FC = () => {
   };
 
   const handleCaseClick = (case_: EnhancedBillingCase) => {
-    setSelectedCase(case_);
-    setIsModalOpen(true);
+    // Kontrollera om det är ett multi-site ärende
+    if (case_.type === 'contract' && case_.customer?.is_multisite) {
+      setSelectedMultisiteCase(case_);
+      setIsMultisiteModalOpen(true);
+    } else {
+      setSelectedCase(case_);
+      setIsModalOpen(true);
+    }
   };
 
   // UI Helper functions
@@ -1122,6 +1133,16 @@ const BillingManagement: React.FC = () => {
         onClose={() => {
           setIsModalOpen(false);
           setSelectedCase(null);
+        }}
+        onCaseUpdate={handleCaseUpdate}
+      />
+      
+      <MultisiteBillingModal
+        case_={selectedMultisiteCase}
+        isOpen={isMultisiteModalOpen}
+        onClose={() => {
+          setIsMultisiteModalOpen(false);
+          setSelectedMultisiteCase(null);
         }}
         onCaseUpdate={handleCaseUpdate}
       />
