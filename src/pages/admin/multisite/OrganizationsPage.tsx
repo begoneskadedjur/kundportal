@@ -260,7 +260,7 @@ export default function OrganizationsPage() {
             organization_number: org.organization_number || '',
             billing_address: org.billing_address || org.contact_address || '',
             billing_email: org.billing_email || org.contact_email || '',
-            billing_method: 'consolidated' as const,
+            billing_method: (org.billing_type || 'consolidated') as 'consolidated' | 'per_site',
             is_active: org.is_active !== false,
             created_at: org.created_at,
             updated_at: org.updated_at,
