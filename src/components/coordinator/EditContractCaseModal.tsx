@@ -12,6 +12,7 @@ import {
   Building, Building2
 } from 'lucide-react'
 import Button from '../ui/Button'
+import Modal from '../ui/Modal'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
@@ -636,104 +637,6 @@ export default function EditContractCaseModal({
     onClose()
   }
 
-  // Fix React-DatePicker z-index conflicts and time layout
-  useEffect(() => {
-    if (isOpen && caseData) {
-      const portalStyles = document.createElement('style')
-      portalStyles.id = 'edit-contract-case-modal-portal-styles'
-      portalStyles.textContent = `
-        .react-datepicker-popper {
-          z-index: 10000 !important;
-        }
-        .react-datepicker {
-          z-index: 10000 !important;
-          display: flex !important;
-        }
-        .react-datepicker__portal {
-          z-index: 10000 !important;
-        }
-        .react-datepicker__portal {
-          z-index: 50000 !important;
-        }
-        .react-datepicker__time-container {
-          float: right !important;
-          border-left: 1px solid #aeaeae !important;
-          width: 85px !important;
-        }
-        .react-datepicker__time-container--with-today-button {
-          display: inline !important;
-          border: 1px solid #aeaeae !important;
-          border-radius: 0.3rem !important;
-          position: absolute !important;
-          right: -87px !important;
-          top: 0 !important;
-        }
-        .react-datepicker__time {
-          background: white !important;
-        }
-        .react-datepicker__time-box {
-          width: 85px !important;
-        }
-        .react-datepicker__time-list {
-          max-height: 200px !important;
-          overflow-y: auto !important;
-          scrollbar-width: thin !important;
-          scrollbar-color: #cbd5e1 #f1f5f9 !important;
-        }
-        .react-datepicker__time-list::-webkit-scrollbar {
-          width: 6px !important;
-        }
-        .react-datepicker__time-list::-webkit-scrollbar-track {
-          background: #f1f5f9 !important;
-        }
-        .react-datepicker__time-list::-webkit-scrollbar-thumb {
-          background: #cbd5e1 !important;
-          border-radius: 3px !important;
-        }
-        .react-datepicker__time-list::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8 !important;
-        }
-        .react-datepicker-wrapper {
-          display: block !important;
-          width: 100% !important;
-        }
-        .react-datepicker__input-container {
-          display: block !important;
-          width: 100% !important;
-        }
-        .react-datepicker__input-container input {
-          width: 100% !important;
-          padding: 0.5rem 1rem !important;
-          background-color: rgb(30 41 59 / 0.5) !important;
-          border: 1px solid rgb(51 65 85) !important;
-          border-radius: 0.5rem !important;
-          color: white !important;
-          outline: none !important;
-        }
-        .react-datepicker__input-container input:focus {
-          border-color: rgb(168 85 247) !important;
-          ring: 2px solid rgb(168 85 247 / 0.2) !important;
-        }
-        .react-datepicker__header {
-          background-color: #f0f0f0 !important;
-          border-bottom: 1px solid #aeaeae !important;
-        }
-        .react-datepicker__time-list-item--selected {
-          background-color: rgb(168 85 247) !important;
-          color: white !important;
-        }
-      `
-      document.head.appendChild(portalStyles)
-      
-      return () => {
-        const existingStyles = document.getElementById('edit-contract-case-modal-portal-styles')
-        if (existingStyles && document.head.contains(existingStyles)) {
-          document.head.removeChild(existingStyles)
-        }
-      }
-    }
-  }, [isOpen, caseData])
-
   if (!isOpen) return null
 
   const formatTime = (minutes: number) => {
@@ -742,104 +645,109 @@ export default function EditContractCaseModal({
     return `${hours}h ${mins}m`
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
-      />
+  // Modal title with enhanced design
+  const modalTitle = (
+    <div className="flex items-center gap-3">
+      <div className="p-2 bg-purple-500/10 rounded-lg">
+        <Crown className="w-6 h-6 text-purple-400" />
+      </div>
+      <div>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-bold text-white">
+            {isCustomerView ? 'Serviceärende' : 'Avtalsärende'}
+          </span>
+          <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium">
+            {formData.case_number || 'Genererar...'}
+          </span>
+        </div>
+        <p className="text-sm text-purple-300">Premium kundsupport</p>
+      </div>
+    </div>
+  )
 
-
-      {/* Modal */}
-      <div className="relative w-full max-w-5xl max-h-[90vh] overflow-visible rounded-2xl">
-        {/* Glass morphism background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 backdrop-blur-xl" />
-        <div className="absolute inset-0 bg-purple-500/5" />
-        
-        {/* Border glow */}
-        <div className="absolute inset-0 rounded-2xl border border-purple-500/20" />
-        
-        {/* Content */}
-        <div className="relative z-10 flex flex-col h-full max-h-[90vh]">
-          {/* Enhanced Header */}
-          <div className="p-6 border-b border-purple-500/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Crown className="w-6 h-6 text-purple-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-white">
-                      {isCustomerView ? 'Serviceärende' : 'Avtalsärende'}
-                    </h2>
-                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium">
-                      {formData.case_number || 'Genererar...'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-purple-300">Premium kundsupport</p>
-                </div>
+  // Header action buttons (for inside modal content)
+  const headerActions = !isCustomerView && (
+    <div className="mb-6 -mt-6 -mx-6 px-6 py-4 bg-slate-800/30 border-b border-slate-700">
+      <div className="flex items-center justify-end gap-2">
+        {/* Quote dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowQuoteDropdown(!showQuoteDropdown)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-300 transition-colors"
+          >
+            <FileSignature className="w-4 h-4" />
+            <span className="text-sm font-medium">Offert</span>
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          
+          {showQuoteDropdown && (
+            <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+              <button
+                onClick={handleGenerateQuote}
+                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
+              >
+                <DollarSign className="w-4 h-4" />
+                Skapa offert via Oneflow
+                <ChevronRight className="w-3 h-3 ml-auto opacity-60" />
+              </button>
+              <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-700">
+                Öppnar Oneflow med förifyllda kunduppgifter
               </div>
-              
-              {/* Action buttons */}
-              {!isCustomerView && (
-                <div className="flex items-center gap-2">
-                  {/* Quote dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowQuoteDropdown(!showQuoteDropdown)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-purple-300 transition-colors"
-                    >
-                      <FileSignature className="w-4 h-4" />
-                      <span className="text-sm font-medium">Offert</span>
-                      <ChevronDown className="w-3 h-3" />
-                    </button>
-                    
-                    {showQuoteDropdown && (
-                      <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
-                        <button
-                          onClick={handleGenerateQuote}
-                          className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
-                        >
-                          <DollarSign className="w-4 h-4" />
-                          Skapa offert via Oneflow
-                          <ChevronRight className="w-3 h-3 ml-auto opacity-60" />
-                        </button>
-                        <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-700">
-                          Öppnar Oneflow med förifyllda kunduppgifter
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Report dropdown */}
-                  <WorkReportDropdown
-                    onDownload={downloadReport}
-                    onSendToTechnician={sendToTechnician}
-                    onSendToContact={sendToContact}
-                    disabled={!canGenerateReport || isGenerating}
-                    technicianName={formData.primary_technician_name}
-                    contactName={formData.contact_person}
-                    totalReports={totalReports}
-                    hasRecentReport={hasRecentReport}
-                    currentReport={currentReport}
-                    getTimeSinceReport={getTimeSinceReport}
-                  />
-
-                  <button
-                    onClick={handleClose}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              )}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto p-6">
+        {/* Report dropdown */}
+        <WorkReportDropdown
+          onDownload={downloadReport}
+          onSendToTechnician={sendToTechnician}
+          onSendToContact={sendToContact}
+          disabled={!canGenerateReport || isGenerating}
+          technicianName={formData.primary_technician_name}
+          contactName={formData.contact_person}
+          totalReports={totalReports}
+          hasRecentReport={hasRecentReport}
+          currentReport={currentReport}
+          getTimeSinceReport={getTimeSinceReport}
+        />
+      </div>
+    </div>
+  )
+
+  // Modal footer
+  const modalFooter = (
+    <div className="flex justify-end gap-3 p-6 bg-slate-800/50">
+      <Button
+        onClick={handleClose}
+        variant="secondary"
+        className="bg-slate-700 hover:bg-slate-600"
+      >
+        Avbryt
+      </Button>
+      {!isCustomerView && (
+        <Button
+          onClick={handleSubmit}
+          loading={loading}
+          className="bg-purple-500 hover:bg-purple-600"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Spara ändringar
+        </Button>
+      )}
+    </div>
+  )
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={modalTitle}
+      size="xl"
+      footer={modalFooter}
+      usePortal={true}
+    >
+      <div className="p-6">
+        {headerActions}
             <div className="space-y-6">
               {/* Customer information - visa för avtalskunder */}
               {customerData && (
@@ -1626,31 +1534,8 @@ export default function EditContractCaseModal({
               </div>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="p-6 border-t border-purple-500/20">
-            <div className="flex justify-end gap-3">
-              <Button
-                onClick={handleClose}
-                variant="secondary"
-                className="bg-slate-700 hover:bg-slate-600"
-              >
-                Avbryt
-              </Button>
-              {!isCustomerView && (
-                <Button
-                  onClick={handleSubmit}
-                  loading={loading}
-                  className="bg-purple-500 hover:bg-purple-600"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Spara ändringar
-                </Button>
-              )}
-            </div>
-          </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
