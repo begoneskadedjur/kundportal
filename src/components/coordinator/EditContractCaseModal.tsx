@@ -1534,8 +1534,6 @@ export default function EditContractCaseModal({
               </div>
             </div>
           </div>
-        </div>
-      </div>
     </Modal>
   )
 }
