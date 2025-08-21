@@ -44,7 +44,17 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Tekniker har redan inloggning aktiverat' })
     }
 
-    // 3. Skapa auth user med ADMIN CLIENT
+    // 3. Mappa korrekt roll baserat på technicians.role
+    const roleMapping: { [key: string]: string } = {
+      'Admin': 'admin',
+      'Koordinator': 'koordinator', 
+      'Skadedjurstekniker': 'technician'
+    }
+    
+    const correctRole = roleMapping[technician.role] || 'technician'
+    console.log(`🔄 Mapping role: ${technician.role} -> ${correctRole}`)
+
+    // 4. Skapa auth user med ADMIN CLIENT
     // handle_new_user trigger kommer automatiskt skapa profilen
     const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
@@ -52,7 +62,7 @@ export default async function handler(req: any, res: any) {
       email_confirm: true,
       user_metadata: {
         display_name: display_name,
-        role: 'technician',           // Trigger använder detta för att sätta role
+        role: correctRole,             // Korrekt roll baserat på technicians.role
         technician_id: technician_id, // Trigger använder detta för FK
         technician_name: technician.name
       }
@@ -66,7 +76,7 @@ export default async function handler(req: any, res: any) {
     console.log('✅ Auth user created:', newAuthUser.user.id)
     console.log('✅ Profile will be created automatically by handle_new_user trigger')
 
-    // 4. Vänta en kort stund och verifiera att profilen skapades
+    // 5. Vänta en kort stund och verifiera att profilen skapades
     await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay
 
     const { data: createdProfile, error: profileCheckError } = await supabaseAdmin
