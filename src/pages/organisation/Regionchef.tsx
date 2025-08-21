@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
+import MultisitePendingQuoteNotification from '../../components/organisation/MultisitePendingQuoteNotification'
 
 interface SiteMetrics {
   customerId: string
@@ -29,14 +30,23 @@ const RegionchefDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
+  const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
+  const [showQuoteNotification, setShowQuoteNotification] = useState(false)
 
   useEffect(() => {
     if (organization && userRole) {
       fetchCustomersAndMetrics()
+      fetchPendingQuotes()
     } else {
       setLoading(false)
     }
   }, [organization, userRole])
+
+  useEffect(() => {
+    if (pendingQuotes.length > 0) {
+      setShowQuoteNotification(true)
+    }
+  }, [pendingQuotes])
 
   const fetchCustomersAndMetrics = async () => {
     if (!organization || !organization.organization_id || !userRole) {
@@ -127,6 +137,64 @@ const RegionchefDashboard: React.FC = () => {
     }
   }
 
+  const fetchPendingQuotes = async () => {
+    if (!organization || !userRole || !accessibleSites.length) {
+      return
+    }
+
+    try {
+      const siteIds = accessibleSites.map(site => site.id)
+      
+      // Get quotes for the region where current user (regionchef) is recipient or should be informed
+      const { data: quoteRecipients, error: recipientsError } = await supabase
+        .from('quote_recipients')
+        .select(`
+          *,
+          cases:cases!quote_recipients_quote_id_fkey(
+            id, case_number, title, quote_sent_at, customer_id,
+            customers:customers!cases_customer_id_fkey(company_name, site_name)
+          )
+        `)
+        .eq('organization_id', organization.id)
+        .eq('is_active', true)
+
+      if (recipientsError) {
+        console.error('Error fetching quote recipients:', recipientsError)
+        return
+      }
+
+      // Regionchef sees quotes for their region
+      const relevantQuotes = (quoteRecipients || []).filter(qr => 
+        qr.recipient_role === 'verksamhetschef' || 
+        (qr.recipient_role === 'regionchef' && qr.region === userRole.region) ||
+        (qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+          siteIds.includes(siteId)
+        ))
+      )
+
+      // Transform to match MultisiteQuote interface
+      const transformedQuotes = relevantQuotes.map(qr => ({
+        id: qr.quote_id,
+        case_number: qr.cases?.case_number || 'Okänt ärendenummer',
+        title: qr.cases?.title || 'Okänd titel', 
+        quote_sent_at: qr.created_at,
+        oneflow_contract_id: '', 
+        source_type: qr.source_type,
+        company_name: qr.cases?.customers?.company_name,
+        site_name: qr.cases?.customers?.site_name,
+        recipient_role: qr.recipient_role,
+        recipient_sites: qr.site_ids ? 
+          customers.filter(customer => qr.site_ids.includes(customer.id)).map(customer => getCustomerDisplayName(customer)) : 
+          [],
+        region: qr.region
+      }))
+
+      setPendingQuotes(transformedQuotes)
+    } catch (error) {
+      console.error('Error fetching pending quotes:', error)
+    }
+  }
+
   // Beräkna totaler
   const totals = {
     sites: siteMetrics.length,
@@ -146,6 +214,15 @@ const RegionchefDashboard: React.FC = () => {
   return (
     <OrganisationLayout userRoleType="regionchef">
       <div className="space-y-6">
+        {/* Multisite Quote Notifications */}
+        {showQuoteNotification && pendingQuotes.length > 0 && (
+          <MultisitePendingQuoteNotification
+            quotes={pendingQuotes}
+            userRole="regionchef"
+            organizationName={organization?.organization_name}
+            onDismiss={() => setShowQuoteNotification(false)}
+          />
+        )}
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-900/20 to-cyan-900/20 rounded-2xl p-6 border border-blue-700/50">
           <div className="flex items-center justify-between">

@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import OrganisationLayout from '../../components/organisation/OrganisationLayout'
 import ServiceRequestModal from '../../components/organisation/ServiceRequestModal'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
+import MultisitePendingQuoteNotification from '../../components/organisation/MultisitePendingQuoteNotification'
 
 interface SiteMetrics {
   customerId: string
@@ -41,14 +42,23 @@ const VerksamhetschefDashboard: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('all')
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])
+  const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
+  const [showQuoteNotification, setShowQuoteNotification] = useState(false)
 
   useEffect(() => {
     if (organization) {
       fetchCustomersAndMetrics()
+      fetchPendingQuotes()
     } else {
       setLoading(false)
     }
   }, [organization])
+
+  useEffect(() => {
+    if (pendingQuotes.length > 0) {
+      setShowQuoteNotification(true)
+    }
+  }, [pendingQuotes])
 
   const fetchCustomersAndMetrics = async () => {
     if (!organization || !organization.organization_id) {
@@ -170,6 +180,55 @@ const VerksamhetschefDashboard: React.FC = () => {
     }
   }
 
+  const fetchPendingQuotes = async () => {
+    if (!organization || !userRole) {
+      return
+    }
+
+    try {
+      // Get quotes for the organization where current user (verksamhetschef) is recipient
+      const { data: quoteRecipients, error: recipientsError } = await supabase
+        .from('quote_recipients')
+        .select(`
+          *,
+          cases:cases!quote_recipients_quote_id_fkey(
+            id, case_number, title, quote_sent_at, customer_id,
+            customers:customers!cases_customer_id_fkey(company_name, site_name)
+          )
+        `)
+        .eq('organization_id', organization.id)
+        .eq('is_active', true)
+
+      if (recipientsError) {
+        console.error('Error fetching quote recipients:', recipientsError)
+        return
+      }
+
+      // Verksamhetschef sees all quotes for the organization
+      const relevantQuotes = quoteRecipients || []
+
+      // Transform to match MultisiteQuote interface
+      const transformedQuotes = relevantQuotes.map(qr => ({
+        id: qr.quote_id,
+        case_number: qr.cases?.case_number || 'Okänt ärendenummer',
+        title: qr.cases?.title || 'Okänd titel', 
+        quote_sent_at: qr.created_at,
+        oneflow_contract_id: '', 
+        source_type: qr.source_type,
+        company_name: qr.cases?.customers?.company_name,
+        site_name: qr.cases?.customers?.site_name,
+        recipient_role: qr.recipient_role,
+        recipient_sites: qr.site_ids ? 
+          sites?.filter(site => qr.site_ids.includes(site.id)).map(site => site.site_name) : 
+          [],
+        region: qr.region
+      }))
+
+      setPendingQuotes(transformedQuotes)
+    } catch (error) {
+      console.error('Error fetching pending quotes:', error)
+    }
+  }
 
   // Hämta unika regioner från customers
   const regions = Array.from(new Set(siteMetrics.map(m => m.region)))
@@ -204,6 +263,15 @@ const VerksamhetschefDashboard: React.FC = () => {
   return (
     <OrganisationLayout userRoleType="verksamhetschef">
       <div className="space-y-6">
+        {/* Multisite Quote Notifications */}
+        {showQuoteNotification && pendingQuotes.length > 0 && (
+          <MultisitePendingQuoteNotification
+            quotes={pendingQuotes}
+            userRole="verksamhetschef"
+            organizationName={organization?.organization_name}
+            onDismiss={() => setShowQuoteNotification(false)}
+          />
+        )}
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-2xl p-6 border border-purple-700/50">
           <div className="flex items-center justify-between">

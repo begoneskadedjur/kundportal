@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useMultisite } from '../../contexts/MultisiteContext'
 import { 
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
@@ -78,6 +79,7 @@ export default function EditContractCaseModal({
 }: EditContractCaseModalProps) {
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const { organization, sites, userRole } = useMultisite()
   const [loading, setLoading] = useState(false)
   const [customerData, setCustomerData] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -145,6 +147,59 @@ export default function EditContractCaseModal({
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null)
   const [showQuoteDropdown, setShowQuoteDropdown] = useState(false)
   const [showReportDropdown, setShowReportDropdown] = useState(false)
+  const [selectedRecipient, setSelectedRecipient] = useState<{
+    role: 'platsansvarig' | 'regionchef' | 'verksamhetschef'
+    userId?: string
+    label: string
+    sites?: string[]
+  } | null>(null)
+
+  // Multisite recipient logic
+  const isMultisiteCustomer = customerData?.is_multisite === true
+  
+  const getRecipientOptions = useCallback(() => {
+    if (!isMultisiteCustomer || !sites || !organization) return []
+    
+    const options = []
+    
+    // Current site (platschef)
+    const currentSite = sites.find(site => site.customer_id === customerData?.id)
+    if (currentSite) {
+      options.push({
+        role: 'platsansvarig' as const,
+        label: `Platschef för ${currentSite.site_name}`,
+        sites: [currentSite.site_name]
+      })
+    }
+    
+    // Regional managers (regionchef)
+    const regionSites = sites.filter(site => 
+      site.organization_id === organization.id && 
+      site.region === currentSite?.region
+    )
+    
+    if (regionSites.length > 1) {
+      const siteNames = regionSites.map(site => site.site_name).join(', ')
+      const truncatedNames = siteNames.length > 50 
+        ? `${regionSites.length} enheter i ${currentSite?.region}` 
+        : siteNames
+        
+      options.push({
+        role: 'regionchef' as const,
+        label: `Regionchef för ${truncatedNames}`,
+        sites: regionSites.map(site => site.site_name)
+      })
+    }
+    
+    // Business manager (verksamhetschef)
+    options.push({
+      role: 'verksamhetschef' as const,
+      label: 'Verksamhetschef',
+      sites: sites.filter(site => site.organization_id === organization.id).map(site => site.site_name)
+    })
+    
+    return options
+  }, [isMultisiteCustomer, sites, organization, customerData])
 
   // Hook för rapport-generering
   const reportData = {
@@ -508,6 +563,12 @@ export default function EditContractCaseModal({
     const oneflowData = prepareCustomerDataForOneflow()
     if (!oneflowData) return
     
+    // For multisite customers, ensure recipient is selected
+    if (isMultisiteCustomer && !selectedRecipient) {
+      toast.error('Välj vem som ska motta offerten')
+      return
+    }
+    
     const prefillData = {
       ...oneflowData,
       documentType: 'offer',
@@ -524,7 +585,15 @@ export default function EditContractCaseModal({
       caseTitle: formData.title,
       pestType: formData.pest_type,
       // Add case_id for webhook linking
-      case_id: caseData?.id
+      case_id: caseData?.id,
+      // Add multisite recipient information
+      multisite_recipient: selectedRecipient ? {
+        role: selectedRecipient.role,
+        userId: selectedRecipient.userId,
+        label: selectedRecipient.label,
+        sites: selectedRecipient.sites,
+        organization_id: organization?.id
+      } : null
     }
     
     // Debug logging
@@ -537,7 +606,11 @@ export default function EditContractCaseModal({
     const oneflowRoute = getOneflowRoute()
     navigate(`${oneflowRoute}?prefill=offer`)
     
-    toast.success('Navigerar till offertskapning med kundinformation...')
+    const successMessage = isMultisiteCustomer && selectedRecipient 
+      ? `Navigerar till offertskapning för ${selectedRecipient.label.toLowerCase()}...`
+      : 'Navigerar till offertskapning med kundinformation...'
+    
+    toast.success(successMessage)
     setShowQuoteDropdown(false)
     
     // Mark quote as generated
@@ -548,6 +621,9 @@ export default function EditContractCaseModal({
         .update({ quote_generated_at: now })
         .eq('id', caseData.id)
     }
+    
+    // Reset recipient selection after successful navigation
+    setSelectedRecipient(null)
   }
 
   const handleSubmit = async () => {
@@ -681,17 +757,70 @@ export default function EditContractCaseModal({
           </button>
           
           {showQuoteDropdown && (
-            <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+            <div className="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+              {/* Multisite recipient selection */}
+              {isMultisiteCustomer && (
+                <div className="p-4 border-b border-slate-700">
+                  <label className="block text-xs font-medium text-slate-400 mb-2">
+                    Vem ska motta offerten?
+                  </label>
+                  <select
+                    value={selectedRecipient ? `${selectedRecipient.role}` : ''}
+                    onChange={(e) => {
+                      const role = e.target.value as 'platsansvarig' | 'regionchef' | 'verksamhetschef'
+                      const option = getRecipientOptions().find(opt => opt.role === role)
+                      setSelectedRecipient(option || null)
+                    }}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Välj mottagare...</option>
+                    {getRecipientOptions().map((option, index) => (
+                      <option key={index} value={option.role}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedRecipient && selectedRecipient.role === 'regionchef' && (
+                    <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Building2 className="w-3 h-3" />
+                        Inkluderade enheter:
+                      </div>
+                      <div className="text-slate-300 leading-relaxed">
+                        {selectedRecipient.sites?.join(', ')}
+                      </div>
+                    </div>
+                  )}
+                  {selectedRecipient && selectedRecipient.role === 'verksamhetschef' && (
+                    <div className="mt-2 p-2 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Building className="w-3 h-3" />
+                        Hela organisationen:
+                      </div>
+                      <div className="text-slate-300">
+                        {organization?.organization_name} ({selectedRecipient.sites?.length || 0} enheter)
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               <button
                 onClick={handleGenerateQuote}
-                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                disabled={isMultisiteCustomer && !selectedRecipient}
+                className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <DollarSign className="w-4 h-4" />
                 Skapa offert via Oneflow
                 <ChevronRight className="w-3 h-3 ml-auto opacity-60" />
               </button>
               <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-700">
-                Öppnar Oneflow med förifyllda kunduppgifter
+                {isMultisiteCustomer 
+                  ? selectedRecipient 
+                    ? `Offerten skickas till ${selectedRecipient.label.toLowerCase()}` 
+                    : 'Välj mottagare för att fortsätta'
+                  : 'Öppnar Oneflow med förifyllda kunduppgifter'
+                }
               </div>
             </div>
           )}

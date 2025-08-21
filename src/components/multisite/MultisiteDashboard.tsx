@@ -5,6 +5,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { supabase } from '../../lib/supabase'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import MultisitePendingQuoteNotification from '../organisation/MultisitePendingQuoteNotification'
 
 interface DashboardMetrics {
   totalSites: number
@@ -22,6 +23,8 @@ const MultisiteDashboard: React.FC = () => {
   const { organization, accessibleSites, userRole, currentSite, sites } = useMultisite()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
+  const [showQuoteNotification, setShowQuoteNotification] = useState(false)
   
   // Debug logging
   console.log('MultisiteDashboard - sites:', sites)
@@ -29,7 +32,14 @@ const MultisiteDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardMetrics()
-  }, [accessibleSites, currentSite])
+    fetchPendingQuotes()
+  }, [accessibleSites, currentSite, organization, userRole])
+
+  useEffect(() => {
+    if (pendingQuotes.length > 0) {
+      setShowQuoteNotification(true)
+    }
+  }, [pendingQuotes])
 
   const fetchDashboardMetrics = async () => {
     if (!organization || accessibleSites.length === 0) {
@@ -95,6 +105,83 @@ const MultisiteDashboard: React.FC = () => {
     }
   }
 
+  const fetchPendingQuotes = async () => {
+    if (!organization || !userRole || accessibleSites.length === 0) {
+      return
+    }
+
+    try {
+      // Get quotes for accessible sites where current user is recipient or should be informed
+      const siteIds = accessibleSites.map(site => site.id)
+      
+      // First get quotes from quote_recipients table based on role and organization
+      const { data: quoteRecipients, error: recipientsError } = await supabase
+        .from('quote_recipients')
+        .select(`
+          *,
+          cases:cases!quote_recipients_quote_id_fkey(
+            id, case_number, title, quote_sent_at, customer_id,
+            customers:customers!cases_customer_id_fkey(company_name, site_name)
+          )
+        `)
+        .eq('organization_id', organization.id)
+        .eq('is_active', true)
+
+      if (recipientsError) {
+        console.error('Error fetching quote recipients:', recipientsError)
+        return
+      }
+
+      // Filter based on user role and access
+      let relevantQuotes: any[] = []
+      
+      if (userRole.role_type === 'verksamhetschef') {
+        // Verksamhetschef sees all quotes for the organization
+        relevantQuotes = quoteRecipients || []
+      } else if (userRole.role_type === 'regionchef') {
+        // Regionchef sees quotes for their region
+        relevantQuotes = (quoteRecipients || []).filter(qr => 
+          qr.recipient_role === 'verksamhetschef' || 
+          qr.recipient_role === 'regionchef' && qr.region === userRole.region ||
+          qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+            siteIds.includes(siteId)
+          )
+        )
+      } else if (userRole.role_type === 'platsansvarig') {
+        // Platsansvarig sees quotes for their sites
+        relevantQuotes = (quoteRecipients || []).filter(qr =>
+          qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+            siteIds.includes(siteId)
+          ) ||
+          // Also show quotes sent to higher levels for information
+          (qr.recipient_role === 'regionchef' || qr.recipient_role === 'verksamhetschef') &&
+          qr.site_ids?.some((siteId: string) => siteIds.includes(siteId))
+        )
+      }
+
+      // Transform to match MultisiteQuote interface
+      const transformedQuotes = relevantQuotes.map(qr => ({
+        id: qr.quote_id,
+        case_number: qr.cases?.case_number || 'Okänt ärendenummer',
+        title: qr.cases?.title || 'Okänd titel', 
+        quote_sent_at: qr.created_at,
+        oneflow_contract_id: '', // Not available in this structure
+        source_type: qr.source_type,
+        company_name: qr.cases?.customers?.company_name,
+        site_name: qr.cases?.customers?.site_name,
+        recipient_role: qr.recipient_role,
+        recipient_sites: qr.site_ids ? 
+          sites?.filter(site => qr.site_ids.includes(site.id)).map(site => site.site_name) : 
+          [],
+        region: qr.region
+      }))
+
+      setPendingQuotes(transformedQuotes)
+    } catch (error) {
+      console.error('Error fetching pending quotes:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -105,6 +192,15 @@ const MultisiteDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Multisite Quote Notifications */}
+      {showQuoteNotification && pendingQuotes.length > 0 && (
+        <MultisitePendingQuoteNotification
+          quotes={pendingQuotes}
+          userRole={userRole?.role_type || 'platsansvarig'}
+          organizationName={organization?.organization_name}
+          onDismiss={() => setShowQuoteNotification(false)}
+        />
+      )}
       {/* Welcome Header */}
       <div className="mb-8">
         <div className="bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-purple-500/20 rounded-2xl p-6 border border-slate-700/50 backdrop-blur">
