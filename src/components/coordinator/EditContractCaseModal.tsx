@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { useMultisite } from '../../contexts/MultisiteContext'
 import { 
   X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
@@ -79,7 +78,6 @@ export default function EditContractCaseModal({
 }: EditContractCaseModalProps) {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { organization, sites, userRole } = useMultisite()
   const [loading, setLoading] = useState(false)
   const [customerData, setCustomerData] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -153,53 +151,59 @@ export default function EditContractCaseModal({
     label: string
     sites?: string[]
   } | null>(null)
+  const [organizationSites, setOrganizationSites] = useState<any[]>([])
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
 
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
   
   const getRecipientOptions = useCallback(() => {
-    if (!isMultisiteCustomer || !sites || !organization) return []
+    if (!isMultisiteCustomer || !customerData || !organizationSites.length) return []
     
     const options = []
     
-    // Current site (platschef)
-    const currentSite = sites.find(site => site.customer_id === customerData?.id)
+    // Current site (platschef) - find by customer_id matching current case
+    const currentSite = organizationSites.find(site => site.id === customerData.id)
     if (currentSite) {
+      const siteName = currentSite.site_name || currentSite.company_name
       options.push({
         role: 'platsansvarig' as const,
-        label: `Platschef för ${currentSite.site_name}`,
-        sites: [currentSite.site_name]
+        label: `Platschef för ${siteName}`,
+        sites: [siteName]
       })
     }
     
-    // Regional managers (regionchef)
-    const regionSites = sites.filter(site => 
-      site.organization_id === organization.id && 
-      site.region === currentSite?.region
-    )
+    // Regional managers (regionchef) - find all sites in same region
+    if (currentSite?.region) {
+      const regionSites = organizationSites.filter(site => 
+        site.region === currentSite.region
+      )
+      
+      if (regionSites.length > 1) {
+        const siteNames = regionSites.map(site => site.site_name || site.company_name).join(', ')
+        const truncatedNames = siteNames.length > 50 
+          ? `${regionSites.length} enheter i ${currentSite.region}` 
+          : siteNames
+          
+        options.push({
+          role: 'regionchef' as const,
+          label: `Regionchef för ${truncatedNames}`,
+          sites: regionSites.map(site => site.site_name || site.company_name)
+        })
+      }
+    }
     
-    if (regionSites.length > 1) {
-      const siteNames = regionSites.map(site => site.site_name).join(', ')
-      const truncatedNames = siteNames.length > 50 
-        ? `${regionSites.length} enheter i ${currentSite?.region}` 
-        : siteNames
-        
+    // Business manager (verksamhetschef) - all sites in organization
+    if (organizationSites.length > 0) {
       options.push({
-        role: 'regionchef' as const,
-        label: `Regionchef för ${truncatedNames}`,
-        sites: regionSites.map(site => site.site_name)
+        role: 'verksamhetschef' as const,
+        label: 'Verksamhetschef',
+        sites: organizationSites.map(site => site.site_name || site.company_name)
       })
     }
-    
-    // Business manager (verksamhetschef)
-    options.push({
-      role: 'verksamhetschef' as const,
-      label: 'Verksamhetschef',
-      sites: sites.filter(site => site.organization_id === organization.id).map(site => site.site_name)
-    })
     
     return options
-  }, [isMultisiteCustomer, sites, organization, customerData])
+  }, [isMultisiteCustomer, customerData, organizationSites])
 
   // Hook för rapport-generering
   const reportData = {
@@ -295,6 +299,8 @@ export default function EditContractCaseModal({
     // Fetch customer data if customer_id exists
     if (isOpen && caseData?.customer_id) {
       fetchCustomerData(caseData.customer_id)
+      // Also fetch organization sites for multisite recipient selection
+      fetchOrganizationSites(caseData.customer_id)
     }
   }, [isOpen, caseData])
 
@@ -379,6 +385,66 @@ export default function EditContractCaseModal({
       }
     } catch (error) {
       console.error('Error fetching customer:', error)
+    }
+  }
+
+  const fetchOrganizationSites = async (customerId: string) => {
+    try {
+      setLoadingRecipients(true)
+      
+      // First get the customer to find organization_id
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('organization_id, parent_customer_id, region')
+        .eq('id', customerId)
+        .single()
+      
+      if (customerError || !customer) {
+        console.error('Error fetching customer for organization:', customerError)
+        return
+      }
+      
+      // Determine the organization_id to use
+      let orgId = customer.organization_id
+      
+      // If no organization_id, try parent customer
+      if (!orgId && customer.parent_customer_id) {
+        const { data: parentCustomer, error: parentError } = await supabase
+          .from('customers')
+          .select('organization_id')
+          .eq('id', customer.parent_customer_id)
+          .single()
+        
+        if (!parentError && parentCustomer) {
+          orgId = parentCustomer.organization_id
+        }
+      }
+      
+      if (!orgId) {
+        console.warn('No organization_id found for customer')
+        return
+      }
+      
+      // Get all sites in the organization
+      const { data: sites, error: sitesError } = await supabase
+        .from('customers')
+        .select('id, company_name, site_name, region, organization_id')
+        .eq('organization_id', orgId)
+        .eq('is_multisite', true)
+        .eq('is_active', true)
+        .order('site_name')
+      
+      if (sitesError) {
+        console.error('Error fetching organization sites:', sitesError)
+        return
+      }
+      
+      setOrganizationSites(sites || [])
+      console.log('fetchOrganizationSites - Found sites:', sites)
+    } catch (error) {
+      console.error('Error fetching organization sites:', error)
+    } finally {
+      setLoadingRecipients(false)
     }
   }
 
@@ -592,7 +658,7 @@ export default function EditContractCaseModal({
         userId: selectedRecipient.userId,
         label: selectedRecipient.label,
         sites: selectedRecipient.sites,
-        organization_id: organization?.id
+        organization_id: customerData?.organization_id
       } : null
     }
     
@@ -764,22 +830,35 @@ export default function EditContractCaseModal({
                   <label className="block text-xs font-medium text-slate-400 mb-2">
                     Vem ska motta offerten?
                   </label>
-                  <select
-                    value={selectedRecipient ? `${selectedRecipient.role}` : ''}
-                    onChange={(e) => {
-                      const role = e.target.value as 'platsansvarig' | 'regionchef' | 'verksamhetschef'
-                      const option = getRecipientOptions().find(opt => opt.role === role)
-                      setSelectedRecipient(option || null)
-                    }}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Välj mottagare...</option>
-                    {getRecipientOptions().map((option, index) => (
-                      <option key={index} value={option.role}>
-                        {option.label}
+                  {loadingRecipients ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-400 text-sm">
+                      <div className="animate-spin w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full"></div>
+                      Laddar mottagare...
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedRecipient ? `${selectedRecipient.role}` : ''}
+                      onChange={(e) => {
+                        const role = e.target.value as 'platsansvarig' | 'regionchef' | 'verksamhetschef'
+                        const option = getRecipientOptions().find(opt => opt.role === role)
+                        setSelectedRecipient(option || null)
+                      }}
+                      disabled={getRecipientOptions().length === 0}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {getRecipientOptions().length === 0 
+                          ? 'Inga mottagare tillgängliga...' 
+                          : 'Välj mottagare...'
+                        }
                       </option>
-                    ))}
-                  </select>
+                      {getRecipientOptions().map((option, index) => (
+                        <option key={index} value={option.role}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {selectedRecipient && selectedRecipient.role === 'regionchef' && (
                     <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
                       <div className="flex items-center gap-1 mb-1">
@@ -798,7 +877,7 @@ export default function EditContractCaseModal({
                         Hela organisationen:
                       </div>
                       <div className="text-slate-300">
-                        {organization?.organization_name} ({selectedRecipient.sites?.length || 0} enheter)
+                        {customerData?.company_name || 'Organisation'} ({selectedRecipient.sites?.length || 0} enheter)
                       </div>
                     </div>
                   )}
