@@ -179,7 +179,7 @@ export default function EditContractCaseModal({
         site.region === currentSite.region
       )
       
-      if (regionSites.length > 1) {
+      if (regionSites.length >= 1) {
         const siteNames = regionSites.map(site => site.site_name || site.company_name).join(', ')
         const truncatedNames = siteNames.length > 50 
           ? `${regionSites.length} enheter i ${currentSite.region}` 
@@ -448,6 +448,60 @@ export default function EditContractCaseModal({
     }
   }
 
+  const saveQuoteRecipient = async (caseId: string, recipient: typeof selectedRecipient, orgId: string) => {
+    if (!recipient || !caseId || !orgId) return
+    
+    try {
+      let siteIds: string[] = []
+      let region: string | null = null
+      
+      // Get current site info
+      const currentSite = organizationSites.find(site => site.id === customerData?.id)
+      
+      if (recipient.role === 'platsansvarig') {
+        // For platschef, only include current site
+        siteIds = currentSite ? [currentSite.id] : []
+      } else if (recipient.role === 'regionchef') {
+        // For regionchef, include all sites in the region
+        region = currentSite?.region || null
+        siteIds = organizationSites
+          .filter(site => site.region === currentSite?.region)
+          .map(site => site.id)
+      } else if (recipient.role === 'verksamhetschef') {
+        // For verksamhetschef, include all sites in organization
+        siteIds = organizationSites.map(site => site.id)
+      }
+      
+      console.log('Saving quote recipient:', {
+        quote_id: caseId,
+        recipient_role: recipient.role,
+        site_ids: siteIds,
+        region,
+        organization_id: orgId
+      })
+      
+      const { error } = await supabase
+        .from('quote_recipients')
+        .insert({
+          quote_id: caseId,
+          source_type: 'case',
+          organization_id: orgId,
+          recipient_role: recipient.role,
+          site_ids: siteIds,
+          region,
+          is_active: true
+        })
+      
+      if (error) {
+        console.error('Error saving quote recipient:', error)
+      } else {
+        console.log('Quote recipient saved successfully')
+      }
+    } catch (error) {
+      console.error('Error saving quote recipient:', error)
+    }
+  }
+
   const handleDateChange = (date: Date | null, fieldName: 'scheduled_start' | 'scheduled_end') => {
     // Om ett datum väljs utan tid, sätt standardtid till 08:00
     if (date) {
@@ -686,6 +740,11 @@ export default function EditContractCaseModal({
         .from('cases')
         .update({ quote_generated_at: now })
         .eq('id', caseData.id)
+    }
+    
+    // Save multisite recipient to database
+    if (isMultisiteCustomer && selectedRecipient && caseData?.id && customerData?.organization_id) {
+      await saveQuoteRecipient(caseData.id, selectedRecipient, customerData.organization_id)
     }
     
     // Reset recipient selection after successful navigation

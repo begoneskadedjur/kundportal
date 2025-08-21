@@ -13,6 +13,7 @@ import OrganizationServiceRequest from '../../components/organisation/Organizati
 import OrganisationActiveCasesList from '../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
 import TrafficLightCaseList from '../../components/organisation/TrafficLightCaseList'
+import MultisitePendingQuoteNotification from '../../components/organisation/MultisitePendingQuoteNotification'
 
 const PlatsansvarigDashboard: React.FC = () => {
   const { profile } = useAuth()
@@ -27,6 +28,8 @@ const PlatsansvarigDashboard: React.FC = () => {
     completedThisMonth: 0,
     upcomingVisits: 0
   })
+  const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
+  const [showQuoteNotification, setShowQuoteNotification] = useState(false)
   
   // Platsansvarig har bara tillgång till en enhet
   const currentSite = accessibleSites[0]
@@ -34,10 +37,17 @@ const PlatsansvarigDashboard: React.FC = () => {
   useEffect(() => {
     if (organization && currentSite) {
       fetchCustomerAndStats()
+      fetchPendingQuotes()
     } else {
       setLoading(false)
     }
   }, [organization, userRole, currentSite])
+
+  useEffect(() => {
+    if (pendingQuotes.length > 0) {
+      setShowQuoteNotification(true)
+    }
+  }, [pendingQuotes])
 
   const fetchCustomerAndStats = async () => {
     if (!organization || !currentSite) return
@@ -113,6 +123,65 @@ const PlatsansvarigDashboard: React.FC = () => {
     }
   }
 
+  const fetchPendingQuotes = async () => {
+    if (!organization || !userRole || !currentSite) {
+      return
+    }
+
+    try {
+      const siteIds = [currentSite.id]
+      
+      // Get quotes for this specific site where current user (platsansvarig) is recipient or should be informed
+      const { data: quoteRecipients, error: recipientsError } = await supabase
+        .from('quote_recipients')
+        .select(`
+          *,
+          cases:cases!quote_recipients_quote_id_fkey(
+            id, case_number, title, quote_sent_at, customer_id,
+            customers:customers!cases_customer_id_fkey(company_name, site_name)
+          )
+        `)
+        .eq('organization_id', organization.id)
+        .eq('is_active', true)
+
+      if (recipientsError) {
+        console.error('Error fetching quote recipients:', recipientsError)
+        return
+      }
+
+      // Platsansvarig sees quotes for their sites
+      const relevantQuotes = (quoteRecipients || []).filter(qr =>
+        qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+          siteIds.includes(siteId)
+        ) ||
+        // Also show quotes sent to higher levels for information
+        (qr.recipient_role === 'regionchef' || qr.recipient_role === 'verksamhetschef') &&
+        qr.site_ids?.some((siteId: string) => siteIds.includes(siteId))
+      )
+
+      // Transform to match MultisiteQuote interface
+      const transformedQuotes = relevantQuotes.map(qr => ({
+        id: qr.quote_id,
+        case_number: qr.cases?.case_number || 'Okänt ärendenummer',
+        title: qr.cases?.title || 'Okänd titel', 
+        quote_sent_at: qr.created_at,
+        oneflow_contract_id: '', 
+        source_type: qr.source_type,
+        company_name: qr.cases?.customers?.company_name,
+        site_name: qr.cases?.customers?.site_name,
+        recipient_role: qr.recipient_role,
+        recipient_sites: qr.site_ids ? 
+          [currentSite.site_name] : 
+          [],
+        region: qr.region
+      }))
+
+      setPendingQuotes(transformedQuotes)
+    } catch (error) {
+      console.error('Error fetching pending quotes:', error)
+    }
+  }
+
   if (contextLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -139,6 +208,15 @@ const PlatsansvarigDashboard: React.FC = () => {
   return (
     <OrganisationLayout userRoleType="platsansvarig">
       <div className="space-y-6">
+        {/* Multisite Quote Notifications */}
+        {showQuoteNotification && pendingQuotes.length > 0 && (
+          <MultisitePendingQuoteNotification
+            quotes={pendingQuotes}
+            userRole="platsansvarig"
+            organizationName={organization?.organization_name}
+            onDismiss={() => setShowQuoteNotification(false)}
+          />
+        )}
         {/* Header */}
         <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-2xl p-6 border border-green-700/50">
           <div className="flex items-start justify-between">
