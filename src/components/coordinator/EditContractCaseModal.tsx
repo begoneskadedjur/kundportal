@@ -790,6 +790,123 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
+              {/* Location and pest */}
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-purple-400" />
+                  Plats och skadedjur
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Adress
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.address}
+                      onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Skadedjur
+                    </label>
+                    <select
+                      value={formData.pest_type}
+                      onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isCustomerView}
+                    >
+                      <option value="">Välj skadedjur</option>
+                      {PEST_TYPES.map(pest => (
+                        <option key={pest} value={pest}>{pest}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact information */}
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5 text-purple-400" />
+                  Kontaktinformation
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Kontaktperson
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.contact_person}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Telefon
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.contact_phone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      E-post
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.contact_email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isCustomerView}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Technicians */}
+              {!isCustomerView && (
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-purple-400" />
+                    Tilldelade tekniker
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <TechnicianDropdown
+                      label="Primär tekniker"
+                      value={formData.primary_technician_id}
+                      onChange={(id) => handleTechnicianChange('primary', id)}
+                      technicians={technicians}
+                      variant="primary"
+                    />
+                    <TechnicianDropdown
+                      label="Sekundär tekniker"
+                      value={formData.secondary_technician_id}
+                      onChange={(id) => handleTechnicianChange('secondary', id)}
+                      technicians={technicians}
+                      variant="secondary"
+                    />
+                    <TechnicianDropdown
+                      label="Tertiär tekniker"
+                      value={formData.tertiary_technician_id}
+                      onChange={(id) => handleTechnicianChange('tertiary', id)}
+                      technicians={technicians}
+                      variant="tertiary"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Schemaläggning */}
               <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10 mb-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -895,123 +1012,6 @@ export default function EditContractCaseModal({
                 </div>
               </div>
 
-              {/* Contact information */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5 text-purple-400" />
-                  Kontaktinformation
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Kontaktperson
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.contact_person}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Telefon
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      E-post
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.contact_email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Location and pest */}
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-purple-400" />
-                  Plats och skadedjur
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Adress
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Skadedjur
-                    </label>
-                    <select
-                      value={formData.pest_type}
-                      onChange={(e) => setFormData(prev => ({ ...prev, pest_type: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={isCustomerView}
-                    >
-                      <option value="">Välj skadedjur</option>
-                      {PEST_TYPES.map(pest => (
-                        <option key={pest} value={pest}>{pest}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Technicians */}
-              {!isCustomerView && (
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-400" />
-                    Tilldelade tekniker
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <TechnicianDropdown
-                      label="Primär tekniker"
-                      value={formData.primary_technician_id}
-                      onChange={(id) => handleTechnicianChange('primary', id)}
-                      technicians={technicians}
-                      variant="primary"
-                    />
-                    <TechnicianDropdown
-                      label="Sekundär tekniker"
-                      value={formData.secondary_technician_id}
-                      onChange={(id) => handleTechnicianChange('secondary', id)}
-                      technicians={technicians}
-                      variant="secondary"
-                    />
-                    <TechnicianDropdown
-                      label="Tertiär tekniker"
-                      value={formData.tertiary_technician_id}
-                      onChange={(id) => handleTechnicianChange('tertiary', id)}
-                      technicians={technicians}
-                      variant="tertiary"
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Work report */}
               <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -1028,7 +1028,7 @@ export default function EditContractCaseModal({
                 />
               </div>
 
-              {/* 🚦 Professional Assessment & Recommendations - Only for contract customers */}
+              {/* 🚦 Bedömning & Rekommendationer - Only for contract customers */}
               {caseData.customer_id && (
                 <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
@@ -1036,7 +1036,7 @@ export default function EditContractCaseModal({
                       <span className="text-2xl">🚦</span>
                     </div>
                     <div>
-                      <span className="text-white">Professionell Bedömning & Rekommendationer</span>
+                      <span className="text-white">Bedömning & Rekommendationer</span>
                       <p className="text-sm text-slate-400 font-normal">Trafikljusstatus med åtgärdsförslag</p>
                     </div>
                   </h3>
