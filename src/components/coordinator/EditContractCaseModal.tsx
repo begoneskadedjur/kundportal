@@ -922,7 +922,7 @@ export default function EditContractCaseModal({
                     <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
                       <div className="flex items-center gap-1 mb-1">
                         <Building2 className="w-3 h-3" />
-                        Inkluderade enheter:
+                        Ansvarar för enheter:
                       </div>
                       <div className="text-slate-300 leading-relaxed">
                         {selectedRecipient.sites?.join(', ')}
