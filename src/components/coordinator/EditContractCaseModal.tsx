@@ -906,7 +906,6 @@ export default function EditContractCaseModal({
                       timeCaption="Tid"
                       placeholderText="Välj från-tid..."
                       isClearable
-                      withPortal={true}
                     />
                   </div>
                   <div>
@@ -925,7 +924,6 @@ export default function EditContractCaseModal({
                       placeholderText="Välj till-tid..."
                       isClearable
                       minDate={formData.scheduled_start || undefined}
-                      withPortal={true}
                     />
                   </div>
                 </div>
