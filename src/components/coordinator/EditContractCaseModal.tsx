@@ -455,20 +455,12 @@ export default function EditContractCaseModal({
       setOrganizationSites(sites || [])
       console.log('fetchOrganizationSites - Found sites:', sites)
       
-      // Also fetch regionchef site_ids from multisite_user_roles
-      console.log('fetchOrganizationSites - Querying multisite_user_roles with org_id:', orgId)
+      // Fetch regionchef site_ids using the same approach as admin pages
+      console.log('fetchOrganizationSites - Querying multisite_users_complete with org_id:', orgId)
       
-      // First test basic access to multisite_user_roles table
-      const { data: allRoles, error: allRolesError } = await supabase
-        .from('multisite_user_roles')
-        .select('*')
-        .limit(5)
-      
-      console.log('fetchOrganizationSites - Basic multisite_user_roles access test:', allRoles, allRolesError)
-      
-      // Then do the specific regionchef query
+      // Use the multisite_users_complete view like admin pages do
       const { data: regionchefRoles, error: regionchefError } = await supabase
-        .from('multisite_user_roles')
+        .from('multisite_users_complete')
         .select('site_ids')
         .eq('organization_id', orgId)
         .eq('role_type', 'regionchef')
@@ -478,14 +470,14 @@ export default function EditContractCaseModal({
         console.error('Error fetching regionchef roles:', regionchefError)
         console.error('Error details:', regionchefError.message, regionchefError.details)
       } else {
-        console.log('fetchOrganizationSites - Regionchef roles query result:', regionchefRoles)
+        console.log('fetchOrganizationSites - Regionchef roles query result from VIEW:', regionchefRoles)
         console.log('fetchOrganizationSites - Regionchef query SUCCESS, length:', regionchefRoles?.length || 0)
         if (regionchefRoles && regionchefRoles.length > 0) {
           const allRegionchefSiteIds = regionchefRoles.flatMap(role => role.site_ids || [])
           setRegionchefSiteIds(allRegionchefSiteIds)
-          console.log('fetchOrganizationSites - Regionchef site_ids:', allRegionchefSiteIds)
+          console.log('fetchOrganizationSites - Regionchef site_ids from VIEW:', allRegionchefSiteIds)
         } else {
-          console.log('fetchOrganizationSites - No regionchef roles found in database')
+          console.log('fetchOrganizationSites - No regionchef roles found in VIEW')
           setRegionchefSiteIds([])
         }
       }
