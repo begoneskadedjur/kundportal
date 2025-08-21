@@ -152,6 +152,7 @@ export default function EditContractCaseModal({
     sites?: string[]
   } | null>(null)
   const [organizationSites, setOrganizationSites] = useState<any[]>([])
+  const [regionchefSiteIds, setRegionchefSiteIds] = useState<string[]>([])
   const [loadingRecipients, setLoadingRecipients] = useState(false)
 
   // Multisite recipient logic
@@ -173,16 +174,16 @@ export default function EditContractCaseModal({
       })
     }
     
-    // Regional managers (regionchef) - find all sites in same region
-    if (currentSite?.region) {
+    // Regional managers (regionchef) - use multisite_user_roles site_ids
+    if (regionchefSiteIds.length > 0) {
       const regionSites = organizationSites.filter(site => 
-        site.region === currentSite.region
+        regionchefSiteIds.includes(site.id)
       )
       
-      if (regionSites.length >= 1) {
+      if (regionSites.length > 0) {
         const siteNames = regionSites.map(site => site.site_name || site.company_name).join(', ')
         const truncatedNames = siteNames.length > 50 
-          ? `${regionSites.length} enheter i ${currentSite.region}` 
+          ? `${regionSites.length} enheter i regionen` 
           : siteNames
           
         options.push({
@@ -203,7 +204,7 @@ export default function EditContractCaseModal({
     }
     
     return options
-  }, [isMultisiteCustomer, customerData, organizationSites])
+  }, [isMultisiteCustomer, customerData, organizationSites, regionchefSiteIds])
 
   // Hook för rapport-generering
   const reportData = {
@@ -441,6 +442,22 @@ export default function EditContractCaseModal({
       
       setOrganizationSites(sites || [])
       console.log('fetchOrganizationSites - Found sites:', sites)
+      
+      // Also fetch regionchef site_ids from multisite_user_roles
+      const { data: regionchefRoles, error: regionchefError } = await supabase
+        .from('multisite_user_roles')
+        .select('site_ids')
+        .eq('organization_id', orgId)
+        .eq('role_type', 'regionchef')
+        .eq('is_active', true)
+      
+      if (regionchefError) {
+        console.error('Error fetching regionchef roles:', regionchefError)
+      } else if (regionchefRoles && regionchefRoles.length > 0) {
+        const allRegionchefSiteIds = regionchefRoles.flatMap(role => role.site_ids || [])
+        setRegionchefSiteIds(allRegionchefSiteIds)
+        console.log('fetchOrganizationSites - Regionchef site_ids:', allRegionchefSiteIds)
+      }
     } catch (error) {
       console.error('Error fetching organization sites:', error)
     } finally {
@@ -462,10 +479,10 @@ export default function EditContractCaseModal({
         // For platschef, only include current site
         siteIds = currentSite ? [currentSite.id] : []
       } else if (recipient.role === 'regionchef') {
-        // For regionchef, include all sites in the region
+        // For regionchef, use the site_ids from multisite_user_roles
         region = currentSite?.region || null
         siteIds = organizationSites
-          .filter(site => site.region === currentSite?.region)
+          .filter(site => regionchefSiteIds.includes(site.id))
           .map(site => site.id)
       } else if (recipient.role === 'verksamhetschef') {
         // For verksamhetschef, include all sites in organization

@@ -139,13 +139,25 @@ const MultisiteDashboard: React.FC = () => {
         // Verksamhetschef sees all quotes for the organization
         relevantQuotes = quoteRecipients || []
       } else if (userRole.role_type === 'regionchef') {
-        // Regionchef sees quotes for their region
+        // Get regionchef site_ids from multisite_user_roles
+        const { data: regionchefRoles } = await supabase
+          .from('multisite_user_roles')
+          .select('site_ids')
+          .eq('organization_id', organization.id)
+          .eq('role_type', 'regionchef')
+          .eq('is_active', true)
+          
+        const regionchefSiteIds = regionchefRoles?.flatMap(role => role.site_ids || []) || []
+        
+        // Regionchef sees quotes for their assigned sites (from multisite_user_roles)
         relevantQuotes = (quoteRecipients || []).filter(qr => 
           qr.recipient_role === 'verksamhetschef' || 
-          qr.recipient_role === 'regionchef' && qr.region === userRole.region ||
-          qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
-            siteIds.includes(siteId)
-          )
+          (qr.recipient_role === 'regionchef' && qr.site_ids?.some((siteId: string) => 
+            regionchefSiteIds.includes(siteId)
+          )) ||
+          (qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+            regionchefSiteIds.includes(siteId)
+          ))
         )
       } else if (userRole.role_type === 'platsansvarig') {
         // Platsansvarig sees quotes for their sites
