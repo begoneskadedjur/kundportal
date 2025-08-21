@@ -791,7 +791,7 @@ export default function EditContractCaseModal({
               )}
 
               {/* Schemaläggning */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 mb-6">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10 mb-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-400" />
                   Schemaläggning - Ankomsttid
@@ -847,7 +847,7 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Basic information */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-purple-400" />
                   Grundläggande information
@@ -896,7 +896,7 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Contact information */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <User className="w-5 h-5 text-purple-400" />
                   Kontaktinformation
@@ -942,7 +942,7 @@ export default function EditContractCaseModal({
               </div>
 
               {/* Location and pest */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-purple-400" />
                   Plats och skadedjur
@@ -981,7 +981,7 @@ export default function EditContractCaseModal({
 
               {/* Technicians */}
               {!isCustomerView && (
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Users className="w-5 h-5 text-purple-400" />
                     Tilldelade tekniker
@@ -1013,7 +1013,7 @@ export default function EditContractCaseModal({
               )}
 
               {/* Work report */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-purple-400" />
                   Arbetsrapport
@@ -1030,7 +1030,7 @@ export default function EditContractCaseModal({
 
               {/* 🚦 Professional Assessment & Recommendations - Only for contract customers */}
               {caseData.customer_id && (
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-lg">
                       <span className="text-2xl">🚦</span>
@@ -1430,7 +1430,7 @@ export default function EditContractCaseModal({
 
               {/* Time tracking */}
               {!isCustomerView && (
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-purple-400" />
                     Tidtagning
@@ -1501,7 +1501,7 @@ export default function EditContractCaseModal({
               )}
 
               {/* Cost summary */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <Star className="w-5 h-5 text-purple-400" />
                   Kostnad och material
