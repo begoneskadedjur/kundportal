@@ -745,8 +745,9 @@ export default function EditContractCaseModal({
       size="xl"
       footer={modalFooter}
       usePortal={true}
+      className="scroll-smooth"
     >
-      <div className="p-6">
+      <div className="p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
         {headerActions}
             <div className="space-y-6">
               {/* Customer information - visa för avtalskunder */}
