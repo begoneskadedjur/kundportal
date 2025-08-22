@@ -177,7 +177,7 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
   }
   
   const markQuoteAsSeen = async (quoteId: string) => {
-    if (!user?.email) return
+    if (!user?.email || !organization) return
     
     try {
       // Hitta eller skapa quote_recipient record
@@ -191,13 +191,16 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
       let recipientId = existingRecipient?.id
       
       if (findError && findError.code === 'PGRST116') {
-        // Record finns inte, skapa en
+        // Record finns inte, skapa en med alla obligatoriska fält
         const { data: newRecipient, error: createError } = await supabase
           .from('quote_recipients')
           .insert({
             quote_id: quoteId,
+            source_type: 'contract', // Obligatoriskt fält
+            organization_id: organization.organization_id || organization.id, // Obligatoriskt fält
+            recipient_role: userRole, // Obligatoriskt fält
             user_email: user.email,
-            recipient_role: userRole,
+            is_active: true,
             seen_at: new Date().toISOString()
           })
           .select('id')
@@ -232,7 +235,7 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
   }
   
   const dismissQuote = async (quoteId: string) => {
-    if (!user?.email) return
+    if (!user?.email || !organization) return
     
     try {
       // Hitta eller skapa quote_recipient record
@@ -246,13 +249,16 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
       let recipientId = existingRecipient?.id
       
       if (findError && findError.code === 'PGRST116') {
-        // Record finns inte, skapa en
+        // Record finns inte, skapa en med alla obligatoriska fält
         const { data: newRecipient, error: createError } = await supabase
           .from('quote_recipients')
           .insert({
             quote_id: quoteId,
+            source_type: 'contract', // Obligatoriskt fält
+            organization_id: organization.organization_id || organization.id, // Obligatoriskt fält
+            recipient_role: userRole, // Obligatoriskt fält
             user_email: user.email,
-            recipient_role: userRole,
+            is_active: true,
             dismissed_at: new Date().toISOString()
           })
           .select('id')
