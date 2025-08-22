@@ -534,8 +534,41 @@ export default async function handler(
       }
     }
     
+    // Create customer_pending_quotes entry for offers
+    let quoteId = null
+    if (documentType === 'offer') {
+      console.log('📝 Skapar customer_pending_quotes post för offert...')
+      
+      const quoteData = {
+        customer_id: customerId, // This could be null if no customer found
+        case_number: `Offert #${createdContract.id.toString().slice(-6)}`,
+        title: recipient.company_name || recipient.name,
+        quote_sent_at: new Date().toISOString(),
+        oneflow_contract_id: createdContract.id.toString(),
+        source_type: 'contract',
+        company_name: recipient.company_name || recipient.name,
+        products: selectedProducts && selectedProducts.length > 0 
+          ? selectedProducts.map(p => p.product.name).join(', ')
+          : 'Standard skadedjursbekämpning'
+      }
+      
+      const { data: quoteRecord, error: quoteError } = await supabase
+        .from('customer_pending_quotes')
+        .insert(quoteData)
+        .select('quote_id')
+        .single()
+      
+      if (quoteError) {
+        console.error('⚠️ Kunde inte skapa customer_pending_quotes post:', quoteError)
+      } else {
+        quoteId = quoteRecord.quote_id
+        console.log('✅ customer_pending_quotes post skapad med quote_id:', quoteId)
+      }
+    }
+    
     return res.status(200).json({ 
       contract: createdContract,
+      quote_id: quoteId, // Include quote_id in response for multisite recipient handling
       sender: {
         name: 'info@begone.se',
         email: 'info@begone.se',

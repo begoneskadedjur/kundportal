@@ -488,8 +488,8 @@ export default function EditContractCaseModal({
     }
   }
 
-  const saveQuoteRecipient = async (caseId: string, recipient: typeof selectedRecipient, orgId: string) => {
-    if (!recipient || !caseId || !orgId) return
+  const saveQuoteRecipient = async (quoteId: string, recipient: typeof selectedRecipient, orgId: string) => {
+    if (!recipient || !quoteId || !orgId) return
     
     try {
       let siteIds: string[] = []
@@ -513,7 +513,7 @@ export default function EditContractCaseModal({
       }
       
       console.log('Saving quote recipient:', {
-        quote_id: caseId,
+        quote_id: quoteId,
         recipient_role: recipient.role,
         site_ids: siteIds,
         region,
@@ -523,7 +523,7 @@ export default function EditContractCaseModal({
       const { error } = await supabase
         .from('quote_recipients')
         .insert({
-          quote_id: caseId,
+          quote_id: quoteId,
           source_type: 'case',
           organization_id: orgId,
           recipient_role: recipient.role,
@@ -534,11 +534,13 @@ export default function EditContractCaseModal({
       
       if (error) {
         console.error('Error saving quote recipient:', error)
+        throw error
       } else {
         console.log('Quote recipient saved successfully')
       }
     } catch (error) {
       console.error('Error saving quote recipient:', error)
+      throw error
     }
   }
 
@@ -729,66 +731,95 @@ export default function EditContractCaseModal({
       return
     }
     
-    const prefillData = {
-      ...oneflowData,
-      documentType: 'offer',
-      selectedTemplate: '8598798', // Template ID for "Offertförslag – Exkl Moms (Företag)"
-      autoSelectTemplate: true, // Flag to trigger auto-selection and skip to step 6
-      // Add technician info
-      anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
-      'e-post-anstlld': profile?.email || '',
-      // For offers, we still set these values (they won't be shown in UI but are needed for API compatibility)
-      avtalslngd: '1',
-      begynnelsedag: new Date().toISOString().split('T')[0],
-      // Add case details for reference
-      caseNumber: formData.case_number,
-      caseTitle: formData.title,
-      pestType: formData.pest_type,
-      // Add case_id for webhook linking
-      case_id: caseData?.id,
-      // Add multisite recipient information
-      multisite_recipient: selectedRecipient ? {
-        role: selectedRecipient.role,
-        userId: selectedRecipient.userId,
-        label: selectedRecipient.label,
-        sites: selectedRecipient.sites,
-        organization_id: customerData?.organization_id
-      } : null
+    setLoading(true)
+    
+    try {
+      const contractData = {
+        anstalld: formData.primary_technician_name || profile?.display_name || 'BeGone Medarbetare',
+        'e-post-anstlld': profile?.email || '',
+        avtalslngd: '1',
+        begynnelsedag: new Date().toISOString().split('T')[0],
+        'dokument-skapat': new Date().toISOString().split('T')[0],
+        'e-post-kontaktperson': oneflowData['e-post-kontaktperson'],
+        foretag: oneflowData.foretag,
+        Kontaktperson: oneflowData.Kontaktperson,
+        'org-nr': oneflowData['org-nr'],
+        'telefonnummer-kontaktperson': oneflowData['telefonnummer-kontaktperson'],
+        'utforande-adress': oneflowData['utforande-adress'],
+        'stycke-1': `Offert för skadedjursbekämpning - ${formData.pest_type || 'Skadedjur'}`,
+        'stycke-2': formData.description || 'Professionell skadedjursbekämpning enligt överenskommet schema.'
+      }
+
+      const recipient = {
+        name: oneflowData.Kontaktperson,
+        email: oneflowData['e-post-kontaktperson'],
+        company_name: oneflowData.foretag,
+        organization_number: oneflowData['org-nr']
+      }
+
+      console.log('Creating quote via Oneflow API...')
+      
+      const response = await fetch('/api/oneflow/create-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          templateId: '8598798', // Template ID for "Offertförslag – Exkl Moms (Företag)"
+          contractData, 
+          recipient, 
+          sendForSigning: true, 
+          partyType: oneflowData.partyType,
+          documentType: 'offer',
+          caseId: caseData?.id,
+          senderEmail: profile?.email,
+          senderName: contractData.anstalld,
+          selectedProducts: []
+        })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
+      }
+      
+      const result = await response.json()
+      console.log('Quote created successfully:', result)
+      
+      // Mark quote as generated
+      const now = new Date().toISOString()
+      if (caseData?.id) {
+        await supabase
+          .from('cases')
+          .update({ quote_generated_at: now })
+          .eq('id', caseData.id)
+      }
+      
+      // Now save multisite recipient with the actual quote ID from customer_pending_quotes
+      if (isMultisiteCustomer && selectedRecipient && result.quote_id && customerData?.organization_id) {
+        try {
+          await saveQuoteRecipient(result.quote_id, selectedRecipient, customerData.organization_id)
+          console.log('✅ Quote recipient saved successfully for multisite customer')
+        } catch (recipientError: any) {
+          console.error('⚠️ Warning: Quote created but failed to save recipient:', recipientError)
+          // Don't throw error here - quote was created successfully, just log the warning
+          toast.success('Offert skapad! (Notifikationsmottagare kunde inte sparas)')
+          return
+        }
+      }
+      
+      const successMessage = isMultisiteCustomer && selectedRecipient 
+        ? `Offert skapad och skickad till ${selectedRecipient.label.toLowerCase()}!`
+        : 'Offert skapad och skickad!'
+      
+      toast.success(successMessage)
+      setShowQuoteDropdown(false)
+      setSelectedRecipient(null)
+      
+    } catch (error: any) {
+      console.error('Error creating quote:', error)
+      toast.error(`Kunde inte skapa offert: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
-    
-    // Debug logging
-    console.log('Sending prefill data to Oneflow:', prefillData)
-    
-    // Save customer data to sessionStorage for Oneflow
-    sessionStorage.setItem('prefill_customer_data', JSON.stringify(prefillData))
-    
-    // Navigate to Oneflow contract creator
-    const oneflowRoute = getOneflowRoute()
-    navigate(`${oneflowRoute}?prefill=offer`)
-    
-    const successMessage = isMultisiteCustomer && selectedRecipient 
-      ? `Navigerar till offertskapning för ${selectedRecipient.label.toLowerCase()}...`
-      : 'Navigerar till offertskapning med kundinformation...'
-    
-    toast.success(successMessage)
-    setShowQuoteDropdown(false)
-    
-    // Mark quote as generated
-    const now = new Date().toISOString()
-    if (caseData?.id) {
-      await supabase
-        .from('cases')
-        .update({ quote_generated_at: now })
-        .eq('id', caseData.id)
-    }
-    
-    // Save multisite recipient to database
-    if (isMultisiteCustomer && selectedRecipient && caseData?.id && customerData?.organization_id) {
-      await saveQuoteRecipient(caseData.id, selectedRecipient, customerData.organization_id)
-    }
-    
-    // Reset recipient selection after successful navigation
-    setSelectedRecipient(null)
   }
 
   const handleSubmit = async () => {
