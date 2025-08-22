@@ -10,22 +10,20 @@ import QuoteDetailModal from '../customer/QuoteDetailModal'
 
 interface MultisiteQuote {
   quote_id: string
-  recipient_role: string
-  organization_id: string
-  site_ids: string[]
-  user_id: string
   oneflow_contract_id: string | null
   contract_status: string
   company_name: string
   contact_person: string
+  contact_email: string | null
   total_value: number | null
   quote_created_at: string
-  is_seen: boolean
-  is_dismissed: boolean
-  seen_at: string | null
-  dismissed_at: string | null
-  notification_type: 'direct' | 'cascade'
-  cascade_reason: string | null
+  selected_products: any[] | null
+  agreement_text: string | null
+  begone_employee_name: string | null
+  begone_employee_email: string | null
+  created_by_name: string | null
+  created_by_email: string | null
+  customer_id: string | null
 }
 
 interface MultisiteQuoteListViewProps {
@@ -33,21 +31,21 @@ interface MultisiteQuoteListViewProps {
 }
 
 const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRole }) => {
-  const { organization } = useMultisite()
+  const { organization, userRole: multisiteUserRole } = useMultisite()
   const [quotes, setQuotes] = useState<MultisiteQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (organization) {
+    if (organization && multisiteUserRole) {
       fetchQuotes()
     }
-  }, [organization])
+  }, [organization, multisiteUserRole])
 
   const fetchQuotes = async () => {
-    if (!organization) {
-      console.log('MultisiteQuoteListView: Ingen organisation tillgänglig')
+    if (!organization || !multisiteUserRole) {
+      console.log('MultisiteQuoteListView: Saknar organisation eller användarroll')
       setLoading(false)
       return
     }
@@ -56,79 +54,83 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
       setLoading(true)
       setError(null)
 
-      console.log('MultisiteQuoteListView: Hämtar offerter för organisation', organization.organization_id)
-
-      // Använd samma logik som fungerar i Regionchef.tsx
       const orgId = organization.organization_id || organization.id
-      
-      const { data: quoteRecipients, error: recipientsError } = await supabase
-        .from('quote_recipients')
-        .select('*')
-        .eq('organization_id', orgId)
-        .eq('is_active', true)
+      console.log('MultisiteQuoteListView: Hämtar offerter för organisation', orgId, 'med roll', userRole)
 
-      if (recipientsError) {
-        console.error('Error fetching quote recipients:', recipientsError)
-        throw recipientsError
+      // Bygg query för att hämta offerter från contracts-tabellen direkt
+      let contractsQuery = supabase
+        .from('contracts')
+        .select(`
+          id,
+          oneflow_contract_id,
+          status,
+          type,
+          company_name,
+          contact_person,
+          contact_email,
+          total_value,
+          created_at,
+          selected_products,
+          agreement_text,
+          begone_employee_name,
+          begone_employee_email,
+          created_by_name,
+          created_by_email,
+          customer_id,
+          customers!inner(
+            organization_id,
+            site_type,
+            is_multisite,
+            region,
+            id
+          )
+        `)
+        .eq('type', 'offer')
+        .eq('customers.organization_id', orgId)
+        .eq('customers.is_multisite', true)
+        .eq('customers.is_active', true)
+
+      // Tillämpa rollbaserad filtrering
+      if (userRole === 'regionchef' && multisiteUserRole.site_ids && multisiteUserRole.site_ids.length > 0) {
+        // Regionchefer ser endast offerter från sina tilldelade enheter
+        contractsQuery = contractsQuery.in('customers.id', multisiteUserRole.site_ids)
+      } else if (userRole === 'platsansvarig' && multisiteUserRole.site_ids && multisiteUserRole.site_ids.length > 0) {
+        // Platsansvariga ser endast offerter för sin specifika enhet
+        contractsQuery = contractsQuery.in('customers.id', multisiteUserRole.site_ids)
+      }
+      // Verksamhetschefer ser alla offerter för organisationen (ingen extra filtrering)
+
+      const { data: contractsData, error: contractsError } = await contractsQuery
+        .order('created_at', { ascending: false })
+
+      if (contractsError) {
+        console.error('Error fetching contracts:', contractsError)
+        throw contractsError
       }
 
-      console.log(`MultisiteQuoteListView: Hittade ${quoteRecipients?.length || 0} quote recipients`)
+      console.log(`MultisiteQuoteListView: Hittade ${contractsData?.length || 0} offerter för roll ${userRole}`)
 
-      if (!quoteRecipients || quoteRecipients.length === 0) {
-        setQuotes([])
-        return
-      }
-
-      // Separate quote IDs by source type
-      const caseQuoteIds = quoteRecipients
-        .filter(qr => qr.source_type === 'case')
-        .map(qr => qr.quote_id)
-      
-      const contractQuoteIds = quoteRecipients
-        .filter(qr => qr.source_type === 'contract')
-        .map(qr => qr.quote_id)
-
-      console.log(`MultisiteQuoteListView: Case quotes: ${caseQuoteIds.length}, Contract quotes: ${contractQuoteIds.length}`)
-
-      // Fetch contracts data if we have contract quotes
-      let contractsData: any[] = []
-      if (contractQuoteIds.length > 0) {
-        const { data: contracts, error: contractsError } = await supabase
-          .from('contracts')
-          .select('*')
-          .in('id', contractQuoteIds)
-
-        if (contractsError) {
-          console.error('Error fetching contracts:', contractsError)
-        } else {
-          contractsData = contracts || []
-          console.log(`MultisiteQuoteListView: Hittade ${contractsData.length} contracts`)
-        }
-      }
-
-      // Transform contracts to the quote format expected by the component
-      const transformedQuotes = contractsData.map(contract => ({
+      // Transformera till MultisiteQuote-format
+      const transformedQuotes: MultisiteQuote[] = (contractsData || []).map(contract => ({
         quote_id: contract.id,
-        recipient_role: 'regionchef', // TODO: Get from quote_recipients
-        organization_id: orgId,
-        site_ids: [],
-        user_id: '', // TODO: Map properly 
         oneflow_contract_id: contract.oneflow_contract_id,
         contract_status: contract.status,
         company_name: contract.company_name,
         contact_person: contract.contact_person,
+        contact_email: contract.contact_email,
         total_value: contract.total_value,
         quote_created_at: contract.created_at,
-        is_seen: false, // TODO: Get from notification status
-        is_dismissed: false,
-        seen_at: null,
-        dismissed_at: null,
-        notification_type: 'direct' as const,
-        cascade_reason: null
+        selected_products: contract.selected_products,
+        agreement_text: contract.agreement_text,
+        begone_employee_name: contract.begone_employee_name,
+        begone_employee_email: contract.begone_employee_email,
+        created_by_name: contract.created_by_name,
+        created_by_email: contract.created_by_email,
+        customer_id: contract.customer_id
       }))
 
       setQuotes(transformedQuotes)
-      console.log(`MultisiteQuoteListView: Satte ${transformedQuotes.length} quotes i state`)
+      console.log(`MultisiteQuoteListView: Satte ${transformedQuotes.length} offerter i state`)
     } catch (error: any) {
       console.error('Error fetching multisite quotes:', error)
       setError(`Kunde inte hämta offerter: ${error.message}`)
@@ -137,62 +139,8 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
     }
   }
 
-  const markQuoteAsSeen = async (quoteId: string) => {
-    try {
-      // Find the quote recipient record for this quote
-      const { data: recipients, error: recipientError } = await supabase
-        .from('quote_recipients')
-        .select('id')
-        .eq('quote_id', quoteId)
-        .limit(1)
-
-      if (recipientError) throw recipientError
-      
-      if (recipients && recipients.length > 0) {
-        // Call the database function to mark as seen
-        await supabase
-          .rpc('update_quote_notification_status', {
-            p_quote_recipient_id: recipients[0].id,
-            p_mark_as_seen: true
-          })
-
-        // Update local state
-        setQuotes(prev => prev.map(q => 
-          q.quote_id === quoteId ? { ...q, is_seen: true, seen_at: new Date().toISOString() } : q
-        ))
-      }
-    } catch (error: any) {
-      console.error('Error marking quote as seen:', error)
-    }
-  }
-
-  const dismissQuote = async (quoteId: string) => {
-    try {
-      // Find the quote recipient record for this quote
-      const { data: recipients, error: recipientError } = await supabase
-        .from('quote_recipients')
-        .select('id')
-        .eq('quote_id', quoteId)
-        .limit(1)
-
-      if (recipientError) throw recipientError
-      
-      if (recipients && recipients.length > 0) {
-        // Call the database function to mark as dismissed
-        await supabase
-          .rpc('update_quote_notification_status', {
-            p_quote_recipient_id: recipients[0].id,
-            p_mark_as_dismissed: true
-          })
-
-        // Update local state
-        setQuotes(prev => prev.map(q => 
-          q.quote_id === quoteId ? { ...q, is_dismissed: true, dismissed_at: new Date().toISOString() } : q
-        ))
-      }
-    } catch (error: any) {
-      console.error('Error dismissing quote:', error)
-    }
+  const openQuoteDetail = (quoteId: string) => {
+    setSelectedQuoteId(quoteId)
   }
 
   const getStatusIcon = (status: string) => {
@@ -201,6 +149,7 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
         return <CheckCircle className="w-5 h-5 text-emerald-500" />
       case 'pending':
         return <Clock className="w-5 h-5 text-amber-500" />
+      case 'declined':
       case 'rejected':
         return <AlertCircle className="w-5 h-5 text-red-500" />
       default:
@@ -214,6 +163,8 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
         return 'Signerad'
       case 'pending':
         return 'Väntar på svar'
+      case 'declined':
+        return 'Avböjd'
       case 'rejected':
         return 'Avvisad'
       case 'expired':
