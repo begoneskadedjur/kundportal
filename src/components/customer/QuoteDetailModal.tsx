@@ -178,13 +178,20 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       (p.products || []).map((product: any) => {
         const servicePrice = parseInt(product.price_1?.amount?.amount || '0')
         const materialPrice = parseInt(product.price_2?.amount?.amount || '0')
-        const totalPrice = servicePrice + materialPrice
+        
+        // Ta det pris som faktiskt har ett värde, föredra servicePrice om båda finns
+        let actualPrice = null
+        if (servicePrice > 0) {
+          actualPrice = servicePrice
+        } else if (materialPrice > 0) {
+          actualPrice = materialPrice
+        }
         
         return {
           name: product.name || 'Unnamed Product',
           description: product.description || '',
           quantity: product.quantity?.amount || 0,
-          totalPrice: totalPrice > 0 ? totalPrice : null
+          totalPrice: actualPrice
         }
       })
     )
