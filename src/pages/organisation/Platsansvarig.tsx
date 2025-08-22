@@ -131,22 +131,66 @@ const PlatsansvarigDashboard: React.FC = () => {
     try {
       const siteIds = [currentSite.id]
       
-      // Get quotes for this specific site where current user (platsansvarig) is recipient or should be informed
+      // First get quote recipients without the problematic JOIN
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
-        .select(`
-          *,
-          cases:cases!quote_recipients_quote_id_fkey(
-            id, case_number, title, quote_sent_at, customer_id,
-            customers:customers!cases_customer_id_fkey(company_name, site_name)
-          )
-        `)
+        .select('*')
         .eq('organization_id', organization.id)
         .eq('is_active', true)
 
       if (recipientsError) {
         console.error('Error fetching quote recipients:', recipientsError)
         return
+      }
+
+      if (!quoteRecipients || quoteRecipients.length === 0) {
+        setPendingQuotes([])
+        return
+      }
+
+      // Separate quote IDs by source type
+      const caseQuoteIds = quoteRecipients
+        .filter(qr => qr.source_type === 'case')
+        .map(qr => qr.quote_id)
+      
+      const contractQuoteIds = quoteRecipients
+        .filter(qr => qr.source_type === 'contract')
+        .map(qr => qr.quote_id)
+
+      // Fetch cases data if we have case quotes
+      let casesData: any[] = []
+      if (caseQuoteIds.length > 0) {
+        const { data: cases, error: casesError } = await supabase
+          .from('cases')
+          .select(`
+            id, case_number, title, quote_sent_at, customer_id,
+            customers:customers!cases_customer_id_fkey(company_name, site_name)
+          `)
+          .in('id', caseQuoteIds)
+
+        if (casesError) {
+          console.error('Error fetching cases:', casesError)
+        } else {
+          casesData = cases || []
+        }
+      }
+
+      // Fetch contracts data if we have contract quotes
+      let contractsData: any[] = []
+      if (contractQuoteIds.length > 0) {
+        const { data: contracts, error: contractsError } = await supabase
+          .from('contracts')
+          .select(`
+            id, oneflow_contract_id, company_name, total_value, 
+            selected_products, created_at, customer_id
+          `)
+          .in('id', contractQuoteIds)
+
+        if (contractsError) {
+          console.error('Error fetching contracts:', contractsError)
+        } else {
+          contractsData = contracts || []
+        }
       }
 
       // Platsansvarig sees quotes for their sites
@@ -160,21 +204,64 @@ const PlatsansvarigDashboard: React.FC = () => {
       )
 
       // Transform to match MultisiteQuote interface
-      const transformedQuotes = relevantQuotes.map(qr => ({
-        id: qr.quote_id,
-        case_number: qr.cases?.case_number || 'Okänt ärendenummer',
-        title: qr.cases?.title || 'Okänd titel', 
-        quote_sent_at: qr.created_at,
-        oneflow_contract_id: '', 
-        source_type: qr.source_type,
-        company_name: qr.cases?.customers?.company_name,
-        site_name: qr.cases?.customers?.site_name,
-        recipient_role: qr.recipient_role,
-        recipient_sites: qr.site_ids ? 
-          [currentSite.site_name] : 
-          [],
-        region: qr.region
-      }))
+      const transformedQuotes = relevantQuotes.map(qr => {
+        // Find the corresponding case or contract data
+        let quoteData: any = {}
+        let source_type = qr.source_type
+        
+        if (source_type === 'case') {
+          const caseData = casesData.find(c => c.id === qr.quote_id)
+          if (caseData) {
+            quoteData = {
+              case_number: caseData.case_number,
+              title: caseData.title,
+              quote_sent_at: caseData.quote_sent_at,
+              company_name: caseData.customers?.company_name,
+              site_name: caseData.customers?.site_name,
+              oneflow_contract_id: ''
+            }
+          }
+        } else if (source_type === 'contract') {
+          const contractData = contractsData.find(c => c.id === qr.quote_id)
+          if (contractData) {
+            // Generate a case number for contract quotes
+            const caseNumber = `Offert #${contractData.id.slice(-6)}`
+            const products = contractData.selected_products 
+              ? (Array.isArray(contractData.selected_products) 
+                  ? contractData.selected_products.map((p: any) => p.name || p.title).join(', ')
+                  : String(contractData.selected_products)
+                )
+              : ''
+            
+            quoteData = {
+              case_number: caseNumber,
+              title: contractData.company_name || 'Skadedjursbekämpning',
+              quote_sent_at: contractData.created_at,
+              company_name: contractData.company_name,
+              site_name: currentSite.site_name || '', // Use current site name for contracts
+              oneflow_contract_id: contractData.oneflow_contract_id || '',
+              products: products
+            }
+          }
+        }
+
+        return {
+          id: qr.quote_id,
+          case_number: quoteData.case_number || 'Okänt ärendenummer',
+          title: quoteData.title || 'Okänd titel', 
+          quote_sent_at: quoteData.quote_sent_at || qr.created_at,
+          oneflow_contract_id: quoteData.oneflow_contract_id || '', 
+          source_type: source_type,
+          company_name: quoteData.company_name,
+          site_name: quoteData.site_name,
+          products: quoteData.products,
+          recipient_role: qr.recipient_role,
+          recipient_sites: qr.site_ids ? 
+            [currentSite.site_name] : 
+            [],
+          region: qr.region
+        }
+      })
 
       setPendingQuotes(transformedQuotes)
     } catch (error) {
