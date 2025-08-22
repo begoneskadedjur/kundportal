@@ -349,6 +349,31 @@ export default function OneflowContractCreator() {
       setCreationStep('Slutför...')
       setCreatedContract(result.contract)
       setShowConfetti(true)
+      
+      // Handle multisite recipient saving for quotes
+      if (wizardData.documentType === 'offer' && wizardData.multisite_recipient && wizardData.case_id) {
+        setCreationStep('Sparar mottagare...')
+        try {
+          const { error } = await fetch('/api/save-quote-recipient', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quote_id: wizardData.case_id,
+              recipient: wizardData.multisite_recipient,
+              organization_id: wizardData.multisite_recipient.organization_id
+            })
+          })
+          
+          if (error) {
+            console.warn('Could not save quote recipient:', error)
+          } else {
+            console.log('✅ Quote recipient saved successfully')
+          }
+        } catch (recipientError) {
+          console.warn('Failed to save quote recipient:', recipientError)
+        }
+      }
+      
       toast.success('✅ Kontrakt skapat framgångslikt!')
       
       // Stäng av confetti efter 5 sekunder
