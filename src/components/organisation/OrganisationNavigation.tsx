@@ -28,9 +28,16 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
       console.warn(`OrganisationNavigation: Rollkonflikt! URL säger '${userRoleType}' men användarens faktiska roll är '${userRole.role_type}'`)
       
       // Omdirigera till korrekt roll-URL för att undvika förvirring
-      const correctPath = `/organisation/${userRole.role_type}`
-      if (location.pathname.startsWith('/organisation/') && !location.pathname.startsWith(correctPath)) {
-        console.log(`OrganisationNavigation: Korrigerar URL från ${location.pathname} till ${correctPath}`)
+      // Hantera både bas-rutter och underrutter (t.ex. /offerter, /arenden)
+      const currentPath = location.pathname
+      const oldBasePath = `/organisation/${userRoleType}`
+      const newBasePath = `/organisation/${userRole.role_type}`
+      
+      if (currentPath.startsWith(oldBasePath)) {
+        // Byt ut den gamla basvägen med den nya, behåll underrutter
+        const subPath = currentPath.substring(oldBasePath.length)
+        const correctPath = newBasePath + subPath
+        console.log(`OrganisationNavigation: Korrigerar URL från ${currentPath} till ${correctPath}`)
         navigate(correctPath, { replace: true })
       }
     }

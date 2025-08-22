@@ -17,13 +17,15 @@ const Offerter: React.FC = () => {
     : 'platsansvarig'
 
   // Konsistenskontroll mellan URL-parameter och faktisk användarroll
+  // Not: OrganisationNavigation hanterar nu URL-korrigeringar, men vi behåller detta som backup
   useEffect(() => {
     if (userRole && urlRole !== userRole.role_type) {
-      console.warn(`Offerter: Rollkonflikt! URL säger '${urlRole}' men användarens faktiska roll är '${userRole.role_type}'`)
+      // Minska log-nivån från warn till info eftersom detta nu är en fallback-funktion
+      console.info(`Offerter: Fallback URL-korrigering - URL säger '${urlRole}' men användarens faktiska roll är '${userRole.role_type}'`)
       
-      // Omdirigera till korrekt roll-URL
+      // Omdirigera till korrekt roll-URL endast om OrganisationNavigation missat det
       const correctPath = `/organisation/${userRole.role_type}/offerter`
-      console.log(`Offerter: Korrigerar URL från /organisation/${urlRole}/offerter till ${correctPath}`)
+      console.info(`Offerter: Korrigerar URL från /organisation/${urlRole}/offerter till ${correctPath}`)
       navigate(correctPath, { replace: true })
     }
   }, [userRole, urlRole, navigate])
