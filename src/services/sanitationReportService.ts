@@ -113,6 +113,8 @@ class SanitationReportService {
     include_all_versions?: boolean  // Ny parameter för att hämta alla versioner
   }): Promise<{ data: SanitationReport[] | null; error: any }> {
     try {
+      console.log('sanitationReportService.getReports called with filters:', filters)
+      
       let query = supabase
         .from('sanitation_reports')
         .select('*')
@@ -148,6 +150,12 @@ class SanitationReportService {
       }
 
       const { data, error } = await query
+      
+      console.log('sanitationReportService.getReports result:', {
+        customer_id: filters?.customer_id,
+        found_reports: data?.length || 0,
+        error: error?.message || null
+      })
 
       return { data, error }
     } catch (error) {

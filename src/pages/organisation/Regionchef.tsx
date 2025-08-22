@@ -172,16 +172,23 @@ const RegionchefDashboard: React.FC = () => {
       
       console.log('fetchPendingQuotes - Querying with:', {
         organization_id: organization.organization_id,
+        organization_plain_id: organization.id,
         userRole: userRole.role_type,
         siteIds: siteIds
       })
       
+      console.log('fetchPendingQuotes - Full organization object:', organization)
+      
       // First get quote recipients without the problematic JOIN
       // VIKTIGT: quote_recipients.organization_id matchar customers.organization_id
+      // Fallback: om organization_id är undefined, använd organization.id
+      const orgId = organization.organization_id || organization.id
+      console.log('fetchPendingQuotes - Using orgId:', orgId)
+      
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
-        .eq('organization_id', organization.organization_id) // Korrekt: använd organization_id
+        .eq('organization_id', orgId)
         .eq('is_active', true)
 
       if (recipientsError) {

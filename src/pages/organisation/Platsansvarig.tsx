@@ -132,10 +132,11 @@ const PlatsansvarigDashboard: React.FC = () => {
       const siteIds = [currentSite.id]
       
       // First get quote recipients without the problematic JOIN
+      const orgId = organization.organization_id || organization.id
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
-        .eq('organization_id', organization.organization_id) // Korrekt: använd organization_id
+        .eq('organization_id', orgId)
         .eq('is_active', true)
 
       if (recipientsError) {
