@@ -63,7 +63,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         .select('*')
         .eq('id', quoteId)
         .eq('type', 'offer')
-        .single()
+        .maybeSingle()
 
       if (contractData && !contractError) {
         // Transformera contracts data till Quote format
@@ -92,7 +92,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       }
 
       // Om inte contracts, försök customer_quotes (för vanliga kunder)
-      if (contractError?.code !== 'PGRST116') {
+      if (contractError && contractError.code !== 'PGRST116') {
         throw contractError
       }
 
@@ -100,10 +100,13 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         .from('customer_quotes')
         .select('*')
         .eq('id', quoteId)
-        .eq('customer_id', customerId)
-        .single()
+        .maybeSingle()
 
       if (quoteError) throw quoteError
+      
+      if (!quoteData) {
+        throw new Error('Offerten kunde inte hittas')
+      }
 
       setQuote(quoteData)
     } catch (error: any) {
@@ -178,11 +181,6 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
     )
   }
 
-  const openInOneflow = () => {
-    if (quote?.oneflow_contract_id) {
-      window.open(`https://app.oneflow.com/contract/${quote.oneflow_contract_id}`, '_blank')
-    }
-  }
 
   if (!isOpen) return null
 
@@ -213,16 +211,6 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               </div>
             )}
             
-            {quote?.oneflow_contract_id && (
-              <Button
-                onClick={openInOneflow}
-                variant="secondary"
-                size="sm"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Öppna i OneFlow
-              </Button>
-            )}
             
             <button
               onClick={onClose}
@@ -394,27 +382,17 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                 </div>
               </Card>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700">
-                {quote.document_url && (
-                  <Button
-                    onClick={() => window.open(quote.document_url!, '_blank')}
-                    variant="secondary"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Ladda ner PDF
-                  </Button>
-                )}
-                
-                {quote.oneflow_contract_id && (
-                  <Button
-                    onClick={openInOneflow}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Hantera i OneFlow
-                  </Button>
-                )}
+              {/* Information instead of actions */}
+              <div className="flex items-center justify-center pt-4 border-t border-slate-700">
+                <div className="text-center text-slate-400">
+                  <Package className="w-8 h-8 mx-auto mb-2" />
+                  <p className="text-sm">
+                    Offerten har skickats via e-post till kontaktpersonen.
+                  </p>
+                  <p className="text-xs mt-1">
+                    Kontrollera e-postinkorgen för att se offertdokumentet.
+                  </p>
+                </div>
               </div>
             </div>
           ) : null}
