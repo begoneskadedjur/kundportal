@@ -185,6 +185,19 @@ const RegionchefDashboard: React.FC = () => {
       const orgId = organization.organization_id || organization.id
       console.log('fetchPendingQuotes - Using orgId:', orgId)
       
+      // Test query först
+      console.log('fetchPendingQuotes - Testing query directly...')
+      const { data: testQuery, error: testError } = await supabase
+        .from('quote_recipients')
+        .select('*')
+        .eq('organization_id', 'ec51df0f-fb16-4e06-9804-c2c78e1f1241')
+      
+      console.log('fetchPendingQuotes - Direct test query result:', {
+        count: testQuery?.length || 0,
+        error: testError?.message || null,
+        data: testQuery
+      })
+      
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
@@ -203,6 +216,8 @@ const RegionchefDashboard: React.FC = () => {
         setPendingQuotes([])
         return
       }
+      
+      console.log('fetchPendingQuotes - Raw quote recipients before filtering:', quoteRecipients)
 
       // Separate quote IDs by source type
       const caseQuoteIds = quoteRecipients

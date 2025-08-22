@@ -123,6 +123,9 @@ class SanitationReportService {
       // Som standard, hämta endast aktuella rapporter (om inte include_all_versions är true)
       if (!filters?.include_all_versions) {
         query = query.eq('is_current', true)
+        console.log('sanitationReportService.getReports - Adding is_current=true filter')
+      } else {
+        console.log('sanitationReportService.getReports - Skipping is_current filter (include_all_versions=true)')
       }
 
       if (filters) {
