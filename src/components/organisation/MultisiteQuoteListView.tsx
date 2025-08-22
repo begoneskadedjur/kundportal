@@ -46,19 +46,89 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
   }, [organization])
 
   const fetchQuotes = async () => {
+    if (!organization) {
+      console.log('MultisiteQuoteListView: Ingen organisation tillgänglig')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      // Use the unified view to get all notifications (direct + cascade) for the current user
-      const { data, error } = await supabase
-        .from('user_all_quote_notifications')
+      console.log('MultisiteQuoteListView: Hämtar offerter för organisation', organization.organization_id)
+
+      // Använd samma logik som fungerar i Regionchef.tsx
+      const orgId = organization.organization_id || organization.id
+      
+      const { data: quoteRecipients, error: recipientsError } = await supabase
+        .from('quote_recipients')
         .select('*')
-        .order('quote_created_at', { ascending: false })
+        .eq('organization_id', orgId)
+        .eq('is_active', true)
 
-      if (error) throw error
+      if (recipientsError) {
+        console.error('Error fetching quote recipients:', recipientsError)
+        throw recipientsError
+      }
 
-      setQuotes(data || [])
+      console.log(`MultisiteQuoteListView: Hittade ${quoteRecipients?.length || 0} quote recipients`)
+
+      if (!quoteRecipients || quoteRecipients.length === 0) {
+        setQuotes([])
+        return
+      }
+
+      // Separate quote IDs by source type
+      const caseQuoteIds = quoteRecipients
+        .filter(qr => qr.source_type === 'case')
+        .map(qr => qr.quote_id)
+      
+      const contractQuoteIds = quoteRecipients
+        .filter(qr => qr.source_type === 'contract')
+        .map(qr => qr.quote_id)
+
+      console.log(`MultisiteQuoteListView: Case quotes: ${caseQuoteIds.length}, Contract quotes: ${contractQuoteIds.length}`)
+
+      // Fetch contracts data if we have contract quotes
+      let contractsData: any[] = []
+      if (contractQuoteIds.length > 0) {
+        const { data: contracts, error: contractsError } = await supabase
+          .from('contracts')
+          .select('*')
+          .in('id', contractQuoteIds)
+
+        if (contractsError) {
+          console.error('Error fetching contracts:', contractsError)
+        } else {
+          contractsData = contracts || []
+          console.log(`MultisiteQuoteListView: Hittade ${contractsData.length} contracts`)
+        }
+      }
+
+      // Transform contracts to the quote format expected by the component
+      const transformedQuotes = contractsData.map(contract => ({
+        quote_id: contract.id,
+        recipient_role: 'regionchef', // TODO: Get from quote_recipients
+        organization_id: orgId,
+        site_ids: [],
+        user_id: '', // TODO: Map properly 
+        oneflow_contract_id: contract.oneflow_contract_id,
+        contract_status: contract.status,
+        company_name: contract.company_name,
+        contact_person: contract.contact_person,
+        total_value: contract.total_value,
+        quote_created_at: contract.created_at,
+        is_seen: false, // TODO: Get from notification status
+        is_dismissed: false,
+        seen_at: null,
+        dismissed_at: null,
+        notification_type: 'direct' as const,
+        cascade_reason: null
+      }))
+
+      setQuotes(transformedQuotes)
+      console.log(`MultisiteQuoteListView: Satte ${transformedQuotes.length} quotes i state`)
     } catch (error: any) {
       console.error('Error fetching multisite quotes:', error)
       setError(`Kunde inte hämta offerter: ${error.message}`)

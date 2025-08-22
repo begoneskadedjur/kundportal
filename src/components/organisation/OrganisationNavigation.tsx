@@ -37,10 +37,13 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
   }, [userRole, userRoleType, location.pathname, navigate])
 
   // Definiera tabs - alla roller har tillgång till alla sidor
-  const getTabs = (): NavigationTab[] => {
+  // VIKTIGT: Gör denna reaktiv till userRole ändringar
+  const tabs = React.useMemo((): NavigationTab[] => {
     // Använd faktisk användarroll för att bygga sökvägar
     const actualRole = userRole?.role_type || userRoleType
     const basePath = `/organisation/${actualRole}`
+    
+    console.log(`OrganisationNavigation: Bygger tabs med actualRole='${actualRole}', userRole=${userRole?.role_type}, userRoleType=${userRoleType}`)
     
     return [
       {
@@ -74,9 +77,7 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
         path: `${basePath}/offerter`
       }
     ]
-  }
-
-  const tabs = getTabs()
+  }, [userRole?.role_type, userRoleType])
   // Hitta aktiv tab genom att kolla om pathname börjar med tab path
   const currentTab = tabs.find(tab => {
     // För dashboard, matcha exakt
