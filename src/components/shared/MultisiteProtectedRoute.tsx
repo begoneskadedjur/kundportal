@@ -1,4 +1,5 @@
 // src/components/shared/MultisiteProtectedRoute.tsx - Route protection for multisite users
+import React from 'react'
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMultisite } from '../../contexts/MultisiteContext';
@@ -11,6 +12,30 @@ type MultisiteProtectedRouteProps = {
 export default function MultisiteProtectedRoute({ children }: MultisiteProtectedRouteProps) {
   const { profile, loading: authLoading } = useAuth();
   const { userRole, loading: multisiteLoading, organization } = useMultisite();
+
+  // Enhanced logging for debugging
+  React.useEffect(() => {
+    if (!authLoading && !multisiteLoading) {
+      console.log('MultisiteProtectedRoute: State check', {
+        profile: profile ? {
+          id: profile.id,
+          role: profile.role,
+          customer_id: profile.customer_id,
+          email: profile.email
+        } : null,
+        userRole: userRole ? {
+          role_type: userRole.role_type,
+          organization_id: userRole.organization_id,
+          site_ids: userRole.site_ids
+        } : null,
+        organization: organization ? {
+          id: organization.id,
+          organization_id: organization.organization_id,
+          organization_name: organization.organization_name
+        } : null
+      })
+    }
+  }, [authLoading, multisiteLoading, profile, userRole, organization])
 
   // Show loading while checking authentication and multisite access
   if (authLoading || multisiteLoading) {
@@ -51,18 +76,32 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
       break;
     case 'customer':
       // CRITICAL FIX: Check if customer is multisite user before redirecting
-      if (!profile.customer_id && userRole) {
-        // Multisite user without access to this specific route -> go to main multisite portal
+      console.log('MultisiteProtectedRoute: Processing customer redirect logic', {
+        customer_id: profile.customer_id,
+        userRole: userRole ? userRole.role_type : 'none',
+        organization: organization ? organization.organization_name : 'none'
+      });
+      
+      if (!profile.customer_id && userRole && organization) {
+        // Multisite user without customer_id but with valid multisite role -> go to main multisite portal
         console.log(`MultisiteProtectedRoute: Customer without customer_id but with multisite role ${userRole.role_type}. Redirecting to /organisation`);
         redirectPath = '/organisation';
-      } else if (profile.customer_id) {
-        // Regular customer with customer_id -> go to customer portal
+      } else if (profile.customer_id && !userRole) {
+        // Regular customer with customer_id but no multisite role -> go to customer portal
         console.log(`MultisiteProtectedRoute: Regular customer with customer_id ${profile.customer_id}. Redirecting to /customer`);
         redirectPath = '/customer';
+      } else if (profile.customer_id && userRole && organization) {
+        // Hybrid customer with both customer_id and multisite role -> this is a valid multisite user
+        console.log(`MultisiteProtectedRoute: Hybrid customer with customer_id ${profile.customer_id} and multisite role ${userRole.role_type}. Allowing access to multisite.`);
+        return <>{children}</>;
       } else {
-        // Customer without customer_id and no multisite role -> should not happen, but fallback to customer
-        console.warn(`MultisiteProtectedRoute: Customer without customer_id and no multisite role. Fallback to /customer`);
-        redirectPath = '/customer';
+        // Edge case: Customer without clear access pattern
+        console.warn(`MultisiteProtectedRoute: Edge case - Customer with unclear access pattern`, {
+          customer_id: profile.customer_id,
+          hasUserRole: !!userRole,
+          hasOrganization: !!organization
+        });
+        redirectPath = profile.customer_id ? '/customer' : '/login';
       }
       break;
   }

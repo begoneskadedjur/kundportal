@@ -20,11 +20,27 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
   const navigate = useNavigate()
   const location = useLocation()
   const { signOut } = useAuth()
-  const { organization } = useMultisite()
+  const { organization, userRole } = useMultisite()
+
+  // Validera att userRoleType matchar faktisk användarroll
+  React.useEffect(() => {
+    if (userRole && userRoleType !== userRole.role_type) {
+      console.warn(`OrganisationNavigation: Rollkonflikt! URL säger '${userRoleType}' men användarens faktiska roll är '${userRole.role_type}'`)
+      
+      // Omdirigera till korrekt roll-URL för att undvika förvirring
+      const correctPath = `/organisation/${userRole.role_type}`
+      if (location.pathname.startsWith('/organisation/') && !location.pathname.startsWith(correctPath)) {
+        console.log(`OrganisationNavigation: Korrigerar URL från ${location.pathname} till ${correctPath}`)
+        navigate(correctPath, { replace: true })
+      }
+    }
+  }, [userRole, userRoleType, location.pathname, navigate])
 
   // Definiera tabs - alla roller har tillgång till alla sidor
   const getTabs = (): NavigationTab[] => {
-    const basePath = `/organisation/${userRoleType}`
+    // Använd faktisk användarroll för att bygga sökvägar
+    const actualRole = userRole?.role_type || userRoleType
+    const basePath = `/organisation/${actualRole}`
     
     return [
       {
@@ -77,7 +93,9 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
   }
 
   const getRoleName = () => {
-    switch (userRoleType) {
+    // Använd faktisk användarroll om tillgänglig, annars fallback till userRoleType
+    const actualRole = userRole?.role_type || userRoleType
+    switch (actualRole) {
       case 'verksamhetschef':
         return 'Verksamhetschef'
       case 'regionchef':
