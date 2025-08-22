@@ -459,9 +459,11 @@ export default async function handler(
       console.log('✅ Creator info sparad i databasen')
     }
     
+    // Deklarera customerId i rätt scope
+    let customerId = null
+    
     // NYTT: Identifiera och koppla kund för offerten
     if (documentType === 'offer' || documentType === 'contract') {
-      let customerId = null
       
       console.log('🔍 Söker efter befintlig kund för:', {
         company: recipient.company_name,
