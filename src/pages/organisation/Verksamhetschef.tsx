@@ -190,7 +190,7 @@ const VerksamhetschefDashboard: React.FC = () => {
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', organization.organization_id) // Korrekt: använd organization_id
         .eq('is_active', true)
 
       if (recipientsError) {

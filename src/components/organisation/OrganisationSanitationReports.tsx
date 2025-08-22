@@ -61,6 +61,14 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
     try {
       setLoading(true)
       
+      console.log('OrganisationSanitationReports - loadReports starting with:', {
+        userRoleType,
+        customerId,
+        siteIds,
+        organizationId: organization?.organization_id,
+        availableSites: availableSites.length,
+        accessibleSitesLength: accessibleSites.length
+      })
       
       // Bygg lista av customer_ids att hämta rapporter för
       let customerIds: string[] = []
@@ -99,6 +107,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
             // För region/platsansvarig, använd accessibleSites direkt
             // accessibleSites är redan filtrerat korrekt av MultisiteContext
             customerIds = availableSites.map(s => s.id)
+            console.log('OrganisationSanitationReports - Using availableSites for customerIds:', customerIds)
           }
         }
       }

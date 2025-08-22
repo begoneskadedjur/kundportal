@@ -177,11 +177,11 @@ const RegionchefDashboard: React.FC = () => {
       })
       
       // First get quote recipients without the problematic JOIN
-      // VIKTIGT: Använd organization.organization_id, inte organization.id
+      // VIKTIGT: quote_recipients.organization_id matchar customers.organization_id
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
-        .eq('organization_id', organization.organization_id) // FIX: Använd organization_id
+        .eq('organization_id', organization.organization_id) // Korrekt: använd organization_id
         .eq('is_active', true)
 
       if (recipientsError) {
