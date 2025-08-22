@@ -50,9 +50,23 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
       redirectPath = '/technician/dashboard';
       break;
     case 'customer':
-      redirectPath = '/customer';
+      // CRITICAL FIX: Check if customer is multisite user before redirecting
+      if (!profile.customer_id && userRole) {
+        // Multisite user without access to this specific route -> go to main multisite portal
+        console.log(`MultisiteProtectedRoute: Customer without customer_id but with multisite role ${userRole.role_type}. Redirecting to /organisation`);
+        redirectPath = '/organisation';
+      } else if (profile.customer_id) {
+        // Regular customer with customer_id -> go to customer portal
+        console.log(`MultisiteProtectedRoute: Regular customer with customer_id ${profile.customer_id}. Redirecting to /customer`);
+        redirectPath = '/customer';
+      } else {
+        // Customer without customer_id and no multisite role -> should not happen, but fallback to customer
+        console.warn(`MultisiteProtectedRoute: Customer without customer_id and no multisite role. Fallback to /customer`);
+        redirectPath = '/customer';
+      }
       break;
   }
 
+  console.log(`MultisiteProtectedRoute: Redirecting ${profile.role} user to ${redirectPath}`);
   return <Navigate to={redirectPath} replace />;
 }

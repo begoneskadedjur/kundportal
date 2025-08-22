@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   .maybeSingle();
                 
                 targetPath = multisiteRole ? '/organisation' : '/customer';
-                console.log(`Customer with customer_id: ${profileData.customer_id}, multisite_role: ${multisiteRole?.role_type}. Going to: ${targetPath}`);
+                console.log(`AuthContext: Customer with customer_id: ${profileData.customer_id}, multisite_role: ${multisiteRole?.role_type}. Going to: ${targetPath}`);
               } catch (error) {
                 console.error('Error checking multisite role:', error);
                 // Fallback to customer portal if multisite check fails
