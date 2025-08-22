@@ -512,6 +512,25 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['oneflow_sync_log']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['oneflow_sync_log']['Insert']>
       }
+      // 🆕 QUOTE RECIPIENTS TABELL - för notifikationsstatus
+      quote_recipients: {
+        Row: {
+          id: string
+          quote_id: string
+          user_email: string
+          recipient_role: 'verksamhetschef' | 'regionchef' | 'platsansvarig'
+          organization_id: string | null
+          notification_type: 'direct' | 'cascade' | null
+          cascade_reason: string | null
+          seen_at: string | null
+          dismissed_at: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['quote_recipients']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['quote_recipients']['Insert']>
+      }
     }
   }
 }
@@ -823,6 +842,11 @@ export type TechnicianAbsenceUpdate = Database['public']['Tables']['technician_a
 export type OneflowSyncLog = Database['public']['Tables']['oneflow_sync_log']['Row']
 export type OneflowSyncLogInsert = Database['public']['Tables']['oneflow_sync_log']['Insert']
 export type OneflowSyncLogUpdate = Database['public']['Tables']['oneflow_sync_log']['Update']
+
+// 🆕 QUOTE RECIPIENTS TYPES
+export type QuoteRecipient = Database['public']['Tables']['quote_recipients']['Row']
+export type QuoteRecipientInsert = Database['public']['Tables']['quote_recipients']['Insert']
+export type QuoteRecipientUpdate = Database['public']['Tables']['quote_recipients']['Update']
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [

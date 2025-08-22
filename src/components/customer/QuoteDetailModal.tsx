@@ -57,16 +57,55 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
+      // Först försök hämta från contracts-tabellen (för multisite)
+      const { data: contractData, error: contractError } = await supabase
+        .from('contracts')
+        .select('*')
+        .eq('id', quoteId)
+        .eq('type', 'offer')
+        .single()
+
+      if (contractData && !contractError) {
+        // Transformera contracts data till Quote format
+        const transformedQuote: Quote = {
+          id: contractData.id,
+          oneflow_contract_id: contractData.oneflow_contract_id,
+          type: contractData.type as 'quote' | 'contract',
+          status: contractData.status,
+          company_name: contractData.company_name || '',
+          contact_person: contractData.contact_person || '',
+          contact_email: contractData.contact_email || '',
+          total_value: contractData.total_value,
+          selected_products: contractData.selected_products || [],
+          agreement_text: contractData.agreement_text,
+          start_date: contractData.start_date,
+          contract_length: contractData.contract_length,
+          validity_period: null, // Finns inte i contracts
+          document_url: null, // Finns inte i contracts
+          signing_deadline: null, // Finns inte i contracts
+          created_at: contractData.created_at,
+          updated_at: contractData.updated_at,
+          template_id: contractData.template_id
+        }
+        setQuote(transformedQuote)
+        return
+      }
+
+      // Om inte contracts, försök customer_quotes (för vanliga kunder)
+      if (contractError?.code !== 'PGRST116') {
+        throw contractError
+      }
+
+      const { data: quoteData, error: quoteError } = await supabase
         .from('customer_quotes')
         .select('*')
         .eq('id', quoteId)
         .eq('customer_id', customerId)
         .single()
 
-      if (error) throw error
+      if (quoteError) throw quoteError
 
-      setQuote(data)
+      setQuote(quoteData)
     } catch (error: any) {
       console.error('Error fetching quote details:', error)
       setError(`Kunde inte hämta offertdetaljer: ${error.message}`)
@@ -76,34 +115,8 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
   }
 
   const markQuoteAsSeen = async () => {
-    try {
-      setMarkingAsSeen(true)
-      
-      // Find the quote recipient record for this user and quote
-      const { data: recipients, error: recipientError } = await supabase
-        .from('quote_recipients')
-        .select('id')
-        .eq('quote_id', quoteId)
-        .limit(1)
-
-      if (recipientError) throw recipientError
-      
-      if (recipients && recipients.length > 0) {
-        // Call the database function to mark as seen
-        const { error: statusError } = await supabase
-          .rpc('update_quote_notification_status', {
-            p_quote_recipient_id: recipients[0].id,
-            p_mark_as_seen: true
-          })
-
-        if (statusError) throw statusError
-      }
-    } catch (error: any) {
-      console.error('Error marking quote as seen:', error)
-      // Don't show this error to user as it's not critical
-    } finally {
-      setMarkingAsSeen(false)
-    }
+    // Detta hanteras nu från parent component (MultisiteQuoteListView)
+    // så vi behöver inte göra något här
   }
 
   const getStatusIcon = (status: string) => {
@@ -289,7 +302,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                     )}
                     {quote.total_value && (
                       <div>
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Totalt värde</label>
+                        <label className="text-xs text-slate-500 uppercase tracking-wide">Kostnad</label>
                         <p className="text-white font-semibold text-lg">{formatCurrency(quote.total_value)}</p>
                       </div>
                     )}
