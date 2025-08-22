@@ -61,7 +61,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             targetPath = '/technician/dashboard';
             break;
           case 'customer':
-            targetPath = '/customer';
+            // Check if this is a multisite user (customer_id is null but has multisite role)
+            if (profileData.customer_id) {
+              // Regular customer with customer_id
+              targetPath = '/customer';
+            } else {
+              // Check if user has multisite role
+              try {
+                const { data: multisiteRole } = await supabase
+                  .from('multisite_user_roles')
+                  .select('role_type')
+                  .eq('user_id', userId)
+                  .eq('is_active', true)
+                  .maybeSingle();
+                
+                targetPath = multisiteRole ? '/organisation' : '/customer';
+                console.log(`Customer with customer_id: ${profileData.customer_id}, multisite_role: ${multisiteRole?.role_type}. Going to: ${targetPath}`);
+              } catch (error) {
+                console.error('Error checking multisite role:', error);
+                // Fallback to customer portal if multisite check fails
+                targetPath = '/customer';
+              }
+            }
             break;
         }
         console.log(`User role is '${profileData.role}'. Navigating to ${targetPath}`);
