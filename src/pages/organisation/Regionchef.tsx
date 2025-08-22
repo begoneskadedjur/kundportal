@@ -12,6 +12,7 @@ import OrganisationLayout from '../../components/organisation/OrganisationLayout
 import OrganizationServiceRequest from '../../components/organisation/OrganizationServiceRequest'
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
 import MultisitePendingQuoteNotification from '../../components/organisation/MultisitePendingQuoteNotification'
+import OrganisationSanitationReports from '../../components/organisation/OrganisationSanitationReports'
 
 interface SiteMetrics {
   customerId: string
@@ -58,7 +59,14 @@ const RegionchefDashboard: React.FC = () => {
     try {
       setLoading(true)
       
-      // Hämta endast enheter för denna organisation och region
+      console.log('fetchCustomersAndMetrics - Starting with:', {
+        organization_id: organization.organization_id,
+        userRole: userRole.role_type,
+        userSiteIds: userRole.site_ids,
+        userRegion: userRole.region
+      })
+      
+      // Hämta endast enheter för denna organisation
       // VIKTIGT: Kontrollera is_multisite för att inte påverka vanliga kunder
       let customersQuery = supabase
         .from('customers')
@@ -68,9 +76,9 @@ const RegionchefDashboard: React.FC = () => {
         .eq('is_multisite', true) // Säkerställ multisite-kunder
         .eq('is_active', true)
       
-      // Filtrera på region om användaren är regionchef
-      if (userRole.region) {
-        customersQuery = customersQuery.eq('region', userRole.region)
+      // FIX: Filtrera baserat på site_ids från multisite_user_roles istället för region
+      if (userRole.site_ids && userRole.site_ids.length > 0) {
+        customersQuery = customersQuery.in('id', userRole.site_ids)
       }
       
       const { data: customersData, error: customersError } = await customersQuery
@@ -80,9 +88,12 @@ const RegionchefDashboard: React.FC = () => {
         throw customersError
       }
       
+      console.log('fetchCustomersAndMetrics - Found customers:', customersData?.length || 0, customersData)
+      
       setCustomers(customersData || [])
       
       if (!customersData || customersData.length === 0) {
+        console.log('fetchCustomersAndMetrics - No customers found, setting empty metrics')
         setSiteMetrics([])
         setLoading(false)
         return
@@ -139,17 +150,29 @@ const RegionchefDashboard: React.FC = () => {
 
   const fetchPendingQuotes = async () => {
     if (!organization || !userRole || !accessibleSites.length) {
+      console.log('fetchPendingQuotes - Missing data:', { 
+        hasOrganization: !!organization, 
+        hasUserRole: !!userRole, 
+        accessibleSitesLength: accessibleSites.length 
+      })
       return
     }
 
     try {
       const siteIds = accessibleSites.map(site => site.id)
       
+      console.log('fetchPendingQuotes - Querying with:', {
+        organization_id: organization.organization_id,
+        userRole: userRole.role_type,
+        siteIds: siteIds
+      })
+      
       // First get quote recipients without the problematic JOIN
+      // VIKTIGT: Använd organization.organization_id, inte organization.id
       const { data: quoteRecipients, error: recipientsError } = await supabase
         .from('quote_recipients')
         .select('*')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', organization.organization_id) // FIX: Använd organization_id
         .eq('is_active', true)
 
       if (recipientsError) {
@@ -157,7 +180,10 @@ const RegionchefDashboard: React.FC = () => {
         return
       }
 
+      console.log('fetchPendingQuotes - Found quote recipients:', quoteRecipients?.length || 0, quoteRecipients)
+
       if (!quoteRecipients || quoteRecipients.length === 0) {
+        console.log('fetchPendingQuotes - No quote recipients found')
         setPendingQuotes([])
         return
       }
@@ -208,25 +234,48 @@ const RegionchefDashboard: React.FC = () => {
       }
 
       // Get regionchef site_ids from multisite_user_roles
+      // FIX: Använd organization.organization_id, inte organization.id
       const { data: regionchefRoles } = await supabase
         .from('multisite_user_roles')
         .select('site_ids')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', organization.organization_id) // FIX: Använd organization_id
         .eq('role_type', 'regionchef')
         .eq('is_active', true)
         
       const regionchefSiteIds = regionchefRoles?.flatMap(role => role.site_ids || []) || []
       
+      console.log('fetchPendingQuotes - Regionchef site filtering:', {
+        regionchefRoles,
+        regionchefSiteIds,
+        currentUserSiteIds: userRole.site_ids
+      })
+      
       // Regionchef sees quotes for their assigned sites (from multisite_user_roles)
-      const relevantQuotes = (quoteRecipients || []).filter(qr => 
-        qr.recipient_role === 'verksamhetschef' || 
-        (qr.recipient_role === 'regionchef' && qr.site_ids?.some((siteId: string) => 
+      const relevantQuotes = (quoteRecipients || []).filter(qr => {
+        const isForVerksamhetschef = qr.recipient_role === 'verksamhetschef'
+        const isForRegionchef = qr.recipient_role === 'regionchef' && qr.site_ids?.some((siteId: string) => 
           regionchefSiteIds.includes(siteId)
-        )) ||
-        (qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
+        )
+        const isForPlatsansvarig = qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
           regionchefSiteIds.includes(siteId)
-        ))
-      )
+        )
+        
+        const isRelevant = isForVerksamhetschef || isForRegionchef || isForPlatsansvarig
+        
+        console.log('fetchPendingQuotes - Quote filtering:', {
+          quote_id: qr.quote_id,
+          recipient_role: qr.recipient_role,
+          quote_site_ids: qr.site_ids,
+          isForVerksamhetschef,
+          isForRegionchef,
+          isForPlatsansvarig,
+          isRelevant
+        })
+        
+        return isRelevant
+      })
+      
+      console.log('fetchPendingQuotes - Relevant quotes after filtering:', relevantQuotes?.length || 0)
 
       // Transform to match MultisiteQuote interface
       const transformedQuotes = relevantQuotes.map(qr => {
@@ -483,6 +532,28 @@ const RegionchefDashboard: React.FC = () => {
           <OrganisationServiceActivityTimeline 
             siteIds={customers.map(c => c.id)}
           />
+        )}
+
+        {/* Saneringsrapporter för enheter i regionen */}
+        {customers.length > 0 && (
+          <Card className="bg-slate-800/50 border-slate-700">
+            <div className="p-6 border-b border-slate-700">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                Saneringsrapporter - {userRole?.region || 'din region'}
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Saneringsrapporter för alla enheter i regionen
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <OrganisationSanitationReports 
+                siteIds={customers.map(c => c.id)}
+                userRoleType="regionchef"
+              />
+            </div>
+          </Card>
         )}
         
         {/* Service Request Modal */}
