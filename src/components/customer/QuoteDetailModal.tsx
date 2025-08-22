@@ -14,6 +14,8 @@ interface Quote {
   company_name: string
   contact_person: string
   contact_email: string
+  contact_phone?: string
+  billing_email?: string
   total_value: number | null
   selected_products: any[]
   agreement_text: string | null
@@ -75,6 +77,8 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
           company_name: contractData.company_name || '',
           contact_person: contractData.contact_person || '',
           contact_email: contractData.contact_email || '',
+          contact_phone: contractData.contact_phone || null,
+          billing_email: contractData.billing_email || null,
           total_value: contractData.total_value,
           selected_products: contractData.selected_products || [],
           agreement_text: contractData.agreement_text,
@@ -171,13 +175,18 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
     if (!products || products.length === 0) return []
     
     return products.flatMap(p => 
-      (p.products || []).map((product: any) => ({
-        name: product.name || 'Unnamed Product',
-        description: product.description || '',
-        quantity: product.quantity?.amount || 0,
-        servicePrice: product.price_1?.amount?.amount || '0',
-        materialPrice: product.price_2?.amount?.amount || '0'
-      }))
+      (p.products || []).map((product: any) => {
+        const servicePrice = parseInt(product.price_1?.amount?.amount || '0')
+        const materialPrice = parseInt(product.price_2?.amount?.amount || '0')
+        const totalPrice = servicePrice + materialPrice
+        
+        return {
+          name: product.name || 'Unnamed Product',
+          description: product.description || '',
+          quantity: product.quantity?.amount || 0,
+          totalPrice: totalPrice > 0 ? totalPrice : null
+        }
+      })
     )
   }
 
@@ -255,6 +264,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                     <label className="text-xs text-slate-500 uppercase tracking-wide">Kontaktperson</label>
                     <p className="text-white">{quote.contact_person}</p>
                     <p className="text-sm text-slate-400">{quote.contact_email}</p>
+                    {quote.contact_phone && (
+                      <p className="text-sm text-slate-400">{quote.contact_phone}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wide">Typ</label>
@@ -267,6 +279,12 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                       <span className="text-white">{getStatusText(quote.status)}</span>
                     </div>
                   </div>
+                  {quote.billing_email && quote.billing_email !== quote.contact_email && (
+                    <div className="md:col-span-2">
+                      <label className="text-xs text-slate-500 uppercase tracking-wide">Fakturamail</label>
+                      <p className="text-sm text-slate-400">{quote.billing_email}</p>
+                    </div>
+                  )}
                 </div>
               </Card>
 
@@ -330,14 +348,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                             )}
                             <div className="flex items-center gap-4 mt-2">
                               <span className="text-slate-400 text-sm">Antal: {product.quantity}</span>
-                              {product.servicePrice !== '0' && (
+                              {product.totalPrice && (
                                 <span className="text-slate-400 text-sm">
-                                  Service: {formatCurrency(parseInt(product.servicePrice))}
-                                </span>
-                              )}
-                              {product.materialPrice !== '0' && (
-                                <span className="text-slate-400 text-sm">
-                                  Material: {formatCurrency(parseInt(product.materialPrice))}
+                                  Pris: {formatCurrency(product.totalPrice)}
                                 </span>
                               )}
                             </div>
@@ -354,7 +367,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                 <Card className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Avtalstext
+                    Offertbeskrivning
                   </h3>
                   <div className="bg-slate-800/50 rounded-lg p-4">
                     <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
