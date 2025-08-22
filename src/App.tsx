@@ -70,6 +70,7 @@ import OrganisationRedirect from './pages/organisation/Redirect'
 import OrganisationArenden from './pages/organisation/shared/Arenden';
 import OrganisationStatistik from './pages/organisation/shared/Statistik';
 import OrganisationRapporter from './pages/organisation/shared/Rapporter';
+import OrganisationOfferter from './pages/organisation/shared/Offerter';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -498,6 +499,14 @@ function App() {
                 </MultisiteProtectedRoute>
               } 
             />
+            <Route 
+              path="/organisation/verksamhetschef/offerter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOfferter />
+                </MultisiteProtectedRoute>
+              } 
+            />
 
             {/* Organisation sub-routes for regionchef */}
             <Route 
@@ -524,6 +533,14 @@ function App() {
                 </MultisiteProtectedRoute>
               } 
             />
+            <Route 
+              path="/organisation/regionchef/offerter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOfferter />
+                </MultisiteProtectedRoute>
+              } 
+            />
 
             {/* Organisation sub-routes for platsansvarig */}
             <Route 
@@ -547,6 +564,14 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <OrganisationRapporter />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/platsansvarig/offerter" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOfferter />
                 </MultisiteProtectedRoute>
               } 
             />

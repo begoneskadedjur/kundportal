@@ -1,6 +1,6 @@
 // src/components/organisation/OrganisationNavigation.tsx - Gemensam navigation för organisationsportalen
 import React from 'react'
-import { Home, BarChart3, Calendar, AlertTriangle, FileText, Settings, LogOut, User } from 'lucide-react'
+import { Home, BarChart3, Calendar, AlertTriangle, FileText, Settings, LogOut, User, Receipt } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
@@ -50,6 +50,12 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
         label: 'Rapporter',
         icon: <FileText className="w-5 h-5" />,
         path: `${basePath}/rapporter`
+      },
+      {
+        id: 'quotes',
+        label: 'Offerter',
+        icon: <Receipt className="w-5 h-5" />,
+        path: `${basePath}/offerter`
       }
     ]
   }

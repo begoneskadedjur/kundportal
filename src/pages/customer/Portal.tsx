@@ -22,6 +22,7 @@ import CustomerPortalNavigation from '../../components/customer/CustomerPortalNa
 import CustomerStatistics from '../../components/customer/CustomerStatistics'
 import SanitationReports from './SanitationReports'
 import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
+import QuoteListView from '../../components/customer/QuoteListView'
 
 // Customer type matching new database structure
 type Customer = {
@@ -60,7 +61,7 @@ const CustomerPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports' | 'quotes'>('dashboard')
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
@@ -195,6 +196,15 @@ const CustomerPortal: React.FC = () => {
     <SanitationReports />
   )
 
+  // Quotes view component
+  const renderQuotesView = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <QuoteListView customerId={customer!.id} />
+      </div>
+    </div>
+  )
+
   // Dashboard view component  
   const renderDashboardView = () => (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -299,6 +309,7 @@ const CustomerPortal: React.FC = () => {
       {currentView === 'dashboard' && renderDashboardView()}
       {currentView === 'statistics' && renderStatisticsView()}
       {currentView === 'reports' && renderReportsView()}
+      {currentView === 'quotes' && renderQuotesView()}
     </div>
   )
 }
