@@ -141,7 +141,7 @@ const RegionchefDashboard: React.FC = () => {
         return {
           customerId: customer.id,
           customerName: getCustomerDisplayName(customer),
-          city: customer.city || 'Okänd stad',
+          city: customer.contact_address || 'Ingen adress',
           activeCases: activeCases.length,
           completedThisMonth: completedThisMonth.length,
           scheduledVisits: scheduledCases.length,
@@ -242,49 +242,21 @@ const RegionchefDashboard: React.FC = () => {
         }
       }
 
-      // Get regionchef site_ids from multisite_user_roles
-      // FIX: Använd organization.organization_id, inte organization.id
-      const { data: regionchefRoles } = await supabase
-        .from('multisite_user_roles')
-        .select('site_ids')
-        .eq('organization_id', organization.organization_id) // FIX: Använd organization_id
-        .eq('role_type', 'regionchef')
-        .eq('is_active', true)
-        
-      const regionchefSiteIds = regionchefRoles?.flatMap(role => role.site_ids || []) || []
+      // Use current user's site_ids for filtering (already available from userRole)
+      const currentUserSiteIds = userRole.site_ids || []
       
-      console.log('fetchPendingQuotes - Regionchef site filtering:', {
-        regionchefRoles,
-        regionchefSiteIds,
-        currentUserSiteIds: userRole.site_ids
-      })
-      
-      // Regionchef sees quotes for their assigned sites (from multisite_user_roles)
+      // Regionchef sees quotes for their assigned sites
       const relevantQuotes = (quoteRecipients || []).filter(qr => {
         const isForVerksamhetschef = qr.recipient_role === 'verksamhetschef'
         const isForRegionchef = qr.recipient_role === 'regionchef' && qr.site_ids?.some((siteId: string) => 
-          regionchefSiteIds.includes(siteId)
+          currentUserSiteIds.includes(siteId)
         )
         const isForPlatsansvarig = qr.recipient_role === 'platsansvarig' && qr.site_ids?.some((siteId: string) => 
-          regionchefSiteIds.includes(siteId)
+          currentUserSiteIds.includes(siteId)
         )
         
-        const isRelevant = isForVerksamhetschef || isForRegionchef || isForPlatsansvarig
-        
-        console.log('fetchPendingQuotes - Quote filtering:', {
-          quote_id: qr.quote_id,
-          recipient_role: qr.recipient_role,
-          quote_site_ids: qr.site_ids,
-          isForVerksamhetschef,
-          isForRegionchef,
-          isForPlatsansvarig,
-          isRelevant
-        })
-        
-        return isRelevant
+        return isForVerksamhetschef || isForRegionchef || isForPlatsansvarig
       })
-      
-      console.log('fetchPendingQuotes - Relevant quotes after filtering:', relevantQuotes?.length || 0)
 
       // Transform to match MultisiteQuote interface
       const transformedQuotes = relevantQuotes.map(qr => {
@@ -388,7 +360,7 @@ const RegionchefDashboard: React.FC = () => {
                 {organization?.organization_name}
               </h1>
               <p className="text-blue-200">
-                Regionchef - {userRole?.region || 'Okänd region'}
+                Regionchef
               </p>
             </div>
             <Button
@@ -549,7 +521,7 @@ const RegionchefDashboard: React.FC = () => {
             <div className="p-6 border-b border-slate-700">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-400" />
-                Saneringsrapporter - {userRole?.region || 'din region'}
+                Saneringsrapporter
               </h2>
               <p className="text-slate-400 text-sm mt-1">
                 Saneringsrapporter för alla enheter i regionen
@@ -558,7 +530,6 @@ const RegionchefDashboard: React.FC = () => {
             
             <div className="p-6">
               <OrganisationSanitationReports 
-                siteIds={customers.map(c => c.id)}
                 userRoleType="regionchef"
               />
             </div>
