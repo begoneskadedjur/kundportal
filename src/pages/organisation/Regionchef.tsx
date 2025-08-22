@@ -1,6 +1,6 @@
 // src/pages/organisation/Regionchef.tsx - Dashboard för regionchefer
 import React, { useState, useEffect } from 'react'
-import { Building2, MapPin, AlertTriangle, CheckCircle, TrendingUp, Users } from 'lucide-react'
+import { Building2, MapPin, AlertTriangle, CheckCircle, TrendingUp, Users, FileText } from 'lucide-react'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -105,11 +105,20 @@ const RegionchefDashboard: React.FC = () => {
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
       
+      console.log('fetchCustomersAndMetrics - Fetching cases for customer IDs:', customerIds)
+      
       // Parallell query för bättre prestanda
-      const { data: casesData } = await supabase
+      const { data: casesData, error: casesError } = await supabase
         .from('cases')
         .select('id, customer_id, status, updated_at, scheduled_date')
         .in('customer_id', customerIds)
+        
+      if (casesError) {
+        console.error('Error fetching cases:', casesError)
+        // Continue without crashing, just set empty cases
+      }
+      
+      console.log('fetchCustomersAndMetrics - Found cases:', casesData?.length || 0)
       
       // Bearbeta data per customer
       const metrics: SiteMetrics[] = customersData.map(customer => {
