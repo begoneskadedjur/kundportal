@@ -186,11 +186,11 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
         .select('id')
         .eq('quote_id', quoteId)
         .eq('user_email', user.email)
-        .single()
+        .maybeSingle()
         
       let recipientId = existingRecipient?.id
       
-      if (findError && findError.code === 'PGRST116') {
+      if (!existingRecipient) {
         // Record finns inte, skapa en med alla obligatoriska fält
         const { data: newRecipient, error: createError } = await supabase
           .from('quote_recipients')
@@ -244,11 +244,11 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
         .select('id')
         .eq('quote_id', quoteId)
         .eq('user_email', user.email)
-        .single()
+        .maybeSingle()
         
       let recipientId = existingRecipient?.id
       
-      if (findError && findError.code === 'PGRST116') {
+      if (!existingRecipient) {
         // Record finns inte, skapa en med alla obligatoriska fält
         const { data: newRecipient, error: createError } = await supabase
           .from('quote_recipients')
