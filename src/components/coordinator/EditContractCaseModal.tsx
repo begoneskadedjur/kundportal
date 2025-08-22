@@ -150,9 +150,14 @@ export default function EditContractCaseModal({
     userId?: string
     label: string
     sites?: string[]
+    contactPerson?: string
+    contactEmail?: string
+    contactPhone?: string
   } | null>(null)
   const [organizationSites, setOrganizationSites] = useState<any[]>([])
   const [regionchefSiteIds, setRegionchefSiteIds] = useState<string[]>([])
+  const [regionchefContactInfo, setRegionchefContactInfo] = useState<{contactPerson?: string, contactEmail?: string, contactPhone?: string} | null>(null)
+  const [verksamhetschefContactInfo, setVerksamhetschefContactInfo] = useState<{contactPerson?: string, contactEmail?: string, contactPhone?: string} | null>(null)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
 
   // Multisite recipient logic
@@ -170,15 +175,20 @@ export default function EditContractCaseModal({
       options.push({
         role: 'platsansvarig' as const,
         label: `Platschef för ${siteName}`,
-        sites: [siteName]
+        sites: [siteName],
+        // For platschef, use the current case contact info (no special recipient)
+        contactPerson: formData.contact_person || customerData.contact_person,
+        contactEmail: formData.contact_email || customerData.contact_email,
+        contactPhone: formData.contact_phone || customerData.contact_phone
       })
     }
     
     // Regional managers (regionchef) - use multisite_user_roles site_ids
     console.log('getRecipientOptions - regionchefSiteIds:', regionchefSiteIds)
     console.log('getRecipientOptions - organizationSites:', organizationSites)
+    console.log('getRecipientOptions - regionchefContactInfo:', regionchefContactInfo)
     
-    if (regionchefSiteIds.length > 0) {
+    if (regionchefSiteIds.length > 0 && regionchefContactInfo) {
       const regionSites = organizationSites.filter(site => 
         regionchefSiteIds.includes(site.id)
       )
@@ -191,30 +201,40 @@ export default function EditContractCaseModal({
           ? `${regionSites.length} enheter i regionen` 
           : siteNames
           
+        const contactName = regionchefContactInfo.contactPerson ? ` (${regionchefContactInfo.contactPerson})` : ''
+        
         options.push({
           role: 'regionchef' as const,
-          label: `Regionchef för ${truncatedNames}`,
-          sites: regionSites.map(site => site.site_name || site.company_name)
+          label: `Regionchef för ${truncatedNames}${contactName}`,
+          sites: regionSites.map(site => site.site_name || site.company_name),
+          contactPerson: regionchefContactInfo.contactPerson,
+          contactEmail: regionchefContactInfo.contactEmail,
+          contactPhone: regionchefContactInfo.contactPhone
         })
         console.log('getRecipientOptions - Added regionchef option:', options[options.length - 1])
       } else {
         console.log('getRecipientOptions - No regionSites found after filtering')
       }
     } else {
-      console.log('getRecipientOptions - No regionchefSiteIds available')
+      console.log('getRecipientOptions - No regionchefSiteIds available or contact info missing')
     }
     
     // Business manager (verksamhetschef) - all sites in organization
     if (organizationSites.length > 0) {
+      const contactName = verksamhetschefContactInfo?.contactPerson ? ` (${verksamhetschefContactInfo.contactPerson})` : ''
+      
       options.push({
         role: 'verksamhetschef' as const,
-        label: 'Verksamhetschef',
-        sites: organizationSites.map(site => site.site_name || site.company_name)
+        label: `Verksamhetschef${contactName}`,
+        sites: organizationSites.map(site => site.site_name || site.company_name),
+        contactPerson: verksamhetschefContactInfo?.contactPerson,
+        contactEmail: verksamhetschefContactInfo?.contactEmail,
+        contactPhone: verksamhetschefContactInfo?.contactPhone
       })
     }
     
     return options
-  }, [isMultisiteCustomer, customerData, organizationSites, regionchefSiteIds])
+  }, [isMultisiteCustomer, customerData, organizationSites, regionchefSiteIds, regionchefContactInfo, verksamhetschefContactInfo, formData])
 
   // Hook för rapport-generering
   const reportData = {
@@ -455,13 +475,13 @@ export default function EditContractCaseModal({
       setOrganizationSites(sites || [])
       console.log('fetchOrganizationSites - Found sites:', sites)
       
-      // Fetch regionchef site_ids using the same approach as admin pages
+      // Fetch regionchef site_ids and contact info using the same approach as admin pages
       console.log('fetchOrganizationSites - Querying multisite_users_complete with org_id:', orgId)
       
       // Use the multisite_users_complete view like admin pages do
       const { data: regionchefRoles, error: regionchefError } = await supabase
         .from('multisite_users_complete')
-        .select('site_ids')
+        .select('site_ids, contact_person, contact_email, contact_phone')
         .eq('organization_id', orgId)
         .eq('role_type', 'regionchef')
         .eq('is_active', true)
@@ -476,10 +496,43 @@ export default function EditContractCaseModal({
           const allRegionchefSiteIds = regionchefRoles.flatMap(role => role.site_ids || [])
           setRegionchefSiteIds(allRegionchefSiteIds)
           console.log('fetchOrganizationSites - Regionchef site_ids from VIEW:', allRegionchefSiteIds)
+          
+          // Set contact info from the first regionchef found
+          const firstRegionchef = regionchefRoles[0]
+          setRegionchefContactInfo({
+            contactPerson: firstRegionchef.contact_person || undefined,
+            contactEmail: firstRegionchef.contact_email || undefined,
+            contactPhone: firstRegionchef.contact_phone || undefined
+          })
+          console.log('fetchOrganizationSites - Regionchef contact info:', firstRegionchef)
         } else {
           console.log('fetchOrganizationSites - No regionchef roles found in VIEW')
           setRegionchefSiteIds([])
+          setRegionchefContactInfo(null)
         }
+      }
+      
+      // Also fetch verksamhetschef contact info
+      const { data: verksamhetschefRoles, error: verksamhetschefError } = await supabase
+        .from('multisite_users_complete')
+        .select('contact_person, contact_email, contact_phone')
+        .eq('organization_id', orgId)
+        .eq('role_type', 'verksamhetschef')
+        .eq('is_active', true)
+        .limit(1)
+      
+      if (verksamhetschefError) {
+        console.error('Error fetching verksamhetschef roles:', verksamhetschefError)
+      } else if (verksamhetschefRoles && verksamhetschefRoles.length > 0) {
+        const verksamhetschef = verksamhetschefRoles[0]
+        setVerksamhetschefContactInfo({
+          contactPerson: verksamhetschef.contact_person || undefined,
+          contactEmail: verksamhetschef.contact_email || undefined,
+          contactPhone: verksamhetschef.contact_phone || undefined
+        })
+        console.log('fetchOrganizationSites - Verksamhetschef contact info:', verksamhetschef)
+      } else {
+        setVerksamhetschefContactInfo(null)
       }
     } catch (error) {
       console.error('Error fetching organization sites:', error)
@@ -673,11 +726,22 @@ export default function EditContractCaseModal({
       return null
     }
     
-    // Use customer data if available, otherwise use form data
-    const contactPerson = formData.contact_person || customerData?.contact_person || ''
-    const email = formData.contact_email || customerData?.contact_email || ''
-    const phone = formData.contact_phone || customerData?.contact_phone || ''
+    // Use selectedRecipient contact data if available (for regionchef/verksamhetschef),
+    // otherwise use customer data/form data (for platsansvarig or no recipient)
+    const contactPerson = selectedRecipient?.contactPerson || formData.contact_person || customerData?.contact_person || ''
+    const email = selectedRecipient?.contactEmail || formData.contact_email || customerData?.contact_email || ''
+    const phone = selectedRecipient?.contactPhone || formData.contact_phone || customerData?.contact_phone || ''
     const address = formData.address || customerData?.contact_address || ''
+    
+    console.log('prepareCustomerDataForOneflow - Contact data source:', {
+      selectedRecipient: selectedRecipient ? {
+        role: selectedRecipient.role,
+        contactPerson: selectedRecipient.contactPerson,
+        contactEmail: selectedRecipient.contactEmail,
+        contactPhone: selectedRecipient.contactPhone
+      } : null,
+      finalValues: { contactPerson, email, phone }
+    })
     
     // För multisite, hantera företagsnamn och organisationsnummer korrekt
     let companyName = customerData?.company_name || formData.contact_person || ''
@@ -718,7 +782,7 @@ export default function EditContractCaseModal({
       site_name: customerData?.site_name || '',
       parent_company: customerData?.parent_company_name || ''
     }
-  }, [customerData, formData])
+  }, [customerData, formData, selectedRecipient])
   
   // Quote generation via Oneflow
   const handleGenerateQuote = async () => {
