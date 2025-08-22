@@ -793,10 +793,10 @@ export default function EditContractCaseModal({
           .eq('id', caseData.id)
       }
       
-      // Now save multisite recipient with the actual quote ID from customer_pending_quotes
-      if (isMultisiteCustomer && selectedRecipient && result.quote_id && customerData?.organization_id) {
+      // Now save multisite recipient with the case ID (UUID) instead of contract ID (number)  
+      if (isMultisiteCustomer && selectedRecipient && caseData?.id && customerData?.organization_id) {
         try {
-          await saveQuoteRecipient(result.quote_id, selectedRecipient, customerData.organization_id)
+          await saveQuoteRecipient(caseData.id, selectedRecipient, customerData.organization_id)
           console.log('✅ Quote recipient saved successfully for multisite customer')
         } catch (recipientError: any) {
           console.error('⚠️ Warning: Quote created but failed to save recipient:', recipientError)
