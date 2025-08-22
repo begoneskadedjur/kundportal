@@ -110,7 +110,7 @@ const RegionchefDashboard: React.FC = () => {
       // Parallell query för bättre prestanda
       const { data: casesData, error: casesError } = await supabase
         .from('cases')
-        .select('id, customer_id, status, updated_at, scheduled_date')
+        .select('id, customer_id, status, updated_at, scheduled_start')
         .in('customer_id', customerIds)
         
       if (casesError) {

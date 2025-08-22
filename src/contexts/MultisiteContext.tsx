@@ -177,8 +177,9 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         .eq('is_active', true)
 
       // Apply role-based filtering
-      if (roleData.role_type === 'regionchef' && roleData.region) {
-        sitesQuery = sitesQuery.eq('region', roleData.region)
+      if (roleData.role_type === 'regionchef' && roleData.site_ids && roleData.site_ids.length > 0) {
+        // FIX: Regionchef uses site_ids, not region filtering
+        sitesQuery = sitesQuery.in('id', roleData.site_ids)
       } else if (roleData.role_type === 'platsansvarig' && roleData.site_ids) {
         sitesQuery = sitesQuery.in('id', roleData.site_ids)
       }
@@ -273,7 +274,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
     }
     
     if (userRole.role_type === 'regionchef') {
-      return site.region === userRole.region
+      // FIX: Regionchef uses site_ids, not region
+      return userRole.site_ids?.includes(site.id) || false
     }
     
     if (userRole.role_type === 'platsansvarig') {
