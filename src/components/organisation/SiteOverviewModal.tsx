@@ -4,6 +4,7 @@ import { X, MapPin, User, AlertTriangle, CheckCircle, Clock } from 'lucide-react
 import { supabase } from '../../lib/supabase'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import TrafficLightStatusCard from './TrafficLightStatusCard'
+import CaseListItem from './CaseListItem'
 import { OrganizationSite } from '../../types/multisite'
 
 interface SiteOverviewModalProps {
@@ -227,21 +228,16 @@ const SiteOverviewModal: React.FC<SiteOverviewModalProps> = ({
                   <p className="text-slate-400">Inga ärenden med bedömningar hittades</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {cases.map(caseItem => (
-                    <div
+                    <CaseListItem
                       key={caseItem.id}
+                      caseData={caseItem}
                       onClick={() => {
                         setSelectedCase(caseItem)
                         setShowCaseDetail(true)
                       }}
-                      className="cursor-pointer"
-                    >
-                      <TrafficLightStatusCard
-                        caseData={caseItem}
-                        isCustomerView={false}
-                      />
-                    </div>
+                    />
                   ))}
                 </div>
               )}

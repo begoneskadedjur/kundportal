@@ -233,7 +233,17 @@ const SiteCardWithTrafficLight: React.FC<SiteCardWithTrafficLightProps> = ({
       {/* Kontaktinfo */}
       {site.contact_person && (
         <div className="pt-3 border-t border-slate-700">
-          <p className="text-xs text-slate-400">Kontakt: {site.contact_person}</p>
+          <p className="text-xs text-slate-400 mb-1">Kontakt: {site.contact_person}</p>
+          {site.contact_phone && (
+            <p className="text-xs text-slate-500 flex items-center gap-1">
+              📞 {site.contact_phone}
+            </p>
+          )}
+          {site.contact_email && (
+            <p className="text-xs text-slate-500 flex items-center gap-1">
+              📧 {site.contact_email}
+            </p>
+          )}
         </div>
       )}
     </div>
