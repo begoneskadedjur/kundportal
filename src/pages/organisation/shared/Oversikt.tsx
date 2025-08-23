@@ -125,10 +125,32 @@ const OrganisationOversikt: React.FC = () => {
 
       const { data: allCases } = await supabase
         .from('cases')
-        .select('id, status, updated_at, scheduled_start')
+        .select('id, status, updated_at, scheduled_start, pest_level, problem_rating, recommendations, recommendations_acknowledged')
         .eq('customer_id', site.id)
 
       if (allCases) {
+        // Beräkna trafikljusstatistik
+        const casesWithAssessment = allCases.filter(c => 
+          c.pest_level !== null && c.problem_rating !== null
+        )
+        
+        const criticalCases = casesWithAssessment.filter(c => 
+          c.pest_level >= 3 || c.problem_rating >= 4
+        ).length
+        
+        const warningCases = casesWithAssessment.filter(c => 
+          c.pest_level === 2 || c.problem_rating === 3
+        ).length
+        
+        const okCases = casesWithAssessment.filter(c => 
+          (c.pest_level >= 0 && c.pest_level <= 1) || 
+          (c.problem_rating >= 1 && c.problem_rating <= 2)
+        ).length
+        
+        const unacknowledgedRecommendations = allCases.filter(c => 
+          c.recommendations && !c.recommendations_acknowledged
+        ).length
+
         const stats = {
           activeCases: allCases.filter(c => 
             ['Öppen', 'Bokad', 'Bokat', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5'].includes(c.status)
@@ -149,7 +171,12 @@ const OrganisationOversikt: React.FC = () => {
             (c.status === 'Bokad' || c.status === 'Bokat') &&
             c.scheduled_start &&
             new Date(c.scheduled_start) >= now
-          ).length
+          ).length,
+          // Trafikljusstatistik
+          criticalCases,
+          warningCases,
+          okCases,
+          unacknowledgedRecommendations
         }
         setDetailedStats(stats)
       }
@@ -294,15 +321,16 @@ const OrganisationOversikt: React.FC = () => {
         ) : (
           <div>
             {userRoleType === 'platsansvarig' && detailedStats ? (
-              // Detaljerad statistik för platsansvarig
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              // Detaljerad statistik för platsansvarig - Rad 1: Ärendestatus
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="p-6 bg-slate-800/50 border-slate-700">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 bg-amber-500/20 rounded-lg">
                       <AlertTriangle className="w-5 h-5 text-amber-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Aktiva ärenden</p>
+                      <p className="text-slate-400 text-sm">Aktiva ärenden för din enhet</p>
                       <p className="text-2xl font-bold text-white">{detailedStats.activeCases}</p>
                     </div>
                   </div>
@@ -326,7 +354,7 @@ const OrganisationOversikt: React.FC = () => {
                       <Calendar className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Denna vecka</p>
+                      <p className="text-slate-400 text-sm">Avklarade denna vecka</p>
                       <p className="text-2xl font-bold text-white">{detailedStats.completedThisWeek}</p>
                     </div>
                   </div>
@@ -338,11 +366,63 @@ const OrganisationOversikt: React.FC = () => {
                       <Clock className="w-5 h-5 text-purple-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Kommande besök</p>
+                      <p className="text-slate-400 text-sm">Kommande tekniker-besök</p>
                       <p className="text-2xl font-bold text-white">{detailedStats.upcomingVisits}</p>
                     </div>
                   </div>
                 </Card>
+                </div>
+                
+                {/* Rad 2: Trafikljusbedömningar */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="p-6 bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-red-500/20 rounded-lg">
+                        <span className="text-2xl">🔴</span>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-sm">Kritiska situationer</p>
+                        <p className="text-2xl font-bold text-red-400">{detailedStats.criticalCases}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-yellow-500/20 rounded-lg">
+                        <span className="text-2xl">🟡</span>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-sm">Kräver uppsikt</p>
+                        <p className="text-2xl font-bold text-yellow-400">{detailedStats.warningCases}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-green-500/20 rounded-lg">
+                        <span className="text-2xl">🟢</span>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-sm">Under kontroll</p>
+                        <p className="text-2xl font-bold text-green-400">{detailedStats.okCases}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="p-6 bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-orange-500/20 rounded-lg">
+                        <Clock className="w-5 h-5 text-orange-400" />
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-sm">Väntar bekräftelse</p>
+                        <p className="text-2xl font-bold text-orange-400">{detailedStats.unacknowledgedRecommendations}</p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
               </div>
             ) : statistics ? (
               // Aggregerad statistik för regionchef/verksamhetschef
@@ -352,8 +432,8 @@ const OrganisationOversikt: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-slate-400 text-sm">
-                          {userRoleType === 'verksamhetschef' && 'Enheter'}
-                          {userRoleType === 'regionchef' && 'Enheter i region'}
+                          {userRoleType === 'verksamhetschef' && 'Alla enheter i organisationen'}
+                          {userRoleType === 'regionchef' && 'Enheter under ditt ansvar'}
                           {userRoleType === 'platsansvarig' && 'Din enhet'}
                         </p>
                         <p className="text-3xl font-bold text-white mt-2">{statistics.totalSites}</p>
@@ -369,7 +449,7 @@ const OrganisationOversikt: React.FC = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-sm">Totalt ärenden</p>
+                        <p className="text-slate-400 text-sm">Totala ärenden (alla enheter)</p>
                         <p className="text-3xl font-bold text-white mt-2">{statistics.totalCases}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -383,7 +463,7 @@ const OrganisationOversikt: React.FC = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-sm">Öppna</p>
+                        <p className="text-slate-400 text-sm">Väntar på start (öppna)</p>
                         <p className="text-3xl font-bold text-amber-400 mt-2">{statistics.openCases}</p>
                       </div>
                       <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
@@ -397,7 +477,7 @@ const OrganisationOversikt: React.FC = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-sm">Pågående</p>
+                        <p className="text-slate-400 text-sm">Pågående tekniker-besök</p>
                         <p className="text-3xl font-bold text-blue-400 mt-2">{statistics.inProgressCases}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -411,7 +491,7 @@ const OrganisationOversikt: React.FC = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-sm">Avklarade</p>
+                        <p className="text-slate-400 text-sm">Slutförda ärenden</p>
                         <p className="text-3xl font-bold text-green-400 mt-2">{statistics.completedCases}</p>
                       </div>
                       <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
