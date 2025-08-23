@@ -1,6 +1,7 @@
 // src/pages/organisation/shared/Oversikt.tsx - Översikt för alla multisite-roller
 import React, { useState, useEffect } from 'react'
 import { useMultisite } from '../../../contexts/MultisiteContext'
+import { useAuth } from '../../../contexts/AuthContext'
 import { supabase } from '../../../lib/supabase'
 import OrganisationLayout from '../../../components/organisation/OrganisationLayout'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
@@ -19,6 +20,7 @@ import { getCustomerDisplayName } from '../../../utils/multisiteHelpers'
 
 const OrganisationOversikt: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
+  const { profile } = useAuth()
   const location = useLocation()
   const [loading, setLoading] = useState(false)
   const [statistics, setStatistics] = useState<any>(null)
@@ -182,29 +184,32 @@ const OrganisationOversikt: React.FC = () => {
                   <p className="text-purple-200">
                     {organization?.organization_name} - Platsansvarig
                   </p>
-                  {currentSite.contact_address && (
+                  {currentSite.address && (
                     <p className="text-slate-400 text-sm mt-2">
-                      {currentSite.contact_address}
-                      {currentSite.postal_code && `, ${currentSite.postal_code}`}
-                      {currentSite.city && ` ${currentSite.city}`}
+                      {currentSite.address}
+                      {/* Note: postal_code och city finns inte i OrganizationSite struktur än */}
                     </p>
                   )}
                 </div>
               ) : (
                 <div>
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    Välkommen till {organization?.organization_name}
+                  <h1 className="text-3xl font-bold text-white mb-2">
+                    {organization?.organization_name}
                   </h1>
                   <p className="text-purple-200">
+                    {userRoleType === 'verksamhetschef' && `Verksamhetschef${profile?.display_name ? ` - ${profile.display_name}` : ''}`}
+                    {userRoleType === 'regionchef' && `Regionchef${profile?.display_name ? ` - ${profile.display_name}` : ''}`}
+                  </p>
+                  <p className="text-slate-400 text-sm mt-1">
                     {userRoleType === 'verksamhetschef' && 'Översikt över hela organisationen'}
                     {userRoleType === 'regionchef' && `Översikt över ${availableSites.length} enheter i din region`}
-                    {userRoleType === 'platsansvarig' && 'Översikt över din enhet'}
                   </p>
                 </div>
               )}
             </div>
             <div className="text-right space-y-3 ml-6">
-              {userRoleType === 'platsansvarig' && currentSite?.contact_person && (
+              {/* Kontaktinfo för alla roller */}
+              {userRoleType === 'platsansvarig' && currentSite?.contact_person ? (
                 <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
                   <p className="text-xs text-slate-400 mb-1">Kontaktperson</p>
                   <p className="text-white font-medium">{currentSite.contact_person}</p>
@@ -215,7 +220,18 @@ const OrganisationOversikt: React.FC = () => {
                     </p>
                   )}
                 </div>
-              )}
+              ) : (userRoleType === 'verksamhetschef' || userRoleType === 'regionchef') && profile ? (
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-1">Inloggad som</p>
+                  <p className="text-white font-medium">{profile.display_name || 'Användare'}</p>
+                  {profile.email && (
+                    <p className="text-slate-300 text-sm mt-1 flex items-center justify-end gap-1">
+                      <Phone className="w-3 h-3" />
+                      {profile.email}
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <Home className="w-6 h-6 text-purple-400" />
                 <Button

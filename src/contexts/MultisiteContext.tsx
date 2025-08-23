@@ -211,7 +211,11 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
         is_primary: false,
         is_active: customer.is_active,
         created_at: customer.created_at,
-        updated_at: customer.updated_at
+        updated_at: customer.updated_at,
+        // Lägg till nödvändiga fält för getCustomerDisplayName
+        is_multisite: customer.is_multisite,
+        site_type: customer.site_type,
+        company_name: customer.company_name
       }))
       
       setSites(sites)

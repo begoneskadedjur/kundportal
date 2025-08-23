@@ -29,6 +29,10 @@ export interface OrganizationSite {
   is_active: boolean
   created_at: string
   updated_at: string
+  // Lägg till fält för getCustomerDisplayName kompatibilitet
+  is_multisite?: boolean
+  site_type?: string
+  company_name?: string
 }
 
 export type MultisiteUserRoleType = 'verksamhetschef' | 'regionchef' | 'platsansvarig'
