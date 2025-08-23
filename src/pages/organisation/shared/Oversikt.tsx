@@ -13,7 +13,6 @@ import OrganisationActiveCasesList from '../../../components/organisation/Organi
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import TrafficLightAggregatedView from '../../../components/organisation/TrafficLightAggregatedView'
-import TrafficLightAlertPanel from '../../../components/organisation/TrafficLightAlertPanel'
 import TrafficLightCaseList from '../../../components/organisation/TrafficLightCaseList'
 import SiteCardWithTrafficLight from '../../../components/organisation/SiteCardWithTrafficLight'
 import SiteOverviewModal from '../../../components/organisation/SiteOverviewModal'
@@ -286,16 +285,6 @@ const OrganisationOversikt: React.FC = () => {
             )}
           </div>
         </Card>
-
-        {/* Alert Panel för kritiska situationer */}
-        <TrafficLightAlertPanel
-          siteIds={getCustomerIds()}
-          userRole={userRoleType}
-          onAlertClick={(siteId) => {
-            // Scroll to sites section or open site details
-            console.log('Alert clicked for site:', siteId)
-          }}
-        />
 
         {/* Statistics Cards */}
         {loading ? (
