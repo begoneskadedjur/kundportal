@@ -72,7 +72,7 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
         // Hämta alla sites för organisationen
         const { data: sites, error: sitesError } = await supabase
           .from('customers')
-          .select('id, company_name, address')
+          .select('id, company_name, contact_address')
           .eq('organization_id', organizationId)
           .eq('is_multisite', true)
 
@@ -108,7 +108,7 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
       // Hämta customer info
       const { data: customers, error: customersError } = await supabase
         .from('customers')
-        .select('id, company_name, address, region')
+        .select('id, company_name, contact_address, region')
         .in('id', customerIds)
 
       if (customersError) throw customersError
