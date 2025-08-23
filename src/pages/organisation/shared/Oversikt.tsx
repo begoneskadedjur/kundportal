@@ -16,6 +16,7 @@ import TrafficLightAggregatedView from '../../../components/organisation/Traffic
 import TrafficLightAlertPanel from '../../../components/organisation/TrafficLightAlertPanel'
 import TrafficLightCaseList from '../../../components/organisation/TrafficLightCaseList'
 import SiteCardWithTrafficLight from '../../../components/organisation/SiteCardWithTrafficLight'
+import SiteOverviewModal from '../../../components/organisation/SiteOverviewModal'
 import { getCustomerDisplayName } from '../../../utils/multisiteHelpers'
 
 const OrganisationOversikt: React.FC = () => {
@@ -27,6 +28,8 @@ const OrganisationOversikt: React.FC = () => {
   const [showServiceRequestModal, setShowServiceRequestModal] = useState(false)
   const [detailedStats, setDetailedStats] = useState<any>(null)
   const [currentSite, setCurrentSite] = useState<any>(null)
+  const [selectedSite, setSelectedSite] = useState<any>(null)
+  const [showSiteOverviewModal, setShowSiteOverviewModal] = useState(false)
   
   // Bestäm användarroll baserat på URL
   const getUserRoleType = (): 'verksamhetschef' | 'regionchef' | 'platsansvarig' => {
@@ -246,6 +249,43 @@ const OrganisationOversikt: React.FC = () => {
           </div>
         </div>
 
+        {/* Sites Overview med trafikljus - Flyttad till toppen för bättre överblick */}
+        <Card className="bg-slate-800/50 border-slate-700">
+          <div className="p-6 border-b border-slate-700">
+            <div>
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
+                <MapPin className="w-5 h-5 text-purple-400" />
+                {userRoleType === 'verksamhetschef' && 'Alla enheter med trafikljusstatus'}
+                {userRoleType === 'regionchef' && 'Enheter i din region med trafikljusstatus'}
+                {userRoleType === 'platsansvarig' && 'Din enhet med trafikljusstatus'}
+              </h2>
+              <p className="text-sm text-slate-400">
+                Klicka på en enhet för att se detaljerad information om tekniska bedömningar och kritiska situationer
+              </p>
+            </div>
+          </div>
+          <div className="p-6">
+            {availableSites.length === 0 ? (
+              <div className="text-center py-8">
+                <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-400">Inga enheter tillgängliga</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {availableSites.map(site => (
+                  <SiteCardWithTrafficLight
+                    key={site.id}
+                    site={site}
+                    onClick={() => {
+                      setSelectedSite(site)
+                      setShowSiteOverviewModal(true)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
 
         {/* Alert Panel för kritiska situationer */}
         <TrafficLightAlertPanel
@@ -446,44 +486,6 @@ const OrganisationOversikt: React.FC = () => {
           </div>
         </div>
 
-        {/* Sites Overview med trafikljus */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <div className="p-6 border-b border-slate-700">
-            <div>
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <MapPin className="w-5 h-5 text-purple-400" />
-                {userRoleType === 'verksamhetschef' && 'Alla enheter med trafikljusstatus'}
-                {userRoleType === 'regionchef' && 'Enheter i din region med trafikljusstatus'}
-                {userRoleType === 'platsansvarig' && 'Din enhet med trafikljusstatus'}
-              </h2>
-              <p className="text-sm text-slate-400">
-                Klicka på en enhet för att se detaljerad information om tekniska bedömningar och kritiska situationer
-              </p>
-            </div>
-          </div>
-          <div className="p-6">
-            {availableSites.length === 0 ? (
-              <div className="text-center py-8">
-                <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400">Inga enheter tillgängliga</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableSites.map(site => (
-                  <SiteCardWithTrafficLight
-                    key={site.id}
-                    site={site}
-                    onClick={() => {
-                      // Future: Navigate to site details or open modal
-                      console.log('Site clicked:', site.site_name)
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </Card>
-
         {/* Service Request Modal */}
         {showServiceRequestModal && (
           <ServiceRequestModal
@@ -495,6 +497,18 @@ const OrganisationOversikt: React.FC = () => {
               if (userRoleType === 'platsansvarig') {
                 fetchDetailedStats()
               }
+            }}
+          />
+        )}
+
+        {/* Site Overview Modal */}
+        {showSiteOverviewModal && selectedSite && (
+          <SiteOverviewModal
+            site={selectedSite}
+            isOpen={showSiteOverviewModal}
+            onClose={() => {
+              setShowSiteOverviewModal(false)
+              setSelectedSite(null)
             }}
           />
         )}
