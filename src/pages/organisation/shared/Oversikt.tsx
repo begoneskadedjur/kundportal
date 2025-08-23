@@ -12,6 +12,8 @@ import OrganisationActiveCasesList from '../../../components/organisation/Organi
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import TrafficLightAggregatedView from '../../../components/organisation/TrafficLightAggregatedView'
+import TrafficLightAlertPanel from '../../../components/organisation/TrafficLightAlertPanel'
+import SiteCardWithTrafficLight from '../../../components/organisation/SiteCardWithTrafficLight'
 
 const OrganisationOversikt: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
@@ -139,6 +141,16 @@ const OrganisationOversikt: React.FC = () => {
           </Button>
         </div>
 
+        {/* Alert Panel för kritiska situationer */}
+        <TrafficLightAlertPanel
+          siteIds={getCustomerIds()}
+          userRole={userRoleType}
+          onAlertClick={(siteId) => {
+            // Scroll to sites section or open site details
+            console.log('Alert clicked for site:', siteId)
+          }}
+        />
+
         {/* Statistics Cards */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -218,39 +230,47 @@ const OrganisationOversikt: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Traffic Light Aggregated View */}
-        <TrafficLightAggregatedView
-          organizationId={organization?.organization_id}
-          siteIds={getCustomerIds()}
-          userRole={userRoleType}
-        />
+        {/* Huvudfokus: Trafikljus och kritiska situationer */}
+        <div className="space-y-6">
+          {/* Traffic Light Aggregated View - Nu mer prominent */}
+          <TrafficLightAggregatedView
+            organizationId={organization?.organization_id}
+            siteIds={getCustomerIds()}
+            userRole={userRoleType}
+          />
 
-        {/* Cases Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Active Cases */}
-          <div>
-            <OrganisationActiveCasesList 
-              siteIds={getCustomerIds()}
-            />
-          </div>
-          
-          {/* Service Activity Timeline */}
-          <div>
-            <OrganisationServiceActivityTimeline 
-              siteIds={getCustomerIds()}
-            />
+          {/* Cases Overview - Nu med trafikljus-fokus */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Active Cases med trafikljusfilter */}
+            <div>
+              <OrganisationActiveCasesList 
+                siteIds={getCustomerIds()}
+              />
+            </div>
+            
+            {/* Service Activity Timeline */}
+            <div>
+              <OrganisationServiceActivityTimeline 
+                siteIds={getCustomerIds()}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Sites Overview */}
+        {/* Sites Overview med trafikljus */}
         <Card className="bg-slate-800/50 border-slate-700">
           <div className="p-6 border-b border-slate-700">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-purple-400" />
-              {userRoleType === 'verksamhetschef' && 'Alla enheter'}
-              {userRoleType === 'regionchef' && 'Enheter i din region'}
-              {userRoleType === 'platsansvarig' && 'Din enhet'}
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
+                <MapPin className="w-5 h-5 text-purple-400" />
+                {userRoleType === 'verksamhetschef' && 'Alla enheter med trafikljusstatus'}
+                {userRoleType === 'regionchef' && 'Enheter i din region med trafikljusstatus'}
+                {userRoleType === 'platsansvarig' && 'Din enhet med trafikljusstatus'}
+              </h2>
+              <p className="text-sm text-slate-400">
+                Klicka på en enhet för att se detaljerad information om tekniska bedömningar och kritiska situationer
+              </p>
+            </div>
           </div>
           <div className="p-6">
             {availableSites.length === 0 ? (
@@ -261,29 +281,14 @@ const OrganisationOversikt: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {availableSites.map(site => (
-                  <div key={site.id} className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-medium text-white">{site.site_name}</h4>
-                        {site.region && (
-                          <p className="text-sm text-purple-400 mt-1">Region: {site.region}</p>
-                        )}
-                        {site.address && (
-                          <p className="text-xs text-slate-500 mt-2">{site.address}</p>
-                        )}
-                      </div>
-                      <div className={`px-2 py-1 rounded text-xs ${
-                        site.is_active ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {site.is_active ? 'Aktiv' : 'Inaktiv'}
-                      </div>
-                    </div>
-                    {site.contact_person && (
-                      <div className="mt-3 pt-3 border-t border-slate-700">
-                        <p className="text-xs text-slate-400">Kontakt: {site.contact_person}</p>
-                      </div>
-                    )}
-                  </div>
+                  <SiteCardWithTrafficLight
+                    key={site.id}
+                    site={site}
+                    onClick={() => {
+                      // Future: Navigate to site details or open modal
+                      console.log('Site clicked:', site.site_name)
+                    }}
+                  />
                 ))}
               </div>
             )}

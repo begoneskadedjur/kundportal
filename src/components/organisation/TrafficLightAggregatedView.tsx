@@ -180,11 +180,20 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
         }
       })
 
-      // Sortera efter kritikalitet
+      // Förbättrad sortering efter kritikalitet och urgency
       aggregatedData.sort((a, b) => {
-        // Först kritiska, sen varningar, sen ok
+        // Prioritera enheter med kritiska cases
         if (a.criticalCases !== b.criticalCases) return b.criticalCases - a.criticalCases
+        
+        // Sedan enheter med obekräftade rekommendationer
+        if (a.unacknowledgedRecommendations !== b.unacknowledgedRecommendations) {
+          return b.unacknowledgedRecommendations - a.unacknowledgedRecommendations
+        }
+        
+        // Sedan varningar
         if (a.warningCases !== b.warningCases) return b.warningCases - a.warningCases
+        
+        // Senast OK-cases
         return b.okCases - a.okCases
       })
 
@@ -295,12 +304,17 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
       {/* Detaljerad lista per enhet */}
       <Card className="bg-gradient-to-r from-slate-800/50 to-slate-900/50 border-slate-700">
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-400" />
-            {userRole === 'verksamhetschef' && 'Alla enheter - Trafikljusstatus'}
-            {userRole === 'regionchef' && 'Din region - Trafikljusstatus'}
-            {userRole === 'platsansvarig' && 'Din enhet - Trafikljusstatus'}
-          </h3>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-purple-400" />
+              {userRole === 'verksamhetschef' && 'Ärendebedömningar - Alla enheter'}
+              {userRole === 'regionchef' && 'Ärendebedömningar - Din region'}
+              {userRole === 'platsansvarig' && 'Ärendebedömningar - Din enhet'}
+            </h3>
+            <p className="text-sm text-slate-400">
+              Tekniska bedömningar per ärende - varje färg representerar situationen vid specifika besök
+            </p>
+          </div>
 
           <div className="space-y-3">
             {sitesData.map(site => {
