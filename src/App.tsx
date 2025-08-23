@@ -454,7 +454,7 @@ function App() {
               path="/organisation/verksamhetschef" 
               element={
                 <MultisiteProtectedRoute>
-                  <VerksamhetschefDashboard />
+                  <OrganisationOversikt />
                 </MultisiteProtectedRoute>
               } 
             />
@@ -462,7 +462,7 @@ function App() {
               path="/organisation/regionchef" 
               element={
                 <MultisiteProtectedRoute>
-                  <RegionchefDashboard />
+                  <OrganisationOversikt />
                 </MultisiteProtectedRoute>
               } 
             />
@@ -470,7 +470,7 @@ function App() {
               path="/organisation/platsansvarig" 
               element={
                 <MultisiteProtectedRoute>
-                  <PlatsansvarigDashboard />
+                  <OrganisationOversikt />
                 </MultisiteProtectedRoute>
               } 
             />
@@ -573,32 +573,6 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <OrganisationOfferter />
-                </MultisiteProtectedRoute>
-              } 
-            />
-
-            {/* Översikt-routes för alla roller - ny avancerad trafikljusvy */}
-            <Route 
-              path="/organisation/verksamhetschef/oversikt" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/regionchef/oversikt" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
-                </MultisiteProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/organisation/platsansvarig/oversikt" 
-              element={
-                <MultisiteProtectedRoute>
-                  <OrganisationOversikt />
                 </MultisiteProtectedRoute>
               } 
             />

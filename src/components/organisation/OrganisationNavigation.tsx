@@ -57,7 +57,7 @@ const OrganisationNavigation: React.FC<OrganisationNavigationProps> = ({ userRol
         id: 'dashboard',
         label: 'Översikt',
         icon: <Home className="w-5 h-5" />,
-        path: `${basePath}/oversikt`
+        path: basePath
       },
       {
         id: 'statistics',
