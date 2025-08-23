@@ -71,6 +71,7 @@ import OrganisationArenden from './pages/organisation/shared/Arenden';
 import OrganisationStatistik from './pages/organisation/shared/Statistik';
 import OrganisationRapporter from './pages/organisation/shared/Rapporter';
 import OrganisationOfferter from './pages/organisation/shared/Offerter';
+import OrganisationOversikt from './pages/organisation/shared/Oversikt';
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -572,6 +573,32 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <OrganisationOfferter />
+                </MultisiteProtectedRoute>
+              } 
+            />
+
+            {/* Översikt-routes för alla roller - ny avancerad trafikljusvy */}
+            <Route 
+              path="/organisation/verksamhetschef/oversikt" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOversikt />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/regionchef/oversikt" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOversikt />
+                </MultisiteProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organisation/platsansvarig/oversikt" 
+              element={
+                <MultisiteProtectedRoute>
+                  <OrganisationOversikt />
                 </MultisiteProtectedRoute>
               } 
             />
