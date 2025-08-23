@@ -67,13 +67,13 @@ const VerksamhetschefRapporter: React.FC = () => {
       const summaries: ReportSummary[] = []
       
       for (const site of sites) {
-        if (!site.customer_id) continue
+        if (!site.id) continue
         
         // Hämta rapportdata för varje site
         const { data: reports, error } = await supabase
           .from('sanitation_reports')
           .select('*')
-          .eq('customer_id', site.customer_id)
+          .eq('customer_id', site.id)
           .order('created_at', { ascending: false })
         
         if (!error && reports) {

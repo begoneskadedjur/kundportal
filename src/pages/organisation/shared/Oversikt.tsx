@@ -107,7 +107,7 @@ const OrganisationOversikt: React.FC = () => {
 
   // Get customer IDs for case components
   const getCustomerIds = () => {
-    return availableSites.map(s => s.customer_id).filter(Boolean) as string[]
+    return availableSites.map(s => s.id).filter(Boolean) as string[]
   }
 
   return (
