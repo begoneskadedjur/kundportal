@@ -13,6 +13,9 @@ import OrganizationServiceRequest from '../../components/organisation/Organizati
 import OrganisationServiceActivityTimeline from '../../components/organisation/OrganisationServiceActivityTimeline'
 import MultisitePendingQuoteNotification from '../../components/organisation/MultisitePendingQuoteNotification'
 import OrganisationSanitationReports from '../../components/organisation/OrganisationSanitationReports'
+import TrafficLightAlertPanel from '../../components/organisation/TrafficLightAlertPanel'
+import SiteCardWithTrafficLight from '../../components/organisation/SiteCardWithTrafficLight'
+import TrafficLightAggregatedView from '../../components/organisation/TrafficLightAggregatedView'
 
 interface SiteMetrics {
   customerId: string
@@ -317,6 +320,11 @@ const RegionchefDashboard: React.FC = () => {
   }
 
   // Beräkna totaler
+  // Helper function to get customer IDs for traffic light components
+  const getCustomerIds = () => {
+    return accessibleSites.map(site => site.id).filter(Boolean) as string[]
+  }
+
   const totals = {
     sites: siteMetrics.length,
     activeCases: siteMetrics.reduce((sum, m) => sum + m.activeCases, 0),
@@ -344,6 +352,20 @@ const RegionchefDashboard: React.FC = () => {
             onDismiss={() => setShowQuoteNotification(false)}
           />
         )}
+        
+        {/* Alert Panel för kritiska situationer */}
+        <TrafficLightAlertPanel
+          siteIds={getCustomerIds()}
+          userRole="regionchef"
+          onAlertClick={(siteId) => {
+            // Scroll to the site in the list or open details
+            const element = document.getElementById(`site-${siteId}`)
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          }}
+        />
+        
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-900/20 to-cyan-900/20 rounded-2xl p-6 border border-blue-700/50">
           <div className="flex items-center justify-between">
@@ -416,15 +438,17 @@ const RegionchefDashboard: React.FC = () => {
         </Card>
 
         <Card className="p-6 bg-slate-800/50 border-slate-700">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="flex gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+              </div>
             </div>
             <div>
-              <p className="text-slate-400 text-sm">Trafikljus</p>
-              <div className="flex gap-2 text-lg font-bold">
+              <p className="text-slate-400 text-sm">Trafikljusstatus</p>
+              <div className="flex gap-3 text-lg font-bold">
                 <span className="text-green-400">{siteMetrics.filter(m => m.trafficLight === 'green').length}</span>
                 <span className="text-yellow-400">{siteMetrics.filter(m => m.trafficLight === 'yellow').length}</span>
                 <span className="text-red-400">{siteMetrics.filter(m => m.trafficLight === 'red').length}</span>
@@ -434,13 +458,23 @@ const RegionchefDashboard: React.FC = () => {
         </Card>
         </div>
 
-        {/* Enheter i regionen */}
+        {/* Aggregerad trafikljusvy för regionen */}
+        <TrafficLightAggregatedView
+          organizationId={organization?.organization_id}
+          siteIds={getCustomerIds()}
+          userRole="regionchef"
+        />
+
+        {/* Enheter i regionen med trafikljusstatus */}
         <Card className="bg-slate-800/50 border-slate-700">
           <div className="p-6 border-b border-slate-700">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
               <MapPin className="w-5 h-5 text-blue-400" />
-              Enheter i {userRole?.region || 'din region'}
+              Enheter i {userRole?.region || 'din region'} med trafikljusstatus
             </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Klicka på en enhet för att se detaljerad information om tekniska bedömningar och kritiska situationer
+            </p>
           </div>
           
           <div className="p-6">
@@ -453,46 +487,16 @@ const RegionchefDashboard: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {siteMetrics.map((metric) => (
-                  <div
-                    key={metric.customerId}
-                    className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-white text-lg">{metric.customerName}</h3>
-                          <div className={`w-3 h-3 rounded-full ${
-                            metric.trafficLight === 'green' ? 'bg-green-500' :
-                            metric.trafficLight === 'yellow' ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`} />
-                        </div>
-                        <p className="text-slate-400 text-sm mb-3">{metric.city}</p>
-                        
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="bg-slate-800/50 rounded p-3">
-                            <p className="text-slate-500 text-xs mb-1">Aktiva ärenden</p>
-                            <p className="font-semibold text-amber-400">{metric.activeCases}</p>
-                          </div>
-                          <div className="bg-slate-800/50 rounded p-3">
-                            <p className="text-slate-500 text-xs mb-1">Avklarade</p>
-                            <p className="font-semibold text-green-400">{metric.completedThisMonth}</p>
-                          </div>
-                          <div className="bg-slate-800/50 rounded p-3">
-                            <p className="text-slate-500 text-xs mb-1">Schemalagda</p>
-                            <p className="font-semibold text-purple-400">{metric.scheduledVisits}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="ml-6">
-                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-                          Visa detaljer
-                        </button>
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {customers.map((site) => (
+                  <div key={site.id} id={`site-${site.id}`}>
+                    <SiteCardWithTrafficLight
+                      site={site}
+                      onClick={() => {
+                        // Future: Navigate to site details or open modal
+                        console.log('Site clicked:', site.site_name || site.company_name)
+                      }}
+                    />
                   </div>
                 ))}
               </div>
