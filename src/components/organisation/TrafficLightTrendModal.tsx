@@ -1,5 +1,5 @@
 // src/components/organisation/TrafficLightTrendModal.tsx - Huvudmodal för trafikljus trendanalys
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { X, Calendar, Filter, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -59,24 +59,43 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     lastAssessment: null as string | null
   })
 
+  // Stabilisera customer IDs för att undvika re-renders
+  const stableCustomerIds = useMemo(() => {
+    if (customerId) {
+      return [customerId]
+    } else if (siteIds && siteIds.length > 0) {
+      return [...siteIds] // Skapa ny array för att undvika referens-problem
+    }
+    return []
+  }, [customerId, siteIds])
+
+  // Debug logging för att identifiera render-loop
   useEffect(() => {
-    if (isOpen) {
+    console.log('TrafficLightTrendModal render:', {
+      isOpen,
+      customerId,
+      siteIds: siteIds?.length || 0,
+      userRole,
+      timeRange,
+      stableCustomerIds: stableCustomerIds.length
+    })
+  }, [isOpen, customerId, siteIds, userRole, timeRange, stableCustomerIds])
+
+  useEffect(() => {
+    if (isOpen && stableCustomerIds.length > 0) {
+      console.log('Fetching trend data for:', { stableCustomerIds, userRole })
       fetchTrendData()
     }
-  }, [isOpen, customerId, siteIds, userRole, timeRange])
+  }, [isOpen, stableCustomerIds, userRole, timeRange])
 
   const fetchTrendData = async () => {
     try {
       setLoading(true)
       
-      // Bestäm vilka kund-ID:n som ska hämtas
-      let customerIds: string[] = []
-      if (customerId) {
-        customerIds = [customerId]
-      } else if (siteIds.length > 0) {
-        customerIds = siteIds
-      } else {
-        console.warn('Varken customerId eller siteIds angivna')
+      // Använd stabiliserade customer IDs
+      if (stableCustomerIds.length === 0) {
+        console.warn('Inga customer IDs angivna för trenddata')
+        setLoading(false)
         return
       }
 
@@ -108,14 +127,20 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
           recommendations_acknowledged,
           customers!inner(site_name)
         `)
-        .in('customer_id', customerIds)
+        .in('customer_id', stableCustomerIds)
         .gte('assessment_date', startDate.toISOString())
         .not('assessment_date', 'is', null)
         .order('assessment_date', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching trend data:', error)
+        throw error
+      }
+
+      console.log(`Fetched ${cases?.length || 0} cases for trend analysis`)
 
       if (!cases || cases.length === 0) {
+        console.log('No cases found, setting empty state')
         setRawData([])
         setPestLevelData([])
         setProblemRatingData([])
@@ -131,6 +156,7 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
           unacknowledgedCount: 0,
           lastAssessment: null
         })
+        setLoading(false) // Viktigt: sätt loading till false även när ingen data finns
         return
       }
 
@@ -178,6 +204,22 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
 
     } catch (error) {
       console.error('Error fetching trend data:', error)
+      // Sätt till tom state vid fel
+      setRawData([])
+      setPestLevelData([])
+      setProblemRatingData([])
+      setCurrentStats({
+        currentPestLevel: null,
+        currentProblemRating: null,
+        pestLevelTrend: null,
+        problemRatingTrend: null,
+        totalCases: 0,
+        criticalCases: 0,
+        warningCases: 0,
+        okCases: 0,
+        unacknowledgedCount: 0,
+        lastAssessment: null
+      })
     } finally {
       setLoading(false)
     }
@@ -265,6 +307,13 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
   }
 
   if (!isOpen) return null
+
+  // Inte visa modal om inga customer IDs finns (förhindrar flimmer)
+  if (isOpen && stableCustomerIds.length === 0) {
+    console.warn('Modal öppnad utan giltiga customer IDs, stänger automatiskt')
+    setTimeout(() => onClose(), 100) // Stäng efter kort delay för att undvika loop
+    return null
+  }
 
   return (
     <>
