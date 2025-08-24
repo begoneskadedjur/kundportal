@@ -321,8 +321,20 @@ const OrganisationOversikt: React.FC = () => {
         ) : (
           <div>
             {userRoleType === 'platsansvarig' && detailedStats ? (
-              // Detaljerad statistik för platsansvarig - Rad 1: Ärendestatus
+              // Detaljerad statistik för platsansvarig
               <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <p className="text-slate-400 text-sm mb-2">
+                    Översikt över ärendestatus och tekniska bedömningar för din enhet
+                  </p>
+                </div>
+                
+                {/* Sektion 1: Ärendestatus */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-xl">📊</span>
+                    ÄRENDESTATUS
+                  </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="p-6 bg-slate-800/50 border-slate-700">
                   <div className="flex items-center gap-3 mb-3">
@@ -366,14 +378,20 @@ const OrganisationOversikt: React.FC = () => {
                       <Clock className="w-5 h-5 text-purple-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Kommande tekniker-besök</p>
+                      <p className="text-slate-400 text-sm">Inbokade besök</p>
                       <p className="text-2xl font-bold text-white">{detailedStats.upcomingVisits}</p>
                     </div>
                   </div>
                 </Card>
                 </div>
+                </div>
                 
-                {/* Rad 2: Trafikljusbedömningar */}
+                {/* Sektion 2: Enhetsstatus */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-xl">🚦</span>
+                    ENHETSSTATUS
+                  </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="p-6 bg-slate-800/50 border-slate-700">
                     <div className="flex items-center gap-3 mb-3">
@@ -422,6 +440,7 @@ const OrganisationOversikt: React.FC = () => {
                       </div>
                     </div>
                   </Card>
+                </div>
                 </div>
               </div>
             ) : statistics ? (
@@ -477,7 +496,7 @@ const OrganisationOversikt: React.FC = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-sm">Pågående tekniker-besök</p>
+                        <p className="text-slate-400 text-sm">Inbokade besök</p>
                         <p className="text-3xl font-bold text-blue-400 mt-2">{statistics.inProgressCases}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
