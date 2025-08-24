@@ -65,17 +65,28 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     lastAssessment: null as string | null
   })
 
-  // Stabilisera customer IDs med robust validering
+  // Stabilisera customer IDs med robust validering - använd useRef för att undvika ny array-referens
+  const stableCustomerIdsRef = useRef<string[]>([])
   const stableCustomerIds = useMemo(() => {
+    let newIds: string[] = []
+    
     // Robust validering för customerId
     if (customerId && typeof customerId === 'string' && customerId.trim()) {
-      return [customerId.trim()]
+      newIds = [customerId.trim()]
     } 
     // Robust validering för siteIds array
-    if (Array.isArray(siteIds) && siteIds.length > 0) {
-      return siteIds.filter(id => id && typeof id === 'string' && id.trim())
+    else if (Array.isArray(siteIds) && siteIds.length > 0) {
+      newIds = siteIds.filter(id => id && typeof id === 'string' && id.trim())
     }
-    return []
+    
+    // Returnera samma array-referens om innehållet är identiskt
+    if (stableCustomerIdsRef.current.length === newIds.length && 
+        stableCustomerIdsRef.current.every((id, index) => id === newIds[index])) {
+      return stableCustomerIdsRef.current
+    }
+    
+    stableCustomerIdsRef.current = newIds
+    return newIds
   }, [customerId, siteIds])
 
   // Memoized fetchTrendData för att undvika onödiga re-renders
@@ -249,7 +260,7 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     }
     
     fetchTrendData()
-  }, [stableCustomerIds, timeRange]) // Ta bort fetchTrendData från dependencies för att stoppa loop
+  }, [stableCustomerIds, timeRange, fetchTrendData])
 
   const calculateCurrentStats = (
     data: CaseData[], 
