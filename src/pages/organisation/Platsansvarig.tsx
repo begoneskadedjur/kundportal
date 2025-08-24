@@ -41,7 +41,7 @@ const PlatsansvarigDashboard: React.FC = () => {
     } else {
       setLoading(false)
     }
-  }, [organization, userRole, currentSite])
+  }, [organization, currentSite])
 
   useEffect(() => {
     if (pendingQuotes.length > 0) {

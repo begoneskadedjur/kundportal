@@ -341,7 +341,7 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
       {/* Endast visa modal om vi har giltigt customerId */}
       {showTrendModal && customerId && customerId.trim() !== '' && (
         <TrafficLightTrendModal
-          isOpen={true}
+          isOpen={showTrendModal}
           onClose={() => setShowTrendModal(false)}
           customerId={customerId}
           userRole="platsansvarig"
