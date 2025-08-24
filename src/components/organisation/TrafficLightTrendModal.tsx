@@ -249,7 +249,7 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     }
     
     fetchTrendData()
-  }, [stableCustomerIds, timeRange, fetchTrendData])
+  }, [stableCustomerIds, timeRange]) // Ta bort fetchTrendData från dependencies för att stoppa loop
 
   const calculateCurrentStats = (
     data: CaseData[], 
