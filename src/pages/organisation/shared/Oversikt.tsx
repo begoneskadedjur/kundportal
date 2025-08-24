@@ -7,7 +7,7 @@ import OrganisationLayout from '../../../components/organisation/OrganisationLay
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
-import { Home, Users, MapPin, TrendingUp, AlertTriangle, Calendar, CheckCircle, Clock, Plus, Phone } from 'lucide-react'
+import { Home, Users, MapPin, TrendingUp, AlertTriangle, Calendar, CheckCircle, Clock, Plus, Phone, BarChart3, Activity, Building2, Target } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
@@ -16,6 +16,7 @@ import TrafficLightAggregatedView from '../../../components/organisation/Traffic
 import TrafficLightCaseList from '../../../components/organisation/TrafficLightCaseList'
 import SiteCardWithTrafficLight from '../../../components/organisation/SiteCardWithTrafficLight'
 import SiteOverviewModal from '../../../components/organisation/SiteOverviewModal'
+import KpiSectionHeader from '../../../components/shared/KpiSectionHeader'
 import { getCustomerDisplayName } from '../../../utils/multisiteHelpers'
 
 const OrganisationOversikt: React.FC = () => {
@@ -122,6 +123,7 @@ const OrganisationOversikt: React.FC = () => {
       const weekStart = new Date(today)
       weekStart.setDate(weekStart.getDate() - weekStart.getDay())
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const yearStart = new Date(now.getFullYear(), 0, 1)
 
       const { data: allCases } = await supabase
         .from('cases')
@@ -162,6 +164,10 @@ const OrganisationOversikt: React.FC = () => {
           completedThisWeek: allCases.filter(c => 
             ['Slutförd', 'Stängd'].includes(c.status) &&
             new Date(c.updated_at) >= weekStart
+          ).length,
+          completedThisYear: allCases.filter(c => 
+            ['Slutförd', 'Stängd'].includes(c.status) &&
+            new Date(c.updated_at) >= yearStart
           ).length,
           completedThisMonth: allCases.filter(c => 
             ['Slutförd', 'Stängd'].includes(c.status) &&
@@ -322,19 +328,21 @@ const OrganisationOversikt: React.FC = () => {
           <div>
             {userRoleType === 'platsansvarig' && detailedStats ? (
               // Detaljerad statistik för platsansvarig
-              <div className="space-y-6">
-                <div className="text-center mb-6">
+              <div className="space-y-8">
+                <div className="text-center mb-8">
                   <p className="text-slate-400 text-sm mb-2">
                     Översikt över ärendestatus och tekniska bedömningar för din enhet
                   </p>
                 </div>
                 
                 {/* Sektion 1: Ärendestatus */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span className="text-xl">📊</span>
-                    ÄRENDESTATUS
-                  </h3>
+                <div>
+                  <KpiSectionHeader 
+                    icon={BarChart3}
+                    title="ÄRENDESTATUS"
+                    description="Aktuell status och utveckling av ärenden för din enhet"
+                    iconColor="text-blue-400"
+                  />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="p-6 bg-slate-800/50 border-slate-700">
                   <div className="flex items-center gap-3 mb-3">
@@ -366,8 +374,8 @@ const OrganisationOversikt: React.FC = () => {
                       <Calendar className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Avklarade denna vecka</p>
-                      <p className="text-2xl font-bold text-white">{detailedStats.completedThisWeek}</p>
+                      <p className="text-slate-400 text-sm">Avklarade i år</p>
+                      <p className="text-2xl font-bold text-white">{detailedStats.completedThisYear}</p>
                     </div>
                   </div>
                 </Card>
@@ -388,10 +396,12 @@ const OrganisationOversikt: React.FC = () => {
                 
                 {/* Sektion 2: Enhetsstatus */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span className="text-xl">🚦</span>
-                    ENHETSSTATUS
-                  </h3>
+                  <KpiSectionHeader 
+                    icon={Activity}
+                    title="ENHETSSTATUS"
+                    description="Trafikljussystem och tekniska bedömningar"
+                    iconColor="text-green-400"
+                  />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="p-6 bg-slate-800/50 border-slate-700">
                     <div className="flex items-center gap-3 mb-3">
@@ -445,80 +455,108 @@ const OrganisationOversikt: React.FC = () => {
               </div>
             ) : statistics ? (
               // Aggregerad statistik för regionchef/verksamhetschef
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">
-                          {userRoleType === 'verksamhetschef' && 'Alla enheter i organisationen'}
-                          {userRoleType === 'regionchef' && 'Enheter under ditt ansvar'}
-                          {userRoleType === 'platsansvarig' && 'Din enhet'}
-                        </p>
-                        <p className="text-3xl font-bold text-white mt-2">{statistics.totalSites}</p>
+              <div className="space-y-8">
+                <div className="text-center mb-8">
+                  <p className="text-slate-400 text-sm mb-2">
+                    {userRoleType === 'verksamhetschef' && 'Översikt över alla enheter och prestanda i organisationen'}
+                    {userRoleType === 'regionchef' && 'Översikt över enheter och prestanda under ditt regionansvar'}
+                  </p>
+                </div>
+
+                {/* Sektion 1: Översikt */}
+                <div>
+                  <KpiSectionHeader 
+                    icon={userRoleType === 'verksamhetschef' ? Building2 : MapPin}
+                    title={userRoleType === 'verksamhetschef' ? 'ORGANISATIONSÖVERSIKT' : 'REGIONAL ÖVERSIKT'}
+                    description={userRoleType === 'verksamhetschef' ? 'Grundläggande statistik för alla enheter' : 'Grundläggande statistik för din region'}
+                    iconColor="text-purple-400"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-400 text-sm">
+                              {userRoleType === 'verksamhetschef' && 'Alla enheter i organisationen'}
+                              {userRoleType === 'regionchef' && 'Enheter under ditt ansvar'}
+                            </p>
+                            <p className="text-3xl font-bold text-white mt-2">{statistics.totalSites}</p>
+                          </div>
+                          <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <MapPin className="w-6 h-6 text-purple-500" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <MapPin className="w-6 h-6 text-purple-500" />
+                    </Card>
+                    
+                    <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-400 text-sm">Totala ärenden (alla enheter)</p>
+                            <p className="text-3xl font-bold text-white mt-2">{statistics.totalCases}</p>
+                          </div>
+                          <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <AlertTriangle className="w-6 h-6 text-blue-500" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-400 text-sm">Slutförda ärenden</p>
+                            <p className="text-3xl font-bold text-green-400 mt-2">{statistics.completedCases}</p>
+                          </div>
+                          <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Totala ärenden (alla enheter)</p>
-                        <p className="text-3xl font-bold text-white mt-2">{statistics.totalCases}</p>
+                </div>
+
+                {/* Sektion 2: Prestanda & Status */}
+                <div>
+                  <KpiSectionHeader 
+                    icon={userRoleType === 'verksamhetschef' ? Target : TrendingUp}
+                    title={userRoleType === 'verksamhetschef' ? 'NYCKELTAL' : 'PRESTANDA & STATUS'}
+                    description="Pågående aktiviteter och operationell status"
+                    iconColor={userRoleType === 'verksamhetschef' ? 'text-green-400' : 'text-blue-400'}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-400 text-sm">Väntar på start (öppna)</p>
+                            <p className="text-3xl font-bold text-amber-400 mt-2">{statistics.openCases}</p>
+                          </div>
+                          <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                            <Clock className="w-6 h-6 text-amber-500" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <AlertTriangle className="w-6 h-6 text-blue-500" />
+                    </Card>
+                    
+                    <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-400 text-sm">Inbokade besök</p>
+                            <p className="text-3xl font-bold text-blue-400 mt-2">{statistics.inProgressCases}</p>
+                          </div>
+                          <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-blue-500" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </Card>
                   </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Väntar på start (öppna)</p>
-                        <p className="text-3xl font-bold text-amber-400 mt-2">{statistics.openCases}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                        <Clock className="w-6 h-6 text-amber-500" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Inbokade besök</p>
-                        <p className="text-3xl font-bold text-blue-400 mt-2">{statistics.inProgressCases}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-blue-500" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-slate-400 text-sm">Slutförda ärenden</p>
-                        <p className="text-3xl font-bold text-green-400 mt-2">{statistics.completedCases}</p>
-                      </div>
-                      <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                        <CheckCircle className="w-6 h-6 text-green-500" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                </div>
               </div>
             ) : null}
           </div>
