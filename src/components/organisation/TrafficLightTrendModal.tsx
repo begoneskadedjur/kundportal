@@ -62,12 +62,15 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     lastAssessment: null as string | null
   })
 
-  // Stabilisera customer IDs för att undvika re-renders
+  // Stabilisera customer IDs med robust validering
   const stableCustomerIds = useMemo(() => {
-    if (customerId) {
-      return [customerId]
-    } else if (siteIds && siteIds.length > 0) {
-      return [...siteIds] // Skapa ny array för att undvika referens-problem
+    // Robust validering för customerId
+    if (customerId && typeof customerId === 'string' && customerId.trim()) {
+      return [customerId.trim()]
+    } 
+    // Robust validering för siteIds array
+    if (Array.isArray(siteIds) && siteIds.length > 0) {
+      return siteIds.filter(id => id && typeof id === 'string' && id.trim())
     }
     return []
   }, [customerId, siteIds])
@@ -208,11 +211,11 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     } finally {
       setLoading(false)
     }
-  }, [stableCustomerIds, timeRange]) // Dependencies för useCallback
+  }, [stableCustomerIds, timeRange, userRole]) // Komplett dependencies för useCallback
 
   // UseEffect med förbättrade guards
   useEffect(() => {
-    // Tidig exit om ingen data att hämta
+    // Tidig exit om modal inte är öppen eller ingen data att hämta
     if (stableCustomerIds.length === 0) {
       console.log('No customer IDs available, skipping fetch')
       return
@@ -303,10 +306,8 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     }
   }
 
-  // Inte visa modal om inga customer IDs finns (förhindrar flimmer)
+  // Enkel early return om inga customer IDs finns (låt parent hantera logiken)
   if (stableCustomerIds.length === 0) {
-    console.warn('Modal öppnad utan giltiga customer IDs, stänger automatiskt')
-    setTimeout(() => onClose(), 100) // Stäng efter kort delay för att undvika loop
     return null
   }
 
