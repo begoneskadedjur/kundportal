@@ -1,5 +1,5 @@
 // src/components/organisation/TrafficLightTrendModal.tsx - Huvudmodal för trafikljus trendanalys
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { X, Calendar, Filter, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -42,6 +42,9 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
   // Early return om modal inte är öppen för att undvika all logik
   if (!isOpen) return null
 
+  // Ref för att tracka om komponenten är mounted
+  const isMountedRef = useRef(true)
+
   const [loading, setLoading] = useState(true)
   const [rawData, setRawData] = useState<CaseData[]>([])
   const [pestLevelData, setPestLevelData] = useState<TrendDataPoint[]>([])
@@ -83,9 +86,14 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
       // Använd stabiliserade customer IDs
       if (stableCustomerIds.length === 0) {
         console.warn('Inga customer IDs angivna för trenddata')
-        setLoading(false)
+        if (isMountedRef.current) {
+          setLoading(false)
+        }
         return
       }
+
+      // Debug log inuti funktionen för att undvika objektskapande vid render
+      console.log('Fetching trend data for:', { stableCustomerIds, userRole })
 
       // Beräkna datumområde
       const endDate = new Date()
@@ -129,22 +137,24 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
 
       if (!cases || cases.length === 0) {
         console.log('No cases found, setting empty state')
-        setRawData([])
-        setPestLevelData([])
-        setProblemRatingData([])
-        setCurrentStats({
-          currentPestLevel: null,
-          currentProblemRating: null,
-          pestLevelTrend: null,
-          problemRatingTrend: null,
-          totalCases: 0,
-          criticalCases: 0,
-          warningCases: 0,
-          okCases: 0,
-          unacknowledgedCount: 0,
-          lastAssessment: null
-        })
-        setLoading(false) // Viktigt: sätt loading till false även när ingen data finns
+        if (isMountedRef.current) {
+          setRawData([])
+          setPestLevelData([])
+          setProblemRatingData([])
+          setCurrentStats({
+            currentPestLevel: null,
+            currentProblemRating: null,
+            pestLevelTrend: null,
+            problemRatingTrend: null,
+            totalCases: 0,
+            criticalCases: 0,
+            warningCases: 0,
+            okCases: 0,
+            unacknowledgedCount: 0,
+            lastAssessment: null
+          })
+          setLoading(false)
+        }
         return
       }
 
@@ -157,6 +167,9 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
         customer_id: caseItem.customer_id,
         site_name: (caseItem.customers as any)?.site_name || 'Okänd enhet'
       }))
+
+      // Kontrollera att komponenten fortfarande är mounted innan state updates
+      if (!isMountedRef.current) return
 
       setRawData(processedData)
 
@@ -184,34 +197,48 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
           })
         }))
 
-      setPestLevelData(pestLevelTrends)
-      setProblemRatingData(problemRatingTrends)
+      if (isMountedRef.current) {
+        setPestLevelData(pestLevelTrends)
+        setProblemRatingData(problemRatingTrends)
 
-      // Beräkna aktuell statistik
-      calculateCurrentStats(processedData, pestLevelTrends, problemRatingTrends)
+        // Beräkna aktuell statistik
+        calculateCurrentStats(processedData, pestLevelTrends, problemRatingTrends)
+      }
 
     } catch (error) {
       console.error('Error fetching trend data:', error)
-      // Sätt till tom state vid fel
-      setRawData([])
-      setPestLevelData([])
-      setProblemRatingData([])
-      setCurrentStats({
-        currentPestLevel: null,
-        currentProblemRating: null,
-        pestLevelTrend: null,
-        problemRatingTrend: null,
-        totalCases: 0,
-        criticalCases: 0,
-        warningCases: 0,
-        okCases: 0,
-        unacknowledgedCount: 0,
-        lastAssessment: null
-      })
+      // Sätt till tom state vid fel, endast om mounted
+      if (isMountedRef.current) {
+        setRawData([])
+        setPestLevelData([])
+        setProblemRatingData([])
+        setCurrentStats({
+          currentPestLevel: null,
+          currentProblemRating: null,
+          pestLevelTrend: null,
+          problemRatingTrend: null,
+          totalCases: 0,
+          criticalCases: 0,
+          warningCases: 0,
+          okCases: 0,
+          unacknowledgedCount: 0,
+          lastAssessment: null
+        })
+      }
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
-  }, [stableCustomerIds, timeRange, userRole]) // Komplett dependencies för useCallback
+  }, [stableCustomerIds, timeRange]) // Endast nödvändiga dependencies
+
+  // Cleanup effect för att tracka mount status
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // UseEffect med förbättrade guards
   useEffect(() => {
@@ -221,9 +248,8 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
       return
     }
     
-    console.log('Fetching trend data for:', { stableCustomerIds, userRole })
     fetchTrendData()
-  }, [stableCustomerIds, userRole, timeRange, fetchTrendData])
+  }, [stableCustomerIds, timeRange, fetchTrendData])
 
   const calculateCurrentStats = (
     data: CaseData[], 
