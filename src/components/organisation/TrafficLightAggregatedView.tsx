@@ -1,10 +1,11 @@
 // src/components/organisation/TrafficLightAggregatedView.tsx
 import React, { useState, useEffect } from 'react'
-import { Building2, AlertTriangle, Check, Clock, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
+import { Building2, AlertTriangle, Check, Clock, TrendingUp, ChevronDown, ChevronUp, LineChart } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import TrafficLightBadge from './TrafficLightBadge'
+import TrafficLightTrendModal from './TrafficLightTrendModal'
 
 interface SiteData {
   siteId: string
@@ -34,6 +35,7 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
   const [sitesData, setSitesData] = useState<SiteData[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set())
+  const [showTrendModal, setShowTrendModal] = useState(false)
 
   useEffect(() => {
     fetchAggregatedData()
@@ -305,12 +307,24 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
       <Card className="bg-gradient-to-r from-slate-800/50 to-slate-900/50 border-slate-700">
         <div className="p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-400" />
-              {userRole === 'verksamhetschef' && 'Ärendebedömningar - Alla enheter'}
-              {userRole === 'regionchef' && 'Ärendebedömningar - Din region'}
-              {userRole === 'platsansvarig' && 'Ärendebedömningar - Din enhet'}
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-400" />
+                {userRole === 'verksamhetschef' && 'Ärendebedömningar - Alla enheter'}
+                {userRole === 'regionchef' && 'Ärendebedömningar - Din region'}
+                {userRole === 'platsansvarig' && 'Ärendebedömningar - Din enhet'}
+              </h3>
+              
+              {/* Trendanalys-knapp */}
+              <button
+                onClick={() => setShowTrendModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2"
+              >
+                <LineChart className="w-4 h-4" />
+                Visa trendanalys
+              </button>
+            </div>
+            
             <p className="text-sm text-slate-400">
               Tekniska bedömningar per ärende - varje färg representerar situationen vid specifika besök
             </p>
@@ -414,6 +428,19 @@ const TrafficLightAggregatedView: React.FC<TrafficLightAggregatedViewProps> = ({
           </div>
         </div>
       </Card>
+
+      {/* Trendanalys Modal */}
+      <TrafficLightTrendModal
+        isOpen={showTrendModal}
+        onClose={() => setShowTrendModal(false)}
+        siteIds={siteIds}
+        userRole={userRole}
+        title={
+          userRole === 'verksamhetschef' 
+            ? 'Organisatorisk trendanalys' 
+            : 'Regional trendanalys'
+        }
+      />
     </div>
   )
 }

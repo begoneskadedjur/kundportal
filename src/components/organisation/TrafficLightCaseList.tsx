@@ -1,11 +1,12 @@
 // src/components/organisation/TrafficLightCaseList.tsx
 import React, { useState, useEffect } from 'react'
-import { AlertTriangle, Check, Clock, ChevronRight, FileText } from 'lucide-react'
+import { AlertTriangle, Check, Clock, ChevronRight, FileText, TrendingUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import TrafficLightBadge from './TrafficLightBadge'
 import TrafficLightStatusCard from './TrafficLightStatusCard'
+import TrafficLightTrendModal from './TrafficLightTrendModal'
 import { ClickUpStatus } from '../../types/database'
 
 interface Case {
@@ -39,6 +40,7 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
   const [loading, setLoading] = useState(true)
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [showTrendModal, setShowTrendModal] = useState(false)
 
   useEffect(() => {
     fetchCases()
@@ -192,12 +194,24 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
                 )}
               </div>
             </div>
-            {statusCounts.unacknowledged > 0 && (
-              <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg px-3 py-1 text-amber-400 text-sm">
-                <AlertTriangle className="w-4 h-4 inline mr-1" />
-                {statusCounts.unacknowledged} obekräftad{statusCounts.unacknowledged !== 1 ? 'e' : ''}
-              </div>
-            )}
+            
+            <div className="flex items-center gap-3">
+              {/* Trendanalys-knapp */}
+              <button
+                onClick={() => setShowTrendModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Visa trendanalys
+              </button>
+              
+              {statusCounts.unacknowledged > 0 && (
+                <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg px-3 py-1 text-amber-400 text-sm">
+                  <AlertTriangle className="w-4 h-4 inline mr-1" />
+                  {statusCounts.unacknowledged} obekräftad{statusCounts.unacknowledged !== 1 ? 'e' : ''}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Förklaring av statussystemet */}
@@ -322,6 +336,15 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
           </div>
         </div>
       )}
+
+      {/* Trendanalys Modal */}
+      <TrafficLightTrendModal
+        isOpen={showTrendModal}
+        onClose={() => setShowTrendModal(false)}
+        customerId={customerId}
+        userRole="platsansvarig"
+        title="Trendanalys för era ärenden"
+      />
     </>
   )
 }
