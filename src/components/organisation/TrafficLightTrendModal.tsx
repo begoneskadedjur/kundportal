@@ -1,5 +1,5 @@
 // src/components/organisation/TrafficLightTrendModal.tsx - Huvudmodal för trafikljus trendanalys
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, Calendar, Filter, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import LoadingSpinner from '../shared/LoadingSpinner'
@@ -39,6 +39,9 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
   userRole,
   title
 }) => {
+  // Early return om modal inte är öppen för att undvika all logik
+  if (!isOpen) return null
+
   const [loading, setLoading] = useState(true)
   const [rawData, setRawData] = useState<CaseData[]>([])
   const [pestLevelData, setPestLevelData] = useState<TrendDataPoint[]>([])
@@ -69,26 +72,8 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     return []
   }, [customerId, siteIds])
 
-  // Debug logging för att identifiera render-loop
-  useEffect(() => {
-    console.log('TrafficLightTrendModal render:', {
-      isOpen,
-      customerId,
-      siteIds: siteIds?.length || 0,
-      userRole,
-      timeRange,
-      stableCustomerIds: stableCustomerIds.length
-    })
-  }, [isOpen, customerId, siteIds, userRole, timeRange, stableCustomerIds])
-
-  useEffect(() => {
-    if (isOpen && stableCustomerIds.length > 0) {
-      console.log('Fetching trend data for:', { stableCustomerIds, userRole })
-      fetchTrendData()
-    }
-  }, [isOpen, stableCustomerIds, userRole, timeRange])
-
-  const fetchTrendData = async () => {
+  // Memoized fetchTrendData för att undvika onödiga re-renders
+  const fetchTrendData = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -223,7 +208,19 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [stableCustomerIds, timeRange]) // Dependencies för useCallback
+
+  // UseEffect med förbättrade guards
+  useEffect(() => {
+    // Tidig exit om ingen data att hämta
+    if (stableCustomerIds.length === 0) {
+      console.log('No customer IDs available, skipping fetch')
+      return
+    }
+    
+    console.log('Fetching trend data for:', { stableCustomerIds, userRole })
+    fetchTrendData()
+  }, [stableCustomerIds, userRole, timeRange, fetchTrendData])
 
   const calculateCurrentStats = (
     data: CaseData[], 
@@ -306,10 +303,8 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
     }
   }
 
-  if (!isOpen) return null
-
   // Inte visa modal om inga customer IDs finns (förhindrar flimmer)
-  if (isOpen && stableCustomerIds.length === 0) {
+  if (stableCustomerIds.length === 0) {
     console.warn('Modal öppnad utan giltiga customer IDs, stänger automatiskt')
     setTimeout(() => onClose(), 100) // Stäng efter kort delay för att undvika loop
     return null
