@@ -295,65 +295,21 @@ export default function CustomerCaseDetailsModal({
                   </div>
                 </Card>
 
-                {/* Teknisk Bedömning */}
-                {(caseData.pest_level !== null || caseData.problem_rating !== null) && trafficLight && (
+                {/* Ärendebeskrivning (om den finns) */}
+                {caseData.description && (
                   <Card className="bg-slate-800/50 border-slate-700">
                     <div className="p-6">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                        <AlertTriangle className="w-5 h-5 text-purple-400" />
-                        Teknisk bedömning
+                        <FileText className="w-5 h-5 text-slate-400" />
+                        Ärendebeskrivning
                       </h3>
-                      
-                      {/* Övergripande status */}
-                      <div className={`p-4 rounded-lg border mb-4 ${trafficLight.bg} ${trafficLight.border}`}>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-slate-300">Vår bedömning:</span>
-                          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${trafficLight.text}`}>
-                            <span className="text-xl">{trafficLight.emoji}</span>
-                            <span>{trafficLight.label}</span>
-                          </div>
-                        </div>
-                        
-                        <p className="text-xs text-slate-400 mb-3">
-                          Baserat på inspektion och expertis har vår tekniker bedömt situationen:
-                        </p>
-
-                        {/* Detaljerade scores */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {caseData.pest_level !== null && (
-                            <div className="bg-slate-800/40 rounded-lg p-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Bug className="w-4 h-4 text-orange-400" />
-                                <p className="text-sm font-medium text-slate-300">Aktivitetsnivå</p>
-                              </div>
-                              <p className="text-lg font-bold text-white">
-                                Nivå {caseData.pest_level} av 3
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                {getPestLevelDescription(caseData.pest_level)}
-                              </p>
-                            </div>
-                          )}
-
-                          {caseData.problem_rating !== null && (
-                            <div className="bg-slate-800/40 rounded-lg p-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Activity className="w-4 h-4 text-blue-400" />
-                                <p className="text-sm font-medium text-slate-300">Situationsbedömning</p>
-                              </div>
-                              <p className="text-lg font-bold text-white">
-                                {caseData.problem_rating} av 5
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                {getProblemRatingDescription(caseData.problem_rating)}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {caseData.description}
+                      </p>
                     </div>
                   </Card>
                 )}
+
 
                 {/* Service & Logistik */}
                 <Card className="bg-slate-800/50 border-slate-700">
@@ -420,8 +376,8 @@ export default function CustomerCaseDetailsModal({
                       </div>
 
                       <div className="space-y-4">
-                        {/* Arbetstid */}
-                        {caseData.time_spent_minutes && (
+                        {/* Arbetstid - visa bara om det finns verklig tid registrerad */}
+                        {caseData.time_spent_minutes && caseData.time_spent_minutes > 0 && (
                           <div className="flex items-start gap-3">
                             <Clock className="w-5 h-5 text-slate-400 mt-1" />
                             <div>
@@ -463,6 +419,66 @@ export default function CustomerCaseDetailsModal({
                         <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
                           {caseData.work_report}
                         </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Teknisk Bedömning - flyttad hit precis före Rekommendationer */}
+                {(caseData.pest_level !== null || caseData.problem_rating !== null) && trafficLight && (
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                        <AlertTriangle className="w-5 h-5 text-purple-400" />
+                        Teknisk bedömning
+                      </h3>
+                      
+                      {/* Övergripande status */}
+                      <div className={`p-4 rounded-lg border mb-4 ${trafficLight.bg} ${trafficLight.border}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-slate-300">Vår bedömning:</span>
+                          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${trafficLight.text}`}>
+                            <span className="text-xl">{trafficLight.emoji}</span>
+                            <span>{trafficLight.label}</span>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-slate-400 mb-3">
+                          Baserat på inspektion och expertis har vår tekniker bedömt situationen:
+                        </p>
+
+                        {/* Detaljerade scores */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {caseData.pest_level !== null && (
+                            <div className="bg-slate-800/40 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Bug className="w-4 h-4 text-orange-400" />
+                                <p className="text-sm font-medium text-slate-300">Aktivitetsnivå</p>
+                              </div>
+                              <p className="text-lg font-bold text-white">
+                                Nivå {caseData.pest_level} av 3
+                              </p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                {getPestLevelDescription(caseData.pest_level)}
+                              </p>
+                            </div>
+                          )}
+
+                          {caseData.problem_rating !== null && (
+                            <div className="bg-slate-800/40 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Activity className="w-4 h-4 text-blue-400" />
+                                <p className="text-sm font-medium text-slate-300">Situationsbedömning</p>
+                              </div>
+                              <p className="text-lg font-bold text-white">
+                                {caseData.problem_rating} av 5
+                              </p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                {getProblemRatingDescription(caseData.problem_rating)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -517,20 +533,6 @@ export default function CustomerCaseDetailsModal({
                   </Card>
                 )}
 
-                {/* Beskrivning (om den finns) */}
-                {caseData.description && (
-                  <Card className="bg-slate-800/50 border-slate-700">
-                    <div className="p-6">
-                      <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                        <FileText className="w-5 h-5 text-slate-400" />
-                        Beskrivning
-                      </h3>
-                      <p className="text-slate-200 whitespace-pre-wrap leading-relaxed">
-                        {caseData.description}
-                      </p>
-                    </div>
-                  </Card>
-                )}
 
               </div>
             )}
