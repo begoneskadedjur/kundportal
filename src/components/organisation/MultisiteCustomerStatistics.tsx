@@ -373,29 +373,94 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       .map(([name, värde]) => ({ name, värde }))
   }, [statistics.pestTypeCounts])
 
-  // Create pest trends data (mock data based on pest types for now)
+  // Create pest trends data based on real case data over time
   const pestTrendsData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun']
-    return months.map(month => {
-      const data: any = { month }
-      Object.keys(statistics.pestTypeCounts || {}).forEach(pestType => {
-        data[pestType] = Math.floor(Math.random() * 10) + 1
+    if (!statistics.siteStatistics || statistics.siteStatistics.length === 0) return []
+    
+    // Get all cases from site statistics to create monthly groupings
+    const allCases = statistics.siteStatistics.flatMap(site => site.cases || [])
+    
+    // Group cases by month over the last 6 months
+    const now = new Date()
+    const months = []
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({
+        monthKey: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`,
+        monthLabel: date.toLocaleDateString('sv-SE', { month: 'short' })
       })
-      return data
-    })
-  }, [statistics.pestTypeCounts])
+    }
 
-  // Create pest assessment data 
-  const pestAssessmentData = useMemo(() => {
-    return Object.entries(statistics.pestTypeCounts || {})
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 6)
-      .map(([name, count]) => ({
-        name,
-        aktivitetsnivå: Math.random() * 3,
-        situationsbedömning: Math.random() * 4 + 1
-      }))
-  }, [statistics.pestTypeCounts])
+    return months.map(({ monthKey, monthLabel }) => {
+      const monthCases = allCases.filter(c => {
+        if (!c.created_at) return false
+        const caseDate = new Date(c.created_at)
+        const caseMonthKey = `${caseDate.getFullYear()}-${(caseDate.getMonth() + 1).toString().padStart(2, '0')}`
+        return caseMonthKey === monthKey
+      })
+
+      const data: any = { month: monthLabel }
+      
+      // Count cases by pest type for this month
+      Object.keys(statistics.pestTypeCounts || {}).forEach(pestType => {
+        if (pestType === 'Okänt') return // Skip unknown pests in trends
+        data[pestType] = monthCases.filter(c => (c.pest_type || 'Okänt') === pestType).length
+      })
+      
+      return data
+    }).filter(monthData => {
+      // Only include months that have at least some pest data
+      const pestCounts = Object.values(monthData).slice(1) as number[]
+      return pestCounts.some(count => count > 0)
+    })
+  }, [statistics.siteStatistics, statistics.pestTypeCounts])
+
+  // Create health status over time data (replacing pest assessment)
+  const healthStatusOverTimeData = useMemo(() => {
+    if (!statistics.siteStatistics || statistics.siteStatistics.length === 0) return []
+    
+    // Get all cases from site statistics to create monthly health trends
+    const allCases = statistics.siteStatistics.flatMap(site => site.cases || [])
+    
+    // Group cases by month over the last 6 months
+    const now = new Date()
+    const months = []
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({
+        monthKey: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`,
+        monthLabel: date.toLocaleDateString('sv-SE', { month: 'short' })
+      })
+    }
+
+    return months.map(({ monthKey, monthLabel }) => {
+      const monthCases = allCases.filter(c => {
+        if (!c.created_at) return false
+        const caseDate = new Date(c.created_at)
+        const caseMonthKey = `${caseDate.getFullYear()}-${(caseDate.getMonth() + 1).toString().padStart(2, '0')}`
+        return caseMonthKey === monthKey
+      })
+
+      // Calculate average pest_level and problem_rating for the month
+      const casesWithPestLevel = monthCases.filter(c => c.pest_level !== null && c.pest_level !== undefined)
+      const casesWithProblemRating = monthCases.filter(c => c.problem_rating !== null && c.problem_rating !== undefined)
+
+      const avgPestLevel = casesWithPestLevel.length > 0 
+        ? casesWithPestLevel.reduce((sum, c) => sum + (c.pest_level || 0), 0) / casesWithPestLevel.length
+        : 0
+
+      const avgProblemRating = casesWithProblemRating.length > 0
+        ? casesWithProblemRating.reduce((sum, c) => sum + (c.problem_rating || 0), 0) / casesWithProblemRating.length
+        : 0
+
+      return {
+        månad: monthLabel,
+        aktivitetsnivå: Math.round(avgPestLevel * 10) / 10, // Round to 1 decimal
+        situationsbedömning: Math.round(avgProblemRating * 10) / 10, // Round to 1 decimal
+        antalÄrenden: monthCases.length
+      }
+    }).filter(monthData => monthData.antalÄrenden > 0) // Only include months with cases
+  }, [statistics.siteStatistics])
 
   // Animate values on mount (only once or when period changes)
   useEffect(() => {
@@ -906,22 +971,22 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
           </div>
         )}
 
-        {/* Technical Assessment by Pest Type - Bar Chart (New Addition) */}
-        {pestAssessmentData.length > 0 && (
+        {/* Health Status Over Time - Line Chart (Replacing Technical Assessment) */}
+        {healthStatusOverTimeData.length > 0 && (
           <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-400" />
-              Teknisk Bedömning per Skadedjur
+              Hälsostatus Över Tid
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              Genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) för olika skadedjurstyper
+              Utveckling av genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) över tid
             </p>
             
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pestAssessmentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={healthStatusOverTimeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <XAxis dataKey="månad" stroke="#9ca3af" fontSize={12} />
                   <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 5]} />
                   <Tooltip 
                     contentStyle={{ 
@@ -937,22 +1002,29 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
                       if (name === 'situationsbedömning') {
                         return [`${value}/5`, 'Situationsbedömning']
                       }
+                      if (name === 'antalÄrenden') {
+                        return [`${value}`, 'Antal ärenden']
+                      }
                       return [value, name]
                     }}
                   />
-                  <Bar 
-                    dataKey="aktivitetsnivå" 
-                    fill="#f59e0b" 
+                  <Line
+                    type="monotone"
+                    dataKey="aktivitetsnivå"
+                    stroke="#f59e0b"
+                    strokeWidth={3}
+                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
                     name="Aktivitetsnivå (0-3)"
-                    radius={[2, 2, 0, 0]}
                   />
-                  <Bar 
-                    dataKey="situationsbedömning" 
-                    fill="#ef4444" 
+                  <Line
+                    type="monotone"
+                    dataKey="situationsbedömning"
+                    stroke="#ef4444"
+                    strokeWidth={3}
+                    dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
                     name="Situationsbedömning (1-5)"
-                    radius={[2, 2, 0, 0]}
                   />
-                </BarChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
             

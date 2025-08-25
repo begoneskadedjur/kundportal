@@ -107,10 +107,29 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
           return acc
         }, {} as Record<string, number>) || {}
 
-        const topPestEntry = Object.entries(pestTypeCounts)
-          .sort(([,a], [,b]) => b - a)[0]
-        const topPestType = topPestEntry?.[0] || 'Ingen data'
-        const topPestCount = topPestEntry?.[1] || 0
+        // Filter out "Okänt" and get the top actual pest type
+        const knownPests = Object.entries(pestTypeCounts)
+          .filter(([pestType]) => pestType !== 'Okänt')
+          .sort(([,a], [,b]) => b - a)
+
+        let topPestType: string
+        let topPestCount: number
+
+        if (knownPests.length > 0) {
+          // Use the most common known pest
+          topPestType = knownPests[0][0]
+          topPestCount = knownPests[0][1]
+        } else {
+          // If only "Okänt" exists, check if we have any data at all
+          const unknownCount = pestTypeCounts['Okänt'] || 0
+          if (unknownCount > 0) {
+            topPestType = 'Ej specificerat'
+            topPestCount = unknownCount
+          } else {
+            topPestType = 'Ingen data'
+            topPestCount = 0
+          }
+        }
 
         // Calculate average service quality score (based on completion rate and low critical cases)
         const qualityScore = Math.max(0, Math.min(100, 
@@ -185,8 +204,13 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
     return () => clearInterval(interval)
   }, [organizationMetrics, activeCasesCount, analyzedSites.length, hasAnimated])
 
+  // Reset animation when analyzed sites change
+  useEffect(() => {
+    setHasAnimated(false)
+  }, [analyzedSites.map(s => s.id).join(',')])
+
   const formatNextVisitDate = (dateString: string | null) => {
-    if (!dateString) return { value: 'Ej schemalagt', subtitle: 'Ingen bokning planerad' }
+    if (!dateString) return { value: 'Ej bokat', subtitle: 'Ingen tid schemalagd' }
     
     try {
       const visitData = JSON.parse(dateString)
