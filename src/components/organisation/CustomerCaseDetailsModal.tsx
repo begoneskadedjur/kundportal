@@ -23,6 +23,7 @@ import {
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import PDFExportButton from '../shared/PDFExportButton'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -52,6 +53,51 @@ export default function CustomerCaseDetailsModal({
   const [customerData, setCustomerData] = useState<CustomerData | null>(null)
   const [loading, setLoading] = useState(false)
   const [acknowledgingRecommendations, setAcknowledgingRecommendations] = useState(false)
+
+  // PDF Export functionality for single case
+  const handlePDFExport = async () => {
+    try {
+      const response = await fetch('/api/generate-case-report-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reportType: 'single',
+          caseData: caseData,
+          customerData: customerData,
+          userRole: userRole
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.pdf) {
+        // Create blob and download
+        const pdfBlob = new Blob([
+          Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0))
+        ], { type: 'application/pdf' })
+        
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename || `BeGone_Arende_${caseData.case_number || 'N/A'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error(data.error || 'PDF generation failed')
+      }
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      throw error
+    }
+  }
 
   useEffect(() => {
     if (isOpen && caseData?.customer_id) {
@@ -206,12 +252,22 @@ export default function CustomerCaseDetailsModal({
               </div>
             </div>
             
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors p-2"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              <PDFExportButton
+                onExport={handlePDFExport}
+                variant="ghost"
+                size="sm"
+                iconOnly={true}
+                tooltip="Exportera ärende som PDF"
+                className="text-slate-400 hover:text-white hover:bg-slate-700"
+              />
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-white transition-colors p-2"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}

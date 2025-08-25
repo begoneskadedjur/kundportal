@@ -191,6 +191,12 @@ const OrganisationArenden: React.FC = () => {
                 cases={allCases}
                 onCaseClick={handleEditCase}
                 loading={loading}
+                userRole={userRoleType}
+                customerData={{
+                  company_name: organization?.organization_name || 'Organisation',
+                  id: organization?.id
+                }}
+                showPDFExport={true}
               />
             </div>
             

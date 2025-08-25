@@ -3,6 +3,7 @@
 
 import React from 'react'
 import { ChevronRight, Calendar, User, DollarSign } from 'lucide-react'
+import PDFExportButton from '../shared/PDFExportButton'
 
 interface CaseRowData {
   // Kärn-info
@@ -33,14 +34,66 @@ interface CompactCasesListProps {
   onCaseClick: (caseData: CaseRowData) => void
   loading?: boolean
   className?: string
+  userRole?: 'platsansvarig' | 'regionchef' | 'verksamhetschef'
+  customerData?: any
+  showPDFExport?: boolean
 }
 
 export default function CompactCasesList({ 
   cases, 
   onCaseClick, 
   loading = false, 
-  className = '' 
+  className = '',
+  userRole = 'platsansvarig',
+  customerData,
+  showPDFExport = true
 }: CompactCasesListProps) {
+  
+  // PDF Export functionality
+  const handlePDFExport = async () => {
+    try {
+      const response = await fetch('/api/generate-case-report-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reportType: 'multiple',
+          cases: cases,
+          customerData: customerData,
+          userRole: userRole,
+          period: 'aktuell visning'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.pdf) {
+        // Create blob and download
+        const pdfBlob = new Blob([
+          Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0))
+        ], { type: 'application/pdf' })
+        
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename || 'BeGone_Arenderapport.pdf'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error(data.error || 'PDF generation failed')
+      }
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      throw error
+    }
+  }
   
   // Trafikljussystem baserat på pest_level och problem_rating
   const getTrafficLightStatus = (pest_level?: number | null, problem_rating?: number | null) => {
@@ -133,10 +186,22 @@ export default function CompactCasesList({
     <div className={`bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900/20 to-purple-800/20 px-6 py-4 border-b border-slate-700">
-        <h3 className="text-white font-semibold flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-purple-400" />
-          Ärenden ({cases.length})
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-purple-400" />
+            Ärenden ({cases.length})
+          </h3>
+          {showPDFExport && cases.length > 0 && (
+            <PDFExportButton
+              onExport={handlePDFExport}
+              variant="secondary"
+              size="sm"
+              label="Exportera rapport"
+              className="ml-4"
+              tooltip="Exportera alla ärenden som PDF-rapport"
+            />
+          )}
+        </div>
       </div>
 
       {/* Cases list */}
