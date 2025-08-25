@@ -111,6 +111,7 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1y')
   const [animatedValues, setAnimatedValues] = useState<{ [key: string]: number }>({})
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [hasAnimated, setHasAnimated] = useState(false)
 
   // Determine which sites to analyze
   const analyzedSites = useMemo(() => {
@@ -365,8 +366,28 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       }))
   }, [statistics.siteStatistics])
 
-  // Animate values on mount
+  // Animate values on mount (only once or when period changes)
   useEffect(() => {
+    const key = `${selectedPeriod}-${statistics.totalCases}-${statistics.analyzedSitesCount}`
+    
+    if (hasAnimated && statistics.totalCases !== undefined) {
+      // If already animated and data exists, set values directly without animation
+      setAnimatedValues({
+        totalCases: statistics.totalCases,
+        completedCases: statistics.completedCases,
+        completionRate: statistics.completionRate,
+        avgCostPerCase: statistics.avgCostPerCase,
+        criticalCases: statistics.criticalCases,
+        analyzedSitesCount: statistics.analyzedSitesCount
+      })
+      return
+    }
+
+    if (statistics.totalCases === 0 && statistics.analyzedSitesCount === 0) {
+      // No data to animate
+      return
+    }
+
     const duration = 1500
     const steps = 60
     const stepDuration = duration / steps
@@ -388,11 +409,17 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
 
       if (currentStep >= steps) {
         clearInterval(interval)
+        setHasAnimated(true)
       }
     }, stepDuration)
 
     return () => clearInterval(interval)
-  }, [statistics])
+  }, [statistics, selectedPeriod, hasAnimated])
+
+  // Reset animation when period changes
+  useEffect(() => {
+    setHasAnimated(false)
+  }, [selectedPeriod])
 
   const periodOptions = [
     { value: '30d', label: 'Senaste 30 dagarna' },
@@ -404,12 +431,16 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
 
   const statCards: StatCard[] = [
     {
-      title: 'Analyserade enheter',
-      value: animatedValues.analyzedSitesCount || 0,
-      subtitle: `av ${sites.length} totala enheter`,
+      title: userRoleType === 'platsansvarig' ? 'Min enhet' : 'Analyserade enheter',
+      value: userRoleType === 'platsansvarig' && sites.length === 1 
+        ? 'Inkluderad' 
+        : (animatedValues.analyzedSitesCount || 0),
+      subtitle: userRoleType === 'platsansvarig' && sites.length === 1
+        ? `${sites.find(s => selectedSiteIds.includes(s.id) || selectedSiteIds.includes('all'))?.site_name || 'Enhet'}`
+        : `av ${sites.length} totala enheter`,
       icon: <Building className="w-5 h-5" />,
       color: 'purple',
-      tooltip: `Antal enheter som ingår i denna statistikanalys. ${userRoleType === 'verksamhetschef' ? 'Du kan se alla enheter' : userRoleType === 'regionchef' ? 'Du ser enheter i din region' : 'Du ser din enhet'}`
+      tooltip: `${userRoleType === 'platsansvarig' ? 'Din enhet är inkluderad i statistikanalysen' : `Antal enheter som ingår i denna statistikanalys. ${userRoleType === 'verksamhetschef' ? 'Du kan se alla enheter' : 'Du ser enheter i din region'}`}`
     },
     {
       title: 'Totalt antal ärenden',
@@ -431,7 +462,8 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
     {
       title: 'Aktiva ärenden',
       value: statistics.activeCases,
-      subtitle: statistics.activeCases === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
+      subtitle: statistics.activeCases === 0 ? 'Inga pågående ärenden' :
+                statistics.activeCases === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
       icon: <Activity className="w-5 h-5" />,
       color: 'amber',
       tooltip: 'Ärenden som BeGone arbetar aktivt med just nu över alla enheter. Lågt antal indikerar väl kontrollerad situation'
@@ -447,12 +479,12 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       tooltip: 'Ärenden med hög aktivitetsnivå (3/3) eller allvarlig situationsbedömning (4-5/5) över alla enheter. Noll är målet!'
     },
     {
-      title: 'Genomsnittlig kostnad',
+      title: 'Servicekostnad per ärende',
       value: formatCurrency(animatedValues.avgCostPerCase || 0),
-      subtitle: 'Per ärende denna period',
+      subtitle: 'Genomsnitt utöver avtalet',
       icon: <CreditCard className="w-5 h-5" />,
       color: 'emerald',
-      tooltip: 'Genomsnittskostnad per hanterat ärende över alla analyserade enheter. Ger översikt över budgetinslag för skadedjurshantering'
+      tooltip: 'Genomsnittlig servicekostnad per ärende utöver grundavtalet. Visar kostnader för extra insatser och specialbehandlingar'
     }
   ]
 
@@ -746,6 +778,162 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-red-500 rounded"></div>
                 <span className="text-sm text-slate-300">Kritiska situationer</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pest Type Distribution - Bar Chart (New Addition) */}
+        {Object.keys(statistics.pestTypeCounts).length > 0 && (
+          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+              <Bug className="w-5 h-5 text-red-400" />
+              Skadedjursfördelning
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Fördelning av olika skadedjurstyper - hjälper identifiera vanligaste problem
+            </p>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pestTypeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#9ca3af" 
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="värde" 
+                    fill="#ef4444" 
+                    name="Antal ärenden"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Pest Trends Over Time - Line Chart (New Addition) */}
+        {pestTrendsData.length > 0 && (
+          <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+              <Bug className="w-5 h-5 text-green-400" />
+              Skadedjurstrender Över Tid
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Visar utvecklingen av olika skadedjurstyper över tid - hjälper identifiera säsongsmönster och trender
+            </p>
+            
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={pestTrendsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                  />
+                  {Object.entries(statistics.pestTypeCounts)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 4)
+                    .map(([pestType], index) => {
+                      const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
+                      return (
+                        <Line
+                          key={pestType}
+                          type="monotone"
+                          dataKey={pestType}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[index % colors.length], strokeWidth: 2 }}
+                          name={pestType}
+                        />
+                      )
+                    })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Technical Assessment by Pest Type - Bar Chart (New Addition) */}
+        {pestAssessmentData.length > 0 && (
+          <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              Teknisk Bedömning per Skadedjur
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) för olika skadedjurstyper
+            </p>
+            
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pestAssessmentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 5]} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                    formatter={(value, name) => {
+                      if (name === 'aktivitetsnivå') {
+                        return [`${value}/3`, 'Aktivitetsnivå']
+                      }
+                      if (name === 'situationsbedömning') {
+                        return [`${value}/5`, 'Situationsbedömning']
+                      }
+                      return [value, name]
+                    }}
+                  />
+                  <Bar 
+                    dataKey="aktivitetsnivå" 
+                    fill="#f59e0b" 
+                    name="Aktivitetsnivå (0-3)"
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Bar 
+                    dataKey="situationsbedömning" 
+                    fill="#ef4444" 
+                    name="Situationsbedömning (1-5)"
+                    radius={[2, 2, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 mt-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-amber-500 rounded"></div>
+                <span className="text-sm text-slate-300">Aktivitetsnivå (0=Ingen, 3=Hög)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-500 rounded"></div>
+                <span className="text-sm text-slate-300">Situationsbedömning (1=Utmärkt, 5=Kritisk)</span>
               </div>
             </div>
           </div>

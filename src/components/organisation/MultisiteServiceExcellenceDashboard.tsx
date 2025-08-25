@@ -1,6 +1,6 @@
 // src/components/organisation/MultisiteServiceExcellenceDashboard.tsx - Premium KPI Cards for Multisite Organizations
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, Calendar, CreditCard, CheckCircle, Building, Users, AlertTriangle, Target } from 'lucide-react'
+import { TrendingUp, Calendar, CreditCard, CheckCircle, Building, Users, AlertTriangle, Target, Bug } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus } from '../../types/database'
@@ -33,6 +33,7 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
   const [activeCasesCount, setActiveCasesCount] = useState<number>(0)
   const [nextVisit, setNextVisit] = useState<string | null>(null)
   const [organizationMetrics, setOrganizationMetrics] = useState<any>({})
+  const [hasAnimated, setHasAnimated] = useState(false)
 
   // Determine which sites to analyze
   const analyzedSites = selectedSiteIds.includes('all') 
@@ -99,6 +100,18 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
           c.pest_level === 3 || (c.problem_rating && c.problem_rating >= 4)
         ).length || 0
 
+        // Calculate top pest type
+        const pestTypeCounts = data?.reduce((acc, c) => {
+          const pestType = c.pest_type || 'Okänt'
+          acc[pestType] = (acc[pestType] || 0) + 1
+          return acc
+        }, {} as Record<string, number>) || {}
+
+        const topPestEntry = Object.entries(pestTypeCounts)
+          .sort(([,a], [,b]) => b - a)[0]
+        const topPestType = topPestEntry?.[0] || 'Ingen data'
+        const topPestCount = topPestEntry?.[1] || 0
+
         // Calculate average service quality score (based on completion rate and low critical cases)
         const qualityScore = Math.max(0, Math.min(100, 
           Math.round(completionRate * 0.7 + (100 - Math.min(criticalCases * 10, 100)) * 0.3)
@@ -110,7 +123,9 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
           qualityScore,
           criticalCases,
           totalCases,
-          completedCases
+          completedCases,
+          topPestType,
+          topPestCount
         })
 
       } catch (error) {
@@ -121,10 +136,28 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
     fetchOrganizationData()
   }, [analyzedSites])
 
-  // Animate numbers on mount
+  // Animate numbers on mount (only once or when data significantly changes)
   useEffect(() => {
+    if (hasAnimated && organizationMetrics.totalRevenue !== undefined) {
+      // If already animated and data exists, set values directly without animation
+      setAnimatedValues({
+        revenue: organizationMetrics.totalRevenue || 0,
+        quality: organizationMetrics.qualityScore || 0,
+        cases: activeCasesCount,
+        sites: analyzedSites.length,
+        completion: organizationMetrics.completionRate || 0
+      })
+      return
+    }
+
     const totalRevenue = organizationMetrics.totalRevenue || 0
     const qualityScore = organizationMetrics.qualityScore || 0
+    
+    if (totalRevenue === 0 && qualityScore === 0 && activeCasesCount === 0) {
+      // No data to animate
+      return
+    }
+
     const duration = 1500
     const steps = 60
     const stepDuration = duration / steps
@@ -145,11 +178,12 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
 
       if (currentStep >= steps) {
         clearInterval(interval)
+        setHasAnimated(true)
       }
     }, stepDuration)
 
     return () => clearInterval(interval)
-  }, [organizationMetrics, activeCasesCount, analyzedSites.length])
+  }, [organizationMetrics, activeCasesCount, analyzedSites.length, hasAnimated])
 
   const formatNextVisitDate = (dateString: string | null) => {
     if (!dateString) return { value: 'Ej schemalagt', subtitle: 'Ingen bokning planerad' }
@@ -224,16 +258,18 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
              organizationMetrics.qualityScore >= 70 ? 'blue' : 'amber'
     },
     {
-      title: 'Total omsättning',
+      title: 'Servicekostnader',
       value: formatCurrency(animatedValues.revenue || 0),
-      subtitle: 'Sammanlagd intäkt för perioden',
+      subtitle: 'Kostnader utöver avtalet',
       icon: <CreditCard className="w-5 h-5" />,
       color: 'emerald'
     },
     {
-      title: 'Aktiva enheter',
-      value: animatedValues.sites || 0,
-      subtitle: `av ${sites.length} totala enheter`,
+      title: userRoleType === 'platsansvarig' && sites.length === 1 ? 'Min enhet' : 'Aktiva enheter',
+      value: userRoleType === 'platsansvarig' && sites.length === 1 ? 'Aktiv' : (animatedValues.sites || 0),
+      subtitle: userRoleType === 'platsansvarig' && sites.length === 1 
+        ? `${sites[0]?.site_name || 'Enhet'}` 
+        : `av ${sites.length} totala enheter`,
       icon: <Building className="w-5 h-5" />,
       color: 'blue'
     },
@@ -248,7 +284,8 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
     {
       title: 'Aktiva ärenden',
       value: animatedValues.cases || 0,
-      subtitle: activeCasesCount === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
+      subtitle: (animatedValues.cases || 0) === 0 ? 'Inga pågående ärenden' : 
+                (animatedValues.cases || 0) === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
       icon: <Target className="w-5 h-5" />,
       trend: activeCasesCount <= 5 ? 'up' : activeCasesCount <= 15 ? 'stable' : 'down',
       color: 'purple'
@@ -259,6 +296,13 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
       subtitle: nextVisitDisplay.subtitle,
       icon: <Calendar className="w-5 h-5" />,
       color: 'amber'
+    },
+    {
+      title: 'Vanligaste skadedjur',
+      value: organizationMetrics.topPestType || 'Ingen data',
+      subtitle: organizationMetrics.topPestCount > 0 ? `${organizationMetrics.topPestCount} ärenden` : 'Inga registrerade skadedjur',
+      icon: <Bug className="w-5 h-5" />,
+      color: 'red'
     }
   ]
 
@@ -331,7 +375,7 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
         {kpiCards.map((card, index) => {
           const colors = getColorClasses(card.color)
           
