@@ -29,7 +29,8 @@ import {
   Activity,
   Bug,
   MapPin,
-  CreditCard
+  CreditCard,
+  AlertTriangle
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../../types/database'
@@ -42,7 +43,7 @@ import {
 } from '../../utils/statisticsUtils'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
-import StatisticsLoadingState from './StatisticsLoadingState'
+import StatisticsLoadingState from './StatisticsLoadingState'\nimport TooltipWrapper from '../ui/TooltipWrapper'
 import toast from 'react-hot-toast'
 
 interface CustomerStatisticsProps {
@@ -64,6 +65,11 @@ interface CaseData {
   scheduled_end: string | null
   completed_date: string | null
   address: string | null
+  pest_level: number | null
+  problem_rating: number | null
+  time_spent_minutes: number | null
+  recommendations: string | null
+  recommendations_acknowledged: boolean | null
 }
 
 type TimePeriod = '30d' | '3m' | '6m' | '1y' | 'all'
@@ -76,6 +82,7 @@ interface StatCard {
   trend?: 'up' | 'down' | 'stable'
   trendValue?: string
   color: 'emerald' | 'blue' | 'purple' | 'amber' | 'red'
+  tooltip?: string
 }
 
 interface ChartData {
@@ -109,7 +116,12 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
             scheduled_start,
             scheduled_end,
             completed_date,
-            address
+            address,
+            pest_level,
+            problem_rating,
+            time_spent_minutes,
+            recommendations,
+            recommendations_acknowledged
           `)
           .eq('customer_id', customer.id)
           .order('created_at', { ascending: false })
@@ -154,28 +166,19 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
     const activeCases = totalCases - completedCases
     const completionRate = totalCases > 0 ? Math.round((completedCases / totalCases) * 100) : 0
 
-    // Calculate total cost
+    // Calculate total cost and average
     const totalCost = filteredCases
       .filter(c => c.price && c.price > 0)
       .reduce((sum, c) => sum + (c.price || 0), 0)
-
-    // Calculate average response time (days between created and scheduled)
-    const casesWithBothDates = filteredCases.filter(c => 
-      c.created_at && c.scheduled_start
-    )
     
-    const avgResponseTime = casesWithBothDates.length > 0 
-      ? Math.round(
-          casesWithBothDates.reduce((sum, c) => {
-            const created = new Date(c.created_at)
-            const scheduled = new Date(c.scheduled_start!)
-            const diffDays = (scheduled.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
-            return sum + diffDays
-          }, 0) / casesWithBothDates.length
-        )
-      : 0
+    const avgCostPerCase = totalCases > 0 ? Math.round(totalCost / totalCases) : 0
 
-    // Most common pest types
+    // Critical cases (pest_level = 3 OR problem_rating >= 4)
+    const criticalCases = filteredCases.filter(c => 
+      c.pest_level === 3 || (c.problem_rating && c.problem_rating >= 4)
+    ).length
+
+    // Pest types analysis
     const pestTypeCounts = filteredCases.reduce((acc, c) => {
       const pestType = c.pest_type || 'Okänt'
       acc[pestType] = (acc[pestType] || 0) + 1
@@ -184,6 +187,30 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
 
     const topPestType = Object.entries(pestTypeCounts)
       .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Ingen data'
+    const topPestCount = pestTypeCounts[topPestType] || 0
+
+    // Calculate pest type reduction (compare current period with equivalent previous period)
+    let pestReductionText = ''
+    if (selectedPeriod !== 'all' && topPestType !== 'Ingen data') {
+      // Simplified trend calculation - you could make this more sophisticated
+      const currentPeriodCases = filteredCases.filter(c => c.pest_type === topPestType).length
+      if (currentPeriodCases > 0) {
+        pestReductionText = `(${currentPeriodCases} ärenden denna period)`
+      }
+    }
+
+    // Recommendations status
+    const casesWithRecommendations = filteredCases.filter(c => c.recommendations)
+    const acknowledgedRecommendations = casesWithRecommendations.filter(c => c.recommendations_acknowledged).length
+    const pendingRecommendations = casesWithRecommendations.length - acknowledgedRecommendations
+
+    // Average working time for completed cases
+    const completedWithTime = filteredCases.filter(c => 
+      isCompletedStatus(c.status) && c.time_spent_minutes && c.time_spent_minutes > 0
+    )
+    const avgWorkingTime = completedWithTime.length > 0 
+      ? Math.round(completedWithTime.reduce((sum, c) => sum + (c.time_spent_minutes || 0), 0) / completedWithTime.length)
+      : 0
 
     return {
       totalCases,
@@ -191,11 +218,17 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
       activeCases,
       completionRate,
       totalCost,
-      avgResponseTime,
+      avgCostPerCase,
+      criticalCases,
       topPestType,
-      pestTypeCounts
+      topPestCount,
+      pestReductionText,
+      pestTypeCounts,
+      acknowledgedRecommendations,
+      pendingRecommendations,
+      avgWorkingTime
     }
-  }, [filteredCases])
+  }, [filteredCases, selectedPeriod])
 
   // Status distribution for pie chart
   const statusData = useMemo(() => {
@@ -254,6 +287,85 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
       }))
   }, [statistics.pestTypeCounts])
 
+  // Pest trends over time (monthly)
+  const pestTrendsData = useMemo(() => {
+    const monthlyPestData = filteredCases.reduce((acc, c) => {
+      const date = new Date(c.created_at || c.scheduled_start || '')
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const pestType = c.pest_type || 'Okänt'
+      
+      if (!acc[monthKey]) {
+        acc[monthKey] = {}
+      }
+      
+      acc[monthKey][pestType] = (acc[monthKey][pestType] || 0) + 1
+      
+      return acc
+    }, {} as Record<string, Record<string, number>>)
+
+    // Get top 4 pest types for the chart
+    const topPestTypes = Object.entries(statistics.pestTypeCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 4)
+      .map(([type]) => type)
+
+    return Object.entries(monthlyPestData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, pests]) => {
+        const result: any = {
+          month: new Date(month + '-01').toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+        }
+        
+        topPestTypes.forEach(pestType => {
+          result[pestType] = pests[pestType] || 0
+        })
+        
+        return result
+      })
+  }, [filteredCases, statistics.pestTypeCounts])
+
+  // Technical assessment by pest type
+  const pestAssessmentData = useMemo(() => {
+    const pestAssessments = filteredCases.reduce((acc, c) => {
+      const pestType = c.pest_type || 'Okänt'
+      
+      if (!acc[pestType]) {
+        acc[pestType] = {
+          count: 0,
+          totalPestLevel: 0,
+          totalProblemRating: 0,
+          pestLevelCount: 0,
+          problemRatingCount: 0
+        }
+      }
+      
+      acc[pestType].count++
+      
+      if (c.pest_level !== null) {
+        acc[pestType].totalPestLevel += c.pest_level
+        acc[pestType].pestLevelCount++
+      }
+      
+      if (c.problem_rating !== null) {
+        acc[pestType].totalProblemRating += c.problem_rating
+        acc[pestType].problemRatingCount++
+      }
+      
+      return acc
+    }, {} as Record<string, any>)
+
+    return Object.entries(pestAssessments)
+      .filter(([, data]) => data.count >= 2) // Only show pest types with at least 2 cases
+      .sort(([,a], [,b]) => b.count - a.count)
+      .slice(0, 6)
+      .map(([pestType, data]) => ({
+        name: pestType,
+        aktivitetsnivå: data.pestLevelCount > 0 ? (data.totalPestLevel / data.pestLevelCount).toFixed(1) : 0,
+        situationsbedömning: data.problemRatingCount > 0 ? (data.totalProblemRating / data.problemRatingCount).toFixed(1) : 0,
+        antal: data.count
+      }))
+  }, [filteredCases])
+
   // Animate values on mount
   useEffect(() => {
     const duration = 1500
@@ -270,8 +382,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
         totalCases: Math.floor(statistics.totalCases * easeOutQuart),
         completedCases: Math.floor(statistics.completedCases * easeOutQuart),
         completionRate: Math.floor(statistics.completionRate * easeOutQuart),
-        totalCost: Math.floor(statistics.totalCost * easeOutQuart),
-        avgResponseTime: Math.floor(statistics.avgResponseTime * easeOutQuart)
+        avgCostPerCase: Math.floor(statistics.avgCostPerCase * easeOutQuart)
       })
 
       if (currentStep >= steps) {
@@ -296,7 +407,8 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
       value: animatedValues.totalCases || 0,
       subtitle: selectedPeriod === 'all' ? 'Hela tiden' : periodOptions.find(p => p.value === selectedPeriod)?.label,
       icon: <BarChart3 className="w-5 h-5" />,
-      color: 'blue'
+      color: 'blue',
+      tooltip: 'Totala antalet skadedjursärenden som BeGone har hanterat för er under vald tidsperiod'
     },
     {
       title: 'Avslutningsgrad',
@@ -304,36 +416,42 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
       subtitle: `${animatedValues.completedCases || 0} av ${statistics.totalCases} avslutade`,
       icon: <CheckCircle className="w-5 h-5" />,
       trend: statistics.completionRate >= 80 ? 'up' : statistics.completionRate >= 60 ? 'stable' : 'down',
-      color: 'emerald'
+      color: 'emerald',
+      tooltip: 'Andel ärenden som BeGone har slutfört framgångsrikt. Hög procent visar effektiv problemlösning'
     },
     {
       title: 'Aktiva ärenden',
       value: statistics.activeCases,
       subtitle: statistics.activeCases === 1 ? 'Aktivt ärende' : 'Aktiva ärenden',
       icon: <Activity className="w-5 h-5" />,
-      color: 'purple'
+      color: 'purple',
+      tooltip: 'Ärenden som BeGone arbetar aktivt med just nu. Lågt antal indikerar väl kontrollerad situation'
     },
     {
-      title: 'Genomsnittlig responstid',
-      value: `${animatedValues.avgResponseTime || 0} dagar`,
-      subtitle: 'Från registrering till schemaläggning',
-      icon: <Clock className="w-5 h-5" />,
-      trend: statistics.avgResponseTime <= 3 ? 'up' : statistics.avgResponseTime <= 7 ? 'stable' : 'down',
-      color: 'amber'
+      title: 'Kritiska situationer',
+      value: statistics.criticalCases,
+      subtitle: statistics.criticalCases === 0 ? 'Inga kritiska situationer' : 
+                 statistics.criticalCases === 1 ? 'Kritisk situation' : 'Kritiska situationer',
+      icon: <AlertTriangle className="w-5 h-5" />,
+      trend: statistics.criticalCases === 0 ? 'up' : statistics.criticalCases <= 2 ? 'stable' : 'down',
+      color: statistics.criticalCases === 0 ? 'emerald' : statistics.criticalCases <= 2 ? 'amber' : 'red',
+      tooltip: 'Ärenden med hög aktivitetsnivå (3/3) eller allvarlig situationsbedömning (4-5/5). Noll är målet!'
     },
     {
       title: 'Vanligaste skadedjur',
       value: statistics.topPestType,
-      subtitle: `${statistics.pestTypeCounts[statistics.topPestType] || 0} ärenden`,
+      subtitle: statistics.topPestCount > 0 ? `${statistics.topPestCount} ärenden ${statistics.pestReductionText}` : 'Ingen data',
       icon: <Bug className="w-5 h-5" />,
-      color: 'red'
+      color: 'red',
+      tooltip: 'Det skadedjur som förekommit mest i era lokaler. Hjälper planera förebyggande åtgärder'
     },
     {
-      title: 'Total kostnad',
-      value: formatCurrency(animatedValues.totalCost || 0),
-      subtitle: 'Genomsnitt per ärende',
+      title: 'Genomsnittlig kostnad',
+      value: formatCurrency(animatedValues.avgCostPerCase || 0),
+      subtitle: 'Per ärende denna period',
       icon: <CreditCard className="w-5 h-5" />,
-      color: 'emerald'
+      color: 'emerald',
+      tooltip: 'Genomsnittskostnad per hanterat ärende. Ger översikt över budgetinslag för skadedjurshantering'
     }
   ]
 
@@ -740,18 +858,21 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
             </div>
           </div>
 
-          {/* Pest Type Distribution - Bar Chart */}
+          {/* Pest Trends Over Time - Line Chart */}
           <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
               <Bug className="w-5 h-5 text-green-400" />
-              Vanligaste Skadedjur
+              Skadedjurstrender Över Tid
             </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Visar utvecklingen av olika skadedjurstyper över tid - hjälper identifiera säsongsmönster
+            </p>
             
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pestTypeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={pestTrendsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
                   <YAxis stroke="#9ca3af" fontSize={12} />
                   <Tooltip 
                     contentStyle={{ 
@@ -761,13 +882,89 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                       color: '#e2e8f0'
                     }}
                   />
-                  <Bar dataKey="värde" fill="#10b981" radius={[4, 4, 0, 0]}>
-                    {pestTypeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(${(index * 60) % 360}, 70%, 50%)`} />
-                    ))}
-                  </Bar>
+                  {Object.entries(statistics.pestTypeCounts)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 4)
+                    .map(([pestType], index) => {
+                      const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
+                      return (
+                        <Line
+                          key={pestType}
+                          type="monotone"
+                          dataKey={pestType}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: colors[index % colors.length], strokeWidth: 2 }}
+                          name={pestType}
+                        />
+                      )
+                    })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Technical Assessment by Pest Type - New Chart */}
+        <div className="grid grid-cols-1 gap-8 mt-8">
+          <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              Teknisk Bedömning per Skadedjur
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Genomsnittlig aktivitetsnivå (0-3) och situationsbedömning (1-5) för olika skadedjurstyper
+            </p>
+            
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pestAssessmentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 5]} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #475569',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                    formatter={(value, name) => {
+                      if (name === 'aktivitetsnivå') {
+                        return [`${value}/3`, 'Aktivitetsnivå']
+                      }
+                      if (name === 'situationsbedömning') {
+                        return [`${value}/5`, 'Situationsbedömning']
+                      }
+                      return [value, name]
+                    }}
+                  />
+                  <Bar 
+                    dataKey="aktivitetsnivå" 
+                    fill="#f59e0b" 
+                    name="Aktivitetsnivå (0-3)"
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Bar 
+                    dataKey="situationsbedömning" 
+                    fill="#ef4444" 
+                    name="Situationsbedömning (1-5)"
+                    radius={[2, 2, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 mt-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-amber-500 rounded"></div>
+                <span className="text-sm text-slate-300">Aktivitetsnivå (0=Ingen, 3=Hög)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-500 rounded"></div>
+                <span className="text-sm text-slate-300">Situationsbedömning (1=Utmärkt, 5=Kritisk)</span>
+              </div>
             </div>
           </div>
         </div>
