@@ -501,6 +501,36 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
       </div>
     </div>
     
+    <!-- Description -->
+    ${caseData.description ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📝</span>
+        Ärendebeskrivning
+      </div>
+      <div class="report-container">
+        <div class="report-content">
+          <div class="report-text">${caseData.description}</div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+    
+    <!-- Work Report -->
+    ${caseData.work_report ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📋</span>
+        Arbetsrapport
+      </div>
+      <div class="report-container">
+        <div class="report-content">
+          <div class="report-text">${caseData.work_report}</div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+    
     <!-- Technical Assessment -->
     ${(caseData.pest_level !== null || caseData.problem_rating !== null) ? `
     <div class="section">
@@ -566,36 +596,6 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
           <div style="font-size: 12px; color: #6B7280; text-align: center; font-style: italic;">
             Bedömning utförd av certifierad BeGone tekniker enligt branschstandard
           </div>
-        </div>
-      </div>
-    </div>
-    ` : ''}
-    
-    <!-- Description -->
-    ${caseData.description ? `
-    <div class="section">
-      <div class="section-header">
-        <span class="section-icon">📝</span>
-        Ärendebeskrivning
-      </div>
-      <div class="report-container">
-        <div class="report-content">
-          <div class="report-text">${caseData.description}</div>
-        </div>
-      </div>
-    </div>
-    ` : ''}
-    
-    <!-- Work Report -->
-    ${caseData.work_report ? `
-    <div class="section">
-      <div class="section-header">
-        <span class="section-icon">📋</span>
-        Arbetsrapport
-      </div>
-      <div class="report-container">
-        <div class="report-content">
-          <div class="report-text">${caseData.work_report}</div>
         </div>
       </div>
     </div>
