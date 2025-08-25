@@ -12,6 +12,7 @@ import { useLocation } from 'react-router-dom'
 import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
 import CustomerCaseDetailsModal from '../../../components/organisation/CustomerCaseDetailsModal'
+import CompactCasesList from '../../../components/organisation/CompactCasesList'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import Button from '../../../components/ui/Button'
 
@@ -182,89 +183,59 @@ const OrganisationArenden: React.FC = () => {
             <LoadingSpinner text="Laddar ärenden..." />
           </div>
         ) : selectedSiteId === 'all' ? (
-          // Visa översikt av alla ärenden
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-slate-800/50 border-slate-700">
-              <div className="p-6 border-b border-slate-700">
-                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                  Senaste ärenden - {userRoleType === 'verksamhetschef' ? 'Alla enheter' : 
-                                     userRoleType === 'regionchef' ? 'Din region' : 'Din enhet'}
-                </h2>
-              </div>
-              <div className="p-6">
-                {allCases.length === 0 ? (
-                  <div className="text-center py-8">
-                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                    <p className="text-slate-400">Inga aktiva ärenden</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {allCases.slice(0, 10).map((caseItem) => (
-                      <div key={caseItem.id} className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-white">{caseItem.title || 'Ingen titel'}</h4>
-                            <p className="text-xs text-purple-400 mt-1">
-                              {caseItem.customers?.site_name || caseItem.customers?.company_name || 'Okänd enhet'}
-                            </p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                caseItem.status === 'Slutförd' || caseItem.status === 'Stängd' ? 'bg-green-500/20 text-green-400' :
-                                caseItem.status === 'Bokad' || caseItem.status === 'Bokat' || caseItem.status.startsWith('Återbesök') ? 'bg-amber-500/20 text-amber-400' :
-                                caseItem.status === 'Öppen' ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-slate-500/20 text-slate-400'
-                              }`}>
-                                {caseItem.status}
-                              </span>
-                              <span className="text-slate-400 text-xs">
-                                {new Date(caseItem.created_at).toLocaleDateString('sv-SE')}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleEditCase(caseItem)}
-                            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                          >
-                            <Edit3 className="w-4 h-4 text-slate-400" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card>
+          // Visa skalbar lista av alla ärenden
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Kompakt ärendelista */}
+            <div className="xl:col-span-2">
+              <CompactCasesList 
+                cases={allCases}
+                onCaseClick={handleEditCase}
+                loading={loading}
+              />
+            </div>
             
-            <Card className="bg-slate-800/50 border-slate-700">
-              <div className="p-6 border-b border-slate-700">
-                <h2 className="text-xl font-semibold text-white">Ärendestatistik</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Totalt antal ärenden</span>
-                  <span className="text-xl font-bold text-white">{allCases.length}</span>
+            {/* Ärendestatistik sidebar */}
+            <div>
+              <Card className="bg-slate-800/50 border-slate-700">
+                <div className="p-6 border-b border-slate-700">
+                  <h2 className="text-lg font-semibold text-white">Ärendestatistik</h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {userRoleType === 'verksamhetschef' ? 'Alla enheter' : 
+                     userRoleType === 'regionchef' ? 'Din region' : 'Din enhet'}
+                  </p>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Pågående</span>
-                  <span className="text-xl font-bold text-amber-400">
-                    {allCases.filter(c => c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')).length}
-                  </span>
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Totalt antal</span>
+                    <span className="text-xl font-bold text-white">{allCases.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Pågående</span>
+                    <span className="text-lg font-bold text-amber-400">
+                      {allCases.filter(c => c.status === 'Bokad' || c.status === 'Bokat' || c.status.startsWith('Återbesök')).length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Avklarade</span>
+                    <span className="text-lg font-bold text-green-400">
+                      {allCases.filter(c => c.status === 'Slutförd' || c.status === 'Stängd').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Öppna</span>
+                    <span className="text-lg font-bold text-blue-400">
+                      {allCases.filter(c => c.status === 'Öppen').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-700">
+                    <span className="text-slate-400">Kritiska</span>
+                    <span className="text-lg font-bold text-red-400">
+                      {allCases.filter(c => c.pest_level >= 3 || c.problem_rating >= 4).length}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Avklarade</span>
-                  <span className="text-xl font-bold text-green-400">
-                    {allCases.filter(c => c.status === 'Slutförd' || c.status === 'Stängd').length}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Öppna</span>
-                  <span className="text-xl font-bold text-blue-400">
-                    {allCases.filter(c => c.status === 'Öppen').length}
-                  </span>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
           </div>
         ) : customer ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
