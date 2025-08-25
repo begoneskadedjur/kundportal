@@ -40,7 +40,7 @@ interface CustomerData {
   contact_person?: string
   contact_phone?: string
   contact_email?: string
-  address?: any
+  contact_address?: string
 }
 
 export default function CustomerCaseDetailsModal({ 
@@ -64,7 +64,7 @@ export default function CustomerCaseDetailsModal({
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('company_name, site_name, region, contact_person, contact_phone, contact_email, address')
+        .select('company_name, site_name, region, contact_person, contact_phone, contact_email, contact_address')
         .eq('id', caseData.customer_id)
         .single()
 
@@ -144,8 +144,10 @@ export default function CustomerCaseDetailsModal({
   }
 
   const formatAddress = (address: any) => {
-    if (typeof address === 'string') return address
+    // Hantera JSONB-format från cases-tabellen
     if (typeof address === 'object' && address?.address) return address.address
+    // Hantera string-format från customers contact_address
+    if (typeof address === 'string' && address.trim()) return address
     return 'Ingen adress registrerad'
   }
 
@@ -245,7 +247,7 @@ export default function CustomerCaseDetailsModal({
                           <MapPin className="w-5 h-5 text-slate-400 mt-1" />
                           <div>
                             <p className="text-sm text-slate-400">Adress</p>
-                            <p className="text-white">{formatAddress(caseData.address || customerData?.address)}</p>
+                            <p className="text-white">{formatAddress(caseData.address || customerData?.contact_address)}</p>
                           </div>
                         </div>
 
