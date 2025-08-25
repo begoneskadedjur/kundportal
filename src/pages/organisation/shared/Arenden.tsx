@@ -11,7 +11,7 @@ import { useLocation } from 'react-router-dom'
 // Återanvänd befintliga komponenter
 import OrganisationActiveCasesList from '../../../components/organisation/OrganisationActiveCasesList'
 import OrganisationServiceActivityTimeline from '../../../components/organisation/OrganisationServiceActivityTimeline'
-import EditContractCaseModal from '../../../components/coordinator/EditContractCaseModal'
+import CustomerCaseDetailsModal from '../../../components/organisation/CustomerCaseDetailsModal'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import Button from '../../../components/ui/Button'
 
@@ -283,9 +283,9 @@ const OrganisationArenden: React.FC = () => {
           </Card>
         )}
         
-        {/* Edit Modal */}
+        {/* Customer Case Details Modal */}
         {showEditModal && selectedCase && (
-          <EditContractCaseModal
+          <CustomerCaseDetailsModal
             caseData={selectedCase}
             isOpen={showEditModal}
             onClose={() => {
@@ -295,6 +295,7 @@ const OrganisationArenden: React.FC = () => {
                 fetchAllCases()
               }
             }}
+            userRole={userRoleType}
           />
         )}
         
