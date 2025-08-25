@@ -1,5 +1,5 @@
 // src/components/organisation/MultisiteServiceExcellenceDashboard.tsx - Premium KPI Cards for Multisite Organizations
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { TrendingUp, Calendar, CreditCard, CheckCircle, Building, Users, AlertTriangle, Target, Bug } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
@@ -56,7 +56,7 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
         // Fetch cases data for all analyzed sites
         const { data, error } = await supabase
           .from('cases')
-          .select('status, scheduled_start, scheduled_end, price, pest_level, problem_rating, created_at, customer_id')
+          .select('status, scheduled_start, scheduled_end, price, pest_level, problem_rating, created_at, customer_id, pest_type')
           .in('customer_id', customerIds)
         
         if (error) throw error
@@ -204,10 +204,11 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
     return () => clearInterval(interval)
   }, [organizationMetrics, activeCasesCount, analyzedSites.length, hasAnimated])
 
-  // Reset animation when analyzed sites change
+  // Reset animation when analyzed sites change (using stable comparison)
+  const analyzedSiteIds = useMemo(() => analyzedSites.map(s => s.id).sort().join(','), [analyzedSites])
   useEffect(() => {
     setHasAnimated(false)
-  }, [analyzedSites.map(s => s.id).join(',')])
+  }, [analyzedSiteIds])
 
   const formatNextVisitDate = (dateString: string | null) => {
     if (!dateString) return { value: 'Ej bokat', subtitle: 'Ingen tid schemalagd' }

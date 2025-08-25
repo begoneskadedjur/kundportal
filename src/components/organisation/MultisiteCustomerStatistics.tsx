@@ -375,10 +375,10 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
 
   // Create pest trends data based on real case data over time
   const pestTrendsData = useMemo(() => {
-    if (!statistics.siteStatistics || statistics.siteStatistics.length === 0) return []
+    if (!cases || cases.length === 0) return []
     
-    // Get all cases from site statistics to create monthly groupings
-    const allCases = statistics.siteStatistics.flatMap(site => site.cases || [])
+    // Use the existing cases array to create monthly groupings
+    const allCases = cases
     
     // Group cases by month over the last 6 months
     const now = new Date()
@@ -413,14 +413,14 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       const pestCounts = Object.values(monthData).slice(1) as number[]
       return pestCounts.some(count => count > 0)
     })
-  }, [statistics.siteStatistics, statistics.pestTypeCounts])
+  }, [cases, statistics.pestTypeCounts])
 
   // Create health status over time data (replacing pest assessment)
   const healthStatusOverTimeData = useMemo(() => {
-    if (!statistics.siteStatistics || statistics.siteStatistics.length === 0) return []
+    if (!cases || cases.length === 0) return []
     
-    // Get all cases from site statistics to create monthly health trends
-    const allCases = statistics.siteStatistics.flatMap(site => site.cases || [])
+    // Use the existing cases array to create monthly health trends
+    const allCases = cases
     
     // Group cases by month over the last 6 months
     const now = new Date()
@@ -460,7 +460,7 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
         antalÄrenden: monthCases.length
       }
     }).filter(monthData => monthData.antalÄrenden > 0) // Only include months with cases
-  }, [statistics.siteStatistics])
+  }, [cases])
 
   // Animate values on mount (only once or when period changes)
   useEffect(() => {
