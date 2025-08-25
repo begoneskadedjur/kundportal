@@ -272,7 +272,7 @@ export default function CompactCasesList({
               onExport={handlePDFExport}
               variant="secondary"
               size="sm"
-              label="Exportera rapport"
+              label="Exportera sammanställning"
               className="ml-4"
               tooltip="Exportera alla ärenden som PDF-rapport"
             />

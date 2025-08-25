@@ -198,17 +198,6 @@ const OrganisationArenden: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* PDF Export knapp - visa bara om det finns ärenden att exportera */}
-              {selectedSiteId === 'all' && allCases.length > 0 && (
-                <PDFExportButton
-                  onExport={handlePDFExportAll}
-                  variant="secondary"
-                  size="sm"
-                  label="Exportera alla"
-                  tooltip={`Exportera alla ${allCases.length} ärenden som PDF`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                />
-              )}
               <Button
                 onClick={() => setShowServiceRequestModal(true)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"

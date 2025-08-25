@@ -407,11 +407,26 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
     <div class="title-section">
       <h1 class="main-title">${caseData.case_number || 'Ärenderapport'}</h1>
       <div class="case-subtitle">${caseData.title || 'Ingen titel'}</div>
-      <div class="status-row">
-        <div class="status-badge">${caseData.status}</div>
-        <div class="traffic-light">
-          <span style="font-size: 16px;">${trafficLight.emoji}</span>
-          <span>${trafficLight.label}</span>
+      
+      <!-- Separated Status and Technical Assessment -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px;">
+        <!-- Case Status -->
+        <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
+          <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+            Ärendestatus
+          </div>
+          <div class="status-badge" style="margin: 0;">${caseData.status}</div>
+        </div>
+        
+        <!-- Technical Assessment -->
+        <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
+          <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+            Teknisk bedömning
+          </div>
+          <div class="traffic-light" style="margin: 0;">
+            <span style="font-size: 16px;">${trafficLight.emoji}</span>
+            <span>${trafficLight.label}</span>
+          </div>
         </div>
       </div>
     </div>
