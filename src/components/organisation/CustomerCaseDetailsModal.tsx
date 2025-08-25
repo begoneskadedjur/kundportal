@@ -164,7 +164,10 @@ export default function CustomerCaseDetailsModal({
     if (caseData.price && caseData.price > 0) {
       return `Totalkostnad: ${caseData.price} SEK`
     }
-    return "Ingår i avtal"
+    if (caseData.price === 0) {
+      return "Kostnadsfritt ärende"
+    }
+    return "Ingår i serviceavtal"
   }
 
   if (!isOpen) return null
