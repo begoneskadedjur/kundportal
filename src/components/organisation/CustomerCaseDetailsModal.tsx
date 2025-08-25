@@ -380,7 +380,7 @@ export default function CustomerCaseDetailsModal({
 
                       <div className="space-y-4">
                         {/* Arbetstid - visa bara om det finns verklig tid registrerad */}
-                        {caseData.time_spent_minutes && caseData.time_spent_minutes > 0 && (
+                        {!!(caseData.time_spent_minutes && caseData.time_spent_minutes > 0) && (
                           <div className="flex items-start gap-3">
                             <Clock className="w-5 h-5 text-slate-400 mt-1" />
                             <div>
