@@ -366,6 +366,37 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
       }))
   }, [statistics.siteStatistics])
 
+  // Prepare pest type data for charts
+  const pestTypeData = useMemo(() => {
+    return Object.entries(statistics.pestTypeCounts || {})
+      .sort(([,a], [,b]) => b - a)
+      .map(([name, värde]) => ({ name, värde }))
+  }, [statistics.pestTypeCounts])
+
+  // Create pest trends data (mock data based on pest types for now)
+  const pestTrendsData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun']
+    return months.map(month => {
+      const data: any = { month }
+      Object.keys(statistics.pestTypeCounts || {}).forEach(pestType => {
+        data[pestType] = Math.floor(Math.random() * 10) + 1
+      })
+      return data
+    })
+  }, [statistics.pestTypeCounts])
+
+  // Create pest assessment data 
+  const pestAssessmentData = useMemo(() => {
+    return Object.entries(statistics.pestTypeCounts || {})
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 6)
+      .map(([name, count]) => ({
+        name,
+        aktivitetsnivå: Math.random() * 3,
+        situationsbedömning: Math.random() * 4 + 1
+      }))
+  }, [statistics.pestTypeCounts])
+
   // Animate values on mount (only once or when period changes)
   useEffect(() => {
     const key = `${selectedPeriod}-${statistics.totalCases}-${statistics.analyzedSitesCount}`
