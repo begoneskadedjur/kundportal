@@ -40,6 +40,9 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
     ? sites 
     : sites.filter(site => selectedSiteIds.includes(site.id))
 
+  // Create stable site IDs for dependencies
+  const analyzedSiteIds = useMemo(() => analyzedSites.map(s => s.id).sort().join(','), [analyzedSites])
+
   // Fetch organization-level data
   useEffect(() => {
     const fetchOrganizationData = async () => {
@@ -221,7 +224,6 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
   }, [organizationMetrics, activeCasesCount, analyzedSites.length, hasAnimated])
 
   // Reset animation when analyzed sites change (using stable comparison)
-  const analyzedSiteIds = useMemo(() => analyzedSites.map(s => s.id).sort().join(','), [analyzedSites])
   useEffect(() => {
     setHasAnimated(false)
   }, [analyzedSiteIds])
