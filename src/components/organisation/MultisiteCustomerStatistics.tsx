@@ -169,11 +169,6 @@ const MultisiteCustomerStatistics: React.FC<MultisiteCustomerStatisticsProps> = 
 
         if (error) throw error
 
-        console.log('Statistics cases data:', { 
-          totalCases: data?.length || 0,
-          casesData: data?.slice(0, 3).map(c => ({ status: c.status, customer_id: c.customer_id, pest_type: c.pest_type }))
-        })
-
         // Add site information to cases
         const casesWithSiteInfo = (data || []).map(caseItem => {
           const site = analyzedSites.find(s => s.customer_id === caseItem.customer_id)
