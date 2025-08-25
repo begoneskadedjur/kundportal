@@ -565,7 +565,7 @@ export default function CustomerCaseDetailsModal({
                             <>
                               <CheckCircle className="w-5 h-5 text-green-400" />
                               <span className="text-green-400 text-sm">
-                                Bekräftat {new Date(caseData.recommendations_acknowledged_at).toLocaleDateString('sv-SE')}
+                                Bekräftat av kund {new Date(caseData.recommendations_acknowledged_at).toLocaleDateString('sv-SE')}
                               </span>
                             </>
                           ) : (

@@ -95,21 +95,50 @@ export default function CompactCasesList({
     }
   }
   
-  // Trafikljussystem baserat på pest_level och problem_rating
+  // Utökat trafikljussystem med detaljerad bedömning
   const getTrafficLightStatus = (pest_level?: number | null, problem_rating?: number | null) => {
     if (pest_level === null && problem_rating === null) {
-      return { color: 'bg-slate-600', emoji: '⚪', label: 'Ej bedömd' }
+      return { 
+        color: 'bg-slate-600', 
+        emoji: '⚪', 
+        label: 'Ej bedömd',
+        assessment: 'Vår bedömning:\n⚪\nEj bedömd - Avvaktar inspektion\nBaserat på inspektion och expertis har vår tekniker inte ännu bedömt situationen.'
+      }
     }
     
     if ((pest_level && pest_level >= 3) || (problem_rating && problem_rating >= 4)) {
-      return { color: 'bg-red-500', emoji: '🔴', label: 'Kritisk' }
+      const activityLevel = pest_level >= 3 ? `Nivå ${pest_level} av 3\n\nHög nivå - Kräver omedelbar åtgärd` : `Nivå ${pest_level || 0} av 3\n\nMedium nivå - Bör åtgärdas`
+      const situationRating = problem_rating >= 4 ? `${problem_rating} av 5\n\nAllvarligt - Åtgärd krävs` : `${problem_rating || 0} av 5\n\nMedium - Övervakning rekommenderas`
+      
+      return { 
+        color: 'bg-red-500', 
+        emoji: '🔴', 
+        label: 'Kritisk - Åtgärd krävs',
+        assessment: `Vår bedömning:\n🔴\nKritisk - Åtgärd krävs\nBaserat på inspektion och expertis har vår tekniker bedömt situationen:\n\nAktivitetsnivå\n\n${activityLevel}\n\nSituationsbedömning\n\n${situationRating}`
+      }
     }
     
     if ((pest_level && pest_level === 2) || (problem_rating && problem_rating === 3)) {
-      return { color: 'bg-yellow-500', emoji: '🟡', label: 'Varning' }
+      const activityLevel = `Nivå ${pest_level || 0} av 3\n\nMedium nivå - Bör åtgärdas`
+      const situationRating = `${problem_rating || 0} av 5\n\nMedium - Övervakning rekommenderas`
+      
+      return { 
+        color: 'bg-yellow-500', 
+        emoji: '🟡', 
+        label: 'Varning - Övervakning krävs',
+        assessment: `Vår bedömning:\n🟡\nVarning - Övervakning krävs\nBaserat på inspektion och expertis har vår tekniker bedömt situationen:\n\nAktivitetsnivå\n\n${activityLevel}\n\nSituationsbedömning\n\n${situationRating}`
+      }
     }
     
-    return { color: 'bg-green-500', emoji: '🟢', label: 'OK' }
+    const activityLevel = `Nivå ${pest_level || 0} av 3\n\nLåg nivå - Under kontroll`
+    const situationRating = `${problem_rating || 0} av 5\n\nLåg - Situationen är stabil`
+    
+    return { 
+      color: 'bg-green-500', 
+      emoji: '🟢', 
+      label: 'OK - Situation under kontroll',
+      assessment: `Vår bedömning:\n🟢\nOK - Situation under kontroll\nBaserat på inspektion och expertis har vår tekniker bedömt situationen:\n\nAktivitetsnivå\n\n${activityLevel}\n\nSituationsbedömning\n\n${situationRating}`
+    }
   }
 
   // Status badge färger

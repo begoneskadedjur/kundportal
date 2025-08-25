@@ -15,6 +15,7 @@ import CustomerCaseDetailsModal from '../../../components/organisation/CustomerC
 import CompactCasesList from '../../../components/organisation/CompactCasesList'
 import ServiceRequestModal from '../../../components/organisation/ServiceRequestModal'
 import Button from '../../../components/ui/Button'
+import PDFExportButton from '../../../components/shared/PDFExportButton'
 
 const OrganisationArenden: React.FC = () => {
   const { organization, sites, accessibleSites, userRole, loading: contextLoading } = useMultisite()
@@ -114,6 +115,61 @@ const OrganisationArenden: React.FC = () => {
     setShowEditModal(true)
   }
 
+  // PDF Export functionality för alla ärenden
+  const handlePDFExportAll = async () => {
+    try {
+      const casesToExport = selectedSiteId === 'all' ? allCases : []
+      if (casesToExport.length === 0) {
+        alert('Inga ärenden att exportera')
+        return
+      }
+
+      const response = await fetch('/api/generate-case-report-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reportType: 'multiple',
+          cases: casesToExport,
+          customerData: {
+            company_name: organization?.organization_name || 'Organisation',
+            id: organization?.id
+          },
+          userRole: userRoleType,
+          period: 'alla ärenden'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.pdf) {
+        // Create blob and download
+        const pdfBlob = new Blob([
+          Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0))
+        ], { type: 'application/pdf' })
+        
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename || 'BeGone_Alla_Arenden.pdf'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error(data.error || 'PDF generation failed')
+      }
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      alert('Misslyckades med att exportera PDF. Försök igen.')
+    }
+  }
+
   if (contextLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -141,13 +197,26 @@ const OrganisationArenden: React.FC = () => {
                 {userRoleType === 'platsansvarig' && 'Hantera ärenden för din enhet'}
               </p>
             </div>
-            <Button
-              onClick={() => setShowServiceRequestModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Begär service
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* PDF Export knapp - visa bara om det finns ärenden att exportera */}
+              {selectedSiteId === 'all' && allCases.length > 0 && (
+                <PDFExportButton
+                  onExport={handlePDFExportAll}
+                  variant="secondary"
+                  size="sm"
+                  label="Exportera alla"
+                  tooltip={`Exportera alla ${allCases.length} ärenden som PDF`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                />
+              )}
+              <Button
+                onClick={() => setShowServiceRequestModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Begär service
+              </Button>
+            </div>
           </div>
         </div>
 
