@@ -493,9 +493,64 @@ const generateSingleCaseHTML = (caseData: any, customerData: any, reportType: st
         <span class="section-icon">🔍</span>
         Teknisk bedömning
       </div>
-      <div class="card">
-        <div style="white-space: pre-line; line-height: 1.6; color: #374151; font-size: 14px; background: #F8FAFC; padding: 16px; border-radius: 8px; border-left: 4px solid ${trafficLight.color};">
-          ${trafficLight.assessment}
+      <div class="card" style="background: linear-gradient(135deg, ${trafficLight.color}15 0%, ${trafficLight.color}08 100%); border: 1px solid ${trafficLight.color}30;">
+        <!-- Assessment Header with Large Visual Indicator -->
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, ${trafficLight.color}20 0%, ${trafficLight.color}10 100%); border-radius: 12px; border-left: 6px solid ${trafficLight.color};">
+          <div style="font-size: 48px; line-height: 1;">${trafficLight.emoji}</div>
+          <div>
+            <div style="font-size: 22px; font-weight: 700; color: #1F2937; margin-bottom: 6px;">
+              ${trafficLight.label}
+            </div>
+            <div style="font-size: 14px; color: #6B7280; font-weight: 500;">
+              Baserat på inspektion och expertis har vår tekniker bedömt situationen
+            </div>
+          </div>
+        </div>
+
+        <!-- Assessment Details Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
+          <!-- Activity Level Card -->
+          <div style="background: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div style="background: ${trafficLight.color}20; padding: 8px; border-radius: 6px;">
+                <span style="font-size: 18px;">⚡</span>
+              </div>
+              <div style="font-size: 16px; font-weight: 600; color: #374151;">Aktivitetsnivå</div>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">
+              Nivå ${caseData.pest_level || 0} av 3
+            </div>
+            <div style="font-size: 13px; color: #6B7280; font-weight: 500;">
+              ${(caseData.pest_level >= 3) ? 'Hög nivå - Kräver omedelbar åtgärd' : 
+                (caseData.pest_level === 2) ? 'Medium nivå - Bör åtgärdas' : 
+                'Låg nivå - Under kontroll'}
+            </div>
+          </div>
+
+          <!-- Situation Rating Card -->
+          <div style="background: #FFFFFF; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div style="background: ${trafficLight.color}20; padding: 8px; border-radius: 6px;">
+                <span style="font-size: 18px;">📊</span>
+              </div>
+              <div style="font-size: 16px; font-weight: 600; color: #374151;">Situationsbedömning</div>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: ${trafficLight.color}; margin-bottom: 4px;">
+              ${caseData.problem_rating || 0} av 5
+            </div>
+            <div style="font-size: 13px; color: #6B7280; font-weight: 500;">
+              ${(caseData.problem_rating >= 4) ? 'Allvarligt - Åtgärd krävs' : 
+                (caseData.problem_rating === 3) ? 'Medium - Övervakning rekommenderas' : 
+                'Låg - Situationen är stabil'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Professional Footer -->
+        <div style="background: #F9FAFB; padding: 16px; border-radius: 8px; border-top: 1px solid #E5E7EB; margin-top: 8px;">
+          <div style="font-size: 12px; color: #6B7280; text-align: center; font-style: italic;">
+            Bedömning utförd av certifierad BeGone tekniker enligt branschstandard
+          </div>
         </div>
       </div>
     </div>

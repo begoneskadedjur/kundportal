@@ -2,7 +2,7 @@
 // Skalbar kompakt ärendelista för organisationsroller
 
 import React from 'react'
-import { ChevronRight, Calendar, User, DollarSign } from 'lucide-react'
+import { ChevronRight, Calendar, User, DollarSign, FileText } from 'lucide-react'
 import PDFExportButton from '../shared/PDFExportButton'
 
 interface CaseRowData {
@@ -92,6 +92,53 @@ export default function CompactCasesList({
     } catch (error) {
       console.error('PDF export failed:', error)
       throw error
+    }
+  }
+
+  // PDF Export functionality för enskilt ärende
+  const handleSingleCasePDFExport = async (caseItem: CaseRowData, event: React.MouseEvent) => {
+    event.stopPropagation() // Förhindra att ärendet öppnas
+    
+    try {
+      const response = await fetch('/api/generate-case-report-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reportType: 'single',
+          caseData: caseItem,
+          customerData: customerData,
+          userRole: userRole
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.pdf) {
+        // Create blob and download
+        const pdfBlob = new Blob([
+          Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0))
+        ], { type: 'application/pdf' })
+        
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename || `BeGone_Arende_${caseItem.case_number || 'N/A'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        throw new Error(data.error || 'PDF generation failed')
+      }
+    } catch (error) {
+      console.error('Single case PDF export failed:', error)
+      alert('Misslyckades med att exportera PDF. Försök igen.')
     }
   }
   
@@ -305,6 +352,17 @@ export default function CompactCasesList({
                     {formatPrice(caseData.price)}
                   </span>
                 </div>
+              </div>
+
+              {/* PDF Export knapp */}
+              <div className="hidden sm:block w-8 flex-shrink-0">
+                <button
+                  onClick={(e) => handleSingleCasePDFExport(caseData, e)}
+                  className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-700 rounded transition-colors"
+                  title="Exportera som PDF"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Datum */}
