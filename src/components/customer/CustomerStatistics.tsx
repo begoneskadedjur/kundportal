@@ -43,7 +43,8 @@ import {
 } from '../../utils/statisticsUtils'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
-import StatisticsLoadingState from './StatisticsLoadingState'\nimport TooltipWrapper from '../ui/TooltipWrapper'
+import StatisticsLoadingState from './StatisticsLoadingState'
+import TooltipWrapper from '../ui/TooltipWrapper'
 import toast from 'react-hot-toast'
 
 interface CustomerStatisticsProps {
