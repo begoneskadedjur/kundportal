@@ -51,6 +51,13 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
           .map(site => site.customer_id)
           .filter(Boolean)
         
+        console.log('🔍 Dashboard Debug:', {
+          analyzedSitesCount: analyzedSites.length,
+          customerIdsCount: customerIds.length,
+          customerIds: customerIds,
+          sitesData: analyzedSites.map(s => ({ id: s.id, name: s.site_name, customer_id: s.customer_id }))
+        })
+        
         if (customerIds.length === 0) {
           // No customer IDs found - set defaults to show no active cases
           setActiveCasesCount(0)
@@ -76,8 +83,20 @@ const MultisiteServiceExcellenceDashboard: React.FC<MultisiteServiceExcellenceDa
         
         if (error) throw error
         
+        console.log('📊 Dashboard Cases:', {
+          totalCases: data?.length || 0,
+          casesData: data?.map(c => ({ status: c.status, pest_type: c.pest_type, customer_id: c.customer_id })),
+          customerIds: customerIds
+        })
+        
         // Count active cases across all sites
         const activeCount = data?.filter(caseItem => !isCompletedStatus(caseItem.status)).length || 0
+        
+        console.log('✅ Dashboard Active Count:', {
+          activeCount,
+          calculation: data?.map(c => ({ status: c.status, isCompleted: isCompletedStatus(c.status) }))
+        })
+        
         setActiveCasesCount(activeCount)
 
         // Find next scheduled visit across all sites
