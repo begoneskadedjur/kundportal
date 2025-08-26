@@ -126,6 +126,7 @@ interface ConsolidatedAnalytics {
   averageContractValue: number
   averageHealthScore: number
   organizationsAtRisk: number
+  monthlyGrowth: number
   
   topOrganizationsByValue: ConsolidatedCustomer[]
   organizationsAtRiskList: ConsolidatedCustomer[]
@@ -416,6 +417,7 @@ export function useConsolidatedCustomers() {
         averageContractValue: 0,
         averageHealthScore: 0,
         organizationsAtRisk: 0,
+        monthlyGrowth: 0,
         topOrganizationsByValue: [],
         organizationsAtRiskList: [],
         upcomingRenewals: [],
@@ -473,6 +475,7 @@ export function useConsolidatedCustomers() {
       averageContractValue,
       averageHealthScore,
       organizationsAtRisk: organizationsAtRiskCount,
+      monthlyGrowth: 5.2, // Placeholder värde
       topOrganizationsByValue,
       organizationsAtRiskList,
       upcomingRenewals,
