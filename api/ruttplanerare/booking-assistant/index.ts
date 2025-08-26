@@ -26,6 +26,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
   const virtualStartEvent: EventSlot = { start: subMinutes(daySchedule.workStart, 1), end: daySchedule.workStart, type: 'case', title: 'Hemadress', address: daySchedule.technician.address };
   const allEvents = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
   
+  // Kontrollera om detta är dagens datum och sätt minimum starttid
+  const now = new Date();
+  const isToday = daySchedule.date.toDateString() === now.toDateString();
+  const minStartTimeToday = isToday ? addMinutes(now, 15) : null; // 15 min buffert för förberedelse
+  
   for (let i = 0; i < allEvents.length; i++) {
     const currentEvent = allEvents[i]; const nextEvent = allEvents[i + 1];
     const gapStart = currentEvent.end; const gapEnd = nextEvent ? nextEvent.start : daySchedule.workEnd;
@@ -33,7 +38,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 
     const travelTime = travelTimes.get(currentEvent.address || daySchedule.technician.address) || DEFAULT_TRAVEL_TIME;
     const isFirstJob = (currentEvent.title === 'Hemadress');
-    let currentTry = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
+    
+    // Justera starttid för att respektera aktuell tid för dagens datum
+    let baseStartTime = isFirstJob ? daySchedule.workStart : max([addMinutes(gapStart, travelTime), daySchedule.workStart]);
+    let currentTry = minStartTimeToday ? max([baseStartTime, minStartTimeToday]) : baseStartTime;
+    
     const absoluteLatestStart = min([subMinutes(gapEnd, timeSlotDuration), lastPossibleStartForJob]);
     const isLastGap = !nextEvent;
 
