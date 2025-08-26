@@ -114,15 +114,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         .eq('is_active', true);
 
       if (!rolesError && rolesData) {
-        // Hämta profiles separat för varje roll
+        // Hämta användardata via RPC (eliminerar onödiga profiles-anrop)
         const enrichedRoles = await Promise.all(rolesData.map(async (role) => {
-          // Hämta profil separat
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('email, display_name')
-            .eq('user_id', role.user_id)
-            .single();
-          
           try {
             // Hämta metadata från auth.users
             const { data: userData, error: rpcError } = await supabase
@@ -130,23 +123,27 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
             
             if (rpcError) {
               console.error('RPC error for user:', role.user_id, rpcError);
+              return {
+                ...role,
+                user_name: `Användare ${role.user_id.slice(0, 8)}`,
+                user_phone: null,
+                user_email: null
+              };
             }
             
             return {
               ...role,
-              profiles: profileData,
-              user_name: userData?.raw_user_meta_data?.name || profileData?.display_name,
-              user_phone: userData?.raw_user_meta_data?.phone,
-              user_email: profileData?.email || userData?.email
+              user_name: userData?.raw_user_meta_data?.name || userData?.raw_user_meta_data?.display_name,
+              user_phone: userData?.raw_user_meta_data?.phone || userData?.phone,
+              user_email: userData?.email
             };
           } catch (err) {
-            // Fallback om vi inte kan hämta auth.users data
+            console.error('Failed to fetch user metadata for:', role.user_id, err);
             return {
               ...role,
-              profiles: profileData,
-              user_name: profileData?.display_name,
+              user_name: `Användare ${role.user_id.slice(0, 8)}`,
               user_phone: null,
-              user_email: profileData?.email
+              user_email: null
             };
           }
         }));
