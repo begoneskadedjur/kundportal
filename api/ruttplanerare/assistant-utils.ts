@@ -46,7 +46,7 @@ export const getDayKey = (date: Date): keyof WorkSchedule => {
 export async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
   const staffIds = staff.map(s => s.id); if (staffIds.length === 0) return new Map();
   const { data, error } = await supabase.from('cases_secure_view')
-    .select('scheduled_start, scheduled_end, primary_technician_id, secondary_technician_id, tertiary_technician_id, adress, title')
+    .select('scheduled_start, scheduled_end, primary_technician_id, secondary_technician_id, tertiary_technician_id, address, title')
     .or(`primary_technician_id.in.(${staffIds.join(',')}),secondary_technician_id.in.(${staffIds.join(',')}),tertiary_technician_id.in.(${staffIds.join(',')})`)
     .gte('scheduled_start', from.toISOString())
     .lte('scheduled_start', to.toISOString())
@@ -55,7 +55,7 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   const schedules = new Map<string, EventSlot[]>(); staff.forEach(s => schedules.set(s.id, []));
   data?.forEach(c => { 
     if(c.scheduled_start && c.scheduled_end) {
-      const eventSlot = { start: new Date(c.scheduled_start), end: new Date(c.scheduled_end), title: c.title || 'Ärende', address: formatAddress(c.adress), type: 'case' as const };
+      const eventSlot = { start: new Date(c.scheduled_start), end: new Date(c.scheduled_end), title: c.title || 'Ärende', address: formatAddress(c.address), type: 'case' as const };
       // Lägg till ärendet för alla tekniker som är tilldelade
       if (c.primary_technician_id && staffIds.includes(c.primary_technician_id)) schedules.get(c.primary_technician_id)?.push(eventSlot);
       if (c.secondary_technician_id && staffIds.includes(c.secondary_technician_id)) schedules.get(c.secondary_technician_id)?.push(eventSlot);
