@@ -45,10 +45,10 @@ export const getDayKey = (date: Date): keyof WorkSchedule => {
 // --- Data-hämtning ---
 export async function getSchedules(staff: StaffMember[], from: Date, to: Date): Promise<Map<string, EventSlot[]>> {
   const staffIds = staff.map(s => s.id); if (staffIds.length === 0) return new Map();
-  const { data, error } = await supabase.from('cases_with_technician_view').select('start_date, due_date, technician_id, adress, title').in('technician_id', staffIds).gte('start_date', from.toISOString()).lte('start_date', to.toISOString()).order('start_date');
+  const { data, error } = await supabase.from('cases_secure_view').select('scheduled_start, scheduled_end, technician_id, adress, title').in('technician_id', staffIds).gte('scheduled_start', from.toISOString()).lte('scheduled_start', to.toISOString()).order('scheduled_start');
   if (error) throw error;
   const schedules = new Map<string, EventSlot[]>(); staff.forEach(s => schedules.set(s.id, []));
-  data?.forEach(c => { if(c.start_date && c.due_date && c.technician_id) schedules.get(c.technician_id)?.push({ start: new Date(c.start_date), end: new Date(c.due_date), title: c.title || 'Ärende', address: formatAddress(c.adress), type: 'case' }); });
+  data?.forEach(c => { if(c.scheduled_start && c.scheduled_end && c.technician_id) schedules.get(c.technician_id)?.push({ start: new Date(c.scheduled_start), end: new Date(c.scheduled_end), title: c.title || 'Ärende', address: formatAddress(c.adress), type: 'case' }); });
   return schedules;
 }
 export async function getAbsences(staffIds: string[], from: Date, to: Date): Promise<Map<string, AbsencePeriod[]>> {
