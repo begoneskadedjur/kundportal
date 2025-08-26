@@ -1,7 +1,7 @@
 // src/components/admin/customers/SiteDetailRow.tsx - Rad för individuella sites under organisationer
 
 import React from 'react'
-import { MapPinIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline'
+import { MapPin, Building2 } from 'lucide-react'
 import { CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 
 interface SiteDetailRowProps {
@@ -112,9 +112,9 @@ const formatContractPeriod = (site: CustomerSite): string => {
 
 const getSiteTypeIcon = (siteType: string | null | undefined) => {
   if (siteType === 'huvudkontor') {
-    return <BuildingOffice2Icon className="h-4 w-4 text-blue-500" />
+    return <Building2 className="h-4 w-4 text-blue-500" />
   }
-  return <MapPinIcon className="h-4 w-4 text-gray-400" />
+  return <MapPin className="h-4 w-4 text-gray-400" />
 }
 
 const getSiteTypeName = (siteType: string | null | undefined) => {

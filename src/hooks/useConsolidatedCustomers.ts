@@ -128,7 +128,7 @@ interface ConsolidatedAnalytics {
   organizationsAtRisk: number
   
   topOrganizationsByValue: ConsolidatedCustomer[]
-  organizationsAtRisk: ConsolidatedCustomer[]
+  organizationsAtRiskList: ConsolidatedCustomer[]
   upcomingRenewals: ConsolidatedCustomer[]
   
   portalAccessStats: {
@@ -417,7 +417,7 @@ export function useConsolidatedCustomers() {
         averageHealthScore: 0,
         organizationsAtRisk: 0,
         topOrganizationsByValue: [],
-        organizationsAtRisk: [],
+        organizationsAtRiskList: [],
         upcomingRenewals: [],
         portalAccessStats: { fullAccess: 0, partialAccess: 0, noAccess: 0 }
       }
@@ -474,7 +474,7 @@ export function useConsolidatedCustomers() {
       averageHealthScore,
       organizationsAtRisk: organizationsAtRiskCount,
       topOrganizationsByValue,
-      organizationsAtRisk: organizationsAtRiskList,
+      organizationsAtRiskList,
       upcomingRenewals,
       portalAccessStats
     }
@@ -567,4 +567,9 @@ export function useConsolidatedCustomers() {
   }
 }
 
-export type { ConsolidatedCustomer, CustomerSite, ConsolidatedAnalytics, PortalAccessStatus }
+export type { 
+  ConsolidatedCustomer, 
+  CustomerSite, 
+  ConsolidatedAnalytics, 
+  PortalAccessStatus 
+}

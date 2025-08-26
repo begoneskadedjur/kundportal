@@ -605,13 +605,13 @@ export default function Customers() {
             </Card>
 
             {/* At risk organizations */}
-            {consolidatedAnalytics.organizationsAtRisk.length > 0 && (
+            {consolidatedAnalytics.organizationsAtRiskList.length > 0 && (
               <Card className="p-4 bg-red-500/10 border-red-500/20">
                 <h4 className="text-sm font-medium text-red-400 mb-3">
-                  Organisationer i Riskzonen ({consolidatedAnalytics.organizationsAtRisk.length})
+                  Organisationer i Riskzonen ({consolidatedAnalytics.organizationsAtRiskList.length})
                 </h4>
                 <div className="space-y-2">
-                  {consolidatedAnalytics.organizationsAtRisk.slice(0, 5).map((organization) => (
+                  {consolidatedAnalytics.organizationsAtRiskList.slice(0, 5).map((organization) => (
                     <div 
                       key={organization.id}
                       className="p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"

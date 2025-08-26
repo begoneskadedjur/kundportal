@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDownIcon, ChevronRightIcon, BuildingOfficeIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import { ChevronDown, ChevronRight, Building2, Users } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
 
 interface ExpandableOrganizationRowProps {
@@ -134,16 +134,16 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
             className="mr-3 p-1 rounded hover:bg-gray-200 transition-colors"
           >
             {isExpanded ? (
-              <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+              <ChevronDown className="h-4 w-4 text-gray-500" />
             ) : (
-              <ChevronRightIcon className="h-4 w-4 text-gray-500" />
+              <ChevronRight className="h-4 w-4 text-gray-500" />
             )}
           </button>
           
           <div className="flex-1">
             <div className="flex items-center">
               {isMultisite ? (
-                <BuildingOfficeIcon className="h-5 w-5 text-blue-500 mr-2" />
+                <Building2 className="h-5 w-5 text-blue-500 mr-2" />
               ) : (
                 <div className="w-5 h-5 mr-2" />
               )}
@@ -263,7 +263,7 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               className="text-blue-600 hover:text-blue-800 text-sm font-medium"
               title={isMultisite ? "Bjud in organisation till portal" : "Bjud in till portal"}
             >
-              <UserGroupIcon className="h-4 w-4" />
+              <Users className="h-4 w-4" />
             </button>
           )}
 
