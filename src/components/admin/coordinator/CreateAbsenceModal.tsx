@@ -38,6 +38,8 @@ interface CreateAbsenceModalProps {
 }
 
 export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technicians }: CreateAbsenceModalProps) {
+  const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
+  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     technician_id: '',
     start_date: null as Date | null,
@@ -50,6 +52,8 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
 
   useEffect(() => {
     if (isOpen) {
+      setSelectionMode('single');
+      setSelectedTechnicianIds([]);
       setFormData({
         technician_id: '',
         start_date: null,
@@ -62,6 +66,23 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
     }
   }, [isOpen]);
 
+  // Hantera val av tekniker för multi-mode
+  const toggleTechnician = (technicianId: string) => {
+    setSelectedTechnicianIds(prev => 
+      prev.includes(technicianId) 
+        ? prev.filter(id => id !== technicianId)
+        : [...prev, technicianId]
+    );
+  };
+
+  const selectAllTechnicians = () => {
+    setSelectedTechnicianIds(technicians.map(t => t.id));
+  };
+
+  const clearAllTechnicians = () => {
+    setSelectedTechnicianIds([]);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -73,45 +94,84 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { technician_id, start_date, end_date, reason } = formData;
+    const { start_date, end_date, reason } = formData;
 
-    if (!technician_id || !start_date || !end_date || !reason) {
-      toast.error('Tekniker, starttid, sluttid och anledning måste fyllas i.');
+    // Validering av datum och anledning
+    if (!start_date || !end_date || !reason) {
+      toast.error('Starttid, sluttid och anledning måste fyllas i.');
       return;
     }
 
     if (start_date >= end_date) {
-        toast.error('Slutdatum måste vara efter startdatum.');
+      toast.error('Slutdatum måste vara efter startdatum.');
+      return;
+    }
+
+    // Validering av tekniker baserat på mode
+    let technicianIds: string[];
+    if (selectionMode === 'single') {
+      if (!formData.technician_id) {
+        toast.error('En tekniker måste väljas.');
         return;
+      }
+      technicianIds = [formData.technician_id];
+    } else {
+      if (selectedTechnicianIds.length === 0) {
+        toast.error('Minst en tekniker måste väljas.');
+        return;
+      }
+      technicianIds = selectedTechnicianIds;
     }
 
     setLoading(true);
     setError(null);
 
     try {
+      // Skapa frånvaroposter för alla valda tekniker
+      const absenceRecords = technicianIds.map(technicianId => ({
+        technician_id: technicianId,
+        start_date: start_date.toISOString(),
+        end_date: end_date.toISOString(),
+        reason,
+        notes: formData.notes || null
+      }));
+
+      // Batch insert
       const { error: insertError } = await supabase
         .from('technician_absences')
-        .insert([{ 
-            technician_id, 
-            start_date: start_date.toISOString(), 
-            end_date: end_date.toISOString(), 
-            reason,
-            notes: formData.notes || null
-        }]);
+        .insert(absenceRecords);
 
       if (insertError) throw insertError;
 
-      toast.success(`Frånvaro för ${reason} har registrerats!`);
+      // Success meddelande baserat på antal tekniker
+      const technicianCount = technicianIds.length;
+      const successMessage = technicianCount === 1 
+        ? `Frånvaro för ${reason} har registrerats!`
+        : `Frånvaro för ${reason} har registrerats för ${technicianCount} tekniker!`;
+      
+      toast.success(successMessage);
       onSuccess();
       onClose();
 
     } catch (err: any) {
       setError(`Fel vid registrering: ${err.message}`);
-      toast.error('Kunde inte registrera frånvaro.');
+      const errorMessage = selectionMode === 'multiple' 
+        ? 'Kunde inte registrera frånvaro för tekniker.'
+        : 'Kunde inte registrera frånvaro.';
+      toast.error(errorMessage);
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSubmitButtonText = () => {
+    if (selectionMode === 'single') {
+      return 'Registrera Frånvaro';
+    }
+    const count = selectedTechnicianIds.length;
+    if (count === 0) return 'Registrera Frånvaro';
+    return `Registrera Frånvaro (${count} tekniker)`;
   };
 
   const footer = (
@@ -119,7 +179,7 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
       <div className="flex gap-3">
         <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>Avbryt</Button>
         <Button type="submit" form="create-absence-form" loading={loading} disabled={loading} size="lg">
-          <CheckCircle className="w-5 h-5 mr-2"/> Registrera Frånvaro
+          <CheckCircle className="w-5 h-5 mr-2"/> {getSubmitButtonText()}
         </Button>
       </div>
     </div>
@@ -135,19 +195,91 @@ export default function CreateAbsenceModal({ isOpen, onClose, onSuccess, technic
           </div>
         )}
         
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
-          <select 
-            name="technician_id" 
-            value={formData.technician_id} 
-            onChange={handleChange} 
-            required 
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
-          >
-            <option value="" disabled>Välj tekniker...</option>
-            {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+        {/* Selection Mode Toggle */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-300 mb-3">Registrera för</label>
+          <div className="flex gap-6">
+            <label className="flex items-center cursor-pointer">
+              <input 
+                type="radio" 
+                name="mode" 
+                value="single" 
+                checked={selectionMode === 'single'} 
+                onChange={() => setSelectionMode('single')}
+                className="w-4 h-4 text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="ml-2 text-slate-200">En tekniker</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input 
+                type="radio" 
+                name="mode" 
+                value="multiple" 
+                checked={selectionMode === 'multiple'} 
+                onChange={() => setSelectionMode('multiple')}
+                className="w-4 h-4 text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="ml-2 text-slate-200">Flera tekniker</span>
+            </label>
+          </div>
         </div>
+
+        {/* Single Technician Selection */}
+        {selectionMode === 'single' && (
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Tekniker *</label>
+            <select 
+              name="technician_id" 
+              value={formData.technician_id} 
+              onChange={handleChange} 
+              required 
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+            >
+              <option value="" disabled>Välj tekniker...</option>
+              {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Multiple Technician Selection */}
+        {selectionMode === 'multiple' && (
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <label className="block text-sm font-medium text-slate-300">
+                Tekniker * ({selectedTechnicianIds.length} av {technicians.length} valda)
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllTechnicians}
+                  className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-500/30 hover:border-blue-400"
+                >
+                  Välj alla
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAllTechnicians}
+                  className="text-xs text-slate-400 hover:text-slate-300 px-2 py-1 rounded border border-slate-600 hover:border-slate-500"
+                >
+                  Rensa
+                </button>
+              </div>
+            </div>
+            <div className="max-h-48 overflow-y-auto bg-slate-800 border border-slate-600 rounded-lg p-3 space-y-2">
+              {technicians.map(technician => (
+                <label key={technician.id} className="flex items-center cursor-pointer hover:bg-slate-700 p-2 rounded transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedTechnicianIds.includes(technician.id)}
+                    onChange={() => toggleTechnician(technician.id)}
+                    className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <span className="ml-3 text-slate-200">{technician.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
