@@ -6,7 +6,7 @@ import {
   Search, Filter, RefreshCw, ChevronDown, ChevronUp,
   Mail, Phone, Building2, User, Calendar, DollarSign,
   ChevronLeft, ChevronRight, X, UserPlus, ExternalLink,
-  TrendingUp, AlertTriangle, Activity, Send, Edit3
+  TrendingUp, AlertTriangle, Activity, Send, Edit3, Users
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
