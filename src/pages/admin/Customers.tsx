@@ -430,34 +430,58 @@ export default function Customers() {
           </Card>
 
           {/* Consolidated Customer table */}
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-800/50 border-b border-slate-700">
+                <thead className="bg-slate-800/70 border-b border-slate-600">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Organisation & Kontakt
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-blue-400" />
+                        Organisation & Kontakt
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Portal
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-green-400" />
+                        Portal
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Kontraktsvärde
+                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <DollarSign className="w-4 h-4 text-yellow-400" />
+                        Kontraktsvärde
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Kontraktsperiod
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-purple-400" />
+                        Kontraktsperiod
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Health Score
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-green-400" />
+                        Health Score
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Churn Risk
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        Churn Risk
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Säljare
+                    <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-blue-400" />
+                        Säljare
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Åtgärder
+                    <th className="px-6 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-2">
+                        <Edit3 className="w-4 h-4 text-slate-400" />
+                        Åtgärder
+                      </div>
                     </th>
                   </tr>
                 </thead>
@@ -499,12 +523,19 @@ export default function Customers() {
               </table>
 
               {filteredCustomers.length === 0 && (
-                <div className="text-center py-16">
-                  <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">
+                <div className="text-center py-20 bg-slate-800/20">
+                  <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
+                    <Building2 className="w-16 h-16 text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-300 mb-2">
                     {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
                       ? 'Inga organisationer matchar dina filter'
-                      : 'Inga organisationer att visa'}
+                      : 'Inga organisationer registrerade'}
+                  </h3>
+                  <p className="text-slate-500 text-sm max-w-md mx-auto">
+                    {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                      ? 'Prova att justera dina filterkriterier för att hitta organisationer.'
+                      : 'Organisationer kommer att visas här när de läggs till i systemet.'}
                   </p>
                 </div>
               )}
@@ -514,8 +545,9 @@ export default function Customers() {
 
         {/* Analytics Sidebar */}
         <div className={`
-          fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-800 
-          transform transition-transform duration-300 z-40 overflow-y-auto
+          fixed top-0 right-0 h-full w-96 
+          bg-slate-900/95 backdrop-blur-xl border-l border-slate-700/50 
+          transform transition-all duration-300 z-40 overflow-y-auto shadow-2xl
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
           <div className="p-6 space-y-6">

@@ -15,11 +15,11 @@ const PortalAccessBadge: React.FC<{ status: 'none' | 'pending' | 'active' }> = (
   const getBadgeStyles = () => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-700 border-green-200'
+        return 'bg-green-500/20 text-green-400 border-green-500/30'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
       case 'none':
-        return 'bg-gray-100 text-gray-600 border-gray-200'
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     }
   }
 
@@ -45,15 +45,15 @@ const HealthScoreBadge: React.FC<{ level: string; score: number }> = ({ level, s
   const getBadgeStyles = () => {
     switch (level) {
       case 'excellent':
-        return 'bg-green-50 text-green-700 border-green-200'
+        return 'bg-green-500/20 text-green-400 border-green-500/30'
       case 'good':
-        return 'bg-blue-50 text-blue-700 border-blue-200'
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
       case 'fair':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200'
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
       case 'poor':
-        return 'bg-red-50 text-red-700 border-red-200'
+        return 'bg-red-500/20 text-red-400 border-red-500/30'
       default:
-        return 'bg-gray-50 text-gray-600 border-gray-200'
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     }
   }
 
@@ -112,9 +112,9 @@ const formatContractPeriod = (site: CustomerSite): string => {
 
 const getSiteTypeIcon = (siteType: string | null | undefined) => {
   if (siteType === 'huvudkontor') {
-    return <Building2 className="h-4 w-4 text-blue-500" />
+    return <Building2 className="h-4 w-4 text-blue-400" />
   }
-  return <MapPin className="h-4 w-4 text-gray-400" />
+  return <MapPin className="h-4 w-4 text-slate-400" />
 }
 
 const getSiteTypeName = (siteType: string | null | undefined) => {
@@ -132,39 +132,39 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
   const indentWidth = indentLevel * 24 // 24px per indent level
 
   return (
-    <tr className="border-b border-gray-100 bg-gray-50/50 hover:bg-gray-100/50">
+    <tr className="border-b border-slate-700/50 bg-slate-800/20 hover:bg-slate-800/40 transition-colors duration-200">
       {/* Company & Contact Column */}
       <td className="px-6 py-3">
         <div className="flex items-center" style={{ paddingLeft: `${indentWidth}px` }}>
-          <div className="mr-2 text-gray-300">└─</div>
+          <div className="mr-2 text-slate-500">└─</div>
           
           <div className="flex items-center">
             {getSiteTypeIcon(site.site_type)}
             
             <div className="ml-2">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-800 text-sm">
+                <span className="font-medium text-slate-200 text-sm">
                   {site.site_name || site.company_name}
                 </span>
-                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
+                <span className="text-xs bg-slate-600/50 text-slate-300 px-2 py-0.5 rounded border border-slate-600">
                   {getSiteTypeName(site.site_type)}
                 </span>
                 {site.region && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-slate-500">
                     {site.region}
                   </span>
                 )}
               </div>
               
-              <div className="text-xs text-gray-600 mt-1">
+              <div className="text-xs text-slate-400 mt-1">
                 {site.contact_person && (
                   <span>{site.contact_person} • </span>
                 )}
-                <span className="text-blue-600">{site.contact_email}</span>
+                <span className="text-blue-400">{site.contact_email}</span>
               </div>
               
               {site.site_code && (
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-500 mt-1">
                   Kod: {site.site_code}
                 </div>
               )}
@@ -181,10 +181,10 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
       {/* Contract Value Column */}
       <td className="px-6 py-3">
         <div className="text-right text-sm">
-          <div className="font-medium text-gray-700">
+          <div className="font-medium text-slate-200">
             {formatCurrency(site.total_contract_value || 0)}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             {formatCurrency(site.monthly_value || 0)}/mån
           </div>
         </div>
@@ -192,11 +192,11 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
 
       {/* Contract Period Column */}
       <td className="px-6 py-3">
-        <div className="text-sm text-gray-700">
+        <div className="text-sm text-slate-200">
           {formatContractPeriod(site)}
         </div>
         {site.contractProgress.daysRemaining <= 90 && site.contractProgress.daysRemaining > 0 && (
-          <div className="text-xs text-amber-600 mt-1">
+          <div className="text-xs text-amber-400 mt-1">
             ⚠ Utgår snart
           </div>
         )}
@@ -213,21 +213,21 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
       {/* Churn Risk Column */}
       <td className="px-6 py-3">
         <div className={`text-sm font-medium ${
-          site.churnRisk.risk === 'high' ? 'text-red-600' :
-          site.churnRisk.risk === 'medium' ? 'text-yellow-600' :
-          'text-green-600'
+          site.churnRisk.risk === 'high' ? 'text-red-400' :
+          site.churnRisk.risk === 'medium' ? 'text-yellow-400' :
+          'text-green-400'
         }`}>
           {site.churnRisk.risk === 'high' ? 'Hög' :
            site.churnRisk.risk === 'medium' ? 'Medel' : 'Låg'}
         </div>
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-slate-500">
           {Math.round(site.churnRisk.score)}%
         </div>
       </td>
 
       {/* Manager Column */}
       <td className="px-6 py-3">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-slate-400">
           {site.assigned_account_manager || '—'}
         </div>
       </td>
@@ -238,7 +238,7 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
           {/* Site-specific actions */}
           <button
             onClick={() => onSiteContact?.(site)}
-            className="text-gray-400 hover:text-gray-600 text-xs"
+            className="text-slate-400 hover:text-slate-200 text-xs transition-colors duration-200"
             title="Kontakta enhet"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,7 +248,7 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
 
           <button
             onClick={() => onSiteEdit?.(site)}
-            className="text-gray-400 hover:text-gray-600 text-xs"
+            className="text-slate-400 hover:text-slate-200 text-xs transition-colors duration-200"
             title="Redigera enhet"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
