@@ -128,6 +128,12 @@ interface ConsolidatedAnalytics {
   organizationsAtRisk: number
   monthlyGrowth: number
   
+  // KPI Cards properties
+  totalCustomers: number
+  activeCustomers: number
+  netRevenueRetention: number
+  highRiskCount: number
+  
   topOrganizationsByValue: ConsolidatedCustomer[]
   organizationsAtRiskList: ConsolidatedCustomer[]
   upcomingRenewals: ConsolidatedCustomer[]
@@ -189,10 +195,15 @@ export function useConsolidatedCustomers() {
         }
       })
 
-      // Hämta inbjudningar
-      const { data: invitationsData } = await supabase
+      // Hämta inbjudningar med felhantering
+      const { data: invitationsData, error: invitationsError } = await supabase
         .from('user_invitations')
         .select('customer_id, accepted_at, expires_at')
+      
+      // Om vi får 403-fel, fortsätt utan inbjudningsdata
+      if (invitationsError && !invitationsError.message.includes('permission denied')) {
+        console.error('Error fetching invitations:', invitationsError)
+      }
 
       const invitationMap = new Map<string, 'pending' | 'active'>()
       invitationsData?.forEach(inv => {
@@ -418,6 +429,10 @@ export function useConsolidatedCustomers() {
         averageHealthScore: 0,
         organizationsAtRisk: 0,
         monthlyGrowth: 0,
+        totalCustomers: 0,
+        activeCustomers: 0,
+        netRevenueRetention: 100,
+        highRiskCount: 0,
         topOrganizationsByValue: [],
         organizationsAtRiskList: [],
         upcomingRenewals: [],
@@ -464,6 +479,9 @@ export function useConsolidatedCustomers() {
       .filter(c => c.daysToNextRenewal && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90)
       .sort((a, b) => (a.daysToNextRenewal || 0) - (b.daysToNextRenewal || 0))
     
+    // Additional metrics for KPI cards
+    const activeCustomersCount = consolidatedCustomers.filter(c => c.is_active).length
+    
     return {
       totalOrganizations: consolidatedCustomers.length,
       totalSites,
@@ -476,6 +494,13 @@ export function useConsolidatedCustomers() {
       averageHealthScore,
       organizationsAtRisk: organizationsAtRiskCount,
       monthlyGrowth: 5.2, // Placeholder värde
+      
+      // KPI Cards properties
+      totalCustomers: consolidatedCustomers.length,
+      activeCustomers: activeCustomersCount,
+      netRevenueRetention: 98.5, // Placeholder värde
+      highRiskCount: organizationsAtRiskCount,
+      
       topOrganizationsByValue,
       organizationsAtRiskList,
       upcomingRenewals,
