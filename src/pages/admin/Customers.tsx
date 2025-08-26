@@ -22,6 +22,9 @@ import EditCustomerModal from '../../components/admin/customers/EditCustomerModa
 import ARRForecastChart from '../../components/admin/customers/ARRForecastChart'
 import TooltipWrapper from '../../components/ui/TooltipWrapper'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
+import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
+import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
+import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -165,7 +168,18 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
 
 export default function Customers() {
   const navigate = useNavigate()
-  const { customers, analytics, loading, error, filterCustomers, refresh } = useCustomerAnalytics()
+  // Use consolidated customers hook instead of regular customer analytics
+  const { 
+    consolidatedCustomers, 
+    analytics: consolidatedAnalytics, 
+    loading, 
+    error, 
+    filterCustomers: filterConsolidatedCustomers, 
+    refresh 
+  } = useConsolidatedCustomers()
+  
+  // Keep old hook for backwards compatibility with components that need individual customers
+  const { customers: legacyCustomers } = useCustomerAnalytics()
   
   // State management
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -180,19 +194,21 @@ export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expiring'>('all')
   const [healthFilter, setHealthFilter] = useState<'all' | 'excellent' | 'good' | 'fair' | 'poor'>('all')
-  const [portalFilter, setPortalFilter] = useState<'all' | 'active' | 'pending' | 'none'>('all')
+  const [portalFilter, setPortalFilter] = useState<'all' | 'full' | 'partial' | 'none'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
+  const [organizationTypeFilter, setOrganizationTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
-    return filterCustomers({
+    return filterConsolidatedCustomers({
       search: searchTerm,
       status: statusFilter,
       healthScore: healthFilter,
       portalAccess: portalFilter,
-      manager: managerFilter === 'all' ? undefined : managerFilter
+      manager: managerFilter === 'all' ? undefined : managerFilter,
+      organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
-  }, [customers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, filterCustomers])
+  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, filterConsolidatedCustomers])
 
   // Toggle expanded row
   const toggleExpandedRow = (customerId: string) => {
@@ -205,32 +221,39 @@ export default function Customers() {
     setExpandedRows(newExpanded)
   }
 
-  // Portal invitation
-  const inviteToPortal = async (customer: any) => {
-    setSendingInvitation(customer.id)
+  // Portal invitation for consolidated customers
+  const inviteToPortal = async (organization: any) => {
+    setSendingInvitation(organization.id)
     try {
-      // Skapa auth-användare och profil
-      const response = await fetch('/api/create-customer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company_name: customer.company_name,
-          contact_person: customer.contact_person,
-          contact_email: customer.contact_email,
-          contact_phone: customer.contact_phone,
-          customer_id: customer.id,
-          skip_customer_creation: true // Vi har redan kunden, skapa bara profil
+      if (organization.organizationType === 'multisite') {
+        // For multisite - invite organization
+        toast.info('Multisite portal-inbjudan kommer snart...')
+        // TODO: Implement multisite portal invitation
+      } else {
+        // For single customer - use existing logic
+        const singleCustomer = organization.sites[0]
+        const response = await fetch('/api/create-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_name: singleCustomer.company_name,
+            contact_person: singleCustomer.contact_person,
+            contact_email: singleCustomer.contact_email,
+            contact_phone: singleCustomer.contact_phone,
+            customer_id: singleCustomer.id,
+            skip_customer_creation: true
+          })
         })
-      })
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Kunde inte skicka inbjudan')
+        const data = await response.json()
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Kunde inte skicka inbjudan')
+        }
+        
+        toast.success('Portal-inbjudan skickad!')
       }
-      
-      toast.success('Portal-inbjudan skickad!')
-      refresh() // Uppdatera listan
+      refresh()
     } catch (error: any) {
       console.error('Error inviting to portal:', error)
       toast.error(error.message || 'Ett fel uppstod')
@@ -253,13 +276,13 @@ export default function Customers() {
   // Get unique managers for filter
   const uniqueManagers = useMemo(() => {
     const managers = new Set<string>()
-    customers.forEach(c => {
+    consolidatedCustomers.forEach(c => {
       if (c.assigned_account_manager) {
         managers.add(c.assigned_account_manager)
       }
     })
     return Array.from(managers).sort()
-  }, [customers])
+  }, [consolidatedCustomers])
 
   if (loading) {
     return (
@@ -328,7 +351,7 @@ export default function Customers() {
       />
 
       {/* KPI Cards */}
-      <CustomerKpiCards analytics={analytics} />
+      <CustomerKpiCards analytics={consolidatedAnalytics} />
 
       {/* Main content with sidebar */}
       <div className="relative">
@@ -376,9 +399,19 @@ export default function Customers() {
                 className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
               >
                 <option value="all">Portal Access</option>
-                <option value="active">Aktiv</option>
-                <option value="pending">Inbjuden</option>
-                <option value="none">Ej inbjuden</option>
+                <option value="full">Full tillgång</option>
+                <option value="partial">Delvis tillgång</option>
+                <option value="none">Ingen tillgång</option>
+              </select>
+
+              <select
+                value={organizationTypeFilter}
+                onChange={(e) => setOrganizationTypeFilter(e.target.value as any)}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-green-500"
+              >
+                <option value="all">Alla typer</option>
+                <option value="multisite">Multisite</option>
+                <option value="single">Enkelsites</option>
               </select>
 
               {uniqueManagers.length > 0 && (
@@ -396,214 +429,69 @@ export default function Customers() {
             </div>
           </Card>
 
-          {/* Customer table */}
+          {/* Consolidated Customer table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-800/50 border-b border-slate-700">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Företag & Kontakt
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Organisation & Kontakt
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Portal
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Kontraktsvärde
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Kontraktsperiod
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Health Score
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Churn Risk
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Säljare
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
                       Åtgärder
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {filteredCustomers.map((customer) => {
-                    const isExpanded = expandedRows.has(customer.id)
-                    const contractPeriod = formatContractPeriod(
-                      customer.contract_start_date,
-                      customer.contract_end_date
-                    )
-                    const progress = customer.contractProgress
+                <tbody>
+                  {filteredCustomers.map((organization) => {
+                    const isExpanded = expandedRows.has(organization.id)
 
                     return (
-                      <React.Fragment key={customer.id}>
-                        <tr className="hover:bg-slate-800/30 transition-colors">
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="text-sm font-medium text-white">
-                                {customer.company_name}
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                {customer.contact_person || 'Ingen kontaktperson'}
-                              </p>
-                              {customer.organization_number && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                  Org.nr: {customer.organization_number}
-                                </p>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <PortalAccessBadge status={customer.invitationStatus || 'none'} size="sm" />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="text-sm font-bold text-white">
-                                {formatCurrency(customer.total_contract_value)}
-                              </p>
-                              <p className="text-xs text-green-400 mt-1">
-                                {formatCurrency(customer.annual_value)} /år
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {formatCurrency(customer.monthly_value)} /mån
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <TooltipWrapper content={contractPeriod.tooltip} position="top">
-                              <div className="cursor-help">
-                                <p className="text-sm text-white">
-                                  {contractPeriod.display}
-                                </p>
-                                <div className="mt-2">
-                                  <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full transition-all ${
-                                        progress.status === 'expired' ? 'bg-red-500' :
-                                        progress.status === 'expiring-soon' ? 'bg-orange-500' :
-                                        'bg-green-500'
-                                      }`}
-                                      style={{ width: `${progress.percentage}%` }}
-                                    />
-                                  </div>
-                                </div>
-                                <p className={`text-xs mt-1 ${
-                                  contractPeriod.isExpired ? 'text-red-400' :
-                                  contractPeriod.isExpiringSoon ? 'text-orange-400' :
-                                  'text-slate-500'
-                                }`}>
-                                  {contractPeriod.isExpired ? 'Utgånget' :
-                                   contractPeriod.isExpiringSoon ? `${contractPeriod.daysRemaining} dagar kvar!` :
-                                   `${contractPeriod.monthsRemaining} månader kvar`}
-                                </p>
-                              </div>
-                            </TooltipWrapper>
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <HealthScoreBadge
-                              score={customer.healthScore.score}
-                              level={customer.healthScore.level}
-                              tooltip={customer.healthScore.tooltip}
-                              size="sm"
+                      <React.Fragment key={organization.id}>
+                        {/* Organization main row */}
+                        <ExpandableOrganizationRow
+                          organization={organization}
+                          isExpanded={isExpanded}
+                          onToggle={() => toggleExpandedRow(organization.id)}
+                          onInviteToPortal={inviteToPortal}
+                          onEdit={(org) => handleEditCustomer(org.sites[0])} // Edit first site for now
+                        />
+                        
+                        {/* Site detail rows (only for multisite when expanded) */}
+                        {isExpanded && organization.organizationType === 'multisite' && 
+                          organization.sites.map((site) => (
+                            <SiteDetailRow
+                              key={site.id}
+                              site={site}
+                              indentLevel={1}
+                              onSiteEdit={(site) => handleEditCustomer(site)}
                             />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <ChurnRiskBadge
-                              risk={customer.churnRisk.risk}
-                              score={customer.churnRisk.score}
-                              tooltip={customer.churnRisk.tooltip}
-                              size="sm"
-                            />
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="text-sm text-white">
-                                {customer.assigned_account_manager || 'Ej tilldelad'}
-                              </p>
-                              {customer.sales_person && customer.sales_person !== customer.assigned_account_manager && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                  Såld av: {customer.sales_person}
-                                </p>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-4">
-                            <div className="flex justify-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditCustomer(customer)}
-                                className="text-green-400 hover:text-green-300"
-                                title="Redigera kund"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </Button>
-                              
-                              {customer.invitationStatus === 'none' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => inviteToPortal(customer)}
-                                  disabled={sendingInvitation === customer.id}
-                                  className="text-blue-400 hover:text-blue-300"
-                                  title="Bjud in till portal"
-                                >
-                                  {sendingInvitation === customer.id ? (
-                                    <LoadingSpinner size="sm" />
-                                  ) : (
-                                    <UserPlus className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              )}
-                              
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.location.href = `mailto:${customer.billing_email || customer.contact_email}`}
-                                className="text-slate-400 hover:text-white"
-                                title={customer.billing_email ? "Skicka faktura-mail" : "Skicka e-post"}
-                              >
-                                <Mail className={`w-4 h-4 ${customer.billing_email ? 'text-yellow-400' : ''}`} />
-                              </Button>
-
-                              {customer.contact_phone && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.location.href = `tel:${customer.contact_phone}`}
-                                  className="text-slate-400 hover:text-white"
-                                  title="Ring"
-                                >
-                                  <Phone className="w-4 h-4" />
-                                </Button>
-                              )}
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleExpandedRow(customer.id)}
-                                className="text-slate-400 hover:text-white"
-                                title={isExpanded ? 'Dölj detaljer' : 'Visa detaljer'}
-                              >
-                                {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isExpanded && <ExpandedCustomerRow customer={customer} />}
+                          ))
+                        }
+                        
+                        {/* Expanded details for single-site customers */}
+                        {isExpanded && organization.organizationType === 'single' && (
+                          <ExpandedCustomerRow customer={organization.sites[0]} />
+                        )}
                       </React.Fragment>
                     )
                   })}
@@ -614,9 +502,9 @@ export default function Customers() {
                 <div className="text-center py-16">
                   <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">
-                    {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' 
-                      ? 'Inga kunder matchar dina filter'
-                      : 'Inga kunder att visa'}
+                    {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                      ? 'Inga organisationer matchar dina filter'
+                      : 'Inga organisationer att visa'}
                   </p>
                 </div>
               )}
@@ -645,39 +533,44 @@ export default function Customers() {
             </div>
 
             {/* ARR Forecast - Prominent feature */}
-            <ARRForecastChart customers={customers} />
+            <ARRForecastChart customers={legacyCustomers || []} />
 
             {/* Separator */}
             <div className="border-t border-slate-700"></div>
 
-            {/* Industry breakdown */}
+            {/* Organization statistics */}
             <Card className="p-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Fördelning per Industri</h4>
-              <div className="space-y-2">
-                {analytics.customersByIndustry.slice(0, 5).map((item) => (
-                  <div key={item.industry} className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">{item.industry}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-white">{item.count} st</span>
-                      <span className="text-xs text-green-400">
-                        {formatCurrency(item.value)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <h4 className="text-sm font-medium text-slate-300 mb-3">Organisationsöversikt</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                  <span className="text-xs text-slate-400">Totalt organisationer</span>
+                  <span className="text-sm font-medium text-white">{consolidatedAnalytics.totalOrganizations}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded">
+                  <span className="text-xs text-slate-400">Multisite-organisationer</span>
+                  <span className="text-sm font-medium text-blue-400">{consolidatedAnalytics.multisiteOrganizations}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                  <span className="text-xs text-slate-400">Enkelkunder</span>
+                  <span className="text-sm font-medium text-white">{consolidatedAnalytics.singleCustomers}</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
+                  <span className="text-xs text-slate-400">Totalt enheter</span>
+                  <span className="text-sm font-medium text-green-400">{consolidatedAnalytics.totalSites}</span>
+                </div>
               </div>
             </Card>
 
-            {/* Top customers */}
+            {/* Top organizations */}
             <Card className="p-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Top 5 Kunder</h4>
+              <h4 className="text-sm font-medium text-slate-300 mb-3">Top 5 Organisationer</h4>
               <div className="space-y-2">
-                {analytics.topCustomersByValue.slice(0, 5).map((customer, idx) => (
+                {consolidatedAnalytics.topOrganizationsByValue.slice(0, 5).map((organization, idx) => (
                   <div 
-                    key={customer.id}
+                    key={organization.id}
                     className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
                     onClick={() => {
-                      setSearchTerm(customer.company_name)
+                      setSearchTerm(organization.company_name)
                       setSidebarOpen(false)
                     }}
                   >
@@ -685,52 +578,66 @@ export default function Customers() {
                       <span className="text-xs text-slate-500">#{idx + 1}</span>
                       <div>
                         <p className="text-sm text-white truncate">
-                          {customer.company_name}
+                          {organization.company_name}
                         </p>
-                        <HealthScoreBadge
-                          score={customer.healthScore.score}
-                          level={customer.healthScore.level}
-                          tooltip={customer.healthScore.tooltip}
-                          size="sm"
-                          showIcon={false}
-                        />
+                        <div className="flex items-center gap-2">
+                          <HealthScoreBadge
+                            score={organization.overallHealthScore.score}
+                            level={organization.overallHealthScore.level}
+                            tooltip=""
+                            size="sm"
+                            showIcon={false}
+                          />
+                          {organization.organizationType === 'multisite' && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded">
+                              {organization.totalSites} enheter
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <p className="text-sm font-bold text-green-400">
-                      {formatCurrency(customer.total_contract_value)}
+                      {formatCurrency(organization.totalContractValue)}
                     </p>
                   </div>
                 ))}
               </div>
             </Card>
 
-            {/* At risk customers */}
-            {analytics.customersAtRisk.length > 0 && (
+            {/* At risk organizations */}
+            {consolidatedAnalytics.organizationsAtRisk.length > 0 && (
               <Card className="p-4 bg-red-500/10 border-red-500/20">
                 <h4 className="text-sm font-medium text-red-400 mb-3">
-                  Kunder i Riskzonen ({analytics.customersAtRisk.length})
+                  Organisationer i Riskzonen ({consolidatedAnalytics.organizationsAtRisk.length})
                 </h4>
                 <div className="space-y-2">
-                  {analytics.customersAtRisk.slice(0, 5).map((customer) => (
+                  {consolidatedAnalytics.organizationsAtRisk.slice(0, 5).map((organization) => (
                     <div 
-                      key={customer.id}
+                      key={organization.id}
                       className="p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
                       onClick={() => {
-                        setSearchTerm(customer.company_name)
+                        setSearchTerm(organization.company_name)
                         setSidebarOpen(false)
                       }}
                     >
-                      <p className="text-sm text-white truncate">{customer.company_name}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-white truncate">{organization.company_name}</p>
+                        {organization.organizationType === 'multisite' && (
+                          <span className="text-xs bg-red-200 text-red-800 px-1 py-0.5 rounded">
+                            {organization.totalSites} enheter
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center justify-between mt-1">
                         <ChurnRiskBadge
-                          risk={customer.churnRisk.risk}
-                          score={customer.churnRisk.score}
-                          tooltip={customer.churnRisk.tooltip}
+                          risk={organization.highestChurnRisk.risk}
+                          score={organization.highestChurnRisk.score}
+                          tooltip=""
                           size="sm"
                           showIcon={false}
                         />
                         <span className="text-xs text-slate-500">
-                          {customer.contractProgress.daysRemaining} dagar kvar
+                          {organization.daysToNextRenewal ? `${organization.daysToNextRenewal} dagar kvar` : 'Okänt'}
                         </span>
                       </div>
                     </div>
@@ -742,30 +649,37 @@ export default function Customers() {
             {/* Upcoming renewals */}
             <Card className="p-4">
               <h4 className="text-sm font-medium text-slate-300 mb-3">
-                Kommande Förnyelser ({analytics.upcomingRenewals.length})
+                Kommande Förnyelser ({consolidatedAnalytics.upcomingRenewals.length})
               </h4>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {analytics.upcomingRenewals.map((customer) => (
+                {consolidatedAnalytics.upcomingRenewals.map((organization) => (
                   <div 
-                    key={customer.id}
+                    key={organization.id}
                     className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-all cursor-pointer"
                     onClick={() => {
-                      setSearchTerm(customer.company_name)
+                      setSearchTerm(organization.company_name)
                       setSidebarOpen(false)
                     }}
                   >
                     <div>
-                      <p className="text-sm text-white truncate">{customer.company_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-white truncate">{organization.company_name}</p>
+                        {organization.organizationType === 'multisite' && (
+                          <span className="text-xs bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded">
+                            {organization.totalSites} enheter
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">
-                        {formatCurrency(customer.total_contract_value)}
+                        {formatCurrency(organization.totalContractValue)}
                       </p>
                     </div>
                     <span className={`text-xs font-medium ${
-                      customer.contractProgress.daysRemaining <= 30 ? 'text-red-400' :
-                      customer.contractProgress.daysRemaining <= 60 ? 'text-orange-400' :
+                      (organization.daysToNextRenewal || 0) <= 30 ? 'text-red-400' :
+                      (organization.daysToNextRenewal || 0) <= 60 ? 'text-orange-400' :
                       'text-yellow-400'
                     }`}>
-                      {customer.contractProgress.daysRemaining} dagar
+                      {organization.daysToNextRenewal || 0} dagar
                     </span>
                   </div>
                 ))}
@@ -777,33 +691,30 @@ export default function Customers() {
               <h4 className="text-sm font-medium text-slate-300 mb-3">Tillväxt Metrics</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-slate-500">Månadsvis</p>
+                  <p className="text-xs text-slate-500">Portal-tillgång</p>
+                  <div className="grid grid-cols-3 gap-1 text-xs">
+                    <span className="text-green-400">✓ {consolidatedAnalytics.portalAccessStats.fullAccess}</span>
+                    <span className="text-yellow-400">⚠ {consolidatedAnalytics.portalAccessStats.partialAccess}</span>
+                    <span className="text-gray-400">✗ {consolidatedAnalytics.portalAccessStats.noAccess}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Genomsnittsvärde</p>
                   <p className="text-lg font-bold text-white">
-                    {analytics.monthlyGrowth > 0 ? '+' : ''}{analytics.monthlyGrowth.toFixed(1)}%
+                    {formatCurrency(consolidatedAnalytics.averageContractValue)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Kvartalsvis</p>
-                  <p className="text-lg font-bold text-white">
-                    {analytics.quarterlyGrowth > 0 ? '+' : ''}{analytics.quarterlyGrowth.toFixed(1)}%
+                  <p className="text-xs text-slate-500">Health Score</p>
+                  <p className="text-lg font-bold text-green-400">
+                    {consolidatedAnalytics.averageHealthScore.toFixed(0)}/100
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Årlig</p>
-                  <p className="text-lg font-bold text-white">
-                    {analytics.yearlyGrowth > 0 ? '+' : ''}{analytics.yearlyGrowth.toFixed(1)}%
+                  <p className="text-xs text-slate-500">I riskzonen</p>
+                  <p className="text-lg font-bold text-red-400">
+                    {consolidatedAnalytics.organizationsAtRisk}
                   </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">NRR</p>
-                  <TooltipWrapper 
-                    content="Net Revenue Retention - visar hur mycket intäkterna växer från befintliga kunder. Över 100% betyder expansion."
-                    position="left"
-                  >
-                    <p className="text-lg font-bold text-green-400 cursor-help">
-                      {analytics.netRevenueRetention}%
-                    </p>
-                  </TooltipWrapper>
                 </div>
               </div>
             </Card>
@@ -815,7 +726,7 @@ export default function Customers() {
       <EmailCampaignModal
         isOpen={emailCampaignOpen}
         onClose={() => setEmailCampaignOpen(false)}
-        customers={filteredCustomers}
+        customers={legacyCustomers || []}
       />
 
       {/* Edit Customer Modal */}
