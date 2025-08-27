@@ -65,13 +65,14 @@ const CustomerPortal: React.FC = () => {
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
-  // Check multisite access and redirect if needed
+  // Check multisite access and redirect if needed - KRITISK: Måste köras först
   useEffect(() => {
     // Vänta tills multisite-context har laddats
     if (!multisiteLoading && profile) {
       // Om användaren ENDAST har multisite-roll och ingen customer_id
       if (userRole && organization && !profile.customer_id) {
-        navigate('/organisation')
+        console.log('Multisite user detected, redirecting to organisation portal:', userRole)
+        navigate('/organisation', { replace: true })
         return
       }
       
@@ -79,6 +80,18 @@ const CustomerPortal: React.FC = () => {
       // men visa tydlig navigation till multisite
     }
   }, [multisiteLoading, userRole, organization, profile, navigate])
+
+  // Early return för multisite-användare som inte ska vara här
+  if (!multisiteLoading && profile && userRole && organization && !profile.customer_id) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="text-white mt-4">Omdirigerar till organisationsportal...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Fetch customer data
   useEffect(() => {
@@ -235,7 +248,13 @@ const CustomerPortal: React.FC = () => {
   const renderQuotesView = () => (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <QuoteListView customerId={customer!.id} />
+        {customer ? (
+          <QuoteListView customerId={customer.id} />
+        ) : (
+          <div className="text-center text-slate-400">
+            <p>Ingen kunddata tillgänglig för att visa offerter.</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -277,14 +296,18 @@ const CustomerPortal: React.FC = () => {
             />
 
             {/* Service Assessment Summary */}
-            <ServiceAssessmentSummary 
-              customerId={customer.id}
-            />
+            {customer && (
+              <ServiceAssessmentSummary 
+                customerId={customer.id}
+              />
+            )}
 
             {/* Service Activity Timeline */}
-            <ServiceActivityTimeline 
-              customerId={customer.id}
-            />
+            {customer && (
+              <ServiceActivityTimeline 
+                customerId={customer.id}
+              />
+            )}
           </div>
 
           {/* Right Column - Relationships (1/3 width) */}
@@ -337,7 +360,7 @@ const CustomerPortal: React.FC = () => {
       <CustomerPortalNavigation
         currentView={currentView}
         onViewChange={setCurrentView}
-        customerName={customer.company_name}
+        customerName={customer?.company_name || 'Okänd kund'}
       />
 
       {/* Content based on current view */}
