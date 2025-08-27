@@ -478,10 +478,6 @@ export default function EditContractCaseModal({
       // Fetch regionchef site_ids and contact info using the same approach as admin pages
       console.log('fetchOrganizationSites - Querying multisite_user_roles with org_id:', orgId)
       
-      // Debug: Check current user context
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      console.log('DEBUG - Current user context:', user ? { id: user.id, email: user.email } : 'No user')
-      
       // Use secure query instead of the insecure view
       const { data: regionchefRoles, error: regionchefError } = await supabase
         .from('multisite_user_roles')
@@ -504,46 +500,9 @@ export default function EditContractCaseModal({
         console.error('Error details:', regionchefError.details)
         console.error('Error hint:', regionchefError.hint)
       } else {
-        console.log('SUCCESS - Regionchef roles query result:', regionchefRoles)
-        console.log('SUCCESS - Regionchef query length:', regionchefRoles?.length || 0)
-        
-        // DEBUG: Detaljerad analys av regionchef data
-        if (regionchefRoles && regionchefRoles.length > 0) {
-          const regionchef = regionchefRoles[0]
-          console.log('DEBUG - Regionchef full object:', regionchef)
-          console.log('DEBUG - Regionchef site_ids:', regionchef.site_ids)
-          console.log('DEBUG - Regionchef profiles object:', regionchef.profiles)
-          
-          if (!regionchef.profiles) {
-            console.warn('WARNING - Regionchef profiles är null, möjligen RLS problem med profiles-tabellen')
-            
-            // Testa direkt profiles query för samma user_id
-            const testUserId = '166d1dff-5ad7-428b-82c1-809fb84d8c16' // från konsolen
-            const { data: testProfile, error: testError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', testUserId)
-              .single()
-            
-            console.log('DEBUG - Direkt profiles test för user_id', testUserId, ':', { data: testProfile, error: testError })
-          } else {
-            console.log('SUCCESS - Regionchef profiles data:', regionchef.profiles)
-          }
-        }
-        
-        // Debug: Test a simple multisite_user_roles query to verify access
-        const { data: testQuery, error: testError } = await supabase
-          .from('multisite_user_roles')
-          .select('user_id, role_type, organization_id')
-          .eq('organization_id', orgId)
-        console.log('DEBUG - Test query for all roles in org:', testQuery)
-        if (testError) {
-          console.error('DEBUG - Test query error:', testError)
-        }
         if (regionchefRoles && regionchefRoles.length > 0) {
           const allRegionchefSiteIds = regionchefRoles.flatMap(role => role.site_ids || [])
           setRegionchefSiteIds(allRegionchefSiteIds)
-          console.log('fetchOrganizationSites - Regionchef site_ids from VIEW:', allRegionchefSiteIds)
           
           // Set contact info from the first regionchef found
           const firstRegionchef = regionchefRoles[0]
@@ -552,9 +511,7 @@ export default function EditContractCaseModal({
             contactEmail: firstRegionchef.profiles?.email || undefined,
             contactPhone: firstRegionchef.profiles?.phone || undefined
           })
-          console.log('fetchOrganizationSites - Regionchef contact info:', firstRegionchef)
         } else {
-          console.log('fetchOrganizationSites - No regionchef roles found in VIEW')
           setRegionchefSiteIds([])
           setRegionchefContactInfo(null)
         }
@@ -584,7 +541,6 @@ export default function EditContractCaseModal({
           contactEmail: verksamhetschef.profiles?.email || undefined,
           contactPhone: verksamhetschef.profiles?.phone || undefined
         })
-        console.log('fetchOrganizationSites - Verksamhetschef contact info:', verksamhetschef)
       } else {
         setVerksamhetschefContactInfo(null)
       }
@@ -952,39 +908,20 @@ export default function EditContractCaseModal({
         }
       }
 
-      // DEBUG: Logga vad som skickas till databasen
-      const updateData = {
-        ...cleanedFormData,
-        customer_id: customerId || null
-      }
-      console.log('DEBUG - Data som skickas till databas-update:', updateData)
-      console.log('DEBUG - Case ID som uppdateras:', caseData.id)
-      
       const { data, error } = await supabase
         .from('cases')
-        .update(updateData)
+        .update({
+          ...cleanedFormData,
+          customer_id: customerId || null
+        })
         .eq('id', caseData.id)
-        .select() // Lägg till select för att få tillbaka uppdaterad data
+        .select()
 
-      console.log('DEBUG - Databas update response:', { data, error })
-      
-      if (error) {
-        console.error('ERROR - Databas update misslyckades:', error)
-        console.error('ERROR - Error code:', error.code)
-        console.error('ERROR - Error message:', error.message)
-        console.error('ERROR - Error details:', error.details)
-        throw error
-      }
+      if (error) throw error
 
-      if (data && data.length > 0) {
-        console.log('SUCCESS - Databas update lyckades, uppdaterad data:', data[0])
-        toast.success('Ärende uppdaterat!')
-        onSuccess?.()
-        handleClose()
-      } else {
-        console.warn('WARNING - Databas update returnerade ingen data, möjligen RLS problem')
-        toast.error('Uppdatering misslyckades - kontrollera behörigheter')
-      }
+      toast.success('Ärende uppdaterat!')
+      onSuccess?.()
+      handleClose()
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
