@@ -47,7 +47,7 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
       setError(null)
 
       const { data, error } = await supabase
-        .from('customer_quotes')
+        .from('quotes_secure_view')
         .select('*')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })

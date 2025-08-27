@@ -478,10 +478,17 @@ export default function EditContractCaseModal({
       // Fetch regionchef site_ids and contact info using the same approach as admin pages
       console.log('fetchOrganizationSites - Querying multisite_users_complete with org_id:', orgId)
       
-      // Use the multisite_users_complete view like admin pages do
+      // Use secure query instead of the insecure view
       const { data: regionchefRoles, error: regionchefError } = await supabase
-        .from('multisite_users_complete')
-        .select('site_ids, display_name, email, phone')
+        .from('multisite_user_roles')
+        .select(`
+          site_ids,
+          profiles!inner (
+            display_name,
+            email,
+            phone
+          )
+        `)
         .eq('organization_id', orgId)
         .eq('role_type', 'regionchef')
         .eq('is_active', true)
@@ -500,9 +507,9 @@ export default function EditContractCaseModal({
           // Set contact info from the first regionchef found
           const firstRegionchef = regionchefRoles[0]
           setRegionchefContactInfo({
-            contactPerson: firstRegionchef.display_name || undefined,
-            contactEmail: firstRegionchef.email || undefined,
-            contactPhone: firstRegionchef.phone || undefined
+            contactPerson: firstRegionchef.profiles?.display_name || undefined,
+            contactEmail: firstRegionchef.profiles?.email || undefined,
+            contactPhone: firstRegionchef.profiles?.phone || undefined
           })
           console.log('fetchOrganizationSites - Regionchef contact info:', firstRegionchef)
         } else {
@@ -514,8 +521,14 @@ export default function EditContractCaseModal({
       
       // Also fetch verksamhetschef contact info
       const { data: verksamhetschefRoles, error: verksamhetschefError } = await supabase
-        .from('multisite_users_complete')
-        .select('display_name, email, phone')
+        .from('multisite_user_roles')
+        .select(`
+          profiles!inner (
+            display_name,
+            email,
+            phone
+          )
+        `)
         .eq('organization_id', orgId)
         .eq('role_type', 'verksamhetschef')
         .eq('is_active', true)
@@ -526,9 +539,9 @@ export default function EditContractCaseModal({
       } else if (verksamhetschefRoles && verksamhetschefRoles.length > 0) {
         const verksamhetschef = verksamhetschefRoles[0]
         setVerksamhetschefContactInfo({
-          contactPerson: verksamhetschef.display_name || undefined,
-          contactEmail: verksamhetschef.email || undefined,
-          contactPhone: verksamhetschef.phone || undefined
+          contactPerson: verksamhetschef.profiles?.display_name || undefined,
+          contactEmail: verksamhetschef.profiles?.email || undefined,
+          contactPhone: verksamhetschef.profiles?.phone || undefined
         })
         console.log('fetchOrganizationSites - Verksamhetschef contact info:', verksamhetschef)
       } else {

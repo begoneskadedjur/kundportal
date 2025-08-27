@@ -37,11 +37,23 @@
       "Bash(node:*)",
       "Read(/C:\\c\\Users\\chris/**)",
       "WebFetch(domain:kundportal.vercel.app)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Read(/C:\\c\\Users\\chris/**)",
+      "mcp__supabase__get_project_url",
+      "Bash(test:*)",
+      "mcp__supabase__list_organizations",
+      "Bash(psql:*)",
+      "Bash(cat:*)",
+      "Bash(rg:*)",
+      "mcp__supabase__get_cost",
+      "mcp__supabase__confirm_cost",
+      "mcp__supabase__create_branch",
+      "mcp__supabase__list_branches"
     ],
     "deny": [],
     "additionalDirectories": [
-      "C:\\mnt\\c\\Users\\chris"
+      "C:\\mnt\\c\\Users\\chris",
+      "C:\\c\\Users\\chris"
     ]
   },
   "mcpServers": {

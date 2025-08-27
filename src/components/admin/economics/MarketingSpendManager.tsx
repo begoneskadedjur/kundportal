@@ -1,10 +1,11 @@
 // 📁 src/components/admin/economics/MarketingSpendManager.tsx
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit3, Save, X, DollarSign, Calendar, TrendingUp } from 'lucide-react'
+import { Plus, Trash2, Edit3, Save, X, DollarSign, Calendar, TrendingUp, Activity } from 'lucide-react'
 import Card from '../../ui/Card'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import { supabase } from '../../../lib/supabase'
+import { useMarketingSpendPerformance } from '../../../hooks/usePerformanceMonitoring'
 import toast from 'react-hot-toast'
 
 interface MarketingSpend {
@@ -47,10 +48,21 @@ const MarketingSpendManager: React.FC = () => {
     notes: ''
   })
 
+  // Performance monitoring hook
+  const { 
+    performanceData, 
+    markDataLoaded, 
+    markRenderComplete, 
+    getDetailedReport, 
+    isPerformant 
+  } = useMarketingSpendPerformance()
+
   // Hämta alla marknadsföringskostnader
   const fetchSpendData = async () => {
     try {
       setLoading(true)
+      const startTime = performance.now()
+      
       const { data, error } = await supabase
         .from('monthly_marketing_spend')
         .select('*')
@@ -58,6 +70,13 @@ const MarketingSpendManager: React.FC = () => {
 
       if (error) throw error
       setSpendData(data || [])
+      
+      // Märk att data har laddats för performance monitoring
+      markDataLoaded()
+      
+      const loadTime = performance.now() - startTime
+      console.log(`🚀 MarketingSpend data loaded in ${Math.round(loadTime)}ms`)
+      
     } catch (error) {
       console.error('Error fetching marketing spend:', error)
       toast.error('Kunde inte hämta marknadsföringskostnader')
@@ -69,6 +88,13 @@ const MarketingSpendManager: React.FC = () => {
   useEffect(() => {
     fetchSpendData()
   }, [])
+
+  // Märk rendering som klar när komponenten är fullt laddad
+  useEffect(() => {
+    if (!loading && spendData.length >= 0) {
+      markRenderComplete()
+    }
+  }, [loading, spendData, markRenderComplete])
 
   // Hantera formulärförändringar
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -97,6 +123,8 @@ const MarketingSpendManager: React.FC = () => {
     if (!validateForm()) return
 
     try {
+      const startTime = performance.now()
+      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .insert([{
@@ -106,6 +134,9 @@ const MarketingSpendManager: React.FC = () => {
         }])
 
       if (error) throw error
+
+      const createTime = performance.now() - startTime
+      console.log(`✅ CREATE operation completed in ${Math.round(createTime)}ms`)
 
       toast.success('Marknadsföringskostnad sparad!')
       setFormData({ month: '', spend: '', notes: '' })
@@ -126,6 +157,8 @@ const MarketingSpendManager: React.FC = () => {
     if (!validateForm()) return
 
     try {
+      const startTime = performance.now()
+      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .update({
@@ -137,6 +170,9 @@ const MarketingSpendManager: React.FC = () => {
         .eq('id', id)
 
       if (error) throw error
+
+      const updateTime = performance.now() - startTime
+      console.log(`✅ UPDATE operation completed in ${Math.round(updateTime)}ms`)
 
       toast.success('Marknadsföringskostnad uppdaterad!')
       setEditingId(null)
@@ -159,12 +195,17 @@ const MarketingSpendManager: React.FC = () => {
     }
 
     try {
+      const startTime = performance.now()
+      
       const { error } = await supabase
         .from('monthly_marketing_spend')
         .delete()
         .eq('id', id)
 
       if (error) throw error
+
+      const deleteTime = performance.now() - startTime
+      console.log(`🗑️ DELETE operation completed in ${Math.round(deleteTime)}ms`)
 
       toast.success('Marknadsföringskostnad borttagen!')
       fetchSpendData()
@@ -195,11 +236,21 @@ const MarketingSpendManager: React.FC = () => {
   const totalSpend = spendData.reduce((sum, item) => sum + item.spend, 0)
 
   return (
-    <Card>
+    <Card data-testid="marketing-spend-manager">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <DollarSign className="w-5 h-5 text-purple-500 mr-2" />
           <h2 className="text-lg font-semibold text-white">Marknadsföringskostnader</h2>
+          
+          {/* Performance indicator */}
+          {!loading && (
+            <div className="ml-3 flex items-center text-xs">
+              <Activity className={`w-3 h-3 mr-1 ${isPerformant ? 'text-green-400' : 'text-yellow-400'}`} />
+              <span className={`${isPerformant ? 'text-green-400' : 'text-yellow-400'}`}>
+                {performanceData.loadTime > 0 ? `${performanceData.loadTime}ms` : 'Loading...'}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -209,6 +260,7 @@ const MarketingSpendManager: React.FC = () => {
           <Button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2"
+            data-testid="add-marketing-spend"
           >
             <Plus className="w-4 h-4" />
             Lägg till
@@ -218,7 +270,7 @@ const MarketingSpendManager: React.FC = () => {
 
       {/* Formulär för att lägga till ny kostnad */}
       {showForm && (
-        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700" data-testid="marketing-spend-form">
           <h3 className="text-white font-medium mb-4">Lägg till marknadsföringskostnad</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
@@ -282,11 +334,12 @@ const MarketingSpendManager: React.FC = () => {
           <p className="text-sm">Klicka på "Lägg till" för att börja</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="marketing-spend-list">
           {spendData.map((spend) => (
             <div
               key={spend.id}
               className="flex items-center justify-between p-4 bg-slate-800/30 rounded-lg border border-slate-700 hover:bg-slate-800/50 transition-colors"
+              data-testid={`marketing-spend-item-${spend.id}`}
             >
               {editingId === spend.id ? (
                 // Redigeringsläge

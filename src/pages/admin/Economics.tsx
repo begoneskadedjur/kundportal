@@ -1,6 +1,6 @@
 // 📁 src/pages/admin/Economics.tsx - UTAN TEKNIKER-SEKTION
 import React from 'react'
-import { RefreshCw, DollarSign, BarChart3, TrendingUp } from 'lucide-react'
+import { RefreshCw, DollarSign, BarChart3, TrendingUp, Activity } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import { PageHeader } from '../../components/shared'
 
@@ -9,6 +9,8 @@ import KpiCards from '../../components/admin/economics/KpiCards'
 import MonthlyRevenueChart from '../../components/admin/economics/MonthlyRevenueChart'
 import BeGoneMonthlyStatsChart from '../../components/admin/economics/BeGoneMonthlyStatsChart'
 import EconomicInsightsChart from '../../components/admin/economics/EconomicInsightsChart'
+import MarketingSpendManager from '../../components/admin/economics/MarketingSpendManager'
+import PerformanceTestReport from '../../components/admin/economics/PerformanceTestReport'
 
 const Economics: React.FC = () => {
   const handleRefresh = async () => {
@@ -94,6 +96,42 @@ const Economics: React.FC = () => {
               </p>
             </div>
             <EconomicInsightsChart />
+          </section>
+
+          {/* Separator */}
+          <div className="border-t border-slate-700"></div>
+
+          {/* 5. MARKNADSFÖRINGSKOSTNADER */}
+          <section>
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-purple-400" />
+                Marknadsföringskostnader
+                <span className="ml-2 text-sm text-slate-400">Monthly Marketing Spend Management</span>
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Hantera och spåra marknadsföringskostnader per månad - Nu med RLS-optimering
+              </p>
+            </div>
+            <MarketingSpendManager />
+          </section>
+
+          {/* Separator */}
+          <div className="border-t border-slate-700"></div>
+
+          {/* 6. PERFORMANCE TEST RAPPORT */}
+          <section>
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-cyan-400" />
+                Performance Test Rapport
+                <span className="ml-2 text-sm text-slate-400">RLS-Optimering Validering</span>
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Testa och validera prestanda-förbättringar efter RLS-optimeringar
+              </p>
+            </div>
+            <PerformanceTestReport />
           </section>
 
         </div>

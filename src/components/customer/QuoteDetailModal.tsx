@@ -59,60 +59,45 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       setLoading(true)
       setError(null)
 
-      // Först försök hämta från contracts-tabellen (för multisite)
-      const { data: contractData, error: contractError } = await supabase
-        .from('contracts')
-        .select('*')
-        .eq('id', quoteId)
-        .eq('type', 'offer')
-        .maybeSingle()
-
-      if (contractData && !contractError) {
-        // Transformera contracts data till Quote format
-        const transformedQuote: Quote = {
-          id: contractData.id,
-          oneflow_contract_id: contractData.oneflow_contract_id,
-          type: contractData.type as 'quote' | 'contract',
-          status: contractData.status,
-          company_name: contractData.company_name || '',
-          contact_person: contractData.contact_person || '',
-          contact_email: contractData.contact_email || '',
-          contact_phone: contractData.contact_phone || null,
-          billing_email: contractData.billing_email || null,
-          total_value: contractData.total_value,
-          selected_products: contractData.selected_products || [],
-          agreement_text: contractData.agreement_text,
-          start_date: contractData.start_date,
-          contract_length: contractData.contract_length,
-          validity_period: null, // Finns inte i contracts
-          document_url: null, // Finns inte i contracts
-          signing_deadline: null, // Finns inte i contracts
-          created_at: contractData.created_at,
-          updated_at: contractData.updated_at,
-          template_id: contractData.template_id
-        }
-        setQuote(transformedQuote)
-        return
-      }
-
-      // Om inte contracts, försök customer_quotes (för vanliga kunder)
-      if (contractError && contractError.code !== 'PGRST116') {
-        throw contractError
-      }
-
+      // Använd säker vy för att hämta offertdata
       const { data: quoteData, error: quoteError } = await supabase
-        .from('customer_quotes')
+        .from('quotes_secure_view')
         .select('*')
         .eq('id', quoteId)
+        .eq('customer_id', customerId) // Extra säkerhetskontroll
         .maybeSingle()
 
       if (quoteError) throw quoteError
       
       if (!quoteData) {
-        throw new Error('Offerten kunde inte hittas')
+        throw new Error('Offerten kunde inte hittas eller du har inte behörighet att se den')
       }
 
-      setQuote(quoteData)
+      // Transformera till Quote format
+      const transformedQuote: Quote = {
+        id: quoteData.id,
+        oneflow_contract_id: quoteData.oneflow_contract_id,
+        type: quoteData.type as 'quote' | 'contract',
+        status: quoteData.status,
+        company_name: quoteData.company_name || '',
+        contact_person: quoteData.contact_person || '',
+        contact_email: quoteData.contact_email || '',
+        contact_phone: quoteData.contact_phone || null,
+        billing_email: quoteData.billing_email || null,
+        total_value: quoteData.total_value,
+        selected_products: quoteData.selected_products || [],
+        agreement_text: quoteData.agreement_text,
+        start_date: quoteData.start_date,
+        contract_length: quoteData.contract_length,
+        validity_period: quoteData.validity_period,
+        document_url: quoteData.document_url,
+        signing_deadline: quoteData.signing_deadline,
+        created_at: quoteData.created_at,
+        updated_at: quoteData.updated_at,
+        template_id: quoteData.template_id
+      }
+
+      setQuote(transformedQuote)
     } catch (error: any) {
       console.error('Error fetching quote details:', error)
       setError(`Kunde inte hämta offertdetaljer: ${error.message}`)
