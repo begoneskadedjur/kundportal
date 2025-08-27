@@ -99,6 +99,19 @@ export default function ResetPassword() {
       const email = searchParams.get('email')
 
       if (token && email) {
+        // Validera token-format på frontend innan API-anrop
+        const hexRegex = /^[a-f0-9]{64}$/i
+        if (!hexRegex.test(token)) {
+          toast.error('Ogiltig återställningslänk - använd den senaste länken från ditt e-post')
+          return
+        }
+
+        console.log('Sending password reset request:', {
+          tokenLength: token.length,
+          email: decodeURIComponent(email),
+          timestamp: new Date().toISOString()
+        })
+
         // Använd vår API för att verifiera token och uppdatera lösenord
         const response = await fetch('/api/verify-reset-token', {
           method: 'POST',
@@ -114,8 +127,26 @@ export default function ResetPassword() {
 
         if (!response.ok) {
           const error = await response.json()
-          throw new Error(error.error || 'Kunde inte uppdatera lösenordet')
+          console.error('Password reset failed:', {
+            status: response.status,
+            error: error.error,
+            timestamp: new Date().toISOString()
+          })
+          
+          // Ge mer användarvänliga felmeddelanden
+          if (response.status === 429) {
+            toast.error('För många försök. Vänta några minuter innan du försöker igen.')
+          } else if (error.error?.includes('felaktigt token-format')) {
+            toast.error('Ogiltig återställningslänk. Begär en ny återställning.')
+          } else if (error.error?.includes('gått ut')) {
+            toast.error('Återställningslänken har gått ut. Begär en ny återställning.')
+          } else {
+            toast.error(error.error || 'Kunde inte uppdatera lösenordet')
+          }
+          return
         }
+
+        console.log('Password reset successful')
       } else {
         // Fallback för Supabase magic links
         const { error } = await supabase.auth.updateUser({
@@ -135,7 +166,19 @@ export default function ResetPassword() {
       }, 2000)
     } catch (error: any) {
       console.error('Error updating password:', error)
-      toast.error(error.message || 'Kunde inte uppdatera lösenordet')
+      
+      // Ge användarvänlig vägledning baserat på feltyp
+      if (error.message?.includes('Ogiltig återställningslänk')) {
+        toast.error(
+          'Återställningslänken är inte giltig. Detta kan bero på att:\n' +
+          '• Du har använt en gammal länk\n' +
+          '• Länken redan har använts\n' +
+          '• Du behöver begära en ny återställning',
+          { duration: 8000 }
+        )
+      } else {
+        toast.error(error.message || 'Kunde inte uppdatera lösenordet')
+      }
     } finally {
       setLoading(false)
     }

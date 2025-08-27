@@ -77,9 +77,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       organizationName = org?.company_name
     }
 
-    // 4. Generera återställningstoken
+    // 4. Kontrollera om en token redan existerar och är giltig
+    const existingToken = user.raw_user_meta_data?.reset_token
+    const existingExpiry = user.raw_user_meta_data?.reset_token_expires
+    
+    if (existingToken && existingExpiry) {
+      const expiryTime = new Date(existingExpiry)
+      const now = new Date()
+      const timeDiff = expiryTime.getTime() - now.getTime()
+      
+      // Om det finns en giltig token som expires inom 5 minuter, använd den istället
+      if (timeDiff > 0 && timeDiff < 5 * 60 * 1000) {
+        console.log('Recent reset token exists, rate limiting applied')
+        return res.status(429).json({
+          error: 'En återställningslänk skickades nyligen. Vänta några minuter innan du begär en ny.',
+          retryAfter: Math.ceil(timeDiff / 1000)
+        })
+      }
+    }
+
+    // 5. Generera återställningstoken
     const resetToken = crypto.randomBytes(32).toString('hex')
     const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex')
+    
+    console.log('Generated new reset token:', {
+      tokenLength: resetToken.length,
+      tokenPreview: resetToken.substring(0, 8) + '...',
+      hashLength: tokenHash.length,
+      hashPreview: tokenHash.substring(0, 8) + '...'
+    })
     
     // Spara token i databas (använd auth.users metadata)
     const expiresAt = new Date()
@@ -98,10 +124,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Kunde inte skapa återställningstoken')
     }
 
-    // 5. Skapa återställningslänk
-    const resetLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`
+    console.log('Reset token saved successfully, expires:', expiresAt.toISOString())
 
-    // 6. Skicka e-post via Resend
+    // 6. Skapa återställningslänk
+    const resetLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`
+    
+    console.log('Reset link created:', {
+      linkLength: resetLink.length,
+      tokenInLink: resetToken,
+      emailInLink: encodeURIComponent(email)
+    })
+
+    // 7. Skicka e-post via Resend
     const emailHtml = getPasswordResetEmailTemplate({
       userName,
       organizationName,
