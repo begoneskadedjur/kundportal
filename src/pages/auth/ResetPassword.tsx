@@ -22,33 +22,73 @@ export default function ResetPassword() {
   const [userId, setUserId] = useState('')
 
   useEffect(() => {
-    // Kontrollera token från URL
+    // Kontrollera token från URL eller hash
     const checkResetToken = async () => {
       try {
+        // Först kontrollera om det är Supabase recovery URL med hash
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
+        const type = hashParams.get('type')
+        
+        console.log('URL check:', {
+          hasHash: !!window.location.hash,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          type: type
+        })
+
+        if (accessToken && refreshToken && type === 'recovery') {
+          // Det är en Supabase recovery URL
+          console.log('Detected Supabase recovery URL')
+          
+          try {
+            const { data: { session }, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            })
+            
+            if (!error && session) {
+              console.log('Session set successfully:', session.user.email)
+              setIsValidToken(true)
+              setUserEmail(session.user.email || '')
+              setUserId(session.user.id)
+              setCheckingToken(false)
+              return
+            } else {
+              console.error('Failed to set session:', error)
+            }
+          } catch (sessionError) {
+            console.error('Session error:', sessionError)
+          }
+        }
+
+        // Fallback: Kontrollera vanliga query params (för gamla länkar)
         const token = searchParams.get('token')
         const email = searchParams.get('email')
 
-        if (!token || !email) {
-          // Kolla om det är en Supabase magic link session
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (!error && session) {
-            setIsValidToken(true)
-            setUserEmail(session.user.email || '')
-            setUserId(session.user.id)
-            setCheckingToken(false)
-            return
-          }
-
-          toast.error('Ogiltig eller utgången återställningslänk')
-          setTimeout(() => navigate('/login'), 3000)
+        if (token && email) {
+          console.log('Using legacy token format')
+          setIsValidToken(true)
+          setUserEmail(decodeURIComponent(email))
+          setCheckingToken(false)
           return
         }
 
-        // Vi kan inte verifiera token på klientsidan utan admin-privilegier
-        // Så vi litar på att token är giltigt och verifierar det när användaren försöker uppdatera lösenordet
-        setIsValidToken(true)
-        setUserEmail(decodeURIComponent(email))
+        // Kolla om vi redan har en session
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (!error && session) {
+          console.log('Found existing session')
+          setIsValidToken(true)
+          setUserEmail(session.user.email || '')
+          setUserId(session.user.id)
+          setCheckingToken(false)
+          return
+        }
+
+        console.log('No valid token or session found')
+        toast.error('Ogiltig eller utgången återställningslänk')
+        setTimeout(() => navigate('/login'), 3000)
       } catch (error) {
         console.error('Error checking reset token:', error)
         toast.error('Något gick fel')
@@ -95,65 +135,43 @@ export default function ResetPassword() {
 
     setLoading(true)
     try {
-      // Hämta session från Supabase (från URL hash eller query params)
+      // Hämta session från Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      console.log('Session check:', { 
+      console.log('Password reset attempt:', { 
         hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        hasRefreshToken: !!session?.refresh_token,
+        userEmail: session?.user?.email,
         timestamp: new Date().toISOString()
       })
 
-      if (session?.access_token && session?.refresh_token) {
-        // Använd Supabase session för att uppdatera lösenord
+      if (session?.user) {
+        // Vi har en giltig session - använd direkt Supabase updateUser
         console.log('Using Supabase session for password reset')
         
-        const response = await fetch('/api/verify-reset-token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            newPassword
-          })
-        })
-
-        if (!response.ok) {
-          const error = await response.json()
-          console.error('Password reset failed:', {
-            status: response.status,
-            error: error.error,
-            timestamp: new Date().toISOString()
-          })
-          
-          // Ge mer användarvänliga felmeddelanden
-          if (response.status === 429) {
-            toast.error('För många försök. Vänta några minuter innan du försöker igen.')
-          } else if (error.error?.includes('Ogiltig återställningslänk')) {
-            toast.error('Återställningslänken är ogiltig eller har gått ut. Begär en ny återställning.')
-          } else {
-            toast.error(error.error || 'Kunde inte uppdatera lösenordet')
-          }
-          return
-        }
-
-        console.log('Password reset successful via Supabase session')
-      } else {
-        // Fallback: Försök uppdatera direkt med Supabase
-        console.log('No session found, trying direct update')
         const { error } = await supabase.auth.updateUser({
           password: newPassword
         })
 
         if (error) {
-          console.error('Direct password update failed:', error)
-          throw error
+          console.error('Password update failed:', error)
+          
+          // Hantera olika typer av fel
+          if (error.message?.includes('session_not_found')) {
+            toast.error('Återställningslänken har gått ut. Begär en ny återställning.')
+          } else if (error.message?.includes('weak_password')) {
+            toast.error('Lösenordet är för svagt. Välj ett starkare lösenord.')
+          } else {
+            toast.error(error.message || 'Kunde inte uppdatera lösenordet')
+          }
+          return
         }
 
-        console.log('Password updated successfully via direct Supabase call')
+        console.log('Password updated successfully via Supabase')
+      } else {
+        // Ingen session - visa fel
+        console.error('No valid session found for password reset')
+        toast.error('Återställningslänken är ogiltig eller har gått ut. Begär en ny återställning.')
+        return
       }
 
       toast.success('Lösenordet har uppdaterats!')
