@@ -507,6 +507,30 @@ export default function EditContractCaseModal({
         console.log('SUCCESS - Regionchef roles query result:', regionchefRoles)
         console.log('SUCCESS - Regionchef query length:', regionchefRoles?.length || 0)
         
+        // DEBUG: Detaljerad analys av regionchef data
+        if (regionchefRoles && regionchefRoles.length > 0) {
+          const regionchef = regionchefRoles[0]
+          console.log('DEBUG - Regionchef full object:', regionchef)
+          console.log('DEBUG - Regionchef site_ids:', regionchef.site_ids)
+          console.log('DEBUG - Regionchef profiles object:', regionchef.profiles)
+          
+          if (!regionchef.profiles) {
+            console.warn('WARNING - Regionchef profiles är null, möjligen RLS problem med profiles-tabellen')
+            
+            // Testa direkt profiles query för samma user_id
+            const testUserId = '166d1dff-5ad7-428b-82c1-809fb84d8c16' // från konsolen
+            const { data: testProfile, error: testError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', testUserId)
+              .single()
+            
+            console.log('DEBUG - Direkt profiles test för user_id', testUserId, ':', { data: testProfile, error: testError })
+          } else {
+            console.log('SUCCESS - Regionchef profiles data:', regionchef.profiles)
+          }
+        }
+        
         // Debug: Test a simple multisite_user_roles query to verify access
         const { data: testQuery, error: testError } = await supabase
           .from('multisite_user_roles')
@@ -928,19 +952,39 @@ export default function EditContractCaseModal({
         }
       }
 
-      const { error } = await supabase
+      // DEBUG: Logga vad som skickas till databasen
+      const updateData = {
+        ...cleanedFormData,
+        customer_id: customerId || null
+      }
+      console.log('DEBUG - Data som skickas till databas-update:', updateData)
+      console.log('DEBUG - Case ID som uppdateras:', caseData.id)
+      
+      const { data, error } = await supabase
         .from('cases')
-        .update({
-          ...cleanedFormData,
-          customer_id: customerId || null
-        })
+        .update(updateData)
         .eq('id', caseData.id)
+        .select() // Lägg till select för att få tillbaka uppdaterad data
 
-      if (error) throw error
+      console.log('DEBUG - Databas update response:', { data, error })
+      
+      if (error) {
+        console.error('ERROR - Databas update misslyckades:', error)
+        console.error('ERROR - Error code:', error.code)
+        console.error('ERROR - Error message:', error.message)
+        console.error('ERROR - Error details:', error.details)
+        throw error
+      }
 
-      toast.success('Ärende uppdaterat!')
-      onSuccess?.()
-      handleClose()
+      if (data && data.length > 0) {
+        console.log('SUCCESS - Databas update lyckades, uppdaterad data:', data[0])
+        toast.success('Ärende uppdaterat!')
+        onSuccess?.()
+        handleClose()
+      } else {
+        console.warn('WARNING - Databas update returnerade ingen data, möjligen RLS problem')
+        toast.error('Uppdatering misslyckades - kontrollera behörigheter')
+      }
     } catch (error) {
       console.error('Error updating case:', error)
       toast.error('Kunde inte uppdatera ärendet')
