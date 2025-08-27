@@ -82,26 +82,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Hämta användare och verifiera token
     console.log('Looking up user by email...')
-    const { data: { users } } = await supabase.auth.admin.listUsers()
-    const user = users.find(u => u.email === email)
-
-    if (!user) {
+    
+    // Först hitta användar-ID från e-post
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+    if (listError) {
+      console.error('Failed to list users:', listError)
+      return res.status(500).json({ error: 'Kunde inte hämta användardata' })
+    }
+    
+    const userFromList = users.find(u => u.email === email)
+    if (!userFromList) {
       console.error('User not found for email:', email)
       return res.status(400).json({ error: 'Ogiltig återställningslänk' })
     }
 
-    console.log('User found:', { 
+    console.log('User found in list:', { 
+      userId: userFromList.id,
+      userEmail: userFromList.email,
+      metadataFromList: userFromList.raw_user_meta_data
+    })
+
+    // Nu hämta användaren direkt med ID för att få senaste data
+    console.log('Fetching fresh user data by ID...')
+    const { data: { user }, error: getUserError } = await supabase.auth.admin.getUserById(userFromList.id)
+    
+    if (getUserError || !user) {
+      console.error('Failed to get user by ID:', getUserError)
+      return res.status(500).json({ error: 'Kunde inte hämta användardata' })
+    }
+
+    console.log('Fresh user data retrieved:', { 
       userId: user.id,
       userEmail: user.email,
       lastSignIn: user.last_sign_in_at,
-      updatedAt: user.updated_at
+      updatedAt: user.updated_at,
+      metadataFromDirect: user.raw_user_meta_data
     })
 
-    // Verifiera token och utgångstid
-    const storedToken = user.raw_user_meta_data?.reset_token
-    const expiresAt = user.raw_user_meta_data?.reset_token_expires
+    // Verifiera token och utgångstid (med retry för eventual consistency)
+    let storedToken = user.raw_user_meta_data?.reset_token
+    let expiresAt = user.raw_user_meta_data?.reset_token_expires
+    let finalUser = user
 
-    console.log('Token comparison:', {
+    console.log('Initial token check:', {
       hasStoredToken: !!storedToken,
       storedTokenPreview: storedToken?.substring(0, 8) + '...',
       generatedTokenPreview: tokenHash.substring(0, 8) + '...',
@@ -111,8 +134,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       isExpired: expiresAt ? new Date(expiresAt) < new Date() : 'no_expiry_set'
     })
 
+    // Om token inte finns, försök igen efter kort delay (eventual consistency)
+    if (!storedToken) {
+      console.log('No token found, retrying after delay...')
+      await new Promise(resolve => setTimeout(resolve, 1000)) // 1 sekund delay
+      
+      const { data: { user: retryUser }, error: retryError } = await supabase.auth.admin.getUserById(user.id)
+      if (!retryError && retryUser) {
+        finalUser = retryUser
+        storedToken = retryUser.raw_user_meta_data?.reset_token
+        expiresAt = retryUser.raw_user_meta_data?.reset_token_expires
+        
+        console.log('Retry token check:', {
+          hasStoredToken: !!storedToken,
+          storedTokenPreview: storedToken?.substring(0, 8) + '...',
+          tokensMatch: storedToken === tokenHash,
+          expiresAt: expiresAt
+        })
+      } else {
+        console.error('Retry failed:', retryError)
+      }
+    }
+
     if (!storedToken || storedToken !== tokenHash) {
-      console.error('Token mismatch or missing stored token')
+      console.error('Token mismatch or missing stored token after retry')
+      
+      // Lägg till extra debug-info
+      console.error('Debug info:', {
+        receivedToken: token,
+        receivedTokenLength: token.length,
+        generatedHash: tokenHash,
+        generatedHashLength: tokenHash.length,
+        storedToken: storedToken,
+        storedTokenLength: storedToken?.length,
+        fullUserMetadata: finalUser.raw_user_meta_data
+      })
+      
       return res.status(400).json({ error: 'Ogiltig återställningslänk' })
     }
 
@@ -125,10 +182,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Uppdatera lösenord och rensa token
     console.log('Updating password and clearing reset token...')
-    const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+    const { error: updateError } = await supabase.auth.admin.updateUserById(finalUser.id, {
       password: newPassword,
       user_metadata: {
-        ...user.raw_user_meta_data,
+        ...finalUser.raw_user_meta_data,
         reset_token: null,
         reset_token_expires: null
       }
@@ -142,12 +199,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Password updated successfully, token cleared')
 
     // Uppdatera display_name i profiles om det behövs
-    if (user.raw_user_meta_data?.name) {
+    if (finalUser.raw_user_meta_data?.name) {
       console.log('Updating display_name in profiles...')
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ display_name: user.raw_user_meta_data.name })
-        .eq('id', user.id)
+        .update({ display_name: finalUser.raw_user_meta_data.name })
+        .eq('id', finalUser.id)
       
       if (profileError) {
         console.error('Failed to update profile display_name:', profileError)
