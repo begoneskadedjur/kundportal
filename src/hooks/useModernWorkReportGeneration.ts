@@ -37,6 +37,8 @@ interface TechnicianCase {
   // Trafikljussystem
   pest_level?: number | null;
   problem_rating?: number | null;
+  // Rekommendationer från databasen
+  recommendations?: string;
 }
 
 export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
@@ -210,8 +212,10 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Trafikljussystem - VIKTIGT för den nya rapporten!
       pest_level: caseData.pest_level,
       problem_rating: caseData.problem_rating,
-      // Rapport/beskrivning
-      rapport: caseData.rapport,
+      // Arbetsrapport - KORREKT fältnamn för PDF-generatorn
+      work_report: caseData.rapport,
+      // Rekommendationer från databasen 
+      recommendations: caseData.recommendations,
       // Företagsinformation
       company_name: caseData.foretag,
       org_number: caseData.org_nr,
