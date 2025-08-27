@@ -66,8 +66,6 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       // Försök först med quotes_secure_view, sedan contracts direkt om det är multisite
       let quoteData, quoteError
       
-      // TEMP DEBUG: Logga parameters
-      console.log('🔍 DEBUG QuoteDetailModal - Parameters:', { quoteId, customerId })
       
       // Försök med quotes_secure_view först (för backward compatibility)
       const { data: secureViewData, error: secureViewError } = await supabase
@@ -77,7 +75,6 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         .eq('customer_id', customerId)
         .maybeSingle()
 
-      console.log('🔍 DEBUG quotes_secure_view result:', { data: secureViewData, error: secureViewError })
 
       if (secureViewError || !secureViewData) {
         // Om quotes_secure_view inte fungerar, försök med contracts direkt (för multisite)
@@ -90,12 +87,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
           .eq('id', quoteId)
           .eq('customers.id', customerId)
           .maybeSingle()
-        
-        console.log('🔍 DEBUG contracts fallback result:', { data: contractData, error: contractError })
         quoteData = contractData
         quoteError = contractError
       } else {
-        console.log('🔍 DEBUG using quotes_secure_view data')
         quoteData = secureViewData
         quoteError = secureViewError
       }
@@ -106,42 +100,45 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         throw new Error('Offerten kunde inte hittas eller du har inte behörighet att se den')
       }
 
-      // Transformera till Quote format
+      // Transformera till Quote format - korrekt mappning för quotes_secure_view
       const transformedQuote: Quote = {
         id: quoteData.id,
         oneflow_contract_id: quoteData.oneflow_contract_id,
-        type: quoteData.type as 'quote' | 'contract',
-        status: quoteData.status,
-        company_name: quoteData.company_name || '',
-        contact_person: quoteData.contact_person || '',
+        // Gissa typ baserat på om det finns oneflow_contract_id
+        type: quoteData.oneflow_contract_id ? 'contract' : 'quote',
+        // Korrekt mappning från quote_status
+        status: quoteData.quote_status || 'pending',
+        // Använd title som company_name för quotes_secure_view
+        company_name: quoteData.title || 'Ej specificerat',
+        contact_person: quoteData.contact_person || 'Ej specificerat',
         contact_email: quoteData.contact_email || '',
         contact_phone: quoteData.contact_phone || null,
-        billing_email: quoteData.billing_email || null,
-        total_value: quoteData.total_value,
-        selected_products: quoteData.selected_products || [],
-        agreement_text: quoteData.agreement_text,
-        start_date: quoteData.start_date,
-        contract_length: quoteData.contract_length,
-        validity_period: quoteData.validity_period,
-        document_url: quoteData.document_url,
-        signing_deadline: quoteData.signing_deadline,
-        created_at: quoteData.created_at,
-        updated_at: quoteData.updated_at,
-        template_id: quoteData.template_id,
-        begone_employee_name: quoteData.begone_employee_name,
-        begone_employee_email: quoteData.begone_employee_email,
-        created_by_name: quoteData.created_by_name,
-        created_by_email: quoteData.created_by_email
+        billing_email: null, // Finns inte i quotes_secure_view
+        // Korrekt mappning från price
+        total_value: quoteData.price,
+        // Skapa produktarray från service_type och pest_type
+        selected_products: [
+          ...(quoteData.service_type ? [{ name: quoteData.service_type, description: 'Tjänst', quantity: 1, totalPrice: null }] : []),
+          ...(quoteData.pest_type ? [{ name: `Skadedjur: ${quoteData.pest_type}`, description: 'Behandling', quantity: 1, totalPrice: null }] : [])
+        ],
+        agreement_text: null, // Finns inte i quotes_secure_view
+        // Korrekt mappning från scheduled_start
+        start_date: quoteData.scheduled_start,
+        contract_length: null, // Finns inte i quotes_secure_view
+        validity_period: null, // Finns inte i quotes_secure_view
+        document_url: null, // Finns inte i quotes_secure_view
+        signing_deadline: null, // Finns inte i quotes_secure_view
+        // Korrekt mappning från quote_generated_at
+        created_at: quoteData.quote_generated_at || new Date().toISOString(),
+        // Använd quote_sent_at eller quote_signed_at som senaste uppdatering
+        updated_at: quoteData.quote_signed_at || quoteData.quote_sent_at || quoteData.quote_generated_at || new Date().toISOString(),
+        template_id: null, // Finns inte i quotes_secure_view
+        begone_employee_name: null, // Finns inte i quotes_secure_view
+        begone_employee_email: null, // Finns inte i quotes_secure_view
+        created_by_name: null, // Finns inte i quotes_secure_view
+        created_by_email: null // Finns inte i quotes_secure_view
       }
 
-      console.log('🔍 DEBUG transformed quote:', transformedQuote)
-      console.log('🔍 DEBUG - Title generation attempt:', {
-        customer_title: quoteData.customer_title,
-        title_field: quoteData.title,
-        company_name: quoteData.company_name,
-        selected_products: quoteData.selected_products
-      })
-      
       setQuote(transformedQuote)
     } catch (error: any) {
       console.error('Error fetching quote details:', error)
