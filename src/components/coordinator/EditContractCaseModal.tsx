@@ -22,7 +22,7 @@ import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
-import { useWorkReportGeneration } from '../../hooks/useWorkReportGeneration'
+import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
 
 // Registrera svensk lokalisering för DatePicker
@@ -262,7 +262,7 @@ export default function EditContractCaseModal({
     hasRecentReport,
     currentReport,
     getTimeSinceReport
-  } = useWorkReportGeneration(reportData)
+  } = useModernWorkReportGeneration(reportData)
 
   useEffect(() => {
     if (caseData && isOpen) {
