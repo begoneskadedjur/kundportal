@@ -66,6 +66,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       // Försök först med quotes_secure_view, sedan contracts direkt om det är multisite
       let quoteData, quoteError
       
+      // TEMP DEBUG: Logga parameters
+      console.log('🔍 DEBUG QuoteDetailModal - Parameters:', { quoteId, customerId })
+      
       // Försök med quotes_secure_view först (för backward compatibility)
       const { data: secureViewData, error: secureViewError } = await supabase
         .from('quotes_secure_view')
@@ -73,6 +76,8 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         .eq('id', quoteId)
         .eq('customer_id', customerId)
         .maybeSingle()
+
+      console.log('🔍 DEBUG quotes_secure_view result:', { data: secureViewData, error: secureViewError })
 
       if (secureViewError || !secureViewData) {
         // Om quotes_secure_view inte fungerar, försök med contracts direkt (för multisite)
@@ -86,9 +91,11 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
           .eq('customers.id', customerId)
           .maybeSingle()
         
+        console.log('🔍 DEBUG contracts fallback result:', { data: contractData, error: contractError })
         quoteData = contractData
         quoteError = contractError
       } else {
+        console.log('🔍 DEBUG using quotes_secure_view data')
         quoteData = secureViewData
         quoteError = secureViewError
       }
@@ -127,6 +134,14 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         created_by_email: quoteData.created_by_email
       }
 
+      console.log('🔍 DEBUG transformed quote:', transformedQuote)
+      console.log('🔍 DEBUG - Title generation attempt:', {
+        customer_title: quoteData.customer_title,
+        title_field: quoteData.title,
+        company_name: quoteData.company_name,
+        selected_products: quoteData.selected_products
+      })
+      
       setQuote(transformedQuote)
     } catch (error: any) {
       console.error('Error fetching quote details:', error)
@@ -493,14 +508,18 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                     </h4>
                     
                     {quote.status === 'pending' && (
-                      <div className="space-y-2 text-sm">
-                        <p className="text-slate-300">
-                          <strong>Nästa steg:</strong> Offerten har skickats till{' '}
-                          <span className="text-white">{quote.contact_email}</span> och väntar på svar.
-                        </p>
-                        <p className="text-slate-400">
-                          Kontaktpersonen kommer att få en e-post med offertdokumentet för granskning och godkännande.
-                        </p>
+                      <div className="space-y-3 text-sm">
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                          <p className="text-blue-200 font-medium mb-2">
+                            📧 <strong>Viktigt - Kontrollera e-post</strong>
+                          </p>
+                          <p className="text-blue-100">
+                            Offerten har skickats via OneFlow till <span className="text-white font-medium">{quote.contact_email}</span> för digital signering.
+                          </p>
+                          <p className="text-blue-200 mt-2">
+                            <strong>Nästa steg:</strong> Gå till er e-postinkorg och leta efter meddelande från OneFlow för att granska och signera offerten.
+                          </p>
+                        </div>
                         {quote.signing_deadline && (
                           <p className="text-amber-400">
                             <strong>Signeringsfrist:</strong> {formatDate(quote.signing_deadline)}
