@@ -476,7 +476,11 @@ export default function EditContractCaseModal({
       console.log('fetchOrganizationSites - Found sites:', sites)
       
       // Fetch regionchef site_ids and contact info using the same approach as admin pages
-      console.log('fetchOrganizationSites - Querying multisite_users_complete with org_id:', orgId)
+      console.log('fetchOrganizationSites - Querying multisite_user_roles with org_id:', orgId)
+      
+      // Debug: Check current user context
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      console.log('DEBUG - Current user context:', user ? { id: user.id, email: user.email } : 'No user')
       
       // Use secure query instead of the insecure view
       const { data: regionchefRoles, error: regionchefError } = await supabase
@@ -494,11 +498,24 @@ export default function EditContractCaseModal({
         .eq('is_active', true)
       
       if (regionchefError) {
-        console.error('Error fetching regionchef roles:', regionchefError)
-        console.error('Error details:', regionchefError.message, regionchefError.details)
+        console.error('ERROR fetching regionchef roles:', regionchefError)
+        console.error('Error code:', regionchefError.code)
+        console.error('Error message:', regionchefError.message)
+        console.error('Error details:', regionchefError.details)
+        console.error('Error hint:', regionchefError.hint)
       } else {
-        console.log('fetchOrganizationSites - Regionchef roles query result from VIEW:', regionchefRoles)
-        console.log('fetchOrganizationSites - Regionchef query SUCCESS, length:', regionchefRoles?.length || 0)
+        console.log('SUCCESS - Regionchef roles query result:', regionchefRoles)
+        console.log('SUCCESS - Regionchef query length:', regionchefRoles?.length || 0)
+        
+        // Debug: Test a simple multisite_user_roles query to verify access
+        const { data: testQuery, error: testError } = await supabase
+          .from('multisite_user_roles')
+          .select('user_id, role_type, organization_id')
+          .eq('organization_id', orgId)
+        console.log('DEBUG - Test query for all roles in org:', testQuery)
+        if (testError) {
+          console.error('DEBUG - Test query error:', testError)
+        }
         if (regionchefRoles && regionchefRoles.length > 0) {
           const allRegionchefSiteIds = regionchefRoles.flatMap(role => role.site_ids || [])
           setRegionchefSiteIds(allRegionchefSiteIds)
