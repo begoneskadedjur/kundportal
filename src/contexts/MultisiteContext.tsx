@@ -142,30 +142,42 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
       
       if (!orgData) {
         console.warn('No huvudkontor found for organization:', roleData.organization_id)
-        // Don't crash - graceful degradation
-        setOrganization(null)
-        setSites([])
-        setLoading(false)
-        return
+        // Graceful degradation - create basic organization from user role data
+        const fallbackOrganization = {
+          id: roleData.organization_id,
+          organization_id: roleData.organization_id,
+          name: 'Organisation (okänt namn)',
+          organization_name: 'Organisation (okänt namn)',
+          organization_number: null,
+          billing_type: 'consolidated' as const,
+          primary_contact_email: null,
+          primary_contact_phone: null,
+          billing_address: null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        setOrganization(fallbackOrganization)
+        // Continue to try to fetch sites even without huvudkontor
+      } else {
+        // Map customer fields to organization structure
+        // VIKTIGT: id ska vara huvudkontorets customer.id, inte organization_id
+        const organization = {
+          id: orgData.id, // Använd huvudkontorets customer.id
+          organization_id: orgData.organization_id, // Behåll organization_id separat
+          name: orgData.company_name,
+          organization_name: orgData.company_name, // For backwards compatibility
+          organization_number: orgData.organization_number,
+          billing_type: 'consolidated' as const,
+          primary_contact_email: orgData.contact_email,
+          primary_contact_phone: orgData.contact_phone,
+          billing_address: orgData.billing_address,
+          is_active: orgData.is_active,
+          created_at: orgData.created_at,
+          updated_at: orgData.updated_at
+        }
+        setOrganization(organization)
       }
-      
-      // Map customer fields to organization structure
-      // VIKTIGT: id ska vara huvudkontorets customer.id, inte organization_id
-      const organization = {
-        id: orgData.id, // Använd huvudkontorets customer.id
-        organization_id: orgData.organization_id, // Behåll organization_id separat
-        name: orgData.company_name,
-        organization_name: orgData.company_name, // For backwards compatibility
-        organization_number: orgData.organization_number,
-        billing_type: 'consolidated' as const,
-        primary_contact_email: orgData.contact_email,
-        primary_contact_phone: orgData.contact_phone,
-        billing_address: orgData.billing_address,
-        is_active: orgData.is_active,
-        created_at: orgData.created_at,
-        updated_at: orgData.updated_at
-      }
-      setOrganization(organization)
 
       // Fetch sites based on role (enheter customers)
       

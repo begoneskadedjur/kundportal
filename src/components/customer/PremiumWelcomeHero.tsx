@@ -84,7 +84,7 @@ const PremiumWelcomeHero: React.FC<PremiumWelcomeHeroProps> = ({
           {/* Left side - Welcome message */}
           <div className="flex-1">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-              {greeting}, {customer.contact_person.split(' ')[0]}!
+              {greeting}, {customer.contact_person?.split(' ')[0] || 'Kund'}!
             </h1>
             <p className="text-xl text-slate-300 mb-6">
               Välkommen till er premium kundportal

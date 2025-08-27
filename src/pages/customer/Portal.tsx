@@ -69,9 +69,17 @@ const CustomerPortal: React.FC = () => {
   useEffect(() => {
     // Vänta tills multisite-context har laddats
     if (!multisiteLoading && profile) {
-      // Om användaren ENDAST har multisite-roll och ingen customer_id
-      if (userRole && organization && !profile.customer_id) {
-        console.log('Multisite user detected, redirecting to organisation portal:', userRole)
+      // Förbättrad multisite-detection: kolla både userRole OCH organization_id
+      const isMultisiteUser = (userRole && organization) || profile.organization_id
+      const hasTraditionalCustomerAccess = profile.customer_id
+      
+      // Om användaren ENDAST har multisite-åtkomst och ingen traditionell kundåtkomst
+      if (isMultisiteUser && !hasTraditionalCustomerAccess) {
+        console.log('Multisite user detected, redirecting to organisation portal:', {
+          userRole: userRole?.role_type,
+          organizationId: profile.organization_id,
+          hasCustomerId: !!profile.customer_id
+        })
         navigate('/organisation', { replace: true })
         return
       }
@@ -82,15 +90,20 @@ const CustomerPortal: React.FC = () => {
   }, [multisiteLoading, userRole, organization, profile, navigate])
 
   // Early return för multisite-användare som inte ska vara här
-  if (!multisiteLoading && profile && userRole && organization && !profile.customer_id) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner />
-          <p className="text-white mt-4">Omdirigerar till organisationsportal...</p>
+  if (!multisiteLoading && profile) {
+    const isMultisiteUser = (userRole && organization) || profile.organization_id
+    const hasTraditionalCustomerAccess = profile.customer_id
+    
+    if (isMultisiteUser && !hasTraditionalCustomerAccess) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+          <div className="text-center">
+            <LoadingSpinner />
+            <p className="text-white mt-4">Omdirigerar till organisationsportal...</p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
   }
 
   // Fetch customer data
