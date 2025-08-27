@@ -1,0 +1,12 @@
+[project]
+# Begone Kundportal project config
+ref = "rfyufytjwvqiqwueinoj"
+
+[auth]
+# Enable Email Hook
+enabled = true
+# Email hook configuration will be set through dashboard
+
+[functions]
+# Edge Functions configuration
+enabled = true
