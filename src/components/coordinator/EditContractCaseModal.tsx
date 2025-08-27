@@ -487,7 +487,7 @@ export default function EditContractCaseModal({
         .from('multisite_user_roles')
         .select(`
           site_ids,
-          profiles!inner (
+          profiles!user_id (
             display_name,
             email,
             phone
@@ -540,7 +540,7 @@ export default function EditContractCaseModal({
       const { data: verksamhetschefRoles, error: verksamhetschefError } = await supabase
         .from('multisite_user_roles')
         .select(`
-          profiles!inner (
+          profiles!user_id (
             display_name,
             email,
             phone

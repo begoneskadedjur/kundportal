@@ -48,7 +48,8 @@
       "mcp__supabase__get_cost",
       "mcp__supabase__confirm_cost",
       "mcp__supabase__create_branch",
-      "mcp__supabase__list_branches"
+      "mcp__supabase__list_branches",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "additionalDirectories": [
