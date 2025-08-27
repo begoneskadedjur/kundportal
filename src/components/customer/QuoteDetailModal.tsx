@@ -31,6 +31,8 @@ interface Quote {
   begone_employee_email?: string | null
   created_by_name?: string | null
   created_by_email?: string | null
+  address?: string | null
+  case_number?: string | null
 }
 
 interface QuoteDetailModalProps {
@@ -116,11 +118,8 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         billing_email: null, // Finns inte i quotes_secure_view
         // Korrekt mappning från price
         total_value: quoteData.price,
-        // Skapa produktarray från service_type och pest_type
-        selected_products: [
-          ...(quoteData.service_type ? [{ name: quoteData.service_type, description: 'Tjänst', quantity: 1, totalPrice: null }] : []),
-          ...(quoteData.pest_type ? [{ name: `Skadedjur: ${quoteData.pest_type}`, description: 'Behandling', quantity: 1, totalPrice: null }] : [])
-        ],
+        // Endast visa selected_products om de innehåller riktig detaljerad data
+        selected_products: quoteData.selected_products?.length > 0 ? quoteData.selected_products : [],
         agreement_text: null, // Finns inte i quotes_secure_view
         // Korrekt mappning från scheduled_start
         start_date: quoteData.scheduled_start,
@@ -136,7 +135,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         begone_employee_name: null, // Finns inte i quotes_secure_view
         begone_employee_email: null, // Finns inte i quotes_secure_view
         created_by_name: null, // Finns inte i quotes_secure_view
-        created_by_email: null // Finns inte i quotes_secure_view
+        created_by_email: null, // Finns inte i quotes_secure_view
+        address: quoteData.address,
+        case_number: quoteData.case_number
       }
 
       setQuote(transformedQuote)
@@ -296,7 +297,14 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                     {getStatusText(quote.status)} • {formatDate(quote.created_at)}
                   </p>
                   <p className="text-sm text-slate-300 font-medium">
-                    {getProductSummary(quote.selected_products)}
+                    {quote.selected_products && quote.selected_products.length > 0 
+                      ? getProductSummary(quote.selected_products)
+                      : quote.address 
+                        ? `📍 ${quote.address}`
+                        : quote.case_number
+                          ? `🔢 Ärende: ${quote.case_number}`
+                          : 'Skadedjursbekämpning'
+                    }
                   </p>
                 </div>
               )}
@@ -394,44 +402,9 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                 </div>
               </Card>
 
-              {/* Contract Details */}
-              {quote.type === 'contract' && (
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-purple-400" />
-                    Kontraktdetaljer
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Startdatum</label>
-                      <p className="text-white">{formatDate(quote.start_date)}</p>
-                    </div>
-                    {quote.contract_length && (
-                      <div>
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Kontraktslängd</label>
-                        <p className="text-white">{quote.contract_length}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {quote.validity_period && (
-                    <div className="mt-4">
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Giltighetsperiod</label>
-                      <p className="text-white">{quote.validity_period}</p>
-                    </div>
-                  )}
-                  
-                  {quote.signing_deadline && (
-                    <div className="mt-4">
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Signeringsfrist</label>
-                      <p className="text-white">{formatDate(quote.signing_deadline)}</p>
-                    </div>
-                  )}
-                </Card>
-              )}
 
-              {/* Products */}
-              {quote.selected_products && quote.selected_products.length > 0 && (
+              {/* Project Details - Visa endast om vi har detaljerade produkter ELLER om vi har adress/ärendenummer */}
+              {(quote.selected_products && quote.selected_products.length > 0) ? (
                 <Card className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Package className="w-5 h-5 text-green-400" />
@@ -458,6 +431,27 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                         </div>
                       </div>
                     ))}
+                  </div>
+                </Card>
+              ) : (quote.address || quote.case_number) && (
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-green-400" />
+                    Projektdetaljer
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {quote.address && (
+                      <div>
+                        <label className="text-xs text-slate-500 uppercase tracking-wide">Plats/Adress</label>
+                        <p className="text-white">{quote.address}</p>
+                      </div>
+                    )}
+                    {quote.case_number && (
+                      <div>
+                        <label className="text-xs text-slate-500 uppercase tracking-wide">Ärendenummer</label>
+                        <p className="text-white">{quote.case_number}</p>
+                      </div>
+                    )}
                   </div>
                 </Card>
               )}
