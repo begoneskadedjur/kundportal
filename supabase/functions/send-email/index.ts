@@ -3,6 +3,57 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
+const WEBHOOK_SECRET = 'test_secret_for_begone_kundportal_email_hook' // Base64-decoded secret
+
+// Function to verify webhook signature
+async function verifyWebhookSignature(
+  body: string,
+  signature: string | null,
+  secret: string
+): Promise<boolean> {
+  if (!signature) {
+    console.log('No signature provided')
+    return false
+  }
+
+  try {
+    // Supabase webhook signatures typically come as "v1=<hash>"
+    const [version, hash] = signature.split('=')
+    if (version !== 'v1') {
+      console.log('Unsupported signature version:', version)
+      return false
+    }
+
+    // Create HMAC with the secret
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(secret)
+    const bodyData = encoder.encode(body)
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+    
+    const signature_buffer = await crypto.subtle.sign('HMAC', cryptoKey, bodyData)
+    const expected_hash = Array.from(new Uint8Array(signature_buffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+    
+    console.log('Signature verification:', { 
+      provided: hash, 
+      expected: expected_hash,
+      match: hash === expected_hash 
+    })
+    
+    return hash === expected_hash
+  } catch (error) {
+    console.error('Signature verification error:', error)
+    return false
+  }
+}
 
 interface EmailHookPayload {
   type: 'recovery'
@@ -28,12 +79,43 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  console.log('=== EMAIL HOOK REQUEST START ===')
+  console.log('Method:', req.method)
+  console.log('Headers:', Object.fromEntries(req.headers.entries()))
+
   try {
-    const payload: EmailHookPayload = await req.json()
+    // Read the raw body for signature verification
+    const bodyText = await req.text()
+    console.log('Raw body length:', bodyText.length)
+    
+    // Get signature from headers (Supabase might use different header names)
+    const signature = req.headers.get('x-supabase-signature') || 
+                     req.headers.get('x-webhook-signature') ||
+                     req.headers.get('signature')
+    
+    console.log('Webhook signature:', signature ? signature.substring(0, 20) + '...' : 'none')
+
+    // For now, we'll be permissive with signature verification
+    // since we need to see what Supabase actually sends
+    if (signature && WEBHOOK_SECRET) {
+      const isValid = await verifyWebhookSignature(bodyText, signature, WEBHOOK_SECRET)
+      if (!isValid) {
+        console.warn('Webhook signature verification failed, but continuing...')
+        // Don't fail yet - let's see what Supabase sends
+      } else {
+        console.log('Webhook signature verified successfully')
+      }
+    } else {
+      console.log('No signature verification - signature or secret missing')
+    }
+
+    // Parse the JSON payload
+    const payload: EmailHookPayload = JSON.parse(bodyText)
     console.log('Email hook triggered:', { 
       type: payload.type, 
       email: payload.user.email,
-      hasToken: !!payload.email_data.token 
+      hasToken: !!payload.email_data.token,
+      timestamp: new Date().toISOString()
     })
 
     // Endast hantera recovery emails (lösenordsåterställning)
@@ -47,22 +129,17 @@ serve(async (req) => {
 
     const { user, email_data } = payload
 
-    // Hämta användarnamn och organisation (samma logik som tidigare)
+    // Hämta användarnamn
     const userName = user.user_metadata?.name || 'Användare'
+    console.log('User details:', {
+      userName,
+      hasOrganizationId: !!user.user_metadata?.organization_id,
+      organizationId: user.user_metadata?.organization_id
+    })
     
-    // Hämta organisationsnamn om användaren tillhör en organisation
+    // För nu sätter vi organisationsnamn till null
+    // Vi kan lägga till Supabase-query senare om det behövs
     let organizationName: string | null = null
-    if (user.user_metadata?.organization_id) {
-      // Här skulle vi kunna hämta från Supabase, men för att hålla det enkelt
-      // använder vi samma logik som tidigare
-      try {
-        // Detta skulle vara en Supabase-query, men för Edge Functions 
-        // måste vi skicka organization_id från frontend eller använda en annan approach
-        organizationName = null // Sätts till null för nu
-      } catch (error) {
-        console.log('Could not fetch organization name:', error)
-      }
-    }
 
     // Skapa återställningslänk från Supabase confirmation_url
     const resetLink = email_data.confirmation_url
