@@ -396,24 +396,25 @@ export default function OrganizationsPage() {
 
   const fetchOrganizationUsers = async (orgId: string, organizationId: string) => {
     try {
-      // Hämta användare från den nya viewen som kombinerar all data
+      // Använd säker RPC-funktion istället för multisite_users_complete VIEW
       const { data: users, error } = await supabase
-        .from('multisite_users_complete')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
+        .rpc('get_organization_users_complete', { 
+          org_id: organizationId 
+        })
 
       if (error) throw error
 
-      // Formatera användardata
+      // Data kommer redan formaterad från RPC-funktionen
       const formattedUsers = (users || []).map(user => ({
         id: user.id,
         user_id: user.user_id,
         organization_id: user.organization_id,
         role_type: user.role_type,
         site_ids: user.site_ids,
+        region: user.region,
         is_active: user.is_active,
         created_at: user.created_at,
+        updated_at: user.updated_at,
         email: user.email || 'Okänd email',
         name: user.display_name || 'Okänt namn',
         phone: user.phone || null,
