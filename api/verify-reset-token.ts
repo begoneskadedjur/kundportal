@@ -43,8 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Verifiera token och utgångstid
-    const storedToken = user.user_metadata?.reset_token
-    const expiresAt = user.user_metadata?.reset_token_expires
+    const storedToken = user.raw_user_meta_data?.reset_token
+    const expiresAt = user.raw_user_meta_data?.reset_token_expires
 
     if (!storedToken || storedToken !== tokenHash) {
       return res.status(400).json({ error: 'Ogiltig återställningslänk' })
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       password: newPassword,
       user_metadata: {
-        ...user.user_metadata,
+        ...user.raw_user_meta_data,
         reset_token: null,
         reset_token_expires: null
       }
@@ -70,10 +70,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Uppdatera display_name i profiles om det behövs
-    if (user.user_metadata?.name) {
+    if (user.raw_user_meta_data?.name) {
       await supabase
         .from('profiles')
-        .update({ display_name: user.user_metadata.name })
+        .update({ display_name: user.raw_user_meta_data.name })
         .eq('id', user.id)
     }
 

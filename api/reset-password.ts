@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('id', user.id)
       .single()
 
-    const userName = profile?.display_name || user.user_metadata?.name || 'Användare'
+    const userName = profile?.display_name || user.raw_user_meta_data?.name || 'Användare'
     
     // Hämta organisationsnamn om användaren tillhör en organisation
     let organizationName = null
@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       user_metadata: {
-        ...user.user_metadata,
+        ...user.raw_user_meta_data,
         reset_token: tokenHash,
         reset_token_expires: expiresAt.toISOString()
       }
