@@ -85,9 +85,12 @@ const CustomerPortal: React.FC = () => {
     if (profile?.customer_id) {
       fetchCustomerData()
       fetchPendingQuotes()
-    } else if (profile && !multisiteLoading && !userRole) {
-      // Endast visa fel om användaren inte har multisite heller
+    } else if (profile && !multisiteLoading && !userRole && !profile.organization_id) {
+      // Endast visa fel om användaren inte har multisite heller OCH inte har organization_id
       setError('Ingen kundkoppling hittades')
+      setLoading(false)
+    } else if (profile && !multisiteLoading && !profile.customer_id && profile.organization_id) {
+      // Användare har organization_id men inte customer_id - denna är multisite-kund utan traditionell kundtillgång
       setLoading(false)
     }
   }, [profile, multisiteLoading, userRole])
@@ -165,8 +168,8 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
-  // Error state
-  if (error || !customer) {
+  // Error state - endast visa för användare som verkligen har fel, inte multisite-användare
+  if (error && !profile?.organization_id && !userRole) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <Card className="text-center p-8 max-w-md bg-slate-800/50 backdrop-blur border-slate-700">
@@ -182,6 +185,38 @@ const CustomerPortal: React.FC = () => {
             Försök igen
           </Button>
         </Card>
+      </div>
+    )
+  }
+
+  // För multisite-användare utan customer_id - visa meddelande om att de ska använda organisationsportalen
+  if (!customer && profile?.organization_id && userRole) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <Card className="text-center p-8 max-w-md bg-slate-800/50 backdrop-blur border-slate-700">
+          <div className="text-emerald-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-6 4h6m-6 4h6" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">Organisationsportal</h2>
+          <p className="text-slate-400 mb-4">Du är inloggad som {userRole} för din organisation. Använd organisationsportalen för att hantera dina ärenden.</p>
+          <Button onClick={() => navigate('/organisation')} className="bg-emerald-500 hover:bg-emerald-600">
+            Gå till Organisationsportal
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
+  // Om ingen customer data och inte multisite - visa loading
+  if (!customer && !profile?.organization_id && !error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="text-white mt-4">Laddar kunddata...</p>
+        </div>
       </div>
     )
   }
