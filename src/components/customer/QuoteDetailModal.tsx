@@ -33,6 +33,8 @@ interface Quote {
   created_by_email?: string | null
   address?: string | null
   case_number?: string | null
+  quote_reference_number?: string | null
+  contact_address?: string | null
 }
 
 interface QuoteDetailModalProps {
@@ -65,35 +67,34 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       setLoading(true)
       setError(null)
 
-      // Försök först med quotes_secure_view, sedan contracts direkt om det är multisite
+      // Försök med contracts först för att få all rik data, fallback till quotes_secure_view
       let quoteData, quoteError
       
-      
-      // Försök med quotes_secure_view först (för backward compatibility)
-      const { data: secureViewData, error: secureViewError } = await supabase
-        .from('quotes_secure_view')
-        .select('*')
+      // Försök med contracts först (innehåller rik produktdata och avtalsinformation)
+      const { data: contractData, error: contractError } = await supabase
+        .from('contracts')
+        .select(`
+          *,
+          customers!inner(id, organization_id)
+        `)
         .eq('id', quoteId)
-        .eq('customer_id', customerId)
+        .eq('customers.id', customerId)
         .maybeSingle()
 
-
-      if (secureViewError || !secureViewData) {
-        // Om quotes_secure_view inte fungerar, försök med contracts direkt (för multisite)
-        const { data: contractData, error: contractError } = await supabase
-          .from('contracts')
-          .select(`
-            *,
-            customers!inner(id, organization_id)
-          `)
+      if (contractError || !contractData) {
+        // Om contracts inte fungerar, försök med quotes_secure_view som fallback
+        const { data: secureViewData, error: secureViewError } = await supabase
+          .from('quotes_secure_view')
+          .select('*')
           .eq('id', quoteId)
-          .eq('customers.id', customerId)
+          .eq('customer_id', customerId)
           .maybeSingle()
-        quoteData = contractData
-        quoteError = contractError
-      } else {
+        
         quoteData = secureViewData
         quoteError = secureViewError
+      } else {
+        quoteData = contractData
+        quoteError = contractError
       }
 
       if (quoteError) throw quoteError
@@ -102,42 +103,41 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         throw new Error('Offerten kunde inte hittas eller du har inte behörighet att se den')
       }
 
-      // Transformera till Quote format - korrekt mappning för quotes_secure_view
+      // Transformera till Quote format - smart hantering av contracts vs quotes_secure_view
+      const isFromContracts = quoteData.agreement_text !== undefined // contracts har detta fält
+      
       const transformedQuote: Quote = {
         id: quoteData.id,
         oneflow_contract_id: quoteData.oneflow_contract_id,
-        // Gissa typ baserat på om det finns oneflow_contract_id
-        type: quoteData.oneflow_contract_id ? 'contract' : 'quote',
-        // Korrekt mappning från quote_status
-        status: quoteData.quote_status || 'pending',
-        // Använd title som company_name för quotes_secure_view
-        company_name: quoteData.title || 'Ej specificerat',
+        type: quoteData.type || (quoteData.oneflow_contract_id ? 'contract' : 'quote'),
+        status: quoteData.status || quoteData.quote_status || 'pending',
+        company_name: quoteData.company_name || quoteData.title || 'Ej specificerat',
         contact_person: quoteData.contact_person || 'Ej specificerat',
         contact_email: quoteData.contact_email || '',
         contact_phone: quoteData.contact_phone || null,
-        billing_email: null, // Finns inte i quotes_secure_view
-        // Korrekt mappning från price
-        total_value: quoteData.price,
-        // Endast visa selected_products om de innehåller riktig detaljerad data
-        selected_products: quoteData.selected_products?.length > 0 ? quoteData.selected_products : [],
-        agreement_text: null, // Finns inte i quotes_secure_view
-        // Korrekt mappning från scheduled_start
-        start_date: quoteData.scheduled_start,
-        contract_length: null, // Finns inte i quotes_secure_view
-        validity_period: null, // Finns inte i quotes_secure_view
-        document_url: null, // Finns inte i quotes_secure_view
-        signing_deadline: null, // Finns inte i quotes_secure_view
-        // Korrekt mappning från quote_generated_at
-        created_at: quoteData.quote_generated_at || new Date().toISOString(),
-        // Använd quote_sent_at eller quote_signed_at som senaste uppdatering
-        updated_at: quoteData.quote_signed_at || quoteData.quote_sent_at || quoteData.quote_generated_at || new Date().toISOString(),
-        template_id: null, // Finns inte i quotes_secure_view
-        begone_employee_name: null, // Finns inte i quotes_secure_view
-        begone_employee_email: null, // Finns inte i quotes_secure_view
-        created_by_name: null, // Finns inte i quotes_secure_view
-        created_by_email: null, // Finns inte i quotes_secure_view
-        address: quoteData.address,
-        case_number: quoteData.case_number
+        billing_email: quoteData.billing_email || null,
+        total_value: quoteData.total_value || quoteData.price,
+        // Parsa selected_products JSON om det är en sträng från contracts
+        selected_products: isFromContracts && typeof quoteData.selected_products === 'string' 
+          ? JSON.parse(quoteData.selected_products || '[]')
+          : (quoteData.selected_products || []),
+        agreement_text: quoteData.agreement_text,
+        start_date: quoteData.start_date || quoteData.scheduled_start,
+        contract_length: quoteData.contract_length,
+        validity_period: quoteData.validity_period,
+        document_url: quoteData.document_url,
+        signing_deadline: quoteData.signing_deadline,
+        created_at: quoteData.created_at || quoteData.quote_generated_at || new Date().toISOString(),
+        updated_at: quoteData.updated_at || quoteData.quote_signed_at || quoteData.quote_sent_at || quoteData.quote_generated_at || new Date().toISOString(),
+        template_id: quoteData.template_id,
+        begone_employee_name: quoteData.begone_employee_name,
+        begone_employee_email: quoteData.begone_employee_email,
+        created_by_name: quoteData.created_by_name,
+        created_by_email: quoteData.created_by_email,
+        address: quoteData.contact_address || quoteData.address,
+        case_number: quoteData.case_number,
+        quote_reference_number: quoteData.quote_reference_number,
+        contact_address: quoteData.contact_address
       }
 
       setQuote(transformedQuote)
@@ -391,6 +391,12 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                     <div>
                       <label className="text-xs text-slate-500 uppercase tracking-wide">Totalt värde</label>
                       <p className="text-white font-semibold text-lg">{formatCurrency(quote.total_value)}</p>
+                    </div>
+                  )}
+                  {quote.quote_reference_number && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wide">Referensnummer</label>
+                      <p className="text-white font-mono text-sm">{quote.quote_reference_number}</p>
                     </div>
                   )}
                   {quote.billing_email && quote.billing_email !== quote.contact_email && (
