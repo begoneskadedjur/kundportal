@@ -27,6 +27,10 @@ interface Quote {
   created_at: string
   updated_at: string
   template_id: string | null
+  begone_employee_name?: string | null
+  begone_employee_email?: string | null
+  created_by_name?: string | null
+  created_by_email?: string | null
 }
 
 interface QuoteDetailModalProps {
@@ -59,13 +63,35 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
       setLoading(true)
       setError(null)
 
-      // Använd säker vy för att hämta offertdata
-      const { data: quoteData, error: quoteError } = await supabase
+      // Försök först med quotes_secure_view, sedan contracts direkt om det är multisite
+      let quoteData, quoteError
+      
+      // Försök med quotes_secure_view först (för backward compatibility)
+      const { data: secureViewData, error: secureViewError } = await supabase
         .from('quotes_secure_view')
         .select('*')
         .eq('id', quoteId)
-        .eq('customer_id', customerId) // Extra säkerhetskontroll
+        .eq('customer_id', customerId)
         .maybeSingle()
+
+      if (secureViewError || !secureViewData) {
+        // Om quotes_secure_view inte fungerar, försök med contracts direkt (för multisite)
+        const { data: contractData, error: contractError } = await supabase
+          .from('contracts')
+          .select(`
+            *,
+            customers!inner(id, organization_id)
+          `)
+          .eq('id', quoteId)
+          .eq('customers.id', customerId)
+          .maybeSingle()
+        
+        quoteData = contractData
+        quoteError = contractError
+      } else {
+        quoteData = secureViewData
+        quoteError = secureViewError
+      }
 
       if (quoteError) throw quoteError
       
@@ -94,7 +120,11 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         signing_deadline: quoteData.signing_deadline,
         created_at: quoteData.created_at,
         updated_at: quoteData.updated_at,
-        template_id: quoteData.template_id
+        template_id: quoteData.template_id,
+        begone_employee_name: quoteData.begone_employee_name,
+        begone_employee_email: quoteData.begone_employee_email,
+        created_by_name: quoteData.created_by_name,
+        created_by_email: quoteData.created_by_email
       }
 
       setQuote(transformedQuote)
@@ -159,27 +189,79 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
   const getProductDetails = (products: any[]) => {
     if (!products || products.length === 0) return []
     
-    return products.flatMap(p => 
-      (p.products || []).map((product: any) => {
-        const servicePrice = parseInt(product.price_1?.amount?.amount || '0')
-        const materialPrice = parseInt(product.price_2?.amount?.amount || '0')
-        
-        // Ta det pris som faktiskt har ett värde, föredra servicePrice om båda finns
-        let actualPrice = null
-        if (servicePrice > 0) {
-          actualPrice = servicePrice
-        } else if (materialPrice > 0) {
-          actualPrice = materialPrice
-        }
-        
-        return {
-          name: product.name || 'Unnamed Product',
-          description: product.description || '',
-          quantity: product.quantity?.amount || 0,
-          totalPrice: actualPrice
-        }
-      })
-    )
+    // Hantera olika produktstrukturer
+    const extractedProducts: Array<{name: string, description: string, quantity: number, totalPrice: number | null}> = []
+    
+    products.forEach(p => {
+      // OneFlow-struktur med products array
+      if (p.products && Array.isArray(p.products)) {
+        p.products.forEach((product: any) => {
+          const servicePrice = parseInt(product.price_1?.amount?.amount || '0')
+          const materialPrice = parseInt(product.price_2?.amount?.amount || '0')
+          
+          // Ta det pris som faktiskt har ett värde, föredra servicePrice om båda finns
+          let actualPrice = null
+          if (servicePrice > 0) {
+            actualPrice = servicePrice
+          } else if (materialPrice > 0) {
+            actualPrice = materialPrice
+          }
+          
+          extractedProducts.push({
+            name: product.name || 'Unnamed Product',
+            description: product.description || '',
+            quantity: product.quantity?.amount || 1,
+            totalPrice: actualPrice
+          })
+        })
+      }
+      // Enkel struktur med direkta produktnamn (för multisite)
+      else if (typeof p === 'string') {
+        extractedProducts.push({
+          name: p,
+          description: '',
+          quantity: 1,
+          totalPrice: null
+        })
+      }
+      // Om produkten har name direkt
+      else if (p.name) {
+        extractedProducts.push({
+          name: p.name,
+          description: p.description || '',
+          quantity: p.quantity || 1,
+          totalPrice: p.price || p.totalPrice || null
+        })
+      }
+      // Om produkten är ett objekt med title istället för name
+      else if (p.title) {
+        extractedProducts.push({
+          name: p.title,
+          description: p.description || '',
+          quantity: p.quantity || 1,
+          totalPrice: p.price || p.totalPrice || null
+        })
+      }
+    })
+    
+    return extractedProducts
+  }
+
+  const getProductSummary = (products: any[]) => {
+    if (!products || products.length === 0) return 'Inga produkter specificerade'
+    
+    const extractedProducts = getProductDetails(products)
+    if (extractedProducts.length === 0) return 'Inga produkter specificerade'
+    
+    const names = extractedProducts.map(p => p.name).filter(name => name && name !== 'Unnamed Product')
+    if (names.length === 0) return 'Inga produkter specificerade'
+    
+    // Visa max 2 produktnamn + antal ytterligare
+    if (names.length <= 2) {
+      return names.join(', ')
+    } else {
+      return `${names.slice(0, 2).join(', ')} + ${names.length - 2} till`
+    }
   }
 
 
@@ -197,9 +279,14 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                 {quote ? `${quote.type === 'contract' ? 'Kontrakt' : 'Offert'} - ${quote.company_name}` : 'Laddar offert...'}
               </h2>
               {quote && (
-                <p className="text-slate-400">
-                  {getStatusText(quote.status)} • {formatDate(quote.created_at)}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-slate-400">
+                    {getStatusText(quote.status)} • {formatDate(quote.created_at)}
+                  </p>
+                  <p className="text-sm text-slate-300 font-medium">
+                    {getProductSummary(quote.selected_products)}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -244,7 +331,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               {/* Basic Information */}
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5" />
+                  <User className="w-5 h-5 text-blue-400" />
                   Grundläggande information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -271,6 +358,21 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                       <span className="text-white">{getStatusText(quote.status)}</span>
                     </div>
                   </div>
+                  {(quote.begone_employee_name || quote.created_by_name) && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wide">Säljare/Ansvarig</label>
+                      <p className="text-white">{quote.begone_employee_name || quote.created_by_name}</p>
+                      {(quote.begone_employee_email || quote.created_by_email) && (
+                        <p className="text-sm text-slate-400">{quote.begone_employee_email || quote.created_by_email}</p>
+                      )}
+                    </div>
+                  )}
+                  {quote.total_value && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wide">Totalt värde</label>
+                      <p className="text-white font-semibold text-lg">{formatCurrency(quote.total_value)}</p>
+                    </div>
+                  )}
                   {quote.billing_email && quote.billing_email !== quote.contact_email && (
                     <div className="md:col-span-2">
                       <label className="text-xs text-slate-500 uppercase tracking-wide">Fakturamail</label>
@@ -284,10 +386,10 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               {quote.type === 'contract' && (
                 <Card className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Building2 className="w-5 h-5" />
+                    <Building2 className="w-5 h-5 text-purple-400" />
                     Kontraktdetaljer
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="text-xs text-slate-500 uppercase tracking-wide">Startdatum</label>
                       <p className="text-white">{formatDate(quote.start_date)}</p>
@@ -296,12 +398,6 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                       <div>
                         <label className="text-xs text-slate-500 uppercase tracking-wide">Kontraktslängd</label>
                         <p className="text-white">{quote.contract_length}</p>
-                      </div>
-                    )}
-                    {quote.total_value && (
-                      <div>
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Kostnad</label>
-                        <p className="text-white font-semibold text-lg">{formatCurrency(quote.total_value)}</p>
                       </div>
                     )}
                   </div>
@@ -326,7 +422,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               {quote.selected_products && quote.selected_products.length > 0 && (
                 <Card className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Package className="w-5 h-5" />
+                    <Package className="w-5 h-5 text-green-400" />
                     Produkter & Tjänster
                   </h3>
                   <div className="space-y-4">
@@ -358,10 +454,10 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               {quote.agreement_text && (
                 <Card className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
+                    <FileText className="w-5 h-5 text-blue-400" />
                     Offertbeskrivning
                   </h3>
-                  <div className="bg-slate-800/50 rounded-lg p-4">
+                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                     <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
                       {quote.agreement_text}
                     </p>
@@ -372,7 +468,7 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
               {/* Timestamps */}
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
+                  <Calendar className="w-5 h-5 text-purple-400" />
                   Tidsstämplar
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -387,18 +483,76 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
                 </div>
               </Card>
 
-              {/* Information instead of actions */}
-              <div className="flex items-center justify-center pt-4 border-t border-slate-700">
-                <div className="text-center text-slate-400">
-                  <Package className="w-8 h-8 mx-auto mb-2" />
-                  <p className="text-sm">
-                    Offerten har skickats via e-post till kontaktpersonen.
-                  </p>
-                  <p className="text-xs mt-1">
-                    Kontrollera e-postinkorgen för att se offertdokumentet.
-                  </p>
+              {/* Status Information */}
+              <Card className="p-6 bg-gradient-to-r from-slate-800/50 to-slate-700/50 border border-slate-600">
+                <div className="flex items-start gap-4">
+                  {getStatusIcon(quote.status)}
+                  <div className="flex-1">
+                    <h4 className="text-lg font-semibold text-white mb-2">
+                      Status: {getStatusText(quote.status)}
+                    </h4>
+                    
+                    {quote.status === 'pending' && (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-slate-300">
+                          <strong>Nästa steg:</strong> Offerten har skickats till{' '}
+                          <span className="text-white">{quote.contact_email}</span> och väntar på svar.
+                        </p>
+                        <p className="text-slate-400">
+                          Kontaktpersonen kommer att få en e-post med offertdokumentet för granskning och godkännande.
+                        </p>
+                        {quote.signing_deadline && (
+                          <p className="text-amber-400">
+                            <strong>Signeringsfrist:</strong> {formatDate(quote.signing_deadline)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {quote.status === 'signed' && (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-slate-300">
+                          <strong>Klart!</strong> Offerten har signerats och kontraktet är aktivt.
+                        </p>
+                        <p className="text-slate-400">
+                          Nästa steg är implementation och uppstart av tjänsterna.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {quote.status === 'rejected' && (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-slate-300">
+                          <strong>Avvisad:</strong> Kunden har avvisat offerten.
+                        </p>
+                        <p className="text-slate-400">
+                          Kontakta säljaren för eventuell omförhandling eller förtydliganden.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {quote.status === 'expired' && (
+                      <div className="space-y-2 text-sm">
+                        <p className="text-slate-300">
+                          <strong>Utgången:</strong> Offertens giltighetsperiod har passerat.
+                        </p>
+                        <p className="text-slate-400">
+                          Kontakta säljaren för att förnya offerten vid intresse.
+                        </p>
+                      </div>
+                    )}
+
+                    {quote.oneflow_contract_id && (
+                      <div className="mt-4 pt-4 border-t border-slate-600">
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <ExternalLink className="w-4 h-4" />
+                          <span>OneFlow-ID: {quote.oneflow_contract_id}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Card>
             </div>
           ) : null}
         </div>
