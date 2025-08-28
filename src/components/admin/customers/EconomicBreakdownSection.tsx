@@ -199,7 +199,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                 <FileText className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <div className="text-blue-400 font-medium">{organization.organization_name}</div>
+                <div className="text-blue-400 font-medium">{organization.company_name}</div>
                 <div className="text-xs text-slate-400">Årspremie</div>
               </div>
             </div>
