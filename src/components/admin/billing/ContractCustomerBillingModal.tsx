@@ -221,50 +221,36 @@ export const ContractCustomerBillingModal: React.FC<ContractCustomerBillingModal
               <h3 className="text-lg font-medium text-white">Kunduppgifter</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Företag</p>
                 <p className="text-white font-medium">{customer?.company_name || '-'}</p>
               </div>
               
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Organisationsnummer</p>
                 <p className="text-white font-medium">{customer?.organization_number || '-'}</p>
               </div>
               
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Kontaktperson</p>
                 <p className="text-white font-medium">{case_.contact_person || customer?.contact_person || '-'}</p>
               </div>
               
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Telefon</p>
                 <p className="text-white font-medium">{case_.contact_phone || customer?.contact_phone || '-'}</p>
               </div>
               
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Email</p>
                 <p className="text-white font-medium">{case_.contact_email || customer?.contact_email || '-'}</p>
               </div>
               
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
                 <p className="text-sm text-slate-400 mb-1">Faktura-email</p>
                 <p className="text-white font-medium">{customer?.billing_email || customer?.contact_email || '-'}</p>
               </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                <p className="text-sm text-slate-400 mb-1">Faktureringsadress</p>
-                <p className="text-white font-medium whitespace-pre-line">
-                  {customer?.billing_address || customer?.contact_address || 'Ingen adress angiven'}
-                </p>
-              </div>
-
-              {customer?.product_summary && (
-                <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                  <p className="text-sm text-slate-400 mb-1">Produkter/Tjänster</p>
-                  <p className="text-white">{customer.product_summary}</p>
-                </div>
-              )}
             </div>
           </div>
 
