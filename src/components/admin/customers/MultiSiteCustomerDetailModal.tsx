@@ -212,23 +212,6 @@ export default function MultiSiteCustomerDetailModal({
                 </div>
               </div>
 
-              {/* Portal Status */}
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">Portal Status:</span>
-                  <PortalAccessBadge
-                    status={organization.portalAccessStatus}
-                    userCount={organization.multisiteUsers?.length || organization.activeUsersCount}
-                    tooltip=""
-                    size="sm"
-                  />
-                </div>
-                {organization.pendingInvitationsCount > 0 && (
-                  <span className="text-sm text-amber-400">
-                    {organization.pendingInvitationsCount} väntande inbjudningar
-                  </span>
-                )}
-              </div>
             </div>
           </div>
 
