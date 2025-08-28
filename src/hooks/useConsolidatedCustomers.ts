@@ -254,14 +254,20 @@ export function useConsolidatedCustomers() {
         console.log('🔍 DEBUG - Profiles result:', profiles?.length, 'error:', profilesError)
         multisiteProfilesData = profiles
 
-        // Hämta auth users data för korrekt login-status
-        const { data: authUsers, error: authError } = await supabase
-          .from('auth.users')
-          .select('id, last_sign_in_at')
-          .in('id', userIds)
-        
-        console.log('🔍 DEBUG - Auth users result:', authUsers?.length, 'error:', authError)
-        authUsersData = authUsers
+        // Hämta auth users data via RPC för korrekt login-status
+        try {
+          const { data: authUsers, error: authError } = await supabase
+            .rpc('get_user_login_status', { user_ids: userIds })
+          
+          console.log('🔍 DEBUG - Auth users RPC result:', authUsers?.length, 'error:', authError)
+          if (!authError && authUsers) {
+            authUsersData = authUsers
+          }
+        } catch (rpcError) {
+          console.warn('⚠️ RPC get_user_login_status inte tillgänglig, använder profiles.last_login fallback:', rpcError)
+          // Fallback till profiles.last_login om RPC inte finns
+          authUsersData = null
+        }
       }
 
       // Skapa multisite users map med fullständig info
@@ -297,7 +303,7 @@ export function useConsolidatedCustomers() {
               last_sign_in_at: authUser?.last_sign_in_at || null,
               email_verified: profile.email_verified,
               is_active: profile.is_active,
-              hasLoggedIn: !!authUser?.last_sign_in_at // Använd auth.users data istället för profiles
+              hasLoggedIn: authUser?.last_sign_in_at ? !!authUser.last_sign_in_at : !!profile.last_login // Fallback till profiles om auth data saknas
             })
             multisiteUsersMap.set(role.organization_id, current)
           }
