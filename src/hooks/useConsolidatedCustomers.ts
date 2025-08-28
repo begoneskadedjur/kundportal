@@ -197,6 +197,11 @@ export function useConsolidatedCustomers() {
         .order('created_at', { ascending: false })
 
       if (customersError) throw customersError
+      
+      // DEBUG: Log raw data
+      console.log('🔍 DEBUG - Raw customers data:', customersData?.length)
+      console.log('🔍 DEBUG - Multisite candidates:', customersData?.filter(c => c.is_multisite && c.organization_id)?.length)
+      console.log('🔍 DEBUG - Sample multisite customer:', customersData?.find(c => c.is_multisite && c.organization_id))
 
       // Hämta portal access information
       const { data: profilesData } = await supabase
@@ -325,6 +330,10 @@ export function useConsolidatedCustomers() {
     multisiteAccessMap: Map<string, number>
   ): ConsolidatedCustomer[] => {
     const consolidatedMap = new Map<string, ConsolidatedCustomer>()
+    
+    // DEBUG: Log consolidation input
+    console.log('🔧 DEBUG - Consolidating customers:', customers.length)
+    console.log('🔧 DEBUG - Multisite customers to consolidate:', customers.filter(c => c.is_multisite && c.organization_id).length)
     
     customers.forEach(customer => {
       if (customer.is_multisite && customer.organization_id) {
@@ -555,7 +564,15 @@ export function useConsolidatedCustomers() {
       }
     })
     
-    return Array.from(consolidatedMap.values())
+    const result = Array.from(consolidatedMap.values())
+    
+    // DEBUG: Log consolidation result
+    console.log('✅ DEBUG - Consolidated result:', result.length)
+    console.log('✅ DEBUG - Multisite organizations:', result.filter(c => c.organizationType === 'multisite').length)
+    console.log('✅ DEBUG - Single customers:', result.filter(c => c.organizationType === 'single').length)
+    console.log('✅ DEBUG - Sample multisite org:', result.find(c => c.organizationType === 'multisite'))
+    
+    return result
   }
 
   // Beräkna analytics baserat på consolidated customers

@@ -179,6 +179,11 @@ export default function Customers() {
     refresh 
   } = useConsolidatedCustomers()
   
+  // DEBUG: Log consolidated customers data in frontend
+  console.log('🎨 FRONTEND DEBUG - consolidatedCustomers:', consolidatedCustomers.length)
+  console.log('🎨 FRONTEND DEBUG - Multisite orgs:', consolidatedCustomers.filter(c => c.organizationType === 'multisite').length)
+  console.log('🎨 FRONTEND DEBUG - Sample data:', consolidatedCustomers.slice(0, 2))
+  
   // Keep old hook for backwards compatibility with components that need individual customers
   const { customers: legacyCustomers } = useCustomerAnalytics()
   
@@ -203,7 +208,7 @@ export default function Customers() {
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
-    return filterConsolidatedCustomers({
+    const result = filterConsolidatedCustomers({
       search: searchTerm,
       status: statusFilter,
       healthScore: healthFilter,
@@ -211,6 +216,13 @@ export default function Customers() {
       manager: managerFilter === 'all' ? undefined : managerFilter,
       organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
+    
+    // DEBUG: Log filtering results
+    console.log('🔽 FILTER DEBUG - Applied filters:', { searchTerm, statusFilter, healthFilter, organizationTypeFilter })
+    console.log('🔽 FILTER DEBUG - Filtered result:', result.length)
+    console.log('🔽 FILTER DEBUG - Multisite in filtered result:', result.filter(c => c.organizationType === 'multisite').length)
+    
+    return result
   }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, filterConsolidatedCustomers])
 
   // Toggle expanded row
@@ -278,6 +290,8 @@ export default function Customers() {
 
   // Handle multisite detail view - Opens detailed modal for multisite organizations
   const handleViewMultiSiteDetails = (organization: any) => {
+    console.log('🚀 MODAL DEBUG - Opening multisite detail for:', organization.company_name)
+    console.log('🚀 MODAL DEBUG - Organization data:', organization)
     setSelectedMultiSiteOrg(organization)
     setMultiSiteDetailOpen(true)
   }
