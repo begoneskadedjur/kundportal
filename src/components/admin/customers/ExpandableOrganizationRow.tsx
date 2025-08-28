@@ -219,14 +219,38 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
         </div>
       </td>
 
-      {/* Contract Value Column */}
-      <td className="px-6 py-4">
+      {/* Annual Premium Column */}
+      <td className="px-4 lg:px-6 py-4">
         <div className="text-right">
-          <div className="font-semibold text-slate-200">
+          <div className="font-semibold text-green-400 text-sm lg:text-base">
+            {formatCurrency(organization.totalAnnualValue || 0)}
+          </div>
+          <div className="text-xs text-slate-500 hidden sm:block">
+            {formatCurrency((organization.totalAnnualValue || 0) / 12)}/mån
+          </div>
+        </div>
+      </td>
+
+      {/* Extra Billing Column */}
+      <td className="hidden lg:table-cell px-4 lg:px-6 py-4">
+        <div className="text-right">
+          <div className="font-semibold text-blue-400 text-sm lg:text-base">
+            {formatCurrency(organization.totalCasesValue || 0)}
+          </div>
+          <div className="text-xs text-slate-500 hidden sm:block">
+            utöver avtal
+          </div>
+        </div>
+      </td>
+
+      {/* Total Contract Value Column */}
+      <td className="px-4 lg:px-6 py-4">
+        <div className="text-right">
+          <div className="font-semibold text-slate-200 text-sm lg:text-base">
             {formatCurrency(organization.totalContractValue)}
           </div>
-          <div className="text-sm text-slate-400">
-            {formatCurrency(organization.totalMonthlyValue)}/mån
+          <div className="text-xs text-slate-500 hidden sm:block">
+            totalt värde
           </div>
         </div>
       </td>

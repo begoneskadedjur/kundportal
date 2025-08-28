@@ -25,6 +25,7 @@ import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
 import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
+import ContactAndUnitsExpandedView from '../../components/admin/customers/ContactAndUnitsExpandedView'
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import { 
   formatCurrency, 
@@ -66,7 +67,7 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
 
   return (
     <tr>
-      <td colSpan={9} className="px-4 py-4 bg-slate-800/30">
+      <td colSpan={11} className="px-4 py-4 bg-slate-800/30">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Kontaktinformation */}
           <div>
@@ -472,8 +473,20 @@ export default function Customers() {
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                       <div className="flex items-center justify-end gap-2">
+                        <DollarSign className="w-4 h-4 text-green-400" />
+                        Årspremie
+                      </div>
+                    </th>
+                    <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <DollarSign className="w-4 h-4 text-blue-400" />
+                        Debiterat utöver
+                      </div>
+                    </th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-yellow-400" />
-                        Kontraktsvärde
+                        Avtalsvärde
                       </div>
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -524,42 +537,10 @@ export default function Customers() {
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
                         />
                         
-                        {/* Organization summary row for multisite when expanded */}
+                        {/* Contact and units expanded view for multisite organizations */}
                         {isExpanded && organization.organizationType === 'multisite' && (
-                          <tr className="bg-slate-800/10 border-b border-slate-700/30">
-                            <td colSpan={9} className="px-6 py-3">
-                              <div className="flex items-center justify-between text-xs text-slate-400">
-                                <div className="flex items-center gap-4">
-                                  <span>📊 Organisationsmätningar:</span>
-                                  <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">
-                                    {organization.totalSites} enheter
-                                  </span>
-                                  <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded border border-green-500/20">
-                                    {organization.totalCasesCount} ärenden totalt
-                                  </span>
-                                  <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded border border-yellow-500/20">
-                                    {formatCurrency(organization.totalCasesValue)} ärendevärde
-                                  </span>
-                                </div>
-                                <div className="text-slate-500">
-                                  Expandera för att se individuella enheter
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
+                          <ContactAndUnitsExpandedView organization={organization} />
                         )}
-                        
-                        {/* Site detail rows (only for multisite when expanded) */}
-                        {isExpanded && organization.organizationType === 'multisite' && 
-                          organization.sites.map((site) => (
-                            <SiteDetailRow
-                              key={site.id}
-                              site={site}
-                              indentLevel={1}
-                              onSiteEdit={(site) => handleEditCustomer(site)}
-                            />
-                          ))
-                        }
                         
                         {/* Expanded details for single-site customers */}
                         {isExpanded && organization.organizationType === 'single' && (

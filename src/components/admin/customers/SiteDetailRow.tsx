@@ -177,14 +177,38 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
         <PortalAccessBadge status={site.invitationStatus || 'none'} />
       </td>
 
-      {/* Contract Value Column - Simplified for sites under org */}
-      <td className="px-6 py-3">
+      {/* Annual Premium Column */}
+      <td className="px-4 lg:px-6 py-3">
+        <div className="text-right text-sm">
+          <div className="font-medium text-green-400 text-xs">
+            {formatCurrency(site.annual_value || 0)}
+          </div>
+          <div className="text-xs text-slate-500 hidden sm:block">
+            årspremie
+          </div>
+        </div>
+      </td>
+
+      {/* Extra Billing Column */}
+      <td className="hidden lg:table-cell px-4 lg:px-6 py-3">
+        <div className="text-right text-sm">
+          <div className="font-medium text-blue-400 text-xs">
+            {formatCurrency(site.casesValue || 0)}
+          </div>
+          <div className="text-xs text-slate-500 hidden sm:block">
+            utöver avtal
+          </div>
+        </div>
+      </td>
+
+      {/* Total Contract Value Column */}
+      <td className="px-4 lg:px-6 py-3">
         <div className="text-right text-sm">
           <div className="font-medium text-slate-300 text-xs">
             {formatCurrency(site.total_contract_value || 0)}
           </div>
-          <div className="text-xs text-slate-500">
-            {formatCurrency(site.monthly_value || 0)}/mån
+          <div className="text-xs text-slate-500 hidden sm:block">
+            totalt värde
           </div>
         </div>
       </td>
