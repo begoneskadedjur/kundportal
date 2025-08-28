@@ -10,6 +10,7 @@ import {
 
 import Button from '../../ui/Button';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+import { CompactFieldDisplay } from './CompactFieldDisplay';
 import type { BillingCase } from '../../../types/billing';
 
 interface MultisiteBillingModalProps {
@@ -259,34 +260,16 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                     <h3 className="text-lg font-medium text-white">Huvudkontor - Faktureringsuppgifter</h3>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Organisationsnamn</p>
-                      <p className="text-white font-medium">{organizationData?.company_name || '-'}</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Organisationsnummer</p>
-                      <p className="text-white font-medium">{organizationData?.organization_number || '-'}</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Faktura-email</p>
-                      <p className="text-white font-medium">{organizationData?.billing_email || organizationData?.contact_email || '-'}</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Telefon</p>
-                      <p className="text-white font-medium">{organizationData?.contact_phone || '-'}</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
-                      <p className="text-sm text-slate-400 mb-1">Faktureringsadress</p>
-                      <p className="text-white font-medium whitespace-pre-line">
-                        {organizationData?.billing_address || organizationData?.contact_address || '-'}
-                      </p>
-                    </div>
-                  </div>
+                  <CompactFieldDisplay 
+                    columns={1}
+                    fields={[
+                      { label: 'Organisationsnamn', value: organizationData?.company_name },
+                      { label: 'Organisationsnummer', value: organizationData?.organization_number },
+                      { label: 'Faktura-email', value: organizationData?.billing_email || organizationData?.contact_email },
+                      { label: 'Telefon', value: organizationData?.contact_phone },
+                      { label: 'Faktureringsadress', value: organizationData?.billing_address || organizationData?.contact_address }
+                    ]}
+                  />
                 </div>
               )}
 
@@ -300,55 +283,21 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                     </h3>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Enhetsnamn</p>
-                      <p className="text-white font-medium">{case_.customer?.site_name || case_.customer?.company_name || '-'}</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 p-4 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-1">Enhetskod</p>
-                      <p className="text-white font-medium">{case_.customer?.site_code || 'Ej angiven'}</p>
-                    </div>
-                    
-                    {case_.customer?.region && (
-                      <div className="bg-slate-800/30 p-4 rounded-lg">
-                        <p className="text-sm text-slate-400 mb-1">Region</p>
-                        <p className="text-white font-medium">{case_.customer.region}</p>
-                      </div>
-                    )}
-                    
-                    {!isConsolidated && (
-                      <>
-                        <div className="bg-slate-800/30 p-4 rounded-lg">
-                          <p className="text-sm text-slate-400 mb-1">Kontaktperson</p>
-                          <p className="text-white font-medium">{case_.contact_person || case_.customer?.contact_person || '-'}</p>
-                        </div>
-                        
-                        <div className="bg-slate-800/30 p-4 rounded-lg">
-                          <p className="text-sm text-slate-400 mb-1">Kontakt-email</p>
-                          <p className="text-white font-medium">{case_.contact_email || case_.customer?.contact_email || '-'}</p>
-                        </div>
-                        
-                        <div className="bg-slate-800/30 p-4 rounded-lg">
-                          <p className="text-sm text-slate-400 mb-1">Telefon</p>
-                          <p className="text-white font-medium">{case_.contact_phone || case_.customer?.contact_phone || '-'}</p>
-                        </div>
-                        
-                        <div className="bg-slate-800/30 p-4 rounded-lg">
-                          <p className="text-sm text-slate-400 mb-1">Faktura-email</p>
-                          <p className="text-white font-medium">{case_.customer?.billing_email || case_.customer?.contact_email || case_.contact_email || '-'}</p>
-                        </div>
-                        
-                        <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
-                          <p className="text-sm text-slate-400 mb-1">Faktureringsadress</p>
-                          <p className="text-white font-medium whitespace-pre-line">
-                            {case_.customer?.billing_address || case_.customer?.contact_address || 'Ingen adress angiven'}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <CompactFieldDisplay 
+                    columns={1}
+                    fields={[
+                      { label: 'Enhetsnamn', value: case_.customer?.site_name || case_.customer?.company_name },
+                      { label: 'Enhetskod', value: case_.customer?.site_code || 'Ej angiven' },
+                      ...(case_.customer?.region ? [{ label: 'Region', value: case_.customer.region }] : []),
+                      ...(!isConsolidated ? [
+                        { label: 'Kontaktperson', value: case_.contact_person || case_.customer?.contact_person },
+                        { label: 'Kontakt-email', value: case_.contact_email || case_.customer?.contact_email },
+                        { label: 'Telefon', value: case_.contact_phone || case_.customer?.contact_phone },
+                        { label: 'Faktura-email', value: case_.customer?.billing_email || case_.customer?.contact_email || case_.contact_email },
+                        { label: 'Faktureringsadress', value: case_.customer?.billing_address || case_.customer?.contact_address || 'Ingen adress angiven' }
+                      ] : [])
+                    ]}
+                  />
                 </div>
               )}
 
@@ -359,59 +308,72 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                   <h3 className="text-lg font-medium text-white">Ärendeinformation</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-800/30 p-4 rounded-lg">
-                    <p className="text-sm text-slate-400 mb-1">Ärendenummer</p>
-                    <p className="text-white font-medium">{case_.case_number || '-'}</p>
+                <CompactFieldDisplay 
+                  columns={1}
+                  fields={[
+                    { label: 'Ärendenummer', value: case_.case_number },
+                    { 
+                      label: 'Avslutad datum', 
+                      value: case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : 'Ej avslutat'
+                    },
+                    { label: 'Tekniker', value: case_.primary_technician_name || case_.primary_assignee_name },
+                    { label: 'Skadedjur', value: case_.pest_type || case_.skadedjur }
+                  ]}
+                />
+                
+                {case_.description && (
+                  <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+                    <p className="text-sm text-slate-400 mb-2">Beskrivning</p>
+                    <p className="text-white">{case_.description}</p>
                   </div>
-                  
-                  <div className="bg-slate-800/30 p-4 rounded-lg">
-                    <p className="text-sm text-slate-400 mb-1">Avslutad datum</p>
-                    <p className="text-white font-medium">
-                      {case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : 'Ej avslutat'}
-                    </p>
+                )}
+                
+                {(case_.work_report || case_.rapport) && (
+                  <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
+                    <p className="text-sm text-slate-400 mb-2">Arbetsrapport</p>
+                    <p className="text-white whitespace-pre-wrap">{case_.work_report || case_.rapport}</p>
                   </div>
-                  
-                  <div className="bg-slate-800/30 p-4 rounded-lg">
-                    <p className="text-sm text-slate-400 mb-1">Tekniker</p>
-                    <p className="text-white font-medium">{case_.primary_technician_name || case_.primary_assignee_name || '-'}</p>
-                  </div>
-                  
-                  <div className="bg-slate-800/30 p-4 rounded-lg">
-                    <p className="text-sm text-slate-400 mb-1">Skadedjur</p>
-                    <p className="text-white font-medium">{case_.pest_type || case_.skadedjur || '-'}</p>
-                  </div>
-                  
-                  {case_.description && (
-                    <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
-                      <p className="text-sm text-slate-400 mb-1">Beskrivning</p>
-                      <p className="text-white">{case_.description}</p>
-                    </div>
-                  )}
-                  
-                  {(case_.work_report || case_.rapport) && (
-                    <div className="bg-slate-800/30 p-4 rounded-lg md:col-span-2">
-                      <p className="text-sm text-slate-400 mb-1">Arbetsrapport</p>
-                      <p className="text-white whitespace-pre-wrap">{case_.work_report || case_.rapport}</p>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               {/* Summa att fakturera */}
-              <div className="bg-gradient-to-r from-slate-800 to-slate-800/50 p-6 rounded-lg">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-r from-slate-800 to-slate-800/50 p-6 rounded-lg border border-slate-700">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-medium text-white mb-1">Summa att fakturera</h3>
                     <p className="text-sm text-slate-400">
                       {isConsolidated ? 'Faktureras till huvudkontor' : 'Faktureras till enhet'}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-green-400">
+                </div>
+                
+                {/* Kompakt momsuppdelning för multisite avtalsärenden */}
+                <div className="space-y-3">
+                  {/* Summa exkl. moms */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-medium">Summa exkl. moms</span>
+                    <span className="text-xl font-semibold text-white font-mono">
+                      {formatCurrency((case_.pris || case_.price || 0) / 1.25)}
+                    </span>
+                  </div>
+                  
+                  {/* Moms rad */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Moms (25%)</span>
+                    <span className="text-lg font-medium text-slate-300 font-mono">
+                      {formatCurrency((case_.pris || case_.price || 0) - (case_.pris || case_.price || 0) / 1.25)}
+                    </span>
+                  </div>
+                  
+                  {/* Separator linje */}
+                  <div className="border-t border-slate-600/50"></div>
+                  
+                  {/* Totalt inkl. moms */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
+                    <span className="text-2xl font-bold text-green-400 font-mono">
                       {formatCurrency(case_.pris || case_.price || 0)}
-                    </p>
-                    <p className="text-sm text-slate-400 mt-1">inkl. moms</p>
+                    </span>
                   </div>
                 </div>
               </div>

@@ -10,6 +10,7 @@ import {
 
 import Button from '../../ui/Button';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+import { CompactFieldDisplay } from './CompactFieldDisplay';
 
 interface ContractCustomerBillingModalProps {
   case_: any;
@@ -221,37 +222,17 @@ export const ContractCustomerBillingModal: React.FC<ContractCustomerBillingModal
               <h3 className="text-lg font-medium text-white">Kunduppgifter</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Företag</p>
-                <p className="text-white font-medium">{customer?.company_name || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Organisationsnummer</p>
-                <p className="text-white font-medium">{customer?.organization_number || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Kontaktperson</p>
-                <p className="text-white font-medium">{case_.contact_person || customer?.contact_person || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Telefon</p>
-                <p className="text-white font-medium">{case_.contact_phone || customer?.contact_phone || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Email</p>
-                <p className="text-white font-medium">{case_.contact_email || customer?.contact_email || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Faktura-email</p>
-                <p className="text-white font-medium">{customer?.billing_email || customer?.contact_email || '-'}</p>
-              </div>
-            </div>
+            <CompactFieldDisplay 
+              columns={1}
+              fields={[
+                { label: 'Företag', value: customer?.company_name },
+                { label: 'Organisationsnummer', value: customer?.organization_number },
+                { label: 'Kontaktperson', value: case_.contact_person || customer?.contact_person },
+                { label: 'Telefon', value: case_.contact_phone || customer?.contact_phone },
+                { label: 'Email', value: case_.contact_email || customer?.contact_email },
+                { label: 'Faktura-email', value: customer?.billing_email || customer?.contact_email }
+              ]}
+            />
           </div>
 
           {/* Ärendeinformation */}
@@ -261,43 +242,32 @@ export const ContractCustomerBillingModal: React.FC<ContractCustomerBillingModal
               <h3 className="text-lg font-medium text-white">Ärendeinformation</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CompactFieldDisplay 
+              columns={1}
+              fields={[
+                { label: 'Ärendenummer', value: case_.case_number },
+                { 
+                  label: 'Avslutad datum', 
+                  value: case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : 'Ej avslutat'
+                },
+                { label: 'Tekniker', value: case_.primary_technician_name || case_.assigned_technician_name },
+                { label: 'Skadedjur', value: case_.pest_type }
+              ]}
+            />
+            
+            {case_.description && (
               <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Ärendenummer</p>
-                <p className="text-white font-medium">{case_.case_number || '-'}</p>
+                <p className="text-sm text-slate-400 mb-2">Beskrivning</p>
+                <p className="text-white">{case_.description}</p>
               </div>
-              
+            )}
+            
+            {case_.work_report && (
               <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Avslutad datum</p>
-                <p className="text-white font-medium">
-                  {case_.completed_date ? new Date(case_.completed_date).toLocaleDateString('sv-SE') : 'Ej avslutat'}
-                </p>
+                <p className="text-sm text-slate-400 mb-2">Arbetsrapport</p>
+                <p className="text-white whitespace-pre-wrap">{case_.work_report}</p>
               </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Tekniker</p>
-                <p className="text-white font-medium">{case_.primary_technician_name || case_.assigned_technician_name || '-'}</p>
-              </div>
-              
-              <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700">
-                <p className="text-sm text-slate-400 mb-1">Skadedjur</p>
-                <p className="text-white font-medium">{case_.pest_type || '-'}</p>
-              </div>
-              
-              {case_.description && (
-                <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                  <p className="text-sm text-slate-400 mb-1">Beskrivning</p>
-                  <p className="text-white">{case_.description}</p>
-                </div>
-              )}
-              
-              {case_.work_report && (
-                <div className="bg-slate-800/30 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                  <p className="text-sm text-slate-400 mb-1">Arbetsrapport</p>
-                  <p className="text-white whitespace-pre-wrap">{case_.work_report}</p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Summa att fakturera */}

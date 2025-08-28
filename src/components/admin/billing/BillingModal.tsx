@@ -303,10 +303,13 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
 
   // Förbättrad prisberäkning
   const renderPricingInfo = () => {
-    const basePrice = case_.pris || 0;
+    const totalPrice = case_.pris || 0;
     const isBusinessCase = case_.type === 'business';
-    const vatAmount = isBusinessCase ? basePrice * 0.25 : 0;
-    const totalAmount = basePrice + vatAmount;
+    
+    // För business cases: totalPrice innehåller inkl. moms, vi beräknar exkl. moms och moms separat
+    // För private cases: totalPrice visas som inkl. moms (oförändrat)
+    const basePrice = isBusinessCase ? totalPrice / 1.25 : totalPrice;
+    const vatAmount = isBusinessCase ? totalPrice - basePrice : 0;
 
     return (
       <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6">
@@ -316,31 +319,41 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
         </h3>
         
         <div className="bg-slate-800/50 rounded-lg p-4">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-400">Grundpris</span>
-              <span className="text-sm font-medium text-white">{formatCurrency(basePrice)}</span>
-            </div>
-            
-            {isBusinessCase && (
+          {isBusinessCase ? (
+            // Business case: Visa exkl. moms + moms + totalt
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400">Moms (25%)</span>
-                <span className="text-sm font-medium text-white">{formatCurrency(vatAmount)}</span>
-              </div>
-            )}
-            
-            <div className="border-t border-slate-700 pt-3">
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-slate-300">
-                  Totalt att fakturera
+                <span className="text-slate-300 font-medium">Summa exkl. moms</span>
+                <span className="text-xl font-semibold text-white font-mono">
+                  {formatCurrency(basePrice)}
                 </span>
-                <span className="text-2xl font-bold text-green-400">{formatCurrency(totalAmount)}</span>
               </div>
-              {isBusinessCase && (
-                <p className="text-xs text-slate-400 mt-1 text-right">Inkl. 25% moms</p>
-              )}
+              
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Moms (25%)</span>
+                <span className="text-lg font-medium text-slate-300 font-mono">
+                  {formatCurrency(vatAmount)}
+                </span>
+              </div>
+              
+              <div className="border-t border-slate-600/50"></div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
+                <span className="text-2xl font-bold text-green-400 font-mono">
+                  {formatCurrency(totalPrice)}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Private case: Visa bara totalt inkl. moms
+            <div className="flex justify-between items-center">
+              <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
+              <span className="text-2xl font-bold text-green-400 font-mono">
+                {formatCurrency(totalPrice)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
