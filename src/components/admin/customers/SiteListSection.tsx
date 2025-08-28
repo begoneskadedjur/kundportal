@@ -21,6 +21,8 @@ interface SiteCardProps {
 interface CasesSectionProps {
   siteId: string
   siteName: string
+  casesCount: number
+  casesValue: number
 }
 
 // Individual case item interface
@@ -37,19 +39,17 @@ interface CaseItem {
 }
 
 // Cases section component for each site
-const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
+const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName, casesCount, casesValue }) => {
   // TODO: This will fetch real cases data when integration is implemented
   // For now, we'll show placeholder data and structure
   const [isExpanded, setIsExpanded] = useState(false)
   
-  // Placeholder cases data - this will come from actual API calls
-  const mockCases: CaseItem[] = [
-    // This will be populated from private_cases and business_cases tables
-    // filtered by customer_id or site association
-  ]
+  // Use real data from site props
+  const totalCasesValue = casesValue || 0
+  const actualCasesCount = casesCount || 0
   
-  const totalCasesValue = mockCases.reduce((sum, c) => sum + (c.price || 0), 0)
-  const casesCount = mockCases.length
+  // Placeholder for future cases breakdown - will be populated from actual API calls
+  const mockCases: CaseItem[] = []
   
   // Calculate billing status breakdown
   const billingBreakdown = mockCases.reduce((acc, c) => {
@@ -89,7 +89,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
               <Activity className="w-4 h-4 text-blue-400" />
               <span className="text-sm font-medium text-slate-300">Ärenden Översikt</span>
             </div>
-            {casesCount > 0 && (
+            {actualCasesCount > 0 && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
@@ -102,7 +102,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-lg font-bold text-blue-400">{casesCount}</div>
+              <div className="text-lg font-bold text-blue-400">{actualCasesCount}</div>
               <div className="text-xs text-slate-400">Totalt ärenden</div>
             </div>
             <div>
@@ -112,7 +112,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           </div>
           
           {/* Billing Status Pills */}
-          {casesCount > 0 && (
+          {actualCasesCount > 0 && (
             <div className="mt-4 space-y-2">
               <div className="text-xs text-slate-500">Faktureringsstatus:</div>
               <div className="flex flex-wrap gap-2">
@@ -132,7 +132,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
             </div>
           )}
           
-          {casesCount === 0 && (
+          {actualCasesCount === 0 && (
             <div className="mt-4 text-center py-6 text-slate-400">
               <div className="mb-2">📋</div>
               <div className="text-sm">Inga ärenden för denna enhet</div>
@@ -142,7 +142,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
         </div>
         
         {/* Expanded Cases List */}
-        {isExpanded && casesCount > 0 && (
+        {isExpanded && actualCasesCount > 0 && (
           <div className="border-t border-slate-700/50 bg-slate-900/50">
             <div className="p-4">
               <div className="space-y-3">
@@ -402,48 +402,6 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 </div>
               </div>
 
-              {/* Contract Information */}
-              <div>
-                <h6 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Kontraktsinformation
-                </h6>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Total avtalsvärde:</span>
-                    <span className="text-green-400 font-medium">{formatCurrency(site.total_contract_value || 0)}</span>
-                  </div>
-                  {site.annual_value && site.annual_value > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Årsvärde:</span>
-                      <span className="text-white font-medium">{formatCurrency(site.annual_value)}</span>
-                    </div>
-                  )}
-                  {site.contract_start_date && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Startdatum:</span>
-                      <span className="text-white">{new Date(site.contract_start_date).toLocaleDateString('sv-SE')}</span>
-                    </div>
-                  )}
-                  {site.contract_end_date && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Slutdatum:</span>
-                      <span className={`font-medium ${
-                        contractProgress.daysRemaining <= 30 ? 'text-red-400' :
-                        contractProgress.daysRemaining <= 90 ? 'text-amber-400' :
-                        'text-white'
-                      }`}>
-                        {new Date(site.contract_end_date).toLocaleDateString('sv-SE')}
-                        {contractProgress.daysRemaining > 0 && (
-                          <span className="ml-1 text-xs">
-                            ({contractProgress.daysRemaining} dagar)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Enhetens Aktivitet & Status */}
@@ -452,26 +410,13 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 <TrendingUp className="w-4 h-4" />
                 Enhetsstatus & Aktivitet  
               </h6>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <div className="text-lg font-bold text-blue-400 mb-1">
-                    {site.casesCount || 0}
-                  </div>
-                  <div className="text-xs text-slate-400">Aktiva ärenden</div>
-                  <div className="text-xs text-green-400 mt-1">
-                    {formatCurrency(site.casesValue || 0)} värde
-                  </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-lg font-bold text-blue-400 mb-1">
+                  {site.casesCount || 0}
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <div className="text-lg font-bold text-green-400 mb-1">
-                    {formatCurrency(site.total_contract_value || 0)}
-                  </div>
-                  <div className="text-xs text-slate-400">Avtalsvärde</div>
-                  {contractProgress.daysRemaining > 0 && (
-                    <div className="text-xs text-purple-400 mt-1">
-                      {contractProgress.daysRemaining} dagar kvar
-                    </div>
-                  )}
+                <div className="text-xs text-slate-400">Aktiva ärenden</div>
+                <div className="text-xs text-green-400 mt-1">
+                  {formatCurrency(site.casesValue || 0)} värde
                 </div>
               </div>
               
@@ -509,7 +454,12 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
               </h6>
               
               {/* Cases Summary for this site */}
-              <CasesSection siteId={site.id} siteName={site.site_name || site.company_name} />
+              <CasesSection 
+                siteId={site.id} 
+                siteName={site.site_name || site.company_name}
+                casesCount={site.casesCount || 0}
+                casesValue={site.casesValue || 0}
+              />
             </div>
 
             {/* Actions */}

@@ -92,9 +92,27 @@ export default function MultiSiteCustomerDetailModal({
                     <div className="flex items-center gap-4 text-sm text-slate-400">
                       <span className="flex items-center gap-1">
                         <Users className="w-4 h-4" />
-                        {organization.contact_person}
+                        {(() => {
+                          // Hitta verksamhetschef från multisiteUsers först
+                          const verksamhetschef = organization.multisiteUsers?.find(user => user.role_type === 'verksamhetschef')
+                          if (verksamhetschef?.display_name) {
+                            return verksamhetschef.display_name
+                          }
+                          // Fallback till organisation kontaktperson
+                          if (organization.contact_person && organization.contact_person.trim() !== '') {
+                            return organization.contact_person
+                          }
+                          // Sista utväg: försök hitta namn från multisiteUsers med samma email
+                          const userWithEmail = organization.multisiteUsers?.find(user => 
+                            user.email === organization.contact_email && user.display_name && user.display_name.trim() !== ''
+                          )
+                          return userWithEmail?.display_name || 'Verksamhetschef ej angivet'
+                        })()}
                       </span>
                       <span className="text-blue-400">{organization.contact_email}</span>
+                      {organization.organization_number && (
+                        <span>• Org.nr: {organization.organization_number}</span>
+                      )}
                       {organization.assigned_account_manager && (
                         <span>• Säljare: {organization.assigned_account_manager}</span>
                       )}
@@ -200,7 +218,7 @@ export default function MultiSiteCustomerDetailModal({
                   <span className="text-sm text-slate-400">Portal Status:</span>
                   <PortalAccessBadge
                     status={organization.portalAccessStatus}
-                    userCount={organization.activeUsersCount}
+                    userCount={organization.multisiteUsers?.length || organization.activeUsersCount}
                     tooltip=""
                     size="sm"
                   />

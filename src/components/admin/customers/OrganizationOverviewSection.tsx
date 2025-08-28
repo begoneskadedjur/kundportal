@@ -183,7 +183,7 @@ export default function OrganizationOverviewSection({ organization }: Organizati
                   <span className="text-slate-300">{formatCurrency(organization.totalContractValue)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Cases:</span>
+                  <span className="text-slate-500">Ärenden:</span>
                   <span className="text-blue-400">{formatCurrency(totalCasesValue)}</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-2">
@@ -249,20 +249,20 @@ export default function OrganizationOverviewSection({ organization }: Organizati
             <div className="pt-4 border-t border-slate-700/50">
               <div className="text-sm text-slate-400 mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
-                Cases & Extra Arbeten
+                Ärenden & Extra Arbeten
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-700/30 rounded-lg p-3">
                   <div className="text-lg font-bold text-blue-400 mb-1">
                     {totalCasesCount}
                   </div>
-                  <div className="text-xs text-slate-400">Totala cases</div>
+                  <div className="text-xs text-slate-400">Totala ärenden</div>
                 </div>
                 <div className="bg-slate-700/30 rounded-lg p-3">
                   <div className="text-lg font-bold text-green-400 mb-1">
                     {formatCurrency(totalCasesValue)}
                   </div>
-                  <div className="text-xs text-slate-400">Cases värde</div>
+                  <div className="text-xs text-slate-400">Ärenden värde</div>
                 </div>
               </div>
               
@@ -293,8 +293,8 @@ export default function OrganizationOverviewSection({ organization }: Organizati
               
               {totalCasesValue === 0 && (
                 <div className="mt-4 p-3 bg-slate-800/30 rounded-lg text-center">
-                  <div className="text-slate-400 text-sm">📋 Inga cases ännu</div>
-                  <div className="text-slate-500 text-xs mt-1">Cases visas när de läggs till i systemet</div>
+                  <div className="text-slate-400 text-sm">📋 Inga ärenden ännu</div>
+                  <div className="text-slate-500 text-xs mt-1">Ärenden visas när de läggs till i systemet</div>
                 </div>
               )}
             </div>
@@ -306,7 +306,7 @@ export default function OrganizationOverviewSection({ organization }: Organizati
                 <div className="text-lg font-semibold text-white">
                   {formatCurrency(totalOrganizationValue / Math.max(1, organization.totalSites))}
                 </div>
-                <div className="text-xs text-slate-500">Kontrakt + Cases</div>
+                <div className="text-xs text-slate-500">Kontrakt + Ärenden</div>
               </div>
               <div>
                 <div className="text-sm text-slate-400">Enheter</div>
