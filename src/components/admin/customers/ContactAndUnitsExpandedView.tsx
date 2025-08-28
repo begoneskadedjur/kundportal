@@ -64,12 +64,13 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
     site.hasPortalAccess || site.invitationStatus === 'pending' || site.invitationStatus === 'active'
   )
 
-  // Räkna olika typer av användare
+  // Räkna olika typer av användare från multisite_user_roles
   const userRolesSummary = {
-    active: organization.sites.filter(site => site.invitationStatus === 'active').length,
-    pending: organization.sites.filter(site => site.invitationStatus === 'pending').length,
-    huvudkontor: organization.sites.filter(site => site.site_type === 'huvudkontor' && site.hasPortalAccess).length,
-    enheter: organization.sites.filter(site => site.site_type === 'enhet' && site.hasPortalAccess).length
+    active: organization.multisiteUsers?.filter(user => user.hasLoggedIn).length || 0,
+    pending: organization.multisiteUsers?.filter(user => !user.hasLoggedIn).length || 0,
+    verksamhetschef: organization.multisiteUsers?.filter(user => user.role_type === 'verksamhetschef').length || 0,
+    regionchef: organization.multisiteUsers?.filter(user => user.role_type === 'regionchef').length || 0,
+    platsansvarig: organization.multisiteUsers?.filter(user => user.role_type === 'platsansvarig').length || 0
   }
 
   // Räkna ärenden per enhet
@@ -149,69 +150,86 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                     <h5 className="text-sm font-medium text-slate-300">Alla användare och roller</h5>
                   </div>
                   
-                  {/* Användarlistning */}
+                  {/* Användarlistning - från multisite_user_roles istället för sites */}
                   <div className="space-y-2 mb-3">
-                    {organization.sites.map((site, index) => {
-                      const userName = getContactName(site.contact_person, site.contact_email)
-                      if (!userName) return null
+                    {organization.multisiteUsers?.map((user, index) => {
+                      const userName = user.full_name || getContactName(null, user.email)
+                      
+                      const getRoleIcon = (roleType: string) => {
+                        switch (roleType) {
+                          case 'verksamhetschef':
+                            return <Crown className="w-3 h-3 text-amber-400" />
+                          case 'regionchef':
+                            return <Shield className="w-3 h-3 text-purple-400" />
+                          case 'platsansvarig':
+                            return <Building2 className="w-3 h-3 text-blue-400" />
+                          default:
+                            return <Users className="w-3 h-3 text-slate-400" />
+                        }
+                      }
+
+                      const getRoleColor = (roleType: string) => {
+                        switch (roleType) {
+                          case 'verksamhetschef':
+                            return 'bg-amber-500/20 text-amber-400'
+                          case 'regionchef':
+                            return 'bg-purple-500/20 text-purple-400'
+                          case 'platsansvarig':
+                            return 'bg-blue-500/20 text-blue-400'
+                          default:
+                            return 'bg-slate-500/20 text-slate-400'
+                        }
+                      }
+
+                      const getRoleLabel = (roleType: string) => {
+                        switch (roleType) {
+                          case 'verksamhetschef':
+                            return 'Verksamhetschef'
+                          case 'regionchef':
+                            return 'Regionchef'
+                          case 'platsansvarig':
+                            return 'Platsansvarig'
+                          default:
+                            return roleType
+                        }
+                      }
                       
                       return (
-                        <div key={site.id || index} className="flex items-center justify-between bg-slate-800/50 rounded p-2">
+                        <div key={user.user_id || index} className="flex items-center justify-between bg-slate-800/50 rounded p-2">
                           <div className="flex items-center gap-2">
-                            {site.site_type === 'huvudkontor' ? (
-                              <Crown className="w-3 h-3 text-amber-400" />
-                            ) : (
-                              <Building2 className="w-3 h-3 text-blue-400" />
-                            )}
+                            {getRoleIcon(user.role_type)}
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-slate-200 font-medium">
                                   {userName}
                                 </span>
                                 <div className="flex items-center gap-1">
-                                  {site.contact_email && (
-                                    <a 
-                                      href={`mailto:${site.contact_email}`}
-                                      className="text-slate-400 hover:text-blue-400 transition-colors"
-                                      title={`Skicka email till ${userName}`}
-                                    >
-                                      <Mail className="w-3 h-3" />
-                                    </a>
-                                  )}
-                                  {site.contact_phone && (
-                                    <a 
-                                      href={`tel:${site.contact_phone}`}
-                                      className="text-slate-400 hover:text-green-400 transition-colors"
-                                      title={`Ring ${userName}`}
-                                    >
-                                      <Phone className="w-3 h-3" />
-                                    </a>
-                                  )}
+                                  <a 
+                                    href={`mailto:${user.email}`}
+                                    className="text-slate-400 hover:text-blue-400 transition-colors"
+                                    title={`Skicka email till ${userName}`}
+                                  >
+                                    <Mail className="w-3 h-3" />
+                                  </a>
                                 </div>
                               </div>
                               <div className="text-xs text-slate-400">
-                                {site.site_name || site.company_name}
+                                {user.email}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              site.site_type === 'huvudkontor' ? 'bg-amber-500/20 text-amber-400' :
-                              'bg-blue-500/20 text-blue-400'
-                            }`}>
-                              {site.site_type === 'huvudkontor' ? 'Huvudkontor' : 'Enhet'}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleColor(user.role_type)}`}>
+                              {getRoleLabel(user.role_type)}
                             </span>
-                            {site.hasPortalAccess && (
-                              <div className={`w-2 h-2 rounded-full ${
-                                site.invitationStatus === 'active' ? 'bg-green-400' :
-                                site.invitationStatus === 'pending' ? 'bg-amber-400' :
-                                'bg-slate-500'
-                              }`} />
-                            )}
+                            <div className={`w-2 h-2 rounded-full ${
+                              user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'
+                            }`} 
+                            title={user.hasLoggedIn ? 'Har loggat in' : 'Aldrig inloggad'} />
                           </div>
                         </div>
                       )
-                    })}
+                    }) || <div className="text-xs text-slate-500 italic">Inga användare hittades</div>}
                   </div>
                   
                   {/* Rollsummering */}
@@ -227,6 +245,31 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                       <div className="text-sm font-semibold text-amber-400">
                         {userRolesSummary.pending}
                       </div>
+                    </div>
+                  </div>
+                  
+                  {/* Rollfördelning */}
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Crown className="w-3 h-3 text-amber-400" />
+                        <span className="text-slate-300">Verksamhetschefer</span>
+                      </div>
+                      <span className="text-amber-400 font-medium">{userRolesSummary.verksamhetschef}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-3 h-3 text-purple-400" />
+                        <span className="text-slate-300">Regionchefer</span>
+                      </div>
+                      <span className="text-purple-400 font-medium">{userRolesSummary.regionchef}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-3 h-3 text-blue-400" />
+                        <span className="text-slate-300">Platsansvariga</span>
+                      </div>
+                      <span className="text-blue-400 font-medium">{userRolesSummary.platsansvarig}</span>
                     </div>
                   </div>
                   

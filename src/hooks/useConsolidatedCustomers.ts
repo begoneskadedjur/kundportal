@@ -117,6 +117,18 @@ export interface ConsolidatedCustomer {
   activeUsersCount: number
   pendingInvitationsCount: number
   
+  // Multisite users data
+  multisiteUsers?: Array<{
+    user_id: string
+    role_type: string
+    full_name: string | null
+    email: string
+    last_sign_in_at: string | null
+    email_confirmed_at: string | null
+    is_active: boolean
+    hasLoggedIn: boolean
+  }>
+  
   // Cases aggregated data
   totalCasesValue: number
   totalCasesCount: number
@@ -216,18 +228,60 @@ export function useConsolidatedCustomers() {
         }
       })
 
-      // Hämta multisite portal access
+      // Hämta multisite portal access med fullständig användarinfo
       const { data: multisiteRoles } = await supabase
         .from('multisite_user_roles')
-        .select('organization_id, user_id, is_active')
+        .select(`
+          organization_id, 
+          user_id, 
+          is_active, 
+          role_type,
+          site_ids,
+          profiles!inner(
+            user_id,
+            full_name,
+            email,
+            last_sign_in_at,
+            email_confirmed_at,
+            is_active
+          )
+        `)
         .eq('is_active', true)
+        .eq('profiles.is_active', true)
 
-      const multisiteAccessMap = new Map<string, number>()
+      // Skapa multisite users map med fullständig info
+      const multisiteUsersMap = new Map<string, Array<{
+        user_id: string
+        role_type: string
+        full_name: string | null
+        email: string
+        last_sign_in_at: string | null
+        email_confirmed_at: string | null
+        is_active: boolean
+        hasLoggedIn: boolean
+      }>>()
+
       multisiteRoles?.forEach(role => {
-        if (role.organization_id) {
-          const current = multisiteAccessMap.get(role.organization_id) || 0
-          multisiteAccessMap.set(role.organization_id, current + 1)
+        if (role.organization_id && role.profiles) {
+          const current = multisiteUsersMap.get(role.organization_id) || []
+          current.push({
+            user_id: role.user_id,
+            role_type: role.role_type,
+            full_name: role.profiles.full_name,
+            email: role.profiles.email,
+            last_sign_in_at: role.profiles.last_sign_in_at,
+            email_confirmed_at: role.profiles.email_confirmed_at,
+            is_active: role.profiles.is_active,
+            hasLoggedIn: !!role.profiles.last_sign_in_at
+          })
+          multisiteUsersMap.set(role.organization_id, current)
         }
+      })
+
+      // Skapa bakåtkompatibel access map för befintlig kod
+      const multisiteAccessMap = new Map<string, number>()
+      multisiteUsersMap.forEach((users, orgId) => {
+        multisiteAccessMap.set(orgId, users.length)
       })
 
       // Hämta cases-data för alla kunder
@@ -314,7 +368,7 @@ export function useConsolidatedCustomers() {
       })
 
       // Konsolidera kunder
-      const consolidated = consolidateCustomers(enrichedCustomers, multisiteAccessMap)
+      const consolidated = consolidateCustomers(enrichedCustomers, multisiteAccessMap, multisiteUsersMap)
       setConsolidatedCustomers(consolidated)
 
     } catch (err) {
@@ -327,7 +381,17 @@ export function useConsolidatedCustomers() {
 
   const consolidateCustomers = (
     customers: CustomerSite[], 
-    multisiteAccessMap: Map<string, number>
+    multisiteAccessMap: Map<string, number>,
+    multisiteUsersMap: Map<string, Array<{
+      user_id: string
+      role_type: string
+      full_name: string | null
+      email: string
+      last_sign_in_at: string | null
+      email_confirmed_at: string | null
+      is_active: boolean
+      hasLoggedIn: boolean
+    }>>
   ): ConsolidatedCustomer[] => {
     const consolidatedMap = new Map<string, ConsolidatedCustomer>()
     
@@ -345,6 +409,10 @@ export function useConsolidatedCustomers() {
           const huvudkontor = customers.find(c => 
             c.organization_id === orgId && c.site_type === 'huvudkontor'
           ) || customer
+          
+          // Hämta användarinfo för denna organisation
+          const orgUsers = multisiteUsersMap.get(orgId) || []
+          const activeUsers = orgUsers.filter(u => u.hasLoggedIn)
           
           consolidatedMap.set(orgId, {
             id: orgId,
@@ -369,9 +437,12 @@ export function useConsolidatedCustomers() {
             totalContractValue: 0,
             totalAnnualValue: 0,
             totalMonthlyValue: 0,
-            portalAccessStatus: 'none',
-            activeUsersCount: multisiteAccessMap.get(orgId) || 0,
-            pendingInvitationsCount: 0,
+            portalAccessStatus: orgUsers.length > 0 ? 'partial' : 'none',
+            activeUsersCount: activeUsers.length,
+            pendingInvitationsCount: orgUsers.length - activeUsers.length,
+            
+            // Lägg till användarinfo
+            multisiteUsers: orgUsers,
             
             // Cases initialization
             totalCasesValue: 0,
