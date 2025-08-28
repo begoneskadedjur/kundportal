@@ -6,7 +6,7 @@ import { useNavigate, Link, Navigate } from 'react-router-dom';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { Bug } from 'lucide-react';
+import { LogIn, User, Lock } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -60,46 +60,77 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <div className="flex items-center space-x-3">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center relative">
-              <Bug className="w-10 h-10 text-slate-950" />
-              <div className="absolute inset-0 rounded-full border-2 border-red-500 transform rotate-45"></div>
-              <div className="absolute w-full h-0.5 bg-red-500 top-1/2 transform -translate-y-1/2 rotate-45"></div>
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: `url('/images/om_oss_begone_skadedjur.jpg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95" />
+      <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
+        <div className="w-full max-w-md">
+          {/* Hero Section */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-500/20 rounded-full mb-4">
+              <LogIn className="w-8 h-8 text-purple-400" />
             </div>
-            <h1 className="text-4xl font-bold">
-              <span className="text-gradient">BeGone</span>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Välkommen tillbaka
             </h1>
+            <p className="text-slate-400">
+              Logga in på ditt BeGone-konto
+            </p>
           </div>
-        </div>
 
-        {/* Login Form */}
-        <div className="glass rounded-2xl p-8">
-          <h2 className="text-2xl font-semibold text-center mb-6">
-            Logga in
-          </h2>
+          {/* Login Form */}
+          <div className="glass rounded-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <Input
-              type="email"
-              label="E-postadress"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={isSubmitting}
-            />
-            <Input
-              type="password"
-              label="Lösenord"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              disabled={isSubmitting}
-            />
+            <div className="space-y-1">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-300">
+                E-postadress
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="din@email.se"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-300">
+                Lösenord
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  disabled={isSubmitting}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Ditt lösenord"
+                />
+              </div>
+            </div>
             <Button
               type="submit"
               loading={isSubmitting}
@@ -112,22 +143,23 @@ export default function Login() {
           <div className="mt-6 text-center">
             <Link 
               to="/forgot-password"
-              className="text-sm text-green-400 hover:text-green-300 transition-colors"
+              className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
             >
               Glömt lösenord?
             </Link>
           </div>
-        </div>
+          </div>
 
-        <p className="text-center text-sm text-slate-400 mt-8">
-          Har du fått en inbjudan?{' '}
-          <Link 
-            to="/set-password" 
-            className="text-green-400 hover:text-green-300 ml-1 transition-colors"
-          >
-            Sätt ditt lösenord här
-          </Link>
-        </p>
+          <p className="text-center text-sm text-slate-400 mt-8">
+            Har du fått en inbjudan?{' '}
+            <Link 
+              to="/set-password" 
+              className="text-purple-400 hover:text-purple-300 ml-1 transition-colors"
+            >
+              Sätt ditt lösenord här
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -203,29 +203,61 @@ export default function ResetPassword() {
 
   if (checkingToken) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      <div 
+        className="min-h-screen relative"
+        style={{
+          backgroundImage: `url('/images/om_oss_begone_skadedjur.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95" />
+        <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        </div>
       </div>
     )
   }
 
   if (!isValidToken) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full p-8 text-center">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Ogiltig länk</h2>
-          <p className="text-slate-400">
-            Återställningslänken är ogiltig eller saknas. Du omdirigeras till inloggningssidan...
-          </p>
-        </Card>
+      <div 
+        className="min-h-screen relative"
+        style={{
+          backgroundImage: `url('/images/om_oss_begone_skadedjur.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95" />
+        <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
+          <Card className="max-w-md w-full p-8 text-center">
+            <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Ogiltig länk</h2>
+            <p className="text-slate-400">
+              Återställningslänken är ogiltig eller saknas. Du omdirigeras till inloggningssidan...
+            </p>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8">
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: `url('/images/om_oss_begone_skadedjur.jpg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95" />
+      <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
+        <Card className="max-w-md w-full p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-500/20 rounded-full mb-4">
             <Lock className="w-8 h-8 text-purple-400" />
@@ -408,7 +440,8 @@ export default function ResetPassword() {
             </button>
           </div>
         </form>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }
