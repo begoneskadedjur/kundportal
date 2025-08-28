@@ -59,7 +59,7 @@ interface Customer {
   site_type?: 'huvudkontor' | 'enhet' | null
 }
 
-interface CustomerSite extends Customer {
+export interface CustomerSite extends Customer {
   healthScore: ReturnType<typeof calculateHealthScore>
   churnRisk: ReturnType<typeof calculateChurnRisk>
   renewalProbability: ReturnType<typeof calculateRenewalProbability>
@@ -87,9 +87,9 @@ interface CustomerSite extends Customer {
   }>
 }
 
-type PortalAccessStatus = 'full' | 'partial' | 'none'
+export type PortalAccessStatus = 'full' | 'partial' | 'none'
 
-interface ConsolidatedCustomer {
+export interface ConsolidatedCustomer {
   id: string // organization_id for multisite, customer.id for single
   organizationType: 'multisite' | 'single'
   organizationId?: string | null
@@ -145,7 +145,7 @@ interface ConsolidatedCustomer {
   updated_at: string | null
 }
 
-interface ConsolidatedAnalytics {
+export interface ConsolidatedAnalytics {
   totalOrganizations: number
   totalSites: number
   multisiteOrganizations: number
@@ -375,8 +375,19 @@ export function useConsolidatedCustomers() {
               skip: { count: 0, value: 0 }
             },
             
-            overallHealthScore: { score: 0, level: 'poor' as const, factors: [] },
-            highestChurnRisk: { score: 0, risk: 'low' as const, factors: [] },
+            overallHealthScore: { 
+              score: 0, 
+              level: 'poor' as const, 
+              color: '#ef4444',
+              breakdown: {
+                contractAge: { value: 0, weight: 0.25, score: 0 },
+                communicationFrequency: { value: 0, weight: 0.25, score: 0 },
+                supportTickets: { value: 0, weight: 0.25, score: 0 },
+                paymentHistory: { value: 0, weight: 0.25, score: 0 }
+              },
+              tooltip: 'No data available'
+            },
+            highestChurnRisk: { score: 0, risk: 'low' as const, color: '#10b981', factors: [], tooltip: 'Low risk' },
             averageRenewalProbability: 0,
             
             is_active: huvudkontor.is_active || false,
@@ -444,7 +455,7 @@ export function useConsolidatedCustomers() {
           
           overallHealthScore: customer.healthScore,
           highestChurnRisk: customer.churnRisk,
-          averageRenewalProbability: customer.renewalProbability,
+          averageRenewalProbability: customer.renewalProbability.probability,
           nextRenewalDate: customer.contract_end_date,
           daysToNextRenewal: customer.contractProgress.daysRemaining,
           
@@ -508,18 +519,25 @@ export function useConsolidatedCustomers() {
         org.overallHealthScore = {
           score: Math.round(avgHealth),
           level: worstHealth >= 80 ? 'excellent' : worstHealth >= 60 ? 'good' : worstHealth >= 40 ? 'fair' : 'poor',
-          factors: []
+          color: worstHealth >= 80 ? '#10b981' : worstHealth >= 60 ? '#f59e0b' : worstHealth >= 40 ? '#f97316' : '#ef4444',
+          breakdown: {
+            contractAge: { value: 0, weight: 0.25, score: 0 },
+            communicationFrequency: { value: 0, weight: 0.25, score: 0 },
+            supportTickets: { value: 0, weight: 0.25, score: 0 },
+            paymentHistory: { value: 0, weight: 0.25, score: 0 }
+          },
+          tooltip: `Health Score: ${Math.round(avgHealth)}/100`
         }
         
         // Churn risk
         const highestRisk = sites.reduce((max, site) => 
           site.churnRisk.score > max.score ? site.churnRisk : max, 
-          { score: 0, risk: 'low' as const, factors: [] }
+          { score: 0, risk: 'low' as const, color: '#10b981', factors: [], tooltip: 'Low risk' }
         )
         org.highestChurnRisk = highestRisk
         
         // Renewal probability
-        org.averageRenewalProbability = sites.reduce((sum, site) => sum + site.renewalProbability, 0) / sites.length
+        org.averageRenewalProbability = sites.reduce((sum, site) => sum + site.renewalProbability.probability, 0) / sites.length
         
         // Next renewal
         const nextRenewal = sites
@@ -721,9 +739,6 @@ export function useConsolidatedCustomers() {
   }
 }
 
-export type { 
-  ConsolidatedCustomer, 
-  CustomerSite, 
-  ConsolidatedAnalytics, 
-  PortalAccessStatus 
-}
+// Re-export all types to ensure they're available 
+export { useConsolidatedCustomers as default }
+export type { CustomerSite, PortalAccessStatus, ConsolidatedCustomer, ConsolidatedAnalytics }
