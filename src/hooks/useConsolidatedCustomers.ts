@@ -228,26 +228,28 @@ export function useConsolidatedCustomers() {
         }
       })
 
-      // Hämta multisite portal access med fullständig användarinfo
-      const { data: multisiteRoles } = await supabase
+      // Hämta multisite portal access - först testa enkel query
+      console.log('🔍 DEBUG - Testing simple multisite_user_roles query...')
+      const { data: multisiteRoles, error: multisiteError } = await supabase
         .from('multisite_user_roles')
-        .select(`
-          organization_id, 
-          user_id, 
-          is_active, 
-          role_type,
-          site_ids,
-          profiles!inner(
-            user_id,
-            full_name,
-            email,
-            last_sign_in_at,
-            email_confirmed_at,
-            is_active
-          )
-        `)
+        .select('organization_id, user_id, is_active, role_type, site_ids')
         .eq('is_active', true)
-        .eq('profiles.is_active', true)
+      
+      console.log('🔍 DEBUG - Multisite roles result:', multisiteRoles?.length, 'error:', multisiteError)
+      
+      // Hämta profiles separat om multisite_user_roles fungerar
+      let multisiteProfilesData = null
+      if (multisiteRoles && !multisiteError) {
+        const userIds = multisiteRoles.map(r => r.user_id)
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email, last_sign_in_at, email_confirmed_at, is_active')
+          .in('user_id', userIds)
+          .eq('is_active', true)
+        
+        console.log('🔍 DEBUG - Profiles result:', profiles?.length, 'error:', profilesError)
+        multisiteProfilesData = profiles
+      }
 
       // Skapa multisite users map med fullständig info
       const multisiteUsersMap = new Map<string, Array<{
@@ -261,22 +263,28 @@ export function useConsolidatedCustomers() {
         hasLoggedIn: boolean
       }>>()
 
-      multisiteRoles?.forEach(role => {
-        if (role.organization_id && role.profiles) {
-          const current = multisiteUsersMap.get(role.organization_id) || []
-          current.push({
-            user_id: role.user_id,
-            role_type: role.role_type,
-            full_name: role.profiles.full_name,
-            email: role.profiles.email,
-            last_sign_in_at: role.profiles.last_sign_in_at,
-            email_confirmed_at: role.profiles.email_confirmed_at,
-            is_active: role.profiles.is_active,
-            hasLoggedIn: !!role.profiles.last_sign_in_at
-          })
-          multisiteUsersMap.set(role.organization_id, current)
-        }
-      })
+      // Kombinera multisite_user_roles med profiles data
+      if (multisiteRoles && multisiteProfilesData) {
+        const profilesMap = new Map(multisiteProfilesData.map(p => [p.user_id, p]))
+        
+        multisiteRoles.forEach(role => {
+          const profile = profilesMap.get(role.user_id)
+          if (role.organization_id && profile) {
+            const current = multisiteUsersMap.get(role.organization_id) || []
+            current.push({
+              user_id: role.user_id,
+              role_type: role.role_type,
+              full_name: profile.full_name,
+              email: profile.email,
+              last_sign_in_at: profile.last_sign_in_at,
+              email_confirmed_at: profile.email_confirmed_at,
+              is_active: profile.is_active,
+              hasLoggedIn: !!profile.last_sign_in_at
+            })
+            multisiteUsersMap.set(role.organization_id, current)
+          }
+        })
+      }
 
       // Skapa bakåtkompatibel access map för befintlig kod
       const multisiteAccessMap = new Map<string, number>()
