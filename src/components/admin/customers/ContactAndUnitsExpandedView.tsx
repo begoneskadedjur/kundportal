@@ -54,9 +54,10 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
     return null
   }
 
-  // Använd organisation-nivå kontaktperson först, sedan site-nivå
+  // Använd organisation-nivå kontaktperson först, sedan site-nivå, till sist fallback
   const verksamhetschefName = getContactName(organization.contact_person, organization.contact_email) 
     || getContactName(verksamhetschef?.contact_person, verksamhetschef?.contact_email)
+    || "Verksamhetschef" // Fallback när ingen kontaktperson finns
 
   // Hitta portal-användare och deras roller (ersätter "andra kontakter")
   const portalUsers = organization.sites.filter(site => 
@@ -162,10 +163,32 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                             ) : (
                               <Building2 className="w-3 h-3 text-blue-400" />
                             )}
-                            <div>
-                              <span className="text-xs text-slate-200 font-medium">
-                                {userName}
-                              </span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-200 font-medium">
+                                  {userName}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {site.contact_email && (
+                                    <a 
+                                      href={`mailto:${site.contact_email}`}
+                                      className="text-slate-400 hover:text-blue-400 transition-colors"
+                                      title={`Skicka email till ${userName}`}
+                                    >
+                                      <Mail className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                  {site.contact_phone && (
+                                    <a 
+                                      href={`tel:${site.contact_phone}`}
+                                      className="text-slate-400 hover:text-green-400 transition-colors"
+                                      title={`Ring ${userName}`}
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                               <div className="text-xs text-slate-400">
                                 {site.site_name || site.company_name}
                               </div>
@@ -213,17 +236,14 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                       <span className="text-xs text-slate-400">Portal-tillgång</span>
                       <div className="flex items-center gap-1">
                         <div className={`w-2 h-2 rounded-full ${
-                          organization.portalAccessStatus === 'full' ? 'bg-green-400' :
-                          organization.portalAccessStatus === 'partial' ? 'bg-amber-400' :
-                          'bg-slate-500'
+                          organization.activeUsersCount > 0 ? 'bg-green-400' : 'bg-slate-500'
                         }`} />
                         <span className={`text-xs font-medium ${
-                          organization.portalAccessStatus === 'full' ? 'text-green-400' :
-                          organization.portalAccessStatus === 'partial' ? 'text-amber-400' :
-                          'text-slate-400'
+                          organization.activeUsersCount > 0 ? 'text-green-400' : 'text-slate-400'
                         }`}>
-                          {organization.portalAccessStatus === 'full' ? 'Fullständig' :
-                           organization.portalAccessStatus === 'partial' ? 'Delvis' : 'Ingen'}
+                          {organization.activeUsersCount > 0 
+                            ? `${organization.activeUsersCount} användare har tillgång`
+                            : 'Ingen tillgång'}
                         </span>
                       </div>
                     </div>

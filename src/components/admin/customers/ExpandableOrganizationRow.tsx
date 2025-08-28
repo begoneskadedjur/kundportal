@@ -17,37 +17,23 @@ interface ExpandableOrganizationRowProps {
 }
 
 const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number }> = ({ status, userCount }) => {
+  // Använd userCount istället för status för att avgöra färg och text
+  const hasAccess = userCount > 0
+  
   const getBadgeStyles = () => {
-    switch (status) {
-      case 'full':
-        return 'bg-green-500/20 text-green-400 border-green-500/30'
-      case 'partial':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-      case 'none':
-        return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-    }
+    return hasAccess 
+      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+      : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
   }
 
   const getBadgeIcon = () => {
-    switch (status) {
-      case 'full':
-        return '✓'
-      case 'partial':
-        return '⚠'
-      case 'none':
-        return '✗'
-    }
+    return hasAccess ? '✓' : '✗'
   }
 
   const getBadgeLabel = () => {
-    switch (status) {
-      case 'full':
-        return 'Full tillgång'
-      case 'partial':
-        return 'Delvis tillgång'
-      case 'none':
-        return 'Ingen tillgång'
-    }
+    return hasAccess 
+      ? `${userCount} användare har tillgång`
+      : 'Ingen tillgång'
   }
 
   return (
