@@ -23,25 +23,10 @@ const AdminCasesList: React.FC<AdminCasesListProps> = ({ customerId, organizatio
     try {
       setLoading(true)
       
-      // Hämta ALLA ärenden för denna enhet oavsett status
+      // Hämta ALLA ärenden för denna enhet oavsett status med komplett data
       const { data: casesData, error } = await supabase
         .from('cases')
-        .select(`
-          id, 
-          case_number,
-          title, 
-          status, 
-          priority,
-          created_at,
-          updated_at,
-          scheduled_start,
-          primary_technician_name,
-          pest_level,
-          problem_rating,
-          assessment_date,
-          price,
-          customers!inner(company_name, site_name, region)
-        `)
+        .select('*, customers!inner(company_name, site_name, region, contact_person, contact_phone, contact_email, contact_address)')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
         .limit(20) // Begränsa till senaste 20 ärenden
