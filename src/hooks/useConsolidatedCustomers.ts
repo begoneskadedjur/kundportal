@@ -124,6 +124,7 @@ export interface ConsolidatedCustomer {
     display_name: string | null
     email: string
     last_login: string | null
+    last_sign_in_at: string | null
     email_verified: boolean | null
     is_active: boolean
     hasLoggedIn: boolean
@@ -237,10 +238,13 @@ export function useConsolidatedCustomers() {
       
       console.log('🔍 DEBUG - Multisite roles result:', multisiteRoles?.length, 'error:', multisiteError)
       
-      // Hämta profiles separat om multisite_user_roles fungerar
+      // Hämta profiles och auth users separat om multisite_user_roles fungerar
       let multisiteProfilesData = null
+      let authUsersData = null
       if (multisiteRoles && !multisiteError) {
         const userIds = multisiteRoles.map(r => r.user_id)
+        
+        // Hämta profiles data
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, display_name, email, last_login, email_verified, is_active')
@@ -249,6 +253,15 @@ export function useConsolidatedCustomers() {
         
         console.log('🔍 DEBUG - Profiles result:', profiles?.length, 'error:', profilesError)
         multisiteProfilesData = profiles
+
+        // Hämta auth users data för korrekt login-status
+        const { data: authUsers, error: authError } = await supabase
+          .from('auth.users')
+          .select('id, last_sign_in_at')
+          .in('id', userIds)
+        
+        console.log('🔍 DEBUG - Auth users result:', authUsers?.length, 'error:', authError)
+        authUsersData = authUsers
       }
 
       // Skapa multisite users map med fullständig info
@@ -258,17 +271,21 @@ export function useConsolidatedCustomers() {
         display_name: string | null
         email: string
         last_login: string | null
+        last_sign_in_at: string | null
         email_verified: boolean | null
         is_active: boolean
         hasLoggedIn: boolean
       }>>()
 
-      // Kombinera multisite_user_roles med profiles data
+      // Kombinera multisite_user_roles med profiles och auth users data
       if (multisiteRoles && multisiteProfilesData) {
         const profilesMap = new Map(multisiteProfilesData.map(p => [p.user_id, p]))
+        const authUsersMap = new Map((authUsersData || []).map(u => [u.id, u]))
         
         multisiteRoles.forEach(role => {
           const profile = profilesMap.get(role.user_id)
+          const authUser = authUsersMap.get(role.user_id)
+          
           if (role.organization_id && profile) {
             const current = multisiteUsersMap.get(role.organization_id) || []
             current.push({
@@ -277,9 +294,10 @@ export function useConsolidatedCustomers() {
               display_name: profile.display_name,
               email: profile.email,
               last_login: profile.last_login,
+              last_sign_in_at: authUser?.last_sign_in_at || null,
               email_verified: profile.email_verified,
               is_active: profile.is_active,
-              hasLoggedIn: !!profile.last_login
+              hasLoggedIn: !!authUser?.last_sign_in_at // Använd auth.users data istället för profiles
             })
             multisiteUsersMap.set(role.organization_id, current)
           }

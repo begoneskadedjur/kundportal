@@ -23,8 +23,14 @@ const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: numbe
   
   const getBadgeStyles = () => {
     return hasAccess 
-      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-      : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+      ? 'text-green-400' // Enkel text för användare med tillgång
+      : 'bg-slate-500/20 text-slate-400 border-slate-500/30' // Cirkel för ingen tillgång
+  }
+
+  const getBadgeShape = () => {
+    return hasAccess 
+      ? 'rounded' // Mindre rundning för bättre textpassning
+      : 'rounded-full' // Behåll cirkel för "ingen tillgång"
   }
 
   const getBadgeIcon = () => {
@@ -39,9 +45,18 @@ const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: numbe
 
   return (
     <div className="flex flex-col gap-1">
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getBadgeStyles()}`}>
-        {getBadgeIcon()} {getBadgeLabel()}
-      </span>
+      {hasAccess ? (
+        // Design för användare MED tillgång - enkel text utan cirkel
+        <div className={`inline-flex items-center gap-1 text-xs font-medium ${getBadgeStyles()}`}>
+          <span>{getBadgeIcon()}</span>
+          <span>{getBadgeLabel()}</span>
+        </div>
+      ) : (
+        // Design för användare UTAN tillgång - behåll cirkel
+        <span className={`inline-flex items-center px-2.5 py-1 ${getBadgeShape()} text-xs font-medium border ${getBadgeStyles()}`}>
+          {getBadgeIcon()} {getBadgeLabel()}
+        </span>
+      )}
       {(status === 'full' || status === 'partial') && userCount > 0 && (
         <div className="flex items-center gap-1">
           <Users className="w-3 h-3 text-slate-400" />
