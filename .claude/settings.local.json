@@ -50,7 +50,8 @@
       "mcp__supabase__create_branch",
       "mcp__supabase__list_branches",
       "Bash(git log:*)",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "mcp__supabase__deploy_edge_function"
     ],
     "deny": [],
     "additionalDirectories": [

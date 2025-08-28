@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import * as crypto from 'crypto-js'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -19,82 +17,33 @@ export default function ResetPassword() {
   const [isValidToken, setIsValidToken] = useState(false)
   const [checkingToken, setCheckingToken] = useState(true)
   const [userEmail, setUserEmail] = useState('')
-  const [userId, setUserId] = useState('')
+  const [resetToken, setResetToken] = useState('')
 
   useEffect(() => {
-    // Kontrollera token från URL eller hash
-    const checkResetToken = async () => {
+    // Kontrollera token och email från URL params
+    const checkResetToken = () => {
       try {
-        // Först kontrollera om det är Supabase recovery URL med hash
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        const accessToken = hashParams.get('access_token')
-        const refreshToken = hashParams.get('refresh_token')
-        const type = hashParams.get('type')
-        
-        console.log('URL check:', {
-          hasHash: !!window.location.hash,
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          type: type
-        })
-
-        if (accessToken && refreshToken && type === 'recovery') {
-          // Det är en Supabase recovery URL
-          console.log('Detected Supabase recovery URL')
-          
-          try {
-            const { data: { session }, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            })
-            
-            if (!error && session) {
-              console.log('Session set successfully:', session.user.email)
-              setIsValidToken(true)
-              setUserEmail(session.user.email || '')
-              setUserId(session.user.id)
-              setCheckingToken(false)
-              return
-            } else {
-              console.error('Failed to set session:', error)
-            }
-          } catch (sessionError) {
-            console.error('Session error:', sessionError)
-          }
-        }
-
-        // Fallback: Kontrollera vanliga query params (för gamla länkar)
         const token = searchParams.get('token')
         const email = searchParams.get('email')
 
+        console.log('URL params check:', { hasToken: !!token, hasEmail: !!email })
+
         if (token && email) {
-          console.log('Using legacy token format')
-          setIsValidToken(true)
+          console.log('Valid reset link detected')
+          setResetToken(token)
           setUserEmail(decodeURIComponent(email))
-          setCheckingToken(false)
-          return
-        }
-
-        // Kolla om vi redan har en session
-        const { data: { session }, error } = await supabase.auth.getSession()
-        if (!error && session) {
-          console.log('Found existing session')
           setIsValidToken(true)
-          setUserEmail(session.user.email || '')
-          setUserId(session.user.id)
           setCheckingToken(false)
           return
         }
 
-        console.log('No valid token or session found')
-        toast.error('Ogiltig eller utgången återställningslänk')
+        console.log('No valid token or email found in URL')
+        toast.error('Ogiltig eller saknad återställningslänk')
         setTimeout(() => navigate('/login'), 3000)
       } catch (error) {
         console.error('Error checking reset token:', error)
         toast.error('Något gick fel')
         navigate('/login')
-      } finally {
-        setCheckingToken(false)
       }
     }
 
@@ -135,68 +84,56 @@ export default function ResetPassword() {
 
     setLoading(true)
     try {
-      // Hämta session från Supabase
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
       console.log('Password reset attempt:', { 
-        hasSession: !!session,
-        userEmail: session?.user?.email,
+        email: userEmail,
+        hasToken: !!resetToken,
         timestamp: new Date().toISOString()
       })
 
-      if (session?.user) {
-        // Vi har en giltig session - använd direkt Supabase updateUser
-        console.log('Using Supabase session for password reset')
+      // Anropa vårt verify-reset-token API
+      const response = await fetch('/api/verify-reset-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token: resetToken,
+          email: userEmail,
+          newPassword: newPassword
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Password reset failed:', data)
         
-        const { error } = await supabase.auth.updateUser({
-          password: newPassword
-        })
-
-        if (error) {
-          console.error('Password update failed:', error)
-          
-          // Hantera olika typer av fel
-          if (error.message?.includes('session_not_found')) {
-            toast.error('Återställningslänken har gått ut. Begär en ny återställning.')
-          } else if (error.message?.includes('weak_password')) {
-            toast.error('Lösenordet är för svagt. Välj ett starkare lösenord.')
-          } else {
-            toast.error(error.message || 'Kunde inte uppdatera lösenordet')
-          }
-          return
+        // Hantera olika typer av fel
+        if (data.error?.includes('utgången') || data.error?.includes('gått ut')) {
+          toast.error('Återställningslänken har gått ut. Begär en ny återställning.')
+        } else if (data.error?.includes('Ogiltig återställningslänk')) {
+          toast.error(
+            'Återställningslänken är inte giltig. Detta kan bero på att:\n' +
+            '• Du har använt en gammal länk\n' +
+            '• Länken redan har använts\n' +
+            '• Du behöver begära en ny återställning',
+            { duration: 8000 }
+          )
+        } else {
+          toast.error(data.error || 'Kunde inte uppdatera lösenordet')
         }
-
-        console.log('Password updated successfully via Supabase')
-      } else {
-        // Ingen session - visa fel
-        console.error('No valid session found for password reset')
-        toast.error('Återställningslänken är ogiltig eller har gått ut. Begär en ny återställning.')
         return
       }
 
+      console.log('Password updated successfully')
       toast.success('Lösenordet har uppdaterats!')
-      
-      // Logga ut användaren så de kan logga in med det nya lösenordet
-      await supabase.auth.signOut()
       
       setTimeout(() => {
         navigate('/login')
       }, 2000)
     } catch (error: any) {
       console.error('Error updating password:', error)
-      
-      // Ge användarvänlig vägledning baserat på feltyp
-      if (error.message?.includes('Ogiltig återställningslänk')) {
-        toast.error(
-          'Återställningslänken är inte giltig. Detta kan bero på att:\n' +
-          '• Du har använt en gammal länk\n' +
-          '• Länken redan har använts\n' +
-          '• Du behöver begära en ny återställning',
-          { duration: 8000 }
-        )
-      } else {
-        toast.error(error.message || 'Kunde inte uppdatera lösenordet')
-      }
+      toast.error(error.message || 'Kunde inte uppdatera lösenordet')
     } finally {
       setLoading(false)
     }
@@ -217,7 +154,7 @@ export default function ResetPassword() {
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Ogiltig länk</h2>
           <p className="text-slate-400">
-            Återställningslänken är ogiltig eller har gått ut. Du omdirigeras till inloggningssidan...
+            Återställningslänken är ogiltig eller saknas. Du omdirigeras till inloggningssidan...
           </p>
         </Card>
       </div>
@@ -237,6 +174,11 @@ export default function ResetPassword() {
           <p className="text-slate-400">
             Ange ditt nya lösenord nedan
           </p>
+          {userEmail && (
+            <p className="text-sm text-purple-400 mt-2">
+              För: {userEmail}
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
