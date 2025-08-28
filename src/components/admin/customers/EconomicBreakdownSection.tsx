@@ -14,6 +14,7 @@ interface ValueDistributionBarProps {
     company_name: string
     site_name?: string | null
     total_contract_value?: number | null
+    casesValue: number
     healthScore: { score: number; level: string }
     churnRisk: { risk: string; score: number }
   }
@@ -22,7 +23,8 @@ interface ValueDistributionBarProps {
 }
 
 const ValueDistributionBar: React.FC<ValueDistributionBarProps> = ({ site, maxValue, totalValue }) => {
-  const siteValue = site.total_contract_value || 0
+  // Visa bara ärendeintäkter (extrabeställningar) per enhet
+  const siteValue = site.casesValue || 0
   const percentage = totalValue > 0 ? (siteValue / totalValue) * 100 : 0
   const barWidth = maxValue > 0 ? (siteValue / maxValue) * 100 : 0
   
@@ -102,10 +104,10 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
   const expectedRenewalValue = totalOrganizationValue * (renewalProbability / 100)
   const potentialLoss = totalOrganizationValue - expectedRenewalValue
   
-  // Sort sites by value for distribution
+  // Sort sites by cases value (extrabeställningar) för distribution
   const sortedSites = [...organization.sites]
-    .sort((a, b) => (b.total_contract_value || 0) - (a.total_contract_value || 0))
-  const maxSiteValue = sortedSites.length > 0 ? (sortedSites[0].total_contract_value || 0) : 0
+    .sort((a, b) => (b.casesValue || 0) - (a.casesValue || 0))
+  const maxSiteValue = sortedSites.length > 0 ? (sortedSites[0].casesValue || 0) : 0
 
   return (
     <section className="space-y-6">
@@ -185,42 +187,79 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
       <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
         <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-amber-400" />
-          Värdefördelning per Enhet
+          Extrabeställningar per Enhet
         </h4>
         
-        <div className="space-y-4">
-          {sortedSites.map((site) => (
-            <ValueDistributionBar
-              key={site.id}
-              site={site}
-              maxValue={maxSiteValue}
-              totalValue={totalOrganizationValue}
-            />
-          ))}
-        </div>
-
-        <div className="mt-6 pt-4 border-t border-slate-700/50">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                <span className="text-slate-400">Hög prestanda</span>
+        {/* Avtalsvärd på organisationsnivå */}
+        <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <FileText className="w-5 h-5 text-blue-400" />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                <span className="text-slate-400">Bra prestanda</span>
+              <div>
+                <div className="text-blue-400 font-medium">Total Avtalsv\u00e4rde (Organisation)</div>
+                <div className="text-xs text-slate-400">Fast månadsbetalning för alla enheter</div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
-                <span className="text-slate-400">Medium risk</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                <span className="text-slate-400">Hög risk</span>
-              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-400">{formatCurrency(totalContractValue)}</div>
+              <div className="text-xs text-slate-400">{organization.totalSites} enheter</div>
             </div>
           </div>
         </div>
+        
+        <div className="space-y-4">
+          {totalCasesValue > 0 ? (
+            sortedSites.map((site) => (
+              <ValueDistributionBar
+                key={site.id}
+                site={site}
+                maxValue={maxSiteValue}
+                totalValue={totalCasesValue}
+              />
+            ))
+          ) : (
+            <div className="text-center py-6 text-slate-400">
+              <div className="mb-2">💼</div>
+              <div className="text-sm">Inga extrabeställningar ännu</div>
+              <div className="text-xs text-slate-500 mt-1">
+                Extrabeställningar och ärendeintäkter utöver avtalet visas här
+              </div>
+            </div>
+          )}
+        </div>
+
+        {totalCasesValue > 0 && (
+          <div className="mt-6 pt-4 border-t border-slate-700/50">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col gap-2">
+                <div className="text-slate-300 text-xs font-medium">Färgkodning baserad på enhetens prestanda och risk:</div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span className="text-slate-400">Hög prestanda</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                    <span className="text-slate-400">Bra prestanda</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
+                    <span className="text-slate-400">Medium risk</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                    <span className="text-slate-400">Hög risk</span>
+                  </div>
+                </div>
+                <div className="text-slate-500 text-xs">
+                  Visar endast extrabeställningar och ärendeintäkter utöver fast avtalsbetalning
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Risk Analysis */}
