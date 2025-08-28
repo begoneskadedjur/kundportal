@@ -302,18 +302,42 @@ export const ContractCustomerBillingModal: React.FC<ContractCustomerBillingModal
 
           {/* Summa att fakturera */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-800/50 p-6 rounded-lg border border-slate-700">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-medium text-white mb-1">Summa att fakturera</h3>
                 <p className="text-sm text-slate-400">
                   Faktureras till {customer?.company_name || 'kund'}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-green-400">
+            </div>
+            
+            {/* Kompakt momsuppdelning */}
+            <div className="space-y-3">
+              {/* Summa exkl. moms */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300 font-medium">Summa exkl. moms</span>
+                <span className="text-xl font-semibold text-white font-mono">
+                  {formatCurrency((case_.price || 0) / 1.25)}
+                </span>
+              </div>
+              
+              {/* Moms rad */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Moms (25%)</span>
+                <span className="text-lg font-medium text-slate-300 font-mono">
+                  {formatCurrency((case_.price || 0) - (case_.price || 0) / 1.25)}
+                </span>
+              </div>
+              
+              {/* Separator linje */}
+              <div className="border-t border-slate-600/50"></div>
+              
+              {/* Totalt inkl. moms */}
+              <div className="flex items-center justify-between">
+                <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
+                <span className="text-2xl font-bold text-green-400 font-mono">
                   {formatCurrency(case_.price || 0)}
-                </p>
-                <p className="text-sm text-slate-400 mt-1">inkl. moms</p>
+                </span>
               </div>
             </div>
           </div>
