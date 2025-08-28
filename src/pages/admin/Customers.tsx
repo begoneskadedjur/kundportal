@@ -276,7 +276,7 @@ export default function Customers() {
     refresh()
   }
 
-  // Handle multisite detail view
+  // Handle multisite detail view - Opens detailed modal for multisite organizations
   const handleViewMultiSiteDetails = (organization: any) => {
     setSelectedMultiSiteOrg(organization)
     setMultiSiteDetailOpen(true)
