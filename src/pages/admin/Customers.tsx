@@ -524,6 +524,31 @@ export default function Customers() {
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
                         />
                         
+                        {/* Organization summary row for multisite when expanded */}
+                        {isExpanded && organization.organizationType === 'multisite' && (
+                          <tr className="bg-slate-800/10 border-b border-slate-700/30">
+                            <td colSpan={9} className="px-6 py-3">
+                              <div className="flex items-center justify-between text-xs text-slate-400">
+                                <div className="flex items-center gap-4">
+                                  <span>📊 Organisationsmätningar:</span>
+                                  <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20">
+                                    {organization.totalSites} enheter
+                                  </span>
+                                  <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded border border-green-500/20">
+                                    {organization.totalCasesCount} ärenden totalt
+                                  </span>
+                                  <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded border border-yellow-500/20">
+                                    {formatCurrency(organization.totalCasesValue)} ärendevärde
+                                  </span>
+                                </div>
+                                <div className="text-slate-500">
+                                  Expandera för att se individuella enheter
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        
                         {/* Site detail rows (only for multisite when expanded) */}
                         {isExpanded && organization.organizationType === 'multisite' && 
                           organization.sites.map((site) => (

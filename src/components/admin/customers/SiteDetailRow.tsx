@@ -97,16 +97,15 @@ const formatContractPeriod = (site: CustomerSite): string => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
   if (diffDays < 0) {
-    return 'Utgången'
+    return 'Utgånget'
   } else if (diffDays <= 30) {
-    return `${diffDays} dagar kvar`
+    return `${diffDays} dagar`
   } else if (diffDays <= 90) {
-    return `~${Math.ceil(diffDays / 30)} mån kvar`
+    const months = Math.ceil(diffDays / 30)
+    return `${months} mån`
   } else {
-    return endDate.toLocaleDateString('sv-SE', { 
-      year: 'numeric', 
-      month: 'short' 
-    })
+    const months = Math.ceil(diffDays / 30)
+    return `${months} mån`
   }
 }
 
@@ -178,10 +177,10 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
         <PortalAccessBadge status={site.invitationStatus || 'none'} />
       </td>
 
-      {/* Contract Value Column */}
+      {/* Contract Value Column - Simplified for sites under org */}
       <td className="px-6 py-3">
         <div className="text-right text-sm">
-          <div className="font-medium text-slate-200">
+          <div className="font-medium text-slate-300 text-xs">
             {formatCurrency(site.total_contract_value || 0)}
           </div>
           <div className="text-xs text-slate-500">
@@ -190,14 +189,15 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
         </div>
       </td>
 
-      {/* Contract Period Column */}
+      {/* Contract Period Column - Only show if different from org */}
       <td className="px-6 py-3">
-        <div className="text-sm text-slate-200">
+        <div className="text-xs text-slate-400">
           {formatContractPeriod(site)}
         </div>
         {site.contractProgress.daysRemaining <= 90 && site.contractProgress.daysRemaining > 0 && (
-          <div className="text-xs text-amber-400 mt-1">
-            ⚠ Utgår snart
+          <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+            Utgår snart
           </div>
         )}
       </td>
@@ -225,10 +225,14 @@ export const SiteDetailRow: React.FC<SiteDetailRowProps> = ({
         </div>
       </td>
 
-      {/* Manager Column */}
+      {/* Manager Column - Simplified for sites (often inherited from org) */}
       <td className="px-6 py-3">
-        <div className="text-sm text-slate-400">
-          {site.assigned_account_manager || '—'}
+        <div className="text-xs text-slate-500">
+          {site.assigned_account_manager ? (
+            <span className="italic">Som organisation</span>
+          ) : (
+            '—'
+          )}
         </div>
       </td>
 

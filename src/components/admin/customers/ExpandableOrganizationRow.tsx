@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users, ExternalLink } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, Users, ExternalLink, AlertTriangle } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
 
 interface ExpandableOrganizationRowProps {
@@ -27,21 +27,42 @@ const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: numbe
     }
   }
 
-  const getBadgeText = () => {
+  const getBadgeIcon = () => {
     switch (status) {
       case 'full':
-        return `✓ Portal (${userCount})`
+        return '✓'
       case 'partial':
-        return `⚠ Delvis (${userCount})`
+        return '⚠'
       case 'none':
-        return '✗ Ingen'
+        return '✗'
+    }
+  }
+
+  const getBadgeLabel = () => {
+    switch (status) {
+      case 'full':
+        return 'Full tillgång'
+      case 'partial':
+        return 'Delvis tillgång'
+      case 'none':
+        return 'Ingen tillgång'
     }
   }
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getBadgeStyles()}`}>
-      {getBadgeText()}
-    </span>
+    <div className="flex flex-col gap-1">
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getBadgeStyles()}`}>
+        {getBadgeIcon()} {getBadgeLabel()}
+      </span>
+      {(status === 'full' || status === 'partial') && userCount > 0 && (
+        <div className="flex items-center gap-1">
+          <Users className="w-3 h-3 text-slate-400" />
+          <span className="text-xs text-slate-400 font-mono">
+            {userCount} {userCount === 1 ? 'användare' : 'användare'}
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -93,7 +114,7 @@ const formatCurrency = (amount: number): string => {
 }
 
 const formatContractPeriod = (org: ConsolidatedCustomer): string => {
-  if (!org.nextRenewalDate) return 'Okänt'
+  if (!org.nextRenewalDate) return 'Okänt avtal'
   
   const endDate = new Date(org.nextRenewalDate)
   const now = new Date()
@@ -101,11 +122,15 @@ const formatContractPeriod = (org: ConsolidatedCustomer): string => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
   if (diffDays < 0) {
-    return 'Utgången'
+    return 'Utgånget'
   } else if (diffDays <= 30) {
-    return `${diffDays} dagar kvar`
+    return `${diffDays} dagar`
   } else if (diffDays <= 90) {
-    return `~${Math.ceil(diffDays / 30)} mån kvar`
+    const months = Math.ceil(diffDays / 30)
+    return `${months} mån`
+  } else if (diffDays <= 365) {
+    const months = Math.ceil(diffDays / 30)
+    return `${months} månader`
   } else {
     return endDate.toLocaleDateString('sv-SE', { 
       year: 'numeric', 
@@ -184,9 +209,12 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
             userCount={organization.activeUsersCount} 
           />
           {organization.pendingInvitationsCount > 0 && (
-            <span className="text-xs text-amber-400">
-              +{organization.pendingInvitationsCount} väntande
-            </span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+              <span className="text-xs text-amber-400">
+                {organization.pendingInvitationsCount} väntande inbjudan{organization.pendingInvitationsCount > 1 ? 'ar' : ''}
+              </span>
+            </div>
           )}
         </div>
       </td>
@@ -205,12 +233,27 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
 
       {/* Contract Period Column */}
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-900">
-          {formatContractPeriod(organization)}
+        <div className="flex items-center gap-2">
+          <div className="text-sm text-slate-200 font-medium">
+            {formatContractPeriod(organization)}
+          </div>
+          {organization.daysToNextRenewal && (
+            <div className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+              organization.daysToNextRenewal <= 30 
+                ? 'bg-red-500/20 text-red-400 border-red-500/30' 
+                : organization.daysToNextRenewal <= 90 
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'bg-green-500/20 text-green-400 border-green-500/30'
+            }`}>
+              {organization.daysToNextRenewal <= 30 ? '🔥 ' : ''}
+              {organization.daysToNextRenewal} dagar
+            </div>
+          )}
         </div>
         {organization.hasExpiringSites && (
-          <div className="text-xs text-amber-400 mt-1">
-            ⚠ Utgående avtal
+          <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            Utgående avtal
           </div>
         )}
       </td>
@@ -245,11 +288,13 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
 
       {/* Manager Column */}
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-900">
-          {organization.assigned_account_manager || 'Ej tilldelad'}
+        <div className="text-sm font-medium text-slate-200">
+          {organization.assigned_account_manager || (
+            <span className="text-slate-500 italic">Ej tilldelad</span>
+          )}
         </div>
         {organization.account_manager_email && (
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">
             {organization.account_manager_email}
           </div>
         )}
