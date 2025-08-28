@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabase';
 import { formatCurrency } from '../../../utils/formatters';
 import {
   X, User, Building2, ChevronDown, History, Clock, UserIcon, ChevronRight,
-  Edit, Save, RotateCcw, Calculator
+  Edit, Save, RotateCcw, Calculator, FileText
 } from 'lucide-react';
 
 import Button from '../../ui/Button';
@@ -401,6 +401,44 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Ärendeinformation */}
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-blue-400 mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Ärendeinformation
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-800/30 p-4 rounded-lg">
+                <p className="text-sm text-slate-400 mb-1">Ärendenummer</p>
+                <p className="text-white font-medium">{case_.case_number || 'Ej angivet'}</p>
+              </div>
+              
+              {case_.avslutad_datum && (
+                <div className="bg-slate-800/30 p-4 rounded-lg">
+                  <p className="text-sm text-slate-400 mb-1">Avslutad datum</p>
+                  <p className="text-white font-medium">
+                    {new Date(case_.avslutad_datum).toLocaleDateString('sv-SE')}
+                  </p>
+                </div>
+              )}
+              
+              {case_.tekniker && (
+                <div className="bg-slate-800/30 p-4 rounded-lg">
+                  <p className="text-sm text-slate-400 mb-1">Tekniker</p>
+                  <p className="text-white font-medium">{case_.tekniker}</p>
+                </div>
+              )}
+              
+              {case_.skadedjur && (
+                <div className="bg-slate-800/30 p-4 rounded-lg">
+                  <p className="text-sm text-slate-400 mb-1">Skadedjur</p>
+                  <p className="text-white font-medium">{case_.skadedjur}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Använd din befintliga EditableBillingFields komponent */}
           <EditableBillingFields
             case_={case_}
@@ -423,22 +461,17 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
             </div>
           )}
           
-          {/* Tekniker-rapport */}
+          {/* Arbetsrapport */}
           {case_.rapport && (
-            <div className="border-t border-slate-700/50 pt-6">
-              <button 
-                onClick={() => setReportExpanded(!reportExpanded)} 
-                className="flex items-center justify-between w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <h3 className="text-lg font-semibold text-slate-300">Tekniker-rapport</h3>
-                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${reportExpanded ? 'rotate-180' : ''}`} />
-              </button>
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Arbetsrapport
+              </h3>
               
-              {reportExpanded && (
-                <div className="mt-3 p-4 bg-slate-800/30 rounded-lg">
-                  <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{case_.rapport}</p>
-                </div>
-              )}
+              <div className="bg-slate-800/30 rounded-lg p-4">
+                <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{case_.rapport}</p>
+              </div>
             </div>
           )}
 
