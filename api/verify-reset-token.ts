@@ -23,6 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   console.log('=== VERIFY RESET TOKEN API START ===')
   console.log('Request timestamp:', new Date().toISOString())
+  console.log('Environment check:', {
+    hasSupabaseUrl: !!SUPABASE_URL,
+    hasServiceKey: !!SUPABASE_SERVICE_KEY,
+    serviceKeyPrefix: SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY.substring(0, 20) + '...' : 'MISSING'
+  })
 
   // Använd Service Key för admin-operationer
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
@@ -132,8 +137,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     if (updateError) {
-      console.error('Failed to update password:', updateError)
-      return res.status(500).json({ error: 'Kunde inte uppdatera lösenordet' })
+      console.error('Failed to update password - Full error details:', {
+        message: updateError.message,
+        status: updateError.status,
+        details: updateError
+      })
+      return res.status(500).json({ 
+        error: 'Kunde inte uppdatera lösenordet',
+        details: updateError.message 
+      })
     }
 
     console.log('Password updated successfully, clearing reset token...')
