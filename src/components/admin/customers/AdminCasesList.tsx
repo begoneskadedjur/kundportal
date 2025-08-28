@@ -100,10 +100,10 @@ const AdminCasesList: React.FC<AdminCasesListProps> = ({ customerId, organizatio
       {/* Case Details Modal */}
       {selectedCase && (
         <CustomerCaseDetailsModal
+          caseData={selectedCase}
           isOpen={!!selectedCase}
           onClose={handleCloseModal}
-          caseId={selectedCase.id}
-          customerId={customerId}
+          userRole="verksamhetschef"
         />
       )}
     </>

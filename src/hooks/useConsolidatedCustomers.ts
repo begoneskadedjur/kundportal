@@ -128,6 +128,7 @@ export interface ConsolidatedCustomer {
     email_verified: boolean | null
     is_active: boolean
     hasLoggedIn: boolean
+    site_ids?: string[]
   }>
   
   // Cases aggregated data
@@ -281,6 +282,7 @@ export function useConsolidatedCustomers() {
         email_verified: boolean | null
         is_active: boolean
         hasLoggedIn: boolean
+        site_ids?: string[]
       }>>()
 
       // Kombinera multisite_user_roles med profiles och auth users data
@@ -303,7 +305,8 @@ export function useConsolidatedCustomers() {
               last_sign_in_at: authUser?.last_sign_in_at || null,
               email_verified: profile.email_verified,
               is_active: profile.is_active,
-              hasLoggedIn: authUser?.last_sign_in_at ? !!authUser.last_sign_in_at : !!profile.last_login // Fallback till profiles om auth data saknas
+              hasLoggedIn: authUser?.last_sign_in_at ? !!authUser.last_sign_in_at : !!profile.last_login, // Fallback till profiles om auth data saknas
+              site_ids: role.site_ids // Lägg till site_ids från multisite_user_roles
             })
             multisiteUsersMap.set(role.organization_id, current)
           }
@@ -417,12 +420,14 @@ export function useConsolidatedCustomers() {
     multisiteUsersMap: Map<string, Array<{
       user_id: string
       role_type: string
-      full_name: string | null
+      display_name: string | null
       email: string
+      last_login: string | null
       last_sign_in_at: string | null
-      email_confirmed_at: string | null
+      email_verified: boolean | null
       is_active: boolean
       hasLoggedIn: boolean
+      site_ids?: string[]
     }>>
   ): ConsolidatedCustomer[] => {
     const consolidatedMap = new Map<string, ConsolidatedCustomer>()
