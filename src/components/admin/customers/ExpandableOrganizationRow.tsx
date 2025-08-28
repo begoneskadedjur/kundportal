@@ -16,9 +16,10 @@ interface ExpandableOrganizationRowProps {
   onViewMultiSiteDetails?: (org: ConsolidatedCustomer) => void
 }
 
-const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number }> = ({ status, userCount }) => {
-  // Använd userCount istället för status för att avgöra färg och text
-  const hasAccess = userCount > 0
+const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number; organization?: any }> = ({ status, userCount, organization }) => {
+  // Använd multisiteUsers.length om det finns, annars userCount
+  const totalUsers = organization?.multisiteUsers?.length || userCount
+  const hasAccess = totalUsers > 0
   
   const getBadgeStyles = () => {
     return hasAccess 
@@ -32,7 +33,7 @@ const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: numbe
 
   const getBadgeLabel = () => {
     return hasAccess 
-      ? `${userCount} användare har tillgång`
+      ? `${totalUsers} användare har tillgång`
       : 'Ingen tillgång'
   }
 
@@ -193,7 +194,8 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
         <div className="flex flex-col gap-1">
           <PortalAccessBadge 
             status={organization.portalAccessStatus} 
-            userCount={organization.activeUsersCount} 
+            userCount={organization.activeUsersCount}
+            organization={organization}
           />
           {organization.pendingInvitationsCount > 0 && (
             <div className="flex items-center gap-1">

@@ -54,8 +54,10 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
     return null
   }
 
-  // Använd organisation-nivå kontaktperson först, sedan site-nivå, till sist fallback
-  const verksamhetschefName = getContactName(organization.contact_person, organization.contact_email) 
+  // Hitta verksamhetschef från multisiteUsers först, sedan fallback till gamla metoden
+  const verksamhetschefFromUsers = organization.multisiteUsers?.find(user => user.role_type === 'verksamhetschef')
+  const verksamhetschefName = verksamhetschefFromUsers?.display_name 
+    || getContactName(organization.contact_person, organization.contact_email) 
     || getContactName(verksamhetschef?.contact_person, verksamhetschef?.contact_email)
     || "Verksamhetschef" // Fallback när ingen kontaktperson finns
 
@@ -107,10 +109,10 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   <div className="flex items-center gap-2 text-sm">
                     <Mail className="w-3 h-3 text-slate-400" />
                     <a 
-                      href={`mailto:${organization.contact_email}`}
+                      href={`mailto:${verksamhetschefFromUsers?.email || organization.contact_email}`}
                       className="text-blue-400 hover:text-blue-300 transition-colors"
                     >
-                      {organization.contact_email}
+                      {verksamhetschefFromUsers?.email || organization.contact_email}
                     </a>
                   </div>
                   {(organization.contact_phone || verksamhetschef?.contact_phone) && (
@@ -279,13 +281,13 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                       <span className="text-xs text-slate-400">Portal-tillgång</span>
                       <div className="flex items-center gap-1">
                         <div className={`w-2 h-2 rounded-full ${
-                          organization.activeUsersCount > 0 ? 'bg-green-400' : 'bg-slate-500'
+                          (organization.multisiteUsers?.length || 0) > 0 ? 'bg-green-400' : 'bg-slate-500'
                         }`} />
                         <span className={`text-xs font-medium ${
-                          organization.activeUsersCount > 0 ? 'text-green-400' : 'text-slate-400'
+                          (organization.multisiteUsers?.length || 0) > 0 ? 'text-green-400' : 'text-slate-400'
                         }`}>
-                          {organization.activeUsersCount > 0 
-                            ? `${organization.activeUsersCount} användare har tillgång`
+                          {(organization.multisiteUsers?.length || 0) > 0 
+                            ? `${organization.multisiteUsers?.length || 0} användare har tillgång`
                             : 'Ingen tillgång'}
                         </span>
                       </div>
