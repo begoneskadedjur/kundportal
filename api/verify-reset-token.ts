@@ -158,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ display_name: metadata.name })
-        .eq('id', user.id)
+        .eq('user_id', user.id)
       
       if (profileError) {
         console.error('Failed to update profile display_name:', profileError)
