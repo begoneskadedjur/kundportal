@@ -4,6 +4,7 @@ import { MapPin, ChevronDown, ChevronRight, Building2, Edit3, Mail, Phone, User,
 import { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import HealthScoreBadge from './HealthScoreBadge'
 import ChurnRiskBadge from './ChurnRiskBadge'
+import OrganisationActiveCasesList from '../../organisation/OrganisationActiveCasesList'
 import { formatCurrency, getContractProgress } from '../../../utils/customerMetrics'
 
 interface SiteListSectionProps {
@@ -434,21 +435,21 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 <div className="mt-4 p-3 bg-slate-700/20 rounded-lg">
                   <div className="text-xs text-slate-400 mb-2">Ansvariga användare med portaltillgång:</div>
                   {(() => {
-                    // Verksamhetschef har alltid tillgång till alla enheter
-                    const verksamhetschefer = organization.multisiteUsers.filter(user => user.role_type === 'verksamhetschef')
+                    // Verksamhetschef har alltid tillgång till alla enheter (site_ids är null)
+                    const verksamhetschefer = organization.multisiteUsers.filter(user => 
+                      user.role_type === 'verksamhetschef'
+                    )
                     
-                    // Regionchefer som har valt denna enhet ELLER alla regionchefer om site_ids är tom/null
+                    // Regionchefer som har denna enhet i sin site_ids array
                     const regionchefer = organization.multisiteUsers.filter(user => {
                       if (user.role_type !== 'regionchef') return false
-                      // Om site_ids är null, tom, eller innehåller site.id
-                      return !user.site_ids || user.site_ids.length === 0 || user.site_ids.includes(site.id)
+                      return user.site_ids && Array.isArray(user.site_ids) && user.site_ids.includes(site.id)
                     })
                     
-                    // Platsansvariga för denna specifika enhet ELLER alla platsansvariga om site_ids är tom/null
+                    // Platsansvariga som har denna specifika enhet i sin site_ids array
                     const platsansvariga = organization.multisiteUsers.filter(user => {
                       if (user.role_type !== 'platsansvarig') return false
-                      // Om site_ids är null, tom, eller innehåller site.id
-                      return !user.site_ids || user.site_ids.length === 0 || user.site_ids.includes(site.id)
+                      return user.site_ids && Array.isArray(user.site_ids) && user.site_ids.includes(site.id)
                     })
                     
                     const allRelevantUsers = [...verksamhetschefer, ...regionchefer, ...platsansvariga]
@@ -494,19 +495,17 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
               )}
             </div>
 
-            {/* Cases Section */}
+            {/* Aktiva Ärenden Section */}
             <div>
               <h6 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
-                Ärenden & Extra Arbeten
+                Aktiva Ärenden för denna enhet
               </h6>
               
-              {/* Cases Summary for this site */}
-              <CasesSection 
-                siteId={site.id} 
-                siteName={site.site_name || site.company_name}
-                casesCount={site.casesCount || 0}
-                casesValue={site.casesValue || 0}
+              {/* Använd OrganisationActiveCasesList för att visa faktiska ärenden */}
+              <OrganisationActiveCasesList 
+                customerId={site.id}
+                organizationId={organization.organization_id}
               />
             </div>
 
