@@ -14,6 +14,7 @@ interface ExpandableOrganizationRowProps {
   onEmailContact?: (org: ConsolidatedCustomer) => void
   onViewDetails?: (org: ConsolidatedCustomer) => void
   onViewMultiSiteDetails?: (org: ConsolidatedCustomer) => void
+  onViewSingleCustomerDetails?: (org: ConsolidatedCustomer) => void
 }
 
 const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number; organization?: any }> = ({ status, userCount, organization }) => {
@@ -150,7 +151,8 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onEdit,
   onEmailContact,
   onViewDetails,
-  onViewMultiSiteDetails
+  onViewMultiSiteDetails,
+  onViewSingleCustomerDetails
 }) => {
   const isMultisite = organization.organizationType === 'multisite'
   
@@ -386,6 +388,17 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               onClick={() => onViewMultiSiteDetails(organization)}
               className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
               title="Visa detaljerad multisite-vy"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+          )}
+          
+          {/* Single Customer Detail Button */}
+          {!isMultisite && onViewSingleCustomerDetails && (
+            <button
+              onClick={() => onViewSingleCustomerDetails(organization)}
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors duration-200"
+              title="Visa detaljerad kundvy"
             >
               <ExternalLink className="h-4 w-4" />
             </button>

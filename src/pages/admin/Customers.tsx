@@ -27,6 +27,7 @@ import ExpandableOrganizationRow from '../../components/admin/customers/Expandab
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
 import ContactAndUnitsExpandedView from '../../components/admin/customers/ContactAndUnitsExpandedView'
 import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
+import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -198,6 +199,8 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
   const [multiSiteDetailOpen, setMultiSiteDetailOpen] = useState(false)
   const [selectedMultiSiteOrg, setSelectedMultiSiteOrg] = useState<any>(null)
+  const [singleCustomerDetailOpen, setSingleCustomerDetailOpen] = useState(false)
+  const [selectedSingleCustomer, setSelectedSingleCustomer] = useState<any>(null)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -295,6 +298,14 @@ export default function Customers() {
     console.log('🚀 MODAL DEBUG - Organization data:', organization)
     setSelectedMultiSiteOrg(organization)
     setMultiSiteDetailOpen(true)
+  }
+
+  // Handle single customer detail view - Opens detailed modal for single customers
+  const handleViewSingleCustomerDetails = (organization: any) => {
+    console.log('🚀 SINGLE MODAL DEBUG - Opening single customer detail for:', organization.company_name)
+    console.log('🚀 SINGLE MODAL DEBUG - Customer data:', organization)
+    setSelectedSingleCustomer(organization)
+    setSingleCustomerDetailOpen(true)
   }
 
   // Get unique managers for filter
@@ -535,6 +546,7 @@ export default function Customers() {
                           onInviteToPortal={inviteToPortal}
                           onEdit={(org) => handleEditCustomer(org.sites[0])} // Edit first site for now
                           onViewMultiSiteDetails={handleViewMultiSiteDetails}
+                          onViewSingleCustomerDetails={handleViewSingleCustomerDetails}
                         />
                         
                         {/* Contact and units expanded view for multisite organizations */}
@@ -809,6 +821,16 @@ export default function Customers() {
         onClose={() => {
           setMultiSiteDetailOpen(false)
           setSelectedMultiSiteOrg(null)
+        }}
+      />
+
+      {/* Single Customer Detail Modal */}
+      <SingleCustomerDetailModal
+        customer={selectedSingleCustomer}
+        isOpen={singleCustomerDetailOpen}
+        onClose={() => {
+          setSingleCustomerDetailOpen(false)
+          setSelectedSingleCustomer(null)
         }}
       />
     </div>
