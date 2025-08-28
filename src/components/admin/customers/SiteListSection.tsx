@@ -1,6 +1,6 @@
 // src/components/admin/customers/SiteListSection.tsx
 import React, { useState } from 'react'
-import { MapPin, ChevronDown, ChevronRight, Building2, Edit3, Mail, Phone, User, AlertTriangle, Calendar, TrendingUp, DollarSign, FileText, Activity, ExternalLink } from 'lucide-react'
+import { MapPin, ChevronDown, ChevronRight, Building2, Edit3, Mail, Phone, User, UserCheck, AlertTriangle, Calendar, TrendingUp, DollarSign, FileText, Activity, ExternalLink } from 'lucide-react'
 import { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import HealthScoreBadge from './HealthScoreBadge'
 import ChurnRiskBadge from './ChurnRiskBadge'
