@@ -38,16 +38,25 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
   const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') 
     || organization.sites[0]
 
-  // Hitta namn för verksamhetschef (kan vara från kontakt eller email)
+  // Hitta namn för verksamhetschef (förbättrad version)
   const getContactName = (contact_person: string | null, contact_email: string) => {
-    // Först: använd organisation-nivå kontaktperson
+    // Först: använd organisation-nivå kontaktperson om det finns
     if (contact_person && contact_person.trim() !== '') {
       return contact_person
     }
-    // Fallback: försök extrahera namn från email
+    
+    // Andra prioritet: Sök efter användare med samma email i multisiteUsers för att få display_name
+    const userWithEmail = organization.multisiteUsers?.find(user => 
+      user.email === contact_email && user.display_name && user.display_name.trim() !== ''
+    )
+    if (userWithEmail?.display_name) {
+      return userWithEmail.display_name
+    }
+    
+    // Sista utväg: försök extrahera namn från email (men bara om inget annat finns)
     if (contact_email) {
       const emailParts = contact_email.split('@')
-      if (emailParts[0]) {
+      if (emailParts[0] && emailParts[0].length > 3) { // Endast om email-delen är rimlig
         return emailParts[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
       }
     }
@@ -59,7 +68,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
   const verksamhetschefName = verksamhetschefFromUsers?.display_name 
     || getContactName(organization.contact_person, organization.contact_email) 
     || getContactName(verksamhetschef?.contact_person, verksamhetschef?.contact_email)
-    || "Verksamhetschef" // Fallback när ingen kontaktperson finns
+    || "Ej angivet" // Mer exakt fallback
 
   // Hitta portal-användare och deras roller (ersätter "andra kontakter")
   const portalUsers = organization.sites.filter(site => 
@@ -155,7 +164,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   {/* Användarlistning - från multisite_user_roles istället för sites */}
                   <div className="space-y-2 mb-3">
                     {organization.multisiteUsers?.map((user, index) => {
-                      const userName = user.display_name || getContactName(null, user.email)
+                      const userName = user.display_name || getContactName(null, user.email) || 'Ej angivet'
                       
                       const getRoleIcon = (roleType: string) => {
                         switch (roleType) {
@@ -323,30 +332,93 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                 <div>
                   <h5 className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
                     <Activity className="w-3 h-3" />
-                    Enheter med extra ärenden
+                    Intäkter från ärenden som inte ingår i avtal
                   </h5>
                   <div className="space-y-2">
-                    {unitsWithCases.slice(0, 4).map(site => (
-                      <div key={site.id} className="flex items-center justify-between bg-slate-800/50 rounded p-2">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3 h-3 text-slate-500" />
-                          <span className="text-xs text-slate-300">
-                            {site.site_name || site.company_name}
-                          </span>
-                          {site.site_code && (
-                            <span className="text-xs text-slate-500">({site.site_code})</span>
+                    {unitsWithCases.slice(0, 4).map(site => {
+                      // Hitta ansvariga användare för denna site
+                      const siteResponsibleUsers = organization.multisiteUsers?.filter(user => 
+                        user.role_type === 'platsansvarig' && 
+                        Array.isArray(user.site_ids) && 
+                        user.site_ids.includes(site.id)
+                      ) || []
+                      
+                      return (
+                        <div key={site.id} className="bg-slate-800/50 rounded p-3 border border-slate-700/50">
+                          {/* Site header med grundinfo */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-3 h-3 text-slate-500" />
+                              <span className="text-sm font-medium text-slate-200">
+                                {site.site_name || site.company_name}
+                              </span>
+                              {site.site_code && (
+                                <span className="text-xs text-slate-500">({site.site_code})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-blue-400">
+                                {site.casesCount} ärenden
+                              </span>
+                              <span className="text-xs font-medium text-green-400">
+                                {formatCurrency(site.casesValue)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Ansvariga användare för denna site */}
+                          {siteResponsibleUsers.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-700/50">
+                              <div className="text-xs text-slate-400 mb-1">Ansvariga:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {siteResponsibleUsers.map(user => (
+                                  <div key={user.user_id} className="flex items-center gap-1 bg-slate-700/50 rounded px-2 py-1">
+                                    <span className="text-xs text-slate-300">
+                                      {user.display_name || getContactName(null, user.email) || 'Ej angivet'}
+                                    </span>
+                                    <a 
+                                      href={`mailto:${user.email}`}
+                                      className="text-slate-400 hover:text-blue-400 transition-colors"
+                                      title={`Skicka email till ${user.display_name || user.email}`}
+                                    >
+                                      <Mail className="w-3 h-3" />
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Visa grundkontakt för site om ingen platsansvarig finns */}
+                          {siteResponsibleUsers.length === 0 && (site.contact_person || site.contact_email) && (
+                            <div className="mt-2 pt-2 border-t border-slate-700/50">
+                              <div className="text-xs text-slate-400 mb-1">Kontakt:</div>
+                              <div className="flex items-center gap-2">
+                                {site.contact_person && (
+                                  <span className="text-xs text-slate-300">{site.contact_person}</span>
+                                )}
+                                {site.contact_email && (
+                                  <a 
+                                    href={`mailto:${site.contact_email}`}
+                                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                  >
+                                    <Mail className="w-3 h-3" />
+                                  </a>
+                                )}
+                                {site.contact_phone && (
+                                  <a 
+                                    href={`tel:${site.contact_phone}`}
+                                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-blue-400">
-                            {site.casesCount} ärenden
-                          </span>
-                          <span className="text-xs font-medium text-green-400">
-                            {formatCurrency(site.casesValue)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {unitsWithCases.length > 4 && (
                       <div className="text-xs text-slate-500 text-center">
                         +{unitsWithCases.length - 4} fler enheter med ärenden...
@@ -361,25 +433,25 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
             <div>
               <h5 className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
                 <DollarSign className="w-3 h-3" />
-                Faktureringsstatus (Extra ärenden)
+                Faktureringsstatus (Ärenden)
               </h5>
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-green-500/10 rounded p-2 border border-green-500/20">
                   <div className="text-xs text-green-400">Betald</div>
                   <div className="font-medium text-green-400">
-                    {formatCurrency(organization.casesBillingStatus.paid.value)}
+                    {formatCurrency(organization.casesBillingStatus.paid?.value || 0)}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {organization.casesBillingStatus.paid.count} ärenden
+                    {organization.casesBillingStatus.paid?.count || 0} ärenden
                   </div>
                 </div>
                 <div className="bg-amber-500/10 rounded p-2 border border-amber-500/20">
                   <div className="text-xs text-amber-400">Väntande</div>
                   <div className="font-medium text-amber-400">
-                    {formatCurrency(organization.casesBillingStatus.pending.value)}
+                    {formatCurrency(organization.casesBillingStatus.pending?.value || 0)}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {organization.casesBillingStatus.pending.count} ärenden
+                    {organization.casesBillingStatus.pending?.count || 0} ärenden
                   </div>
                 </div>
               </div>

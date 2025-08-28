@@ -15,6 +15,7 @@ interface SiteCardProps {
   isExpanded: boolean
   onToggle: () => void
   onEdit?: (site: CustomerSite) => void
+  organization?: ConsolidatedCustomer // Lägg till för åtkomst till multisite data
 }
 
 interface CasesSectionProps {
@@ -102,7 +103,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-lg font-bold text-blue-400">{casesCount}</div>
-              <div className="text-xs text-slate-400">Totala cases</div>
+              <div className="text-xs text-slate-400">Totala ärenden</div>
             </div>
             <div>
               <div className="text-lg font-bold text-green-400">{formatCurrency(totalCasesValue)}</div>
@@ -134,8 +135,8 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           {casesCount === 0 && (
             <div className="mt-4 text-center py-6 text-slate-400">
               <div className="mb-2">📋</div>
-              <div className="text-sm">Inga cases för denna enhet</div>
-              <div className="text-xs text-slate-500 mt-1">Cases visas här när de skapas</div>
+              <div className="text-sm">Inga ärenden för denna enhet</div>
+              <div className="text-xs text-slate-500 mt-1">Ärenden visas här när de skapas</div>
             </div>
           )}
         </div>
@@ -183,7 +184,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
                 {mockCases.length > 5 && (
                   <div className="text-center pt-2">
                     <span className="text-xs text-slate-500">
-                      +{mockCases.length - 5} fler cases...
+                      +{mockCases.length - 5} fler ärenden...
                     </span>
                   </div>
                 )}
@@ -196,7 +197,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
   )
 }
 
-const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit }) => {
+const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit, organization }) => {
   const contractProgress = getContractProgress(site.contract_start_date, site.contract_end_date)
   
   // Determine site type display
@@ -251,12 +252,68 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit 
                 )}
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
-                <span className="flex items-center gap-1">
-                  <User className="w-3 h-3" />
-                  {site.contact_person || 'Ingen kontakt'}
-                </span>
-                <span className="text-blue-400">{site.contact_email}</span>
+              <div className="space-y-2 mb-3">
+                {/* Site Contact Information */}
+                <div className="flex items-center gap-4 text-sm text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    {site.contact_person || 'Ingen kontakt'}
+                  </span>
+                  {site.contact_email && (
+                    <a 
+                      href={`mailto:${site.contact_email}`}
+                      className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                      title={`Skicka email till ${site.contact_person || 'kontakt'}`}
+                    >
+                      <Mail className="w-3 h-3" />
+                      {site.contact_email}
+                    </a>
+                  )}
+                  {site.contact_phone && (
+                    <a 
+                      href={`tel:${site.contact_phone}`}
+                      className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                      title={`Ring ${site.contact_person || 'kontakt'}`}
+                    >
+                      <Phone className="w-3 h-3" />
+                      {site.contact_phone}
+                    </a>
+                  )}
+                </div>
+                
+                {/* Platsansvariga användare från multisite data */}
+                {organization?.multisiteUsers && (
+                  <div className="pt-2">
+                    {(() => {
+                      const siteResponsibleUsers = organization.multisiteUsers.filter(user => 
+                        user.role_type === 'platsansvarig' && 
+                        user.site_ids?.includes(site.id)
+                      )
+                      
+                      if (siteResponsibleUsers.length > 0) {
+                        return (
+                          <div className="space-y-1">
+                            <div className="text-xs text-slate-500">Platsansvariga:</div>
+                            {siteResponsibleUsers.map((user, index) => (
+                              <div key={user.user_id} className="flex items-center gap-2 text-xs">
+                                <UserCheck className="w-3 h-3 text-purple-400" />
+                                <span className="text-slate-300">{user.display_name || 'Namnlös användare'}</span>
+                                <a 
+                                  href={`mailto:${user.email}`}
+                                  className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                                  title={`Kontakta ${user.display_name || 'användare'}`}
+                                >
+                                  <Mail className="w-3 h-3" />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Status badges */}
@@ -575,6 +632,7 @@ export default function SiteListSection({ organization }: SiteListSectionProps) 
               isExpanded={expandedSites.has(site.id)}
               onToggle={() => toggleSiteExpansion(site.id)}
               onEdit={handleEditSite}
+              organization={organization}
             />
           ))
         ) : (

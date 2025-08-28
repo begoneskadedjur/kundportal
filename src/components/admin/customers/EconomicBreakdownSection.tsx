@@ -63,12 +63,17 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
   // Calculate economic metrics
   const totalContractValue = organization.totalContractValue
   
-  // Real cases integration - data from useConsolidatedCustomers hook
-  const totalCasesValue = organization.totalCasesValue
-  const totalCasesCount = organization.totalCasesCount
+  // Real cases integration - data from useConsolidatedCustomers hook - säker tillgång
+  const totalCasesValue = organization.totalCasesValue || 0
+  const totalCasesCount = organization.totalCasesCount || 0
   
-  // Cases billing breakdown from aggregated organization data
-  const casesBillingBreakdown = organization.casesBillingStatus
+  // Cases billing breakdown from aggregated organization data - säker tillgång med fallbacks
+  const casesBillingBreakdown = organization.casesBillingStatus || {
+    pending: { count: 0, value: 0 },
+    sent: { count: 0, value: 0 },
+    paid: { count: 0, value: 0 },
+    skip: { count: 0, value: 0 }
+  }
   
   const totalOrganizationValue = totalContractValue + totalCasesValue
   const avgValuePerSite = organization.totalSites > 0 ? totalOrganizationValue / organization.totalSites : 0
@@ -131,7 +136,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
           </div>
           {totalCasesValue > 0 && (
             <div className="text-xs text-blue-400">
-              +Cases: {formatCurrency(totalCasesValue)}
+              Intäkter från ärenden som inte ingår i avtal: {formatCurrency(totalCasesValue)}
             </div>
           )}
         </div>
@@ -334,14 +339,14 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
         </div>
       </div>
 
-      {/* Cases Economic Analysis */}
+      {/* Ärenden Economic Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Cases Overview */}
+        {/* Ärenden Overview */}
         <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
           <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-blue-400" />
-            Cases & Extra Arbeten
+            Ärenden & Extra Arbeten
           </h4>
           
           <div className="space-y-4">
@@ -350,19 +355,19 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                 <div className="text-2xl font-bold text-blue-400 mb-1">
                   {totalCasesCount}
                 </div>
-                <div className="text-xs text-slate-400">Totala cases</div>
+                <div className="text-xs text-slate-400">Totala ärenden</div>
               </div>
               <div className="bg-slate-700/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-green-400 mb-1">
                   {formatCurrency(totalCasesValue)}
                 </div>
-                <div className="text-xs text-slate-400">Cases värde</div>
+                <div className="text-xs text-slate-400">Ärendevärde</div>
               </div>
             </div>
             
-            {/* Per Site Cases Breakdown */}
+            {/* Per Site Ärenden Breakdown */}
             <div className="pt-4 border-t border-slate-700/50">
-              <div className="text-sm text-slate-400 mb-3">Cases per enhet:</div>
+              <div className="text-sm text-slate-400 mb-3">Ärenden per enhet:</div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {organization.sites.map((site) => {
                   // Real cases data per site from useConsolidatedCustomers
@@ -375,7 +380,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                         {site.site_name || site.company_name}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500">{siteCasesCount} cases</span>
+                        <span className="text-xs text-slate-500">{siteCasesCount} ärenden</span>
                         <span className="text-sm font-medium text-green-400">
                           {formatCurrency(siteCasesValue)}
                         </span>
@@ -388,9 +393,9 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
               {totalCasesCount === 0 && (
                 <div className="text-center py-6 text-slate-400">
                   <div className="mb-2">📋</div>
-                  <div className="text-sm">Inga cases ännu</div>
+                  <div className="text-sm">Inga ärenden ännu</div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Cases visas här när de skapas i systemet
+                    Ärenden visas här när de skapas i systemet
                   </div>
                 </div>
               )}
@@ -402,7 +407,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
         <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
           <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-purple-400" />
-            Faktureringsstatus
+            Faktureringsstatus (Ärenden)
           </h4>
           
           <div className="space-y-4">
@@ -417,7 +422,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-amber-400 font-bold">{formatCurrency(casesBillingBreakdown.pending)}</div>
+                  <div className="text-amber-400 font-bold">{formatCurrency(casesBillingBreakdown.pending?.value || 0)}</div>
                 </div>
               </div>
               
@@ -430,7 +435,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-blue-400 font-bold">{formatCurrency(casesBillingBreakdown.sent)}</div>
+                  <div className="text-blue-400 font-bold">{formatCurrency(casesBillingBreakdown.sent?.value || 0)}</div>
                 </div>
               </div>
               
@@ -443,7 +448,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-green-400 font-bold">{formatCurrency(casesBillingBreakdown.paid)}</div>
+                  <div className="text-green-400 font-bold">{formatCurrency(casesBillingBreakdown.paid?.value || 0)}</div>
                 </div>
               </div>
               
@@ -456,7 +461,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-slate-400 font-bold">{formatCurrency(casesBillingBreakdown.skip)}</div>
+                  <div className="text-slate-400 font-bold">{formatCurrency(casesBillingBreakdown.skip?.value || 0)}</div>
                 </div>
               </div>
             </div>
@@ -469,16 +474,16 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                   <div
                     className="bg-green-400 h-2 rounded-full transition-all duration-500"
                     style={{ 
-                      width: `${totalCasesValue > 0 ? (casesBillingBreakdown.paid / totalCasesValue) * 100 : 0}%` 
+                      width: `${totalCasesValue > 0 ? ((casesBillingBreakdown.paid?.value || 0) / totalCasesValue) * 100 : 0}%` 
                     }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>
-                    {totalCasesValue > 0 ? Math.round((casesBillingBreakdown.paid / totalCasesValue) * 100) : 0}% betalt
+                    {totalCasesValue > 0 ? Math.round(((casesBillingBreakdown.paid?.value || 0) / totalCasesValue) * 100) : 0}% betalt
                   </span>
                   <span>
-                    {formatCurrency(casesBillingBreakdown.paid)} / {formatCurrency(totalCasesValue)}
+                    {formatCurrency(casesBillingBreakdown.paid?.value || 0)} / {formatCurrency(totalCasesValue)}
                   </span>
                 </div>
               </div>
