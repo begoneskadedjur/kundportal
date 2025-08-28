@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, Users, ExternalLink } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
 
 interface ExpandableOrganizationRowProps {
@@ -12,6 +12,7 @@ interface ExpandableOrganizationRowProps {
   onEdit?: (org: ConsolidatedCustomer) => void
   onEmailContact?: (org: ConsolidatedCustomer) => void
   onViewDetails?: (org: ConsolidatedCustomer) => void
+  onViewMultiSiteDetails?: (org: ConsolidatedCustomer) => void
 }
 
 const PortalAccessBadge: React.FC<{ status: PortalAccessStatus; userCount: number }> = ({ status, userCount }) => {
@@ -120,7 +121,8 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
   onInviteToPortal,
   onEdit,
   onEmailContact,
-  onViewDetails
+  onViewDetails,
+  onViewMultiSiteDetails
 }) => {
   const isMultisite = organization.organizationType === 'multisite'
   
@@ -256,11 +258,22 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
       {/* Actions Column */}
       <td className="px-6 py-4">
         <div className="flex items-center gap-2">
+          {/* Multisite Detail Button */}
+          {isMultisite && onViewMultiSiteDetails && (
+            <button
+              onClick={() => onViewMultiSiteDetails(organization)}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
+              title="Visa detaljerad multisite-vy"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+          )}
+          
           {/* Portal invite button */}
           {organization.portalAccessStatus !== 'full' && onInviteToPortal && (
             <button
               onClick={() => onInviteToPortal(organization)}
-              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors duration-200"
+              className="text-green-400 hover:text-green-300 text-sm font-medium transition-colors duration-200"
               title={isMultisite ? "Bjud in organisation till portal" : "Bjud in till portal"}
             >
               <Users className="h-4 w-4" />

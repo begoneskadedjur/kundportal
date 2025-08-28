@@ -66,6 +66,25 @@ interface CustomerSite extends Customer {
   contractProgress: ReturnType<typeof getContractProgress>
   hasPortalAccess?: boolean
   invitationStatus?: 'none' | 'pending' | 'active'
+  
+  // Cases data per site
+  casesCount: number
+  casesValue: number
+  casesBillingBreakdown: {
+    pending: number
+    sent: number
+    paid: number
+    skip: number
+  }
+  cases?: Array<{
+    id: string
+    title: string
+    description?: string
+    price: number
+    billing_status: 'pending' | 'sent' | 'paid' | 'skip'
+    created_at: string
+    case_type: 'private_case' | 'business_case'
+  }>
 }
 
 type PortalAccessStatus = 'full' | 'partial' | 'none'
@@ -97,6 +116,17 @@ interface ConsolidatedCustomer {
   portalAccessStatus: PortalAccessStatus
   activeUsersCount: number
   pendingInvitationsCount: number
+  
+  // Cases aggregated data
+  totalCasesValue: number
+  totalCasesCount: number
+  totalOrganizationValue: number // totalContractValue + totalCasesValue
+  casesBillingStatus: {
+    pending: { count: number; value: number }
+    sent: { count: number; value: number }
+    paid: { count: number; value: number }
+    skip: { count: number; value: number }
+  }
   
   // Aggregated metrics
   overallHealthScore: ReturnType<typeof calculateHealthScore>
@@ -195,6 +225,33 @@ export function useConsolidatedCustomers() {
         }
       })
 
+      // Hämta cases-data för alla kunder
+      const { data: casesData, error: casesError } = await supabase
+        .from('cases')
+        .select('id, customer_id, title, description, price, billing_status, created_at')
+
+      if (casesError && !casesError.message.includes('permission denied')) {
+        console.error('Error fetching cases:', casesError)
+      }
+
+      // Skapa cases map per customer_id
+      const casesMap = new Map<string, any[]>()
+      casesData?.forEach(caseItem => {
+        if (caseItem.customer_id) {
+          const existing = casesMap.get(caseItem.customer_id) || []
+          existing.push({
+            id: caseItem.id,
+            title: caseItem.title,
+            description: caseItem.description,
+            price: caseItem.price || 0,
+            billing_status: caseItem.billing_status || 'pending',
+            created_at: caseItem.created_at,
+            case_type: 'private_case' // Assuming private cases for now
+          })
+          casesMap.set(caseItem.customer_id, existing)
+        }
+      })
+
       // Hämta inbjudningar med felhantering
       const { data: invitationsData, error: invitationsError } = await supabase
         .from('user_invitations')
@@ -221,6 +278,16 @@ export function useConsolidatedCustomers() {
         const hasPortalAccess = portalAccessMap.has(customer.id)
         const invitationStatus = invitationMap.get(customer.id) || 'none'
         
+        // Hämta cases för denna kund
+        const customerCases = casesMap.get(customer.id) || []
+        const casesValue = customerCases.reduce((sum, c) => sum + c.price, 0)
+        const casesBillingBreakdown = {
+          pending: customerCases.filter(c => c.billing_status === 'pending').length,
+          sent: customerCases.filter(c => c.billing_status === 'sent').length,
+          paid: customerCases.filter(c => c.billing_status === 'paid').length,
+          skip: customerCases.filter(c => c.billing_status === 'skip').length
+        }
+        
         return {
           ...customer,
           healthScore: calculateHealthScore(customer),
@@ -231,7 +298,13 @@ export function useConsolidatedCustomers() {
             customer.contract_end_date
           ),
           hasPortalAccess,
-          invitationStatus: hasPortalAccess ? 'active' : invitationStatus
+          invitationStatus: hasPortalAccess ? 'active' : invitationStatus,
+          
+          // Cases data
+          casesCount: customerCases.length,
+          casesValue,
+          casesBillingBreakdown,
+          cases: customerCases
         }
       })
 
@@ -291,6 +364,17 @@ export function useConsolidatedCustomers() {
             activeUsersCount: multisiteAccessMap.get(orgId) || 0,
             pendingInvitationsCount: 0,
             
+            // Cases initialization
+            totalCasesValue: 0,
+            totalCasesCount: 0,
+            totalOrganizationValue: 0,
+            casesBillingStatus: {
+              pending: { count: 0, value: 0 },
+              sent: { count: 0, value: 0 },
+              paid: { count: 0, value: 0 },
+              skip: { count: 0, value: 0 }
+            },
+            
             overallHealthScore: { score: 0, level: 'poor' as const, factors: [] },
             highestChurnRisk: { score: 0, risk: 'low' as const, factors: [] },
             averageRenewalProbability: 0,
@@ -335,6 +419,29 @@ export function useConsolidatedCustomers() {
           activeUsersCount: customer.hasPortalAccess ? 1 : 0,
           pendingInvitationsCount: customer.invitationStatus === 'pending' ? 1 : 0,
           
+          // Cases data for single customer
+          totalCasesValue: customer.casesValue,
+          totalCasesCount: customer.casesCount,
+          totalOrganizationValue: (customer.total_contract_value || 0) + customer.casesValue,
+          casesBillingStatus: {
+            pending: { 
+              count: customer.casesBillingBreakdown.pending, 
+              value: customer.cases?.filter(c => c.billing_status === 'pending').reduce((sum, c) => sum + c.price, 0) || 0 
+            },
+            sent: { 
+              count: customer.casesBillingBreakdown.sent, 
+              value: customer.cases?.filter(c => c.billing_status === 'sent').reduce((sum, c) => sum + c.price, 0) || 0 
+            },
+            paid: { 
+              count: customer.casesBillingBreakdown.paid, 
+              value: customer.cases?.filter(c => c.billing_status === 'paid').reduce((sum, c) => sum + c.price, 0) || 0 
+            },
+            skip: { 
+              count: customer.casesBillingBreakdown.skip, 
+              value: customer.cases?.filter(c => c.billing_status === 'skip').reduce((sum, c) => sum + c.price, 0) || 0 
+            }
+          },
+          
           overallHealthScore: customer.healthScore,
           highestChurnRisk: customer.churnRisk,
           averageRenewalProbability: customer.renewalProbability,
@@ -361,6 +468,25 @@ export function useConsolidatedCustomers() {
         org.totalContractValue = sites.reduce((sum, site) => sum + (site.total_contract_value || 0), 0)
         org.totalAnnualValue = sites.reduce((sum, site) => sum + (site.annual_value || 0), 0)
         org.totalMonthlyValue = sites.reduce((sum, site) => sum + (site.monthly_value || 0), 0)
+        
+        // Aggregera cases-värden
+        org.totalCasesValue = sites.reduce((sum, site) => sum + site.casesValue, 0)
+        org.totalCasesCount = sites.reduce((sum, site) => sum + site.casesCount, 0)
+        org.totalOrganizationValue = org.totalContractValue + org.totalCasesValue
+        
+        // Aggregera billing status
+        org.casesBillingStatus = sites.reduce((acc, site) => {
+          site.cases?.forEach(caseItem => {
+            acc[caseItem.billing_status].count++
+            acc[caseItem.billing_status].value += caseItem.price
+          })
+          return acc
+        }, {
+          pending: { count: 0, value: 0 },
+          sent: { count: 0, value: 0 },
+          paid: { count: 0, value: 0 },
+          skip: { count: 0, value: 0 }
+        })
         
         // Portal access status
         const sitesWithAccess = sites.filter(site => site.hasPortalAccess).length

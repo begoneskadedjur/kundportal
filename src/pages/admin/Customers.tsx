@@ -25,6 +25,7 @@ import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers } from '../../hooks/useConsolidatedCustomers'
 import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
 import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
+import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
 import { 
   formatCurrency, 
   formatContractPeriod,
@@ -189,6 +190,8 @@ export default function Customers() {
   const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
+  const [multiSiteDetailOpen, setMultiSiteDetailOpen] = useState(false)
+  const [selectedMultiSiteOrg, setSelectedMultiSiteOrg] = useState<any>(null)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -271,6 +274,12 @@ export default function Customers() {
   const handleCustomerSaved = (updatedCustomer: any) => {
     // Refresh the data to show updated information
     refresh()
+  }
+
+  // Handle multisite detail view
+  const handleViewMultiSiteDetails = (organization: any) => {
+    setSelectedMultiSiteOrg(organization)
+    setMultiSiteDetailOpen(true)
   }
 
   // Get unique managers for filter
@@ -498,6 +507,7 @@ export default function Customers() {
                           onToggle={() => toggleExpandedRow(organization.id)}
                           onInviteToPortal={inviteToPortal}
                           onEdit={(org) => handleEditCustomer(org.sites[0])} // Edit first site for now
+                          onViewMultiSiteDetails={handleViewMultiSiteDetails}
                         />
                         
                         {/* Site detail rows (only for multisite when expanded) */}
@@ -770,6 +780,16 @@ export default function Customers() {
           setEditingCustomer(null)
         }}
         onSave={handleCustomerSaved}
+      />
+
+      {/* MultiSite Customer Detail Modal */}
+      <MultiSiteCustomerDetailModal
+        organization={selectedMultiSiteOrg}
+        isOpen={multiSiteDetailOpen}
+        onClose={() => {
+          setMultiSiteDetailOpen(false)
+          setSelectedMultiSiteOrg(null)
+        }}
       />
     </div>
   )
