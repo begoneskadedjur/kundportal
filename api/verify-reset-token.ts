@@ -142,9 +142,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: updateError.status,
         details: updateError
       })
+      
+      // Hantera specifika lösenordsproblem
+      if (updateError.status === 422 && updateError.code === 'weak_password') {
+        if (updateError.reasons?.includes('pwned')) {
+          return res.status(422).json({ 
+            error: 'Osäkert lösenord',
+            type: 'weak_password_pwned',
+            message: 'Detta lösenord är känt för hackare och har läckt i databaser. Välj ett mer unikt lösenord.'
+          })
+        } else {
+          return res.status(422).json({ 
+            error: 'Svagt lösenord', 
+            type: 'weak_password_generic',
+            message: 'Lösenordet är för enkelt att gissa. Använd en kombination av ord, siffror och specialtecken.'
+          })
+        }
+      }
+      
       return res.status(500).json({ 
         error: 'Kunde inte uppdatera lösenordet',
-        details: updateError.message 
+        type: 'server_error',
+        message: updateError.message 
       })
     }
 

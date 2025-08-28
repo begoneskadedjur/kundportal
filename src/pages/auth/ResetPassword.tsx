@@ -66,6 +66,46 @@ export default function ResetPassword() {
     return null
   }
 
+  // Kontrollera om lösenordet innehåller vanliga osäkra mönster
+  const hasWeakPatterns = (password: string) => {
+    const weakPatterns = [
+      /123456/, /654321/, /qwerty/, /asdf/, /password/, 
+      /admin/, /login/, /welcome/, /abc/, /111/, /000/,
+      /^(.)\1{4,}/, // Upprepade tecken (aaaaa)
+      /^(012|123|234|345|456|567|678|789)/, // Sekvenser
+    ]
+    return weakPatterns.some(pattern => pattern.test(password.toLowerCase()))
+  }
+
+  // Beräkna lösenordsstyrka
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { score: 0, text: 'Ange lösenord', color: 'text-slate-500' }
+    
+    let score = 0
+    const checks = {
+      length: password.length >= 8,
+      longLength: password.length >= 12,
+      upperCase: /[A-Z]/.test(password),
+      lowerCase: /[a-z]/.test(password),
+      numbers: /[0-9]/.test(password),
+      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+      noWeakPatterns: !hasWeakPatterns(password)
+    }
+    
+    score += checks.length ? 1 : 0
+    score += checks.longLength ? 1 : 0
+    score += checks.upperCase ? 1 : 0
+    score += checks.lowerCase ? 1 : 0
+    score += checks.numbers ? 1 : 0
+    score += checks.special ? 1 : 0
+    score += checks.noWeakPatterns ? 1 : 0
+    
+    if (score <= 3) return { score, text: 'Svagt', color: 'text-red-400' }
+    if (score <= 5) return { score, text: 'Medel', color: 'text-yellow-400' }
+    if (score <= 6) return { score, text: 'Starkt', color: 'text-green-400' }
+    return { score, text: 'Mycket starkt', color: 'text-green-300' }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -119,8 +159,30 @@ export default function ResetPassword() {
             '• Du behöver begära en ny återställning',
             { duration: 8000 }
           )
+        } else if (data.type === 'weak_password_pwned') {
+          toast.error(
+            '🚨 Osäkert lösenord\n\n' +
+            'Detta lösenord är känt för hackare och har läckt i databaser.\n\n' +
+            '💡 Tips för ett säkert lösenord:\n' +
+            '• Kombinera 3-4 slumpmässiga ord\n' +
+            '• Lägg till siffror och specialtecken\n' +
+            '• Undvik personlig information\n' +
+            '• Använd inte samma lösenord på flera sidor',
+            { duration: 12000 }
+          )
+        } else if (data.type === 'weak_password_generic') {
+          toast.error(
+            '⚠️ Svagt lösenord\n\n' +
+            'Lösenordet är för enkelt att gissa.\n\n' +
+            '💡 Förbättra lösenordet genom att:\n' +
+            '• Göra det längre (minst 12 tecken)\n' +
+            '• Blanda stora och små bokstäver\n' +
+            '• Inkludera siffror och specialtecken (!@#$%)\n' +
+            '• Undvika vanliga mönster (123, abc, qwerty)',
+            { duration: 10000 }
+          )
         } else {
-          toast.error(data.error || 'Kunde inte uppdatera lösenordet')
+          toast.error(data.message || data.error || 'Kunde inte uppdatera lösenordet')
         }
         return
       }
@@ -230,27 +292,99 @@ export default function ResetPassword() {
             </div>
           </div>
 
+          {/* Lösenordsstyrka-indikator */}
+          {newPassword && (
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm font-medium text-slate-300">Lösenordsstyrka:</p>
+                <span className={`text-sm font-medium ${getPasswordStrength(newPassword).color}`}>
+                  {getPasswordStrength(newPassword).text}
+                </span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    getPasswordStrength(newPassword).score <= 3 ? 'bg-red-500' :
+                    getPasswordStrength(newPassword).score <= 5 ? 'bg-yellow-500' :
+                    getPasswordStrength(newPassword).score <= 6 ? 'bg-green-500' : 'bg-green-400'
+                  }`}
+                  style={{ width: `${(getPasswordStrength(newPassword).score / 7) * 100}%` }}
+                />
+              </div>
+              
+              {/* Proaktiv varning för svaga lösenord */}
+              {getPasswordStrength(newPassword).score <= 3 && (
+                <div className="mt-3 p-3 bg-red-900/30 border border-red-800/50 rounded-lg">
+                  <p className="text-red-300 text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Svagt lösenord - risk för avvisning
+                  </p>
+                  <p className="text-red-200/80 text-xs mt-1">
+                    Detta lösenord kan avvisas av säkerhetsskäl. Försök göra det starkare för att undvika problem.
+                  </p>
+                </div>
+              )}
+              
+              {hasWeakPatterns(newPassword) && (
+                <div className="mt-3 p-3 bg-orange-900/30 border border-orange-800/50 rounded-lg">
+                  <p className="text-orange-300 text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Vanligt mönster upptäckt
+                  </p>
+                  <p className="text-orange-200/80 text-xs mt-1">
+                    Undvik sekvenser som 123, qwerty eller upprepningar. De är lätta att gissa.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Lösenordskrav */}
           <div className="bg-slate-800/50 rounded-lg p-4">
-            <p className="text-sm font-medium text-slate-300 mb-2">Lösenordskrav:</p>
-            <ul className="space-y-1 text-sm">
-              <li className={`flex items-center gap-2 ${newPassword.length >= 8 ? 'text-green-400' : 'text-slate-500'}`}>
-                <CheckCircle className="w-4 h-4" />
-                Minst 8 tecken
-              </li>
-              <li className={`flex items-center gap-2 ${/[A-Z]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
-                <CheckCircle className="w-4 h-4" />
-                Minst en stor bokstav
-              </li>
-              <li className={`flex items-center gap-2 ${/[a-z]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
-                <CheckCircle className="w-4 h-4" />
-                Minst en liten bokstav
-              </li>
-              <li className={`flex items-center gap-2 ${/[0-9]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
-                <CheckCircle className="w-4 h-4" />
-                Minst en siffra
-              </li>
-            </ul>
+            <p className="text-sm font-medium text-slate-300 mb-3">Lösenordskrav:</p>
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              {/* Grundläggande krav */}
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 font-medium mb-2">GRUNDLÄGGANDE:</p>
+                <li className={`flex items-center gap-2 ${newPassword.length >= 8 ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Minst 8 tecken
+                </li>
+                <li className={`flex items-center gap-2 ${/[A-Z]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Minst en stor bokstav (A-Z)
+                </li>
+                <li className={`flex items-center gap-2 ${/[a-z]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Minst en liten bokstav (a-z)
+                </li>
+                <li className={`flex items-center gap-2 ${/[0-9]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Minst en siffra (0-9)
+                </li>
+              </div>
+
+              {/* Säkerhetskrav */}
+              <div className="space-y-1 mt-3">
+                <p className="text-xs text-slate-400 font-medium mb-2">SÄKERHET:</p>
+                <li className={`flex items-center gap-2 ${newPassword.length >= 12 ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Rekommenderat: Minst 12 tecken
+                </li>
+                <li className={`flex items-center gap-2 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword) ? 'text-green-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Specialtecken (!@#$% osv.)
+                </li>
+                <li className={`flex items-center gap-2 ${!hasWeakPatterns(newPassword) ? 'text-green-400' : newPassword ? 'text-red-400' : 'text-slate-500'}`}>
+                  <CheckCircle className="w-4 h-4" />
+                  Inga vanliga mönster (123, qwerty, osv.)
+                </li>
+                <li className="flex items-center gap-2 text-blue-400">
+                  <CheckCircle className="w-4 h-4" />
+                  Inte känt för hackare (kontrolleras vid submit)
+                </li>
+              </div>
+            </div>
           </div>
 
           {/* Submit-knapp */}
