@@ -104,8 +104,9 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
   const expectedRenewalValue = totalOrganizationValue * (renewalProbability / 100)
   const potentialLoss = totalOrganizationValue - expectedRenewalValue
   
-  // Sort sites by cases value (extrabeställningar) för distribution
+  // Filtrera och sortera bara riktiga enheter (inte organisationen själv)
   const sortedSites = [...organization.sites]
+    .filter(site => site.site_name && site.site_name !== site.company_name) // Endast enheter med site_name
     .sort((a, b) => (b.casesValue || 0) - (a.casesValue || 0))
   const maxSiteValue = sortedSites.length > 0 ? (sortedSites[0].casesValue || 0) : 0
 
@@ -198,8 +199,8 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                 <FileText className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <div className="text-blue-400 font-medium">Total Avtalsv\u00e4rde (Organisation)</div>
-                <div className="text-xs text-slate-400">Fast månadsbetalning för alla enheter</div>
+                <div className="text-blue-400 font-medium">{organization.organization_name}</div>
+                <div className="text-xs text-slate-400">Årspremie</div>
               </div>
             </div>
             <div className="text-right">
