@@ -15,6 +15,7 @@ import Card from '../../components/ui/Card';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import { BillingModal } from '../../components/admin/billing/BillingModal';
 import { MultisiteBillingModal } from '../../components/admin/billing/MultisiteBillingModal';
+import { ContractCustomerBillingModal } from '../../components/admin/billing/ContractCustomerBillingModal';
 import type { BillingCase, BillingStatus, SortField, SortDirection } from '../../types/billing';
 import { PageHeader } from '../../components/shared';
 
@@ -432,6 +433,10 @@ const BillingManagement: React.FC = () => {
   const [selectedMultisiteCase, setSelectedMultisiteCase] = useState<EnhancedBillingCase | null>(null);
   const [isMultisiteModalOpen, setIsMultisiteModalOpen] = useState(false);
 
+  // Contract customer modal state  
+  const [selectedContractCase, setSelectedContractCase] = useState<EnhancedBillingCase | null>(null);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+
   // Case history modal state
   const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
   const [selectedCaseForHistory, setSelectedCaseForHistory] = useState<{ id: string; number: string } | null>(null);
@@ -765,7 +770,12 @@ const BillingManagement: React.FC = () => {
     if (case_.type === 'contract' && case_.customer?.is_multisite) {
       setSelectedMultisiteCase(case_);
       setIsMultisiteModalOpen(true);
+    } else if (case_.type === 'contract') {
+      // Vanlig avtalskund (non-multisite)
+      setSelectedContractCase(case_);
+      setIsContractModalOpen(true);
     } else {
+      // Private eller business case
       setSelectedCase(case_);
       setIsModalOpen(true);
     }
@@ -1144,6 +1154,16 @@ const BillingManagement: React.FC = () => {
         onClose={() => {
           setIsMultisiteModalOpen(false);
           setSelectedMultisiteCase(null);
+        }}
+        onCaseUpdate={handleCaseUpdate}
+      />
+      
+      <ContractCustomerBillingModal
+        case_={selectedContractCase}
+        isOpen={isContractModalOpen}
+        onClose={() => {
+          setIsContractModalOpen(false);
+          setSelectedContractCase(null);
         }}
         onCaseUpdate={handleCaseUpdate}
       />

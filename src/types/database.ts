@@ -150,10 +150,14 @@ export type Database = {
           case_type: string | null
           price: number | null
           technician_report: string | null
+          work_report: string | null
           files: any | null // jsonb
           assigned_technician_name: string | null
           assigned_technician_email: string | null
           assigned_technician_id: string | null // FK till technicians
+          contact_person: string | null
+          contact_email: string | null
+          contact_phone: string | null
           // Offert- och rapportfält
           quote_generated_at: string | null
           report_generated_at: string | null
@@ -169,6 +173,10 @@ export type Database = {
           assessment_date: string | null
           assessed_by: string | null
           pest_level_trend: 'improving' | 'stable' | 'worsening' | null
+          // Billing fields for contract customers
+          billing_status: 'pending' | 'sent' | 'paid' | 'skip' | null
+          billing_updated_at: string | null
+          billing_updated_by_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
