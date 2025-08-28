@@ -145,7 +145,16 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName, casesCoun
         {isExpanded && actualCasesCount > 0 && (
           <div className="border-t border-slate-700/50 bg-slate-900/50">
             <div className="p-4">
-              <div className="space-y-3">
+              <div className="text-center py-6 text-slate-400">
+                <div className="mb-2">🔧</div>
+                <div className="text-sm">Detaljerade ärendelistan kommer snart</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Vi förbereder integration med befintliga ärendekomponenter
+                </div>
+              </div>
+              {/* TODO: Integrera med befintliga ärendekomponenter som CaseListItem eller ActiveCasesList 
+                  när ärendedata är tillgängligt per site/organization */}
+              <div className="space-y-3 hidden">
                 {mockCases.slice(0, 5).map((caseItem) => (
                   <div key={caseItem.id} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg hover:bg-slate-800/50 transition-colors">
                     <div className="flex-1 min-w-0">
@@ -425,16 +434,53 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 <div className="mt-4 p-3 bg-slate-700/20 rounded-lg">
                   <div className="text-xs text-slate-400 mb-2">Ansvariga användare med portaltillgång:</div>
                   {(() => {
-                    const siteUsers = organization.multisiteUsers.filter(user => 
+                    // Verksamhetschef har alltid tillgång till alla enheter
+                    const verksamhetschefer = organization.multisiteUsers.filter(user => user.role_type === 'verksamhetschef')
+                    
+                    // Regionchefer som har valt denna enhet
+                    const regionchefer = organization.multisiteUsers.filter(user => 
+                      user.role_type === 'regionchef' && 
                       user.site_ids?.includes(site.id)
                     )
-                    if (siteUsers.length > 0) {
+                    
+                    // Platsansvariga för denna specifika enhet
+                    const platsansvariga = organization.multisiteUsers.filter(user => 
+                      user.role_type === 'platsansvarig' && 
+                      user.site_ids?.includes(site.id)
+                    )
+                    
+                    const allRelevantUsers = [...verksamhetschefer, ...regionchefer, ...platsansvariga]
+                    
+                    if (allRelevantUsers.length > 0) {
                       return (
-                        <div className="space-y-1">
-                          {siteUsers.map(user => (
+                        <div className="space-y-2">
+                          {/* Verksamhetschefer först */}
+                          {verksamhetschefer.map(user => (
                             <div key={user.user_id} className="text-xs text-slate-300 flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full ${user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'}`} />
-                              {user.display_name || 'Namnlös användare'} ({user.role_type})
+                              <span className="font-medium text-amber-400">👑</span>
+                              {user.display_name || 'Namnlös användare'} 
+                              <span className="text-slate-500">(Verksamhetschef)</span>
+                            </div>
+                          ))}
+                          
+                          {/* Regionchefer */}
+                          {regionchefer.map(user => (
+                            <div key={user.user_id} className="text-xs text-slate-300 flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'}`} />
+                              <span className="font-medium text-purple-400">🛡️</span>
+                              {user.display_name || 'Namnlös användare'} 
+                              <span className="text-slate-500">(Regionchef)</span>
+                            </div>
+                          ))}
+                          
+                          {/* Platsansvariga */}
+                          {platsansvariga.map(user => (
+                            <div key={user.user_id} className="text-xs text-slate-300 flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'}`} />
+                              <span className="font-medium text-blue-400">🏢</span>
+                              {user.display_name || 'Namnlös användare'} 
+                              <span className="text-slate-500">(Platsansvarig)</span>
                             </div>
                           ))}
                         </div>
@@ -462,20 +508,6 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
               />
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
-              <div className="text-xs text-slate-500">
-                Site ID: {site.id}
-                {site.site_code && ` • Kod: ${site.site_code}`}
-              </div>
-              <button
-                onClick={() => onEdit?.(site)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <Edit3 className="w-4 h-4" />
-                Redigera enhet
-              </button>
-            </div>
           </div>
         </div>
       )}

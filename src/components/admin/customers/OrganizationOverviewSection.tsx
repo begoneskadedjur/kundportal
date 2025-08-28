@@ -91,7 +91,22 @@ export default function OrganizationOverviewSection({ organization }: Organizati
               <div>
                 <div className="text-sm text-slate-400">Kontaktperson</div>
                 <div className="text-white font-medium">
-                  {organization.contact_person || 'Ej angivet'}
+                  {(() => {
+                    // Hitta verksamhetschef från multisiteUsers först
+                    const verksamhetschef = organization.multisiteUsers?.find(user => user.role_type === 'verksamhetschef')
+                    if (verksamhetschef?.display_name) {
+                      return verksamhetschef.display_name
+                    }
+                    // Fallback till organisation kontaktperson
+                    if (organization.contact_person && organization.contact_person.trim() !== '') {
+                      return organization.contact_person
+                    }
+                    // Sista utväg: försök hitta namn från multisiteUsers med samma email
+                    const userWithEmail = organization.multisiteUsers?.find(user => 
+                      user.email === organization.contact_email && user.display_name && user.display_name.trim() !== ''
+                    )
+                    return userWithEmail?.display_name || 'Verksamhetschef ej angivet'
+                  })()}
                 </div>
               </div>
             </div>
