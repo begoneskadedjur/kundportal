@@ -480,7 +480,7 @@ export default function Customers() {
                     <th className="hidden lg:table-cell px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                       <div className="flex items-center justify-end gap-2">
                         <DollarSign className="w-4 h-4 text-blue-400" />
-                        Debiterat utöver
+                        Debiterat utöver avtal
                       </div>
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">

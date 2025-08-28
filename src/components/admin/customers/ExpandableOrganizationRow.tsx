@@ -3,6 +3,7 @@
 import React from 'react'
 import { ChevronDown, ChevronRight, Building2, Users, ExternalLink, AlertTriangle } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
+import CustomTooltip from '../../ui/CustomTooltip'
 
 interface ExpandableOrganizationRowProps {
   organization: ConsolidatedCustomer
@@ -284,10 +285,35 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
 
       {/* Health Score Column */}
       <td className="px-6 py-4">
-        <HealthScoreBadge 
-          level={organization.overallHealthScore.level} 
-          score={organization.overallHealthScore.score} 
-        />
+        <CustomTooltip
+          content={
+            <div className="space-y-2">
+              <div className="font-semibold">Health Score</div>
+              <div className="text-xs">
+                Beräknas utifrån:
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  <li>Antal aktiva ärenden</li>
+                  <li>Genomsnittlig responstid</li>
+                  <li>Kundnöjdhet från enkäter</li>
+                  <li>Betalningshistorik</li>
+                  <li>Avtalsföljsamhet</li>
+                </ul>
+              </div>
+              <div className="text-xs pt-1 border-t border-slate-600">
+                <strong>Excellent:</strong> 90-100 poäng<br/>
+                <strong>Good:</strong> 70-89 poäng<br/>
+                <strong>Fair:</strong> 50-69 poäng<br/>
+                <strong>Poor:</strong> Under 50 poäng
+              </div>
+            </div>
+          }
+          position="left"
+        >
+          <HealthScoreBadge 
+            level={organization.overallHealthScore.level} 
+            score={organization.overallHealthScore.score} 
+          />
+        </CustomTooltip>
         {organization.hasHighRiskSites && (
           <div className="text-xs text-red-600 mt-1">
             ⚠ Riskenhet
@@ -297,14 +323,38 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
 
       {/* Churn Risk Column */}
       <td className="px-6 py-4">
-        <div className={`text-sm font-medium ${
-          organization.highestChurnRisk.risk === 'high' ? 'text-red-600' :
-          organization.highestChurnRisk.risk === 'medium' ? 'text-yellow-600' :
-          'text-green-600'
-        }`}>
-          {organization.highestChurnRisk.risk === 'high' ? 'Hög' :
-           organization.highestChurnRisk.risk === 'medium' ? 'Medel' : 'Låg'}
-        </div>
+        <CustomTooltip
+          content={
+            <div className="space-y-2">
+              <div className="font-semibold">Churn Risk</div>
+              <div className="text-xs">
+                Sannolikhet att kunden säger upp avtalet:
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  <li>Betalningsförseningar</li>
+                  <li>Minskat engagemang</li>
+                  <li>Support-ärenden trend</li>
+                  <li>Användning av tjänster</li>
+                  <li>Avtalsförnyelsehistorik</li>
+                </ul>
+              </div>
+              <div className="text-xs pt-1 border-t border-slate-600">
+                <strong>Hög risk:</strong> &gt;70% sannolikhet<br/>
+                <strong>Medel risk:</strong> 40-70% sannolikhet<br/>
+                <strong>Låg risk:</strong> &lt;40% sannolikhet
+              </div>
+            </div>
+          }
+          position="left"
+        >
+          <div className={`text-sm font-medium ${
+            organization.highestChurnRisk.risk === 'high' ? 'text-red-600' :
+            organization.highestChurnRisk.risk === 'medium' ? 'text-yellow-600' :
+            'text-green-600'
+          }`}>
+            {organization.highestChurnRisk.risk === 'high' ? 'Hög' :
+             organization.highestChurnRisk.risk === 'medium' ? 'Medel' : 'Låg'}
+          </div>
+        </CustomTooltip>
         <div className="text-xs text-slate-500">
           {Math.round(organization.highestChurnRisk.score)}%
         </div>

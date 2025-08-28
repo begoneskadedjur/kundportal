@@ -10,8 +10,12 @@ import {
   DollarSign,
   Activity,
   AlertTriangle,
-  Crown
+  Crown,
+  Shield,
+  UserCheck,
+  HelpCircle
 } from 'lucide-react'
+import TooltipWrapper from '../../ui/TooltipWrapper'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 
 interface ContactAndUnitsExpandedViewProps {
@@ -30,14 +34,42 @@ const formatCurrency = (amount: number): string => {
 export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewProps> = ({
   organization
 }) => {
-  // Hitta verksamhetschef (huvudkontor kontakt)
+  // Hitta verksamhetschef - använd först organisation-nivå data, sedan huvudkontor site
   const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') 
     || organization.sites[0]
 
-  // Andra viktiga kontakter
-  const otherContacts = organization.sites.filter(site => 
-    site.id !== verksamhetschef.id && site.contact_person && site.contact_person.trim() !== ''
+  // Hitta namn för verksamhetschef (kan vara från kontakt eller email)
+  const getContactName = (contact_person: string | null, contact_email: string) => {
+    // Först: använd organisation-nivå kontaktperson
+    if (contact_person && contact_person.trim() !== '') {
+      return contact_person
+    }
+    // Fallback: försök extrahera namn från email
+    if (contact_email) {
+      const emailParts = contact_email.split('@')
+      if (emailParts[0]) {
+        return emailParts[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+      }
+    }
+    return null
+  }
+
+  // Använd organisation-nivå kontaktperson först, sedan site-nivå
+  const verksamhetschefName = getContactName(organization.contact_person, organization.contact_email) 
+    || getContactName(verksamhetschef?.contact_person, verksamhetschef?.contact_email)
+
+  // Hitta portal-användare och deras roller (ersätter "andra kontakter")
+  const portalUsers = organization.sites.filter(site => 
+    site.hasPortalAccess || site.invitationStatus === 'pending' || site.invitationStatus === 'active'
   )
+
+  // Räkna olika typer av användare
+  const userRolesSummary = {
+    active: organization.sites.filter(site => site.invitationStatus === 'active').length,
+    pending: organization.sites.filter(site => site.invitationStatus === 'pending').length,
+    huvudkontor: organization.sites.filter(site => site.site_type === 'huvudkontor' && site.hasPortalAccess).length,
+    enheter: organization.sites.filter(site => site.site_type === 'enhet' && site.hasPortalAccess).length
+  }
 
   // Räkna ärenden per enhet
   const unitsWithCases = organization.sites.filter(site => site.casesCount > 0)
@@ -63,25 +95,30 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                 </div>
                 <div className="space-y-2">
                   <div className="font-medium text-white">
-                    {verksamhetschef.contact_person || 'Ej angivet'}
+                    {verksamhetschefName || 'Namn ej angivet'}
                   </div>
+                  {verksamhetschef.site_name && (
+                    <div className="text-xs text-slate-400">
+                      {verksamhetschef.site_name}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 text-sm">
                     <Mail className="w-3 h-3 text-slate-400" />
                     <a 
-                      href={`mailto:${verksamhetschef.contact_email}`}
+                      href={`mailto:${organization.contact_email}`}
                       className="text-blue-400 hover:text-blue-300 transition-colors"
                     >
-                      {verksamhetschef.contact_email}
+                      {organization.contact_email}
                     </a>
                   </div>
-                  {verksamhetschef.contact_phone && (
+                  {(organization.contact_phone || verksamhetschef?.contact_phone) && (
                     <div className="flex items-center gap-2 text-sm">
                       <Phone className="w-3 h-3 text-slate-400" />
                       <a 
-                        href={`tel:${verksamhetschef.contact_phone}`}
+                        href={`tel:${organization.contact_phone || verksamhetschef?.contact_phone}`}
                         className="text-blue-400 hover:text-blue-300 transition-colors"
                       >
-                        {verksamhetschef.contact_phone}
+                        {organization.contact_phone || verksamhetschef?.contact_phone}
                       </a>
                     </div>
                   )}
@@ -103,32 +140,96 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                 )}
               </div>
 
-              {/* Andra kontakter */}
-              {otherContacts.length > 0 && (
-                <div className="mt-4">
-                  <h5 className="text-xs font-medium text-slate-400 mb-2">Andra kontakter</h5>
-                  <div className="space-y-2">
-                    {otherContacts.slice(0, 3).map(contact => (
-                      <div key={contact.id} className="flex items-center gap-3 text-xs">
-                        <MapPin className="w-3 h-3 text-slate-500" />
-                        <span className="text-slate-300">{contact.contact_person}</span>
-                        <span className="text-slate-500">•</span>
-                        <a 
-                          href={`mailto:${contact.contact_email}`}
-                          className="text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          {contact.contact_email}
-                        </a>
+              {/* Portal-användare och roller */}
+              <div className="mt-4">
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <UserCheck className="w-4 h-4 text-green-400" />
+                    <h5 className="text-sm font-medium text-slate-300">Alla användare och roller</h5>
+                  </div>
+                  
+                  {/* Användarlistning */}
+                  <div className="space-y-2 mb-3">
+                    {organization.sites.map((site, index) => {
+                      const userName = getContactName(site.contact_person, site.contact_email)
+                      if (!userName) return null
+                      
+                      return (
+                        <div key={site.id || index} className="flex items-center justify-between bg-slate-800/50 rounded p-2">
+                          <div className="flex items-center gap-2">
+                            {site.site_type === 'huvudkontor' ? (
+                              <Crown className="w-3 h-3 text-amber-400" />
+                            ) : (
+                              <Building2 className="w-3 h-3 text-blue-400" />
+                            )}
+                            <div>
+                              <span className="text-xs text-slate-200 font-medium">
+                                {userName}
+                              </span>
+                              <div className="text-xs text-slate-400">
+                                {site.site_name || site.company_name}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              site.site_type === 'huvudkontor' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {site.site_type === 'huvudkontor' ? 'Huvudkontor' : 'Enhet'}
+                            </span>
+                            {site.hasPortalAccess && (
+                              <div className={`w-2 h-2 rounded-full ${
+                                site.invitationStatus === 'active' ? 'bg-green-400' :
+                                site.invitationStatus === 'pending' ? 'bg-amber-400' :
+                                'bg-slate-500'
+                              }`} />
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* Rollsummering */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-slate-800/50 rounded p-2">
+                      <div className="text-xs text-slate-400">Aktiva användare</div>
+                      <div className="text-sm font-semibold text-green-400">
+                        {userRolesSummary.active}
                       </div>
-                    ))}
-                    {otherContacts.length > 3 && (
-                      <div className="text-xs text-slate-500">
-                        +{otherContacts.length - 3} fler kontakter...
+                    </div>
+                    <div className="bg-slate-800/50 rounded p-2">
+                      <div className="text-xs text-slate-400">Väntande inbjudningar</div>
+                      <div className="text-sm font-semibold text-amber-400">
+                        {userRolesSummary.pending}
                       </div>
-                    )}
+                    </div>
+                  </div>
+                  
+                  {/* Portal-tillgång sammanfattning */}
+                  <div className="mt-3 pt-3 border-t border-slate-600/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Portal-tillgång</span>
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${
+                          organization.portalAccessStatus === 'full' ? 'bg-green-400' :
+                          organization.portalAccessStatus === 'partial' ? 'bg-amber-400' :
+                          'bg-slate-500'
+                        }`} />
+                        <span className={`text-xs font-medium ${
+                          organization.portalAccessStatus === 'full' ? 'text-green-400' :
+                          organization.portalAccessStatus === 'partial' ? 'text-amber-400' :
+                          'text-slate-400'
+                        }`}>
+                          {organization.portalAccessStatus === 'full' ? 'Fullständig' :
+                           organization.portalAccessStatus === 'partial' ? 'Delvis' : 'Ingen'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -219,9 +320,89 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
               </div>
             </div>
 
+            {/* Health Score & Churn Risk med tooltips */}
+            <div className="space-y-3">
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <TooltipWrapper 
+                    content={
+                      <div className="p-3 max-w-sm">
+                        <div className="font-medium text-white mb-2">Health Score Beräkning</div>
+                        <div className="text-xs text-slate-300 space-y-1">
+                          <div>• <strong>Avtalsdata:</strong> Kontraktslängd och värde</div>
+                          <div>• <strong>Betalningshistorik:</strong> Fakturastatus och betalningsmönster</div>
+                          <div>• <strong>Engagemang:</strong> Portal-användning och kommunikation</div>
+                          <div>• <strong>Tjänsteutnyttjande:</strong> Frekvens av extra ärenden</div>
+                        </div>
+                        <div className="mt-2 text-xs text-slate-400">
+                          Skala: 0-100 (högre = friskare kund)
+                        </div>
+                      </div>
+                    }
+                    placement="top"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-green-400" />
+                      <span className="text-xs font-medium text-slate-300">Health Score</span>
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </TooltipWrapper>
+                </div>
+                <div className="text-lg font-bold text-green-400">
+                  {organization.overallHealthScore.score}/100
+                </div>
+                <div className="text-xs text-slate-400">
+                  Status: {organization.overallHealthScore.level === 'excellent' ? 'Utmärkt' :
+                           organization.overallHealthScore.level === 'good' ? 'Bra' :
+                           organization.overallHealthScore.level === 'fair' ? 'Acceptabel' : 'Riskabel'}
+                </div>
+              </div>
+              
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <TooltipWrapper 
+                    content={
+                      <div className="p-3 max-w-sm">
+                        <div className="font-medium text-white mb-2">Churn Risk Beräkning</div>
+                        <div className="text-xs text-slate-300 space-y-1">
+                          <div>• <strong>Avtalsförnyelse:</strong> Dagar till förnyelse</div>
+                          <div>• <strong>Health Score:</strong> Övergripande kundstatus</div>
+                          <div>• <strong>Betalningsproblem:</strong> Försenade eller missade betalningar</div>
+                          <div>• <strong>Support-ärenden:</strong> Antal och typ av problem</div>
+                          <div>• <strong>Användningsmönster:</strong> Minskat engagemang</div>
+                        </div>
+                        <div className="mt-2 text-xs text-slate-400">
+                          Skala: Låg → Medel → Hög → Kritisk
+                        </div>
+                      </div>
+                    }
+                    placement="top"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      <span className="text-xs font-medium text-slate-300">Churn Risk</span>
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </TooltipWrapper>
+                </div>
+                <div className={`text-lg font-bold ${
+                  organization.highestChurnRisk.risk === 'low' ? 'text-green-400' :
+                  organization.highestChurnRisk.risk === 'medium' ? 'text-amber-400' :
+                  organization.highestChurnRisk.risk === 'high' ? 'text-red-400' : 'text-red-500'
+                }`}>
+                  {organization.highestChurnRisk.risk === 'low' ? 'Låg' :
+                   organization.highestChurnRisk.risk === 'medium' ? 'Medel' :
+                   organization.highestChurnRisk.risk === 'high' ? 'Hög' : 'Kritisk'}
+                </div>
+                <div className="text-xs text-slate-400">
+                  Score: {organization.highestChurnRisk.score.toFixed(1)}
+                </div>
+              </div>
+            </div>
+
             {/* Varningar */}
             {(organization.hasExpiringSites || organization.hasHighRiskSites) && (
-              <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+              <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/20 mt-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-red-400" />
                   <span className="text-xs font-medium text-red-400">Uppmärksamhet krävs</span>
