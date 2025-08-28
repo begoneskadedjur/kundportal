@@ -151,10 +151,14 @@ export default function UserModal({
           const { error: profileError } = await supabase
             .from('profiles')
             .update({ display_name: fullName })
-            .eq('id', existingUser.user_id)
+            .eq('user_id', existingUser.user_id)
 
           if (profileError) {
             console.error('Error updating profile:', profileError)
+            toast.error(`Kunde inte uppdatera användarnamn: ${profileError.message}`)
+            return
+          } else {
+            console.log('Profile display_name updated successfully for user:', existingUser.user_id)
           }
         }
 

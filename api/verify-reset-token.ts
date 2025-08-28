@@ -80,11 +80,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.warn('getUserById exception, using cached data:', getUserError)
     }
 
-    // Kontrollera token från raw_user_meta_data
-    const metadata = userData.raw_user_meta_data || {}
+    // Kontrollera token från user_metadata (samma som raw_user_meta_data men konsekvent med reset-password.ts)
+    const metadata = userData.user_metadata || {}
     console.log('User metadata keys:', Object.keys(metadata))
     console.log('Has reset_token_hash:', !!metadata.reset_token_hash)
     console.log('Has reset_token_expires_at:', !!metadata.reset_token_expires_at)
+    console.log('Debug - checking both metadata sources:')
+    console.log('user_metadata:', userData.user_metadata)
+    console.log('raw_user_meta_data:', userData.raw_user_meta_data)
 
     if (!metadata.reset_token_hash || !metadata.reset_token_expires_at) {
       console.log('No reset token found in user metadata')
