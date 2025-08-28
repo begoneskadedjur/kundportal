@@ -353,7 +353,7 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-300 font-medium">Summa exkl. moms</span>
                     <span className="text-xl font-semibold text-white font-mono">
-                      {formatCurrency((case_.pris || case_.price || 0) / 1.25)}
+                      {formatCurrency(case_.pris || case_.price || 0)}
                     </span>
                   </div>
                   
@@ -361,7 +361,7 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Moms (25%)</span>
                     <span className="text-lg font-medium text-slate-300 font-mono">
-                      {formatCurrency((case_.pris || case_.price || 0) - (case_.pris || case_.price || 0) / 1.25)}
+                      {formatCurrency((case_.pris || case_.price || 0) * 0.25)}
                     </span>
                   </div>
                   
@@ -372,7 +372,7 @@ export const MultisiteBillingModal: React.FC<MultisiteBillingModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
                     <span className="text-2xl font-bold text-green-400 font-mono">
-                      {formatCurrency(case_.pris || case_.price || 0)}
+                      {formatCurrency((case_.pris || case_.price || 0) + (case_.pris || case_.price || 0) * 0.25)}
                     </span>
                   </div>
                 </div>

@@ -303,13 +303,14 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
 
   // Förbättrad prisberäkning
   const renderPricingInfo = () => {
-    const totalPrice = case_.pris || 0;
+    const inputPrice = case_.pris || 0;
     const isBusinessCase = case_.type === 'business';
     
-    // För business cases: totalPrice innehåller inkl. moms, vi beräknar exkl. moms och moms separat
-    // För private cases: totalPrice visas som inkl. moms (oförändrat)
-    const basePrice = isBusinessCase ? totalPrice / 1.25 : totalPrice;
-    const vatAmount = isBusinessCase ? totalPrice - basePrice : 0;
+    // För business cases: inputPrice är exkl. moms, moms (25%) tillkommer utöver
+    // För private cases: inputPrice visas som inkl. moms (oförändrat)
+    const basePrice = inputPrice; // För business: exkl. moms, För private: inkl. moms
+    const vatAmount = isBusinessCase ? basePrice * 0.25 : 0;
+    const totalPrice = basePrice + vatAmount;
 
     return (
       <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6">
@@ -350,7 +351,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({ case_, isOpen, onClo
             <div className="flex justify-between items-center">
               <span className="text-white font-semibold text-lg">Totalt inkl. moms</span>
               <span className="text-2xl font-bold text-green-400 font-mono">
-                {formatCurrency(totalPrice)}
+                {formatCurrency(basePrice)}
               </span>
             </div>
           )}
