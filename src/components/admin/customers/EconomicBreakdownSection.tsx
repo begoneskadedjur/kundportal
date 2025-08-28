@@ -136,7 +136,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
           </div>
           {totalCasesValue > 0 && (
             <div className="text-xs text-blue-400">
-              Intäkter från ärenden som inte ingår i avtal: {formatCurrency(totalCasesValue)}
+              Intäkter från ärenden utöver avtal: {formatCurrency(totalCasesValue)}
             </div>
           )}
         </div>
@@ -346,7 +346,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
         <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
           <h4 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-blue-400" />
-            Ärenden & Extra Arbeten
+            Ärenden & Tillfälliga Arbeten
           </h4>
           
           <div className="space-y-4">
@@ -355,7 +355,7 @@ export default function EconomicBreakdownSection({ organization }: EconomicBreak
                 <div className="text-2xl font-bold text-blue-400 mb-1">
                   {totalCasesCount}
                 </div>
-                <div className="text-xs text-slate-400">Totala ärenden</div>
+                <div className="text-xs text-slate-400">Totalt ärenden</div>
               </div>
               <div className="bg-slate-700/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-green-400 mb-1">

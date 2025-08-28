@@ -68,7 +68,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
   const verksamhetschefName = verksamhetschefFromUsers?.display_name 
     || getContactName(organization.contact_person, organization.contact_email) 
     || getContactName(verksamhetschef?.contact_person, verksamhetschef?.contact_email)
-    || "Ej angivet" // Mer exakt fallback
+    || "Namn ej registrerat" // Mer exakt fallback
 
   // Hitta portal-användare och deras roller (ersätter "andra kontakter")
   const portalUsers = organization.sites.filter(site => 
@@ -85,7 +85,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
   }
 
   // Räkna ärenden per enhet
-  const unitsWithCases = organization.sites.filter(site => site.casesCount > 0)
+  const unitsWithArenden = organization.sites.filter(site => site.casesCount > 0)
 
   return (
     <tr>
@@ -108,7 +108,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                 </div>
                 <div className="space-y-2">
                   <div className="font-medium text-white">
-                    {verksamhetschefName || 'Namn ej angivet'}
+                    {verksamhetschefName || 'Namn ej registrerat'}
                   </div>
                   {verksamhetschef.site_name && (
                     <div className="text-xs text-slate-400">
@@ -158,89 +158,86 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                 <div className="bg-slate-700/30 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <UserCheck className="w-4 h-4 text-green-400" />
-                    <h5 className="text-sm font-medium text-slate-300">Alla användare och roller</h5>
+                    <h5 className="text-sm font-medium text-slate-300">Organisationshierarki & Roller</h5>
                   </div>
                   
-                  {/* Användarlistning - från multisite_user_roles istället för sites */}
-                  <div className="space-y-2 mb-3">
-                    {organization.multisiteUsers?.map((user, index) => {
-                      const userName = user.display_name || getContactName(null, user.email) || 'Ej angivet'
+                  {/* Organisationshierarki - grupperad efter roller */}
+                  <div className="space-y-3 mb-3">
+                    {(() => {
+                      // Gruppera användare efter roller för bättre hierarkisk vy
+                      const verksamhetschefer = organization.multisiteUsers?.filter(u => u.role_type === 'verksamhetschef') || []
+                      const regionchefer = organization.multisiteUsers?.filter(u => u.role_type === 'regionchef') || []
+                      const platsansvariga = organization.multisiteUsers?.filter(u => u.role_type === 'platsansvarig') || []
                       
-                      const getRoleIcon = (roleType: string) => {
-                        switch (roleType) {
-                          case 'verksamhetschef':
-                            return <Crown className="w-3 h-3 text-amber-400" />
-                          case 'regionchef':
-                            return <Shield className="w-3 h-3 text-purple-400" />
-                          case 'platsansvarig':
-                            return <Building2 className="w-3 h-3 text-blue-400" />
-                          default:
-                            return <Users className="w-3 h-3 text-slate-400" />
-                        }
-                      }
-
-                      const getRoleColor = (roleType: string) => {
-                        switch (roleType) {
-                          case 'verksamhetschef':
-                            return 'bg-amber-500/20 text-amber-400'
-                          case 'regionchef':
-                            return 'bg-purple-500/20 text-purple-400'
-                          case 'platsansvarig':
-                            return 'bg-blue-500/20 text-blue-400'
-                          default:
-                            return 'bg-slate-500/20 text-slate-400'
-                        }
-                      }
-
-                      const getRoleLabel = (roleType: string) => {
-                        switch (roleType) {
-                          case 'verksamhetschef':
-                            return 'Verksamhetschef'
-                          case 'regionchef':
-                            return 'Regionchef'
-                          case 'platsansvarig':
-                            return 'Platsansvarig'
-                          default:
-                            return roleType
-                        }
+                      const renderUserGroup = (users: any[], title: string, icon: React.ReactNode, colorClass: string) => {
+                        if (users.length === 0) return null
+                        
+                        return (
+                          <div key={title} className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-medium text-slate-300 border-b border-slate-600/50 pb-1">
+                              {icon}
+                              <span>{title} ({users.length})</span>
+                            </div>
+                            {users.map((user, index) => {
+                              const userName = user.display_name || getContactName(null, user.email) || 'Namn ej registrerat'
+                              
+                              return (
+                                <div key={user.user_id || index} className="ml-4 flex items-center justify-between bg-slate-800/30 rounded p-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-200 font-medium">
+                                          {userName}
+                                        </span>
+                                        <a 
+                                          href={`mailto:${user.email}`}
+                                          className="text-slate-400 hover:text-blue-400 transition-colors"
+                                          title={`Kontakta ${userName}`}
+                                        >
+                                          <Mail className="w-3 h-3" />
+                                        </a>
+                                      </div>
+                                      <div className="text-xs text-slate-400">
+                                        {user.email}
+                                      </div>
+                                      {/* Visa vilka enheter platsansvariga är ansvariga för */}
+                                      {user.role_type === 'platsansvarig' && user.site_ids && user.site_ids.length > 0 && (
+                                        <div className="text-xs text-slate-500 mt-1">
+                                          Ansvarig för: {user.site_ids.map(siteId => {
+                                            const site = organization.sites.find(s => s.id === siteId)
+                                            return site?.site_name || site?.company_name || siteId
+                                          }).join(', ')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'
+                                    }`} 
+                                    title={user.hasLoggedIn ? 'Har loggat in i portalen' : 'Aldrig inloggad'} />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
                       }
                       
                       return (
-                        <div key={user.user_id || index} className="flex items-center justify-between bg-slate-800/50 rounded p-2">
-                          <div className="flex items-center gap-2">
-                            {getRoleIcon(user.role_type)}
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-200 font-medium">
-                                  {userName}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <a 
-                                    href={`mailto:${user.email}`}
-                                    className="text-slate-400 hover:text-blue-400 transition-colors"
-                                    title={`Skicka email till ${userName}`}
-                                  >
-                                    <Mail className="w-3 h-3" />
-                                  </a>
-                                </div>
-                              </div>
-                              <div className="text-xs text-slate-400">
-                                {user.email}
-                              </div>
+                        <>
+                          {renderUserGroup(verksamhetschefer, 'Verksamhetschefer', <Crown className="w-3 h-3 text-amber-400" />, 'amber')}
+                          {renderUserGroup(regionchefer, 'Regionchefer', <Shield className="w-3 h-3 text-purple-400" />, 'purple')}  
+                          {renderUserGroup(platsansvariga, 'Platsansvariga', <Building2 className="w-3 h-3 text-blue-400" />, 'blue')}
+                          
+                          {(!organization.multisiteUsers || organization.multisiteUsers.length === 0) && (
+                            <div className="text-xs text-slate-500 italic text-center py-4">
+                              Inga användare med definierade roller hittades
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleColor(user.role_type)}`}>
-                              {getRoleLabel(user.role_type)}
-                            </span>
-                            <div className={`w-2 h-2 rounded-full ${
-                              user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'
-                            }`} 
-                            title={user.hasLoggedIn ? 'Har loggat in' : 'Aldrig inloggad'} />
-                          </div>
-                        </div>
+                          )}
+                        </>
                       )
-                    }) || <div className="text-xs text-slate-500 italic">Inga användare hittades</div>}
+                    })()}
                   </div>
                   
                   {/* Rollsummering */}
@@ -284,23 +281,41 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                     </div>
                   </div>
                   
-                  {/* Portal-tillgång sammanfattning */}
-                  <div className="mt-3 pt-3 border-t border-slate-600/50">
+                  {/* Portal-tillgång och aktivitetssummering */}
+                  <div className="mt-3 pt-3 border-t border-slate-600/50 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-400">Portal-tillgång</span>
                       <div className="flex items-center gap-1">
                         <div className={`w-2 h-2 rounded-full ${
-                          (organization.multisiteUsers?.length || 0) > 0 ? 'bg-green-400' : 'bg-slate-500'
+                          (organization.multisiteUsers?.length || 0) > 0 ? 'bg-green-400' : 'bg-amber-400'
                         }`} />
                         <span className={`text-xs font-medium ${
-                          (organization.multisiteUsers?.length || 0) > 0 ? 'text-green-400' : 'text-slate-400'
+                          (organization.multisiteUsers?.length || 0) > 0 ? 'text-green-400' : 'text-amber-400'
                         }`}>
                           {(organization.multisiteUsers?.length || 0) > 0 
-                            ? `${organization.multisiteUsers?.length || 0} användare har tillgång`
-                            : 'Ingen tillgång'}
+                            ? `${organization.multisiteUsers?.length || 0} användare registrerade`
+                            : 'Väntar på användarregistrering'}
                         </span>
                       </div>
                     </div>
+                    
+                    {/* Aktivitetssammanfattning */}
+                    {(organization.multisiteUsers?.length || 0) > 0 && (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Aktiva:</span>
+                          <span className="text-green-400 font-medium">
+                            {organization.multisiteUsers?.filter(u => u.hasLoggedIn).length || 0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Aldrig inloggat:</span>
+                          <span className="text-amber-400 font-medium">
+                            {organization.multisiteUsers?.filter(u => !u.hasLoggedIn).length || 0}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -328,14 +343,14 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
               </div>
 
               {/* Extra ärenden per enhet */}
-              {unitsWithCases.length > 0 && (
+              {unitsWithArenden.length > 0 && (
                 <div>
                   <h5 className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
                     <Activity className="w-3 h-3" />
-                    Intäkter från ärenden som inte ingår i avtal
+                    Intäkter från ärenden utöver avtal
                   </h5>
                   <div className="space-y-2">
-                    {unitsWithCases.slice(0, 4).map(site => {
+                    {unitsWithArenden.slice(0, 4).map(site => {
                       // Hitta ansvariga användare för denna site
                       const siteResponsibleUsers = organization.multisiteUsers?.filter(user => 
                         user.role_type === 'platsansvarig' && 
@@ -419,9 +434,9 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                         </div>
                       )
                     })}
-                    {unitsWithCases.length > 4 && (
+                    {unitsWithArenden.length > 4 && (
                       <div className="text-xs text-slate-500 text-center">
-                        +{unitsWithCases.length - 4} fler enheter med ärenden...
+                        +{unitsWithArenden.length - 4} fler enheter med ärenden...
                       </div>
                     )}
                   </div>
@@ -457,22 +472,22 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
               </div>
             </div>
 
-            {/* Health Score & Churn Risk med tooltips */}
+            {/* Organisationens övergripande hälsa - endast på organisationsnivå */}
             <div className="space-y-3">
               <div className="bg-slate-700/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <TooltipWrapper 
                     content={
                       <div className="p-3 max-w-sm">
-                        <div className="font-medium text-white mb-2">Health Score Beräkning</div>
+                        <div className="font-medium text-white mb-2">Organisationens Hälsa</div>
                         <div className="text-xs text-slate-300 space-y-1">
-                          <div>• <strong>Avtalsdata:</strong> Kontraktslängd och värde</div>
-                          <div>• <strong>Betalningshistorik:</strong> Fakturastatus och betalningsmönster</div>
-                          <div>• <strong>Engagemang:</strong> Portal-användning och kommunikation</div>
-                          <div>• <strong>Tjänsteutnyttjande:</strong> Frekvens av extra ärenden</div>
+                          <div>• <strong>Avtalsdata:</strong> Sammanlagda kontraktsvärden över alla enheter</div>
+                          <div>• <strong>Betalningshistorik:</strong> Organisationens betalningsbeteende</div>
+                          <div>• <strong>Portaltillgång:</strong> Antal aktiva användare och engagemang</div>
+                          <div>• <strong>Ärendehantering:</strong> Frekvens och värde av extra ärenden</div>
                         </div>
                         <div className="mt-2 text-xs text-slate-400">
-                          Skala: 0-100 (högre = friskare kund)
+                          Beräknas på organisationsnivå - inte per individuell enhet
                         </div>
                       </div>
                     }
@@ -480,7 +495,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   >
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-green-400" />
-                      <span className="text-xs font-medium text-slate-300">Health Score</span>
+                      <span className="text-xs font-medium text-slate-300">Organisationens Hälsa</span>
                       <HelpCircle className="w-3 h-3 text-slate-500" />
                     </div>
                   </TooltipWrapper>
@@ -500,16 +515,16 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   <TooltipWrapper 
                     content={
                       <div className="p-3 max-w-sm">
-                        <div className="font-medium text-white mb-2">Churn Risk Beräkning</div>
+                        <div className="font-medium text-white mb-2">Organisationens Uppsägningsrisk</div>
                         <div className="text-xs text-slate-300 space-y-1">
-                          <div>• <strong>Avtalsförnyelse:</strong> Dagar till förnyelse</div>
-                          <div>• <strong>Health Score:</strong> Övergripande kundstatus</div>
+                          <div>• <strong>Avtalsförnyelse:</strong> Tid till organisationens avtalsförnyelse</div>
+                          <div>• <strong>Organisationshälsa:</strong> Övergripande kundstatus</div>
                           <div>• <strong>Betalningsproblem:</strong> Försenade eller missade betalningar</div>
-                          <div>• <strong>Support-ärenden:</strong> Antal och typ av problem</div>
-                          <div>• <strong>Användningsmönster:</strong> Minskat engagemang</div>
+                          <div>• <strong>Verksamhetschef:</strong> Huvudkontaktens engagemang</div>
+                          <div>• <strong>Portaltillgång:</strong> Användningsmönster på organisationsnivå</div>
                         </div>
                         <div className="mt-2 text-xs text-slate-400">
-                          Skala: Låg → Medel → Hög → Kritisk
+                          Endast organisationen som helhet kan säga upp avtalet
                         </div>
                       </div>
                     }
@@ -517,7 +532,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   >
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <span className="text-xs font-medium text-slate-300">Churn Risk</span>
+                      <span className="text-xs font-medium text-slate-300">Uppsägningsrisk</span>
                       <HelpCircle className="w-3 h-3 text-slate-500" />
                     </div>
                   </TooltipWrapper>

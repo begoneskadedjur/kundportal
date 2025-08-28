@@ -125,7 +125,7 @@ export default function MultiSiteCustomerDetailModal({
                       Kontrakt: {formatCurrency(organization.totalContractValue)}
                     </div>
                     <div className="text-xs text-blue-400">
-                      Cases: {formatCurrency(totalCasesValue)}
+                      Ärenden: {formatCurrency(totalCasesValue)}
                       {totalCasesCount > 0 && (
                         <span className="ml-1 text-slate-500">({totalCasesCount} st)</span>
                       )}

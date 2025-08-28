@@ -87,7 +87,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-blue-400" />
-              <span className="text-sm font-medium text-slate-300">Cases Översikt</span>
+              <span className="text-sm font-medium text-slate-300">Ärenden Översikt</span>
             </div>
             {casesCount > 0 && (
               <button
@@ -103,7 +103,7 @@ const CasesSection: React.FC<CasesSectionProps> = ({ siteId, siteName }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-lg font-bold text-blue-400">{casesCount}</div>
-              <div className="text-xs text-slate-400">Totala ärenden</div>
+              <div className="text-xs text-slate-400">Totalt ärenden</div>
             </div>
             <div>
               <div className="text-lg font-bold text-green-400">{formatCurrency(totalCasesValue)}</div>
@@ -316,30 +316,18 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 )}
               </div>
 
-              {/* Status badges */}
+              {/* Endast relevanta status badges för individuella enheter */}
               <div className="flex items-center gap-3">
-                <HealthScoreBadge
-                  score={site.healthScore.score}
-                  level={site.healthScore.level}
-                  tooltip=""
-                  size="sm"
-                />
-                <ChurnRiskBadge
-                  risk={site.churnRisk.risk}
-                  score={site.churnRisk.score}
-                  tooltip=""
-                  size="sm"
-                />
                 {isExpiring && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    Utgår snart
+                    Avtal utgår snart
                   </span>
                 )}
-                {isHighRisk && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Hög risk
+                {site.casesCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    <Activity className="w-3 h-3 mr-1" />
+                    {site.casesCount} ärenden ({formatCurrency(site.casesValue)})
                   </span>
                 )}
               </div>
@@ -348,11 +336,9 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
 
           <div className="flex items-center gap-2 ml-4">
             <div className="text-right">
+              <div className="text-sm text-slate-400 mb-1">Avtalsvärde</div>
               <div className="text-lg font-semibold text-green-400">
                 {formatCurrency(site.total_contract_value || 0)}
-              </div>
-              <div className="text-sm text-slate-500">
-                {formatCurrency(site.monthly_value || 0)}/mån
               </div>
             </div>
             
@@ -424,17 +410,15 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                 </h6>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Årsvärde:</span>
-                    <span className="text-white font-medium">{formatCurrency(site.annual_value || 0)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Månadsavgift:</span>
-                    <span className="text-white font-medium">{formatCurrency(site.monthly_value || 0)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Total värde:</span>
+                    <span className="text-slate-400">Total avtalsvärde:</span>
                     <span className="text-green-400 font-medium">{formatCurrency(site.total_contract_value || 0)}</span>
                   </div>
+                  {site.annual_value && site.annual_value > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Årsvärde:</span>
+                      <span className="text-white font-medium">{formatCurrency(site.annual_value)}</span>
+                    </div>
+                  )}
                   {site.contract_start_date && (
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">Startdatum:</span>
@@ -462,39 +446,66 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
               </div>
             </div>
 
-            {/* Health & Performance Metrics */}
+            {/* Enhetens Aktivitet & Status */}
             <div>
               <h6 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
-                Prestanda & Hälsa
+                Enhetsstatus & Aktivitet  
               </h6>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 rounded-lg p-3">
                   <div className="text-lg font-bold text-blue-400 mb-1">
-                    {site.healthScore.score}
+                    {site.casesCount || 0}
                   </div>
-                  <div className="text-xs text-slate-400">Health Score</div>
+                  <div className="text-xs text-slate-400">Aktiva ärenden</div>
+                  <div className="text-xs text-green-400 mt-1">
+                    {formatCurrency(site.casesValue || 0)} värde
+                  </div>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <div className="text-lg font-bold text-amber-400 mb-1">
-                    {Math.round(site.churnRisk.score)}%
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  <div className="text-lg font-bold text-green-400 mb-1">
+                    {formatCurrency(site.total_contract_value || 0)}
                   </div>
-                  <div className="text-xs text-slate-400">Churn Risk</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <div className="text-lg font-bold text-purple-400 mb-1">
-                    {Math.round(site.renewalProbability)}%
-                  </div>
-                  <div className="text-xs text-slate-400">Renewal Prob</div>
+                  <div className="text-xs text-slate-400">Avtalsvärde</div>
+                  {contractProgress.daysRemaining > 0 && (
+                    <div className="text-xs text-purple-400 mt-1">
+                      {contractProgress.daysRemaining} dagar kvar
+                    </div>
+                  )}
                 </div>
               </div>
+              
+              {/* Portal Access för denna enhet */}
+              {organization?.multisiteUsers && (
+                <div className="mt-4 p-3 bg-slate-700/20 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-2">Ansvariga användare med portaltillgång:</div>
+                  {(() => {
+                    const siteUsers = organization.multisiteUsers.filter(user => 
+                      user.site_ids?.includes(site.id)
+                    )
+                    if (siteUsers.length > 0) {
+                      return (
+                        <div className="space-y-1">
+                          {siteUsers.map(user => (
+                            <div key={user.user_id} className="text-xs text-slate-300 flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${user.hasLoggedIn ? 'bg-green-400' : 'bg-slate-500'}`} />
+                              {user.display_name || 'Namnlös användare'} ({user.role_type})
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }
+                    return <div className="text-xs text-slate-500 italic">Inga användare med portaltillgång för denna enhet</div>
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Cases Section */}
             <div>
               <h6 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
-                Cases & Extra Arbeten
+                Ärenden & Extra Arbeten
               </h6>
               
               {/* Cases Summary for this site */}
@@ -576,7 +587,7 @@ export default function SiteListSection({ organization }: SiteListSectionProps) 
             <MapPin className="w-5 h-5 text-green-400" />
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-white">Enheter & Sites</h3>
+            <h3 className="text-xl font-semibold text-white">Enheter & Lokaler</h3>
             <p className="text-sm text-slate-400">
               {organization.totalSites} enheter i organisationen
             </p>
