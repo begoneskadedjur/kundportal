@@ -121,10 +121,10 @@ export interface ConsolidatedCustomer {
   multisiteUsers?: Array<{
     user_id: string
     role_type: string
-    full_name: string | null
+    display_name: string | null
     email: string
-    last_sign_in_at: string | null
-    email_confirmed_at: string | null
+    last_login: string | null
+    email_verified: boolean | null
     is_active: boolean
     hasLoggedIn: boolean
   }>
@@ -243,7 +243,7 @@ export function useConsolidatedCustomers() {
         const userIds = multisiteRoles.map(r => r.user_id)
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('user_id, full_name, email, last_sign_in_at, email_confirmed_at, is_active')
+          .select('user_id, display_name, email, last_login, email_verified, is_active')
           .in('user_id', userIds)
           .eq('is_active', true)
         
@@ -255,10 +255,10 @@ export function useConsolidatedCustomers() {
       const multisiteUsersMap = new Map<string, Array<{
         user_id: string
         role_type: string
-        full_name: string | null
+        display_name: string | null
         email: string
-        last_sign_in_at: string | null
-        email_confirmed_at: string | null
+        last_login: string | null
+        email_verified: boolean | null
         is_active: boolean
         hasLoggedIn: boolean
       }>>()
@@ -274,12 +274,12 @@ export function useConsolidatedCustomers() {
             current.push({
               user_id: role.user_id,
               role_type: role.role_type,
-              full_name: profile.full_name,
+              display_name: profile.display_name,
               email: profile.email,
-              last_sign_in_at: profile.last_sign_in_at,
-              email_confirmed_at: profile.email_confirmed_at,
+              last_login: profile.last_login,
+              email_verified: profile.email_verified,
               is_active: profile.is_active,
-              hasLoggedIn: !!profile.last_sign_in_at
+              hasLoggedIn: !!profile.last_login
             })
             multisiteUsersMap.set(role.organization_id, current)
           }

@@ -153,7 +153,7 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
                   {/* Användarlistning - från multisite_user_roles istället för sites */}
                   <div className="space-y-2 mb-3">
                     {organization.multisiteUsers?.map((user, index) => {
-                      const userName = user.full_name || getContactName(null, user.email)
+                      const userName = user.display_name || getContactName(null, user.email)
                       
                       const getRoleIcon = (roleType: string) => {
                         switch (roleType) {
