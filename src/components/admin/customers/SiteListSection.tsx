@@ -345,9 +345,9 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
 
           <div className="flex items-center gap-2 ml-4">
             <div className="text-right">
-              <div className="text-sm text-slate-400 mb-1">Avtalsvärde</div>
-              <div className="text-lg font-semibold text-green-400">
-                {formatCurrency(site.total_contract_value || 0)}
+              <div className="text-xs text-slate-400 mb-1">Intäkter från ärenden som inte ingår i avtal</div>
+              <div className="text-lg font-semibold text-blue-400">
+                {formatCurrency(site.casesValue || 0)}
               </div>
             </div>
             
@@ -437,17 +437,19 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, isExpanded, onToggle, onEdit,
                     // Verksamhetschef har alltid tillgång till alla enheter
                     const verksamhetschefer = organization.multisiteUsers.filter(user => user.role_type === 'verksamhetschef')
                     
-                    // Regionchefer som har valt denna enhet
-                    const regionchefer = organization.multisiteUsers.filter(user => 
-                      user.role_type === 'regionchef' && 
-                      user.site_ids?.includes(site.id)
-                    )
+                    // Regionchefer som har valt denna enhet ELLER alla regionchefer om site_ids är tom/null
+                    const regionchefer = organization.multisiteUsers.filter(user => {
+                      if (user.role_type !== 'regionchef') return false
+                      // Om site_ids är null, tom, eller innehåller site.id
+                      return !user.site_ids || user.site_ids.length === 0 || user.site_ids.includes(site.id)
+                    })
                     
-                    // Platsansvariga för denna specifika enhet
-                    const platsansvariga = organization.multisiteUsers.filter(user => 
-                      user.role_type === 'platsansvarig' && 
-                      user.site_ids?.includes(site.id)
-                    )
+                    // Platsansvariga för denna specifika enhet ELLER alla platsansvariga om site_ids är tom/null
+                    const platsansvariga = organization.multisiteUsers.filter(user => {
+                      if (user.role_type !== 'platsansvarig') return false
+                      // Om site_ids är null, tom, eller innehåller site.id
+                      return !user.site_ids || user.site_ids.length === 0 || user.site_ids.includes(site.id)
+                    })
                     
                     const allRelevantUsers = [...verksamhetschefer, ...regionchefer, ...platsansvariga]
                     
