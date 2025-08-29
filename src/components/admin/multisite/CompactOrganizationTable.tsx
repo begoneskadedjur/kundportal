@@ -32,6 +32,7 @@ interface Organization {
   name: string
   organization_number: string
   organization_id?: string
+  organizationType: 'multisite' | 'single' // Add organization type
   billing_address: string
   billing_email: string
   billing_method: 'consolidated' | 'per_site'
@@ -584,23 +585,50 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Enheter */}
+                  {/* Portal Access & Password Reset - For all customers */}
                   <div className="mt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-blue-400" />
-                        Enheter ({organizationSites[org.id]?.length || 0})
-                      </h4>
+                    <h4 className="text-sm font-semibold text-slate-300 mb-3">Portalåtkomst</h4>
+                    <div className="flex items-center gap-2">
                       <Button
-                        onClick={() => onAddSite(org)}
-                        variant="primary"
+                        onClick={() => onResetPassword(org.billing_email, org.name)}
+                        variant="outline"
                         size="sm"
                         className="flex items-center gap-2"
                       >
-                        <Plus className="w-3 h-3" />
-                        Lägg till enhet
+                        <Key className="w-3 h-3" />
+                        Återställ lösenord
                       </Button>
+                      {org.organizationType === 'single' && (
+                        <span className="text-xs text-blue-400 px-2 py-1 bg-blue-500/20 rounded">
+                          Vanlig kund
+                        </span>
+                      )}
+                      {org.organizationType === 'multisite' && (
+                        <span className="text-xs text-purple-400 px-2 py-1 bg-purple-500/20 rounded">
+                          Multisite-organisation
+                        </span>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Enheter - Only show for multisite organizations */}
+                  {org.organizationType === 'multisite' && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                          Enheter ({organizationSites[org.id]?.length || 0})
+                        </h4>
+                        <Button
+                          onClick={() => onAddSite(org)}
+                          variant="primary"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Lägg till enhet
+                        </Button>
+                      </div>
 
                     {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -641,30 +669,32 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        Inga enheter registrerade
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Användare */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-400" />
-                        Användare ({organizationUsers[org.id]?.length || 0})
-                      </h4>
-                      <Button
-                        onClick={() => onAddUser(org)}
-                        variant="primary"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        Lägg till användare
-                      </Button>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Inga enheter registrerade
+                        </p>
+                      )}
                     </div>
+                  )}
+
+                  {/* Användare - Only show for multisite organizations */}
+                  {org.organizationType === 'multisite' && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-purple-400" />
+                          Användare ({organizationUsers[org.id]?.length || 0})
+                        </h4>
+                        <Button
+                          onClick={() => onAddUser(org)}
+                          variant="primary"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                          Lägg till användare
+                        </Button>
+                      </div>
 
                     {organizationUsers[org.id] && organizationUsers[org.id].length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -711,25 +741,28 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        Inga användare registrerade
-                      </p>
-                    )}
-                  </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Inga användare registrerade
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Visa fullständig hantering */}
-                  <div className="mt-4 pt-4 border-t border-slate-700">
-                    <Button
-                      onClick={() => handleViewDetails(org.id)}
-                      variant="outline"
-                      size="sm"
-                      className="w-full flex items-center justify-center gap-2"
-                    >
-                      Visa fullständig organisationshantering
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {/* Visa fullständig hantering - Only for multisite organizations */}
+                  {org.organizationType === 'multisite' && (
+                    <div className="mt-4 pt-4 border-t border-slate-700">
+                      <Button
+                        onClick={() => handleViewDetails(org.id)}
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        Visa fullständig organisationshantering
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -5,6 +5,7 @@ import { PageHeader } from '../../../components/shared'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
 import toast from 'react-hot-toast'
+import { useConsolidatedCustomers, ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { 
   Building2, 
   Users, 
@@ -35,35 +36,16 @@ import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import { useAuth } from '../../../contexts/AuthContext'
 
-interface Organization {
-  id: string
-  name: string
-  organization_number: string
-  organization_id?: string
+// Extend ConsolidatedCustomer with organization-specific fields
+interface Organization extends ConsolidatedCustomer {
+  name: string // Alias for company_name
   billing_address: string
-  billing_email: string
   billing_method: 'consolidated' | 'per_site'
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  sites_count?: number
-  users_count?: number
-  total_value?: number
-  // Avtalsinfo
-  contract_type?: string
-  contract_end_date?: string
-  contract_length?: number
-  annual_value?: number
-  monthly_value?: number
-  account_manager?: string
+  account_manager?: string // Alias for assigned_account_manager
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
-  // Enheter
-  sites?: any[]
-  contact_phone?: string
-  contact_person?: string
-  // Trafikljusdata
+  // Trafikljusdata - these might not be available in consolidated data
   worstPestLevel?: number | null
   worstProblemRating?: number | null
   unacknowledgedCount?: number
@@ -99,11 +81,13 @@ interface OrganizationSite {
 export default function OrganizationsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
-  const [organizations, setOrganizations] = useState<Organization[]>([])
+  
+  // Use consolidated customers hook instead of local state
+  const { consolidatedCustomers, loading, error, refresh } = useConsolidatedCustomers()
+  
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
   const [organizationUsers, setOrganizationUsers] = useState<Record<string, OrganizationUser[]>>({})
   const [organizationSites, setOrganizationSites] = useState<Record<string, OrganizationSite[]>>({})
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -125,16 +109,43 @@ export default function OrganizationsPage() {
     return diffDays
   }
 
-  useEffect(() => {
-    fetchOrganizations()
-  }, [])
+  // Convert consolidated customers to organizations format
+  const organizations: Organization[] = consolidatedCustomers.map(customer => ({
+    ...customer,
+    name: customer.company_name,
+    billing_address: customer.contact_address || '',
+    billing_email: customer.contact_email,
+    billing_method: 'consolidated' as const,
+    sites_count: customer.totalSites,
+    users_count: customer.organizationType === 'multisite' ? (customer as any).activeUsersCount || 0 : 0,
+    total_value: customer.totalOrganizationValue || 0,
+    annual_value: customer.totalAnnualValue || 0,
+    monthly_value: customer.totalMonthlyValue || 0,
+    account_manager: customer.assigned_account_manager,
+    created_at: customer.created_at || '',
+    updated_at: customer.updated_at || '',
+    // Initialize traffic light data as null - these would need separate fetching
+    worstPestLevel: null,
+    worstProblemRating: null,
+    unacknowledgedCount: 0,
+    criticalCasesCount: 0,
+    warningCasesCount: 0
+  }))
 
+  // Handle loading error from hook
+  useEffect(() => {
+    if (error) {
+      console.error('Error from useConsolidatedCustomers:', error)
+      toast.error('Kunde inte hämta organisationer')
+    }
+  }, [error])
+  
   useEffect(() => {
     // Filtrera och sortera organisationer
     let filtered = searchTerm
       ? organizations.filter(org => 
           org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          org.organization_number.includes(searchTerm) ||
+          (org.organization_number || '').includes(searchTerm) ||
           org.billing_email.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : [...organizations]
@@ -142,16 +153,16 @@ export default function OrganizationsPage() {
     // Smart sortering: Kritiska först, sedan varningar, sedan resten
     filtered.sort((a, b) => {
       // Prioritet 1: Kritiska ärenden
-      if (a.criticalCasesCount > 0 && b.criticalCasesCount === 0) return -1
-      if (b.criticalCasesCount > 0 && a.criticalCasesCount === 0) return 1
+      if ((a.criticalCasesCount || 0) > 0 && (b.criticalCasesCount || 0) === 0) return -1
+      if ((b.criticalCasesCount || 0) > 0 && (a.criticalCasesCount || 0) === 0) return 1
       
       // Prioritet 2: Obekräftade rekommendationer
-      if (a.unacknowledgedCount > 0 && b.unacknowledgedCount === 0) return -1
-      if (b.unacknowledgedCount > 0 && a.unacknowledgedCount === 0) return 1
+      if ((a.unacknowledgedCount || 0) > 0 && (b.unacknowledgedCount || 0) === 0) return -1
+      if ((b.unacknowledgedCount || 0) > 0 && (a.unacknowledgedCount || 0) === 0) return 1
       
       // Prioritet 3: Varningar
-      if (a.warningCasesCount > 0 && b.warningCasesCount === 0) return -1
-      if (b.warningCasesCount > 0 && a.warningCasesCount === 0) return 1
+      if ((a.warningCasesCount || 0) > 0 && (b.warningCasesCount || 0) === 0) return -1
+      if ((b.warningCasesCount || 0) > 0 && (a.warningCasesCount || 0) === 0) return 1
       
       // Prioritet 4: Inaktiva sist
       if (a.is_active && !b.is_active) return -1
@@ -164,147 +175,7 @@ export default function OrganizationsPage() {
     setFilteredOrganizations(filtered)
   }, [searchTerm, organizations])
 
-  const fetchOrganizations = async () => {
-    setLoading(true)
-    try {
-      // Hämta organisationer (huvudkontor från customers)
-      const { data: orgs, error: orgsError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('site_type', 'huvudkontor')
-        .eq('is_multisite', true)
-        .order('created_at', { ascending: false })
-
-      if (orgsError) throw orgsError
-
-      // Hämta statistik för varje organisation
-      if (orgs && orgs.length > 0) {
-        const orgsWithStats = await Promise.all(orgs.map(async (org) => {
-          // Hämta antal sites (enheter från customers)
-          const { count: sitesCount } = await supabase
-            .from('customers')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.organization_id)
-            .eq('site_type', 'enhet')
-            .eq('is_multisite', true)
-            .eq('is_active', true)
-
-          // Hämta enheter med fullständig info
-          const { data: sites } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('organization_id', org.organization_id)
-            .eq('site_type', 'enhet')
-            .eq('is_multisite', true)
-            .order('region', { ascending: true })
-            .order('site_name', { ascending: true })
-
-          // Hämta antal användare
-          const { count: usersCount } = await supabase
-            .from('multisite_user_roles')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.organization_id)
-
-          // Hämta trafikljusdata för alla enheter i organisationen
-          let worstPestLevel: number | null = null
-          let worstProblemRating: number | null = null
-          let unacknowledgedCount = 0
-          let criticalCasesCount = 0
-          let warningCasesCount = 0
-
-          if (sites && sites.length > 0) {
-            const siteIds = sites.map(s => s.id)
-            
-            // Hämta alla cases för organisationens enheter
-            const { data: cases } = await supabase
-              .from('cases')
-              .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
-              .in('customer_id', siteIds)
-
-            if (cases) {
-              cases.forEach(caseItem => {
-                // Uppdatera värsta nivåer
-                if (caseItem.pest_level !== null) {
-                  if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
-                    worstPestLevel = caseItem.pest_level
-                  }
-                }
-                
-                if (caseItem.problem_rating !== null) {
-                  if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
-                    worstProblemRating = caseItem.problem_rating
-                  }
-                }
-
-                // Räkna kritiska och varningar
-                const pest = caseItem.pest_level ?? -1
-                const problem = caseItem.problem_rating ?? -1
-                
-                if (pest >= 3 || problem >= 4) {
-                  criticalCasesCount++
-                } else if (pest === 2 || problem === 3) {
-                  warningCasesCount++
-                }
-
-                // Räkna obekräftade rekommendationer
-                if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
-                  unacknowledgedCount++
-                }
-              })
-            }
-          }
-
-          return {
-            id: org.id,
-            name: org.company_name,
-            organization_number: org.organization_number || '',
-            billing_address: org.billing_address || org.contact_address || '',
-            billing_email: org.billing_email || org.contact_email || '',
-            billing_method: (org.billing_type || 'consolidated') as 'consolidated' | 'per_site',
-            is_active: org.is_active !== false,
-            created_at: org.created_at,
-            updated_at: org.updated_at,
-            organization_id: org.organization_id,
-            sites_count: sitesCount || 0,
-            users_count: usersCount || 0,
-            total_value: org.total_contract_value || 0,
-            // Avtalsinfo
-            contract_type: org.contract_type,
-            contract_end_date: org.contract_end_date,
-            contract_length: org.contract_length,
-            annual_value: org.annual_value || 0,
-            monthly_value: org.monthly_value || 0,
-            account_manager: org.assigned_account_manager,
-            account_manager_email: org.account_manager_email,
-            sales_person: org.sales_person,
-            sales_person_email: org.sales_person_email,
-            // Kontaktinfo
-            contact_phone: org.contact_phone,
-            contact_person: org.contact_person,
-            // Enheter
-            sites: sites || [],
-            // Trafikljusdata
-            worstPestLevel,
-            worstProblemRating,
-            unacknowledgedCount,
-            criticalCasesCount,
-            warningCasesCount
-          }
-        }))
-
-        setOrganizations(orgsWithStats)
-        setFilteredOrganizations(orgsWithStats)
-      } else {
-        setOrganizations([])
-        setFilteredOrganizations([])
-      }
-    } catch (error) {
-      console.error('Error fetching organizations:', error)
-      toast.error('Kunde inte hämta organisationer')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Removed fetchOrganizations - now using useConsolidatedCustomers hook
 
   const handleDeleteOrganization = async (org: Organization) => {
     if (!confirm(`Är du säker på att du vill ta bort ${org.name}? Detta kommer även ta bort alla anläggningar och användare.`)) {
@@ -359,7 +230,7 @@ export default function OrganizationsPage() {
       if (deleteError) throw deleteError
 
       toast.success('Organisation och alla relaterade data borttagna')
-      fetchOrganizations()
+      refresh()
     } catch (error) {
       console.error('Error deleting organization:', error)
       toast.error('Kunde inte ta bort organisation')
@@ -376,7 +247,7 @@ export default function OrganizationsPage() {
       if (error) throw error
 
       toast.success(`Organisation ${org.is_active ? 'inaktiverad' : 'aktiverad'}`)
-      fetchOrganizations()
+      refresh()
     } catch (error) {
       console.error('Error toggling organization:', error)
       toast.error('Kunde inte uppdatera organisation')
@@ -649,11 +520,11 @@ export default function OrganizationsPage() {
             <button 
               className="px-3 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
               onClick={() => {
-                const criticalOrgs = organizations.filter(org => org.criticalCasesCount > 0)
+                const criticalOrgs = organizations.filter(org => (org.criticalCasesCount || 0) > 0)
                 setFilteredOrganizations(criticalOrgs)
               }}
             >
-              🔴 {organizations.filter(org => org.criticalCasesCount > 0).length} med kritiska ärenden
+              🔴 {organizations.filter(org => (org.criticalCasesCount || 0) > 0).length} med kritiska ärenden
             </button>
             <button 
               className="px-3 py-1 text-xs bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors"
@@ -701,7 +572,7 @@ export default function OrganizationsPage() {
               <div>
                 <p className="text-slate-400 text-sm">Totalt anläggningar</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {organizations.reduce((sum, org) => sum + (org.sites_count || 0), 0)}
+                  {organizations.reduce((sum, org) => sum + (org.totalSites || 0), 0)}
                 </p>
               </div>
               <MapPin className="w-8 h-8 text-blue-500" />
@@ -713,7 +584,7 @@ export default function OrganizationsPage() {
               <div>
                 <p className="text-slate-400 text-sm">Totalt användare</p>
                 <p className="text-2xl font-bold text-white mt-1">
-                  {organizations.reduce((sum, org) => sum + (org.users_count || 0), 0)}
+                  {organizations.reduce((sum, org) => sum + (org.organizationType === 'multisite' ? (org as any).activeUsersCount || 0 : 0), 0)}
                 </p>
               </div>
               <Users className="w-8 h-8 text-green-500" />
@@ -731,7 +602,7 @@ export default function OrganizationsPage() {
             <p className="text-slate-400 mb-6">
               {searchTerm 
                 ? 'Prova att justera din sökning' 
-                : 'Börja med att registrera din första multisite-organisation'}
+                : 'Börja med att registrera din första organisation'}
             </p>
             {!searchTerm && (
               <Button
@@ -740,7 +611,7 @@ export default function OrganizationsPage() {
                 className="flex items-center gap-2 mx-auto"
               >
                 <Plus className="w-4 h-4" />
-                Registrera Organisation
+                Ny Organisation
               </Button>
             )}
           </Card>
@@ -777,7 +648,7 @@ export default function OrganizationsPage() {
           onSuccess={() => {
             setShowEditModal(false)
             setSelectedOrg(null)
-            fetchOrganizations()
+            refresh()
           }}
         />
       )}
@@ -818,7 +689,7 @@ export default function OrganizationsPage() {
               fetchOrganizationSites(selectedOrg.id, selectedOrg.organization_id)
             }
             // Uppdatera sites_count
-            fetchOrganizations()
+            refresh()
           }}
           organizationId={selectedOrg.organization_id || ''}
           organizationName={selectedOrg.name}
