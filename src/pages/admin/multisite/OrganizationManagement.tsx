@@ -71,11 +71,11 @@ export default function OrganizationManagement() {
     setLoading(true)
     try {
       // Hämta alla kunder: både multisite-huvudkontor och vanliga kunder
-      // Enkelt: alla som INTE är enheter (dvs huvudkontor eller vanliga kunder utan site_type)
+      // Inkludera kunder med NULL site_type (vanliga kunder) och icke-enhet kunder
       const { data: allCustomersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .not('site_type', 'eq', 'enhet')
+        .or('site_type.is.null,site_type.neq.enhet')
         .order('company_name')
 
       if (customersError) throw customersError
