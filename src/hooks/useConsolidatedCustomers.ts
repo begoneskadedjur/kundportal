@@ -148,6 +148,7 @@ export interface ConsolidatedCustomer {
   averageRenewalProbability: number
   nextRenewalDate?: string | null
   daysToNextRenewal?: number | null
+  earliestContractStartDate?: string | null
   
   // Status flags
   is_active: boolean
@@ -575,6 +576,7 @@ export function useConsolidatedCustomers() {
           averageRenewalProbability: customer.renewalProbability.probability,
           nextRenewalDate: customer.contract_end_date,
           daysToNextRenewal: customer.contractProgress.daysRemaining,
+          earliestContractStartDate: customer.contract_start_date,
           
           is_active: customer.is_active || false,
           hasExpiringSites: customer.contractProgress.daysRemaining <= 90,
@@ -664,6 +666,15 @@ export function useConsolidatedCustomers() {
         if (nextRenewal) {
           org.nextRenewalDate = nextRenewal.contract_end_date
           org.daysToNextRenewal = nextRenewal.contractProgress.daysRemaining
+        }
+        
+        // Earliest contract start
+        const earliestStart = sites
+          .filter(site => site.contract_start_date)
+          .sort((a, b) => new Date(a.contract_start_date!).getTime() - new Date(b.contract_start_date!).getTime())[0]
+        
+        if (earliestStart) {
+          org.earliestContractStartDate = earliestStart.contract_start_date
         }
         
         // Status flags

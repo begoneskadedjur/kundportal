@@ -117,30 +117,50 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-const formatContractPeriod = (org: ConsolidatedCustomer): string => {
-  if (!org.nextRenewalDate) return 'Okänt avtal'
+const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; remaining: string; color: string } => {
+  if (!org.nextRenewalDate) {
+    return { period: 'Okänt avtal', remaining: '', color: 'text-slate-400' }
+  }
   
   const endDate = new Date(org.nextRenewalDate)
   const now = new Date()
   const diffTime = endDate.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
-  if (diffDays < 0) {
-    return 'Utgånget'
-  } else if (diffDays <= 30) {
-    return `${diffDays} dagar`
-  } else if (diffDays <= 90) {
-    const months = Math.ceil(diffDays / 30)
-    return `${months} mån`
-  } else if (diffDays <= 365) {
-    const months = Math.ceil(diffDays / 30)
-    return `${months} månader`
-  } else {
-    return endDate.toLocaleDateString('sv-SE', { 
-      year: 'numeric', 
-      month: 'short' 
-    })
+  // Beräkna antal månader kvar mer exakt
+  const monthsRemaining = Math.ceil(diffDays / 30.44) // Genomsnittliga dagar per månad
+  
+  // Formatera start- och slutdatum
+  let startText = ''
+  if (org.earliestContractStartDate) {
+    const startDate = new Date(org.earliestContractStartDate)
+    startText = startDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
   }
+  
+  const endText = endDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
+  
+  // Bygg ihop perioden
+  const period = startText ? `${startText} - ${endText}` : endText
+  
+  // Formatera återstående tid och färg
+  let remaining = ''
+  let color = 'text-green-400' // Standard grön
+  
+  if (diffDays < 0) {
+    remaining = 'Utgånget'
+    color = 'text-red-400'
+  } else if (diffDays <= 30) {
+    remaining = `${diffDays} dagar kvar`
+    color = 'text-red-400'
+  } else if (diffDays <= 90) {
+    remaining = `${monthsRemaining} mån kvar`
+    color = 'text-amber-400'
+  } else {
+    remaining = `${monthsRemaining} mån kvar`
+    color = 'text-green-400'
+  }
+  
+  return { period, remaining, color }
 }
 
 export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps> = ({
@@ -263,29 +283,27 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
 
       {/* Contract Period Column */}
       <td className="px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-slate-200 font-medium">
-            {formatContractPeriod(organization)}
-          </div>
-          {organization.daysToNextRenewal && (
-            <div className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-              organization.daysToNextRenewal <= 30 
-                ? 'bg-red-500/20 text-red-400 border-red-500/30' 
-                : organization.daysToNextRenewal <= 90 
-                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                : 'bg-green-500/20 text-green-400 border-green-500/30'
-            }`}>
-              {organization.daysToNextRenewal <= 30 ? '🔥 ' : ''}
-              {organization.daysToNextRenewal} dagar
+        {(() => {
+          const { period, remaining, color } = formatContractPeriod(organization)
+          return (
+            <div className="space-y-1">
+              <div className="text-sm text-slate-200 font-medium">
+                {period}
+              </div>
+              {remaining && (
+                <div className={`text-xs font-medium ${color}`}>
+                  {remaining}
+                </div>
+              )}
+              {organization.hasExpiringSites && (
+                <div className="text-xs text-amber-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Utgående avtal
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        {organization.hasExpiringSites && (
-          <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
-            Utgående avtal
-          </div>
-        )}
+          )
+        })()}
       </td>
 
       {/* Health Score Column */}
