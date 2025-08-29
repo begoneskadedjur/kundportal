@@ -1,7 +1,7 @@
 // src/components/admin/customers/ExpandableOrganizationRow.tsx - Expanderbar rad för organisationer
 
 import React from 'react'
-import { ChevronDown, ChevronRight, Building2, Users, ExternalLink, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Building2, ExternalLink } from 'lucide-react'
 import { ConsolidatedCustomer, PortalAccessStatus } from '../../../hooks/useConsolidatedCustomers'
 import CustomTooltip from '../../ui/CustomTooltip'
 
@@ -128,36 +128,44 @@ const formatContractPeriod = (org: ConsolidatedCustomer): { period: string; rema
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
   // Beräkna antal månader kvar mer exakt
-  const monthsRemaining = Math.ceil(diffDays / 30.44) // Genomsnittliga dagar per månad
+  const monthsRemaining = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.44)))
   
-  // Formatera start- och slutdatum
+  // Formatera start- och slutdatum med exakt dag
   let startText = ''
   if (org.earliestContractStartDate) {
     const startDate = new Date(org.earliestContractStartDate)
-    startText = startDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
+    startText = startDate.toLocaleDateString('sv-SE', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    })
   }
   
-  const endText = endDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
+  const endText = endDate.toLocaleDateString('sv-SE', { 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric' 
+  })
   
   // Bygg ihop perioden
   const period = startText ? `${startText} - ${endText}` : endText
   
-  // Formatera återstående tid och färg
+  // Månadsbaserad färgkodning: Röd ≤ 6 mån, Gul 7-12 mån, Grön > 12 mån
   let remaining = ''
-  let color = 'text-green-400' // Standard grön
+  let color = 'text-slate-400'
   
   if (diffDays < 0) {
     remaining = 'Utgånget'
     color = 'text-red-400'
-  } else if (diffDays <= 30) {
-    remaining = `${diffDays} dagar kvar`
-    color = 'text-red-400'
-  } else if (diffDays <= 90) {
+  } else if (monthsRemaining <= 6) {
     remaining = `${monthsRemaining} mån kvar`
-    color = 'text-amber-400'
+    color = 'text-red-400'    // Röd - Akut uppmärksamhet
+  } else if (monthsRemaining <= 12) {
+    remaining = `${monthsRemaining} mån kvar`
+    color = 'text-amber-400'  // Gul - Planering behövs
   } else {
     remaining = `${monthsRemaining} mån kvar`
-    color = 'text-green-400'
+    color = 'text-green-400'  // Grön - Stabilt
   }
   
   return { period, remaining, color }
@@ -295,12 +303,6 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
                   {remaining}
                 </div>
               )}
-              {organization.hasExpiringSites && (
-                <div className="text-xs text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  Utgående avtal
-                </div>
-              )}
             </div>
           )
         })()}
@@ -421,29 +423,6 @@ export const ExpandableOrganizationRow: React.FC<ExpandableOrganizationRowProps>
               <ExternalLink className="h-4 w-4" />
             </button>
           )}
-          
-          {/* Portal invite button */}
-          {organization.portalAccessStatus !== 'full' && onInviteToPortal && (
-            <button
-              onClick={() => onInviteToPortal(organization)}
-              className="text-green-400 hover:text-green-300 text-sm font-medium transition-colors duration-200"
-              title={isMultisite ? "Bjud in organisation till portal" : "Bjud in till portal"}
-            >
-              <Users className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Actions dropdown */}
-          <div className="relative inline-block text-left">
-            <button
-              className="text-slate-400 hover:text-slate-200 p-1 rounded-full hover:bg-slate-600 transition-colors duration-200"
-              title="Fler åtgärder"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-          </div>
         </div>
       </td>
     </tr>
