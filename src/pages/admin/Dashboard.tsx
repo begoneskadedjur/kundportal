@@ -183,8 +183,13 @@ const AdminDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Premium Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-[#20c58f]/5" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#20c58f]/10 via-transparent to-transparent" />
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <PageHeader 
             title="Admin Dashboard" 
             showBackButton={false}
@@ -210,25 +215,39 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Card className="p-8 max-w-md">
+      <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
+        {/* Premium Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-[#20c58f]/5" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#20c58f]/10 via-transparent to-transparent" />
+        
+        <div className="relative z-10">
+        <Card className="p-8 max-w-md backdrop-blur-sm bg-slate-800/70 border-slate-700/50 shadow-2xl">
           <div className="text-center">
             <div className="text-red-400 mb-4">Fel vid laddning av dashboard</div>
             <p className="text-slate-400 mb-6">{error}</p>
             <Button onClick={fetchDashboardStats}>Försök igen</Button>
           </div>
         </Card>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Premium Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-[#20c58f]/5" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#20c58f]/10 via-transparent to-transparent" />
+      
+      <div className="relative z-10">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader 
@@ -240,7 +259,7 @@ const AdminDashboard: React.FC = () => {
         <QuickActionBar />
 
         {/* Main Content */}
-        <div className="space-y-8">
+        <div className="space-y-12">
           
           {/* Enhanced KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -289,29 +308,74 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Navigation Grid */}
-          <div className="space-y-12">
+          <div className="space-y-16">
             
-            {/* Primary Functions */}
+            {/* Kommandocentral - Primary Functions */}
             <div>
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-                <span className="text-slate-300">Huvudfunktioner</span>
-                <div className="w-8 h-px bg-slate-700 flex-1" />
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
+                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Kommandocentral</span>
+                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
               </h2>
               <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                staggerDelay={0.1}
-                initialDelay={0.5}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                staggerDelay={0.08}
+                initialDelay={0.2}
               >
                 <AdminDashboardCard
                   href="/admin/customers"
                   icon={Users}
-                  title="Hantera Kunder"
+                  title="Avtalspipeline - Översikt"
                   description="Avtalskunder & ClickUp-listor"
                   stats={`${stats?.totalCustomers} aktiva kunder`}
-                  tag="Kärnfunktion"
+                  tag="Pipeline"
+                  iconColor="text-[#20c58f]"
                 />
                 
+                <AdminDashboardCard
+                  href="/admin/oneflow-contract-creator"
+                  icon={FileText}
+                  title="Skapa avtalskund & skicka avtal"
+                  description="Oneflow-avtal för signering"
+                  stats="6 tillgängliga mallar"
+                  tag="Skapa"
+                  iconColor="text-emerald-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/contracts-overview"
+                  icon={Target}
+                  title="Försäljningspipeline - Översikt"
+                  description="Alla avtal & offerter"
+                  stats="Status & värdeanalys"
+                  tag="Pipeline"
+                  iconColor="text-purple-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/organisation/register"
+                  icon={Building2}
+                  title="Lägg upp Multi-Site kund & konton"
+                  description="Ny multisite-kund wizard"
+                  stats="Steg-för-steg guide"
+                  tag="Multisite"
+                  iconColor="text-blue-400"
+                />
+              </StaggeredGrid>
+            </div>
+
+            {/* Affärsintelligens - Analytics */}
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
+                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Affärsintelligens</span>
+                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
+              </h2>
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                staggerDelay={0.08}
+                initialDelay={0.6}
+              >
                 <AdminDashboardCard
                   href="/admin/technicians"
                   icon={BarChart3}
@@ -319,6 +383,7 @@ const AdminDashboard: React.FC = () => {
                   description="Prestanda & ranking"
                   stats={`${stats?.activeTechnicians} aktiva tekniker`}
                   tag="Analytics"
+                  iconColor="text-blue-400"
                 />
                 
                 <AdminDashboardCard
@@ -328,47 +393,17 @@ const AdminDashboard: React.FC = () => {
                   description="Intäktsanalys & KPI"
                   stats={formatCurrency(stats?.totalRevenue || 0)}
                   tag="Rapporter"
+                  iconColor="text-green-400"
                 />
                 
                 <AdminDashboardCard
                   href="/admin/billing"
-                  icon={FileText}
+                  icon={DollarSign}
                   title="Fakturering"
                   description="BeGone-ärenden"
                   stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
                   tag="Finans"
-                />
-              </StaggeredGrid>
-            </div>
-
-            {/* Secondary Functions */}
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-                <span className="text-slate-300">Administration</span>
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-              </h2>
-              <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                staggerDelay={0.1}
-                initialDelay={0.9}
-              >
-                <AdminDashboardCard
-                  href="/admin/sales-opportunities"
-                  icon={Target}
-                  title="Försäljningsmöjligheter"
-                  description="Potentiella avtalskunder"
-                  stats="BeGone → Avtal"
-                  iconColor="text-emerald-400"
-                />
-                
-                <AdminDashboardCard
-                  href="/admin/technician-management"
-                  icon={UserCheck}
-                  title="Hantera Tekniker"
-                  description="Lägg till & redigera personal"
-                  tag="Admin"
-                  iconColor="text-teal-400"
+                  iconColor="text-yellow-400"
                 />
                 
                 <AdminDashboardCard
@@ -377,72 +412,52 @@ const AdminDashboard: React.FC = () => {
                   title="Provisioner"
                   description="Beräkna tekniker-provision"
                   tag="Löner"
-                  iconColor="text-green-400"
-                />
-                
-                <AdminDashboardCard
-                  href="/admin/customers/new"
-                  icon={Building2}
-                  title="Lägg till Kund"
-                  description="Skapa ny avtalskund"
-                  stats="ClickUp-integration"
-                  iconColor="text-[#20c58f]"
+                  iconColor="text-emerald-400"
                 />
               </StaggeredGrid>
             </div>
 
-            {/* Contract Management */}
+            {/* Administration - Management Tools */}
             <div>
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-                <span className="text-slate-300">Avtal & Integrationer</span>
-                <div className="w-8 h-px bg-slate-700 flex-1" />
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
+                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Administration</span>
+                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
               </h2>
               <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                staggerDelay={0.1}
-                initialDelay={1.3}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                staggerDelay={0.08}
+                initialDelay={1.0}
               >
                 <AdminDashboardCard
-                  href="/admin/oneflow-contract-creator"
-                  icon={FileText}
-                  title="Skapa Kontrakt"
-                  description="Oneflow-avtal för signering"
-                  stats="6 tillgängliga mallar"
-                  tag="Oneflow"
-                  iconColor="text-emerald-500"
+                  href="/admin/organisation/organizations"
+                  icon={Building2}
+                  title="Hantera kundkonton & användare"
+                  description="Multisite-organisationer & access"
+                  stats="0 organisationer"
+                  tag="Konton"
+                  iconColor="text-purple-400"
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/contracts-overview"
-                  icon={FileText}
-                  title="Avtalsöversikt"
-                  description="Alla avtal & offerter"
-                  stats="Status & värdeanalys"
-                  tag="OneFlow"
-                  iconColor="text-purple-500"
-                />
-
-                <AdminDashboardCard
-                  href="/admin/webhook-config"
-                  icon={Settings}
-                  title="Webhook Config"
-                  description="OneFlow webhook-inställningar"
-                  stats="Events & automation"
-                  tag="Konfiguration"
-                  iconColor="text-blue-500"
+                  href="/admin/technician-management"
+                  icon={UserCheck}
+                  title="Hantera Tekniker"
+                  description="Lägg till & redigera personal"
+                  tag="Personal"
+                  iconColor="text-teal-400"
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/oneflow-diagnostics"
-                  icon={BarChart3}
-                  title="Övervaka Avtal"
-                  description="Status & diagnostik"
-                  stats="Webhook logs"
-                  tag="Diagnostik"
-                  iconColor="text-teal-500"
+                  href="/admin/sales-opportunities"
+                  icon={Target}
+                  title="Försäljningsmöjligheter"
+                  description="Potentiella avtalskunder"
+                  stats="BeGone → Avtal"
+                  tag="Leads"
+                  iconColor="text-emerald-400"
                 />
-
+                
                 <AdminDashboardCard
                   href="/admin/product-management"
                   icon={Package}
@@ -450,7 +465,31 @@ const AdminDashboard: React.FC = () => {
                   description="Skapa & redigera tjänster"
                   stats="Dynamisk prissättning"
                   tag="Katalog"
-                  iconColor="text-blue-500"
+                  iconColor="text-blue-400"
+                />
+              </StaggeredGrid>
+            </div>
+
+            {/* Systemunderhåll - Moved to bottom with reduced visual weight */}
+            <div className="opacity-75">
+              <h2 className="text-lg font-medium text-slate-400 mb-6 flex items-center gap-3">
+                <div className="w-8 h-px bg-slate-700/50 flex-1" />
+                <span className="text-slate-500">Systemunderhåll</span>
+                <div className="w-8 h-px bg-slate-700/50 flex-1" />
+              </h2>
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
+                staggerDelay={0.05}
+                initialDelay={1.4}
+              >
+                <AdminDashboardCard
+                  href="#"
+                  icon={Settings}
+                  title="Inställningar"
+                  description="Systemkonfiguration"
+                  tag="System"
+                  iconColor="text-slate-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
                 
                 <AdminDashboardCard
@@ -461,73 +500,40 @@ const AdminDashboard: React.FC = () => {
                   stats="Alla system online"
                   tag="Live"
                   iconColor="text-green-500"
-                  disabled={false}
+                  className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
                 
                 <AdminDashboardCard
-                  href="#"
-                  icon={Settings}
-                  title="Inställningar"
-                  description="Systemkonfiguration"
-                  tag="Kommande"
-                  iconColor="text-slate-400"
-                  disabled={true}
-                />
-              </StaggeredGrid>
-            </div>
-
-            {/* Multisite Management */}
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-                <span className="text-slate-300">Multisite-hantering</span>
-                <div className="w-8 h-px bg-slate-700 flex-1" />
-              </h2>
-              <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                staggerDelay={0.1}
-                initialDelay={1.4}
-              >
-                <AdminDashboardCard
-                  href="/admin/organisation/register"
-                  icon={UserPlus}
-                  title="Registrera Organisation"
-                  description="Ny multisite-kund wizard"
-                  stats="Steg-för-steg guide"
-                  tag="Ny"
-                  iconColor="text-green-500"
-                  disabled={false}
-                  delay={0.1}
+                  href="/admin/webhook-config"
+                  icon={Wrench}
+                  title="Webhook Config"
+                  description="OneFlow webhook-inställningar"
+                  stats="Events & automation"
+                  tag="Config"
+                  iconColor="text-slate-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/organisation/organizations"
-                  icon={Building2}
-                  title="Organisationer"
-                  description="Hantera multisite-organisationer"
-                  stats="0 organisationer"
-                  tag="Multisite"
-                  iconColor="text-purple-500"
-                />
-                
-                <AdminDashboardCard
-                  href="/admin/organisation/traffic-light"
+                  href="/admin/oneflow-diagnostics"
                   icon={AlertCircle}
-                  title="Trafikljusöversikt"
-                  description="Kvalitetsövervakning alla sites"
-                  stats="Real-time status"
-                  tag="Kvalitet"
-                  iconColor="text-yellow-500"
+                  title="Övervaka Avtal"
+                  description="Status & diagnostik"
+                  stats="Webhook logs"
+                  tag="Debug"
+                  iconColor="text-amber-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/organisation/billing"
-                  icon={Receipt}
-                  title="Multisite-fakturering"
-                  description="Konsoliderad & per-site"
-                  stats="Flexibel fakturering"
-                  tag="Finans"
-                  iconColor="text-blue-500"
+                  href="/admin/customers/new"
+                  icon={UserPlus}
+                  title="Lägg till Kund"
+                  description="Skapa ny avtalskund, ClickUp-integration"
+                  stats="Legacy"
+                  tag="Legacy"
+                  iconColor="text-slate-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200"
                 />
               </StaggeredGrid>
             </div>
@@ -535,12 +541,12 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* System Overview */}
-          <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Recent Activity */}
             <div className="lg:col-span-2">
-              <Card className="p-6 h-full">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-[#20c58f]" />
+              <Card className="p-8 h-full backdrop-blur-sm bg-slate-800/70 border-slate-700/50 shadow-2xl">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                  <Calendar className="w-6 h-6 text-[#20c58f]" />
                   Senaste Aktivitet
                 </h3>
                 {stats?.recentActivity?.length ? (
@@ -580,9 +586,9 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* System Health */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-[#20c58f]" />
+            <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50 shadow-2xl">
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <Shield className="w-6 h-6 text-[#20c58f]" />
                 System Status
               </h3>
               <div className="space-y-4">
@@ -652,6 +658,7 @@ const AdminDashboard: React.FC = () => {
           }
         }}
       />
+    </div>
     </div>
   )
 }
