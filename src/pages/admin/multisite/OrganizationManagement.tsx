@@ -71,10 +71,11 @@ export default function OrganizationManagement() {
     setLoading(true)
     try {
       // Hämta alla kunder: både multisite-huvudkontor och vanliga kunder
+      // Enkelt: alla som INTE är enheter (dvs huvudkontor eller vanliga kunder utan site_type)
       const { data: allCustomersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .or('and(site_type.eq.huvudkontor,is_multisite.eq.true),and(is_multisite.is.null),and(is_multisite.eq.false)')
+        .not('site_type', 'eq', 'enhet')
         .order('company_name')
 
       if (customersError) throw customersError
@@ -323,34 +324,21 @@ export default function OrganizationManagement() {
     }
   }
 
-  const handleResetPassword = async (org: any) => {
+  const handleResetPassword = async (email: string, userName: string) => {
     try {
-      if (!org.primary_contact_email) {
-        toast.error('Ingen kontakt-e-post funnen för denna kund')
-        return
-      }
-
-      // Hämta användaren från profiles
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('customer_id', org.id)
-        .eq('role', 'customer')
-        .single()
-
-      if (!profile) {
-        toast.error('Ingen portal-användare funnen för denna kund')
+      if (!email) {
+        toast.error('Ingen kontakt-e-post funnen')
         return
       }
 
       // Skicka lösenordsåterställning via Supabase Auth
-      const { error } = await supabase.auth.resetPasswordForEmail(org.primary_contact_email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       })
 
       if (error) throw error
 
-      toast.success(`Lösenordsåterställning skickad till ${org.primary_contact_email}`)
+      toast.success(`Lösenordsåterställning skickad till ${email}`)
     } catch (error) {
       console.error('Error resetting password:', error)
       toast.error('Kunde inte skicka lösenordsåterställning')

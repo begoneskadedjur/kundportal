@@ -482,8 +482,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                             {org.portalAccessStatus === 'full' && (
                               <button
                                 onClick={() => {
-                                  // TODO: Implementera lösenordsåterställning
-                                  console.log('Återställ lösenord för:', org.primary_contact_email)
+                                  onResetPassword(org.primary_contact_email || '', org.name || '')
                                   setShowActionsForOrg(null)
                                 }}
                                 className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-slate-700 flex items-center gap-2"
