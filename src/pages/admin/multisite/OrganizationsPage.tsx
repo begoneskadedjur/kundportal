@@ -102,8 +102,9 @@ export default function OrganizationsPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   
-  // Use consolidated customers hook instead of local state
-  const { consolidatedCustomers, loading, error, refresh } = useConsolidatedCustomers()
+  // State management for organizations
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   const [filteredOrganizations, setFilteredOrganizations] = useState<Organization[]>([])
   const [organizationUsers, setOrganizationUsers] = useState<Record<string, OrganizationUser[]>>({})
@@ -152,11 +153,11 @@ export default function OrganizationsPage() {
     warningCasesCount: 0
   }))
 
-  // Handle loading error from hook
+  // Handle loading error
   useEffect(() => {
     if (error) {
-      console.error('Error from useConsolidatedCustomers:', error)
-      toast.error('Kunde inte hämta organisationer')
+      console.error('Error fetching customers:', error)
+      toast.error('Kunde inte hämta kunder')
     }
   }, [error])
   
