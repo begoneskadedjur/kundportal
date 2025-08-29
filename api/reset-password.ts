@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('User found:', user.id)
 
     // 3. Kontrollera rate limiting (max 1 token per 5 minuter)
-    const existingMetadata = user.raw_user_meta_data || {}
+    const existingMetadata = user.user_metadata || {}
     const lastTokenTime = existingMetadata.reset_token_created_at
     
     if (lastTokenTime) {
@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single()
 
     const userName = profile?.name || 'Användare'
-    const organizationName = profile?.customers?.name || null
+    const organizationName = (profile?.customers as any)?.[0]?.name || null
 
     console.log('User details:', { userName, organizationName })
 

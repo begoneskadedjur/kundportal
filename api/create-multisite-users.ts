@@ -87,11 +87,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Creating user: ${userData.email}`)
         
         // Generate temporary password
-        const tempPassword = generateSecurePassword()
+        let tempPassword = generateSecurePassword()
         
         // Check if user already exists
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-        const existingAuthUser = existingUsers?.users?.find(u => u.email === userData.email)
+        const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === userData.email)
         
         let userId: string
         

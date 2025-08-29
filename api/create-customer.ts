@@ -226,7 +226,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 9. Hantera autentisering och profil
     console.log('Checking for existing auth user with email:', customerData.contact_email)
     const { data: { users } } = await supabase.auth.admin.listUsers()
-    const existingAuthUser = users.find(u => u.email === customerData.contact_email)
+    const existingAuthUser = users.find((u: any) => u.email === customerData.contact_email)
     
     let userId: string
     let isNewUser = false
