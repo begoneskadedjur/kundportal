@@ -114,6 +114,7 @@ interface CompactOrganizationTableProps {
   onDeleteSite: (orgId: string, siteId: string) => void
   expandedOrgId: string | null
   getDaysUntilContractEnd: (endDate: string | undefined) => number | null
+  formatContractLength: (length: number | null | undefined) => string
   // Nya callbacks för portal-hantering
   onInviteToPortal?: (org: Organization) => void
   onViewMultiSiteDetails?: (org: Organization) => void
@@ -148,6 +149,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onDeleteSite,
   expandedOrgId,
   getDaysUntilContractEnd,
+  formatContractLength,
   onInviteToPortal,
   onViewMultiSiteDetails,
   onViewSingleCustomerDetails
@@ -409,13 +411,13 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                   ) : (
                     <div className="flex flex-col items-center gap-1">
                       <div className={`text-xs px-2 py-1 rounded ${
-                        org.portalAccessStatus === 'full' 
+                        org.activeUsersCount && org.activeUsersCount > 0
                           ? 'bg-green-500/20 text-green-400' 
                           : 'bg-slate-500/20 text-slate-400'
                       }`}>
-                        {org.portalAccessStatus === 'full' ? '✓ Portal' : 'Ingen portal'}
+                        {org.activeUsersCount && org.activeUsersCount > 0 ? '✓ Portal' : 'Ingen portal'}
                       </div>
-                      {org.hasLoggedIn && (
+                      {org.activeUsersCount && org.activeUsersCount > 0 && (
                         <div className="text-xs text-green-400">
                           ✓ Inloggad
                         </div>
@@ -436,9 +438,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
 
                 {/* Avtalslängd */}
                 <div className="col-span-1 text-center text-sm text-slate-300">
-                  {org.contract_length ? 
-                    (typeof org.contract_length === 'number' ? `${org.contract_length} mån` : org.contract_length) 
-                    : '-'}
+                  {formatContractLength(org.contract_length)}
                 </div>
 
                 {/* Löper ut */}
@@ -471,7 +471,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         {/* Portal-specifika åtgärder för vanliga kunder */}
                         {org.organizationType === 'single' && (
                           <>
-                            {org.portalAccessStatus === 'none' && (
+                            {(!org.activeUsersCount || org.activeUsersCount === 0) && (
                               <button
                                 onClick={() => {
                                   onInviteToPortal?.(org)
@@ -483,10 +483,10 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                 Bjud in till portal
                               </button>
                             )}
-                            {org.portalAccessStatus === 'full' && (
+                            {org.activeUsersCount && org.activeUsersCount > 0 && (
                               <button
                                 onClick={() => {
-                                  onResetPassword(org.primary_contact_email || '', org.name || '')
+                                  onResetPassword(org.billing_email || '', org.name || '')
                                   setShowActionsForOrg(null)
                                 }}
                                 className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-slate-700 flex items-center gap-2"
@@ -736,7 +736,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       {org.organizationType === 'single' && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
-                            Vanlig kund
+                            Avtalskund - Ej Multi-site
                           </span>
                         </div>
                       )}
@@ -750,33 +750,37 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
 
                     <div className="p-3 bg-slate-800/50 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">
-                          <p className="text-slate-300">
-                            Lösenordsåterställning för {org.organizationType === 'multisite' ? 'alla användare' : 'kunden'}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {org.organizationType === 'multisite' 
-                              ? 'Skickas till alla registrerade användare via Resend' 
-                              : 'Skickas till kundens huvudemail via Resend'
-                            }
+                      {org.organizationType === 'multisite' ? (
+                        <div className="text-sm text-slate-400">
+                          <p className="mb-2">Individuell lösenordsåterställning görs för varje användare ovan.</p>
+                          <p className="text-xs text-slate-500">
+                            Klicka på nyckel-ikonen bredvid varje användare för att skicka återställningsmail.
                           </p>
                         </div>
-                        <Button
-                          onClick={() => {
-                            const email = org.organizationType === 'multisite' 
-                              ? org.billing_email 
-                              : (org.primary_contact_email || org.billing_email)
-                            onResetPassword(email, org.name)
-                          }}
-                          variant="primary"
-                          size="sm"
-                          className="flex items-center gap-2"
-                        >
-                          <Key className="w-3 h-3" />
-                          Återställ lösenord
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <p className="text-slate-300">
+                              Lösenordsåterställning för kunden
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Skickas till kundens huvudemail via Resend
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              const email = org.primary_contact_email || org.billing_email
+                              onResetPassword(email, org.name)
+                            }}
+                            variant="primary"
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
+                            <Key className="w-3 h-3" />
+                            Återställ lösenord
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
 

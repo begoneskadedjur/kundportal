@@ -48,6 +48,7 @@ interface Organization {
   updated_at: string
   sites_count?: number
   users_count?: number
+  activeUsersCount?: number
   total_value?: number
   // Organisationstyp för unified view
   organizationType?: 'multisite' | 'single'
@@ -125,6 +126,20 @@ export default function OrganizationsPage() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
     return diffDays
+  }
+
+  // Hjälpfunktion för att formattera avtalslängd med enheter
+  const formatContractLength = (length: number | null | undefined) => {
+    if (!length) return '-'
+    
+    // Om längden är 12 eller större, anta att det är månader och konvertera till år
+    if (length >= 12 && length % 12 === 0) {
+      const years = length / 12
+      return `${years} år`
+    }
+    
+    // Annars visa som månader
+    return `${length} mån`
   }
 
   useEffect(() => {
@@ -224,10 +239,22 @@ export default function OrganizationsPage() {
           .order('region', { ascending: true })
           .order('site_name', { ascending: true })
 
-        // Hämta antal användare
+        // Hämta antal användare och räkna aktiva användare
         const { count: usersCount } = await supabase
           .from('multisite_user_roles')
           .select('*', { count: 'exact', head: true })
+          .eq('organization_id', org.organization_id)
+
+        // Hämta aktiva användare (de som har profiles och har loggat in)
+        const { data: activeUsers } = await supabase
+          .from('multisite_user_roles')
+          .select(`
+            *,
+            profiles!inner (
+              last_sign_in_at,
+              email_confirmed_at
+            )
+          `)
           .eq('organization_id', org.organization_id)
 
         // Hämta trafikljusdata för alla enheter i organisationen
@@ -293,6 +320,7 @@ export default function OrganizationsPage() {
           organizationType: 'multisite' as const,
           sites_count: sitesCount || 0,
           users_count: usersCount || 0,
+          activeUsersCount: activeUsers?.length || 0,
           total_value: org.total_contract_value || 0,
           // Avtalsinfo
           contract_type: org.contract_type,
@@ -348,6 +376,12 @@ export default function OrganizationsPage() {
           .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
           .eq('customer_id', customer.id)
 
+        // Hämta portal access information för denna kund
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('last_sign_in_at, email_confirmed_at')
+          .eq('customer_id', customer.id)
+
         let worstPestLevel: number | null = null
         let worstProblemRating: number | null = null
         let unacknowledgedCount = 0
@@ -399,7 +433,8 @@ export default function OrganizationsPage() {
           organization_id: undefined,
           organizationType: 'single' as const,
           sites_count: 0, // Vanliga kunder har inga sites
-          users_count: 0, // Beräknas senare via profiles-tabellen
+          users_count: profiles?.length || 0,
+          activeUsersCount: profiles?.filter(p => p.last_sign_in_at || p.email_confirmed_at).length || 0,
           total_value: customer.total_contract_value || 0,
           // Avtalsinfo
           contract_type: customer.contract_type,
@@ -730,6 +765,39 @@ export default function OrganizationsPage() {
     return roleNames[roleType] || roleType
   }
 
+  const handleInviteToPortal = async (org: Organization) => {
+    if (!confirm(`Vill du bjuda in ${org.name} till kundportalen?`)) {
+      return
+    }
+
+    try {
+      // Använd vår egen API med Resend för snyggare e-postmallar
+      const response = await fetch('/api/invite-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          customerId: org.id,
+          email: org.billing_email,
+          customerName: org.name
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Kunde inte skicka inbjudan')
+      }
+
+      toast.success(`Inbjudan skickad till ${org.billing_email}`)
+      // Uppdatera organisationer för att reflektera ny portal status
+      fetchOrganizations()
+    } catch (error: any) {
+      console.error('Error sending portal invitation:', error)
+      toast.error(error.message || 'Kunde inte skicka inbjudan till portal')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -957,6 +1025,8 @@ export default function OrganizationsPage() {
             onDeleteSite={handleDeleteSite}
             expandedOrgId={expandedOrgId}
             getDaysUntilContractEnd={getDaysUntilContractEnd}
+            formatContractLength={formatContractLength}
+            onInviteToPortal={handleInviteToPortal}
           />
         )}
       </div>
