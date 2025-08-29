@@ -34,6 +34,7 @@ import MultisiteRegistrationWizard from '../../../components/admin/multisite/Mul
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserManagementPanel from '../../../components/admin/multisite/UserManagementPanel'
 import SiteManagementPanel from '../../../components/admin/multisite/SiteManagementPanel'
+import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import toast from 'react-hot-toast'
 
 export default function OrganizationManagement() {
@@ -45,9 +46,13 @@ export default function OrganizationManagement() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrg, setSelectedOrg] = useState<MultisiteOrganization | null>(null)
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
+  const [portalStatusFilter, setPortalStatusFilter] = useState<'all' | 'has_access' | 'no_access'>('all')
+  const [loginStatusFilter, setLoginStatusFilter] = useState<'all' | 'logged_in' | 'never_logged_in'>('all')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingOrg, setEditingOrg] = useState<MultisiteOrganization | null>(null)
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
+  const [inviteToPortal, setInviteToPortal] = useState<{ org: MultisiteOrganization | null; showModal: boolean }>({ org: null, showModal: false })
 
   useEffect(() => {
     fetchOrganizations()
@@ -65,39 +70,86 @@ export default function OrganizationManagement() {
   const fetchOrganizations = async () => {
     setLoading(true)
     try {
-      // Fetch organizations (huvudkontor customers)
-      const { data: huvudkontorData, error: orgsError } = await supabase
+      // Hämta alla kunder: både multisite-huvudkontor och vanliga kunder
+      const { data: allCustomersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .eq('site_type', 'huvudkontor')
-        .eq('is_multisite', true)
+        .or('and(site_type.eq.huvudkontor,is_multisite.eq.true),and(is_multisite.is.null),and(is_multisite.eq.false)')
         .order('company_name')
 
-      if (orgsError) throw orgsError
+      if (customersError) throw customersError
+
+      // Hämta portal access information
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('customer_id, role, last_sign_in_at, email_verified, is_active')
+        .eq('role', 'customer')
+
+      const portalAccessMap = new Map<string, { hasAccess: boolean; lastLogin?: string; isActive: boolean }>()
+      profilesData?.forEach(profile => {
+        if (profile.customer_id) {
+          portalAccessMap.set(profile.customer_id, {
+            hasAccess: true,
+            lastLogin: profile.last_sign_in_at,
+            isActive: profile.is_active || false
+          })
+        }
+      })
+
+      // Hämta multisite portal access
+      const { data: multisiteRoles } = await supabase
+        .from('multisite_user_roles')
+        .select('organization_id, user_id, is_active')
+        .eq('is_active', true)
+
+      const multisiteAccessMap = new Map<string, number>()
+      multisiteRoles?.forEach(role => {
+        if (role.organization_id) {
+          const current = multisiteAccessMap.get(role.organization_id) || 0
+          multisiteAccessMap.set(role.organization_id, current + 1)
+        }
+      })
 
       // Map customers to organization structure
-      const orgs = (huvudkontorData || []).map(customer => ({
-        id: customer.id, // Använd customer.id som huvudidentifierare
-        organization_id: customer.organization_id, // Behåll organization_id separat
-        name: customer.company_name,
-        organization_number: customer.organization_number,
-        billing_type: 'consolidated' as const,
-        primary_contact_email: customer.contact_email,
-        primary_contact_phone: customer.contact_phone,
-        billing_address: customer.billing_address,
-        is_active: customer.is_active,
-        created_at: customer.created_at,
-        updated_at: customer.updated_at
-      }))
+      const orgs = (allCustomersData || []).map(customer => {
+        const isMultisite = customer.is_multisite && customer.site_type === 'huvudkontor'
+        const portalInfo = portalAccessMap.get(customer.id)
+        const multisiteUserCount = isMultisite ? multisiteAccessMap.get(customer.organization_id || customer.id) || 0 : 0
+        const singlePortalAccess = !isMultisite && portalInfo?.hasAccess
+        
+        return {
+          id: customer.id,
+          organization_id: customer.organization_id,
+          name: customer.company_name,
+          organization_number: customer.organization_number,
+          billing_type: 'consolidated' as const,
+          primary_contact_email: customer.contact_email,
+          primary_contact_phone: customer.contact_phone,
+          billing_address: customer.billing_address,
+          is_active: customer.is_active,
+          created_at: customer.created_at,
+          updated_at: customer.updated_at,
+          // Nya fält för båda kundtyper
+          organizationType: isMultisite ? 'multisite' as const : 'single' as const,
+          portalAccessStatus: isMultisite 
+            ? (multisiteUserCount > 0 ? 'full' as const : 'none' as const)
+            : (singlePortalAccess ? 'full' as const : 'none' as const),
+          activeUsersCount: isMultisite ? multisiteUserCount : (singlePortalAccess ? 1 : 0),
+          hasLoggedIn: portalInfo?.lastLogin ? true : false,
+          lastLoginDate: portalInfo?.lastLogin,
+          sites_count: isMultisite ? undefined : 1 // Kommer uppdateras för multisite nedan
+        }
+      })
 
       setOrganizations(orgs)
 
-      // Fetch sites for each organization
-      if (orgs && orgs.length > 0) {
+      // Fetch sites for each multisite organization
+      const multisiteOrgs = orgs.filter(org => org.organizationType === 'multisite')
+      if (multisiteOrgs && multisiteOrgs.length > 0) {
         const sitesData: Record<string, OrganizationSite[]> = {}
         const usersData: Record<string, MultisiteUserRole[]> = {}
 
-        for (const org of orgs) {
+        for (const org of multisiteOrgs) {
           // Fetch sites (enhet customers)
           const { data: enhetData, error: sitesError } = await supabase
             .from('customers')
@@ -141,6 +193,19 @@ export default function OrganizationManagement() {
 
         setSites(sitesData)
         setUsers(usersData)
+        
+        // Uppdatera sites_count för multisite-organisationer
+        setOrganizations(prevOrgs => 
+          prevOrgs.map(org => {
+            if (org.organizationType === 'multisite' && sitesData[org.id]) {
+              return {
+                ...org,
+                sites_count: sitesData[org.id].length + 1 // +1 för huvudkontor
+              }
+            }
+            return org
+          })
+        )
       }
     } catch (error) {
       console.error('Error fetching organizations:', error)
@@ -216,10 +281,107 @@ export default function OrganizationManagement() {
     }
   }
 
-  const filteredOrganizations = organizations.filter(org =>
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.organization_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Nya funktioner för portal-hantering
+  const handleInviteToPortal = async (org: any) => {
+    try {
+      if (!org.primary_contact_email) {
+        toast.error('Ingen kontakt-e-post funnen för denna kund')
+        return
+      }
+
+      // Använd befintlig API för kundregistrering
+      const response = await fetch('/api/create-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: org.primary_contact_email,
+          customerData: {
+            company_name: org.name,
+            organization_number: org.organization_number,
+            contact_person: org.contact_person,
+            contact_email: org.primary_contact_email,
+            contact_phone: org.primary_contact_phone,
+            existing_customer_id: org.id
+          },
+          sendWelcomeEmail: true,
+          role: 'customer',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        throw new Error(errorData)
+      }
+
+      toast.success(`Portal-inbjudan skickad till ${org.primary_contact_email}`)
+      fetchOrganizations() // Uppdatera listan
+    } catch (error) {
+      console.error('Error inviting to portal:', error)
+      toast.error('Kunde inte skicka portal-inbjudan')
+    }
+  }
+
+  const handleResetPassword = async (org: any) => {
+    try {
+      if (!org.primary_contact_email) {
+        toast.error('Ingen kontakt-e-post funnen för denna kund')
+        return
+      }
+
+      // Hämta användaren från profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('customer_id', org.id)
+        .eq('role', 'customer')
+        .single()
+
+      if (!profile) {
+        toast.error('Ingen portal-användare funnen för denna kund')
+        return
+      }
+
+      // Skicka lösenordsåterställning via Supabase Auth
+      const { error } = await supabase.auth.resetPasswordForEmail(org.primary_contact_email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+
+      if (error) throw error
+
+      toast.success(`Lösenordsåterställning skickad till ${org.primary_contact_email}`)
+    } catch (error) {
+      console.error('Error resetting password:', error)
+      toast.error('Kunde inte skicka lösenordsåterställning')
+    }
+  }
+
+  const filteredOrganizations = organizations.filter(org => {
+    // Textsökning
+    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      org.organization_number?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    // Kundtyp-filter
+    const matchesCustomerType = 
+      customerTypeFilter === 'all' ||
+      (customerTypeFilter === 'multisite' && org.organizationType === 'multisite') ||
+      (customerTypeFilter === 'single' && org.organizationType === 'single')
+    
+    // Portal-status filter
+    const matchesPortalStatus = 
+      portalStatusFilter === 'all' ||
+      (portalStatusFilter === 'has_access' && org.portalAccessStatus === 'full') ||
+      (portalStatusFilter === 'no_access' && org.portalAccessStatus === 'none')
+    
+    // Inloggnings-status filter
+    const matchesLoginStatus = 
+      loginStatusFilter === 'all' ||
+      (loginStatusFilter === 'logged_in' && org.hasLoggedIn) ||
+      (loginStatusFilter === 'never_logged_in' && !org.hasLoggedIn)
+    
+    return matchesSearch && matchesCustomerType && matchesPortalStatus && matchesLoginStatus
+  })
 
   if (loading) {
     return (
@@ -235,8 +397,8 @@ export default function OrganizationManagement() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="Multisite-organisationer"
-          description="Hantera organisationer med flera anläggningar"
+          title="Kundhantering"
+          description="Hantera alla kunder - både multisite-organisationer och vanliga kunder"
           icon={Building2}
         />
 
@@ -259,9 +421,45 @@ export default function OrganizationManagement() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Sök organisation..."
+                placeholder="Sök kund..."
                 className="pl-10"
               />
+            </div>
+            
+            {/* Filter Controls */}
+            <div className="flex items-center gap-3">
+              {/* Kundtyp Filter */}
+              <select
+                value={customerTypeFilter}
+                onChange={(e) => setCustomerTypeFilter(e.target.value as 'all' | 'multisite' | 'single')}
+                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="all">Alla kundtyper</option>
+                <option value="multisite">Multisite</option>
+                <option value="single">Vanlig kund</option>
+              </select>
+              
+              {/* Portal-status Filter */}
+              <select
+                value={portalStatusFilter}
+                onChange={(e) => setPortalStatusFilter(e.target.value as 'all' | 'has_access' | 'no_access')}
+                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="all">Alla portal-status</option>
+                <option value="has_access">Har tillgång</option>
+                <option value="no_access">Ingen tillgång</option>
+              </select>
+              
+              {/* Inloggnings-status Filter */}
+              <select
+                value={loginStatusFilter}
+                onChange={(e) => setLoginStatusFilter(e.target.value as 'all' | 'logged_in' | 'never_logged_in')}
+                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="all">Alla login-status</option>
+                <option value="logged_in">Har loggat in</option>
+                <option value="never_logged_in">Aldrig loggat in</option>
+              </select>
             </div>
           </div>
           <Button
@@ -274,15 +472,15 @@ export default function OrganizationManagement() {
           </Button>
         </div>
 
-        {/* Organizations Grid */}
+        {/* Organizations Table */}
         {filteredOrganizations.length === 0 ? (
           <Card className="p-12 text-center">
             <Building2 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-white mb-2">
-              Inga organisationer hittades
+              Inga kunder hittades
             </h3>
             <p className="text-slate-400 mb-6">
-              {searchTerm ? 'Prova att ändra din sökning' : 'Kom igång genom att skapa din första multisite-organisation'}
+              {searchTerm ? 'Prova att ändra din sökning eller filter' : 'Kom igång genom att skapa din första multisite-organisation'}
             </p>
             {!searchTerm && (
               <Button
@@ -296,202 +494,36 @@ export default function OrganizationManagement() {
             )}
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredOrganizations.map(org => {
-              const orgSites = sites[org.id] || []
-              const orgUsers = users[org.id] || []
-              
-              return (
-                <Card key={org.id} className="overflow-hidden">
-                  {/* Organization Header */}
-                  <div className="p-6 border-b border-slate-700">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          org.is_active ? 'bg-green-500/20' : 'bg-red-500/20'
-                        }`}>
-                          <Building2 className={`w-5 h-5 ${
-                            org.is_active ? 'text-green-400' : 'text-red-400'
-                          }`} />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-white">
-                            {org.name}
-                          </h3>
-                          {org.organization_number && (
-                            <p className="text-sm text-slate-400">
-                              Org.nr: {org.organization_number}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
-                          className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                          title="Visa detaljer"
-                        >
-                          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${
-                            expandedOrg === org.id ? 'rotate-90' : ''
-                          }`} />
-                        </button>
-                        <button
-                          onClick={() => setEditingOrg(org)}
-                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors"
-                          title="Redigera organisation"
-                        >
-                          <Edit2 className="w-4 h-4 text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleActive(org)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            org.is_active 
-                              ? 'hover:bg-slate-700 text-slate-400' 
-                              : 'hover:bg-green-500/20 text-green-400'
-                          }`}
-                          title={org.is_active ? 'Inaktivera' : 'Aktivera'}
-                        >
-                          {org.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrganization(org)}
-                          className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
-                          title="Ta bort"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-400" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Contact Info */}
-                    <div className="space-y-2 text-sm">
-                      {org.primary_contact_email && (
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Mail className="w-4 h-4" />
-                          <span>{org.primary_contact_email}</span>
-                        </div>
-                      )}
-                      {org.primary_contact_phone && (
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Phone className="w-4 h-4" />
-                          <span>{org.primary_contact_phone}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Receipt className="w-4 h-4" />
-                        <span>
-                          Fakturering: {org.billing_type === 'consolidated' ? 'Konsoliderad' : 'Per anläggning'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="p-6 grid grid-cols-2 gap-4">
-                    {/* Sites */}
-                    <div className="bg-slate-800/50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm font-medium text-slate-300">Anläggningar</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">
-                        {orgSites.length}
-                      </div>
-                      {orgSites.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {orgSites.slice(0, 3).map(site => (
-                            <div key={site.id} className="text-xs text-slate-500 truncate">
-                              • {site.site_name}
-                            </div>
-                          ))}
-                          {orgSites.length > 3 && (
-                            <div className="text-xs text-slate-500">
-                              +{orgSites.length - 3} till...
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Users */}
-                    <div className="bg-slate-800/50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Users className="w-4 h-4 text-blue-400" />
-                        <span className="text-sm font-medium text-slate-300">Användare</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">
-                        {orgUsers.length}
-                      </div>
-                      {orgUsers.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'verksamhetschef').length} Verksamhetschef
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'regionchef').length} Regionchef
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {orgUsers.filter(u => u.role_type === 'platsansvarig').length} Platsansvarig
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded Details Panel */}
-                  {expandedOrg === org.id && (
-                    <div className="border-t border-slate-700 bg-slate-950/50">
-                      <div className="p-6">
-                        {/* Tab Navigation */}
-                        <div className="flex gap-4 mb-6 border-b border-slate-700">
-                          <button
-                            onClick={() => setSelectedOrg(org)}
-                            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                              selectedOrg?.id === org.id 
-                                ? 'text-purple-400' 
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            Användare
-                            {selectedOrg?.id === org.id && (
-                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => setSelectedOrg(null)}
-                            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                              selectedOrg?.id !== org.id 
-                                ? 'text-purple-400' 
-                                : 'text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            Anläggningar
-                            {selectedOrg?.id !== org.id && (
-                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Tab Content */}
-                        {selectedOrg?.id === org.id ? (
-                          <UserManagementPanel
-                            organizationId={org.id}
-                            organizationName={org.name}
-                            onUpdate={fetchOrganizations}
-                          />
-                        ) : (
-                          <SiteManagementPanel
-                            organizationId={org.id}
-                            onUpdate={fetchOrganizations}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
-          </div>
+          <CompactOrganizationTable
+            organizations={filteredOrganizations}
+            organizationUsers={users}
+            organizationSites={sites}
+            onToggleExpand={(org) => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
+            onToggleActive={handleToggleActive}
+            onEdit={(org) => setEditingOrg(org)}
+            onDelete={handleDeleteOrganization}
+            onAddUser={(org) => console.log('Add user:', org.id)}
+            onEditUser={(org, user) => console.log('Edit user:', user.id)}
+            onDeleteUser={(orgId, userId) => console.log('Delete user:', userId)}
+            onResetPassword={handleResetPassword}
+            onAddSite={(org) => console.log('Add site:', org.id)}
+            onEditSite={(org, site) => console.log('Edit site:', site.id)}
+            onDeleteSite={(orgId, siteId) => console.log('Delete site:', siteId)}
+            expandedOrgId={expandedOrg}
+            getDaysUntilContractEnd={(endDate) => {
+              if (!endDate) return null
+              const end = new Date(endDate)
+              const now = new Date()
+              return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            }}
+            onInviteToPortal={handleInviteToPortal}
+            onViewMultiSiteDetails={(org) => {
+              navigate('/admin/organisation/details', { state: { organizationId: org.id } })
+            }}
+            onViewSingleCustomerDetails={(org) => {
+              navigate('/admin/customers', { state: { selectedCustomerId: org.id } })
+            }}
+          />
         )}
       </div>
 
