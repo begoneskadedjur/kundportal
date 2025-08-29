@@ -5,7 +5,6 @@ import { PageHeader } from '../../../components/shared'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
 import toast from 'react-hot-toast'
-import { useConsolidatedCustomers, ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { 
   Building2, 
   Users, 
@@ -36,21 +35,42 @@ import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import { useAuth } from '../../../contexts/AuthContext'
 
-// Extend ConsolidatedCustomer with organization-specific fields
-interface Organization extends ConsolidatedCustomer {
-  name: string // Alias for company_name
+interface Organization {
+  id: string
+  name: string
+  organization_number: string
+  organization_id?: string
   billing_address: string
+  billing_email: string
   billing_method: 'consolidated' | 'per_site'
-  account_manager?: string // Alias for assigned_account_manager
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  sites_count?: number
+  users_count?: number
+  total_value?: number
+  // Avtalsinfo
+  contract_type?: string
+  contract_end_date?: string
+  contract_length?: number
+  annual_value?: number
+  monthly_value?: number
+  account_manager?: string
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
-  // Trafikljusdata - these might not be available in consolidated data
+  // Enheter
+  sites?: any[]
+  contact_phone?: string
+  contact_person?: string
+  // Trafikljusdata
   worstPestLevel?: number | null
   worstProblemRating?: number | null
   unacknowledgedCount?: number
   criticalCasesCount?: number
   warningCasesCount?: number
+  // För att skilja mellan multisite och vanliga kunder
+  organizationType?: 'multisite' | 'single'
 }
 
 interface OrganizationUser {
@@ -175,7 +195,186 @@ export default function OrganizationsPage() {
     setFilteredOrganizations(filtered)
   }, [searchTerm, organizations])
 
-  // Removed fetchOrganizations - now using useConsolidatedCustomers hook
+  const fetchMultisiteOrganizations = async (): Promise<Organization[]> => {
+    // Hämta organisationer (huvudkontor från customers)
+    const { data: orgs, error: orgsError } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('site_type', 'huvudkontor')
+      .eq('is_multisite', true)
+      .order('created_at', { ascending: false })
+
+    if (orgsError) throw orgsError
+    if (!orgs || orgs.length === 0) return []
+
+    // Hämta statistik för varje organisation
+    const orgsWithStats = await Promise.all(orgs.map(async (org) => {
+      // Hämta antal sites (enheter från customers)
+      const { count: sitesCount } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.organization_id)
+        .eq('site_type', 'enhet')
+        .eq('is_multisite', true)
+        .eq('is_active', true)
+
+      // Hämta enheter med fullständig info
+      const { data: sites } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('organization_id', org.organization_id)
+        .eq('site_type', 'enhet')
+        .eq('is_multisite', true)
+        .order('region', { ascending: true })
+        .order('site_name', { ascending: true })
+
+      // Hämta antal användare
+      const { count: usersCount } = await supabase
+        .from('multisite_user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.organization_id)
+
+      // Hämta trafikljusdata för alla enheter i organisationen
+      let worstPestLevel: number | null = null
+      let worstProblemRating: number | null = null
+      let unacknowledgedCount = 0
+      let criticalCasesCount = 0
+      let warningCasesCount = 0
+
+      if (sites && sites.length > 0) {
+        const siteIds = sites.map(s => s.id)
+        
+        // Hämta alla cases för organisationens enheter
+        const { data: cases } = await supabase
+          .from('cases')
+          .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
+          .in('customer_id', siteIds)
+
+        if (cases) {
+          cases.forEach(caseItem => {
+            // Uppdatera värsta nivåer
+            if (caseItem.pest_level !== null) {
+              if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
+                worstPestLevel = caseItem.pest_level
+              }
+            }
+            
+            if (caseItem.problem_rating !== null) {
+              if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
+                worstProblemRating = caseItem.problem_rating
+              }
+            }
+
+            // Räkna kritiska och varningar
+            const pest = caseItem.pest_level ?? -1
+            const problem = caseItem.problem_rating ?? -1
+            
+            if (pest >= 3 || problem >= 4) {
+              criticalCasesCount++
+            } else if (pest === 2 || problem === 3) {
+              warningCasesCount++
+            }
+
+            // Räkna obekräftade rekommendationer
+            if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
+              unacknowledgedCount++
+            }
+          })
+        }
+      }
+
+      return {
+        id: org.id,
+        name: org.company_name,
+        organization_number: org.organization_number || '',
+        billing_address: org.billing_address || org.contact_address || '',
+        billing_email: org.billing_email || org.contact_email || '',
+        billing_method: (org.billing_type || 'consolidated') as 'consolidated' | 'per_site',
+        is_active: org.is_active !== false,
+        created_at: org.created_at,
+        updated_at: org.updated_at,
+        organization_id: org.organization_id,
+        sites_count: sitesCount || 0,
+        users_count: usersCount || 0,
+        total_value: org.total_contract_value || 0,
+        // Avtalsinfo
+        contract_type: org.contract_type,
+        contract_end_date: org.contract_end_date,
+        contract_length: org.contract_length,
+        annual_value: org.annual_value || 0,
+        monthly_value: org.monthly_value || 0,
+        account_manager: org.assigned_account_manager,
+        account_manager_email: org.account_manager_email,
+        sales_person: org.sales_person,
+        sales_person_email: org.sales_person_email,
+        // Kontaktinfo
+        contact_phone: org.contact_phone,
+        contact_person: org.contact_person,
+        // Enheter
+        sites: sites || [],
+        // Trafikljusdata
+        worstPestLevel,
+        worstProblemRating,
+        unacknowledgedCount,
+        criticalCasesCount,
+        warningCasesCount,
+        // Organisationstyp
+        organizationType: 'multisite' as const
+      }
+    }))
+
+    return orgsWithStats
+  }
+
+  const fetchSingleCustomers = async (): Promise<Organization[]> => {
+    // Hämta vanliga kunder (inte multisite)
+    const { data: customers, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('is_multisite', false)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    if (!customers || customers.length === 0) return []
+
+    // Konvertera till Organization format
+    return customers.map(customer => ({
+      id: customer.id,
+      name: customer.company_name,
+      organization_number: customer.organization_number || '',
+      billing_address: customer.billing_address || customer.contact_address || '',
+      billing_email: customer.billing_email || customer.contact_email || '',
+      billing_method: 'consolidated' as const,
+      is_active: customer.is_active !== false,
+      created_at: customer.created_at,
+      updated_at: customer.updated_at,
+      sites_count: 1, // Vanliga kunder har bara en "site" (sig själva)
+      users_count: 0, // Vanliga kunder har inte multisite-användare
+      total_value: customer.total_contract_value || 0,
+      // Avtalsinfo
+      contract_type: customer.contract_type,
+      contract_end_date: customer.contract_end_date,
+      contract_length: customer.contract_length,
+      annual_value: customer.annual_value || 0,
+      monthly_value: customer.monthly_value || 0,
+      account_manager: customer.assigned_account_manager,
+      account_manager_email: customer.account_manager_email,
+      sales_person: customer.sales_person,
+      sales_person_email: customer.sales_person_email,
+      // Kontaktinfo
+      contact_phone: customer.contact_phone,
+      contact_person: customer.contact_person,
+      // För vanliga kunder: inga enheter, ingen trafikljusdata
+      sites: [],
+      worstPestLevel: null,
+      worstProblemRating: null,
+      unacknowledgedCount: 0,
+      criticalCasesCount: 0,
+      warningCasesCount: 0,
+      // Organisationstyp
+      organizationType: 'single' as const
+    }))
+  }
 
   const handleDeleteOrganization = async (org: Organization) => {
     if (!confirm(`Är du säker på att du vill ta bort ${org.name}? Detta kommer även ta bort alla anläggningar och användare.`)) {
@@ -230,7 +429,7 @@ export default function OrganizationsPage() {
       if (deleteError) throw deleteError
 
       toast.success('Organisation och alla relaterade data borttagna')
-      refresh()
+      fetchAllCustomers()
     } catch (error) {
       console.error('Error deleting organization:', error)
       toast.error('Kunde inte ta bort organisation')
@@ -247,7 +446,7 @@ export default function OrganizationsPage() {
       if (error) throw error
 
       toast.success(`Organisation ${org.is_active ? 'inaktiverad' : 'aktiverad'}`)
-      refresh()
+      fetchAllCustomers()
     } catch (error) {
       console.error('Error toggling organization:', error)
       toast.error('Kunde inte uppdatera organisation')
@@ -648,7 +847,7 @@ export default function OrganizationsPage() {
           onSuccess={() => {
             setShowEditModal(false)
             setSelectedOrg(null)
-            refresh()
+            fetchAllCustomers()
           }}
         />
       )}
@@ -689,7 +888,7 @@ export default function OrganizationsPage() {
               fetchOrganizationSites(selectedOrg.id, selectedOrg.organization_id)
             }
             // Uppdatera sites_count
-            refresh()
+            fetchAllCustomers()
           }}
           organizationId={selectedOrg.organization_id || ''}
           organizationName={selectedOrg.name}

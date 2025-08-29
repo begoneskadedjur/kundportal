@@ -611,14 +611,15 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Enheter - Only show for multisite organizations */}
-                  {org.organizationType === 'multisite' && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-blue-400" />
-                          Enheter ({organizationSites[org.id]?.length || 0})
-                        </h4>
+                  {/* Enheter */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-blue-400" />
+                        Enheter ({organizationSites[org.id]?.length || 0})
+                      </h4>
+                      {/* Only show Add Site button for multisite organizations */}
+                      {org.organizationType === 'multisite' && (
                         <Button
                           onClick={() => onAddSite(org)}
                           variant="primary"
@@ -628,7 +629,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           <Plus className="w-3 h-3" />
                           Lägg till enhet
                         </Button>
-                      </div>
+                      )}
+                    </div>
 
                     {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -669,22 +671,22 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           </div>
                         ))}
                       </div>
-                      ) : (
-                        <p className="text-sm text-slate-500 text-center py-4">
-                          Inga enheter registrerade
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-4">
+                        {org.organizationType === 'single' ? 'Vanlig kund - inga separata enheter' : 'Inga enheter registrerade'}
+                      </p>
+                    )}
+                  </div>
 
-                  {/* Användare - Only show for multisite organizations */}
-                  {org.organizationType === 'multisite' && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                          <Users className="w-4 h-4 text-purple-400" />
-                          Användare ({organizationUsers[org.id]?.length || 0})
-                        </h4>
+                  {/* Användare */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-purple-400" />
+                        Användare ({organizationUsers[org.id]?.length || 0})
+                      </h4>
+                      {/* Only show Add User button for multisite organizations */}
+                      {org.organizationType === 'multisite' && (
                         <Button
                           onClick={() => onAddUser(org)}
                           variant="primary"
@@ -694,7 +696,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           <UserPlus className="w-3 h-3" />
                           Lägg till användare
                         </Button>
-                      </div>
+                      )}
+                    </div>
 
                     {organizationUsers[org.id] && organizationUsers[org.id].length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -741,13 +744,12 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           </div>
                         ))}
                       </div>
-                      ) : (
-                        <p className="text-sm text-slate-500 text-center py-4">
-                          Inga användare registrerade
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-4">
+                        {org.organizationType === 'single' ? 'Vanlig kund - kontakta direkt via e-post/telefon' : 'Inga användare registrerade'}
+                      </p>
+                    )}
+                  </div>
 
                   {/* Visa fullständig hantering - Only for multisite organizations */}
                   {org.organizationType === 'multisite' && (
