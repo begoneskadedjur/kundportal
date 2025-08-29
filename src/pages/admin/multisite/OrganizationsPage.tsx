@@ -470,6 +470,8 @@ export default function OrganizationsPage() {
           // Kontaktinfo
           contact_phone: customer.contact_phone,
           contact_person: customer.contact_person,
+          contact_email: customer.contact_email,
+          primary_contact_email: customer.contact_email,
           // Enheter (inga för single customers)
           sites: [],
           // Trafikljusdata
@@ -801,7 +803,7 @@ export default function OrganizationsPage() {
         body: JSON.stringify({ 
           company_name: org.name,
           contact_person: org.contact_person,
-          contact_email: org.billing_email,
+          contact_email: org.contact_email || org.primary_contact_email || org.billing_email,
           contact_phone: org.contact_phone,
           customer_id: org.id,
           skip_customer_creation: true // Kunden finns redan, bara skicka inbjudan
@@ -813,7 +815,7 @@ export default function OrganizationsPage() {
         throw new Error(error.error || 'Kunde inte skicka inbjudan')
       }
 
-      toast.success(`Portal-inbjudan skickad till ${org.billing_email}`)
+      toast.success(`Portal-inbjudan skickad till ${org.contact_email || org.primary_contact_email || org.billing_email}`)
       // Uppdatera organisationer för att reflektera ny portal status
       fetchOrganizations()
     } catch (error: any) {

@@ -70,6 +70,7 @@ interface Organization {
   lastLoginDate?: string
   primary_contact_email?: string
   primary_contact_phone?: string
+  contact_email?: string
 }
 
 interface OrganizationUser {
@@ -417,11 +418,6 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       }`}>
                         {org.activeUsersCount && org.activeUsersCount > 0 ? '✓ Portal' : 'Ingen portal'}
                       </div>
-                      {org.activeUsersCount && org.activeUsersCount > 0 && (
-                        <div className="text-xs text-green-400">
-                          ✓ Inloggad
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -544,10 +540,13 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     <div>
                       <h4 className="text-sm font-semibold text-slate-300 mb-3">Kontaktinformation</h4>
                       <div className="space-y-2 text-sm">
-                        {org.billing_email && (
+                        {(org.contact_email || org.primary_contact_email || org.billing_email) && (
                           <div className="flex items-center gap-2 text-slate-400">
                             <Mail className="w-4 h-4" />
-                            <span>{org.billing_email}</span>
+                            <span>{org.contact_email || org.primary_contact_email || org.billing_email}</span>
+                            {org.contact_email !== org.billing_email && org.billing_email && (
+                              <span className="text-xs text-slate-500">(Faktura: {org.billing_email})</span>
+                            )}
                           </div>
                         )}
                         {org.contact_phone && (
