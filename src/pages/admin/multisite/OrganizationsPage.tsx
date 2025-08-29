@@ -252,7 +252,8 @@ export default function OrganizationsPage() {
             *,
             profiles!inner (
               last_sign_in_at,
-              email_confirmed_at
+              email_verified,
+              last_login
             )
           `)
           .eq('organization_id', org.organization_id)
@@ -379,7 +380,7 @@ export default function OrganizationsPage() {
         // Hämta portal access information för denna kund
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('last_sign_in_at, email_confirmed_at')
+          .select('last_sign_in_at, email_verified, last_login')
           .eq('customer_id', customer.id)
 
         let worstPestLevel: number | null = null
@@ -434,7 +435,7 @@ export default function OrganizationsPage() {
           organizationType: 'single' as const,
           sites_count: 0, // Vanliga kunder har inga sites
           users_count: profiles?.length || 0,
-          activeUsersCount: profiles?.filter(p => p.last_sign_in_at || p.email_confirmed_at).length || 0,
+          activeUsersCount: profiles?.filter(p => p.last_sign_in_at || p.last_login || p.email_verified).length || 0,
           total_value: customer.total_contract_value || 0,
           // Avtalsinfo
           contract_type: customer.contract_type,
