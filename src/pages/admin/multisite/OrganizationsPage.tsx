@@ -49,6 +49,8 @@ interface Organization {
   sites_count?: number
   users_count?: number
   total_value?: number
+  // Organisationstyp för unified view
+  organizationType?: 'multisite' | 'single'
   // Avtalsinfo
   contract_type?: string
   contract_end_date?: string
@@ -167,7 +169,27 @@ export default function OrganizationsPage() {
   const fetchOrganizations = async () => {
     setLoading(true)
     try {
-      // Hämta organisationer (huvudkontor från customers)
+      // Hämta båda typer av kunder parallellt för bästa prestanda
+      const [multisiteOrgs, singleCustomers] = await Promise.all([
+        fetchMultisiteOrganizations(),
+        fetchSingleCustomers()
+      ])
+
+      // Kombinera och sätt organisationer
+      const allOrganizations = [...multisiteOrgs, ...singleCustomers]
+      setOrganizations(allOrganizations)
+      setFilteredOrganizations(allOrganizations)
+    } catch (error) {
+      console.error('Error fetching organizations:', error)
+      toast.error('Kunde inte hämta organisationer')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchMultisiteOrganizations = async (): Promise<Organization[]> => {
+    try {
+      // Hämta multisite organisationer (huvudkontor från customers)
       const { data: orgs, error: orgsError } = await supabase
         .from('customers')
         .select('*')
@@ -177,132 +199,236 @@ export default function OrganizationsPage() {
 
       if (orgsError) throw orgsError
 
-      // Hämta statistik för varje organisation
-      if (orgs && orgs.length > 0) {
-        const orgsWithStats = await Promise.all(orgs.map(async (org) => {
-          // Hämta antal sites (enheter från customers)
-          const { count: sitesCount } = await supabase
-            .from('customers')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.organization_id)
-            .eq('site_type', 'enhet')
-            .eq('is_multisite', true)
-            .eq('is_active', true)
-
-          // Hämta enheter med fullständig info
-          const { data: sites } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('organization_id', org.organization_id)
-            .eq('site_type', 'enhet')
-            .eq('is_multisite', true)
-            .order('region', { ascending: true })
-            .order('site_name', { ascending: true })
-
-          // Hämta antal användare
-          const { count: usersCount } = await supabase
-            .from('multisite_user_roles')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.organization_id)
-
-          // Hämta trafikljusdata för alla enheter i organisationen
-          let worstPestLevel: number | null = null
-          let worstProblemRating: number | null = null
-          let unacknowledgedCount = 0
-          let criticalCasesCount = 0
-          let warningCasesCount = 0
-
-          if (sites && sites.length > 0) {
-            const siteIds = sites.map(s => s.id)
-            
-            // Hämta alla cases för organisationens enheter
-            const { data: cases } = await supabase
-              .from('cases')
-              .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
-              .in('customer_id', siteIds)
-
-            if (cases) {
-              cases.forEach(caseItem => {
-                // Uppdatera värsta nivåer
-                if (caseItem.pest_level !== null) {
-                  if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
-                    worstPestLevel = caseItem.pest_level
-                  }
-                }
-                
-                if (caseItem.problem_rating !== null) {
-                  if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
-                    worstProblemRating = caseItem.problem_rating
-                  }
-                }
-
-                // Räkna kritiska och varningar
-                const pest = caseItem.pest_level ?? -1
-                const problem = caseItem.problem_rating ?? -1
-                
-                if (pest >= 3 || problem >= 4) {
-                  criticalCasesCount++
-                } else if (pest === 2 || problem === 3) {
-                  warningCasesCount++
-                }
-
-                // Räkna obekräftade rekommendationer
-                if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
-                  unacknowledgedCount++
-                }
-              })
-            }
-          }
-
-          return {
-            id: org.id,
-            name: org.company_name,
-            organization_number: org.organization_number || '',
-            billing_address: org.billing_address || org.contact_address || '',
-            billing_email: org.billing_email || org.contact_email || '',
-            billing_method: (org.billing_type || 'consolidated') as 'consolidated' | 'per_site',
-            is_active: org.is_active !== false,
-            created_at: org.created_at,
-            updated_at: org.updated_at,
-            organization_id: org.organization_id,
-            sites_count: sitesCount || 0,
-            users_count: usersCount || 0,
-            total_value: org.total_contract_value || 0,
-            // Avtalsinfo
-            contract_type: org.contract_type,
-            contract_end_date: org.contract_end_date,
-            contract_length: org.contract_length,
-            annual_value: org.annual_value || 0,
-            monthly_value: org.monthly_value || 0,
-            account_manager: org.assigned_account_manager,
-            account_manager_email: org.account_manager_email,
-            sales_person: org.sales_person,
-            sales_person_email: org.sales_person_email,
-            // Kontaktinfo
-            contact_phone: org.contact_phone,
-            contact_person: org.contact_person,
-            // Enheter
-            sites: sites || [],
-            // Trafikljusdata
-            worstPestLevel,
-            worstProblemRating,
-            unacknowledgedCount,
-            criticalCasesCount,
-            warningCasesCount
-          }
-        }))
-
-        setOrganizations(orgsWithStats)
-        setFilteredOrganizations(orgsWithStats)
-      } else {
-        setOrganizations([])
-        setFilteredOrganizations([])
+      if (!orgs || orgs.length === 0) {
+        return []
       }
+
+      // Hämta statistik för varje organisation
+      const orgsWithStats = await Promise.all(orgs.map(async (org) => {
+        // Hämta antal sites (enheter från customers)
+        const { count: sitesCount } = await supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', org.organization_id)
+          .eq('site_type', 'enhet')
+          .eq('is_multisite', true)
+          .eq('is_active', true)
+
+        // Hämta enheter med fullständig info
+        const { data: sites } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('organization_id', org.organization_id)
+          .eq('site_type', 'enhet')
+          .eq('is_multisite', true)
+          .order('region', { ascending: true })
+          .order('site_name', { ascending: true })
+
+        // Hämta antal användare
+        const { count: usersCount } = await supabase
+          .from('multisite_user_roles')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', org.organization_id)
+
+        // Hämta trafikljusdata för alla enheter i organisationen
+        let worstPestLevel: number | null = null
+        let worstProblemRating: number | null = null
+        let unacknowledgedCount = 0
+        let criticalCasesCount = 0
+        let warningCasesCount = 0
+
+        if (sites && sites.length > 0) {
+          const siteIds = sites.map(s => s.id)
+          
+          // Hämta alla cases för organisationens enheter
+          const { data: cases } = await supabase
+            .from('cases')
+            .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
+            .in('customer_id', siteIds)
+
+          if (cases) {
+            cases.forEach(caseItem => {
+              // Uppdatera värsta nivåer
+              if (caseItem.pest_level !== null) {
+                if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
+                  worstPestLevel = caseItem.pest_level
+                }
+              }
+              
+              if (caseItem.problem_rating !== null) {
+                if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
+                  worstProblemRating = caseItem.problem_rating
+                }
+              }
+
+              // Räkna kritiska och varningar
+              const pest = caseItem.pest_level ?? -1
+              const problem = caseItem.problem_rating ?? -1
+              
+              if (pest >= 3 || problem >= 4) {
+                criticalCasesCount++
+              } else if (pest === 2 || problem === 3) {
+                warningCasesCount++
+              }
+
+              // Räkna obekräftade rekommendationer
+              if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
+                unacknowledgedCount++
+              }
+            })
+          }
+        }
+
+        return {
+          id: org.id,
+          name: org.company_name,
+          organization_number: org.organization_number || '',
+          billing_address: org.billing_address || org.contact_address || '',
+          billing_email: org.billing_email || org.contact_email || '',
+          billing_method: (org.billing_type || 'consolidated') as 'consolidated' | 'per_site',
+          is_active: org.is_active !== false,
+          created_at: org.created_at,
+          updated_at: org.updated_at,
+          organization_id: org.organization_id,
+          organizationType: 'multisite' as const,
+          sites_count: sitesCount || 0,
+          users_count: usersCount || 0,
+          total_value: org.total_contract_value || 0,
+          // Avtalsinfo
+          contract_type: org.contract_type,
+          contract_end_date: org.contract_end_date,
+          contract_length: org.contract_length,
+          annual_value: org.annual_value || 0,
+          monthly_value: org.monthly_value || 0,
+          account_manager: org.assigned_account_manager,
+          account_manager_email: org.account_manager_email,
+          sales_person: org.sales_person,
+          sales_person_email: org.sales_person_email,
+          // Kontaktinfo
+          contact_phone: org.contact_phone,
+          contact_person: org.contact_person,
+          // Enheter
+          sites: sites || [],
+          // Trafikljusdata
+          worstPestLevel,
+          worstProblemRating,
+          unacknowledgedCount,
+          criticalCasesCount,
+          warningCasesCount
+        }
+      }))
+
+      return orgsWithStats
     } catch (error) {
-      console.error('Error fetching organizations:', error)
-      toast.error('Kunde inte hämta organisationer')
-    } finally {
-      setLoading(false)
+      console.error('Error fetching multisite organizations:', error)
+      return []
+    }
+  }
+
+  const fetchSingleCustomers = async (): Promise<Organization[]> => {
+    try {
+      // Hämta vanliga kunder (is_multisite = false)
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('is_multisite', false)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      if (!customers || customers.length === 0) {
+        return []
+      }
+
+      // Hämta trafikljusdata för varje kund
+      const customersWithStats = await Promise.all(customers.map(async (customer) => {
+        // Hämta cases för denna kund
+        const { data: cases } = await supabase
+          .from('cases')
+          .select('pest_level, problem_rating, recommendations, recommendations_acknowledged')
+          .eq('customer_id', customer.id)
+
+        let worstPestLevel: number | null = null
+        let worstProblemRating: number | null = null
+        let unacknowledgedCount = 0
+        let criticalCasesCount = 0
+        let warningCasesCount = 0
+
+        if (cases) {
+          cases.forEach(caseItem => {
+            // Uppdatera värsta nivåer
+            if (caseItem.pest_level !== null) {
+              if (worstPestLevel === null || caseItem.pest_level > worstPestLevel) {
+                worstPestLevel = caseItem.pest_level
+              }
+            }
+            
+            if (caseItem.problem_rating !== null) {
+              if (worstProblemRating === null || caseItem.problem_rating > worstProblemRating) {
+                worstProblemRating = caseItem.problem_rating
+              }
+            }
+
+            // Räkna kritiska och varningar
+            const pest = caseItem.pest_level ?? -1
+            const problem = caseItem.problem_rating ?? -1
+            
+            if (pest >= 3 || problem >= 4) {
+              criticalCasesCount++
+            } else if (pest === 2 || problem === 3) {
+              warningCasesCount++
+            }
+
+            // Räkna obekräftade rekommendationer
+            if (caseItem.recommendations && !caseItem.recommendations_acknowledged) {
+              unacknowledgedCount++
+            }
+          })
+        }
+
+        return {
+          id: customer.id,
+          name: customer.company_name || customer.contact_person || 'Okänt namn',
+          organization_number: customer.organization_number || '',
+          billing_address: customer.billing_address || customer.contact_address || '',
+          billing_email: customer.billing_email || customer.contact_email || '',
+          billing_method: 'consolidated' as const,
+          is_active: customer.is_active !== false,
+          created_at: customer.created_at,
+          updated_at: customer.updated_at,
+          organization_id: undefined,
+          organizationType: 'single' as const,
+          sites_count: 0, // Vanliga kunder har inga sites
+          users_count: 0, // Beräknas senare via profiles-tabellen
+          total_value: customer.total_contract_value || 0,
+          // Avtalsinfo
+          contract_type: customer.contract_type,
+          contract_end_date: customer.contract_end_date,
+          contract_length: customer.contract_length,
+          annual_value: customer.annual_value || 0,
+          monthly_value: customer.monthly_value || 0,
+          account_manager: customer.assigned_account_manager,
+          account_manager_email: customer.account_manager_email,
+          sales_person: customer.sales_person,
+          sales_person_email: customer.sales_person_email,
+          // Kontaktinfo
+          contact_phone: customer.contact_phone,
+          contact_person: customer.contact_person,
+          // Enheter (inga för single customers)
+          sites: [],
+          // Trafikljusdata
+          worstPestLevel,
+          worstProblemRating,
+          unacknowledgedCount,
+          criticalCasesCount,
+          warningCasesCount
+        }
+      }))
+
+      return customersWithStats
+    } catch (error) {
+      console.error('Error fetching single customers:', error)
+      return []
     }
   }
 
@@ -616,8 +742,8 @@ export default function OrganizationsPage() {
     <div className="min-h-screen bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader 
-          title="Multisite-organisationer" 
-          description="Hantera organisationer med flera anläggningar"
+          title="Organisationer & Kunder" 
+          description="Hantera alla avtalskunder - både multisite-organisationer och vanliga kunder"
         />
 
         {/* Actions Bar */}
@@ -646,6 +772,28 @@ export default function OrganizationsPage() {
           {/* Snabbfilter för prioriterade organisationer */}
           <div className="flex flex-wrap gap-2">
             <span className="text-sm text-slate-400 py-2">Snabbfilter:</span>
+            
+            {/* Organisationstyp filter */}
+            <button 
+              className="px-3 py-1 text-xs bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
+              onClick={() => {
+                const multisiteOrgs = organizations.filter(org => org.organizationType === 'multisite')
+                setFilteredOrganizations(multisiteOrgs)
+              }}
+            >
+              🏢 {organizations.filter(org => org.organizationType === 'multisite').length} multisite-organisationer
+            </button>
+            <button 
+              className="px-3 py-1 text-xs bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors"
+              onClick={() => {
+                const singleOrgs = organizations.filter(org => org.organizationType === 'single')
+                setFilteredOrganizations(singleOrgs)
+              }}
+            >
+              👤 {organizations.filter(org => org.organizationType === 'single').length} vanliga kunder
+            </button>
+            
+            {/* Problem-baserade filter */}
             <button 
               className="px-3 py-1 text-xs bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
               onClick={() => {
@@ -664,6 +812,8 @@ export default function OrganizationsPage() {
             >
               ⚠️ {organizations.filter(org => org.unacknowledgedCount > 0).length} med obekräftade
             </button>
+            
+            {/* Status filter */}
             <button 
               className="px-3 py-1 text-xs bg-slate-700 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
               onClick={() => {
@@ -683,14 +833,22 @@ export default function OrganizationsPage() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Totalt organisationer</p>
+                <p className="text-slate-400 text-sm">Totalt avtalskunder</p>
                 <p className="text-2xl font-bold text-white mt-1">
                   {organizations.length}
                 </p>
+                <div className="flex gap-3 mt-2 text-xs">
+                  <span className="text-blue-400">
+                    {organizations.filter(org => org.organizationType === 'multisite').length} multisite
+                  </span>
+                  <span className="text-green-400">
+                    {organizations.filter(org => org.organizationType === 'single').length} vanliga
+                  </span>
+                </div>
               </div>
               <Building2 className="w-8 h-8 text-purple-500" />
             </div>
@@ -702,6 +860,9 @@ export default function OrganizationsPage() {
                 <p className="text-slate-400 text-sm">Totalt anläggningar</p>
                 <p className="text-2xl font-bold text-white mt-1">
                   {organizations.reduce((sum, org) => sum + (org.sites_count || 0), 0)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Från multisite-organisationer
                 </p>
               </div>
               <MapPin className="w-8 h-8 text-blue-500" />
@@ -715,8 +876,32 @@ export default function OrganizationsPage() {
                 <p className="text-2xl font-bold text-white mt-1">
                   {organizations.reduce((sum, org) => sum + (org.users_count || 0), 0)}
                 </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Multisite portal-användare
+                </p>
               </div>
               <Users className="w-8 h-8 text-green-500" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm">Årlig omsättning</p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {new Intl.NumberFormat('sv-SE', { 
+                    style: 'currency', 
+                    currency: 'SEK',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                    notation: 'compact'
+                  }).format(organizations.reduce((sum, org) => sum + (org.annual_value || 0), 0))}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Alla avtalskunder
+                </p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-amber-500" />
             </div>
           </Card>
         </div>
@@ -726,22 +911,32 @@ export default function OrganizationsPage() {
           <Card className="p-12 text-center">
             <Building2 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-white mb-2">
-              {searchTerm ? 'Inga organisationer hittades' : 'Inga organisationer än'}
+              {searchTerm ? 'Inga kunder hittades' : 'Inga kunder än'}
             </h3>
             <p className="text-slate-400 mb-6">
               {searchTerm 
-                ? 'Prova att justera din sökning' 
-                : 'Börja med att registrera din första multisite-organisation'}
+                ? 'Prova att justera din sökning eller ändra filter' 
+                : 'Sidan visar alla avtalskunder - både multisite-organisationer och vanliga kunder'}
             </p>
             {!searchTerm && (
-              <Button
-                onClick={() => navigate('/admin/organisation/register')}
-                variant="primary"
-                className="flex items-center gap-2 mx-auto"
-              >
-                <Plus className="w-4 h-4" />
-                Registrera Organisation
-              </Button>
+              <div className="flex gap-4 justify-center">
+                <Button
+                  onClick={() => navigate('/admin/organisation/register')}
+                  variant="primary"
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Registrera Multisite-organisation
+                </Button>
+                <Button
+                  onClick={() => navigate('/admin/customers')}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Hantera Vanliga Kunder
+                </Button>
+              </div>
             )}
           </Card>
         ) : (

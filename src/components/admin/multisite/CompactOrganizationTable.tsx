@@ -41,6 +41,9 @@ interface Organization {
   sites_count?: number
   users_count?: number
   total_value?: number
+  // Organisationstyp för unified view
+  organizationType?: 'multisite' | 'single'
+  // Avtalsinfo
   contract_type?: string
   contract_end_date?: string
   contract_length?: number
@@ -50,22 +53,23 @@ interface Organization {
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
+  // Enheter
   sites?: any[]
   contact_phone?: string
   contact_person?: string
+  // Trafikljusdata
   worstPestLevel?: number | null
   worstProblemRating?: number | null
   unacknowledgedCount?: number
   criticalCasesCount?: number
-  // Nya fält för förenad kundhantering
-  organizationType: 'multisite' | 'single'
-  portalAccessStatus: 'full' | 'partial' | 'none'
-  activeUsersCount: number
-  hasLoggedIn: boolean
+  warningCasesCount?: number
+  // Portal access fält (för kompatibilitet)
+  portalAccessStatus?: 'full' | 'partial' | 'none'
+  activeUsersCount?: number
+  hasLoggedIn?: boolean
   lastLoginDate?: string
   primary_contact_email?: string
   primary_contact_phone?: string
-  warningCasesCount?: number
 }
 
 interface OrganizationUser {
@@ -584,138 +588,196 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Enheter */}
+                  {/* Enheter - Visa endast för multisite organisationer */}
+                  {org.organizationType === 'multisite' && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                          Enheter ({organizationSites[org.id]?.length || 0})
+                        </h4>
+                        <Button
+                          onClick={() => onAddSite(org)}
+                          variant="primary"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Lägg till enhet
+                        </Button>
+                      </div>
+
+                      {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {organizationSites[org.id].map(site => (
+                            <div
+                              key={site.id}
+                              className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-blue-500/20 rounded">
+                                  <MapPin className="w-3 h-3 text-blue-400" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white font-medium truncate">
+                                    {site.site_name} ({site.site_code})
+                                  </p>
+                                  <p className="text-xs text-slate-400 truncate">
+                                    {site.region} • {site.contact_email}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => onEditSite(org, site)}
+                                  className="p-1 hover:bg-slate-700 rounded transition-colors"
+                                  title="Redigera"
+                                >
+                                  <Edit2 className="w-3 h-3 text-slate-400" />
+                                </button>
+                                <button
+                                  onClick={() => onDeleteSite(org.id, site.id)}
+                                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                                  title="Ta bort"
+                                >
+                                  <Trash2 className="w-3 h-3 text-red-400" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Inga enheter registrerade
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Användare - Visa endast för multisite organisationer */}
+                  {org.organizationType === 'multisite' && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-purple-400" />
+                          Användare ({organizationUsers[org.id]?.length || 0})
+                        </h4>
+                        <Button
+                          onClick={() => onAddUser(org)}
+                          variant="primary"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                          Lägg till användare
+                        </Button>
+                      </div>
+
+                      {organizationUsers[org.id] && organizationUsers[org.id].length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {organizationUsers[org.id].map(user => (
+                            <div
+                              key={user.id}
+                              className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-purple-500/20 rounded">
+                                  <UserCheck className="w-3 h-3 text-purple-400" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white font-medium truncate">{user.name}</p>
+                                  <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                                </div>
+                                <span className="text-xs text-blue-400 ml-2">
+                                  {getRoleName(user.role_type)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => onResetPassword(user.email || '', user.name || '')}
+                                  className="p-1 hover:bg-purple-500/20 rounded transition-colors"
+                                  title="Återställ lösenord"
+                                >
+                                  <Key className="w-3 h-3 text-purple-400" />
+                                </button>
+                                <button
+                                  onClick={() => onEditUser(org, user)}
+                                  className="p-1 hover:bg-slate-700 rounded transition-colors"
+                                  title="Redigera"
+                                >
+                                  <Edit2 className="w-3 h-3 text-slate-400" />
+                                </button>
+                                <button
+                                  onClick={() => onDeleteUser(org.id, user.id)}
+                                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                                  title="Ta bort"
+                                >
+                                  <Trash2 className="w-3 h-3 text-red-400" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Inga användare registrerade
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Portal Access - Visa för alla kunder */}
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-blue-400" />
-                        Enheter ({organizationSites[org.id]?.length || 0})
+                        <Key className="w-4 h-4 text-green-400" />
+                        Portalåtkomst
                       </h4>
-                      <Button
-                        onClick={() => onAddSite(org)}
-                        variant="primary"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Lägg till enhet
-                      </Button>
+                      {org.organizationType === 'single' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
+                            Vanlig kund
+                          </span>
+                        </div>
+                      )}
+                      {org.organizationType === 'multisite' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
+                            Multisite-organisation
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {organizationSites[org.id].map(site => (
-                          <div
-                            key={site.id}
-                            className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="p-1.5 bg-blue-500/20 rounded">
-                                <MapPin className="w-3 h-3 text-blue-400" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm text-white font-medium truncate">
-                                  {site.site_name} ({site.site_code})
-                                </p>
-                                <p className="text-xs text-slate-400 truncate">
-                                  {site.region} • {site.contact_email}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => onEditSite(org, site)}
-                                className="p-1 hover:bg-slate-700 rounded transition-colors"
-                                title="Redigera"
-                              >
-                                <Edit2 className="w-3 h-3 text-slate-400" />
-                              </button>
-                              <button
-                                onClick={() => onDeleteSite(org.id, site.id)}
-                                className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                                title="Ta bort"
-                              >
-                                <Trash2 className="w-3 h-3 text-red-400" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                    <div className="p-3 bg-slate-800/50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <p className="text-slate-300">
+                            Lösenordsåterställning för {org.organizationType === 'multisite' ? 'alla användare' : 'kunden'}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {org.organizationType === 'multisite' 
+                              ? 'Skickas till alla registrerade användare via Resend' 
+                              : 'Skickas till kundens huvudemail via Resend'
+                            }
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            const email = org.organizationType === 'multisite' 
+                              ? org.billing_email 
+                              : (org.primary_contact_email || org.billing_email)
+                            onResetPassword(email, org.name)
+                          }}
+                          variant="primary"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Key className="w-3 h-3" />
+                          Återställ lösenord
+                        </Button>
                       </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        Inga enheter registrerade
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Användare */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-400" />
-                        Användare ({organizationUsers[org.id]?.length || 0})
-                      </h4>
-                      <Button
-                        onClick={() => onAddUser(org)}
-                        variant="primary"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        Lägg till användare
-                      </Button>
                     </div>
-
-                    {organizationUsers[org.id] && organizationUsers[org.id].length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {organizationUsers[org.id].map(user => (
-                          <div
-                            key={user.id}
-                            className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="p-1.5 bg-purple-500/20 rounded">
-                                <UserCheck className="w-3 h-3 text-purple-400" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm text-white font-medium truncate">{user.name}</p>
-                                <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                              </div>
-                              <span className="text-xs text-blue-400 ml-2">
-                                {getRoleName(user.role_type)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => onResetPassword(user.email || '', user.name || '')}
-                                className="p-1 hover:bg-purple-500/20 rounded transition-colors"
-                                title="Återställ lösenord"
-                              >
-                                <Key className="w-3 h-3 text-purple-400" />
-                              </button>
-                              <button
-                                onClick={() => onEditUser(org, user)}
-                                className="p-1 hover:bg-slate-700 rounded transition-colors"
-                                title="Redigera"
-                              >
-                                <Edit2 className="w-3 h-3 text-slate-400" />
-                              </button>
-                              <button
-                                onClick={() => onDeleteUser(org.id, user.id)}
-                                className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                                title="Ta bort"
-                              >
-                                <Trash2 className="w-3 h-3 text-red-400" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        Inga användare registrerade
-                      </p>
-                    )}
                   </div>
 
                   {/* Visa fullständig hantering */}
