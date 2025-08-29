@@ -129,17 +129,37 @@ export default function OrganizationsPage() {
   }
 
   // Hjälpfunktion för att formattera avtalslängd med enheter
-  const formatContractLength = (length: number | null | undefined) => {
+  const formatContractLength = (length: number | string | null | undefined) => {
     if (!length) return '-'
     
-    // Om längden är 12 eller större, anta att det är månader och konvertera till år
-    if (length >= 12 && length % 12 === 0) {
-      const years = length / 12
-      return `${years} år`
+    // Om längden är redan en sträng med enhet, returnera den direkt
+    if (typeof length === 'string') {
+      // Om strängen redan innehåller "år" eller "månader"/"mån", behåll som den är
+      if (length.includes('år') || length.includes('månader') || length.includes('mån')) {
+        return length
+      }
+      
+      // Om det är bara en siffra som sträng, försök konvertera
+      const numValue = parseInt(length, 10)
+      if (isNaN(numValue)) return length // Om konvertering misslyckas, returnera ursprunglig sträng
+      
+      // För enskilda siffror som sträng, anta att det är år (vanliga avtal)
+      return `${numValue} år`
     }
     
-    // Annars visa som månader
-    return `${length} mån`
+    // Om längden är ett nummer
+    if (typeof length === 'number') {
+      // Om längden är 12 eller större, anta att det är månader och konvertera till år
+      if (length >= 12 && length % 12 === 0) {
+        const years = length / 12
+        return `${years} år`
+      }
+      
+      // Annars visa som månader
+      return `${length} mån`
+    }
+    
+    return '-'
   }
 
   useEffect(() => {
@@ -772,16 +792,19 @@ export default function OrganizationsPage() {
     }
 
     try {
-      // Använd vår egen API med Resend för snyggare e-postmallar
-      const response = await fetch('/api/invite-customer', {
+      // För vanliga avtalskunder, använd create-customer API:et
+      const response = await fetch('/api/create-customer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          customerId: org.id,
-          email: org.billing_email,
-          customerName: org.name
+          company_name: org.name,
+          contact_person: org.contact_person,
+          contact_email: org.billing_email,
+          contact_phone: org.contact_phone,
+          customer_id: org.id,
+          skip_customer_creation: true // Kunden finns redan, bara skicka inbjudan
         })
       })
 
@@ -790,7 +813,7 @@ export default function OrganizationsPage() {
         throw new Error(error.error || 'Kunde inte skicka inbjudan')
       }
 
-      toast.success(`Inbjudan skickad till ${org.billing_email}`)
+      toast.success(`Portal-inbjudan skickad till ${org.billing_email}`)
       // Uppdatera organisationer för att reflektera ny portal status
       fetchOrganizations()
     } catch (error: any) {
