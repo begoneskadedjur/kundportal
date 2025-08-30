@@ -230,11 +230,34 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       console.log('Lead ID:', lead.id)
       console.log('Payload size:', JSON.stringify(updateData).length, 'characters')
 
-      // Step 1: Update lead data first
+      // Step 1: Update lead data first - split large updates for better performance
+      // Remove large text fields temporarily to reduce payload
+      const { sni07_label, notes, business_description, ...coreData } = updateData
+      
+      // First update core data
       const { error } = await supabase
         .from('leads')
-        .update(updateData)
+        .update(coreData)
         .eq('id', lead.id)
+      
+      // Then update text fields separately if no error
+      if (!error && (sni07_label || notes || business_description)) {
+        const textFields = {}
+        if (sni07_label) textFields.sni07_label = sni07_label
+        if (notes) textFields.notes = notes  
+        if (business_description) textFields.business_description = business_description
+        
+        const { error: textError } = await supabase
+          .from('leads')
+          .update(textFields)
+          .eq('id', lead.id)
+          
+        if (textError) {
+          console.warn('Text fields update failed:', textError)
+          // Core data still saved, warn user
+          toast.error('Lead uppdaterad men vissa textfält kunde inte sparas')
+        }
+      }
 
       if (error) {
         console.error('Supabase update error:', error)
@@ -287,6 +310,20 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             if (sniError) {
               console.error('SNI codes insert error:', sniError)
               toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
+            } else {
+              // Update sni07_label with concatenated codes after successful insert
+              const sniString = sniCodeInserts
+                .map(code => `${code.sni_code} ${code.sni_description}`)
+                .join(' ')
+              
+              const { error: labelError } = await supabase
+                .from('leads')
+                .update({ sni07_label: sniString })
+                .eq('id', lead.id)
+                
+              if (labelError) {
+                console.warn('SNI label update failed:', labelError)
+              }
             }
           }
         } catch (sniErr) {
