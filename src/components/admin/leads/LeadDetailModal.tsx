@@ -64,9 +64,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             filter: `lead_id=eq.${lead.id}`
           },
           () => {
-            setTimeout(() => {
-              fetchLeadDetails()
-            }, 500)
+            // Remove setTimeout delay for immediate updates
+            fetchLeadDetails()
           }
         )
         .subscribe()
@@ -81,9 +80,40 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             filter: `lead_id=eq.${lead.id}`
           },
           () => {
-            setTimeout(() => {
-              fetchLeadDetails()
-            }, 500)
+            // Remove setTimeout delay for immediate updates
+            fetchLeadDetails()
+          }
+        )
+        .subscribe()
+
+      const eventsSubscription = supabase
+        .channel(`lead_events_${lead.id}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'lead_events',
+            filter: `lead_id=eq.${lead.id}`
+          },
+          () => {
+            // Remove setTimeout delay for immediate updates
+            fetchLeadDetails()
+          }
+        )
+        .subscribe()
+
+      const leadSubscription = supabase
+        .channel(`leads_${lead.id}`)
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'leads',
+            filter: `id=eq.${lead.id}`
+          },
+          () => {
+            // Remove setTimeout delay for immediate updates
+            fetchLeadDetails()
           }
         )
         .subscribe()
@@ -91,6 +121,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       return () => {
         contactsSubscription.unsubscribe()
         commentsSubscription.unsubscribe()
+        eventsSubscription.unsubscribe()
+        leadSubscription.unsubscribe()
       }
     }
   }, [lead, isOpen])
@@ -108,59 +140,80 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     try {
       setLoading(true)
 
-      // Fetch contacts
-      const { data: contactsData, error: contactsError } = await supabase
-        .from('lead_contacts')
-        .select('*')
-        .eq('lead_id', currentLead.id)
-        .order('is_primary', { ascending: false })
+      // Fetch all data in parallel for better performance and consistency
+      const [contactsResponse, commentsResponse, eventsResponse, technicianResponse] = await Promise.allSettled([
+        supabase
+          .from('lead_contacts')
+          .select('*')
+          .eq('lead_id', currentLead.id)
+          .order('is_primary', { ascending: false }),
+        
+        supabase
+          .from('lead_comments')
+          .select(`
+            *,
+            created_by_profile:profiles!lead_comments_created_by_fkey(display_name, email)
+          `)
+          .eq('lead_id', currentLead.id)
+          .order('created_at', { ascending: false }),
+        
+        supabase
+          .from('lead_events')
+          .select(`
+            *,
+            created_by_profile:profiles!lead_events_created_by_fkey(display_name, email)
+          `)
+          .eq('lead_id', currentLead.id)
+          .order('created_at', { ascending: false }),
+        
+        currentLead.assigned_to 
+          ? supabase
+              .from('technicians')
+              .select('name')
+              .eq('id', currentLead.assigned_to)
+              .single()
+          : Promise.resolve({ data: null, error: null })
+      ])
 
-      if (contactsError) throw contactsError
-
-      // Fetch comments with profile info
-      const { data: commentsData, error: commentsError } = await supabase
-        .from('lead_comments')
-        .select(`
-          *,
-          created_by_profile:profiles!lead_comments_created_by_fkey(display_name, email)
-        `)
-        .eq('lead_id', currentLead.id)
-        .order('created_at', { ascending: false })
-
-      if (commentsError) throw commentsError
-
-      // Fetch events with profile info
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('lead_events')
-        .select(`
-          *,
-          created_by_profile:profiles!lead_events_created_by_fkey(display_name, email)
-        `)
-        .eq('lead_id', currentLead.id)
-        .order('created_at', { ascending: false })
-
-      if (eventsError) throw eventsError
-
-      // Fetch technician name if assigned
-      if (currentLead.assigned_to) {
-        const { data: techData, error: techError } = await supabase
-          .from('technicians')
-          .select('name')
-          .eq('id', currentLead.assigned_to)
-          .single()
-
-        if (!techError && techData) {
-          setTechnician(techData.name)
-        }
+      // Process contacts with error handling
+      if (contactsResponse.status === 'fulfilled' && !contactsResponse.value.error) {
+        setContacts(contactsResponse.value.data || [])
+      } else {
+        console.error('Error fetching contacts:', contactsResponse.status === 'rejected' ? contactsResponse.reason : contactsResponse.value.error)
+        setContacts([]) // Ensure we clear stale data
       }
 
-      setContacts(contactsData || [])
-      setComments(commentsData || [])
-      setEvents(eventsData || [])
+      // Process comments with error handling
+      if (commentsResponse.status === 'fulfilled' && !commentsResponse.value.error) {
+        setComments(commentsResponse.value.data || [])
+      } else {
+        console.error('Error fetching comments:', commentsResponse.status === 'rejected' ? commentsResponse.reason : commentsResponse.value.error)
+        setComments([]) // Ensure we clear stale data
+      }
+
+      // Process events with error handling
+      if (eventsResponse.status === 'fulfilled' && !eventsResponse.value.error) {
+        setEvents(eventsResponse.value.data || [])
+      } else {
+        console.error('Error fetching events:', eventsResponse.status === 'rejected' ? eventsResponse.reason : eventsResponse.value.error)
+        setEvents([]) // Ensure we clear stale data
+      }
+
+      // Process technician with error handling
+      if (technicianResponse.status === 'fulfilled' && !technicianResponse.value.error && technicianResponse.value.data) {
+        setTechnician(technicianResponse.value.data.name)
+      } else {
+        setTechnician(null)
+      }
 
     } catch (err) {
       console.error('Error fetching lead details:', err)
       toast.error('Kunde inte ladda lead-detaljer')
+      // Clear all data to prevent displaying stale information
+      setContacts([])
+      setComments([])
+      setEvents([])
+      setTechnician(null)
     } finally {
       setLoading(false)
     }

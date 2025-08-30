@@ -141,8 +141,9 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'updated',
+            title: `Tagg tillagd: ${tag.trim()}`,
             description: `Tagg "${tag.trim()}" har lagts till`,
-            metadata: {
+            data: {
               tag_added: tag.trim(),
               updated_by_profile: user.email
             },
@@ -190,8 +191,9 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'updated',
+            title: `Tagg borttagen: ${tagToRemove}`,
             description: `Tagg "${tagToRemove}" har tagits bort`,
-            metadata: {
+            data: {
               tag_removed: tagToRemove,
               updated_by_profile: user.email
             },

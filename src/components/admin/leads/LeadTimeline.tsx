@@ -36,8 +36,9 @@ interface LeadTimelineProps {
 
 interface EventFormData {
   event_type: EventType
+  title: string
   description: string
-  metadata: any
+  data: any
 }
 
 const LeadTimeline: React.FC<LeadTimelineProps> = ({ 
@@ -74,15 +75,17 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   
   const [formData, setFormData] = useState<EventFormData>({
     event_type: 'note_added',
+    title: '',
     description: '',
-    metadata: null
+    data: null
   })
 
   const resetForm = () => {
     setFormData({
       event_type: 'note_added',
+      title: '',
       description: '',
-      metadata: null
+      data: null
     })
     setShowForm(false)
     setErrors({})
@@ -97,6 +100,10 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
+
+    if (!formData.title.trim()) {
+      newErrors.title = 'Titel är obligatorisk'
+    }
 
     if (!formData.description.trim()) {
       newErrors.description = 'Beskrivning är obligatorisk'
@@ -117,8 +124,9 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
       const insertData: LeadEventInsert = {
         lead_id: leadId,
         event_type: formData.event_type,
+        title: formData.title,
         description: formData.description,
-        metadata: formData.metadata,
+        data: formData.data,
         created_by: user.id
       }
 

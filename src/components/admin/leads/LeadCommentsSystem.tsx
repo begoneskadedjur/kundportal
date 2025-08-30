@@ -110,8 +110,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
             .insert({
               lead_id: leadId,
               event_type: 'updated',
+              title: `Kommentar uppdaterad`,
               description: `Kommentar har uppdaterats`,
-              metadata: {
+              data: {
                 comment_type: formData.comment_type,
                 comment_content: formData.content.substring(0, 100) + (formData.content.length > 100 ? '...' : ''),
                 action: 'updated',
@@ -146,8 +147,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
             .insert({
               lead_id: leadId,
               event_type: 'note_added',
+              title: `Ny kommentar tillagd`,
               description: `Ny kommentar (${formData.comment_type}) har lagts till`,
-              metadata: {
+              data: {
                 comment_type: formData.comment_type,
                 comment_content: formData.content.substring(0, 100) + (formData.content.length > 100 ? '...' : ''),
                 action: 'created',
@@ -195,8 +197,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'updated',
+            title: `Kommentar borttagen`,
             description: `Kommentar (${comment.comment_type}) har tagits bort`,
-            metadata: {
+            data: {
               comment_type: comment.comment_type,
               comment_content: comment.content.substring(0, 100) + (comment.content.length > 100 ? '...' : ''),
               action: 'deleted',

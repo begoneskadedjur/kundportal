@@ -23,6 +23,7 @@ import {
   LEAD_PRIORITY_DISPLAY,
   getPriorityLabel
 } from '../../../types/database'
+import { LeadEventHelpers, logLeadEvent } from '../../../utils/leadEventLogger'
 import LeadTechnicianManager from './LeadTechnicianManager'
 import SNIBranchManager from './SNIBranchManager'
 
@@ -344,21 +345,15 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           const statusConfig = LEAD_STATUS_DISPLAY[updateData.status as LeadStatus]
           const oldStatusConfig = LEAD_STATUS_DISPLAY[lead.status]
           
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: lead.id,
-              event_type: 'status_changed',
-              description: `Status ändrad från "${oldStatusConfig.label}" till "${statusConfig.label}"`,
-              metadata: {
-                old_status: lead.status,
-                new_status: updateData.status,
-                old_status_label: oldStatusConfig.label,
-                new_status_label: statusConfig.label,
-                changed_by_profile: user.email
-              },
-              created_by: user.id
-            })
+          await LeadEventHelpers.logStatusChange(
+            lead.id,
+            lead.status,
+            updateData.status as LeadStatus,
+            oldStatusConfig.label,
+            statusConfig.label,
+            user.id,
+            user.email
+          )
         }
         
         // Check if priority was changed
@@ -366,111 +361,101 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           const newPriorityLabel = updateData.priority ? getPriorityLabel(updateData.priority) : 'Ingen'
           const oldPriorityLabel = lead.priority ? getPriorityLabel(lead.priority) : 'Ingen'
           
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: lead.id,
-              event_type: 'note_added',
-              description: `Prioritet ändrad från "${oldPriorityLabel}" till "${newPriorityLabel}"`,
-              metadata: {
-                old_priority: lead.priority,
-                new_priority: updateData.priority,
-                old_priority_label: oldPriorityLabel,
-                new_priority_label: newPriorityLabel,
-                changed_by_profile: user.email
-              },
-              created_by: user.id
-            })
+          await logLeadEvent({
+            leadId: lead.id,
+            eventType: 'note_added',
+            title: `Prioritet ändrad till ${newPriorityLabel}`,
+            description: `Prioritet ändrad från "${oldPriorityLabel}" till "${newPriorityLabel}"`,
+            data: {
+              old_priority: lead.priority,
+              new_priority: updateData.priority,
+              old_priority_label: oldPriorityLabel,
+              new_priority_label: newPriorityLabel,
+              changed_by_profile: user.email
+            },
+            userId: user.id
+          })
         }
         
         // Check if contact dates were changed
         if (updatedFields.includes('contact_date') || updatedFields.includes('follow_up_date')) {
           if (updatedFields.includes('contact_date') && updateData.contact_date !== lead.contact_date) {
             const contactDate = updateData.contact_date ? new Date(updateData.contact_date).toLocaleDateString('sv-SE') : 'Ingen'
-            await supabase
-              .from('lead_events')
-              .insert({
-                lead_id: lead.id,
-                event_type: 'contacted',
-                description: `Kontaktdatum har uppdaterats till ${contactDate}`,
-                metadata: {
-                  old_contact_date: lead.contact_date,
-                  new_contact_date: updateData.contact_date,
-                  changed_by_profile: user.email
-                },
-                created_by: user.id
-              })
+            await logLeadEvent({
+              leadId: lead.id,
+              eventType: 'contacted',
+              title: `Kontaktdatum uppdaterat`,
+              description: `Kontaktdatum har uppdaterats till ${contactDate}`,
+              data: {
+                old_contact_date: lead.contact_date,
+                new_contact_date: updateData.contact_date,
+                changed_by_profile: user.email
+              },
+              userId: user.id
+            })
           }
           
           if (updatedFields.includes('follow_up_date') && updateData.follow_up_date !== lead.follow_up_date) {
             const followUpDate = updateData.follow_up_date ? new Date(updateData.follow_up_date).toLocaleDateString('sv-SE') : 'Ingen'
-            await supabase
-              .from('lead_events')
-              .insert({
-                lead_id: lead.id,
-                event_type: 'note_added',
-                description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
-                metadata: {
-                  old_follow_up_date: lead.follow_up_date,
-                  new_follow_up_date: updateData.follow_up_date,
-                  changed_by_profile: user.email
-                },
-                created_by: user.id
-              })
+            await logLeadEvent({
+              leadId: lead.id,
+              eventType: 'note_added',
+              title: `Uppföljningsdatum uppdaterat`,
+              description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
+              data: {
+                old_follow_up_date: lead.follow_up_date,
+                new_follow_up_date: updateData.follow_up_date,
+                changed_by_profile: user.email
+              },
+              userId: user.id
+            })
           }
         }
         
         // Check if quote-related fields were changed
         if (updatedFields.includes('quote_provided_date') && updateData.quote_provided_date !== lead.quote_provided_date) {
           const quoteDate = updateData.quote_provided_date ? new Date(updateData.quote_provided_date).toLocaleDateString('sv-SE') : 'Ingen'
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: lead.id,
-              event_type: 'quote_sent',
-              description: `Offertdatum har uppdaterats till ${quoteDate}`,
-              metadata: {
-                old_quote_date: lead.quote_provided_date,
-                new_quote_date: updateData.quote_provided_date,
-                changed_by_profile: user.email
-              },
-              created_by: user.id
-            })
+          await logLeadEvent({
+            leadId: lead.id,
+            eventType: 'quote_sent',
+            title: `Offertdatum uppdaterat`,
+            description: `Offertdatum har uppdaterats till ${quoteDate}`,
+            data: {
+              old_quote_date: lead.quote_provided_date,
+              new_quote_date: updateData.quote_provided_date,
+              changed_by_profile: user.email
+            },
+            userId: user.id
+          })
         }
         
         // Check if estimated value was changed (important for sales tracking)
         if (updatedFields.includes('estimated_value') && updateData.estimated_value !== lead.estimated_value) {
           const oldValue = lead.estimated_value ? `${lead.estimated_value} SEK` : 'Ingen'
           const newValue = updateData.estimated_value ? `${updateData.estimated_value} SEK` : 'Ingen'
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: lead.id,
-              event_type: 'updated',
-              description: `Uppskattat värde ändrat från ${oldValue} till ${newValue}`,
-              metadata: {
-                old_estimated_value: lead.estimated_value,
-                new_estimated_value: updateData.estimated_value,
-                changed_by_profile: user.email
-              },
-              created_by: user.id
-            })
+          await logLeadEvent({
+            leadId: lead.id,
+            eventType: 'updated',
+            title: `Uppskattat värde ändrat`,
+            description: `Uppskattat värde ändrat från ${oldValue} till ${newValue}`,
+            data: {
+              old_estimated_value: lead.estimated_value,
+              new_estimated_value: updateData.estimated_value,
+              changed_by_profile: user.email
+            },
+            userId: user.id
+          })
         }
         
         // General update event (only if no specific status change was logged)
         if (!updatedFields.includes('status')) {
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: lead.id,
-              event_type: 'updated',
-              description: 'Lead information har uppdaterats',
-              metadata: {
-                updated_fields: updatedFields,
-                updated_by_profile: user.email
-              },
-              created_by: user.id
-            })
+          await LeadEventHelpers.logGeneralUpdate(
+            lead.id,
+            'Lead information har uppdaterats',
+            updatedFields,
+            user.id,
+            user.email
+          )
         }
       } catch (eventError) {
         console.warn('Could not log lead update event:', eventError)

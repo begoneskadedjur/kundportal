@@ -157,8 +157,9 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
             .insert({
               lead_id: leadId,
               event_type: 'updated',
+              title: `Kontaktperson uppdaterad: ${cleanData.name}`,
               description: `Kontaktperson "${cleanData.name}" har uppdaterats`,
-              metadata: {
+              data: {
                 contact_name: cleanData.name,
                 contact_email: cleanData.email,
                 contact_phone: cleanData.phone,
@@ -192,8 +193,9 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
             .insert({
               lead_id: leadId,
               event_type: 'created',
+              title: `Ny kontaktperson tillagd: ${cleanData.name}`,
               description: `Ny kontaktperson "${cleanData.name}" tillagd`,
-              metadata: {
+              data: {
                 contact_name: cleanData.name,
                 contact_email: cleanData.email,
                 contact_phone: cleanData.phone,
@@ -247,8 +249,9 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'updated',
+            title: `Kontaktperson borttagen: ${contact.name}`,
             description: `Kontaktperson "${contact.name}" har tagits bort`,
-            metadata: {
+            data: {
               contact_name: contact.name,
               contact_email: contact.email,
               contact_phone: contact.phone,

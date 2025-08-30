@@ -14,6 +14,7 @@ import {
   LeadTechnicianUpdate, 
   Technician 
 } from '../../../types/database'
+import { LeadEventHelpers } from '../../../utils/leadEventLogger'
 
 interface LeadTechnicianManagerProps {
   leadId: string
@@ -124,8 +125,9 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'assigned',
+            title: `Kollega tilldelad: ${techName}`,
             description: `Kollega ${techName} har tilldelats ${insertData.is_primary ? 'som primär' : 'som sekundär'} kollega`,
-            metadata: {
+            data: {
               technician_id: selectedTechnicianId,
               technician_name: techName,
               is_primary: insertData.is_primary,
@@ -183,8 +185,9 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'unassigned',
+            title: `Kollega borttagen: ${techName}`,
             description: `Kollega ${techName} har tagits bort från tilldelningen`,
-            metadata: {
+            data: {
               technician_id: removedAssignment?.technician_id,
               technician_name: techName,
               was_primary: removedAssignment?.is_primary || false,
@@ -234,8 +237,9 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           .insert({
             lead_id: leadId,
             event_type: 'updated',
+            title: `Primär kollega ändrad: ${techName}`,
             description: `${techName} har utsetts till primär kollega för detta lead`,
-            metadata: {
+            data: {
               technician_id: newPrimaryAssignment?.technician_id,
               technician_name: techName,
               changed_by_profile: user?.email
