@@ -1,7 +1,7 @@
 // src/components/admin/leads/LeadContactsManager.tsx - Component for managing lead contacts
 
 import React, { useState, useEffect } from 'react'
-import { Users, Plus, Edit3, Trash2, Mail, Phone, User, AlertCircle } from 'lucide-react'
+import { Users, Plus, Edit3, Trash2, Mail, Phone, User, AlertCircle, Star, Crown } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Card from '../../ui/Card'
@@ -173,6 +173,10 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
     }
   }
 
+  // Separate primary and secondary contacts
+  const primaryContact = contacts.find(contact => contact.is_primary)
+  const secondaryContacts = contacts.filter(contact => !contact.is_primary)
+
   return (
     <Card className="p-6 bg-slate-800/50 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
@@ -190,63 +194,136 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
         </Button>
       </div>
 
-      {/* Contact List */}
-      {contacts.length > 0 && (
-        <div className="space-y-3 mb-6">
-          {contacts.map((contact) => (
-            <div
-              key={contact.id}
-              className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/30"
-            >
+      {/* Primary Contact Section */}
+      {primaryContact && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Crown className="w-4 h-4 text-yellow-400" />
+            <h4 className="text-sm font-medium text-slate-300">Huvudkontakt</h4>
+          </div>
+          <div className="p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-white">{contact.name}</h4>
-                  {contact.is_primary && (
-                    <span className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded-full border border-green-600/30">
-                      Primär
-                    </span>
-                  )}
+                <div className="flex items-center gap-3">
+                  <h4 className="font-semibold text-white text-lg">{primaryContact.name}</h4>
+                  <span className="px-3 py-1 text-xs bg-blue-600/30 text-blue-300 rounded-full border border-blue-500/50 font-medium">
+                    PRIMÄR KONTAKT
+                  </span>
                 </div>
-                {contact.title && (
-                  <p className="text-sm text-slate-400">{contact.title}</p>
+                {primaryContact.title && (
+                  <p className="text-blue-200 mt-1">{primaryContact.title}</p>
                 )}
-                <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
-                  {contact.email && (
-                    <div className="flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      {contact.email}
+                <div className="flex items-center gap-6 mt-3 text-sm">
+                  {primaryContact.email && (
+                    <div className="flex items-center gap-2 text-blue-200">
+                      <Mail className="w-4 h-4" />
+                      <a href={`mailto:${primaryContact.email}`} className="hover:text-white">
+                        {primaryContact.email}
+                      </a>
                     </div>
                   )}
-                  {contact.phone && (
-                    <div className="flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      {contact.phone}
+                  {primaryContact.phone && (
+                    <div className="flex items-center gap-2 text-blue-200">
+                      <Phone className="w-4 h-4" />
+                      <a href={`tel:${primaryContact.phone}`} className="hover:text-white">
+                        {primaryContact.phone}
+                      </a>
                     </div>
                   )}
                 </div>
+                {primaryContact.notes && (
+                  <p className="text-blue-200/80 text-sm mt-2 italic">{primaryContact.notes}</p>
+                )}
               </div>
               
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setEditingContact(contact)}
+                  onClick={() => setEditingContact(primaryContact)}
                   disabled={loading}
+                  className="text-blue-300 hover:text-white hover:bg-blue-600/30"
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleDelete(contact)}
-                  disabled={loading}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+      )}
+
+      {/* Secondary Contacts List */}
+      {secondaryContacts.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <User className="w-4 h-4 text-slate-400" />
+            <h4 className="text-sm font-medium text-slate-300">
+              Ytterligare kontakter ({secondaryContacts.length})
+            </h4>
+          </div>
+          <div className="space-y-3">
+            {secondaryContacts.map((contact) => (
+              <div
+                key={contact.id}
+                className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/30"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium text-white">{contact.name}</h4>
+                  </div>
+                  {contact.title && (
+                    <p className="text-sm text-slate-400">{contact.title}</p>
+                  )}
+                  <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
+                    {contact.email && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        {contact.email}
+                      </div>
+                    )}
+                    {contact.phone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        {contact.phone}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingContact(contact)}
+                    disabled={loading}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(contact)}
+                    disabled={loading}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Show message if no contacts */}
+      {contacts.length === 0 && (
+        <div className="text-center py-8">
+          <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">
+            Inga kontaktpersoner tillagda ännu. 
+            <br />
+            Klicka på "Lägg till" för att lägga till den första kontakten.
+          </p>
         </div>
       )}
 

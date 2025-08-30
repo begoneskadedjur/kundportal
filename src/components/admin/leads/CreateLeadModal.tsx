@@ -7,6 +7,7 @@ import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
+import SNIBranchManager from './SNIBranchManager'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -16,6 +17,7 @@ import {
   ContactMethod, 
   CompanySize,
   LeadPriority,
+  LeadSniCode,
   LEAD_STATUS_DISPLAY,
   CONTACT_METHOD_DISPLAY,
   COMPANY_SIZE_DISPLAY,
@@ -32,6 +34,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [selectedSniCodes, setSelectedSniCodes] = useState<LeadSniCode[]>([])
   
   const [formData, setFormData] = useState<Partial<LeadInsert>>({
     company_name: '',
@@ -151,11 +154,33 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         updated_by: user.id
       } as LeadInsert
 
-      const { error } = await supabase
+      const { data: insertedLead, error } = await supabase
         .from('leads')
         .insert(leadData)
+        .select()
+        .single()
 
       if (error) throw error
+
+      // Insert SNI codes if any are selected
+      if (selectedSniCodes.length > 0 && insertedLead) {
+        const sniCodeInserts = selectedSniCodes.map(sniCode => ({
+          lead_id: insertedLead.id,
+          sni_code: sniCode.sni_code,
+          sni_description: sniCode.sni_description,
+          is_primary: sniCode.is_primary,
+          created_by: user.id
+        }))
+
+        const { error: sniError } = await supabase
+          .from('lead_sni_codes')
+          .insert(sniCodeInserts)
+
+        if (sniError) {
+          console.error('Warning: Could not save SNI codes:', sniError)
+          toast.error('Lead skapad men SNI-koder kunde inte sparas')
+        }
+      }
 
       toast.success('Lead skapad framgångsrikt')
       onSuccess()
@@ -199,6 +224,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         needs_confirmed: false,
         tags: []
       })
+      setSelectedSniCodes([])
 
     } catch (err) {
       console.error('Error creating lead:', err)
@@ -271,6 +297,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Kontaktperson *
+                  <span className="text-slate-500 text-xs ml-2">(Blir huvudkontakt i kontaktlistan)</span>
                 </label>
                 <Input
                   value={formData.contact_person || ''}
@@ -284,6 +311,9 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                     {errors.contact_person}
                   </p>
                 )}
+                <p className="text-xs text-slate-500 mt-1">
+                  Denna kontakt kommer automatiskt att visas som huvudkontakt i kontakthanteringen
+                </p>
               </div>
 
               <div>
@@ -429,6 +459,14 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   placeholder="Beskriv verksamheten och eventuella särskilda omständigheter"
                   rows={3}
                   className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <SNIBranchManager
+                  selectedSniCodes={selectedSniCodes}
+                  onSelectionChange={setSelectedSniCodes}
+                  disabled={loading}
                 />
               </div>
             </div>
