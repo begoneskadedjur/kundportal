@@ -34,25 +34,13 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   const [assignmentNotes, setAssignmentNotes] = useState('')
 
   // Real-time subscription for lead technicians
+  // Note: Disabled to prevent conflicts with add operations
+  // The parent component will handle refreshes manually after operations
   useEffect(() => {
-    const subscription = supabase
-      .channel(`lead_technicians_${leadId}`)
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'lead_technicians',
-          filter: `lead_id=eq.${leadId}`
-        },
-        (payload) => {
-          console.log('Lead technician changed:', payload)
-          onTechniciansChange() // Trigger parent refresh
-        }
-      )
-      .subscribe()
-
+    // Subscription disabled to prevent auto-refresh conflicts during add operations
+    // Manual refresh is triggered via onTechniciansChange callback after successful operations
     return () => {
-      subscription.unsubscribe()
+      // Cleanup function (no subscription to unsubscribe)
     }
   }, [leadId, onTechniciansChange])
 
@@ -101,7 +89,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       if (error) throw error
 
-      toast.success('Tekniker tillagd')
+      toast.success('Kollega tillagd')
       setSelectedTechnicianId('')
       setAssignmentNotes('')
       setShowAddForm(false)
@@ -109,14 +97,14 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
     } catch (err) {
       console.error('Error adding technician:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till tekniker')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till kollega')
     } finally {
       setLoading(false)
     }
   }
 
   const handleRemoveTechnician = async (assignmentId: string) => {
-    if (!window.confirm('Är du säker på att du vill ta bort denna teknikertilldelning?')) {
+    if (!window.confirm('Är du säker på att du vill ta bort denna kollega-tilldelning?')) {
       return
     }
 
@@ -130,12 +118,12 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       if (error) throw error
 
-      toast.success('Tekniker borttagen')
+      toast.success('Kollega borttagen')
       onTechniciansChange()
 
     } catch (err) {
       console.error('Error removing technician:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort tekniker')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort kollega')
     } finally {
       setLoading(false)
     }
@@ -156,12 +144,12 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       if (error) throw error
 
-      toast.success('Primär tekniker uppdaterad')
+      toast.success('Primär kollega uppdaterad')
       onTechniciansChange()
 
     } catch (err) {
       console.error('Error setting primary technician:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera primär tekniker')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera primär kollega')
     } finally {
       setLoading(false)
     }
@@ -182,7 +170,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-green-400" />
-          Tilldelade tekniker ({assignedTechnicians.length})
+          Tilldelade kollegor ({assignedTechnicians.length})
         </h3>
         <Button
           onClick={() => setShowAddForm(!showAddForm)}
@@ -191,7 +179,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           disabled={unassignedTechnicians.length === 0}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Lägg till tekniker
+          Lägg till kollega
         </Button>
       </div>
 
@@ -200,20 +188,20 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         <Card className="p-4 bg-slate-700/30 border-slate-600/50 mb-6">
           <h4 className="font-medium text-white mb-4 flex items-center gap-2">
             <Users className="w-4 h-4" />
-            Tilldela ny tekniker
+            Tilldela ny kollega
           </h4>
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Välj tekniker
+                Välj kollega
               </label>
               <select
                 value={selectedTechnicianId}
                 onChange={(e) => setSelectedTechnicianId(e.target.value)}
                 className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"
               >
-                <option value="">Välj tekniker...</option>
+                <option value="">Välj kollega...</option>
                 {unassignedTechnicians.map(tech => (
                   <option key={tech.id} value={tech.id}>
                     {tech.name}
@@ -259,7 +247,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                     Lägger till...
                   </>
                 ) : (
-                  'Lägg till tekniker'
+                  'Lägg till kollega'
                 )}
               </Button>
             </div>
@@ -291,7 +279,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-white">
-                          {technician?.name || 'Okänd tekniker'}
+                          {technician?.name || 'Okänd kollega'}
                         </span>
                         {assignment.is_primary && (
                           <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
@@ -326,7 +314,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                         onClick={() => handleSetPrimary(assignment.id)}
                         disabled={loading}
                         className="text-yellow-400 hover:text-yellow-300"
-                        title="Gör till primär tekniker"
+                        title="Gör till primär kollega"
                       >
                         <Star className="w-4 h-4" />
                       </Button>
@@ -352,11 +340,11 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         !showAddForm && (
           <div className="text-center py-8">
             <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p className="text-slate-400">Inga tekniker tilldelade än</p>
+            <p className="text-slate-400">Inga kollegor tilldelade än</p>
             <p className="text-slate-500 text-sm">
               {unassignedTechnicians.length > 0 
-                ? 'Klicka på "Lägg till tekniker" för att tilldela första teknikern'
-                : 'Alla tillgängliga tekniker är redan tilldelade'
+                ? 'Klicka på "Lägg till kollega" för att tilldela första kollegan'
+                : 'Alla tillgängliga kollegor är redan tilldelade'
               }
             </p>
           </div>
@@ -367,7 +355,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
           <div className="flex items-center gap-2 text-blue-400 text-sm">
             <AlertCircle className="w-4 h-4" />
-            Alla tillgängliga tekniker är redan tilldelade till detta lead
+            Alla tillgängliga kollegor är redan tilldelade till detta lead
           </div>
         </div>
       )}

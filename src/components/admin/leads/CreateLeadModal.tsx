@@ -514,7 +514,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   Notering
                 </label>
                 <p className="text-sm text-slate-400 mb-2">
-                  Teknikertilldelningar hanteras efter att leadet har skapats
+                  Kollega-tilldelningar hanteras efter att leadet har skapats
                 </p>
               </div>
 

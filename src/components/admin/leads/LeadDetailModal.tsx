@@ -296,7 +296,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     )}
                     {technician && (
                       <div>
-                        <div className="text-slate-300 font-medium">Tilldelad tekniker</div>
+                        <div className="text-slate-300 font-medium">Tilldelad kollega</div>
                         <div className="text-white">{technician}</div>
                       </div>
                     )}

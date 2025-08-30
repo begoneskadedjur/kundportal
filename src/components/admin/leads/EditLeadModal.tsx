@@ -74,6 +74,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         estimated_value: lead.estimated_value,
         probability: lead.probability,
         closing_date_estimate: lead.closing_date_estimate ? new Date(lead.closing_date_estimate).toISOString().slice(0, 10) : '',
+        competitor: lead.competitor || '',
         decision_maker: lead.decision_maker || '',
         budget_confirmed: lead.budget_confirmed || false,
         timeline_confirmed: lead.timeline_confirmed || false,
@@ -232,7 +233,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
 
       // Step 1: Update lead data first - split large updates for better performance
       // Remove large text fields temporarily to reduce payload
-      const { sni07_label, notes, business_description, ...coreData } = updateData
+      const { sni07_label, notes, business_description, competitor, ...coreData } = updateData
       
       // First update core data
       const { error } = await supabase
@@ -241,11 +242,12 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         .eq('id', lead.id)
       
       // Then update text fields separately if no error
-      if (!error && (sni07_label || notes || business_description)) {
+      if (!error && (sni07_label || notes || business_description || competitor)) {
         const textFields = {}
         if (sni07_label) textFields.sni07_label = sni07_label
         if (notes) textFields.notes = notes  
         if (business_description) textFields.business_description = business_description
+        if (competitor) textFields.competitor = competitor
         
         const { error: textError } = await supabase
           .from('leads')
@@ -700,6 +702,8 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         Avtalsdetaljer
                       </label>
                       <textarea
+                        value={formData.competitor || ''}
+                        onChange={(e) => handleInputChange('competitor', e.target.value)}
                         placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
                         rows={2}
                         className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
@@ -972,7 +976,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             </div>
           </Card>
 
-          {/* Tekniker-hantering */}
+          {/* Kollega-hantering */}
           <LeadTechnicianManager
             leadId={lead.id}
             assignedTechnicians={leadTechnicians}
