@@ -23,7 +23,7 @@ interface LeadCommentsSystemProps {
 }
 
 interface CommentFormData {
-  comment: string
+  content: string
   comment_type: CommentType
 }
 
@@ -39,14 +39,14 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({})
   
   const [formData, setFormData] = useState<CommentFormData>({
-    comment: '',
+    content: '',
     comment_type: 'note'
   })
 
   useEffect(() => {
     if (editingComment) {
       setFormData({
-        comment: editingComment.comment || '',
+        content: editingComment.content || '',
         comment_type: editingComment.comment_type || 'note'
       })
       setShowForm(true)
@@ -55,7 +55,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
 
   const resetForm = () => {
     setFormData({
-      comment: '',
+      content: '',
       comment_type: 'note'
     })
     setEditingComment(null)
@@ -73,8 +73,8 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.comment.trim()) {
-      newErrors.comment = 'Kommentar är obligatorisk'
+    if (!formData.content.trim()) {
+      newErrors.content = 'Kommentar är obligatorisk'
     }
 
     setErrors(newErrors)
@@ -92,9 +92,8 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
       if (editingComment) {
         // Update existing comment
         const updateData: LeadCommentUpdate = {
-          comment: formData.comment,
-          comment_type: formData.comment_type,
-          updated_by: user.id
+          content: formData.content,
+          comment_type: formData.comment_type
         }
         
         const { error } = await supabase
@@ -108,10 +107,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
         // Create new comment
         const insertData: LeadCommentInsert = {
           lead_id: leadId,
-          comment: formData.comment,
+          content: formData.content,
           comment_type: formData.comment_type,
-          created_by: user.id,
-          updated_by: user.id
+          created_by: user.id
         }
 
         const { error } = await supabase
@@ -238,18 +236,18 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
                 Kommentar *
               </label>
               <textarea
-                value={formData.comment}
-                onChange={(e) => handleInputChange('comment', e.target.value)}
+                value={formData.content}
+                onChange={(e) => handleInputChange('content', e.target.value)}
                 placeholder="Skriv din kommentar här..."
                 rows={4}
                 className={`w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none ${
-                  errors.comment ? 'border-red-500' : ''
+                  errors.content ? 'border-red-500' : ''
                 }`}
               />
-              {errors.comment && (
+              {errors.content && (
                 <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
-                  {errors.comment}
+                  {errors.content}
                 </p>
               )}
             </div>
@@ -334,7 +332,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
               </div>
               
               <div className="text-slate-200 whitespace-pre-wrap">
-                {comment.comment}
+                {comment.content}
               </div>
               
               {comment.updated_at !== comment.created_at && (

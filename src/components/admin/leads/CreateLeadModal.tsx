@@ -32,7 +32,6 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [technicians, setTechnicians] = useState<{id: string, name: string}[]>([])
   
   const [formData, setFormData] = useState<Partial<LeadInsert>>({
     company_name: '',
@@ -61,7 +60,6 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
     // Nya fält
     priority: null,
     source: '',
-    assigned_to: null,
     estimated_value: null,
     probability: null,
     closing_date_estimate: null,
@@ -190,7 +188,6 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         contract_end_date: null,
         priority: null,
         source: '',
-        assigned_to: null,
         estimated_value: null,
         probability: null,
         closing_date_estimate: null,
@@ -218,27 +215,6 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
     }
   }
 
-  // Fetch technicians for assignment dropdown
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('technicians')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name')
-        
-        if (error) throw error
-        setTechnicians(data || [])
-      } catch (error) {
-        console.error('Error fetching technicians:', error)
-      }
-    }
-
-    if (isOpen) {
-      fetchTechnicians()
-    }
-  }, [isOpen])
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="xl">
@@ -497,20 +473,11 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Tilldelad tekniker
+                  Notering
                 </label>
-                <select
-                  value={formData.assigned_to || ''}
-                  onChange={(e) => handleInputChange('assigned_to', e.target.value || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                >
-                  <option value="">Ingen tilldelning</option>
-                  {technicians.map(tech => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-sm text-slate-400 mb-2">
+                  Teknikertilldelningar hanteras efter att leadet har skapats
+                </p>
               </div>
 
               <div>
@@ -552,12 +519,12 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Konkurrent
+                  Nuvarande leverantör
                 </label>
                 <Input
                   value={formData.competitor || ''}
                   onChange={(e) => handleInputChange('competitor', e.target.value)}
-                  placeholder="Namn på konkurrent"
+                  placeholder="Namn på nuvarande leverantör"
                 />
               </div>
 

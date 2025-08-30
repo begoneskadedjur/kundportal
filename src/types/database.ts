@@ -660,6 +660,21 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['lead_sni_codes']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['lead_sni_codes']['Insert']>
       }
+      // 🆕 LEAD TECHNICIANS TABELL - många-till-många relation leads <-> technicians
+      lead_technicians: {
+        Row: {
+          id: string
+          lead_id: string
+          technician_id: string
+          is_primary: boolean
+          assigned_at: string
+          assigned_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['lead_technicians']['Row'], 'id' | 'created_at' | 'assigned_at'>
+        Update: Partial<Database['public']['Tables']['lead_technicians']['Insert']>
+      }
     }
   }
 }
@@ -1003,6 +1018,11 @@ export type LeadEventUpdate = Database['public']['Tables']['lead_events']['Updat
 export type LeadSniCode = Database['public']['Tables']['lead_sni_codes']['Row']
 export type LeadSniCodeInsert = Database['public']['Tables']['lead_sni_codes']['Insert']
 export type LeadSniCodeUpdate = Database['public']['Tables']['lead_sni_codes']['Update']
+
+// 🆕 LEAD TECHNICIANS TYPES (many-to-many)
+export type LeadTechnician = Database['public']['Tables']['lead_technicians']['Row']
+export type LeadTechnicianInsert = Database['public']['Tables']['lead_technicians']['Insert']
+export type LeadTechnicianUpdate = Database['public']['Tables']['lead_technicians']['Update']
 
 // 🆕 LEAD WITH RELATIONS - inkluderar alla relaterade data
 export type LeadWithRelations = Lead & {

@@ -1,7 +1,7 @@
 // src/components/admin/leads/EditLeadModal.tsx - Edit existing lead modal
 
 import React, { useState, useEffect } from 'react'
-import { Edit3, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save, Trash2, Target, Star } from 'lucide-react'
+import { Edit3, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save, Trash2, Target, Star, Users } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -22,6 +22,7 @@ import {
   COMPANY_SIZE_DISPLAY,
   LEAD_PRIORITY_DISPLAY
 } from '../../../types/database'
+import LeadTechnicianManager from './LeadTechnicianManager'
 
 interface EditLeadModalProps {
   lead: Lead | null
@@ -36,7 +37,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
   const [deleting, setDeleting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState<Partial<LeadUpdate>>({})
-  const [technicians, setTechnicians] = useState<{id: string, name: string}[]>([])
+  const [leadTechnicians, setLeadTechnicians] = useState<any[]>([])
 
   // Initialize form data when lead changes
   useEffect(() => {
@@ -68,7 +69,6 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         // Nya fält
         priority: lead.priority,
         source: lead.source || '',
-        assigned_to: lead.assigned_to,
         estimated_value: lead.estimated_value,
         probability: lead.probability,
         closing_date_estimate: lead.closing_date_estimate ? new Date(lead.closing_date_estimate).toISOString().slice(0, 10) : '',
@@ -212,27 +212,43 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     }
   }
 
-  // Fetch technicians for assignment dropdown
+  // Fetch lead technicians
   useEffect(() => {
-    const fetchTechnicians = async () => {
+    const fetchLeadTechnicians = async () => {
+      if (!lead?.id) return
+
       try {
         const { data, error } = await supabase
-          .from('technicians')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name')
-        
+          .from('lead_technicians')
+          .select(`
+            id,
+            technician_id,
+            is_primary,
+            assigned_at,
+            assigned_by,
+            notes,
+            technicians!inner(
+              id,
+              name,
+              email,
+              is_active
+            )
+          `)
+          .eq('lead_id', lead.id)
+          .order('is_primary', { ascending: false })
+          .order('assigned_at')
+
         if (error) throw error
-        setTechnicians(data || [])
+        setLeadTechnicians(data || [])
       } catch (error) {
-        console.error('Error fetching technicians:', error)
+        console.error('Error fetching lead technicians:', error)
       }
     }
 
-    if (isOpen) {
-      fetchTechnicians()
+    if (isOpen && lead) {
+      fetchLeadTechnicians()
     }
-  }, [isOpen])
+  }, [isOpen, lead])
 
   if (!lead) return null
 
@@ -638,23 +654,6 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Tilldelad tekniker
-                </label>
-                <select
-                  value={formData.assigned_to || ''}
-                  onChange={(e) => handleInputChange('assigned_to', e.target.value || null)}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                >
-                  <option value="">Ingen tilldelning</option>
-                  {technicians.map(tech => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -695,12 +694,12 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Konkurrent
+                  Nuvarande leverantör
                 </label>
                 <Input
                   value={formData.competitor || ''}
                   onChange={(e) => handleInputChange('competitor', e.target.value)}
-                  placeholder="Namn på konkurrent"
+                  placeholder="Namn på nuvarande leverantör"
                 />
               </div>
 
@@ -787,6 +786,47 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               />
             </div>
           </Card>
+
+          {/* Tekniker-hantering */}
+          <LeadTechnicianManager
+            leadId={lead.id}
+            assignedTechnicians={leadTechnicians}
+            onTechniciansChange={() => {
+              // Refresh lead technicians when changes occur
+              const fetchLeadTechnicians = async () => {
+                if (!lead?.id) return
+
+                try {
+                  const { data, error } = await supabase
+                    .from('lead_technicians')
+                    .select(`
+                      id,
+                      technician_id,
+                      is_primary,
+                      assigned_at,
+                      assigned_by,
+                      notes,
+                      technicians!inner(
+                        id,
+                        name,
+                        email,
+                        is_active
+                      )
+                    `)
+                    .eq('lead_id', lead.id)
+                    .order('is_primary', { ascending: false })
+                    .order('assigned_at')
+
+                  if (error) throw error
+                  setLeadTechnicians(data || [])
+                } catch (error) {
+                  console.error('Error fetching lead technicians:', error)
+                }
+              }
+              
+              fetchLeadTechnicians()
+            }}
+          />
 
           {/* Form Actions */}
           <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-700/50">
