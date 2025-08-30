@@ -14,6 +14,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react'
+import { formatSwedishDateTime, formatSwedishRelativeTime } from '../../../utils/swedishDateFormat'
 import Button from '../../ui/Button'
 import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
@@ -48,6 +49,29 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Real-time subscription för lead events
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`lead_events_${leadId}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'lead_events',
+          filter: `lead_id=eq.${leadId}`
+        },
+        (payload) => {
+          console.log('Lead event changed:', payload)
+          onEventsChange() // Trigger parent refresh
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [leadId, onEventsChange])
   
   const [formData, setFormData] = useState<EventFormData>({
     event_type: 'note_added',
@@ -118,22 +142,26 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Okänt datum'
+    
     const date = new Date(dateString)
+    
+    // Kontrollera om datumet är giltigt
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date string:', dateString)
+      return 'Ogiltigt datum'
+    }
+    
     const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
     
-    if (diffInSeconds < 60) return 'Just nu'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min sedan`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} h sedan`
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} d sedan`
+    // Visa relativ tid för händelser inom 24 timmar
+    if (diffInHours < 24 && diffInHours >= 0) {
+      return formatSwedishRelativeTime(dateString)
+    }
     
-    return date.toLocaleDateString('sv-SE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    // Visa svenskt datumformat för äldre händelser
+    return formatSwedishDateTime(dateString)
   }
 
   const getEventTypeIcon = (type: EventType) => {
@@ -289,7 +317,10 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                     
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <User className="w-3 h-3" />
-                      {event.created_by_profile?.display_name || 'Systemhändelse'}
+                      {event.created_by_profile?.display_name || 
+                       event.created_by_profile?.technicians?.name ||
+                       event.created_by_profile?.email ||
+                       'Systemhändelse'}
                     </div>
                     
                     {event.metadata && (

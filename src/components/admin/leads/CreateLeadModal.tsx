@@ -546,7 +546,8 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Uppskattat slutdatum
+                  Förhoppning om att slutföra affär till
+                  <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
                 <Input
                   type="date"
@@ -555,15 +556,74 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Nuvarande leverantör
-                </label>
-                <Input
-                  value={formData.competitor || ''}
-                  onChange={(e) => handleInputChange('competitor', e.target.value)}
-                  placeholder="Namn på nuvarande leverantör"
-                />
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-300 mb-3">Befintligt avtal hos kunden</h4>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 text-slate-300">
+                      <input
+                        type="radio"
+                        name="hasContract"
+                        checked={!formData.contract_status}
+                        onChange={() => handleInputChange('contract_status', false)}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      Nej - inget befintligt avtal
+                    </label>
+                    <label className="flex items-center gap-2 text-slate-300">
+                      <input
+                        type="radio"
+                        name="hasContract"
+                        checked={formData.contract_status || false}
+                        onChange={() => handleInputChange('contract_status', true)}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      Ja - har befintligt avtal
+                    </label>
+                  </div>
+                </div>
+                
+                {formData.contract_status && (
+                  <div className="bg-slate-700/30 p-4 rounded-lg space-y-4 border border-slate-600/50">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Nuvarande leverantör
+                        <span className="text-slate-500 text-xs ml-2">(Namnet på företaget de har avtal med)</span>
+                      </label>
+                      <Input
+                        value={formData.contract_with || ''}
+                        onChange={(e) => handleInputChange('contract_with', e.target.value)}
+                        placeholder="t.ex. Anticimex, Rentokil"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Avtal löper ut
+                        <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
+                      </label>
+                      <Input
+                        type="date"
+                        value={formData.contract_end_date || ''}
+                        onChange={(e) => handleInputChange('contract_end_date', e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Avtalsdetaljer
+                        <span className="text-slate-500 text-xs ml-2">(Ytterligare information om avtalet)</span>
+                      </label>
+                      <textarea
+                        value={formData.competitor || ''}
+                        onChange={(e) => handleInputChange('competitor', e.target.value)}
+                        placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
+                        rows={2}
+                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -23,6 +23,7 @@ import {
   LEAD_PRIORITY_DISPLAY
 } from '../../../types/database'
 import LeadTechnicianManager from './LeadTechnicianManager'
+import SNIBranchManager from './SNIBranchManager'
 
 interface EditLeadModalProps {
   lead: Lead | null
@@ -38,6 +39,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState<Partial<LeadUpdate>>({})
   const [leadTechnicians, setLeadTechnicians] = useState<any[]>([])
+  const [selectedSniCodes, setSelectedSniCodes] = useState<any[]>([])
 
   // Initialize form data when lead changes
   useEffect(() => {
@@ -81,8 +83,28 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         tags: lead.tags || []
       })
       setErrors({})
+      
+      // Fetch SNI codes for this lead
+      fetchLeadSniCodes()
     }
   }, [lead])
+
+  const fetchLeadSniCodes = async () => {
+    if (!lead?.id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('lead_sni_codes')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('is_primary', { ascending: false })
+      
+      if (error) throw error
+      setSelectedSniCodes(data || [])
+    } catch (error) {
+      console.error('Error fetching SNI codes:', error)
+    }
+  }
 
   const handleInputChange = (field: keyof LeadUpdate, value: any) => {
     setFormData(prev => ({
@@ -163,6 +185,32 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         .eq('id', lead.id)
 
       if (error) throw error
+
+      // Update SNI codes
+      if (selectedSniCodes.length > 0) {
+        // Delete existing SNI codes
+        await supabase
+          .from('lead_sni_codes')
+          .delete()
+          .eq('lead_id', lead.id)
+
+        // Insert new SNI codes
+        const sniCodeInserts = selectedSniCodes.map(sniCode => ({
+          lead_id: lead.id,
+          sni_code: sniCode.sni_code,
+          sni_description: sniCode.sni_description,
+          is_primary: sniCode.is_primary,
+          created_by: user.id
+        }))
+
+        const { error: sniError } = await supabase
+          .from('lead_sni_codes')
+          .insert(sniCodeInserts)
+
+        if (sniError) {
+          console.error('Warning: Could not update SNI codes:', sniError)
+        }
+      }
 
       toast.success('Lead uppdaterad framgångsrikt')
       onSuccess()
@@ -474,43 +522,72 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 </label>
               </div>
 
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={formData.contract_status || false}
-                    onChange={(e) => handleInputChange('contract_status', e.target.checked)}
-                    className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
-                  />
-                  Avtal Ja/Nej
-                </label>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-300 mb-3">Befintligt avtal hos kunden</h4>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 text-slate-300">
+                      <input
+                        type="radio"
+                        name="hasContract"
+                        checked={!formData.contract_status}
+                        onChange={() => handleInputChange('contract_status', false)}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      Nej - inget befintligt avtal
+                    </label>
+                    <label className="flex items-center gap-2 text-slate-300">
+                      <input
+                        type="radio"
+                        name="hasContract"
+                        checked={formData.contract_status || false}
+                        onChange={() => handleInputChange('contract_status', true)}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      Ja - har befintligt avtal
+                    </label>
+                  </div>
+                </div>
+                
+                {formData.contract_status && (
+                  <div className="bg-slate-700/30 p-4 rounded-lg space-y-4 border border-slate-600/50">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Nuvarande leverantör
+                        <span className="text-slate-500 text-xs ml-2">(Namnet på företaget de har avtal med)</span>
+                      </label>
+                      <Input
+                        value={formData.contract_with || ''}
+                        onChange={(e) => handleInputChange('contract_with', e.target.value)}
+                        placeholder="t.ex. Anticimex, Rentokil"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Avtal löper ut
+                        <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
+                      </label>
+                      <Input
+                        type="date"
+                        value={formData.contract_end_date || ''}
+                        onChange={(e) => handleInputChange('contract_end_date', e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Avtalsdetaljer
+                      </label>
+                      <textarea
+                        placeholder="Ytterligare information om avtalet, uppsägningstid, etc."
+                        rows={2}
+                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {formData.contract_status && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Avtal med
-                    </label>
-                    <Input
-                      value={formData.contract_with || ''}
-                      onChange={(e) => handleInputChange('contract_with', e.target.value)}
-                      placeholder="Namnet på avtalsparten"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Avtal tom datum
-                    </label>
-                    <Input
-                      type="date"
-                      value={formData.contract_end_date || ''}
-                      onChange={(e) => handleInputChange('contract_end_date', e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
             </div>
           </Card>
 
@@ -592,13 +669,11 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  SNI-bransch
-                </label>
-                <Input
-                  value={formData.sni07_label || ''}
-                  onChange={(e) => handleInputChange('sni07_label', e.target.value)}
-                  placeholder="SNI-branschkod om känd"
+                <SNIBranchManager
+                  leadId={lead?.id}
+                  selectedSniCodes={selectedSniCodes}
+                  onSelectionChange={setSelectedSniCodes}
+                  disabled={loading}
                 />
               </div>
 
@@ -683,7 +758,8 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Uppskattat slutdatum
+                  Förhoppning om att slutföra affär till
+                  <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
                 <Input
                   type="date"

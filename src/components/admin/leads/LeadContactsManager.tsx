@@ -34,6 +34,29 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<LeadContact | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Real-time subscription för lead contacts
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`lead_contacts_${leadId}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'lead_contacts',
+          filter: `lead_id=eq.${leadId}`
+        },
+        (payload) => {
+          console.log('Lead contact changed:', payload)
+          onContactsChange() // Trigger parent refresh
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [leadId, onContactsChange])
   
   const [formData, setFormData] = useState<ContactFormData>({
     name: '',
