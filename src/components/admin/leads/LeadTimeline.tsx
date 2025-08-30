@@ -354,14 +354,55 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                        'Systemhändelse'}
                     </div>
                     
-                    {event.data && (
-                      <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="text-xs text-slate-400 mb-1">Ytterligare data:</div>
-                        <pre className="text-xs text-slate-300 whitespace-pre-wrap">
-                          {JSON.stringify(event.data, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                    {(() => {
+                      // Filter out technical metadata and show only user-relevant data
+                      const getUserRelevantData = (data: any) => {
+                        if (!data || typeof data !== 'object') return null;
+                        
+                        const relevantData: any = {};
+                        
+                        // Include specific fields that are useful for users
+                        const userRelevantFields = [
+                          'notes', 'comment_content', 'contact_name', 'contact_email', 
+                          'contact_phone', 'technician_name', 'tag_added', 'tag_removed',
+                          'updated_fields', 'new_status_label', 'old_status_label',
+                          'new_priority_label', 'old_priority_label'
+                        ];
+                        
+                        userRelevantFields.forEach(field => {
+                          if (data[field] && data[field] !== null && data[field] !== '') {
+                            relevantData[field] = data[field];
+                          }
+                        });
+                        
+                        // Special handling for arrays
+                        if (data.updated_fields && Array.isArray(data.updated_fields) && data.updated_fields.length > 0) {
+                          relevantData.updated_fields = data.updated_fields;
+                        }
+                        
+                        return Object.keys(relevantData).length > 0 ? relevantData : null;
+                      };
+                      
+                      const relevantData = getUserRelevantData(event.data);
+                      
+                      return relevantData && (
+                        <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
+                          <div className="text-xs text-slate-400 mb-2">Detaljer:</div>
+                          <div className="space-y-1">
+                            {Object.entries(relevantData).map(([key, value]) => (
+                              <div key={key} className="text-xs">
+                                <span className="text-slate-400 capitalize">
+                                  {key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1')}:
+                                </span>
+                                <span className="text-slate-300 ml-2">
+                                  {Array.isArray(value) ? value.join(', ') : String(value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
