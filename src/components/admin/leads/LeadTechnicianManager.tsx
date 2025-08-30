@@ -33,6 +33,18 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
   const [assignmentNotes, setAssignmentNotes] = useState('')
 
+  // DEBUG: Log state changes for troubleshooting
+  useEffect(() => {
+    console.log('LeadTechnicianManager DEBUG:', {
+      showAddForm,
+      availableTechnicians: availableTechnicians.length,
+      assignedTechnicians: assignedTechnicians.length,
+      unassignedCount: availableTechnicians.filter(tech => 
+        !assignedTechnicians.some(assigned => assigned.technician_id === tech.id)
+      ).length
+    })
+  }, [showAddForm, availableTechnicians, assignedTechnicians])
+
   // Real-time subscription for lead technicians
   // Note: Disabled to prevent conflicts with add operations
   // The parent component will handle refreshes manually after operations
@@ -47,6 +59,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   // Fetch available technicians
   useEffect(() => {
     const fetchTechnicians = async () => {
+      console.log('Fetching available technicians...')
       try {
         const { data, error } = await supabase
           .from('technicians')
@@ -54,10 +67,16 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           .eq('is_active', true)
           .order('name')
 
-        if (error) throw error
+        if (error) {
+          console.error('Error fetching technicians:', error)
+          throw error
+        }
+        
+        console.log('Fetched technicians:', data?.length || 0, 'technicians')
         setAvailableTechnicians(data || [])
       } catch (error) {
         console.error('Error fetching technicians:', error)
+        toast.error('Kunde inte hämta tillgängliga kollegor')
       }
     }
 
@@ -68,12 +87,28 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   const unassignedTechnicians = availableTechnicians.filter(tech => 
     !assignedTechnicians.some(assigned => assigned.technician_id === tech.id)
   )
+  
+  // DEBUG: Log filtering logic
+  useEffect(() => {
+    console.log('FILTERING DEBUG:', {
+      availableTechnicians: availableTechnicians.map(t => ({id: t.id, name: t.name})),
+      assignedTechnicians: assignedTechnicians.map(t => ({id: t.id, technician_id: t.technician_id})),
+      unassignedTechnicians: unassignedTechnicians.map(t => ({id: t.id, name: t.name}))
+    })
+  }, [availableTechnicians, assignedTechnicians, unassignedTechnicians])
 
   const handleAddTechnician = async () => {
-    if (!selectedTechnicianId || !user?.id) return
+    console.log('handleAddTechnician called:', { selectedTechnicianId, userId: user?.id, leadId })
+    
+    if (!selectedTechnicianId || !user?.id) {
+      console.error('Missing required data:', { selectedTechnicianId, userId: user?.id, leadId })
+      toast.error('Saknade data för att lägga till kollega')
+      return
+    }
 
     try {
       setLoading(true)
+      console.log('Starting technician insert...')
 
       const insertData: LeadTechnicianInsert = {
         lead_id: leadId,
@@ -83,16 +118,27 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         notes: assignmentNotes.trim() || null
       }
 
-      const { error } = await supabase
+      console.log('Insert data:', insertData)
+
+      const { error, data } = await supabase
         .from('lead_technicians')
         .insert(insertData)
+        .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase insert error:', error)
+        throw error
+      }
 
+      console.log('Technician added successfully:', data)
       toast.success('Kollega tillagd')
+      
+      // Reset form
       setSelectedTechnicianId('')
       setAssignmentNotes('')
       setShowAddForm(false)
+      
+      // Trigger parent refresh
       onTechniciansChange()
 
     } catch (err) {
@@ -173,14 +219,31 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           Tilldelade kollegor ({assignedTechnicians.length})
         </h3>
         <Button
-          onClick={() => setShowAddForm(!showAddForm)}
+          onClick={() => {
+            console.log('ADD KOLLEGA CLICKED:', { 
+              currentShowAddForm: showAddForm, 
+              willBe: !showAddForm,
+              unassignedCount: unassignedTechnicians.length,
+              buttonDisabled: unassignedTechnicians.length === 0
+            })
+            setShowAddForm(prev => {
+              const newValue = !prev
+              console.log('setShowAddForm called:', { prev, newValue })
+              return newValue
+            })
+          }}
           size="sm"
           className="bg-green-600 hover:bg-green-700 text-white"
           disabled={unassignedTechnicians.length === 0}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Lägg till kollega
+          Lägg till kollega {unassignedTechnicians.length === 0 && '(Ingen tillgänglig)'}
         </Button>
+      </div>
+
+      {/* DEBUG: Show state info */}
+      <div className="mb-4 p-2 bg-red-900/20 border border-red-500/20 rounded text-xs text-red-300">
+        DEBUG: showAddForm={showAddForm.toString()}, available={availableTechnicians.length}, unassigned={unassignedTechnicians.length}
       </div>
 
       {/* Add Technician Form */}
@@ -191,24 +254,39 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
             Tilldela ny kollega
           </h4>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Välj kollega
-              </label>
-              <select
-                value={selectedTechnicianId}
-                onChange={(e) => setSelectedTechnicianId(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"
+          {unassignedTechnicians.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-slate-400">Alla tillgängliga kollegor är redan tilldelade</p>
+              <Button
+                onClick={() => setShowAddForm(false)}
+                variant="ghost"
+                className="mt-2"
               >
-                <option value="">Välj kollega...</option>
-                {unassignedTechnicians.map(tech => (
-                  <option key={tech.id} value={tech.id}>
-                    {tech.name}
-                  </option>
-                ))}
-              </select>
+                Stäng
+              </Button>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Välj kollega ({unassignedTechnicians.length} tillgängliga)
+                </label>
+                <select
+                  value={selectedTechnicianId}
+                  onChange={(e) => {
+                    console.log('Technician selected:', e.target.value)
+                    setSelectedTechnicianId(e.target.value)
+                  }}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"
+                >
+                  <option value="">Välj kollega...</option>
+                  {unassignedTechnicians.map(tech => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.name} ({tech.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -223,35 +301,40 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setShowAddForm(false)
-                  setSelectedTechnicianId('')
-                  setAssignmentNotes('')
-                }}
-                disabled={loading}
-              >
-                Avbryt
-              </Button>
-              <Button
-                onClick={handleAddTechnician}
-                disabled={loading || !selectedTechnicianId}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    Lägger till...
-                  </>
-                ) : (
-                  'Lägg till kollega'
-                )}
-              </Button>
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-600/30">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    console.log('Cancel clicked, resetting form')
+                    setShowAddForm(false)
+                    setSelectedTechnicianId('')
+                    setAssignmentNotes('')
+                  }}
+                  disabled={loading}
+                >
+                  Avbryt
+                </Button>
+                <Button
+                  onClick={() => {
+                    console.log('Add technician clicked:', { selectedTechnicianId, loading })
+                    handleAddTechnician()
+                  }}
+                  disabled={loading || !selectedTechnicianId}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Lägger till...
+                    </>
+                  ) : (
+                    'Lägg till kollega'
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
       )}
 
