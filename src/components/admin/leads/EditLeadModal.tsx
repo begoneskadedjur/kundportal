@@ -74,7 +74,6 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         estimated_value: lead.estimated_value,
         probability: lead.probability,
         closing_date_estimate: lead.closing_date_estimate ? new Date(lead.closing_date_estimate).toISOString().slice(0, 10) : '',
-        competitor: lead.competitor || '',
         decision_maker: lead.decision_maker || '',
         budget_confirmed: lead.budget_confirmed || false,
         timeline_confirmed: lead.timeline_confirmed || false,
@@ -165,26 +164,80 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     try {
       setLoading(true)
 
-      // Clean data - remove empty strings and convert to null
+      // Clean data - remove empty strings and convert to null, handle specific types
       const cleanData = { ...formData }
+      
+      // Clean string fields only
       Object.keys(cleanData).forEach(key => {
-        if (cleanData[key as keyof typeof cleanData] === '') {
+        const value = cleanData[key as keyof typeof cleanData]
+        if (typeof value === 'string' && value.trim() === '') {
           cleanData[key as keyof typeof cleanData] = null
         }
       })
 
+      // Handle date fields specifically
+      if (cleanData.contact_date && cleanData.contact_date.trim() === '') {
+        cleanData.contact_date = null
+      }
+      if (cleanData.follow_up_date && cleanData.follow_up_date.trim() === '') {
+        cleanData.follow_up_date = null
+      }
+      if (cleanData.quote_provided_date && cleanData.quote_provided_date.trim() === '') {
+        cleanData.quote_provided_date = null
+      }
+      if (cleanData.contract_end_date && cleanData.contract_end_date.trim() === '') {
+        cleanData.contract_end_date = null
+      }
+      if (cleanData.closing_date_estimate && cleanData.closing_date_estimate.trim() === '') {
+        cleanData.closing_date_estimate = null
+      }
+
+      // Remove undefined fields and validate data integrity
+      const filteredData = Object.fromEntries(
+        Object.entries(cleanData).filter(([key, value]) => {
+          // Filter out undefined values
+          if (value === undefined) return false
+          
+          // Validate numeric fields
+          if (['estimated_value', 'probability'].includes(key) && value !== null) {
+            const numValue = Number(value)
+            if (isNaN(numValue)) {
+              console.warn(`Invalid numeric value for ${key}:`, value)
+              return false
+            }
+          }
+          
+          // Validate date fields format
+          if (key.includes('date') && value !== null && typeof value === 'string') {
+            if (value.trim() && !value.match(/^\d{4}-\d{2}-\d{2}$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+              console.warn(`Invalid date format for ${key}:`, value)
+              return false
+            }
+          }
+          
+          return true
+        })
+      )
+
       // Add audit fields
       const updateData: LeadUpdate = {
-        ...cleanData,
+        ...filteredData,
         updated_by: user.id
       } as LeadUpdate
+
+      // Debug log the update data
+      console.log('Updating lead with data:', updateData)
+      console.log('Lead ID:', lead.id)
 
       const { error } = await supabase
         .from('leads')
         .update(updateData)
         .eq('id', lead.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase update error:', error)
+        throw error
+      }
 
       // Update SNI codes
       if (selectedSniCodes.length > 0) {
@@ -765,17 +818,6 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   type="date"
                   value={formData.closing_date_estimate || ''}
                   onChange={(e) => handleInputChange('closing_date_estimate', e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Nuvarande leverantör
-                </label>
-                <Input
-                  value={formData.competitor || ''}
-                  onChange={(e) => handleInputChange('competitor', e.target.value)}
-                  placeholder="Namn på nuvarande leverantör"
                 />
               </div>
 

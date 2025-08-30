@@ -1,9 +1,10 @@
 // src/components/admin/leads/SNIBranchManager.tsx - Multi-select SNI branch component
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Plus, X, Building2, ChevronDown, Check } from 'lucide-react'
+import { Search, Plus, X, Building2, ChevronDown, Check, Edit3, Type } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import { toast } from 'react-hot-toast'
 import { LeadSniCode } from '../../../types/database'
 
 // Mock SNI data - i produktion skulle detta komma från en API eller databas
@@ -43,6 +44,8 @@ export default function SNIBranchManager({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredCodes, setFilteredCodes] = useState(SNI_CODES)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualInputText, setManualInputText] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Filter SNI codes based on search term
@@ -117,6 +120,63 @@ export default function SNIBranchManager({
   const isCodeSelected = (code: string) => 
     selectedSniCodes.some(selected => selected.sni_code === code)
 
+  const parseManualSniInput = (text: string) => {
+    // Parse SNI codes from text like "68201 Uthyrning och förvaltning av egna eller arrenderade bostäder"
+    const lines = text.split(/[\n\r]+/).filter(line => line.trim())
+    const parsedCodes: { code: string; description: string }[] = []
+    
+    lines.forEach(line => {
+      const trimmed = line.trim()
+      // Match pattern: 5-digit code followed by description
+      const match = trimmed.match(/^(\d{5})\s+(.+)$/)
+      if (match) {
+        const [, code, description] = match
+        parsedCodes.push({ code, description })
+      }
+    })
+    
+    return parsedCodes
+  }
+
+  const handleManualSniSubmit = () => {
+    const parsedCodes = parseManualSniInput(manualInputText)
+    
+    if (parsedCodes.length === 0) {
+      toast.error('Kunde inte hitta några giltiga SNI-koder i texten')
+      return
+    }
+
+    // Add parsed codes to selection
+    let newSelection = [...selectedSniCodes]
+    let addedCount = 0
+
+    parsedCodes.forEach(({ code, description }) => {
+      // Skip if already selected
+      if (!isCodeSelected(code)) {
+        const newSniCode: LeadSniCode = {
+          id: `temp-${Date.now()}-${code}`,
+          lead_id: leadId || '',
+          sni_code: code,
+          sni_description: description,
+          is_primary: newSelection.length === 0, // First one becomes primary
+          created_at: new Date().toISOString(),
+          created_by: null
+        }
+        newSelection.push(newSniCode)
+        addedCount++
+      }
+    })
+
+    if (addedCount > 0) {
+      onSelectionChange(newSelection)
+      toast.success(`${addedCount} SNI-kod${addedCount > 1 ? 'er' : ''} tillagda`)
+      setManualInputText('')
+      setShowManualInput(false)
+    } else {
+      toast.info('Alla SNI-koder från texten är redan valda')
+    }
+  }
+
   return (
     <div className={`space-y-3 ${className}`}>
       <label className="block text-sm font-medium text-slate-300">
@@ -176,30 +236,32 @@ export default function SNIBranchManager({
         </div>
       )}
 
-      {/* Dropdown Selector */}
-      <div className="relative" ref={dropdownRef}>
-        <button
-          type="button"
-          onClick={() => !disabled && setIsDropdownOpen(!isDropdownOpen)}
-          disabled={disabled}
-          className={`
-            w-full flex items-center justify-between px-3 py-2 
-            bg-slate-800 border border-slate-700 rounded-lg
-            text-slate-300 text-sm
-            ${disabled 
-              ? 'cursor-not-allowed opacity-50' 
-              : 'hover:border-slate-600 focus:border-blue-500 focus:outline-none'
-            }
-          `}
-        >
-          <span className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Lägg till branschkod
-          </span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        {/* Dropdown Selector Button */}
+        <div className="relative flex-1" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => !disabled && setIsDropdownOpen(!isDropdownOpen)}
+            disabled={disabled}
+            className={`
+              w-full flex items-center justify-between px-3 py-2 
+              bg-slate-800 border border-slate-700 rounded-lg
+              text-slate-300 text-sm
+              ${disabled 
+                ? 'cursor-not-allowed opacity-50' 
+                : 'hover:border-slate-600 focus:border-blue-500 focus:outline-none'
+              }
+            `}
+          >
+            <span className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Välj från lista
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-        {isDropdownOpen && (
+          {isDropdownOpen && (
           <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-80 overflow-hidden">
             {/* Search Input */}
             <div className="p-3 border-b border-slate-700">
@@ -257,8 +319,73 @@ export default function SNIBranchManager({
               )}
             </div>
           </div>
-        )}
+          )}
+        </div>
+
+        {/* Manual Input Button */}
+        <button
+          type="button"
+          onClick={() => !disabled && setShowManualInput(!showManualInput)}
+          disabled={disabled}
+          className={`
+            px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg
+            text-slate-300 text-sm transition-colors
+            ${disabled 
+              ? 'cursor-not-allowed opacity-50' 
+              : 'hover:border-slate-600 focus:border-blue-500 focus:outline-none'
+            }
+          `}
+        >
+          <Type className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* Manual Input Form */}
+      {showManualInput && (
+        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+          <div className="flex items-center gap-2 mb-3">
+            <Type className="w-4 h-4 text-blue-400" />
+            <h4 className="text-sm font-medium text-slate-300">Klistra in SNI-koder</h4>
+          </div>
+          
+          <div className="space-y-3">
+            <textarea
+              value={manualInputText}
+              onChange={(e) => setManualInputText(e.target.value)}
+              placeholder="Klistra in SNI-koder här, en per rad:&#10;68201 Uthyrning och förvaltning av egna eller arrenderade bostäder&#10;68203 Uthyrning och förvaltning av egna eller arrenderade, andra lokaler"
+              rows={4}
+              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none text-sm"
+            />
+            
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Format: Femställig kod följt av beskrivning (t.ex. "68201 Beskrivning")
+              </p>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowManualInput(false)}
+                  disabled={disabled}
+                >
+                  Avbryt
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleManualSniSubmit}
+                  disabled={disabled || !manualInputText.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Lägg till koder
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Help Text */}
       <p className="text-xs text-slate-500">

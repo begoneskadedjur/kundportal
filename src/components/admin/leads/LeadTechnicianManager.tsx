@@ -33,6 +33,29 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
   const [assignmentNotes, setAssignmentNotes] = useState('')
 
+  // Real-time subscription for lead technicians
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`lead_technicians_${leadId}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'lead_technicians',
+          filter: `lead_id=eq.${leadId}`
+        },
+        (payload) => {
+          console.log('Lead technician changed:', payload)
+          onTechniciansChange() // Trigger parent refresh
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [leadId, onTechniciansChange])
+
   // Fetch available technicians
   useEffect(() => {
     const fetchTechnicians = async () => {
