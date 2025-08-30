@@ -219,7 +219,11 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           Tilldelade kollegor ({assignedTechnicians.length})
         </h3>
         <Button
-          onClick={() => {
+          onClick={(e) => {
+            // KRITISK FIX: Förhindra att klicket propagerar upp till parent form
+            e.preventDefault()
+            e.stopPropagation()
+            
             console.log('ADD KOLLEGA CLICKED:', { 
               currentShowAddForm: showAddForm, 
               willBe: !showAddForm,
@@ -316,7 +320,11 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                   Avbryt
                 </Button>
                 <Button
-                  onClick={() => {
+                  onClick={(e) => {
+                    // KRITISK FIX: Förhindra form submission i parent
+                    e.preventDefault()
+                    e.stopPropagation()
+                    
                     console.log('Add technician clicked:', { selectedTechnicianId, loading })
                     handleAddTechnician()
                   }}
