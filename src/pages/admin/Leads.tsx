@@ -18,7 +18,11 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Flame
+  Flame,
+  Star,
+  DollarSign,
+  BarChart3,
+  Tag
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -34,17 +38,23 @@ import {
   LeadStatus, 
   LEAD_STATUS_DISPLAY, 
   CONTACT_METHOD_DISPLAY,
-  COMPANY_SIZE_DISPLAY 
+  COMPANY_SIZE_DISPLAY,
+  calculateLeadScore,
+  getPriorityLabel,
+  getPriorityColor
 } from '../../types/database'
 import CreateLeadModal from '../../components/admin/leads/CreateLeadModal'
-import EditLeadModal from '../../components/admin/leads/EditLeadModal'
+import LeadDetailModal from '../../components/admin/leads/LeadDetailModal'
 
 interface LeadStats {
   totalLeads: number
   hotLeads: number
+  warmLeads: number
   coldLeads: number
   dealsWon: number
   conversionRate: number
+  totalEstimatedValue: number
+  avgLeadScore: number
 }
 
 const Leads: React.FC = () => {
@@ -60,11 +70,13 @@ const Leads: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [technicians, setTechnicians] = useState<{[key: string]: string}>({})
 
   useEffect(() => {
     fetchLeads()
+    fetchTechnicians()
   }, [])
 
   useEffect(() => {
@@ -98,19 +110,51 @@ const Leads: React.FC = () => {
     }
   }
 
+  const fetchTechnicians = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('technicians')
+        .select('id, name')
+        .eq('is_active', true)
+
+      if (error) throw error
+
+      const techMap: {[key: string]: string} = {}
+      data.forEach(tech => {
+        techMap[tech.id] = tech.name
+      })
+      setTechnicians(techMap)
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+    }
+  }
+
   const calculateStats = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
-    const hotLeads = leadsData.filter(lead => lead.status === 'green_deal').length
+    const hotLeads = leadsData.filter(lead => lead.status === 'orange_hot' || lead.status === 'green_deal').length
+    const warmLeads = leadsData.filter(lead => lead.status === 'yellow_warm').length
     const coldLeads = leadsData.filter(lead => lead.status === 'blue_cold').length
     const dealsWon = leadsData.filter(lead => lead.status === 'green_deal').length
     const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100) : 0
+    
+    // Calculate total estimated value
+    const totalEstimatedValue = leadsData.reduce((sum, lead) => {
+      return sum + (lead.estimated_value || 0)
+    }, 0)
+    
+    // Calculate average lead score
+    const leadScores = leadsData.map(lead => calculateLeadScore(lead))
+    const avgLeadScore = leadScores.length > 0 ? Math.round(leadScores.reduce((a, b) => a + b, 0) / leadScores.length) : 0
 
     setStats({
       totalLeads,
       hotLeads,
+      warmLeads,
       coldLeads,
       dealsWon,
-      conversionRate
+      conversionRate,
+      totalEstimatedValue,
+      avgLeadScore
     })
   }
 
@@ -152,6 +196,19 @@ const Leads: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value)
+  }
+
+  const formatNumber = (value: number) => {
+    return new Intl.NumberFormat('sv-SE').format(value)
   }
 
   if (loading) {
@@ -217,25 +274,27 @@ const Leads: React.FC = () => {
             value={stats?.hotLeads || 0}
             icon={Flame}
             trend="up"
-            trendValue="+3"
+            trendValue={`av ${stats?.totalLeads || 0}`}
             delay={0.1}
           />
           
           <EnhancedKpiCard
-            title="Kalla Leads"
-            value={stats?.coldLeads || 0}
-            icon={Clock}
-            trend="neutral"
+            title="Uppskattat värde"
+            value={stats?.totalEstimatedValue ? formatNumber(Math.round(stats.totalEstimatedValue / 1000)) : 0}
+            suffix="k SEK"
+            icon={DollarSign}
+            trend={stats?.totalEstimatedValue > 500000 ? "up" : "neutral"}
+            trendValue={stats?.totalEstimatedValue ? formatCurrency(stats.totalEstimatedValue) : '0 SEK'}
             delay={0.2}
           />
           
           <EnhancedKpiCard
-            title="Konverteringsgrad"
-            value={stats?.conversionRate || 0}
-            icon={TrendingUp}
-            suffix="%"
-            trend={stats?.conversionRate > 15 ? "up" : "neutral"}
-            trendValue={`${stats?.conversionRate}%`}
+            title="Avg Lead Score"
+            value={stats?.avgLeadScore || 0}
+            suffix="/100"
+            icon={BarChart3}
+            trend={stats?.avgLeadScore > 60 ? "up" : stats?.avgLeadScore > 30 ? "neutral" : "down"}
+            trendValue={`${stats?.avgLeadScore || 0} poäng`}
             delay={0.3}
           />
         </StaggeredGrid>
@@ -266,6 +325,7 @@ const Leads: React.FC = () => {
                 >
                   <option value="all">Alla status</option>
                   <option value="green_deal">Affär</option>
+                  <option value="orange_hot">Het</option>
                   <option value="yellow_warm">Ljummen</option>
                   <option value="blue_cold">Kall</option>
                   <option value="red_lost">Tappad</option>
@@ -323,8 +383,9 @@ const Leads: React.FC = () => {
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Företag</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Kontakt</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Kontaktad</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Uppföljning</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Prioritet</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Tekniker</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Uppskattat värde</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Uppdaterad</th>
                     <th className="text-right p-4 text-sm font-medium text-slate-300">Åtgärder</th>
                   </tr>
@@ -361,25 +422,33 @@ const Leads: React.FC = () => {
                         {getStatusBadge(lead.status)}
                       </td>
                       <td className="p-4">
-                        {lead.contact_date ? (
-                          <div className="text-sm">
-                            <div className="text-white">{formatDate(lead.contact_date)}</div>
-                            {lead.contact_method && (
-                              <div className="text-slate-400 flex items-center gap-1 mt-1">
-                                {lead.contact_method === 'mail' && <Mail className="w-3 h-3" />}
-                                {lead.contact_method === 'phone' && <Phone className="w-3 h-3" />}
-                                {lead.contact_method === 'visit' && <MapPin className="w-3 h-3" />}
-                                {CONTACT_METHOD_DISPLAY[lead.contact_method].label}
-                              </div>
-                            )}
-                          </div>
+                        {lead.priority ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
+                            <Star className="w-3 h-3 mr-1" />
+                            {getPriorityLabel(lead.priority)}
+                          </span>
                         ) : (
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
                       <td className="p-4">
-                        {lead.follow_up_date ? (
-                          <div className="text-sm text-white">{formatDate(lead.follow_up_date)}</div>
+                        {lead.assigned_to && technicians[lead.assigned_to] ? (
+                          <div className="text-sm">
+                            <div className="text-white">{technicians[lead.assigned_to]}</div>
+                            <div className="text-slate-400 text-xs">Tilldelad</div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">Ej tilldelad</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {lead.estimated_value ? (
+                          <div className="text-sm">
+                            <div className="text-white font-mono">{formatCurrency(lead.estimated_value)}</div>
+                            {lead.probability && (
+                              <div className="text-slate-400 text-xs">{lead.probability}% sannolikhet</div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-slate-400">-</span>
                         )}
@@ -398,10 +467,10 @@ const Leads: React.FC = () => {
                           variant="ghost"
                           onClick={() => {
                             setSelectedLead(lead)
-                            setShowEditModal(true)
+                            setShowDetailModal(true)
                           }}
                         >
-                          Redigera
+                          Visa detaljer
                         </Button>
                       </td>
                     </tr>
@@ -419,11 +488,11 @@ const Leads: React.FC = () => {
           onSuccess={fetchLeads}
         />
 
-        <EditLeadModal
+        <LeadDetailModal
           lead={selectedLead}
-          isOpen={showEditModal}
+          isOpen={showDetailModal}
           onClose={() => {
-            setShowEditModal(false)
+            setShowDetailModal(false)
             setSelectedLead(null)
           }}
           onSuccess={fetchLeads}

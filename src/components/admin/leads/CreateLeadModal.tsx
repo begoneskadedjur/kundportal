@@ -1,7 +1,7 @@
 // src/components/admin/leads/CreateLeadModal.tsx - Create new lead modal
 
-import React, { useState } from 'react'
-import { Plus, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Plus, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save, Target, Star, Tag } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -15,9 +15,11 @@ import {
   LeadStatus, 
   ContactMethod, 
   CompanySize,
+  LeadPriority,
   LEAD_STATUS_DISPLAY,
   CONTACT_METHOD_DISPLAY,
-  COMPANY_SIZE_DISPLAY
+  COMPANY_SIZE_DISPLAY,
+  LEAD_PRIORITY_DISPLAY
 } from '../../../types/database'
 
 interface CreateLeadModalProps {
@@ -30,6 +32,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [technicians, setTechnicians] = useState<{id: string, name: string}[]>([])
   
   const [formData, setFormData] = useState<Partial<LeadInsert>>({
     company_name: '',
@@ -54,7 +57,21 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
     procurement: false,
     contract_status: false,
     contract_with: '',
-    contract_end_date: null
+    contract_end_date: null,
+    // Nya fält
+    priority: null,
+    source: '',
+    assigned_to: null,
+    estimated_value: null,
+    probability: null,
+    closing_date_estimate: null,
+    competitor: '',
+    decision_maker: '',
+    budget_confirmed: false,
+    timeline_confirmed: false,
+    authority_confirmed: false,
+    needs_confirmed: false,
+    tags: []
   })
 
   const handleInputChange = (field: keyof LeadInsert, value: any) => {
@@ -170,7 +187,20 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         procurement: false,
         contract_status: false,
         contract_with: '',
-        contract_end_date: null
+        contract_end_date: null,
+        priority: null,
+        source: '',
+        assigned_to: null,
+        estimated_value: null,
+        probability: null,
+        closing_date_estimate: null,
+        competitor: '',
+        decision_maker: '',
+        budget_confirmed: false,
+        timeline_confirmed: false,
+        authority_confirmed: false,
+        needs_confirmed: false,
+        tags: []
       })
 
     } catch (err) {
@@ -187,6 +217,28 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
       setErrors({})
     }
   }
+
+  // Fetch technicians for assignment dropdown
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('technicians')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name')
+        
+        if (error) throw error
+        setTechnicians(data || [])
+      } catch (error) {
+        console.error('Error fetching technicians:', error)
+      }
+    }
+
+    if (isOpen) {
+      fetchTechnicians()
+    }
+  }, [isOpen])
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="xl">
@@ -403,6 +455,172 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                 />
               </div>
+            </div>
+          </Card>
+
+          {/* Lead-hantering & prioritering */}
+          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <Target className="w-5 h-5 text-orange-400" />
+              Lead-hantering & prioritering
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Prioritet
+                </label>
+                <select
+                  value={formData.priority || ''}
+                  onChange={(e) => handleInputChange('priority', e.target.value as LeadPriority || null)}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                >
+                  <option value="">Välj prioritet</option>
+                  {Object.entries(LEAD_PRIORITY_DISPLAY).map(([value, config]) => (
+                    <option key={value} value={value}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Källa
+                </label>
+                <Input
+                  value={formData.source || ''}
+                  onChange={(e) => handleInputChange('source', e.target.value)}
+                  placeholder="t.ex. Webbsida, Telefon, Referral"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Tilldelad tekniker
+                </label>
+                <select
+                  value={formData.assigned_to || ''}
+                  onChange={(e) => handleInputChange('assigned_to', e.target.value || null)}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                >
+                  <option value="">Ingen tilldelning</option>
+                  {technicians.map(tech => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Uppskattat värde (SEK)
+                </label>
+                <Input
+                  type="number"
+                  value={formData.estimated_value || ''}
+                  onChange={(e) => handleInputChange('estimated_value', e.target.value ? Number(e.target.value) : null)}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Sannolikhet (0-100%)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.probability || ''}
+                  onChange={(e) => handleInputChange('probability', e.target.value ? Number(e.target.value) : null)}
+                  placeholder="50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Uppskattat slutdatum
+                </label>
+                <Input
+                  type="date"
+                  value={formData.closing_date_estimate || ''}
+                  onChange={(e) => handleInputChange('closing_date_estimate', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Konkurrent
+                </label>
+                <Input
+                  value={formData.competitor || ''}
+                  onChange={(e) => handleInputChange('competitor', e.target.value)}
+                  placeholder="Namn på konkurrent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Beslutsfattare
+                </label>
+                <Input
+                  value={formData.decision_maker || ''}
+                  onChange={(e) => handleInputChange('decision_maker', e.target.value)}
+                  placeholder="Namn på beslutsfattare"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* BANT-kriterier */}
+          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-400" />
+              BANT-kvalificering
+            </h3>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <label className="flex items-center gap-2 text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={formData.budget_confirmed || false}
+                  onChange={(e) => handleInputChange('budget_confirmed', e.target.checked)}
+                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                />
+                Budget bekräftad
+              </label>
+
+              <label className="flex items-center gap-2 text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={formData.authority_confirmed || false}
+                  onChange={(e) => handleInputChange('authority_confirmed', e.target.checked)}
+                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                />
+                Befogenhet bekräftad
+              </label>
+
+              <label className="flex items-center gap-2 text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={formData.needs_confirmed || false}
+                  onChange={(e) => handleInputChange('needs_confirmed', e.target.checked)}
+                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                />
+                Behov bekräftat
+              </label>
+
+              <label className="flex items-center gap-2 text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={formData.timeline_confirmed || false}
+                  onChange={(e) => handleInputChange('timeline_confirmed', e.target.checked)}
+                  className="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-purple-500"
+                />
+                Tidslinje bekräftad
+              </label>
             </div>
           </Card>
 

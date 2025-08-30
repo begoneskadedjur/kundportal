@@ -548,7 +548,7 @@ export type Database = {
           contact_person: string
           phone_number: string
           email: string
-          status: 'red_lost' | 'blue_cold' | 'yellow_warm' | 'green_deal'
+          status: 'red_lost' | 'blue_cold' | 'yellow_warm' | 'orange_hot' | 'green_deal'
           
           // Frivillig företagsinformation
           organization_number: string | null
@@ -578,9 +578,87 @@ export type Database = {
           created_at: string
           updated_at: string
           update_history: any | null // JSONB
+          
+          // 🆕 Utökade fält för lead-hantering
+          priority: 'low' | 'medium' | 'high' | 'urgent' | null
+          source: string | null // Var leadet kom ifrån (webb, telefon, referral, etc.)
+          assigned_to: string | null // FK till profiles - vem som är ansvarig för leadet
+          estimated_value: number | null // Uppskattat affärsvärde
+          probability: number | null // Sannolikhet för affär (0-100%)
+          closing_date_estimate: string | null // Uppskattat slutdatum för affär
+          competitor: string | null // Konkurrent som leadet jämför med
+          decision_maker: string | null // Beslutsfattare
+          budget_confirmed: boolean
+          timeline_confirmed: boolean
+          authority_confirmed: boolean
+          needs_confirmed: boolean
+          tags: string[] | null // Array av tags för kategorisering
         }
         Insert: Omit<Database['public']['Tables']['leads']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['leads']['Insert']>
+      }
+      // 🆕 LEAD CONTACTS TABELL - för kontaktpersoner till leads
+      lead_contacts: {
+        Row: {
+          id: string
+          lead_id: string
+          name: string
+          title: string | null
+          phone: string | null
+          email: string | null
+          is_primary: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null  // 🔧 TILLAGD: created_by
+          updated_by: string | null  // 🔧 TILLAGD: updated_by
+        }
+        Insert: Omit<Database['public']['Tables']['lead_contacts']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['lead_contacts']['Insert']>
+      }
+      // 🆕 LEAD COMMENTS TABELL - för kommentarer och anteckningar
+      lead_comments: {
+        Row: {
+          id: string
+          lead_id: string
+          content: string  // 🔧 KORRIGERAD: content istället för comment
+          comment_type: 'note' | 'follow_up' | 'meeting' | 'call' | 'email'
+          created_by: string
+          is_internal: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['lead_comments']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['lead_comments']['Insert']>
+      }
+      // 🆕 LEAD EVENTS TABELL - för händelser och aktiviteter
+      lead_events: {
+        Row: {
+          id: string
+          lead_id: string
+          event_type: 'created' | 'updated' | 'status_changed' | 'contacted' | 'meeting' | 'quote_sent' | 'quote_accepted' | 'quote_rejected' | 'assigned' | 'note_added'  // 🔧 KORRIGERADE event_type värden
+          title: string  // 🔧 TILLAGD: title är obligatorisk
+          description: string | null
+          event_date: string | null  // 🔧 TILLAGD: event_date
+          data: any | null // 🔧 KORRIGERAD: data istället för event_data
+          created_by: string
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['lead_events']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['lead_events']['Insert']>
+      }
+      // 🆕 LEAD SNI CODES TABELL - för SNI-kod mappningar
+      lead_sni_codes: {
+        Row: {
+          id: string
+          lead_id: string  // 🔧 TILLAGD: lead_id FK
+          sni_code: string
+          sni_description: string | null  // 🔧 KORRIGERAD: kan vara null
+          is_primary: boolean  // 🔧 KORRIGERAD: is_primary istället för category och is_active
+          created_at: string
+          created_by: string | null  // 🔧 TILLAGD: created_by
+        }
+        Insert: Omit<Database['public']['Tables']['lead_sni_codes']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['lead_sni_codes']['Insert']>
       }
     }
   }
@@ -906,15 +984,56 @@ export type Lead = Database['public']['Tables']['leads']['Row']
 export type LeadInsert = Database['public']['Tables']['leads']['Insert']
 export type LeadUpdate = Database['public']['Tables']['leads']['Update']
 
-export type LeadStatus = 'red_lost' | 'blue_cold' | 'yellow_warm' | 'green_deal'
+// 🆕 LEAD CONTACTS TYPES
+export type LeadContact = Database['public']['Tables']['lead_contacts']['Row']
+export type LeadContactInsert = Database['public']['Tables']['lead_contacts']['Insert']
+export type LeadContactUpdate = Database['public']['Tables']['lead_contacts']['Update']
+
+// 🆕 LEAD COMMENTS TYPES
+export type LeadComment = Database['public']['Tables']['lead_comments']['Row']
+export type LeadCommentInsert = Database['public']['Tables']['lead_comments']['Insert']
+export type LeadCommentUpdate = Database['public']['Tables']['lead_comments']['Update']
+
+// 🆕 LEAD EVENTS TYPES
+export type LeadEvent = Database['public']['Tables']['lead_events']['Row']
+export type LeadEventInsert = Database['public']['Tables']['lead_events']['Insert']
+export type LeadEventUpdate = Database['public']['Tables']['lead_events']['Update']
+
+// 🆕 LEAD SNI CODES TYPES
+export type LeadSniCode = Database['public']['Tables']['lead_sni_codes']['Row']
+export type LeadSniCodeInsert = Database['public']['Tables']['lead_sni_codes']['Insert']
+export type LeadSniCodeUpdate = Database['public']['Tables']['lead_sni_codes']['Update']
+
+// 🆕 LEAD WITH RELATIONS - inkluderar alla relaterade data
+export type LeadWithRelations = Lead & {
+  lead_contacts?: LeadContact[]
+  lead_comments?: LeadComment[]
+  lead_events?: LeadEvent[]
+  created_by_profile?: {
+    display_name: string | null
+    email: string
+  }
+  updated_by_profile?: {
+    display_name: string | null
+    email: string
+  }
+}
+
+export type LeadStatus = 'red_lost' | 'blue_cold' | 'yellow_warm' | 'orange_hot' | 'green_deal'
 export type ContactMethod = 'mail' | 'phone' | 'visit'
 export type CompanySize = 'small' | 'medium' | 'large' | 'enterprise'
+export type LeadPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type CommentType = 'note' | 'follow_up' | 'meeting' | 'call' | 'email'
+
+// 🆕 EVENT TYPE ENUM för olika händelsetyper - 🔧 UPPDATERAD
+export type EventType = 'created' | 'updated' | 'status_changed' | 'contacted' | 'meeting' | 'quote_sent' | 'quote_accepted' | 'quote_rejected' | 'assigned' | 'note_added'
 
 // Status display mappings för UI
 export const LEAD_STATUS_DISPLAY = {
   red_lost: { label: 'Tappad', color: 'red-500' },
   blue_cold: { label: 'Kall', color: 'blue-500' },
   yellow_warm: { label: 'Ljummen', color: 'yellow-500' },
+  orange_hot: { label: 'Het', color: 'orange-500' },
   green_deal: { label: 'Affär', color: 'green-500' }
 } as const
 
@@ -929,6 +1048,37 @@ export const COMPANY_SIZE_DISPLAY = {
   medium: { label: 'Medelstort företag (11-50 anställda)' },
   large: { label: 'Stort företag (51-250 anställda)' },
   enterprise: { label: 'Storföretag (250+ anställda)' }
+} as const
+
+// 🆕 EVENT TYPE DISPLAY för händelsetyper - 🔧 UPPDATERAD
+export const EVENT_TYPE_DISPLAY = {
+  created: { label: 'Skapad', icon: 'Plus', color: 'green-500' },
+  updated: { label: 'Uppdaterad', icon: 'Edit', color: 'blue-500' },
+  status_changed: { label: 'Statusändring', icon: 'RotateCcw', color: 'blue-500' },
+  contacted: { label: 'Kontaktad', icon: 'Phone', color: 'green-500' },
+  meeting: { label: 'Möte', icon: 'Calendar', color: 'purple-500' },
+  quote_sent: { label: 'Offert skickad', icon: 'FileText', color: 'orange-500' },
+  quote_accepted: { label: 'Offert accepterad', icon: 'CheckCircle', color: 'green-600' },
+  quote_rejected: { label: 'Offert avvisad', icon: 'XCircle', color: 'red-500' },
+  assigned: { label: 'Tilldelad', icon: 'UserCheck', color: 'indigo-500' },
+  note_added: { label: 'Anteckning tillagd', icon: 'StickyNote', color: 'gray-500' }
+} as const
+
+// 🆕 LEAD PRIORITY DISPLAY
+export const LEAD_PRIORITY_DISPLAY = {
+  low: { label: 'Låg', color: 'green-500', bgColor: 'bg-green-100' },
+  medium: { label: 'Medium', color: 'yellow-500', bgColor: 'bg-yellow-100' },
+  high: { label: 'Hög', color: 'orange-500', bgColor: 'bg-orange-100' },
+  urgent: { label: 'Brådskande', color: 'red-500', bgColor: 'bg-red-100' }
+} as const
+
+// 🆕 COMMENT TYPE DISPLAY
+export const COMMENT_TYPE_DISPLAY = {
+  note: { label: 'Anteckning', icon: 'StickyNote', color: 'gray-500' },
+  follow_up: { label: 'Uppföljning', icon: 'Clock', color: 'yellow-500' },
+  meeting: { label: 'Möte', icon: 'Users', color: 'purple-500' },
+  call: { label: 'Samtal', icon: 'Phone', color: 'green-500' },
+  email: { label: 'E-post', icon: 'Mail', color: 'blue-500' }
 } as const
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
@@ -1409,4 +1559,65 @@ export const isScheduledCase = (caseData: BeGoneCaseRow | any): boolean => {
   }
   
   return false;
+}
+
+// 🆕 LEAD SYSTEM HJÄLPFUNKTIONER
+export const getLeadStatusColor = (status: LeadStatus): string => {
+  return LEAD_STATUS_DISPLAY[status]?.color || 'gray-500'
+}
+
+export const getLeadStatusLabel = (status: LeadStatus): string => {
+  return LEAD_STATUS_DISPLAY[status]?.label || status
+}
+
+export const getPriorityColor = (priority: LeadPriority | null): string => {
+  if (!priority) return 'gray-500'
+  return LEAD_PRIORITY_DISPLAY[priority]?.color || 'gray-500'
+}
+
+export const getPriorityLabel = (priority: LeadPriority | null): string => {
+  if (!priority) return 'Ej angiven'
+  return LEAD_PRIORITY_DISPLAY[priority]?.label || priority
+}
+
+export const getEventTypeDisplay = (eventType: EventType) => {
+  return EVENT_TYPE_DISPLAY[eventType] || { label: eventType, icon: 'Circle', color: 'gray-500' }
+}
+
+export const getCommentTypeDisplay = (commentType: CommentType) => {
+  return COMMENT_TYPE_DISPLAY[commentType] || { label: commentType, icon: 'MessageSquare', color: 'gray-500' }
+}
+
+// Hjälpfunktion för att beräkna lead score baserat på BANT-kriterier
+export const calculateLeadScore = (lead: Lead): number => {
+  let score = 0
+  
+  // Budget confirmed (25 points)
+  if (lead.budget_confirmed) score += 25
+  
+  // Authority confirmed (25 points)  
+  if (lead.authority_confirmed) score += 25
+  
+  // Need confirmed (25 points)
+  if (lead.needs_confirmed) score += 25
+  
+  // Timeline confirmed (25 points)
+  if (lead.timeline_confirmed) score += 25
+  
+  // Bonus points for other factors
+  if (lead.estimated_value && lead.estimated_value > 50000) score += 10
+  if (lead.probability && lead.probability > 70) score += 10
+  if (lead.priority === 'urgent') score += 5
+  if (lead.priority === 'high') score += 3
+  
+  return Math.min(score, 100) // Cap at 100
+}
+
+// Hjälpfunktion för att avgöra lead kvalitet baserat på score
+export const getLeadQuality = (score: number): { label: string; color: string; bgColor: string } => {
+  if (score >= 80) return { label: 'Utmärkt', color: 'green-600', bgColor: 'bg-green-100' }
+  if (score >= 60) return { label: 'Bra', color: 'blue-600', bgColor: 'bg-blue-100' }
+  if (score >= 40) return { label: 'Medel', color: 'yellow-600', bgColor: 'bg-yellow-100' }
+  if (score >= 20) return { label: 'Svag', color: 'orange-600', bgColor: 'bg-orange-100' }
+  return { label: 'Mycket svag', color: 'red-600', bgColor: 'bg-red-100' }
 }
