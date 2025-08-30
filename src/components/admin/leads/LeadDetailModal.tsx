@@ -51,7 +51,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   useEffect(() => {
     if (lead && isOpen) {
       setCurrentLead(lead)
-      fetchLeadDetails()
+      // Pass lead directly to avoid race condition with state update
+      fetchLeadDetailsForLead(lead)
       
       // Set up real-time subscriptions for lead details
       const contactsSubscription = supabase
@@ -134,8 +135,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     }
   }, [lead, currentLead])
 
-  const fetchLeadDetails = async () => {
-    if (!currentLead) return
+  const fetchLeadDetailsForLead = async (leadToFetch: Lead) => {
+    if (!leadToFetch) return
 
     try {
       setLoading(true)
@@ -145,7 +146,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         supabase
           .from('lead_contacts')
           .select('*')
-          .eq('lead_id', currentLead.id)
+          .eq('lead_id', leadToFetch.id)
           .order('is_primary', { ascending: false }),
         
         supabase
@@ -154,7 +155,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             *,
             created_by_profile:profiles!lead_comments_created_by_fkey(display_name, email)
           `)
-          .eq('lead_id', currentLead.id)
+          .eq('lead_id', leadToFetch.id)
           .order('created_at', { ascending: false }),
         
         supabase
@@ -163,14 +164,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             *,
             created_by_profile:profiles!lead_events_created_by_fkey(display_name, email)
           `)
-          .eq('lead_id', currentLead.id)
+          .eq('lead_id', leadToFetch.id)
           .order('created_at', { ascending: false }),
         
-        currentLead.assigned_to 
+        leadToFetch.assigned_to 
           ? supabase
               .from('technicians')
               .select('name')
-              .eq('id', currentLead.assigned_to)
+              .eq('id', leadToFetch.assigned_to)
               .single()
           : Promise.resolve({ data: null, error: null })
       ])
@@ -216,6 +217,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       setTechnician(null)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchLeadDetails = () => {
+    if (currentLead) {
+      fetchLeadDetailsForLead(currentLead)
     }
   }
 

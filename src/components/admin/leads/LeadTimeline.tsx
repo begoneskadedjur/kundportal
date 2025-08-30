@@ -12,7 +12,8 @@ import {
   User,
   Circle,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react'
 import { formatSwedishDateTime, formatSwedishRelativeTime } from '../../../utils/swedishDateFormat'
 import Button from '../../ui/Button'
@@ -50,6 +51,10 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [visibleEventCount, setVisibleEventCount] = useState(5)
+  
+  const INITIAL_EVENT_COUNT = 5
+  const LOAD_MORE_BATCH_SIZE = 5
 
   // Real-time subscription för lead events
   useEffect(() => {
@@ -186,17 +191,36 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
     }
   }
 
-  // Sort events by date (newest first)
-  const sortedEvents = [...events].sort((a, b) => 
+  // Sort events by date (newest first) and apply pagination
+  const allSortedEvents = [...events].sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+  
+  const visibleEvents = allSortedEvents.slice(0, visibleEventCount)
+  const remainingEventCount = allSortedEvents.length - visibleEventCount
+  const hasMoreEvents = remainingEventCount > 0
+  
+  const loadMoreEvents = () => {
+    const newVisibleCount = Math.min(
+      visibleEventCount + LOAD_MORE_BATCH_SIZE, 
+      allSortedEvents.length
+    )
+    setVisibleEventCount(newVisibleCount)
+  }
+  
+  // Reset visible count when events change (new events added)
+  useEffect(() => {
+    if (allSortedEvents.length > 0 && visibleEventCount < INITIAL_EVENT_COUNT) {
+      setVisibleEventCount(INITIAL_EVENT_COUNT)
+    }
+  }, [allSortedEvents.length])
 
   return (
     <Card className="p-6 bg-slate-800/50 border-slate-700/50">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Clock className="w-5 h-5 text-purple-400" />
-          Händelsetimeline ({events.length})
+          Händelser ({allSortedEvents.length} totalt)
         </h3>
         <Button
           onClick={() => setShowForm(!showForm)}
@@ -289,13 +313,13 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
       )}
 
       {/* Timeline */}
-      {sortedEvents.length > 0 ? (
+      {allSortedEvents.length > 0 ? (
         <div className="relative">
           {/* Timeline line */}
           <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-600"></div>
           
           <div className="space-y-6">
-            {sortedEvents.map((event, index) => (
+            {visibleEvents.map((event, index) => (
               <div key={event.id} className="relative flex items-start gap-4">
                 {/* Timeline dot */}
                 <div className={`relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-${EVENT_TYPE_DISPLAY[event.event_type].color}/10 border-2 border-${EVENT_TYPE_DISPLAY[event.event_type].color}/30`}>
@@ -330,11 +354,11 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                        'Systemhändelse'}
                     </div>
                     
-                    {event.metadata && (
+                    {event.data && (
                       <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="text-xs text-slate-400 mb-1">Metadata:</div>
+                        <div className="text-xs text-slate-400 mb-1">Ytterligare data:</div>
                         <pre className="text-xs text-slate-300 whitespace-pre-wrap">
-                          {JSON.stringify(event.metadata, null, 2)}
+                          {JSON.stringify(event.data, null, 2)}
                         </pre>
                       </div>
                     )}
@@ -343,6 +367,35 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
               </div>
             ))}
           </div>
+
+          {/* Load More Events Button */}
+          {hasMoreEvents && (
+            <div className="mt-6">
+              <button 
+                onClick={loadMoreEvents}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 hover:text-slate-200 hover:bg-slate-800/80 transition-colors duration-200 flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-400" />
+                  <span>Visa {Math.min(LOAD_MORE_BATCH_SIZE, remainingEventCount)} äldre händelser</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400">
+                    ({remainingEventCount} fler händelser)
+                  </span>
+                  <ChevronDown className="w-4 h-4 group-hover:text-blue-400 transition-colors" />
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Completion indicator when all events are loaded */}
+          {!hasMoreEvents && allSortedEvents.length > INITIAL_EVENT_COUNT && (
+            <div className="mt-6 flex items-center justify-center gap-2 text-slate-500 text-sm">
+              <CheckCircle className="w-4 h-4" />
+              <span>Alla händelser visas</span>
+            </div>
+          )}
 
           {/* Timeline end marker */}
           <div className="relative flex items-start gap-4 mt-6">
