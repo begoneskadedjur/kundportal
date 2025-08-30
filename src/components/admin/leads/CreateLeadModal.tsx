@@ -1,0 +1,463 @@
+// src/components/admin/leads/CreateLeadModal.tsx - Create new lead modal
+
+import React, { useState } from 'react'
+import { Plus, Building2, User, Mail, Phone, MapPin, Calendar, AlertCircle, Save } from 'lucide-react'
+import Modal from '../../ui/Modal'
+import Button from '../../ui/Button'
+import Input from '../../ui/Input'
+import Card from '../../ui/Card'
+import LoadingSpinner from '../../shared/LoadingSpinner'
+import { supabase } from '../../../lib/supabase'
+import { toast } from 'react-hot-toast'
+import { useAuth } from '../../../contexts/AuthContext'
+import { 
+  LeadInsert, 
+  LeadStatus, 
+  ContactMethod, 
+  CompanySize,
+  LEAD_STATUS_DISPLAY,
+  CONTACT_METHOD_DISPLAY,
+  COMPANY_SIZE_DISPLAY
+} from '../../../types/database'
+
+interface CreateLeadModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalProps) {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  
+  const [formData, setFormData] = useState<Partial<LeadInsert>>({
+    company_name: '',
+    contact_person: '',
+    phone_number: '',
+    email: '',
+    status: 'blue_cold',
+    organization_number: '',
+    business_type: '',
+    problem_type: '',
+    address: '',
+    website: '',
+    company_size: null,
+    business_description: '',
+    sni07_label: '',
+    notes: '',
+    contact_method: null,
+    contact_date: null,
+    follow_up_date: null,
+    interested_in_quote: false,
+    quote_provided_date: null,
+    procurement: false,
+    contract_status: false,
+    contract_with: '',
+    contract_end_date: null
+  })
+
+  const handleInputChange = (field: keyof LeadInsert, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }))
+    }
+  }
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Required fields
+    if (!formData.company_name?.trim()) {
+      newErrors.company_name = 'Företagsnamn är obligatoriskt'
+    }
+
+    if (!formData.contact_person?.trim()) {
+      newErrors.contact_person = 'Kontaktperson är obligatorisk'
+    }
+
+    if (!formData.phone_number?.trim()) {
+      newErrors.phone_number = 'Telefonnummer är obligatoriskt'
+    }
+
+    if (!formData.email?.trim()) {
+      newErrors.email = 'E-post är obligatorisk'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Ogiltig e-postadress'
+    }
+
+    // Website validation if provided
+    if (formData.website && formData.website.trim()) {
+      const websiteRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
+      if (!websiteRegex.test(formData.website)) {
+        newErrors.website = 'Ogiltig webbadress'
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
+    if (!user?.id) {
+      toast.error('Användare ej inloggad')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      // Clean data - remove empty strings and convert to null
+      const cleanData = { ...formData }
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key as keyof typeof cleanData] === '') {
+          cleanData[key as keyof typeof cleanData] = null
+        }
+      })
+
+      // Add audit fields
+      const leadData: LeadInsert = {
+        ...cleanData,
+        created_by: user.id,
+        updated_by: user.id
+      } as LeadInsert
+
+      const { error } = await supabase
+        .from('leads')
+        .insert(leadData)
+
+      if (error) throw error
+
+      toast.success('Lead skapad framgångsrikt')
+      onSuccess()
+      onClose()
+      
+      // Reset form
+      setFormData({
+        company_name: '',
+        contact_person: '',
+        phone_number: '',
+        email: '',
+        status: 'blue_cold',
+        organization_number: '',
+        business_type: '',
+        problem_type: '',
+        address: '',
+        website: '',
+        company_size: null,
+        business_description: '',
+        sni07_label: '',
+        notes: '',
+        contact_method: null,
+        contact_date: null,
+        follow_up_date: null,
+        interested_in_quote: false,
+        quote_provided_date: null,
+        procurement: false,
+        contract_status: false,
+        contract_with: '',
+        contract_end_date: null
+      })
+
+    } catch (err) {
+      console.error('Error creating lead:', err)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa lead')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    if (!loading) {
+      onClose()
+      setErrors({})
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
+      <div className="p-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-center justify-center w-12 h-12 bg-purple-600/10 rounded-lg">
+            <Plus className="w-6 h-6 text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">Skapa ny lead</h2>
+            <p className="text-slate-400">Lägg till en potentiell kund i lead-pipelinen</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* Obligatorisk huvudinformation */}
+          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-purple-400" />
+              Obligatorisk huvudinformation
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Företagsnamn *
+                </label>
+                <Input
+                  value={formData.company_name || ''}
+                  onChange={(e) => handleInputChange('company_name', e.target.value)}
+                  placeholder="Företagsnamn"
+                  className={errors.company_name ? 'border-red-500' : ''}
+                />
+                {errors.company_name && (
+                  <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.company_name}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Organisationsnummer
+                </label>
+                <Input
+                  value={formData.organization_number || ''}
+                  onChange={(e) => handleInputChange('organization_number', e.target.value)}
+                  placeholder="XXXXXX-XXXX"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Kontaktperson *
+                </label>
+                <Input
+                  value={formData.contact_person || ''}
+                  onChange={(e) => handleInputChange('contact_person', e.target.value)}
+                  placeholder="Namn på kontaktperson"
+                  className={errors.contact_person ? 'border-red-500' : ''}
+                />
+                {errors.contact_person && (
+                  <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.contact_person}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Telefonnummer *
+                </label>
+                <Input
+                  value={formData.phone_number || ''}
+                  onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                  placeholder="07X-XXX XX XX"
+                  className={errors.phone_number ? 'border-red-500' : ''}
+                />
+                {errors.phone_number && (
+                  <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.phone_number}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  E-post *
+                </label>
+                <Input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="kontakt@företag.se"
+                  className={errors.email ? 'border-red-500' : ''}
+                />
+                {errors.email && (
+                  <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.email}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Status
+                </label>
+                <select
+                  value={formData.status || 'blue_cold'}
+                  onChange={(e) => handleInputChange('status', e.target.value as LeadStatus)}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                >
+                  {Object.entries(LEAD_STATUS_DISPLAY).map(([value, config]) => (
+                    <option key={value} value={value}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Företagsinformation */}
+          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-400" />
+              Företagsinformation
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Verksamhetstyp
+                </label>
+                <Input
+                  value={formData.business_type || ''}
+                  onChange={(e) => handleInputChange('business_type', e.target.value)}
+                  placeholder="t.ex. Restaurang, Hotell, Kontor"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Typ av problem
+                </label>
+                <Input
+                  value={formData.problem_type || ''}
+                  onChange={(e) => handleInputChange('problem_type', e.target.value)}
+                  placeholder="t.ex. Råttor, Möss, Vägglöss"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Företagsstorlek
+                </label>
+                <select
+                  value={formData.company_size || ''}
+                  onChange={(e) => handleInputChange('company_size', e.target.value as CompanySize || null)}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                >
+                  <option value="">Välj storlek</option>
+                  {Object.entries(COMPANY_SIZE_DISPLAY).map(([value, config]) => (
+                    <option key={value} value={value}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Hemsida
+                </label>
+                <Input
+                  value={formData.website || ''}
+                  onChange={(e) => handleInputChange('website', e.target.value)}
+                  placeholder="https://www.företag.se"
+                  className={errors.website ? 'border-red-500' : ''}
+                />
+                {errors.website && (
+                  <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.website}
+                  </p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Adress
+                </label>
+                <Input
+                  value={formData.address || ''}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  placeholder="Gatuadress, Postnummer Stad"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Verksamhetsbeskrivning
+                </label>
+                <textarea
+                  value={formData.business_description || ''}
+                  onChange={(e) => handleInputChange('business_description', e.target.value)}
+                  placeholder="Beskriv verksamheten och eventuella särskilda omständigheter"
+                  rows={3}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Anteckningar */}
+          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <User className="w-5 h-5 text-green-400" />
+              Anteckningar
+            </h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Kommentarer och anteckningar
+              </label>
+              <textarea
+                value={formData.notes || ''}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                placeholder="Lägg till kommentarer, mötesinformation eller andra anteckningar här..."
+                rows={4}
+                className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+              />
+            </div>
+          </Card>
+
+          {/* Form Actions */}
+          <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-700/50">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Avbryt
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Skapar lead...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  Skapa lead
+                </>
+              )}
+            </Button>
+          </div>
+
+        </form>
+      </div>
+    </Modal>
+  )
+}

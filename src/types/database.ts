@@ -539,6 +539,49 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['quote_recipients']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['quote_recipients']['Insert']>
       }
+      // 🆕 LEADS TABELL - för lead pipeline hantering
+      leads: {
+        Row: {
+          id: string
+          // Obligatorisk huvudinformation
+          company_name: string
+          contact_person: string
+          phone_number: string
+          email: string
+          status: 'red_lost' | 'blue_cold' | 'yellow_warm' | 'green_deal'
+          
+          // Frivillig företagsinformation
+          organization_number: string | null
+          business_type: string | null
+          problem_type: string | null
+          address: string | null
+          website: string | null
+          company_size: 'small' | 'medium' | 'large' | 'enterprise' | null
+          business_description: string | null
+          sni07_label: string | null
+          
+          // Lead-hantering & uppföljning
+          notes: string | null
+          contact_method: 'mail' | 'phone' | 'visit' | null
+          contact_date: string | null
+          follow_up_date: string | null
+          interested_in_quote: boolean
+          quote_provided_date: string | null
+          procurement: boolean
+          contract_status: boolean
+          contract_with: string | null
+          contract_end_date: string | null
+          
+          // Tracking & audit
+          created_by: string
+          updated_by: string
+          created_at: string
+          updated_at: string
+          update_history: any | null // JSONB
+        }
+        Insert: Omit<Database['public']['Tables']['leads']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['leads']['Insert']>
+      }
     }
   }
 }
@@ -857,6 +900,36 @@ export type OneflowSyncLogUpdate = Database['public']['Tables']['oneflow_sync_lo
 export type QuoteRecipient = Database['public']['Tables']['quote_recipients']['Row']
 export type QuoteRecipientInsert = Database['public']['Tables']['quote_recipients']['Insert']
 export type QuoteRecipientUpdate = Database['public']['Tables']['quote_recipients']['Update']
+
+// 🆕 LEADS TYPES - för lead pipeline hantering
+export type Lead = Database['public']['Tables']['leads']['Row']
+export type LeadInsert = Database['public']['Tables']['leads']['Insert']
+export type LeadUpdate = Database['public']['Tables']['leads']['Update']
+
+export type LeadStatus = 'red_lost' | 'blue_cold' | 'yellow_warm' | 'green_deal'
+export type ContactMethod = 'mail' | 'phone' | 'visit'
+export type CompanySize = 'small' | 'medium' | 'large' | 'enterprise'
+
+// Status display mappings för UI
+export const LEAD_STATUS_DISPLAY = {
+  red_lost: { label: 'Tappad', color: 'red-500' },
+  blue_cold: { label: 'Kall', color: 'blue-500' },
+  yellow_warm: { label: 'Ljummen', color: 'yellow-500' },
+  green_deal: { label: 'Affär', color: 'green-500' }
+} as const
+
+export const CONTACT_METHOD_DISPLAY = {
+  mail: { label: 'Mail', icon: 'Mail' },
+  phone: { label: 'Samtal', icon: 'Phone' },
+  visit: { label: 'Besök', icon: 'MapPin' }
+} as const
+
+export const COMPANY_SIZE_DISPLAY = {
+  small: { label: 'Litet företag (1-10 anställda)' },
+  medium: { label: 'Medelstort företag (11-50 anställda)' },
+  large: { label: 'Stort företag (51-250 anställda)' },
+  enterprise: { label: 'Storföretag (250+ anställda)' }
+} as const
 
 // 👨‍🔧 KÄNDA TEKNIKER (uppdaterade från din gamla fil)
 export const KNOWN_TECHNICIANS = [

@@ -342,13 +342,23 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/contracts-overview"
+                  href="/admin/leads"
                   icon={Target}
+                  title="Lead Pipeline - Översikt"
+                  description="Hantera potentiella kunder"
+                  stats="Manuell leadhantering"
+                  tag="Pipeline"
+                  iconColor="text-purple-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/contracts-overview"
+                  icon={Receipt}
                   title="Försäljningspipeline - Översikt"
                   description="Alla avtal & offerter"
                   stats="Status & värdeanalys"
                   tag="Pipeline"
-                  iconColor="text-purple-400"
+                  iconColor="text-emerald-400"
                 />
                 
                 <AdminDashboardCard

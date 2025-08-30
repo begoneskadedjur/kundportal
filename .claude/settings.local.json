@@ -52,7 +52,8 @@
       "Bash(git log:*)",
       "WebFetch(domain:supabase.com)",
       "mcp__supabase__deploy_edge_function",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "mcp__supabase__generate_typescript_types"
     ],
     "deny": [],
     "additionalDirectories": [
