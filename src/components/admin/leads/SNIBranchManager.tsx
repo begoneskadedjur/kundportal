@@ -121,60 +121,123 @@ export default function SNIBranchManager({
     selectedSniCodes.some(selected => selected.sni_code === code)
 
   const parseManualSniInput = (text: string) => {
-    // Parse SNI codes from text like "68201 Uthyrning och förvaltning av egna eller arrenderade bostäder"
+    // Parse SNI codes from text - supports multiple formats
     const lines = text.split(/[\n\r]+/).filter(line => line.trim())
     const parsedCodes: { code: string; description: string }[] = []
+    const errors: string[] = []
     
-    lines.forEach(line => {
+    lines.forEach((line, index) => {
       const trimmed = line.trim()
-      // Match pattern: 5-digit code followed by description
-      const match = trimmed.match(/^(\d{5})\s+(.+)$/)
-      if (match) {
-        const [, code, description] = match
-        parsedCodes.push({ code, description })
+      if (!trimmed) return
+      
+      // Try multiple patterns for flexibility
+      const patterns = [
+        /^(\d{5})\s+(.+)$/,                    // "68201 Description"
+        /^(\d{5})\s*[-:]\s*(.+)$/,            // "68201 - Description" or "68201: Description"
+        /^(\d{5})\s*[.]\s*(.+)$/,             // "68201. Description"
+        /^(\d{5})\s*[,]\s*(.+)$/,             // "68201, Description"
+        /^(\d{5})(.+)$/                       // "68201Description" (no space)
+      ]
+      
+      let matched = false
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern)
+        if (match) {
+          const [, code, description] = match
+          const cleanCode = code.trim()
+          const cleanDescription = description.trim()
+          
+          // Validate 5-digit code
+          if (cleanCode.length === 5 && /^\d{5}$/.test(cleanCode)) {
+            // Check for duplicates
+            if (!parsedCodes.find(p => p.code === cleanCode)) {
+              parsedCodes.push({ 
+                code: cleanCode, 
+                description: cleanDescription 
+              })
+            } else {
+              errors.push(`Rad ${index + 1}: Dublettkod ${cleanCode}`)
+            }
+          } else {
+            errors.push(`Rad ${index + 1}: Ogiltig SNI-kod "${cleanCode}" (måste vara 5 siffror)`)
+          }
+          matched = true
+          break
+        }
+      }
+      
+      if (!matched) {
+        errors.push(`Rad ${index + 1}: Kunde inte parsa "${trimmed}"`)
       }
     })
+    
+    // Show parsing results
+    if (errors.length > 0) {
+      console.warn('SNI parsing errors:', errors)
+      toast.error(`Parsningsfel: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`)
+    }
+    
+    if (parsedCodes.length > 0) {
+      console.log(`Successfully parsed ${parsedCodes.length} SNI codes:`, parsedCodes)
+    }
     
     return parsedCodes
   }
 
   const handleManualSniSubmit = () => {
+    if (!manualInputText.trim()) {
+      toast.error('Ingen text att parsa')
+      return
+    }
+
     const parsedCodes = parseManualSniInput(manualInputText)
     
     if (parsedCodes.length === 0) {
-      toast.error('Kunde inte hitta några giltiga SNI-koder i texten')
+      toast.error('Kunde inte hitta några giltiga SNI-koder i texten. Kontrollera formatet.')
       return
     }
 
     // Add parsed codes to selection
     let newSelection = [...selectedSniCodes]
     let addedCount = 0
+    let skippedCount = 0
 
-    parsedCodes.forEach(({ code, description }) => {
+    parsedCodes.forEach(({ code, description }, index) => {
       // Skip if already selected
       if (!isCodeSelected(code)) {
         const newSniCode: LeadSniCode = {
-          id: `temp-${Date.now()}-${code}`,
+          id: `temp-${Date.now()}-${Math.random()}-${code}`, // More unique ID
           lead_id: leadId || '',
           sni_code: code,
           sni_description: description,
-          is_primary: newSelection.length === 0, // First one becomes primary
+          is_primary: (newSelection.length + addedCount) === 0, // First one becomes primary
           created_at: new Date().toISOString(),
           created_by: null
         }
         newSelection.push(newSniCode)
         addedCount++
+      } else {
+        skippedCount++
       }
     })
 
+    // Update selection
+    onSelectionChange(newSelection)
+
+    // Show detailed feedback
     if (addedCount > 0) {
-      onSelectionChange(newSelection)
-      toast.success(`${addedCount} SNI-kod${addedCount > 1 ? 'er' : ''} tillagda`)
-      setManualInputText('')
-      setShowManualInput(false)
-    } else {
+      let message = `${addedCount} SNI-kod${addedCount > 1 ? 'er' : ''} tillagda`
+      if (skippedCount > 0) {
+        message += `, ${skippedCount} hoppades över (redan valda)`
+      }
+      toast.success(message)
+    } else if (skippedCount > 0) {
       toast.info('Alla SNI-koder från texten är redan valda')
     }
+
+    // Clear input and close
+    setManualInputText('')
+    setShowManualInput(false)
   }
 
   return (
@@ -352,14 +415,14 @@ export default function SNIBranchManager({
             <textarea
               value={manualInputText}
               onChange={(e) => setManualInputText(e.target.value)}
-              placeholder="Klistra in SNI-koder här, en per rad:&#10;68201 Uthyrning och förvaltning av egna eller arrenderade bostäder&#10;68203 Uthyrning och förvaltning av egna eller arrenderade, andra lokaler"
+              placeholder="Klistra in SNI-koder här, en per rad:&#10;68201 Uthyrning och förvaltning av bostäder&#10;68203 - Förvaltning av lokaler&#10;81100: Fastighetstjänster"
               rows={4}
               className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none text-sm"
             />
             
             <div className="flex items-center justify-between">
               <p className="text-xs text-slate-500">
-                Format: Femställig kod följt av beskrivning (t.ex. "68201 Beskrivning")
+                Stöder format: "68201 Text", "68201 - Text", "68201: Text", "68201. Text"
               </p>
               
               <div className="flex items-center gap-2">

@@ -228,7 +228,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       // Debug log the update data
       console.log('Updating lead with data:', updateData)
       console.log('Lead ID:', lead.id)
+      console.log('Payload size:', JSON.stringify(updateData).length, 'characters')
 
+      // Step 1: Update lead data first
       const { error } = await supabase
         .from('leads')
         .update(updateData)
@@ -236,32 +238,60 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
 
       if (error) {
         console.error('Supabase update error:', error)
-        throw error
+        
+        // More specific error handling
+        if (error.message?.includes('CORS') || error.message?.includes('cors')) {
+          throw new Error('Nätverksfel - kontrollera internetanslutning och försök igen')
+        }
+        
+        if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+          throw new Error('Timeout - försök igen med mindre data åt gången')
+        }
+        
+        if (error.message?.includes('constraint') || error.message?.includes('violates')) {
+          throw new Error('Datavalidering misslyckades - kontrollera alla fält')
+        }
+        
+        throw new Error(`Kunde inte spara lead: ${error.message}`)
       }
 
-      // Update SNI codes
+      // Step 2: Update SNI codes separately with better error handling
       if (selectedSniCodes.length > 0) {
-        // Delete existing SNI codes
-        await supabase
-          .from('lead_sni_codes')
-          .delete()
-          .eq('lead_id', lead.id)
+        try {
+          // Delete existing SNI codes
+          const { error: deleteError } = await supabase
+            .from('lead_sni_codes')
+            .delete()
+            .eq('lead_id', lead.id)
 
-        // Insert new SNI codes
-        const sniCodeInserts = selectedSniCodes.map(sniCode => ({
-          lead_id: lead.id,
-          sni_code: sniCode.sni_code,
-          sni_description: sniCode.sni_description,
-          is_primary: sniCode.is_primary,
-          created_by: user.id
-        }))
+          if (deleteError) {
+            console.warn('Could not delete existing SNI codes:', deleteError)
+          }
 
-        const { error: sniError } = await supabase
-          .from('lead_sni_codes')
-          .insert(sniCodeInserts)
+          // Insert new SNI codes with validation
+          const sniCodeInserts = selectedSniCodes
+            .filter(sniCode => sniCode.sni_code && sniCode.sni_code.trim()) // Only valid codes
+            .map(sniCode => ({
+              lead_id: lead.id,
+              sni_code: sniCode.sni_code.trim(),
+              sni_description: sniCode.sni_description?.trim() || '',
+              is_primary: sniCode.is_primary,
+              created_by: user.id
+            }))
 
-        if (sniError) {
-          console.error('Warning: Could not update SNI codes:', sniError)
+          if (sniCodeInserts.length > 0) {
+            const { error: sniError } = await supabase
+              .from('lead_sni_codes')
+              .insert(sniCodeInserts)
+
+            if (sniError) {
+              console.error('SNI codes insert error:', sniError)
+              toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
+            }
+          }
+        } catch (sniErr) {
+          console.error('SNI codes update failed:', sniErr)
+          toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
         }
       }
 

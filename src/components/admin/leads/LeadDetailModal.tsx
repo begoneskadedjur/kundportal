@@ -284,7 +284,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </Card>
 
               {/* Additional Info */}
-              {(lead.source || lead.decision_maker || lead.competitor || technician) && (
+              {(lead.source || lead.decision_maker || lead.competitor || lead.contract_with || technician) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4">Ytterligare Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -306,9 +306,15 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         <div className="text-white">{lead.decision_maker}</div>
                       </div>
                     )}
-                    {lead.competitor && (
+                    {lead.contract_with && (
                       <div>
                         <div className="text-slate-300 font-medium">Konkurrent</div>
+                        <div className="text-white">{lead.contract_with}</div>
+                      </div>
+                    )}
+                    {lead.competitor && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Avtalsdetaljer</div>
                         <div className="text-white">{lead.competitor}</div>
                       </div>
                     )}
