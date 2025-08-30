@@ -182,6 +182,32 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         }
       }
 
+      // Log automatic event for lead creation
+      if (insertedLead) {
+        try {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: insertedLead.id,
+              event_type: 'created',
+              description: `Lead skapad för ${insertedLead.company_name}`,
+              metadata: {
+                company_name: insertedLead.company_name,
+                contact_person: insertedLead.contact_person,
+                status: insertedLead.status,
+                priority: insertedLead.priority,
+                estimated_value: insertedLead.estimated_value,
+                source: insertedLead.source,
+                created_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        } catch (eventError) {
+          // Don't fail the main operation if event logging fails
+          console.warn('Could not log lead creation event:', eventError)
+        }
+      }
+
       toast.success('Lead skapad framgångsrikt')
       onSuccess()
       onClose()

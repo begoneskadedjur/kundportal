@@ -8,6 +8,7 @@ import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { toast } from 'react-hot-toast'
+import { useAuth } from '../../../contexts/AuthContext'
 import { LeadContact, LeadContactInsert, LeadContactUpdate } from '../../../types/database'
 
 interface LeadContactsManagerProps {
@@ -30,6 +31,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   contacts, 
   onContactsChange 
 }) => {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<LeadContact | null>(null)
@@ -47,7 +49,6 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
           filter: `lead_id=eq.${leadId}`
         },
         (payload) => {
-          console.log('Lead contact changed:', payload)
           onContactsChange() // Trigger parent refresh
         }
       )
@@ -122,6 +123,11 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
     
     if (!validateForm()) return
 
+    if (!user?.id) {
+      toast.error('Användarsession saknas - logga in igen')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -143,6 +149,28 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
           .eq('id', editingContact.id)
 
         if (error) throw error
+        
+        // Log automatic event for contact update
+        try {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: leadId,
+              event_type: 'updated',
+              description: `Kontaktperson "${cleanData.name}" har uppdaterats`,
+              metadata: {
+                contact_name: cleanData.name,
+                contact_email: cleanData.email,
+                contact_phone: cleanData.phone,
+                is_primary: cleanData.is_primary,
+                action: 'updated'
+              },
+              created_by: user.id
+            })
+        } catch (eventError) {
+          console.warn('Could not log contact update event:', eventError)
+        }
+        
         toast.success('Kontaktperson uppdaterad')
       } else {
         // Create new contact
@@ -156,6 +184,28 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
           .insert(insertData)
 
         if (error) throw error
+        
+        // Log automatic event for contact creation
+        try {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: leadId,
+              event_type: 'created',
+              description: `Ny kontaktperson "${cleanData.name}" tillagd`,
+              metadata: {
+                contact_name: cleanData.name,
+                contact_email: cleanData.email,
+                contact_phone: cleanData.phone,
+                is_primary: cleanData.is_primary,
+                action: 'added'
+              },
+              created_by: user.id
+            })
+        } catch (eventError) {
+          console.warn('Could not log contact creation event:', eventError)
+        }
+        
         toast.success('Kontaktperson tillagd')
       }
 
@@ -175,6 +225,11 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
       return
     }
 
+    if (!user?.id) {
+      toast.error('Användarsession saknas - logga in igen')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -184,6 +239,27 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
         .eq('id', contact.id)
 
       if (error) throw error
+
+      // Log automatic event for contact deletion
+      try {
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'updated',
+            description: `Kontaktperson "${contact.name}" har tagits bort`,
+            metadata: {
+              contact_name: contact.name,
+              contact_email: contact.email,
+              contact_phone: contact.phone,
+              is_primary: contact.is_primary,
+              action: 'deleted'
+            },
+            created_by: user?.id
+          })
+      } catch (eventError) {
+        console.warn('Could not log contact deletion event:', eventError)
+      }
 
       toast.success('Kontaktperson borttagen')
       onContactsChange()

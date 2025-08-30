@@ -102,6 +102,27 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
           .eq('id', editingComment.id)
 
         if (error) throw error
+        
+        // Log automatic event for comment update
+        try {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: leadId,
+              event_type: 'updated',
+              description: `Kommentar har uppdaterats`,
+              metadata: {
+                comment_type: formData.comment_type,
+                comment_content: formData.content.substring(0, 100) + (formData.content.length > 100 ? '...' : ''),
+                action: 'updated',
+                updated_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        } catch (eventError) {
+          // Event logging failed, but don't fail the main operation
+        }
+        
         toast.success('Kommentar uppdaterad')
       } else {
         // Create new comment
@@ -117,6 +138,27 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
           .insert(insertData)
 
         if (error) throw error
+        
+        // Log automatic event for comment creation
+        try {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: leadId,
+              event_type: 'note_added',
+              description: `Ny kommentar (${formData.comment_type}) har lagts till`,
+              metadata: {
+                comment_type: formData.comment_type,
+                comment_content: formData.content.substring(0, 100) + (formData.content.length > 100 ? '...' : ''),
+                action: 'created',
+                created_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        } catch (eventError) {
+          // Event logging failed, but don't fail the main operation
+        }
+        
         toast.success('Kommentar tillagd')
       }
 
@@ -145,6 +187,26 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
         .eq('id', comment.id)
 
       if (error) throw error
+
+      // Log automatic event for comment deletion
+      try {
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'updated',
+            description: `Kommentar (${comment.comment_type}) har tagits bort`,
+            metadata: {
+              comment_type: comment.comment_type,
+              comment_content: comment.content.substring(0, 100) + (comment.content.length > 100 ? '...' : ''),
+              action: 'deleted',
+              deleted_by_profile: user?.email
+            },
+            created_by: user?.id
+          })
+      } catch (eventError) {
+        // Event logging failed, but don't fail the main operation
+      }
 
       toast.success('Kommentar borttagen')
       onCommentsChange()

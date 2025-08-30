@@ -77,6 +77,28 @@ const Leads: React.FC = () => {
   useEffect(() => {
     fetchLeads()
     fetchTechnicians()
+    
+    // Set up real-time subscription for leads
+    const subscription = supabase
+      .channel('leads_realtime')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'leads'
+        },
+        (payload) => {
+          // Refresh leads when any lead changes
+          setTimeout(() => {
+            fetchLeads()
+          }, 1000) // Longer delay for main list to ensure consistency
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -495,7 +517,32 @@ const Leads: React.FC = () => {
             setShowDetailModal(false)
             setSelectedLead(null)
           }}
-          onSuccess={fetchLeads}
+          onSuccess={async () => {
+            // Uppdatera lead-listan
+            await fetchLeads()
+            
+            // Uppdatera selectedLead med nya data från listan
+            if (selectedLead?.id) {
+              // Hämta uppdaterade lead-data direkt från databasen för att säkerställa att vi har senaste versionen
+              try {
+                const { data: updatedLead, error } = await supabase
+                  .from('leads')
+                  .select(`
+                    *,
+                    created_by_profile:profiles!leads_created_by_fkey(display_name, email),
+                    updated_by_profile:profiles!leads_updated_by_fkey(display_name, email)
+                  `)
+                  .eq('id', selectedLead.id)
+                  .single()
+                
+                if (!error && updatedLead) {
+                  setSelectedLead(updatedLead)
+                }
+              } catch (err) {
+                console.error('Failed to refresh selected lead:', err)
+              }
+            }
+          }}
         />
       </div>
     </div>

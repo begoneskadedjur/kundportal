@@ -62,7 +62,6 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
           filter: `lead_id=eq.${leadId}`
         },
         (payload) => {
-          console.log('Lead event changed:', payload)
           onEventsChange() // Trigger parent refresh
         }
       )

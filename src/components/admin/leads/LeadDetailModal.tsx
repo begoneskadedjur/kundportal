@@ -46,15 +46,64 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [comments, setComments] = useState<LeadComment[]>([])
   const [events, setEvents] = useState<LeadEvent[]>([])
   const [technician, setTechnician] = useState<string | null>(null)
+  const [currentLead, setCurrentLead] = useState<Lead | null>(null)
 
   useEffect(() => {
     if (lead && isOpen) {
+      setCurrentLead(lead)
       fetchLeadDetails()
+      
+      // Set up real-time subscriptions for lead details
+      const contactsSubscription = supabase
+        .channel(`lead_contacts_${lead.id}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'lead_contacts',
+            filter: `lead_id=eq.${lead.id}`
+          },
+          () => {
+            setTimeout(() => {
+              fetchLeadDetails()
+            }, 500)
+          }
+        )
+        .subscribe()
+      
+      const commentsSubscription = supabase
+        .channel(`lead_comments_${lead.id}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'lead_comments',
+            filter: `lead_id=eq.${lead.id}`
+          },
+          () => {
+            setTimeout(() => {
+              fetchLeadDetails()
+            }, 500)
+          }
+        )
+        .subscribe()
+        
+      return () => {
+        contactsSubscription.unsubscribe()
+        commentsSubscription.unsubscribe()
+      }
     }
   }, [lead, isOpen])
 
+  // Refresh current lead data when lead prop changes
+  useEffect(() => {
+    if (lead && lead.id === currentLead?.id) {
+      setCurrentLead(lead)
+    }
+  }, [lead, currentLead])
+
   const fetchLeadDetails = async () => {
-    if (!lead) return
+    if (!currentLead) return
 
     try {
       setLoading(true)
@@ -63,7 +112,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       const { data: contactsData, error: contactsError } = await supabase
         .from('lead_contacts')
         .select('*')
-        .eq('lead_id', lead.id)
+        .eq('lead_id', currentLead.id)
         .order('is_primary', { ascending: false })
 
       if (contactsError) throw contactsError
@@ -75,7 +124,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           *,
           created_by_profile:profiles!lead_comments_created_by_fkey(display_name, email)
         `)
-        .eq('lead_id', lead.id)
+        .eq('lead_id', currentLead.id)
         .order('created_at', { ascending: false })
 
       if (commentsError) throw commentsError
@@ -87,17 +136,17 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           *,
           created_by_profile:profiles!lead_events_created_by_fkey(display_name, email)
         `)
-        .eq('lead_id', lead.id)
+        .eq('lead_id', currentLead.id)
         .order('created_at', { ascending: false })
 
       if (eventsError) throw eventsError
 
       // Fetch technician name if assigned
-      if (lead.assigned_to) {
+      if (currentLead.assigned_to) {
         const { data: techData, error: techError } = await supabase
           .from('technicians')
           .select('name')
-          .eq('id', lead.assigned_to)
+          .eq('id', currentLead.assigned_to)
           .single()
 
         if (!techError && techData) {
@@ -142,11 +191,11 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     })
   }
 
-  if (!lead) return null
+  if (!currentLead) return null
 
-  const leadScore = calculateLeadScore(lead)
+  const leadScore = calculateLeadScore(currentLead)
   const leadQuality = getLeadQuality(leadScore)
-  const statusConfig = LEAD_STATUS_DISPLAY[lead.status]
+  const statusConfig = LEAD_STATUS_DISPLAY[currentLead.status]
 
   return (
     <>
@@ -159,8 +208,8 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 <Eye className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white">{lead.company_name}</h2>
-                <p className="text-slate-400">{lead.contact_person}</p>
+                <h2 className="text-2xl font-bold text-white">{currentLead.company_name}</h2>
+                <p className="text-slate-400">{currentLead.contact_person}</p>
               </div>
             </div>
             
@@ -198,11 +247,11 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         {statusConfig.label}
                       </span>
                     </div>
-                    {lead.priority && (
+                    {currentLead.priority && (
                       <div>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-${getPriorityColor(currentLead.priority)}/10 text-${getPriorityColor(currentLead.priority)} border border-${getPriorityColor(currentLead.priority)}/20`}>
                           <Star className="w-3 h-3 mr-1" />
-                          {getPriorityLabel(lead.priority)}
+                          {getPriorityLabel(currentLead.priority)}
                         </span>
                       </div>
                     )}
@@ -233,16 +282,16 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <h3 className="text-sm font-medium text-slate-300 mb-3">Affärsvärde</h3>
                   <div className="space-y-2">
                     <div className="text-lg font-semibold text-white">
-                      {lead.estimated_value ? formatCurrency(lead.estimated_value) : 'Ej angivet'}
+                      {currentLead.estimated_value ? formatCurrency(currentLead.estimated_value) : 'Ej angivet'}
                     </div>
-                    {lead.probability && (
+                    {currentLead.probability && (
                       <div className="text-sm text-slate-400">
-                        {lead.probability}% sannolikhet
+                        {currentLead.probability}% sannolikhet
                       </div>
                     )}
-                    {lead.closing_date_estimate && (
+                    {currentLead.closing_date_estimate && (
                       <div className="text-sm text-slate-400">
-                        Förväntat: {formatDate(lead.closing_date_estimate)}
+                        Förväntat: {formatDate(currentLead.closing_date_estimate)}
                       </div>
                     )}
                   </div>
@@ -256,42 +305,42 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   BANT-kvalificering
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className={`p-3 rounded-lg border ${lead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.budget_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
                     <div className="text-sm font-medium text-slate-300">Budget</div>
-                    <div className={lead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
-                      {lead.budget_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
+                    <div className={currentLead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                      {currentLead.budget_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${lead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.authority_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
                     <div className="text-sm font-medium text-slate-300">Befogenhet</div>
-                    <div className={lead.authority_confirmed ? 'text-green-400' : 'text-slate-400'}>
-                      {lead.authority_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
+                    <div className={currentLead.authority_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                      {currentLead.authority_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${lead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.needs_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
                     <div className="text-sm font-medium text-slate-300">Behov</div>
-                    <div className={lead.needs_confirmed ? 'text-green-400' : 'text-slate-400'}>
-                      {lead.needs_confirmed ? 'Bekräftat' : 'Ej bekräftat'}
+                    <div className={currentLead.needs_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                      {currentLead.needs_confirmed ? 'Bekräftat' : 'Ej bekräftat'}
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg border ${lead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
+                  <div className={`p-3 rounded-lg border ${currentLead.timeline_confirmed ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-700/30 border-slate-600/30'}`}>
                     <div className="text-sm font-medium text-slate-300">Tidslinje</div>
-                    <div className={lead.timeline_confirmed ? 'text-green-400' : 'text-slate-400'}>
-                      {lead.timeline_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
+                    <div className={currentLead.timeline_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                      {currentLead.timeline_confirmed ? 'Bekräftad' : 'Ej bekräftad'}
                     </div>
                   </div>
                 </div>
               </Card>
 
               {/* Additional Info */}
-              {(lead.source || lead.decision_maker || lead.competitor || lead.contract_with || technician) && (
+              {(currentLead.source || currentLead.decision_maker || currentLead.competitor || currentLead.contract_with || technician) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4">Ytterligare Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    {lead.source && (
+                    {currentLead.source && (
                       <div>
                         <div className="text-slate-300 font-medium">Källa</div>
-                        <div className="text-white">{lead.source}</div>
+                        <div className="text-white">{currentLead.source}</div>
                       </div>
                     )}
                     {technician && (
@@ -300,22 +349,22 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         <div className="text-white">{technician}</div>
                       </div>
                     )}
-                    {lead.decision_maker && (
+                    {currentLead.decision_maker && (
                       <div>
                         <div className="text-slate-300 font-medium">Beslutsfattare</div>
-                        <div className="text-white">{lead.decision_maker}</div>
+                        <div className="text-white">{currentLead.decision_maker}</div>
                       </div>
                     )}
-                    {lead.contract_with && (
+                    {currentLead.contract_with && (
                       <div>
                         <div className="text-slate-300 font-medium">Konkurrent</div>
-                        <div className="text-white">{lead.contract_with}</div>
+                        <div className="text-white">{currentLead.contract_with}</div>
                       </div>
                     )}
-                    {lead.competitor && (
+                    {currentLead.competitor && (
                       <div>
                         <div className="text-slate-300 font-medium">Avtalsdetaljer</div>
-                        <div className="text-white">{lead.competitor}</div>
+                        <div className="text-white">{currentLead.competitor}</div>
                       </div>
                     )}
                   </div>
@@ -327,14 +376,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 {/* Left Column */}
                 <div className="space-y-6">
                   <LeadContactsManager
-                    leadId={lead.id}
+                    leadId={currentLead.id}
                     contacts={contacts}
                     onContactsChange={fetchLeadDetails}
                   />
                   
                   <LeadTagsManager
-                    leadId={lead.id}
-                    tags={lead.tags || []}
+                    leadId={currentLead.id}
+                    tags={currentLead.tags || []}
                     onTagsChange={() => {
                       fetchLeadDetails()
                       onSuccess() // Refresh main list
@@ -345,13 +394,13 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 {/* Right Column */}
                 <div className="space-y-6">
                   <LeadCommentsSystem
-                    leadId={lead.id}
+                    leadId={currentLead.id}
                     comments={comments}
                     onCommentsChange={fetchLeadDetails}
                   />
                   
                   <LeadTimeline
-                    leadId={lead.id}
+                    leadId={currentLead.id}
                     events={events}
                     onEventsChange={fetchLeadDetails}
                   />
@@ -364,12 +413,16 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
       {/* Edit Modal */}
       <EditLeadModal
-        lead={lead}
+        lead={currentLead}
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        onSuccess={() => {
+        onSuccess={async () => {
           setShowEditModal(false)
-          fetchLeadDetails()
+          
+          // Refresh the lead details first
+          await fetchLeadDetails()
+          
+          // Trigger parent refresh which will update the lead prop
           onSuccess()
         }}
       />

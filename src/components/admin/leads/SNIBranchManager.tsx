@@ -178,7 +178,7 @@ export default function SNIBranchManager({
     }
     
     if (parsedCodes.length > 0) {
-      console.log(`Successfully parsed ${parsedCodes.length} SNI codes:`, parsedCodes)
+      // Successfully parsed SNI codes
     }
     
     return parsedCodes

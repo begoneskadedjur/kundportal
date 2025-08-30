@@ -55,6 +55,31 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   const [newTag, setNewTag] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Real-time subscription for lead tags updates
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`lead_tags_${leadId}`)
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'leads',
+          filter: `id=eq.${leadId}`
+        },
+        (payload) => {
+          // Small delay to ensure database consistency
+          setTimeout(() => {
+            onTagsChange()
+          }, 500)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [leadId, onTagsChange])
+
   const getTagColor = (tag: string, index: number) => {
     // Use a simple hash function to consistently assign colors
     const hashCode = tag.split('').reduce((a, b) => {
@@ -109,6 +134,24 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
 
       if (error) throw error
 
+      // Log automatic event for tag addition
+      try {
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'updated',
+            description: `Tagg "${tag.trim()}" har lagts till`,
+            metadata: {
+              tag_added: tag.trim(),
+              updated_by_profile: user.email
+            },
+            created_by: user.id
+          })
+      } catch (eventError) {
+        console.warn('Could not log tag addition event:', eventError)
+      }
+
       toast.success('Tagg tillagd')
       setNewTag('')
       setShowForm(false)
@@ -139,6 +182,24 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
         .eq('id', leadId)
 
       if (error) throw error
+
+      // Log automatic event for tag removal
+      try {
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'updated',
+            description: `Tagg "${tagToRemove}" har tagits bort`,
+            metadata: {
+              tag_removed: tagToRemove,
+              updated_by_profile: user.email
+            },
+            created_by: user.id
+          })
+      } catch (eventError) {
+        console.warn('Could not log tag removal event:', eventError)
+      }
 
       toast.success('Tagg borttagen')
       onTagsChange()

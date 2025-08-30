@@ -33,49 +33,45 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
   const [assignmentNotes, setAssignmentNotes] = useState('')
 
-  // DEBUG: Log state changes for troubleshooting
-  useEffect(() => {
-    console.log('LeadTechnicianManager DEBUG:', {
-      showAddForm,
-      availableTechnicians: availableTechnicians.length,
-      assignedTechnicians: assignedTechnicians.length,
-      unassignedCount: availableTechnicians.filter(tech => 
-        !assignedTechnicians.some(assigned => assigned.technician_id === tech.id)
-      ).length
-    })
-  }, [showAddForm, availableTechnicians, assignedTechnicians])
 
   // Real-time subscription for lead technicians
-  // Note: Disabled to prevent conflicts with add operations
-  // The parent component will handle refreshes manually after operations
   useEffect(() => {
-    // Subscription disabled to prevent auto-refresh conflicts during add operations
-    // Manual refresh is triggered via onTechniciansChange callback after successful operations
+    const subscription = supabase
+      .channel(`lead_technicians_${leadId}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'lead_technicians',
+          filter: `lead_id=eq.${leadId}`
+        },
+        (payload) => {
+          // Small delay to allow database consistency
+          setTimeout(() => {
+            onTechniciansChange()
+          }, 500)
+        }
+      )
+      .subscribe()
+
     return () => {
-      // Cleanup function (no subscription to unsubscribe)
+      subscription.unsubscribe()
     }
   }, [leadId, onTechniciansChange])
 
   // Fetch available technicians
   useEffect(() => {
     const fetchTechnicians = async () => {
-      console.log('Fetching available technicians...')
-      try {
+        try {
         const { data, error } = await supabase
           .from('technicians')
           .select('id, name, email, is_active')
           .eq('is_active', true)
           .order('name')
 
-        if (error) {
-          console.error('Error fetching technicians:', error)
-          throw error
-        }
-        
-        console.log('Fetched technicians:', data?.length || 0, 'technicians')
+        if (error) throw error
         setAvailableTechnicians(data || [])
       } catch (error) {
-        console.error('Error fetching technicians:', error)
         toast.error('Kunde inte hämta tillgängliga kollegor')
       }
     }
@@ -88,27 +84,15 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
     !assignedTechnicians.some(assigned => assigned.technician_id === tech.id)
   )
   
-  // DEBUG: Log filtering logic
-  useEffect(() => {
-    console.log('FILTERING DEBUG:', {
-      availableTechnicians: availableTechnicians.map(t => ({id: t.id, name: t.name})),
-      assignedTechnicians: assignedTechnicians.map(t => ({id: t.id, technician_id: t.technician_id})),
-      unassignedTechnicians: unassignedTechnicians.map(t => ({id: t.id, name: t.name}))
-    })
-  }, [availableTechnicians, assignedTechnicians, unassignedTechnicians])
 
   const handleAddTechnician = async () => {
-    console.log('handleAddTechnician called:', { selectedTechnicianId, userId: user?.id, leadId })
-    
     if (!selectedTechnicianId || !user?.id) {
-      console.error('Missing required data:', { selectedTechnicianId, userId: user?.id, leadId })
       toast.error('Saknade data för att lägga till kollega')
       return
     }
 
     try {
       setLoading(true)
-      console.log('Starting technician insert...')
 
       const insertData: LeadTechnicianInsert = {
         lead_id: leadId,
@@ -118,7 +102,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         notes: assignmentNotes.trim() || null
       }
 
-      console.log('Insert data:', insertData)
+
 
       const { error, data } = await supabase
         .from('lead_technicians')
@@ -126,11 +110,34 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         .select()
 
       if (error) {
-        console.error('Supabase insert error:', error)
+
         throw error
       }
 
-      console.log('Technician added successfully:', data)
+
+      
+      // Log automatic event for technician assignment
+      try {
+        const techName = availableTechnicians.find(t => t.id === selectedTechnicianId)?.name || 'Okänd kollega'
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'assigned',
+            description: `Kollega ${techName} har tilldelats ${insertData.is_primary ? 'som primär' : 'som sekundär'} kollega`,
+            metadata: {
+              technician_id: selectedTechnicianId,
+              technician_name: techName,
+              is_primary: insertData.is_primary,
+              notes: insertData.notes,
+              assigned_by_profile: user.email
+            },
+            created_by: user.id
+          })
+      } catch (eventError) {
+
+      }
+      
       toast.success('Kollega tillagd')
       
       // Reset form
@@ -142,7 +149,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
       onTechniciansChange()
 
     } catch (err) {
-      console.error('Error adding technician:', err)
+
       toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till kollega')
     } finally {
       setLoading(false)
@@ -164,11 +171,36 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       if (error) throw error
 
+      // Log automatic event for technician removal
+      try {
+        const removedAssignment = assignedTechnicians.find(a => a.id === assignmentId)
+        const techName = removedAssignment ? 
+          availableTechnicians.find(t => t.id === removedAssignment.technician_id)?.name || 'Okänd kollega' : 
+          'Okänd kollega'
+        
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'unassigned',
+            description: `Kollega ${techName} har tagits bort från tilldelningen`,
+            metadata: {
+              technician_id: removedAssignment?.technician_id,
+              technician_name: techName,
+              was_primary: removedAssignment?.is_primary || false,
+              removed_by_profile: user?.email
+            },
+            created_by: user?.id
+          })
+      } catch (eventError) {
+
+      }
+
       toast.success('Kollega borttagen')
       onTechniciansChange()
 
     } catch (err) {
-      console.error('Error removing technician:', err)
+
       toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort kollega')
     } finally {
       setLoading(false)
@@ -190,11 +222,35 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
 
       if (error) throw error
 
+      // Log automatic event for primary technician change
+      try {
+        const newPrimaryAssignment = assignedTechnicians.find(a => a.id === assignmentId)
+        const techName = newPrimaryAssignment ? 
+          availableTechnicians.find(t => t.id === newPrimaryAssignment.technician_id)?.name || 'Okänd kollega' : 
+          'Okänd kollega'
+        
+        await supabase
+          .from('lead_events')
+          .insert({
+            lead_id: leadId,
+            event_type: 'updated',
+            description: `${techName} har utsetts till primär kollega för detta lead`,
+            metadata: {
+              technician_id: newPrimaryAssignment?.technician_id,
+              technician_name: techName,
+              changed_by_profile: user?.email
+            },
+            created_by: user?.id
+          })
+      } catch (eventError) {
+
+      }
+
       toast.success('Primär kollega uppdaterad')
       onTechniciansChange()
 
     } catch (err) {
-      console.error('Error setting primary technician:', err)
+
       toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera primär kollega')
     } finally {
       setLoading(false)
@@ -224,17 +280,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
             e.preventDefault()
             e.stopPropagation()
             
-            console.log('ADD KOLLEGA CLICKED:', { 
-              currentShowAddForm: showAddForm, 
-              willBe: !showAddForm,
-              unassignedCount: unassignedTechnicians.length,
-              buttonDisabled: unassignedTechnicians.length === 0
-            })
-            setShowAddForm(prev => {
-              const newValue = !prev
-              console.log('setShowAddForm called:', { prev, newValue })
-              return newValue
-            })
+            setShowAddForm(prev => !prev)
           }}
           size="sm"
           className="bg-green-600 hover:bg-green-700 text-white"
@@ -245,10 +291,6 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         </Button>
       </div>
 
-      {/* DEBUG: Show state info */}
-      <div className="mb-4 p-2 bg-red-900/20 border border-red-500/20 rounded text-xs text-red-300">
-        DEBUG: showAddForm={showAddForm.toString()}, available={availableTechnicians.length}, unassigned={unassignedTechnicians.length}
-      </div>
 
       {/* Add Technician Form */}
       {showAddForm && (
@@ -277,10 +319,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                 </label>
                 <select
                   value={selectedTechnicianId}
-                  onChange={(e) => {
-                    console.log('Technician selected:', e.target.value)
-                    setSelectedTechnicianId(e.target.value)
-                  }}
+                  onChange={(e) => setSelectedTechnicianId(e.target.value)}
                   className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500/50"
                 >
                   <option value="">Välj kollega...</option>
@@ -310,7 +349,6 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    console.log('Cancel clicked, resetting form')
                     setShowAddForm(false)
                     setSelectedTechnicianId('')
                     setAssignmentNotes('')
@@ -325,7 +363,6 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                     e.preventDefault()
                     e.stopPropagation()
                     
-                    console.log('Add technician clicked:', { selectedTechnicianId, loading })
                     handleAddTechnician()
                   }}
                   disabled={loading || !selectedTechnicianId}

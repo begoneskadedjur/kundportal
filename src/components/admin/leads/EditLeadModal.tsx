@@ -20,7 +20,8 @@ import {
   LEAD_STATUS_DISPLAY,
   CONTACT_METHOD_DISPLAY,
   COMPANY_SIZE_DISPLAY,
-  LEAD_PRIORITY_DISPLAY
+  LEAD_PRIORITY_DISPLAY,
+  getPriorityLabel
 } from '../../../types/database'
 import LeadTechnicianManager from './LeadTechnicianManager'
 import SNIBranchManager from './SNIBranchManager'
@@ -102,7 +103,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       if (error) throw error
       setSelectedSniCodes(data || [])
     } catch (error) {
-      console.error('Error fetching SNI codes:', error)
+
     }
   }
 
@@ -203,7 +204,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           if (['estimated_value', 'probability'].includes(key) && value !== null) {
             const numValue = Number(value)
             if (isNaN(numValue)) {
-              console.warn(`Invalid numeric value for ${key}:`, value)
+
               return false
             }
           }
@@ -211,7 +212,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           // Validate date fields format
           if (key.includes('date') && value !== null && typeof value === 'string') {
             if (value.trim() && !value.match(/^\d{4}-\d{2}-\d{2}$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-              console.warn(`Invalid date format for ${key}:`, value)
+
               return false
             }
           }
@@ -227,9 +228,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       } as LeadUpdate
 
       // Debug log the update data
-      console.log('Updating lead with data:', updateData)
-      console.log('Lead ID:', lead.id)
-      console.log('Payload size:', JSON.stringify(updateData).length, 'characters')
+
+
+
 
       // Step 1: Update lead data first - split large updates for better performance
       // Remove large text fields temporarily to reduce payload
@@ -255,14 +256,14 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           .eq('id', lead.id)
           
         if (textError) {
-          console.warn('Text fields update failed:', textError)
+
           // Core data still saved, warn user
           toast.error('Lead uppdaterad men vissa textfält kunde inte sparas')
         }
       }
 
       if (error) {
-        console.error('Supabase update error:', error)
+
         
         // More specific error handling
         if (error.message?.includes('CORS') || error.message?.includes('cors')) {
@@ -290,7 +291,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             .eq('lead_id', lead.id)
 
           if (deleteError) {
-            console.warn('Could not delete existing SNI codes:', deleteError)
+
           }
 
           // Insert new SNI codes with validation
@@ -310,7 +311,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               .insert(sniCodeInserts)
 
             if (sniError) {
-              console.error('SNI codes insert error:', sniError)
+
               toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
             } else {
               // Update sni07_label with concatenated codes after successful insert
@@ -324,14 +325,156 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 .eq('id', lead.id)
                 
               if (labelError) {
-                console.warn('SNI label update failed:', labelError)
+
               }
             }
           }
         } catch (sniErr) {
-          console.error('SNI codes update failed:', sniErr)
+
           toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
         }
+      }
+
+      // Step 3: Log automatic events for lead update
+      try {
+        const updatedFields = Object.keys(updateData).filter(key => key !== 'updated_by')
+        
+        // Check if status was changed to log specific status change event
+        if (updatedFields.includes('status') && updateData.status !== lead.status) {
+          const statusConfig = LEAD_STATUS_DISPLAY[updateData.status as LeadStatus]
+          const oldStatusConfig = LEAD_STATUS_DISPLAY[lead.status]
+          
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: lead.id,
+              event_type: 'status_changed',
+              description: `Status ändrad från "${oldStatusConfig.label}" till "${statusConfig.label}"`,
+              metadata: {
+                old_status: lead.status,
+                new_status: updateData.status,
+                old_status_label: oldStatusConfig.label,
+                new_status_label: statusConfig.label,
+                changed_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        }
+        
+        // Check if priority was changed
+        if (updatedFields.includes('priority') && updateData.priority !== lead.priority) {
+          const newPriorityLabel = updateData.priority ? getPriorityLabel(updateData.priority) : 'Ingen'
+          const oldPriorityLabel = lead.priority ? getPriorityLabel(lead.priority) : 'Ingen'
+          
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: lead.id,
+              event_type: 'note_added',
+              description: `Prioritet ändrad från "${oldPriorityLabel}" till "${newPriorityLabel}"`,
+              metadata: {
+                old_priority: lead.priority,
+                new_priority: updateData.priority,
+                old_priority_label: oldPriorityLabel,
+                new_priority_label: newPriorityLabel,
+                changed_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        }
+        
+        // Check if contact dates were changed
+        if (updatedFields.includes('contact_date') || updatedFields.includes('follow_up_date')) {
+          if (updatedFields.includes('contact_date') && updateData.contact_date !== lead.contact_date) {
+            const contactDate = updateData.contact_date ? new Date(updateData.contact_date).toLocaleDateString('sv-SE') : 'Ingen'
+            await supabase
+              .from('lead_events')
+              .insert({
+                lead_id: lead.id,
+                event_type: 'contacted',
+                description: `Kontaktdatum har uppdaterats till ${contactDate}`,
+                metadata: {
+                  old_contact_date: lead.contact_date,
+                  new_contact_date: updateData.contact_date,
+                  changed_by_profile: user.email
+                },
+                created_by: user.id
+              })
+          }
+          
+          if (updatedFields.includes('follow_up_date') && updateData.follow_up_date !== lead.follow_up_date) {
+            const followUpDate = updateData.follow_up_date ? new Date(updateData.follow_up_date).toLocaleDateString('sv-SE') : 'Ingen'
+            await supabase
+              .from('lead_events')
+              .insert({
+                lead_id: lead.id,
+                event_type: 'note_added',
+                description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
+                metadata: {
+                  old_follow_up_date: lead.follow_up_date,
+                  new_follow_up_date: updateData.follow_up_date,
+                  changed_by_profile: user.email
+                },
+                created_by: user.id
+              })
+          }
+        }
+        
+        // Check if quote-related fields were changed
+        if (updatedFields.includes('quote_provided_date') && updateData.quote_provided_date !== lead.quote_provided_date) {
+          const quoteDate = updateData.quote_provided_date ? new Date(updateData.quote_provided_date).toLocaleDateString('sv-SE') : 'Ingen'
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: lead.id,
+              event_type: 'quote_sent',
+              description: `Offertdatum har uppdaterats till ${quoteDate}`,
+              metadata: {
+                old_quote_date: lead.quote_provided_date,
+                new_quote_date: updateData.quote_provided_date,
+                changed_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        }
+        
+        // Check if estimated value was changed (important for sales tracking)
+        if (updatedFields.includes('estimated_value') && updateData.estimated_value !== lead.estimated_value) {
+          const oldValue = lead.estimated_value ? `${lead.estimated_value} SEK` : 'Ingen'
+          const newValue = updateData.estimated_value ? `${updateData.estimated_value} SEK` : 'Ingen'
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: lead.id,
+              event_type: 'updated',
+              description: `Uppskattat värde ändrat från ${oldValue} till ${newValue}`,
+              metadata: {
+                old_estimated_value: lead.estimated_value,
+                new_estimated_value: updateData.estimated_value,
+                changed_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        }
+        
+        // General update event (only if no specific status change was logged)
+        if (!updatedFields.includes('status')) {
+          await supabase
+            .from('lead_events')
+            .insert({
+              lead_id: lead.id,
+              event_type: 'updated',
+              description: 'Lead information har uppdaterats',
+              metadata: {
+                updated_fields: updatedFields,
+                updated_by_profile: user.email
+              },
+              created_by: user.id
+            })
+        }
+      } catch (eventError) {
+        console.warn('Could not log lead update event:', eventError)
+        // Don't fail the main operation if event logging fails
       }
 
       toast.success('Lead uppdaterad framgångsrikt')
@@ -339,7 +482,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       onClose()
 
     } catch (err) {
-      console.error('Error updating lead:', err)
+
       toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera lead')
     } finally {
       setLoading(false)
@@ -368,7 +511,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       onClose()
 
     } catch (err) {
-      console.error('Error deleting lead:', err)
+
       toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort lead')
     } finally {
       setDeleting(false)
@@ -411,7 +554,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         if (error) throw error
         setLeadTechnicians(data || [])
       } catch (error) {
-        console.error('Error fetching lead technicians:', error)
+
       }
     }
 
@@ -1009,7 +1152,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   if (error) throw error
                   setLeadTechnicians(data || [])
                 } catch (error) {
-                  console.error('Error fetching lead technicians:', error)
+
                 }
               }
               
