@@ -1050,7 +1050,7 @@ export type EventType = 'created' | 'updated' | 'status_changed' | 'contacted' |
 
 // Status display mappings för UI
 export const LEAD_STATUS_DISPLAY = {
-  red_lost: { label: 'Tappad', color: 'red-500' },
+  red_lost: { label: 'Förlorad', color: 'red-500' },
   blue_cold: { label: 'Kall', color: 'blue-500' },
   yellow_warm: { label: 'Ljummen', color: 'yellow-500' },
   orange_hot: { label: 'Het', color: 'orange-500' },
@@ -1608,29 +1608,37 @@ export const getCommentTypeDisplay = (commentType: CommentType) => {
   return COMMENT_TYPE_DISPLAY[commentType] || { label: commentType, icon: 'MessageSquare', color: 'gray-500' }
 }
 
-// Hjälpfunktion för att beräkna lead score baserat på BANT-kriterier
+// Hjälpfunktion för att beräkna lead score baserat på status + BANT + sannolikhet
 export const calculateLeadScore = (lead: Lead): number => {
-  let score = 0
+  // Automatiska status-scores
+  if (lead.status === 'red_lost') return 0      // Förlorad = 0 poäng
+  if (lead.status === 'green_deal') return 100  // Affär = 100 poäng
   
-  // Budget confirmed (25 points)
-  if (lead.budget_confirmed) score += 25
+  // Bas-score från status (30-50 poäng)
+  let baseScore = 30 // Kall = grundnivå
+  if (lead.status === 'yellow_warm') baseScore = 40  // Ljummen
+  if (lead.status === 'orange_hot') baseScore = 50   // Het
   
-  // Authority confirmed (25 points)  
-  if (lead.authority_confirmed) score += 25
+  // BANT-poäng (0-30 poäng totalt, 7.5 poäng per faktor)
+  let bantScore = 0
+  if (lead.budget_confirmed) bantScore += 7.5    // Budget bekräftad
+  if (lead.authority_confirmed) bantScore += 7.5 // Befogenhet bekräftad  
+  if (lead.needs_confirmed) bantScore += 7.5     // Behov bekräftat
+  if (lead.timeline_confirmed) bantScore += 7.5  // Tidslinje bekräftad
   
-  // Need confirmed (25 points)
-  if (lead.needs_confirmed) score += 25
+  // Sannolikhetsmodifierare (-20 till +20 poäng)
+  let probabilityModifier = 0
+  if (lead.probability !== null && lead.probability !== undefined) {
+    if (lead.probability <= 20) probabilityModifier = -20      // 0-20%: -20p
+    else if (lead.probability <= 40) probabilityModifier = -10 // 21-40%: -10p  
+    else if (lead.probability <= 60) probabilityModifier = 0   // 41-60%: 0p (neutral)
+    else if (lead.probability <= 80) probabilityModifier = 10  // 61-80%: +10p
+    else probabilityModifier = 20                              // 81-100%: +20p
+  }
   
-  // Timeline confirmed (25 points)
-  if (lead.timeline_confirmed) score += 25
-  
-  // Bonus points for other factors
-  if (lead.estimated_value && lead.estimated_value > 50000) score += 10
-  if (lead.probability && lead.probability > 70) score += 10
-  if (lead.priority === 'urgent') score += 5
-  if (lead.priority === 'high') score += 3
-  
-  return Math.min(score, 100) // Cap at 100
+  // Beräkna total score och säkerställ att den är inom 0-100
+  const totalScore = baseScore + bantScore + probabilityModifier
+  return Math.min(Math.max(totalScore, 0), 100)
 }
 
 // Hjälpfunktion för att avgöra lead kvalitet baserat på score

@@ -636,6 +636,30 @@ const Leads: React.FC = () => {
                     <th 
                       className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('lead_score')}
+                      title={`Lead Score Kalkyl (0-100 poäng):
+
+📊 STATUS (grundpoäng):
+• Förlorad: 0p (automatiskt)
+• Kall: 30p 
+• Ljummen: 40p
+• Het: 50p
+• Affär: 100p (automatiskt)
+
+🎯 BANT-KRITERIER (0-30p):
+• Budget bekräftad: +7.5p
+• Befogenhet bekräftad: +7.5p  
+• Behov bekräftat: +7.5p
+• Tidslinje bekräftad: +7.5p
+
+🎲 SANNOLIKHET (modifierare):
+• 0-20%: -20p
+• 21-40%: -10p
+• 41-60%: 0p (neutral)
+• 61-80%: +10p  
+• 81-100%: +20p
+
+🏆 KVALITET:
+80-100p: Utmärkt | 60-79p: Bra | 40-59p: Medel | 20-39p: Svag | 0-19p: Mycket svag`}
                     >
                       <div className="flex items-center gap-2">
                         Lead Score
