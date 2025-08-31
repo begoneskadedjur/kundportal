@@ -1,7 +1,7 @@
 // src/components/admin/leads/LeadDetailModal.tsx - Detailed lead view with all related components
 
 import React, { useState, useEffect } from 'react'
-import { Eye, Edit3, X, Star, TrendingUp, Users, MessageSquare, Clock, Tag } from 'lucide-react'
+import { Eye, Edit3, X, Star, TrendingUp, Users, MessageSquare, Clock, Tag, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, FileContract, Factory } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Card from '../../ui/Card'
@@ -435,6 +435,211 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   </div>
                 </div>
               </Card>
+
+              {/* Lead Details Section */}
+              {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Building className="w-5 h-5 text-blue-400" />
+                    Lead-detaljer
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {currentLead.phone_number && (
+                      <div>
+                        <div className="text-slate-300 font-medium flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          Telefon
+                        </div>
+                        <div className="text-white">{currentLead.phone_number}</div>
+                      </div>
+                    )}
+                    {currentLead.email && (
+                      <div>
+                        <div className="text-slate-300 font-medium flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          E-post
+                        </div>
+                        <div className="text-white">{currentLead.email}</div>
+                      </div>
+                    )}
+                    {currentLead.organization_number && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Org.nr</div>
+                        <div className="text-white">{currentLead.organization_number}</div>
+                      </div>
+                    )}
+                    {currentLead.business_type && (
+                      <div>
+                        <div className="text-slate-300 font-medium flex items-center gap-1">
+                          <Briefcase className="w-3 h-3" />
+                          Verksamhet
+                        </div>
+                        <div className="text-white">{currentLead.business_type}</div>
+                      </div>
+                    )}
+                    {currentLead.problem_type && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Problem</div>
+                        <div className="text-white">{currentLead.problem_type}</div>
+                      </div>
+                    )}
+                    {currentLead.company_size && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Företagsstorlek</div>
+                        <div className="text-white capitalize">{currentLead.company_size}</div>
+                      </div>
+                    )}
+                    {currentLead.website && (
+                      <div>
+                        <div className="text-slate-300 font-medium flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          Webbplats
+                        </div>
+                        <div className="text-white">
+                          <a href={currentLead.website.startsWith('http') ? currentLead.website : `https://${currentLead.website}`} 
+                             target="_blank" 
+                             rel="noopener noreferrer" 
+                             className="text-blue-400 hover:text-blue-300 transition-colors">
+                            {currentLead.website}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {currentLead.address && (
+                      <div>
+                        <div className="text-slate-300 font-medium flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          Adress
+                        </div>
+                        <div className="text-white">{currentLead.address}</div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Timeline & Dates Section */}
+              {(currentLead.contact_date || currentLead.follow_up_date || currentLead.quote_provided_date || currentLead.contact_method) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-purple-400" />
+                    Tidslinje & Datum
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {currentLead.contact_date && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Kontaktdatum</div>
+                        <div className="text-white">{formatDate(currentLead.contact_date)}</div>
+                      </div>
+                    )}
+                    {currentLead.follow_up_date && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Uppföljning</div>
+                        <div className="text-white">{formatDate(currentLead.follow_up_date)}</div>
+                      </div>
+                    )}
+                    {currentLead.quote_provided_date && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Offert skickad</div>
+                        <div className="text-white">{formatDate(currentLead.quote_provided_date)}</div>
+                      </div>
+                    )}
+                    {currentLead.contact_method && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Kontaktmetod</div>
+                        <div className="text-white capitalize">
+                          {currentLead.contact_method === 'mail' ? 'E-post' : 
+                           currentLead.contact_method === 'phone' ? 'Telefon' : 
+                           currentLead.contact_method === 'visit' ? 'Besök' : currentLead.contact_method}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Contract Information Section */}
+              {(currentLead.contract_status || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <FileContract className="w-5 h-5 text-yellow-400" />
+                    Avtalsinfo
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {currentLead.contract_status && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Avtalssstatus</div>
+                        <div className="text-white">{currentLead.contract_status}</div>
+                      </div>
+                    )}
+                    {currentLead.contract_end_date && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Avtal slutar</div>
+                        <div className="text-white">{formatDate(currentLead.contract_end_date)}</div>
+                      </div>
+                    )}
+                    {currentLead.interested_in_quote !== null && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Intresserad av offert</div>
+                        <div className={`font-medium ${currentLead.interested_in_quote ? 'text-green-400' : 'text-red-400'}`}>
+                          {currentLead.interested_in_quote ? 'Ja' : 'Nej'}
+                        </div>
+                      </div>
+                    )}
+                    {currentLead.procurement !== null && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Upphandling</div>
+                        <div className={`font-medium ${currentLead.procurement ? 'text-green-400' : 'text-slate-400'}`}>
+                          {currentLead.procurement ? 'Ja' : 'Nej'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Notes Section */}
+              {currentLead.notes && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-green-400" />
+                    Anteckningar
+                  </h3>
+                  <div className="text-sm">
+                    <div className="text-white whitespace-pre-wrap bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                      {currentLead.notes}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Industry & Classification Section */}
+              {(currentLead.business_description || currentLead.sni07_label) && (
+                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Factory className="w-5 h-5 text-purple-400" />
+                    Bransch & Klassificering
+                  </h3>
+                  <div className="space-y-4 text-sm">
+                    {currentLead.business_description && (
+                      <div>
+                        <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
+                        <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 whitespace-pre-wrap">
+                          {currentLead.business_description}
+                        </div>
+                      </div>
+                    )}
+                    {currentLead.sni07_label && (
+                      <div>
+                        <div className="text-slate-300 font-medium mb-2">SNI-kod (Branschklassning)</div>
+                        <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                          {currentLead.sni07_label}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
 
               {/* Additional Info */}
               {(currentLead.source || currentLead.decision_maker || currentLead.competitor || currentLead.contract_with || technician) && (
