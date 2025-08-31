@@ -50,6 +50,7 @@ import {
   CONTACT_METHOD_DISPLAY,
   COMPANY_SIZE_DISPLAY,
   calculateLeadScore,
+  getLeadQuality,
   getPriorityLabel,
   getPriorityColor
 } from '../../types/database'
