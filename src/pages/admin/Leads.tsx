@@ -602,11 +602,11 @@ const Leads: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1200px]">
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-48"
                       onClick={() => handleSort('company_name')}
                     >
                       <div className="flex items-center gap-2">
@@ -614,9 +614,9 @@ const Leads: React.FC = () => {
                         {getSortIcon('company_name')}
                       </div>
                     </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Kontakt</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-40">Kontakt</th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-32"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-2">
@@ -624,8 +624,26 @@ const Leads: React.FC = () => {
                         {getSortIcon('status')}
                       </div>
                     </th>
+                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-20" title="Budget/Authority/Need/Timeline">
+                      <div className="flex items-center gap-2 justify-center">
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        BANT
+                      </div>
+                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-36">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-green-400" />
+                        Tilldelade kollegor
+                      </div>
+                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300 hidden xl:table-cell w-24">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-blue-400" />
+                        Sannolikhet
+                      </div>
+                    </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-24"
                       onClick={() => handleSort('priority')}
                     >
                       <div className="flex items-center gap-2">
@@ -634,7 +652,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
                       onClick={() => handleSort('lead_score')}
                       title={`Lead Score Kalkyl (0-100 poäng):
 
@@ -667,16 +685,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden xl:table-cell"
-                      onClick={() => handleSort('activity')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Aktivitet
-                        {getSortIcon('activity')}
-                      </div>
-                    </th>
-                    <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
                       onClick={() => handleSort('estimated_value')}
                     >
                       <div className="flex items-center gap-2">
@@ -685,7 +694,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
                       onClick={() => handleSort('updated_at')}
                     >
                       <div className="flex items-center gap-2">
@@ -693,7 +702,7 @@ const Leads: React.FC = () => {
                         {getSortIcon('updated_at')}
                       </div>
                     </th>
-                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-16">Åtgärder</th>
+                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-20">Åtgärder</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
@@ -782,6 +791,80 @@ const Leads: React.FC = () => {
                       <td className="p-3">
                         {getStatusBadge(lead.status)}
                       </td>
+                      {/* BANT Checkboxes Column */}
+                      <td className="p-3">
+                        <div className="flex items-center justify-center">
+                          <div className="grid grid-cols-2 gap-1">
+                            <div className="flex items-center justify-center" title="Budget bekräftad">
+                              {lead.budget_confirmed ? (
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <XCircle className="w-3 h-3 text-slate-500" />
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center" title="Befogenhet bekräftad">
+                              {lead.authority_confirmed ? (
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <XCircle className="w-3 h-3 text-slate-500" />
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center" title="Behov bekräftat">
+                              {lead.needs_confirmed ? (
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <XCircle className="w-3 h-3 text-slate-500" />
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center" title="Tidslinje bekräftad">
+                              {lead.timeline_confirmed ? (
+                                <CheckCircle className="w-3 h-3 text-green-400" />
+                              ) : (
+                                <XCircle className="w-3 h-3 text-slate-500" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {/* Tilldelade kollegor Column */}
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {lead.lead_technicians.slice(0, 2).map((assignment, idx) => (
+                                <div key={assignment.id} className="flex items-center gap-1">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                  }`}></div>
+                                  <span className="text-white text-xs truncate max-w-[80px]">
+                                    {assignment.technicians?.name}
+                                  </span>
+                                  {idx < Math.min(lead.lead_technicians.length - 1, 1) && (
+                                    <span className="text-slate-500">,</span>
+                                  )}
+                                </div>
+                              ))}
+                              {lead.lead_technicians.length > 2 && (
+                                <span className="text-slate-400 text-xs">+{lead.lead_technicians.length - 2}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Ej tilldelad</span>
+                          )}
+                        </div>
+                      </td>
+                      {/* Sannolikhet Column */}
+                      <td className="p-3 hidden xl:table-cell">
+                        {lead.probability ? (
+                          <div className="text-sm text-center">
+                            <div className="text-white font-mono font-medium">
+                              {lead.probability}%
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 block text-center">-</span>
+                        )}
+                      </td>
                       <td className="p-3 hidden lg:table-cell">
                         {lead.priority ? (
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
@@ -799,22 +882,6 @@ const Leads: React.FC = () => {
                           </div>
                           <div className="text-xs text-slate-400">
                             {getLeadQuality(calculateLeadScore(lead)).label}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3 hidden xl:table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3 text-blue-400" />
-                            <span className="text-white text-xs font-medium">
-                              {lead.lead_comments?.[0]?.count || 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Activity className="w-3 h-3 text-green-400" />
-                            <span className="text-white text-xs font-medium">
-                              {lead.lead_events?.[0]?.count || 0}
-                            </span>
                           </div>
                         </div>
                       </td>
@@ -836,30 +903,31 @@ const Leads: React.FC = () => {
                                      lead.updated_by_profile?.email || 
                                      'Okänd användare'}`}>
                           {new Date(lead.updated_at).toLocaleDateString('sv-SE', { 
-                            day: 'numeric', 
-                            month: 'short' 
+                            year: 'numeric',
+                            month: '2-digit', 
+                            day: '2-digit'
                           })}
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="flex flex-col gap-1 items-center w-16">
+                        <div className="flex items-center gap-2 justify-center">
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleEditLead(lead)}
-                            className="text-slate-400 hover:text-blue-400 transition-colors p-1 w-full"
+                            className="text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-200 p-2 rounded-md group"
                             title="Redigera lead"
                           >
-                            <Edit3 className="w-3 h-3" />
+                            <Edit3 className="w-5 h-5 group-hover:scale-110 transition-transform" />
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleViewLead(lead)}
-                            className="text-slate-400 hover:text-purple-400 transition-colors p-1 w-full"
+                            className="text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 transition-all duration-200 p-2 rounded-md group"
                             title="Visa detaljer"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-5 h-5 group-hover:scale-110 transition-transform" />
                           </Button>
                         </div>
                       </td>
@@ -868,14 +936,14 @@ const Leads: React.FC = () => {
                     {/* Expanderbar rad för intern information */}
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
-                        <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
+                        <td colSpan={11} className="p-4 border-l-2 border-l-purple-400">
                           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             
                             {/* Team/Kollegor sektion */}
                             <div className="space-y-3">
                               <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                                 <Users className="w-4 h-4 text-green-400" />
-                                Internt Team
+                                Tilldelade kollegor
                               </h4>
                               {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
                                 <div className="space-y-2">
