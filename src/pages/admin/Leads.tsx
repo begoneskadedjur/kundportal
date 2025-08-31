@@ -299,9 +299,24 @@ const Leads: React.FC = () => {
             aValue = a.company_name?.toLowerCase() || ''
             bValue = b.company_name?.toLowerCase() || ''
             break
+          case 'status':
+            aValue = a.status || ''
+            bValue = b.status || ''
+            break
+          case 'priority':
+            // Priority order: high=3, medium=2, low=1, null=0
+            const priorityValues = { high: 3, medium: 2, low: 1 }
+            aValue = priorityValues[a.priority as keyof typeof priorityValues] || 0
+            bValue = priorityValues[b.priority as keyof typeof priorityValues] || 0
+            break
           case 'estimated_value':
             aValue = a.estimated_value || 0
             bValue = b.estimated_value || 0
+            break
+          case 'activity':
+            // Sort by total activity (comments + events)
+            aValue = (a.lead_comments?.[0]?.count || 0) + (a.lead_events?.[0]?.count || 0)
+            bValue = (b.lead_comments?.[0]?.count || 0) + (b.lead_events?.[0]?.count || 0)
             break
           case 'updated_at':
             aValue = new Date(a.updated_at).getTime()
@@ -600,7 +615,24 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th className="text-left p-3 text-sm font-medium text-slate-300">Kontakt</th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Status & Prioritet</th>
+                    <th 
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Status
+                        {getSortIcon('status')}
+                      </div>
+                    </th>
+                    <th 
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell"
+                      onClick={() => handleSort('priority')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Prioritet
+                        {getSortIcon('priority')}
+                      </div>
+                    </th>
                     <th 
                       className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('lead_score')}
@@ -610,8 +642,24 @@ const Leads: React.FC = () => {
                         {getSortIcon('lead_score')}
                       </div>
                     </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Team & Leverantör</th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Aktivitet & Värde</th>
+                    <th 
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden xl:table-cell"
+                      onClick={() => handleSort('activity')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Aktivitet
+                        {getSortIcon('activity')}
+                      </div>
+                    </th>
+                    <th 
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('estimated_value')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Värde
+                        {getSortIcon('estimated_value')}
+                      </div>
+                    </th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('updated_at')}
@@ -621,7 +669,7 @@ const Leads: React.FC = () => {
                         {getSortIcon('updated_at')}
                       </div>
                     </th>
-                    <th className="text-right p-4 text-sm font-medium text-slate-300">Åtgärder</th>
+                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-16">Åtgärder</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
@@ -635,11 +683,24 @@ const Leads: React.FC = () => {
                       }`}
                     >
                       <td className="p-3">
-                        <div>
-                          <div className="font-medium text-white">{lead.company_name}</div>
-                          {lead.organization_number && (
-                            <div className="text-sm text-slate-400">{lead.organization_number}</div>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-white">{lead.company_name}</div>
+                            {lead.organization_number && (
+                              <div className="text-sm text-slate-400">{lead.organization_number}</div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleExpandRow(lead.id)}
+                            className="text-slate-400 hover:text-white p-1 ml-2"
+                            title="Visa mer information"
+                          >
+                            <ChevronDown className={`w-3 h-3 transition-transform ${
+                              expandedRows.has(lead.id) ? 'rotate-180' : ''
+                            }`} />
+                          </Button>
                         </div>
                       </td>
                       <td className="p-3">
@@ -695,17 +756,17 @@ const Leads: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="space-y-2">
-                          {getStatusBadge(lead.status)}
-                          {lead.priority ? (
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
-                              <Star className="w-3 h-3 mr-1" />
-                              {getPriorityLabel(lead.priority)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 text-xs">Ingen prioritet</span>
-                          )}
-                        </div>
+                        {getStatusBadge(lead.status)}
+                      </td>
+                      <td className="p-3 hidden lg:table-cell">
+                        {lead.priority ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
+                            <Star className="w-3 h-3 mr-1" />
+                            {getPriorityLabel(lead.priority)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
                       </td>
                       <td className="p-3">
                         <div className="text-sm">
@@ -717,121 +778,186 @@ const Leads: React.FC = () => {
                           </div>
                         </div>
                       </td>
+                      <td className="p-3 hidden xl:table-cell">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3 text-blue-400" />
+                            <span className="text-white text-xs font-medium">
+                              {lead.lead_comments?.[0]?.count || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Activity className="w-3 h-3 text-green-400" />
+                            <span className="text-white text-xs font-medium">
+                              {lead.lead_events?.[0]?.count || 0}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
                       <td className="p-3">
-                        <div className="space-y-3">
-                          {/* Kollegor sektion */}
-                          <div>
-                            <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              Kollegor
-                            </div>
-                            {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                              <div className="space-y-1">
-                                {lead.lead_technicians.slice(0, 2).map((assignment) => (
-                                  <div key={assignment.id} className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${
-                                      assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
-                                    }`}></div>
-                                    <div className="text-white text-xs truncate max-w-[120px]">
-                                      {assignment.technicians?.name || 'Okänd'}
-                                    </div>
-                                    {assignment.is_primary && (
-                                      <Star className="w-3 h-3 text-yellow-400" title="Primär" />
-                                    )}
-                                  </div>
-                                ))}
-                                {lead.lead_technicians.length > 2 && (
-                                  <div className="text-xs text-slate-400">+{lead.lead_technicians.length - 2} till</div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">Ej tilldelad</span>
+                        {lead.estimated_value ? (
+                          <div className="text-sm">
+                            <div className="text-white font-mono">{formatCurrency(lead.estimated_value)}</div>
+                            {lead.probability && (
+                              <div className="text-slate-400 text-xs">{lead.probability}%</div>
                             )}
                           </div>
-                          
-                          {/* Leverantör sektion */}
-                          <div>
-                            <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
-                              <Building className="w-3 h-3" />
-                              Leverantör
-                            </div>
-                            <div className="text-white text-xs truncate max-w-[120px]">
-                              {lead.contract_with || 'Finns ej'}
-                            </div>
-                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm text-white" 
+                             title={`${formatDate(lead.updated_at)} av ${lead.updated_by_profile?.display_name || 
+                                     lead.updated_by_profile?.email || 
+                                     'Okänd användare'}`}>
+                          {new Date(lead.updated_at).toLocaleDateString('sv-SE', { 
+                            day: 'numeric', 
+                            month: 'short' 
+                          })}
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="space-y-3">
-                          {/* Aktivitet sektion */}
-                          <div>
-                            <div className="text-xs text-slate-400 mb-1">Aktivitet</div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <MessageSquare className="w-3 h-3 text-blue-400" />
-                                <span className="text-white text-xs font-medium">
-                                  {lead.lead_comments?.[0]?.count || 0}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Activity className="w-3 h-3 text-green-400" />
-                                <span className="text-white text-xs font-medium">
-                                  {lead.lead_events?.[0]?.count || 0}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Värde sektion */}
-                          <div>
-                            <div className="text-xs text-slate-400 mb-1">Värde</div>
-                            {lead.estimated_value ? (
-                              <div>
-                                <div className="text-white font-mono text-sm">{formatCurrency(lead.estimated_value)}</div>
-                                {lead.probability && (
-                                  <div className="text-slate-400 text-xs">{lead.probability}%</div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">-</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm">
-                          <div className="text-white">{formatDate(lead.updated_at)}</div>
-                          <div className="text-slate-400 text-xs">
-                            av {lead.updated_by_profile?.display_name || 
-                                lead.updated_by_profile?.email || 
-                                'Okänd användare'}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2 justify-end">
+                        <div className="flex flex-col gap-1 items-center w-16">
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleEditLead(lead)}
-                            className="text-slate-400 hover:text-blue-400 transition-colors p-2"
+                            className="text-slate-400 hover:text-blue-400 transition-colors p-1 w-full"
                             title="Redigera lead"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3 h-3" />
                           </Button>
-                          
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleViewLead(lead)}
-                            className="text-slate-400 hover:text-purple-400 transition-colors p-2"
+                            className="text-slate-400 hover:text-purple-400 transition-colors p-1 w-full"
                             title="Visa detaljer"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3 h-3" />
                           </Button>
                         </div>
                       </td>
                     </tr>
+
+                    {/* Expanderbar rad för intern information */}
+                    {expandedRows.has(lead.id) && (
+                      <tr className="bg-slate-800/30">
+                        <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            
+                            {/* Team/Kollegor sektion */}
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                                <Users className="w-4 h-4 text-green-400" />
+                                Internt Team
+                              </h4>
+                              {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
+                                <div className="space-y-2">
+                                  {lead.lead_technicians.map((assignment) => (
+                                    <div key={assignment.id} className={`flex items-center gap-3 p-2 rounded-md ${
+                                      assignment.is_primary 
+                                        ? 'bg-yellow-500/10 border border-yellow-500/20' 
+                                        : 'bg-slate-700/30 border border-slate-600/30'
+                                    }`}>
+                                      <div className={`w-3 h-3 rounded-full ${
+                                        assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                      }`}></div>
+                                      <div className="flex-1">
+                                        <div className="text-white text-sm font-medium">
+                                          {assignment.technicians?.name || 'Okänd kollega'}
+                                        </div>
+                                        <div className="text-slate-400 text-xs">
+                                          Tilldelad {new Date(assignment.assigned_at).toLocaleDateString('sv-SE')}
+                                        </div>
+                                      </div>
+                                      {assignment.is_primary && (
+                                        <div className="flex items-center gap-1 text-yellow-400 text-xs">
+                                          <Star className="w-3 h-3" />
+                                          Primär
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-slate-400 text-sm italic">
+                                  Inget team tilldelat än
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Leverantör/Affärsinfo sektion */}
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                                <Building className="w-4 h-4 text-blue-400" />
+                                Affärsinformation
+                              </h4>
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="text-slate-400 text-xs">Nuvarande Leverantör:</span>
+                                  <div className="text-white text-sm">
+                                    {lead.contract_with || 'Ingen registrerad'}
+                                  </div>
+                                </div>
+                                {lead.contract_expires && (
+                                  <div>
+                                    <span className="text-slate-400 text-xs">Avtal löper ut:</span>
+                                    <div className="text-white text-sm">
+                                      {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
+                                    </div>
+                                  </div>
+                                )}
+                                {lead.company_size && (
+                                  <div>
+                                    <span className="text-slate-400 text-xs">Företagsstorlek:</span>
+                                    <div className="text-white text-sm">
+                                      {COMPANY_SIZE_DISPLAY[lead.company_size]?.label || lead.company_size}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Aktivitetsdetaljer sektion */}
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-purple-400" />
+                                Aktivitetssammanfattning
+                              </h4>
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400 text-xs">Kommentarer:</span>
+                                  <span className="text-white text-sm font-medium">
+                                    {lead.lead_comments?.[0]?.count || 0}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400 text-xs">Händelser:</span>
+                                  <span className="text-white text-sm font-medium">
+                                    {lead.lead_events?.[0]?.count || 0}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400 text-xs">Skapad:</span>
+                                  <span className="text-white text-sm">
+                                    {new Date(lead.created_at).toLocaleDateString('sv-SE')}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400 text-xs">Senast uppdaterad:</span>
+                                  <span className="text-white text-sm">
+                                    {formatDate(lead.updated_at)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   ))}
                 </tbody>
               </table>
