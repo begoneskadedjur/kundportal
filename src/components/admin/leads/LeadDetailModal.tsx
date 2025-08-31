@@ -539,7 +539,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         SNI-kod (Branschklassning)
                       </div>
                       <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 space-y-1">
-                        {currentLead.sni07_label.split(/[,;]/).filter(sni => sni.trim()).map((sni, index) => (
+                        {currentLead.sni07_label.split(/(?=\d{5}\s)/).filter(sni => sni.trim()).map((sni, index) => (
                           <div key={index} className="text-sm leading-relaxed border-l-2 border-blue-400/30 pl-3">
                             {sni.trim()}
                           </div>
