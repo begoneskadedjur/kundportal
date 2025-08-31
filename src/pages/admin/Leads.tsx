@@ -587,7 +587,7 @@ const Leads: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1600px]">
+              <table className="w-full">
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th 
@@ -600,10 +600,9 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th className="text-left p-3 text-sm font-medium text-slate-300">Kontakt</th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Status</th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300">Prioritet</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Status & Prioritet</th>
                     <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('lead_score')}
                     >
                       <div className="flex items-center gap-2">
@@ -611,21 +610,8 @@ const Leads: React.FC = () => {
                         {getSortIcon('lead_score')}
                       </div>
                     </th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Kollegor</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Nuvarande Leverantör</th>
-                    <th className="text-left p-2 text-xs font-medium text-slate-300">Adress</th>
-                    <th className="text-left p-2 text-xs font-medium text-slate-300">Postnr</th>
-                    <th className="text-left p-2 text-xs font-medium text-slate-300">Ort</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Aktivitet</th>
-                    <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
-                      onClick={() => handleSort('estimated_value')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Värde
-                        {getSortIcon('estimated_value')}
-                      </div>
-                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Team & Leverantör</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Aktivitet & Värde</th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('updated_at')}
@@ -648,7 +634,7 @@ const Leads: React.FC = () => {
                         lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
                       }`}
                     >
-                      <td className="p-4">
+                      <td className="p-3">
                         <div>
                           <div className="font-medium text-white">{lead.company_name}</div>
                           {lead.organization_number && (
@@ -656,7 +642,7 @@ const Leads: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-3">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-slate-400" />
@@ -708,20 +694,20 @@ const Leads: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
-                        {getStatusBadge(lead.status)}
+                      <td className="p-3">
+                        <div className="space-y-2">
+                          {getStatusBadge(lead.status)}
+                          {lead.priority ? (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
+                              <Star className="w-3 h-3 mr-1" />
+                              {getPriorityLabel(lead.priority)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Ingen prioritet</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-4">
-                        {lead.priority ? (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
-                            <Star className="w-3 h-3 mr-1" />
-                            {getPriorityLabel(lead.priority)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="p-4">
+                      <td className="p-3">
                         <div className="text-sm">
                           <div className="font-mono text-lg font-bold text-white">
                             {calculateLeadScore(lead)}
@@ -731,105 +717,98 @@ const Leads: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
-                        {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                          <div className="text-sm space-y-2">
-                            {lead.lead_technicians.map((assignment, idx) => (
-                              <div key={assignment.id} className={`flex items-center gap-2 p-2 rounded-md ${
-                                assignment.is_primary 
-                                  ? 'bg-yellow-500/10 border border-yellow-500/20' 
-                                  : 'bg-slate-700/30 border border-slate-600/30'
-                              }`}>
-                                <div className={`w-2 h-2 rounded-full ${
-                                  assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
-                                }`}></div>
-                                <div className="text-white text-xs font-medium">
-                                  {assignment.technicians?.name || 'Okänd kollega'}
-                                </div>
-                                {assignment.is_primary && (
-                                  <Star className="w-3 h-3 text-yellow-400 ml-auto" title="Primär kollega" />
+                      <td className="p-3">
+                        <div className="space-y-3">
+                          {/* Kollegor sektion */}
+                          <div>
+                            <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              Kollegor
+                            </div>
+                            {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
+                              <div className="space-y-1">
+                                {lead.lead_technicians.slice(0, 2).map((assignment) => (
+                                  <div key={assignment.id} className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                    }`}></div>
+                                    <div className="text-white text-xs truncate max-w-[120px]">
+                                      {assignment.technicians?.name || 'Okänd'}
+                                    </div>
+                                    {assignment.is_primary && (
+                                      <Star className="w-3 h-3 text-yellow-400" title="Primär" />
+                                    )}
+                                  </div>
+                                ))}
+                                {lead.lead_technicians.length > 2 && (
+                                  <div className="text-xs text-slate-400">+{lead.lead_technicians.length - 2} till</div>
                                 )}
                               </div>
-                            ))}
-                            <div className="text-slate-400 text-xs mt-1 text-center">
-                              {lead.lead_technicians.length} kollega{lead.lead_technicians.length !== 1 ? 'r' : ''}
-                            </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">Ej tilldelad</span>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-slate-400">Ej tilldelad</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">
-                          <div className="text-white">
-                            {lead.contract_with || 'Finns ej'}
-                          </div>
-                          {lead.contract_with && (
-                            <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                          
+                          {/* Leverantör sektion */}
+                          <div>
+                            <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
                               <Building className="w-3 h-3" />
                               Leverantör
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="text-xs">
-                          <div className="text-white truncate max-w-[100px]" title={lead.street_address || '-'}>
-                            {lead.street_address || '-'}
+                            <div className="text-white text-xs truncate max-w-[120px]">
+                              {lead.contract_with || 'Finns ej'}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="p-2">
-                        <div className="text-xs">
-                          <div className="text-white font-mono">{lead.postal_code || '-'}</div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="text-xs">
-                          <div className="text-white truncate max-w-[80px]" title={lead.city || '-'}>
-                            {lead.city || '-'}
+                      <td className="p-3">
+                        <div className="space-y-3">
+                          {/* Aktivitet sektion */}
+                          <div>
+                            <div className="text-xs text-slate-400 mb-1">Aktivitet</div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3 text-blue-400" />
+                                <span className="text-white text-xs font-medium">
+                                  {lead.lead_comments?.[0]?.count || 0}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Activity className="w-3 h-3 text-green-400" />
+                                <span className="text-white text-xs font-medium">
+                                  {lead.lead_events?.[0]?.count || 0}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 text-sm">
-                            <MessageSquare className="w-4 h-4 text-blue-400" />
-                            <span className="text-white font-medium">
-                              {lead.lead_comments?.[0]?.count || 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-sm">
-                            <Activity className="w-4 h-4 text-green-400" />
-                            <span className="text-white font-medium">
-                              {lead.lead_events?.[0]?.count || 0}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        {lead.estimated_value ? (
-                          <div className="text-sm">
-                            <div className="text-white font-mono">{formatCurrency(lead.estimated_value)}</div>
-                            {lead.probability && (
-                              <div className="text-slate-400 text-xs">{lead.probability}% sannolikhet</div>
+                          
+                          {/* Värde sektion */}
+                          <div>
+                            <div className="text-xs text-slate-400 mb-1">Värde</div>
+                            {lead.estimated_value ? (
+                              <div>
+                                <div className="text-white font-mono text-sm">{formatCurrency(lead.estimated_value)}</div>
+                                {lead.probability && (
+                                  <div className="text-slate-400 text-xs">{lead.probability}%</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                        </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-3">
                         <div className="text-sm">
                           <div className="text-white">{formatDate(lead.updated_at)}</div>
-                          <div className="text-slate-400">
+                          <div className="text-slate-400 text-xs">
                             av {lead.updated_by_profile?.display_name || 
                                 lead.updated_by_profile?.email || 
                                 'Okänd användare'}
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-3">
                         <div className="flex items-center gap-2 justify-end">
                           <Button
                             size="sm"
