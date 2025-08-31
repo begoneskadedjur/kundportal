@@ -624,24 +624,6 @@ const Leads: React.FC = () => {
                         {getSortIcon('status')}
                       </div>
                     </th>
-                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-20" title="Budget/Authority/Need/Timeline">
-                      <div className="flex items-center gap-2 justify-center">
-                        <CheckCircle className="w-4 h-4 text-green-400" />
-                        BANT
-                      </div>
-                    </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-36">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-green-400" />
-                        Tilldelade kollegor
-                      </div>
-                    </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300 hidden xl:table-cell w-24">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-blue-400" />
-                        Sannolikhet
-                      </div>
-                    </th>
                     <th 
                       className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-24"
                       onClick={() => handleSort('priority')}
@@ -682,6 +664,12 @@ const Leads: React.FC = () => {
                       <div className="flex items-center gap-2">
                         Lead Score
                         {getSortIcon('lead_score')}
+                      </div>
+                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-36">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-green-400" />
+                        Tilldelade kollegor
                       </div>
                     </th>
                     <th 
@@ -791,38 +779,23 @@ const Leads: React.FC = () => {
                       <td className="p-3">
                         {getStatusBadge(lead.status)}
                       </td>
-                      {/* BANT Checkboxes Column */}
+                      <td className="p-3 hidden lg:table-cell">
+                        {lead.priority ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
+                            <Star className="w-3 h-3 mr-1" />
+                            {getPriorityLabel(lead.priority)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
+                      </td>
                       <td className="p-3">
-                        <div className="flex items-center justify-center">
-                          <div className="grid grid-cols-2 gap-1">
-                            <div className="flex items-center justify-center" title="Budget bekräftad">
-                              {lead.budget_confirmed ? (
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                              ) : (
-                                <XCircle className="w-3 h-3 text-slate-500" />
-                              )}
-                            </div>
-                            <div className="flex items-center justify-center" title="Befogenhet bekräftad">
-                              {lead.authority_confirmed ? (
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                              ) : (
-                                <XCircle className="w-3 h-3 text-slate-500" />
-                              )}
-                            </div>
-                            <div className="flex items-center justify-center" title="Behov bekräftat">
-                              {lead.needs_confirmed ? (
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                              ) : (
-                                <XCircle className="w-3 h-3 text-slate-500" />
-                              )}
-                            </div>
-                            <div className="flex items-center justify-center" title="Tidslinje bekräftad">
-                              {lead.timeline_confirmed ? (
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                              ) : (
-                                <XCircle className="w-3 h-3 text-slate-500" />
-                              )}
-                            </div>
+                        <div className="text-sm">
+                          <div className="font-mono text-lg font-bold text-white">
+                            {calculateLeadScore(lead)}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {getLeadQuality(calculateLeadScore(lead)).label}
                           </div>
                         </div>
                       </td>
@@ -851,38 +824,6 @@ const Leads: React.FC = () => {
                           ) : (
                             <span className="text-slate-400 text-xs italic">Ej tilldelad</span>
                           )}
-                        </div>
-                      </td>
-                      {/* Sannolikhet Column */}
-                      <td className="p-3 hidden xl:table-cell">
-                        {lead.probability ? (
-                          <div className="text-sm text-center">
-                            <div className="text-white font-mono font-medium">
-                              {lead.probability}%
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 block text-center">-</span>
-                        )}
-                      </td>
-                      <td className="p-3 hidden lg:table-cell">
-                        {lead.priority ? (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
-                            <Star className="w-3 h-3 mr-1" />
-                            {getPriorityLabel(lead.priority)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">-</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm">
-                          <div className="font-mono text-lg font-bold text-white">
-                            {calculateLeadScore(lead)}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {getLeadQuality(calculateLeadScore(lead)).label}
-                          </div>
                         </div>
                       </td>
                       <td className="p-3">
@@ -936,7 +877,7 @@ const Leads: React.FC = () => {
                     {/* Expanderbar rad för intern information */}
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
-                        <td colSpan={11} className="p-4 border-l-2 border-l-purple-400">
+                        <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
                           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             
                             {/* Team/Kollegor sektion */}
