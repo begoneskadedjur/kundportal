@@ -22,7 +22,11 @@ import {
   Star,
   DollarSign,
   BarChart3,
-  Tag
+  Tag,
+  Edit3,
+  Eye,
+  MessageSquare,
+  ChevronDown
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -45,6 +49,7 @@ import {
 } from '../../types/database'
 import CreateLeadModal from '../../components/admin/leads/CreateLeadModal'
 import LeadDetailModal from '../../components/admin/leads/LeadDetailModal'
+import EditLeadModal from '../../components/admin/leads/EditLeadModal'
 
 interface LeadStats {
   totalLeads: number
@@ -71,27 +76,65 @@ const Leads: React.FC = () => {
   
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [technicians, setTechnicians] = useState<{[key: string]: string}>({})
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchLeads()
     fetchTechnicians()
     
-    // Set up real-time subscription for leads
+    // Set up optimized real-time subscription for leads
     const subscription = supabase
       .channel('leads_realtime')
       .on('postgres_changes', 
         { 
-          event: '*', 
+          event: 'INSERT', 
           schema: 'public', 
           table: 'leads'
         },
         (payload) => {
-          // Refresh leads when any lead changes
+          // For new leads, refresh the entire list
           setTimeout(() => {
             fetchLeads()
-          }, 1000) // Longer delay for main list to ensure consistency
+          }, 500)
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'leads'
+        },
+        (payload) => {
+          // For updates, try optimistic update first, then sync
+          if (payload.new && payload.old) {
+            const updatedLead = payload.new as Lead
+            optimisticUpdateLead(updatedLead.id, updatedLead)
+            
+            // Also sync full data after a short delay for consistency
+            setTimeout(() => {
+              fetchLeads()
+            }, 2000)
+          }
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'DELETE', 
+          schema: 'public', 
+          table: 'leads'
+        },
+        (payload) => {
+          // For deletes, remove immediately and refresh
+          if (payload.old) {
+            const deletedLead = payload.old as Lead
+            setLeads(prev => prev.filter(lead => lead.id !== deletedLead.id))
+          }
+          setTimeout(() => {
+            fetchLeads()
+          }, 500)
         }
       )
       .subscribe()
@@ -153,16 +196,25 @@ const Leads: React.FC = () => {
 
   const calculateStats = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
-    const hotLeads = leadsData.filter(lead => lead.status === 'orange_hot' || lead.status === 'green_deal').length
+    
+    // More accurate hot leads calculation - include both hot leads AND deals
+    const hotLeads = leadsData.filter(lead => 
+      lead.status === 'orange_hot' || lead.status === 'green_deal'
+    ).length
+    
     const warmLeads = leadsData.filter(lead => lead.status === 'yellow_warm').length
     const coldLeads = leadsData.filter(lead => lead.status === 'blue_cold').length
     const dealsWon = leadsData.filter(lead => lead.status === 'green_deal').length
+    
+    // More accurate conversion rate calculation
     const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100) : 0
     
-    // Calculate total estimated value
-    const totalEstimatedValue = leadsData.reduce((sum, lead) => {
-      return sum + (lead.estimated_value || 0)
-    }, 0)
+    // Calculate total estimated value - only from active leads (not lost)
+    const totalEstimatedValue = leadsData
+      .filter(lead => lead.status !== 'red_lost')
+      .reduce((sum, lead) => {
+        return sum + (lead.estimated_value || 0)
+      }, 0)
     
     // Calculate average lead score
     const leadScores = leadsData.map(lead => calculateLeadScore(lead))
@@ -233,6 +285,37 @@ const Leads: React.FC = () => {
     return new Intl.NumberFormat('sv-SE').format(value)
   }
 
+  const toggleExpandRow = (leadId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId)
+      } else {
+        newSet.add(leadId)
+      }
+      return newSet
+    })
+  }
+
+  const handleViewLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowDetailModal(true)
+  }
+
+  const handleEditLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowEditModal(true)
+  }
+
+  // Optimistic update for better UX
+  const optimisticUpdateLead = (leadId: string, updates: Partial<Lead>) => {
+    setLeads(prev => prev.map(lead => 
+      lead.id === leadId 
+        ? { ...lead, ...updates, updated_at: new Date().toISOString() }
+        : lead
+    ))
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen relative overflow-hidden">
@@ -289,6 +372,8 @@ const Leads: React.FC = () => {
             icon={Users}
             trend="neutral"
             delay={0}
+            onClick={() => setStatusFilter('all')}
+            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'all' ? 'ring-2 ring-purple-500' : ''}`}
           />
           
           <EnhancedKpiCard
@@ -298,6 +383,8 @@ const Leads: React.FC = () => {
             trend="up"
             trendValue={`av ${stats?.totalLeads || 0}`}
             delay={0.1}
+            onClick={() => setStatusFilter('orange_hot')}
+            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'orange_hot' ? 'ring-2 ring-orange-500' : ''}`}
           />
           
           <EnhancedKpiCard
@@ -308,6 +395,8 @@ const Leads: React.FC = () => {
             trend={stats?.totalEstimatedValue > 500000 ? "up" : "neutral"}
             trendValue={stats?.totalEstimatedValue ? formatCurrency(stats.totalEstimatedValue) : '0 SEK'}
             delay={0.2}
+            onClick={() => setStatusFilter('green_deal')}
+            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'green_deal' ? 'ring-2 ring-green-500' : ''}`}
           />
           
           <EnhancedKpiCard
@@ -318,6 +407,8 @@ const Leads: React.FC = () => {
             trend={stats?.avgLeadScore > 60 ? "up" : stats?.avgLeadScore > 30 ? "neutral" : "down"}
             trendValue={`${stats?.avgLeadScore || 0} poäng`}
             delay={0.3}
+            onClick={() => setStatusFilter('all')}
+            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'all' ? 'ring-2 ring-purple-500' : ''}`}
           />
         </StaggeredGrid>
 
@@ -414,7 +505,14 @@ const Leads: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
                   {filteredLeads.map((lead, index) => (
-                    <tr key={lead.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr 
+                      key={lead.id} 
+                      className={`hover:bg-slate-800/30 transition-colors ${
+                        lead.priority === 'high' ? 'border-l-4 border-l-red-400' :
+                        lead.priority === 'medium' ? 'border-l-4 border-l-yellow-400' :
+                        lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
+                      }`}
+                    >
                       <td className="p-4">
                         <div>
                           <div className="font-medium text-white">{lead.company_name}</div>
@@ -424,19 +522,54 @@ const Leads: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div>
-                          <div className="font-medium text-white">{lead.contact_person}</div>
-                          <div className="text-sm text-slate-400 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Mail className="w-3 h-3" />
-                              {lead.email}
-                            </div>
-                            {lead.phone_number && (
-                              <div className="flex items-center gap-2">
-                                <Phone className="w-3 h-3" />
-                                {lead.phone_number}
-                              </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-slate-400" />
+                            <span className="font-medium text-white">{lead.contact_person}</span>
+                            {(lead.email || lead.phone_number) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => toggleExpandRow(lead.id)}
+                                className="text-slate-400 hover:text-white p-1 ml-auto"
+                              >
+                                <ChevronDown className={`w-3 h-3 transition-transform ${
+                                  expandedRows.has(lead.id) ? 'rotate-180' : ''
+                                }`} />
+                              </Button>
                             )}
+                          </div>
+                          
+                          {expandedRows.has(lead.id) && (
+                            <div className="space-y-1 text-sm text-slate-400">
+                              {lead.email && (
+                                <div className="flex items-center gap-2">
+                                  <Mail className="w-3 h-3" />
+                                  <a href={`mailto:${lead.email}`} className="hover:text-white">
+                                    {lead.email}
+                                  </a>
+                                </div>
+                              )}
+                              {lead.phone_number && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-3 h-3" />
+                                  <a href={`tel:${lead.phone_number}`} className="hover:text-white">
+                                    {lead.phone_number}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Activity indicators */}
+                          <div className="flex items-center gap-2 text-xs">
+                            {lead.tags && lead.tags.length > 0 && (
+                              <span className="flex items-center gap-1 text-green-400">
+                                <Tag className="w-3 h-3" />
+                                {lead.tags.length}
+                              </span>
+                            )}
+                            {/* Add more activity indicators here based on available data */}
                           </div>
                         </div>
                       </td>
@@ -483,17 +616,28 @@ const Leads: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedLead(lead)
-                            setShowDetailModal(true)
-                          }}
-                        >
-                          Visa detaljer
-                        </Button>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditLead(lead)}
+                            className="text-slate-400 hover:text-blue-400 transition-colors p-2"
+                            title="Redigera lead"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleViewLead(lead)}
+                            className="text-slate-400 hover:text-purple-400 transition-colors p-2"
+                            title="Visa detaljer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -524,6 +668,47 @@ const Leads: React.FC = () => {
             // Uppdatera selectedLead med nya data från listan
             if (selectedLead?.id) {
               // Hämta uppdaterade lead-data direkt från databasen för att säkerställa att vi har senaste versionen
+              try {
+                const { data: updatedLead, error } = await supabase
+                  .from('leads')
+                  .select(`
+                    *,
+                    created_by_profile:profiles!leads_created_by_fkey(display_name, email),
+                    updated_by_profile:profiles!leads_updated_by_fkey(display_name, email)
+                  `)
+                  .eq('id', selectedLead.id)
+                  .single()
+                
+                if (!error && updatedLead) {
+                  setSelectedLead(updatedLead)
+                }
+              } catch (err) {
+                console.error('Failed to refresh selected lead:', err)
+              }
+            }
+          }}
+        />
+
+        <EditLeadModal
+          lead={selectedLead}
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false)
+            setSelectedLead(null)
+          }}
+          onSuccess={async () => {
+            // Optimistic update för bättre UX
+            if (selectedLead?.id) {
+              optimisticUpdateLead(selectedLead.id, { updated_at: new Date().toISOString() })
+            }
+            
+            setShowEditModal(false)
+            
+            // Uppdatera lead-listan
+            await fetchLeads()
+            
+            // Uppdatera selectedLead med nya data 
+            if (selectedLead?.id) {
               try {
                 const { data: updatedLead, error } = await supabase
                   .from('leads')
