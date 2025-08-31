@@ -29,7 +29,6 @@ import {
   ChevronDown,
   Activity,
   Building,
-  MapPin,
   Hash,
   ArrowUpDown,
   ArrowUp,
