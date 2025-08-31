@@ -249,14 +249,14 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
         </div>
       </div>
 
-      <div className="h-80">
+      <div className="min-h-80">
         {activeView === 'forecast' && (
-          <div>
+          <div className="space-y-4">
             <div className="mb-4">
               <p className="text-slate-400">Pipeline-prognos och sannolikhetsanalys</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Hot Leads */}
               <div className="flex items-center justify-between p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
                 <div className="flex items-center gap-3">
@@ -303,7 +303,7 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
               </div>
 
               {/* Forecast Summary */}
-              <div className="border-t border-slate-700 pt-4">
+              <div className="border-t border-slate-700 pt-3 mt-4">
                 <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
                   <div className="flex items-center gap-3">
                     <TrendingUp className="w-6 h-6 text-green-400" />
@@ -399,9 +399,9 @@ const LeadRevenueAnalytics: React.FC<LeadRevenueAnalyticsProps> = ({ data }) => 
         )}
       </div>
 
-      {/* Insights */}
-      <div className="mt-6 p-4 bg-slate-700/30 rounded-lg border border-slate-700">
-        <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+      {/* Insights - Separated with clear border and spacing */}
+      <div className="mt-8 p-4 bg-slate-700/30 rounded-lg border border-slate-700 clear-both">
+        <h4 className="text-white font-medium mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-yellow-400" />
           Insikter
         </h4>

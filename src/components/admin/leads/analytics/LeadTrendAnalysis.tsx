@@ -50,22 +50,29 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
   
   const { leadsByMonth, leadsBySource, leadsByStatus, revenueByMonth } = data
 
-  // Prepare data for volume trend chart
+  // Prepare data for volume trend chart - ensure we have data
   const volumeTrendData = Object.entries(leadsByMonth)
-    .sort(([a], [b]) => new Date(a + ' 1').getTime() - new Date(b + ' 1').getTime())
+    .sort(([a], [b]) => {
+      // Improved date parsing for Swedish month format
+      const dateA = new Date(a.includes(' ') ? a : `${a} 1`)
+      const dateB = new Date(b.includes(' ') ? b : `${b} 1`)
+      return dateA.getTime() - dateB.getTime()
+    })
     .map(([month, count]) => ({
-      month,
-      leads: count,
+      month: month.length > 10 ? month.substring(0, 10) : month, // Truncate long month names
+      leads: count || 0,
       revenue: revenueByMonth[month] || 0
     }))
+    .filter(item => item.leads > 0 || item.revenue > 0) // Only show months with data
 
-  // Prepare data for source performance
+  // Prepare data for source performance - ensure we have data
   const sourceData = Object.entries(leadsBySource)
+    .filter(([source, count]) => count > 0) // Filter out zero counts
     .map(([source, count]) => ({
-      source: source.length > 15 ? source.substring(0, 15) + '...' : source,
-      fullSource: source,
+      source: source.length > 15 ? source.substring(0, 15) + '...' : source || 'Okänd källa',
+      fullSource: source || 'Okänd källa',
       count,
-      percentage: ((count / data.totalLeads) * 100).toFixed(1)
+      percentage: data.totalLeads > 0 ? ((count / data.totalLeads) * 100).toFixed(1) : '0.0'
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8) // Top 8 sources
@@ -180,50 +187,62 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
           <div>
             <div className="mb-4">
               <p className="text-slate-400">Lead-volym och pipeline-värde över tid</p>
+              {volumeTrendData.length === 0 && (
+                <p className="text-slate-500 text-sm mt-2">Ingen data tillgänglig för vald tidsperiod</p>
+              )}
             </div>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsLineChart data={volumeTrendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#94a3b8"
-                  fontSize={12}
-                />
-                <YAxis 
-                  yAxisId="left"
-                  stroke="#94a3b8"
-                  fontSize={12}
-                />
-                <YAxis 
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="#94a3b8"
-                  fontSize={12}
-                  tickFormatter={formatCurrency}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Line 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="leads" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
-                  name="Leads"
-                />
-                <Line 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#22c55e" 
-                  strokeWidth={3}
-                  dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
-                  name="Pipeline-värde"
-                />
-              </RechartsLineChart>
-            </ResponsiveContainer>
+            {volumeTrendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart data={volumeTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#94a3b8"
+                    fontSize={12}
+                  />
+                  <YAxis 
+                    yAxisId="left"
+                    stroke="#94a3b8"
+                    fontSize={12}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#94a3b8"
+                    fontSize={12}
+                    tickFormatter={formatCurrency}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line 
+                    yAxisId="left"
+                    type="monotone" 
+                    dataKey="leads" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+                    name="Leads"
+                  />
+                  <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#22c55e" 
+                    strokeWidth={3}
+                    dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
+                    name="Pipeline-värde"
+                  />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="text-center">
+                  <LineChart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p>Ingen data att visa för vald tidsperiod</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -231,31 +250,43 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
           <div>
             <div className="mb-4">
               <p className="text-slate-400">Topp lead-källor efter volym</p>
+              {sourceData.length === 0 && (
+                <p className="text-slate-500 text-sm mt-2">Ingen källdata tillgänglig</p>
+              )}
             </div>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={sourceData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis 
-                  type="number"
-                  stroke="#94a3b8"
-                  fontSize={12}
-                />
-                <YAxis 
-                  type="category"
-                  dataKey="source" 
-                  stroke="#94a3b8"
-                  fontSize={12}
-                  width={100}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3b82f6"
-                  name="Antal leads"
-                  radius={[0, 4, 4, 0]}
-                />
-              </RechartsBarChart>
-            </ResponsiveContainer>
+            {sourceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={sourceData} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis 
+                    type="number"
+                    stroke="#94a3b8"
+                    fontSize={12}
+                  />
+                  <YAxis 
+                    type="category"
+                    dataKey="source" 
+                    stroke="#94a3b8"
+                    fontSize={12}
+                    width={100}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#3b82f6"
+                    name="Antal leads"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="text-center">
+                  <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p>Ingen källdata att visa</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -263,31 +294,43 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
           <div>
             <div className="mb-4">
               <p className="text-slate-400">Fördelning av lead-status</p>
+              {statusData.length === 0 && (
+                <p className="text-slate-500 text-sm mt-2">Ingen statusdata tillgänglig</p>
+              )}
             </div>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsPieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={120}
-                  dataKey="count"
-                  nameKey="status"
-                  label={({ status, percentage }) => `${status}: ${percentage}%`}
-                  labelLine={false}
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  wrapperStyle={{ color: '#94a3b8' }}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    dataKey="count"
+                    nameKey="status"
+                    label={({ status, percentage }) => `${status}: ${percentage}%`}
+                    labelLine={false}
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    wrapperStyle={{ color: '#94a3b8' }}
+                  />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="text-center">
+                  <PieChart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p>Ingen statusdata att visa</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

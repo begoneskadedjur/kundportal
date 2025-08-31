@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../../../lib/supabase'
 import { toast } from 'react-hot-toast'
+import { calculateLeadScore } from '../../../../types/database'
 
 import Card from '../../../ui/Card'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
@@ -97,20 +98,50 @@ const LeadTeamPerformance: React.FC<LeadTeamPerformanceProps> = ({ data }) => {
           .filter(lead => lead.status !== 'red_lost' && lead.estimated_value)
           .reduce((sum, lead) => sum + (lead.estimated_value || 0), 0)
 
-        // Calculate average lead score (simplified)
+        // Calculate average lead score using the actual calculateLeadScore function
         const leadScores = memberLeads.map(lead => {
-          // Simplified lead score calculation based on status
-          switch (lead.status) {
-            case 'green_deal': return 100
-            case 'orange_hot': return 75
-            case 'yellow_warm': return 50
-            case 'blue_cold': return 25
-            case 'red_lost': return 0
-            default: return 25
+          let score = 0
+          
+          // Try to use the imported calculateLeadScore function if available
+          try {
+            if (calculateLeadScore && typeof calculateLeadScore === 'function') {
+              score = calculateLeadScore(lead)
+            } else {
+              throw new Error('calculateLeadScore not available')
+            }
+          } catch (error) {
+            // Fallback: Enhanced lead score calculation
+            let baseScore = 0
+            switch (lead.status) {
+              case 'green_deal': baseScore = 100; break
+              case 'orange_hot': baseScore = 85; break
+              case 'yellow_warm': baseScore = 60; break
+              case 'blue_cold': baseScore = 35; break
+              case 'red_lost': baseScore = 0; break
+              default: baseScore = 30; break
+            }
+            
+            // Add bonus points for estimated value
+            if (lead.estimated_value && lead.estimated_value > 0) {
+              baseScore += Math.min(15, Math.floor(lead.estimated_value / 10000))
+            }
+            
+            // Bonus for recent activity (within last 7 days)
+            if (lead.updated_at) {
+              const daysSinceUpdate = (Date.now() - new Date(lead.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+              if (daysSinceUpdate <= 7) {
+                baseScore += 5
+              }
+            }
+            
+            score = Math.min(100, baseScore)
           }
+          
+          return score
         })
+        
         const avgLeadScore = leadScores.length > 0 ? 
-          leadScores.reduce((sum, score) => sum + score, 0) / leadScores.length : 0
+          Math.round(leadScores.reduce((sum, score) => sum + score, 0) / leadScores.length) : 0
 
         // Get last activity date
         const lastActivity = memberLeads.length > 0 ? 

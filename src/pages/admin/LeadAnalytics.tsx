@@ -76,7 +76,7 @@ const LeadAnalytics: React.FC = () => {
       const daysBack = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365
       const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000))
 
-      // Fetch leads data with relations
+      // Fetch leads data with relations and better error handling
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
         .select(`
@@ -99,10 +99,28 @@ const LeadAnalytics: React.FC = () => {
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false })
 
-      if (leadsError) throw leadsError
+      if (leadsError) {
+        console.error('Supabase error details:', leadsError)
+        throw new Error(`Database error: ${leadsError.message}`)
+      }
 
-      // Process analytics data
-      const processedData = processAnalyticsData(leads || [])
+      // Validate and clean the data
+      const validLeads = (leads || []).filter(lead => {
+        if (!lead.id) {
+          console.warn('Lead without ID found, skipping')
+          return false
+        }
+        if (!lead.created_at) {
+          console.warn('Lead without created_at found:', lead.id)
+          return false
+        }
+        return true
+      })
+
+      console.log(`Processed ${validLeads.length} valid leads out of ${(leads || []).length} total leads`)
+
+      // Process analytics data with validated leads
+      const processedData = processAnalyticsData(validLeads)
       setAnalyticsData(processedData)
     } catch (err) {
       console.error('Error fetching analytics data:', err)
@@ -118,47 +136,91 @@ const LeadAnalytics: React.FC = () => {
     // Calculate basic metrics
     const totalLeads = leads.length
     const dealsWon = leads.filter(lead => lead.status === 'green_deal').length
-    const conversionRate = totalLeads > 0 ? (dealsWon / totalLeads) * 100 : 0
+    const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100 * 100) / 100 : 0 // Round to 2 decimals
     
     const totalPipelineValue = leads
       .filter(lead => lead.status !== 'red_lost' && lead.estimated_value)
       .reduce((sum, lead) => sum + (lead.estimated_value || 0), 0)
 
-    // Calculate average lead score
-    const leadScores = leads.map(lead => calculateLeadScore(lead))
-    const avgLeadScore = leadScores.length > 0 ? leadScores.reduce((sum, score) => sum + score, 0) / leadScores.length : 0
+    // Calculate average lead score with error handling
+    let avgLeadScore = 0
+    try {
+      const leadScores = leads.map(lead => calculateLeadScore(lead)).filter(score => !isNaN(score))
+      avgLeadScore = leadScores.length > 0 ? 
+        Math.round(leadScores.reduce((sum, score) => sum + score, 0) / leadScores.length) : 0
+    } catch (error) {
+      console.warn('Error calculating lead scores, using fallback:', error)
+      // Fallback scoring based on status
+      const validLeads = leads.filter(lead => lead.status)
+      avgLeadScore = validLeads.length > 0 ? 
+        Math.round(validLeads.reduce((sum, lead) => {
+          switch (lead.status) {
+            case 'green_deal': return sum + 100
+            case 'orange_hot': return sum + 85
+            case 'yellow_warm': return sum + 60
+            case 'blue_cold': return sum + 35
+            case 'red_lost': return sum + 0
+            default: return sum + 30
+          }
+        }, 0) / validLeads.length) : 0
+    }
 
-    // Group by status
+    // Group by status with validation
     const leadsByStatus = leads.reduce((acc, lead) => {
-      acc[lead.status] = (acc[lead.status] || 0) + 1
+      const status = lead.status || 'unknown'
+      acc[status] = (acc[status] || 0) + 1
       return acc
     }, {} as Record<string, number>)
 
-    // Group by source
+    // Group by source with validation
     const leadsBySource = leads.reduce((acc, lead) => {
       const source = lead.source || 'Okänd'
       acc[source] = (acc[source] || 0) + 1
       return acc
     }, {} as Record<string, number>)
 
-    // Group by month
+    // Group by month with improved date handling
     const leadsByMonth = leads.reduce((acc, lead) => {
-      const month = new Date(lead.created_at).toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
-      acc[month] = (acc[month] || 0) + 1
+      try {
+        const date = new Date(lead.created_at)
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid date for lead:', lead.id)
+          return acc
+        }
+        const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
+        acc[month] = (acc[month] || 0) + 1
+      } catch (error) {
+        console.warn('Error processing date for lead:', lead.id, error)
+      }
       return acc
     }, {} as Record<string, number>)
 
-    // Team performance (placeholder)
-    const teamPerformance = {}
+    // Team performance (placeholder, but with structure)
+    const teamPerformance = {
+      totalMembers: 0,
+      avgConversionRate: 0,
+      topPerformer: null
+    }
 
-    // Geographic data (placeholder)
-    const geographicData = {}
+    // Geographic data (placeholder with structure)
+    const geographicData = {
+      totalRegions: 0,
+      topRegion: null
+    }
 
-    // Revenue by month
+    // Revenue by month with improved validation
     const revenueByMonth = leads.reduce((acc, lead) => {
       if (lead.estimated_value && lead.status !== 'red_lost') {
-        const month = new Date(lead.created_at).toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
-        acc[month] = (acc[month] || 0) + lead.estimated_value
+        try {
+          const date = new Date(lead.created_at)
+          if (isNaN(date.getTime())) {
+            return acc
+          }
+          const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
+          acc[month] = (acc[month] || 0) + lead.estimated_value
+        } catch (error) {
+          console.warn('Error processing revenue date for lead:', lead.id, error)
+        }
       }
       return acc
     }, {} as Record<string, number>)
