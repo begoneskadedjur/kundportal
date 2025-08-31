@@ -195,7 +195,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               id,
               name,
               email,
-              phone
+              phone_number
             )
           `)
           .eq('lead_id', leadToFetch.id)

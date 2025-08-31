@@ -368,7 +368,9 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-sm text-slate-400">
                       <User className="w-3 h-3" />
-                      {comment.created_by_profile?.display_name || 'Okänd användare'}
+                      {comment.created_by_profile?.display_name || 
+                       comment.created_by_profile?.email || 
+                       'Okänd användare'}
                       <Clock className="w-3 h-3 ml-2" />
                       {formatDate(comment.created_at)}
                     </div>
@@ -400,7 +402,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
                 {comment.content}
               </div>
               
-              {comment.updated_at !== comment.created_at && (
+              {comment.updated_at && comment.updated_at !== comment.created_at && (
                 <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
                   <Edit3 className="w-3 h-3" />
                   Redigerad {formatDate(comment.updated_at)}

@@ -137,6 +137,19 @@ const Leads: React.FC = () => {
           }, 500)
         }
       )
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_technicians'
+        },
+        (payload) => {
+          // Refresh leads when technician assignments change
+          setTimeout(() => {
+            fetchLeads()
+          }, 500)
+        }
+      )
       .subscribe()
 
     return () => {
@@ -158,7 +171,17 @@ const Leads: React.FC = () => {
         .select(`
           *,
           created_by_profile:profiles!leads_created_by_fkey(display_name, email),
-          updated_by_profile:profiles!leads_updated_by_fkey(display_name, email)
+          updated_by_profile:profiles!leads_updated_by_fkey(display_name, email),
+          lead_technicians(
+            id,
+            is_primary,
+            assigned_at,
+            technicians:technician_id(
+              id,
+              name,
+              email
+            )
+          )
         `)
         .order('created_at', { ascending: false })
 
@@ -587,10 +610,21 @@ const Leads: React.FC = () => {
                         )}
                       </td>
                       <td className="p-4">
-                        {lead.assigned_to && technicians[lead.assigned_to] ? (
-                          <div className="text-sm">
-                            <div className="text-white">{technicians[lead.assigned_to]}</div>
-                            <div className="text-slate-400 text-xs">Tilldelad</div>
+                        {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
+                          <div className="text-sm space-y-1">
+                            {lead.lead_technicians.map((assignment) => (
+                              <div key={assignment.id} className="flex items-center gap-2">
+                                <div className="text-white">
+                                  {assignment.technicians?.name || 'Okänd kollega'}
+                                </div>
+                                {assignment.is_primary && (
+                                  <Star className="w-3 h-3 text-yellow-400" title="Primär kollega" />
+                                )}
+                              </div>
+                            ))}
+                            <div className="text-slate-400 text-xs">
+                              {lead.lead_technicians.length} kollega{lead.lead_technicians.length !== 1 ? 'r' : ''}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-slate-400">Ej tilldelad</span>
