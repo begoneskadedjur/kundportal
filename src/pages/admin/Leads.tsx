@@ -606,7 +606,7 @@ const Leads: React.FC = () => {
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-48"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-48"
                       onClick={() => handleSort('company_name')}
                     >
                       <div className="flex items-center gap-2">
@@ -614,9 +614,9 @@ const Leads: React.FC = () => {
                         {getSortIcon('company_name')}
                       </div>
                     </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-40">Kontakt</th>
+                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-40">Kontakt</th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-2">
@@ -625,7 +625,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-20"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-20"
                       onClick={() => handleSort('priority')}
                     >
                       <div className="flex items-center gap-2">
@@ -634,7 +634,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
                       onClick={() => handleSort('lead_score')}
                       title={`Lead Score Kalkyl (0-100 poäng):
 
@@ -666,14 +666,14 @@ const Leads: React.FC = () => {
                         {getSortIcon('lead_score')}
                       </div>
                     </th>
-                    <th className="text-left p-3 text-sm font-medium text-slate-300 w-36">
+                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-36">
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-green-400" />
                         Tilldelade kollegor
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
                       onClick={() => handleSort('estimated_value')}
                     >
                       <div className="flex items-center gap-2">
@@ -682,7 +682,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
                       onClick={() => handleSort('updated_at')}
                     >
                       <div className="flex items-center gap-2">
@@ -690,7 +690,7 @@ const Leads: React.FC = () => {
                         {getSortIcon('updated_at')}
                       </div>
                     </th>
-                    <th className="text-center p-3 text-sm font-medium text-slate-300 w-20">Åtgärder</th>
+                    <th className="text-center p-2.5 text-sm font-medium text-slate-300 w-20">Åtgärder</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
@@ -703,7 +703,7 @@ const Leads: React.FC = () => {
                           lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
                         }`}
                       >
-                      <td className="p-3">
+                      <td className="p-2.5">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="text-sm font-medium text-white">{lead.company_name}</div>
@@ -724,8 +724,8 @@ const Leads: React.FC = () => {
                           </Button>
                         </div>
                       </td>
-                      <td className="p-3">
-                        <div className="space-y-2">
+                      <td className="p-2.5">
+                        <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-slate-400" />
                             <span className="text-sm font-medium text-white">{lead.contact_person}</span>
@@ -764,10 +764,10 @@ const Leads: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-2.5">
                         {getStatusBadge(lead.status)}
                       </td>
-                      <td className="p-3 hidden lg:table-cell">
+                      <td className="p-2.5 hidden lg:table-cell">
                         {lead.priority ? (
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
                             <Star className="w-3 h-3 mr-1" />
@@ -777,9 +777,9 @@ const Leads: React.FC = () => {
                           <span className="text-slate-400 text-xs">-</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-2.5">
                         <div className="text-sm">
-                          <div className="font-mono text-lg font-bold text-white">
+                          <div className="font-mono text-base font-bold text-white">
                             {calculateLeadScore(lead)}
                           </div>
                           <div className="text-xs text-slate-400">
@@ -788,7 +788,7 @@ const Leads: React.FC = () => {
                         </div>
                       </td>
                       {/* Tilldelade kollegor Column */}
-                      <td className="p-3">
+                      <td className="p-2.5">
                         <div className="flex items-center gap-1">
                           {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
                             <div className="flex items-center gap-1 flex-wrap">
@@ -814,7 +814,7 @@ const Leads: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-2.5">
                         {lead.estimated_value ? (
                           <div className="text-sm">
                             <div className="text-white font-mono">{formatCurrency(lead.estimated_value)}</div>
@@ -826,7 +826,7 @@ const Leads: React.FC = () => {
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-2.5">
                         <div className="text-sm text-white" 
                              title={`${formatDate(lead.updated_at)} av ${lead.updated_by_profile?.display_name || 
                                      lead.updated_by_profile?.email || 
@@ -838,7 +838,7 @@ const Leads: React.FC = () => {
                           })}
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-2.5">
                         <div className="flex flex-col gap-1 items-center justify-center">
                           <Button
                             size="sm"
@@ -865,69 +865,69 @@ const Leads: React.FC = () => {
                     {/* Expanderbar rad för intern information */}
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
-                        <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <td colSpan={9} className="p-3 border-l-2 border-l-purple-400">
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
                             {/* Leverantör/Affärsinfo sektion */}
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                                <Building className="w-4 h-4 text-blue-400" />
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                <Building className="w-3.5 h-3.5 text-blue-400" />
                                 Affärsinformation
                               </h4>
-                              <div className="space-y-2">
-                                <div>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center">
                                   <span className="text-slate-400 text-xs">Nuvarande Leverantör:</span>
-                                  <div className="text-white text-sm">
+                                  <span className="text-white text-xs font-medium">
                                     {lead.contract_with || 'Ingen registrerad'}
-                                  </div>
+                                  </span>
                                 </div>
                                 {lead.contract_expires && (
-                                  <div>
+                                  <div className="flex justify-between items-center">
                                     <span className="text-slate-400 text-xs">Avtal löper ut:</span>
-                                    <div className="text-white text-sm">
+                                    <span className="text-white text-xs font-medium">
                                       {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
-                                    </div>
+                                    </span>
                                   </div>
                                 )}
                                 {lead.company_size && (
-                                  <div>
+                                  <div className="flex justify-between items-center">
                                     <span className="text-slate-400 text-xs">Företagsstorlek:</span>
-                                    <div className="text-white text-sm">
+                                    <span className="text-white text-xs font-medium">
                                       {COMPANY_SIZE_DISPLAY[lead.company_size]?.label || lead.company_size}
-                                    </div>
+                                    </span>
                                   </div>
                                 )}
                               </div>
                             </div>
 
                             {/* Aktivitetsdetaljer sektion */}
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-purple-400" />
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                <Activity className="w-3.5 h-3.5 text-purple-400" />
                                 Aktivitetssammanfattning
                               </h4>
-                              <div className="space-y-2">
-                                <div className="flex justify-between">
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center">
                                   <span className="text-slate-400 text-xs">Kommentarer:</span>
-                                  <span className="text-white text-sm font-medium">
+                                  <span className="text-white text-xs font-medium">
                                     {lead.lead_comments?.[0]?.count || 0}
                                   </span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                   <span className="text-slate-400 text-xs">Händelser:</span>
-                                  <span className="text-white text-sm font-medium">
+                                  <span className="text-white text-xs font-medium">
                                     {lead.lead_events?.[0]?.count || 0}
                                   </span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                   <span className="text-slate-400 text-xs">Skapad:</span>
-                                  <span className="text-white text-sm">
+                                  <span className="text-white text-xs font-medium">
                                     {new Date(lead.created_at).toLocaleDateString('sv-SE')}
                                   </span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                   <span className="text-slate-400 text-xs">Senast uppdaterad:</span>
-                                  <span className="text-white text-sm">
+                                  <span className="text-white text-xs font-medium">
                                     {formatDate(lead.updated_at)}
                                   </span>
                                 </div>
