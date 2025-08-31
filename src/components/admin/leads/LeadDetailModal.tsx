@@ -1,7 +1,7 @@
 // src/components/admin/leads/LeadDetailModal.tsx - Detailed lead view with all related components
 
 import React, { useState, useEffect } from 'react'
-import { Eye, Edit3, X, Star, TrendingUp, Users, MessageSquare, Clock, Tag, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, FileContract, Factory } from 'lucide-react'
+import { Eye, Edit3, X, Star, TrendingUp, Users, MessageSquare, Clock, Tag, Phone, Mail, Building, Calendar, FileText, Globe, MapPin, Briefcase, Factory } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Card from '../../ui/Card'
@@ -562,7 +562,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               {(currentLead.contract_status || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FileContract className="w-5 h-5 text-yellow-400" />
+                    <FileText className="w-5 h-5 text-yellow-400" />
                     Avtalsinfo
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">

@@ -53,7 +53,8 @@
       "WebFetch(domain:supabase.com)",
       "mcp__supabase__deploy_edge_function",
       "WebFetch(domain:localhost)",
-      "mcp__supabase__generate_typescript_types"
+      "mcp__supabase__generate_typescript_types",
+      "WebSearch"
     ],
     "deny": [],
     "additionalDirectories": [
