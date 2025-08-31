@@ -361,38 +361,38 @@ const Leads: React.FC = () => {
   const getPriorityIndicator = (priority: LeadPriority | null) => {
     if (!priority) {
       return (
-        <div className="flex items-center justify-center w-6 h-6" title="Ej angiven">
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-        </div>
+        <span className="text-xs text-slate-400" title="Ej angiven">
+          Ej angiven
+        </span>
       )
     }
 
     const config = getPriorityColor(priority)
     const label = getPriorityLabel(priority)
     
-    // Use different icons based on priority level
-    const getIcon = () => {
+    // Get priority color classes based on priority level
+    const getColorClass = () => {
       switch (priority) {
         case 'urgent':
-          return <Flame className="w-4 h-4" />
+          return 'text-red-400'
         case 'high':
-          return <Star className="w-4 h-4" />
+          return 'text-orange-400'
         case 'medium':
-          return <Clock className="w-4 h-4" />
+          return 'text-yellow-400'
         case 'low':
-          return <CheckCircle className="w-4 h-4" />
+          return 'text-green-400'
         default:
-          return <Star className="w-4 h-4" />
+          return 'text-slate-400'
       }
     }
 
     return (
-      <div 
-        className={`flex items-center justify-center w-6 h-6 rounded-full bg-${config}/20 text-${config} border border-${config}/30`}
+      <span 
+        className={`text-xs font-medium ${getColorClass()}`}
         title={label}
       >
-        {getIcon()}
-      </div>
+        {label}
+      </span>
     )
   }
 
@@ -672,7 +672,7 @@ const Leads: React.FC = () => {
                       title="Prioritet: Urgent (🔥) | Hög (⭐) | Medium (🕐) | Låg (✅)"
                     >
                       <div className="flex items-center justify-center gap-1">
-                        <Star className="w-4 h-4" />
+                        Prioritet
                         {getSortIcon('priority')}
                       </div>
                     </th>
@@ -827,23 +827,18 @@ const Leads: React.FC = () => {
                       </td>
                       {/* Tilldelade kollegor Column */}
                       <td className="p-2.5 hidden xl:table-cell">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-col gap-1">
                           {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {lead.lead_technicians.slice(0, 1).map((assignment, idx) => (
-                                <div key={assignment.id} className="flex items-center gap-1">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
-                                  }`}></div>
-                                  <span className="text-white text-xs truncate">
-                                    {assignment.technicians?.name?.split(' ')[0]}
-                                  </span>
-                                </div>
-                              ))}
-                              {lead.lead_technicians.length > 1 && (
-                                <span className="text-slate-400 text-xs">+{lead.lead_technicians.length - 1}</span>
-                              )}
-                            </div>
+                            lead.lead_technicians.map((assignment, idx) => (
+                              <div key={assignment.id} className="flex items-center gap-1">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                }`}></div>
+                                <span className="text-white text-xs truncate">
+                                  {assignment.technicians?.name?.split(' ')[0]}
+                                </span>
+                              </div>
+                            ))
                           ) : (
                             <span className="text-slate-400 text-xs italic">Ej tilldelad</span>
                           )}
