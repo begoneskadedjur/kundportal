@@ -325,7 +325,7 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/customers"
                   icon={Users}
                   title="Avtalsöversikt"
-                  description="Skickade & bearbetade avtalsförslag, 9 aktiva kunder"
+                  description="Skickade & bearbetade avtalsförslag"
                   stats={`${stats?.totalCustomers} aktiva kunder`}
                   tag="Pipeline"
                   iconColor="text-[#20c58f]"
@@ -389,7 +389,7 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/technicians"
                   icon={BarChart3}
                   title="Tekniker Statistik"
-                  description="Prestanda & ranking, 5 aktiva tekniker"
+                  description="Prestanda & ranking"
                   stats={`${stats?.activeTechnicians} aktiva tekniker`}
                   tag="Detaljerad data"
                   iconColor="text-blue-400"
@@ -399,7 +399,7 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/economics"
                   icon={TrendingUp}
                   title="Ekonomisk Översikt"
-                  description="Intäktsanalys & KPI, 3 941 575 kr"
+                  description="Intäktsanalys & KPI"
                   stats={formatCurrency(stats?.totalRevenue || 0)}
                   tag="Detaljerad data"
                   iconColor="text-green-400"
@@ -423,7 +423,7 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/organisation/organizations"
                   icon={Building2}
                   title="Kundkonton"
-                  description="Hantera kundkonton & användare, Hantering av både multi-site kunder & vanliga avtalskunder, 0 organisationer"
+                  description="Hantera kundkonton & användare, Hantering av både multi-site kunder & vanliga avtalskunder"
                   stats="0 organisationer"
                   tag="Kundkonton"
                   iconColor="text-purple-400"
@@ -462,7 +462,7 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/billing"
                   icon={DollarSign}
                   title="Fakturering"
-                  description="Sluthantering av avslutade ärenden, 462 ärenden"
+                  description="Sluthantering av avslutade ärenden"
                   stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
                   tag="Fakturering"
                   iconColor="text-yellow-400"
