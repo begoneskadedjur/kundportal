@@ -219,8 +219,8 @@ const LeadAnalytics: React.FC = () => {
           console.warn('Invalid date for lead:', lead.id, 'date:', lead.created_at)
           return acc
         }
-        // FIXED: Remove period from month format to match LeadTrendAnalysis parser
-        const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' }).replace('.', '')
+        // FIXED: Use same format as MonthlyRevenueChart (short month + 2-digit year)
+        const month = date.toLocaleDateString('sv-SE', { year: '2-digit', month: 'short' }).replace('.', '')
         acc[month] = (acc[month] || 0) + 1
         console.log('Processed lead date:', lead.created_at, '-> month key:', month)
       } catch (error) {
@@ -252,7 +252,7 @@ const LeadAnalytics: React.FC = () => {
           if (isNaN(date.getTime())) {
             return acc
           }
-          const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' }).replace('.', '')
+          const month = date.toLocaleDateString('sv-SE', { year: '2-digit', month: 'short' }).replace('.', '')
           acc[month] = (acc[month] || 0) + lead.estimated_value
           console.log('Revenue processing:', {
             leadId: lead.id,

@@ -70,28 +70,30 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
         let dateA, dateB
         
         if (a.includes(' ')) {
-          // Swedish format: "jan 2024"
-          const [monthStr, year] = a.split(' ')
+          // Swedish format: "jan 24" or "jan 2024"
+          const [monthStr, yearStr] = a.split(' ')
+          const year = yearStr.length === 2 ? 2000 + parseInt(yearStr) : parseInt(yearStr)
           const monthMap: Record<string, number> = {
             'jan': 0, 'jan.': 0, 'feb': 1, 'feb.': 1, 'mar': 2, 'mar.': 2, 
             'apr': 3, 'apr.': 3, 'maj': 4, 'maj.': 4, 'jun': 5, 'jun.': 5,
             'jul': 6, 'jul.': 6, 'aug': 7, 'aug.': 7, 'sep': 8, 'sep.': 8, 
             'okt': 9, 'okt.': 9, 'nov': 10, 'nov.': 10, 'dec': 11, 'dec.': 11
           }
-          dateA = new Date(parseInt(year), monthMap[monthStr.toLowerCase()] || 0, 1)
+          dateA = new Date(year, monthMap[monthStr.toLowerCase()] || 0, 1)
         } else {
           dateA = new Date(a.includes('-') ? a + '-01' : `${a}-01-01`)
         }
         
         if (b.includes(' ')) {
-          const [monthStr, year] = b.split(' ')
+          const [monthStr, yearStr] = b.split(' ')
+          const year = yearStr.length === 2 ? 2000 + parseInt(yearStr) : parseInt(yearStr)
           const monthMap: Record<string, number> = {
             'jan': 0, 'jan.': 0, 'feb': 1, 'feb.': 1, 'mar': 2, 'mar.': 2, 
             'apr': 3, 'apr.': 3, 'maj': 4, 'maj.': 4, 'jun': 5, 'jun.': 5,
             'jul': 6, 'jul.': 6, 'aug': 7, 'aug.': 7, 'sep': 8, 'sep.': 8, 
             'okt': 9, 'okt.': 9, 'nov': 10, 'nov.': 10, 'dec': 11, 'dec.': 11
           }
-          dateB = new Date(parseInt(year), monthMap[monthStr.toLowerCase()] || 0, 1)
+          dateB = new Date(year, monthMap[monthStr.toLowerCase()] || 0, 1)
         } else {
           dateB = new Date(b.includes('-') ? b + '-01' : `${b}-01-01`)
         }
@@ -111,6 +113,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     .filter(item => item.leads > 0) // Show any month with leads, revenue is optional
 
   console.log('✅ Final volumeTrendData after processing:', volumeTrendData)
+  console.log('📊 DETAILED volumeTrendData:', JSON.stringify(volumeTrendData, null, 2))
 
   // Debug source data
   console.log('🔍 Source Data Debug:', {
@@ -133,6 +136,8 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     })
     .sort((a, b) => b.count - a.count)
     .slice(0, 8) // Top 8 sources
+
+  console.log('📊 DETAILED sourceData:', JSON.stringify(sourceData, null, 2))
 
   // Debug status data
   console.log('🔍 Status Data Debug:', {
@@ -180,6 +185,8 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     }
   }).filter(item => item.count > 0) // Only show statuses that have leads
 
+  console.log('📊 DETAILED statusData:', JSON.stringify(statusData, null, 2))
+
   const CHART_COLORS = ['#3b82f6', '#eab308', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b']
 
   // Custom tooltip for charts
@@ -210,7 +217,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 p-6">
+    <Card className="p-6">
       <div className="mb-6">
         <h3 className="text-xl font-semibold text-white flex items-center gap-3 mb-4">
           <TrendingUp className="w-6 h-6 text-purple-400" />
@@ -249,7 +256,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
         </div>
       </div>
 
-      <div className="h-96">
+      <div className="h-80">
         {activeChart === 'volume' && (
           <div>
             <div className="mb-4">
@@ -267,7 +274,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {volumeTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={320}>
                 <RechartsLineChart data={volumeTrendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis 
@@ -338,7 +345,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {sourceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={320}>
                 <RechartsBarChart data={sourceData} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis 
@@ -390,7 +397,7 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
               )}
             </div>
             {statusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={320}>
                 <RechartsPieChart>
                   <Pie
                     data={statusData}
