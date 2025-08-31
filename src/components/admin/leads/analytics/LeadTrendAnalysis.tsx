@@ -50,16 +50,6 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
   
   const { leadsByMonth, leadsBySource, leadsByStatus, revenueByMonth } = data
 
-  // Debug: Log raw data to identify issues
-  console.log('🔍 LeadTrendAnalysis Debug Data:', {
-    totalLeads: data.totalLeads,
-    leadsByMonth: Object.keys(leadsByMonth).length,
-    leadsByMonthEntries: leadsByMonth,
-    revenueByMonth: Object.keys(revenueByMonth).length,
-    revenueEntries: revenueByMonth
-  })
-
-  console.log('🔍 Month keys received:', Object.keys(leadsByMonth))
 
   // Prepare data for volume trend chart - ensure we have data
   const volumeTrendData = Object.entries(leadsByMonth)
@@ -112,14 +102,6 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     // CRITICAL FIX: Show months that have leads even if no revenue
     .filter(item => item.leads > 0) // Show any month with leads, revenue is optional
 
-  console.log('✅ Final volumeTrendData after processing:', volumeTrendData)
-  console.log('📊 DETAILED volumeTrendData:', JSON.stringify(volumeTrendData, null, 2))
-
-  // Debug source data
-  console.log('🔍 Source Data Debug:', {
-    leadsBySourceEntries: Object.entries(leadsBySource),
-    totalLeads: data.totalLeads
-  })
 
   // Prepare data for source performance - ensure we have data
   const sourceData = Object.entries(leadsBySource)
@@ -137,13 +119,6 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8) // Top 8 sources
 
-  console.log('📊 DETAILED sourceData:', JSON.stringify(sourceData, null, 2))
-
-  // Debug status data
-  console.log('🔍 Status Data Debug:', {
-    leadsByStatusEntries: Object.entries(leadsByStatus),
-    totalLeads: data.totalLeads
-  })
 
   // Prepare data for status distribution - show all statuses for better insight
   const statusData = Object.entries(leadsByStatus).map(([status, count]) => {
@@ -184,8 +159,6 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
       color
     }
   }).filter(item => item.count > 0) // Only show statuses that have leads
-
-  console.log('📊 DETAILED statusData:', JSON.stringify(statusData, null, 2))
 
   const CHART_COLORS = ['#3b82f6', '#eab308', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b']
 
