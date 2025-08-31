@@ -704,24 +704,24 @@ const Leads: React.FC = () => {
                         }`}
                       >
                       <td className="p-2.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-white">{lead.company_name}</div>
-                            {lead.organization_number && (
-                              <div className="text-xs text-slate-400">{lead.organization_number}</div>
-                            )}
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-white">{lead.company_name}</div>
+                          {lead.organization_number && (
+                            <div className="text-xs text-slate-400">{lead.organization_number}</div>
+                          )}
+                          <div className="flex justify-start">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => toggleExpandRow(lead.id)}
+                              className="text-slate-400 hover:text-white p-1 -ml-1"
+                              title="Visa mer information"
+                            >
+                              <ChevronDown className={`w-3 h-3 transition-transform ${
+                                expandedRows.has(lead.id) ? 'rotate-180' : ''
+                              }`} />
+                            </Button>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => toggleExpandRow(lead.id)}
-                            className="text-slate-400 hover:text-white p-1 ml-2"
-                            title="Visa mer information"
-                          >
-                            <ChevronDown className={`w-3 h-3 transition-transform ${
-                              expandedRows.has(lead.id) ? 'rotate-180' : ''
-                            }`} />
-                          </Button>
                         </div>
                       </td>
                       <td className="p-2.5">
@@ -865,34 +865,34 @@ const Leads: React.FC = () => {
                     {/* Expanderbar rad för intern information */}
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
-                        <td colSpan={9} className="p-3 border-l-2 border-l-purple-400">
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <td colSpan={9} className="px-2 py-2 border-l-2 border-l-purple-400">
+                          <div className="grid grid-cols-2 gap-3 max-w-4xl">
 
-                            {/* Leverantör/Affärsinfo sektion */}
-                            <div className="space-y-2">
-                              <h4 className="text-xs font-semibold text-white flex items-center gap-1.5">
-                                <Building className="w-3.5 h-3.5 text-blue-400" />
+                            {/* Leverantör/Affärsinfo sektion - kompakt */}
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-semibold text-white flex items-center gap-1">
+                                <Building className="w-3 h-3 text-blue-400" />
                                 Affärsinformation
                               </h4>
-                              <div className="space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-xs">Nuvarande Leverantör:</span>
-                                  <span className="text-white text-xs font-medium">
-                                    {lead.contract_with || 'Ingen registrerad'}
+                              <div className="space-y-0.5 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Leverantör:</span>
+                                  <span className="text-white font-medium ml-2 truncate">
+                                    {lead.contract_with || 'Ingen'}
                                   </span>
                                 </div>
                                 {lead.contract_expires && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-slate-400 text-xs">Avtal löper ut:</span>
-                                    <span className="text-white text-xs font-medium">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Avtal ut:</span>
+                                    <span className="text-white font-medium ml-2">
                                       {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
                                     </span>
                                   </div>
                                 )}
                                 {lead.company_size && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-slate-400 text-xs">Företagsstorlek:</span>
-                                    <span className="text-white text-xs font-medium">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Storlek:</span>
+                                    <span className="text-white font-medium ml-2">
                                       {COMPANY_SIZE_DISPLAY[lead.company_size]?.label || lead.company_size}
                                     </span>
                                   </div>
@@ -900,35 +900,29 @@ const Leads: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Aktivitetsdetaljer sektion */}
-                            <div className="space-y-2">
-                              <h4 className="text-xs font-semibold text-white flex items-center gap-1.5">
-                                <Activity className="w-3.5 h-3.5 text-purple-400" />
-                                Aktivitetssammanfattning
+                            {/* Aktivitetsdetaljer sektion - kompakt */}
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-semibold text-white flex items-center gap-1">
+                                <Activity className="w-3 h-3 text-purple-400" />
+                                Aktivitet
                               </h4>
-                              <div className="space-y-1.5">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-xs">Kommentarer:</span>
-                                  <span className="text-white text-xs font-medium">
+                              <div className="space-y-0.5 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Kommentarer:</span>
+                                  <span className="text-white font-medium">
                                     {lead.lead_comments?.[0]?.count || 0}
                                   </span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-xs">Händelser:</span>
-                                  <span className="text-white text-xs font-medium">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Händelser:</span>
+                                  <span className="text-white font-medium">
                                     {lead.lead_events?.[0]?.count || 0}
                                   </span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-xs">Skapad:</span>
-                                  <span className="text-white text-xs font-medium">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Skapad:</span>
+                                  <span className="text-white font-medium">
                                     {new Date(lead.created_at).toLocaleDateString('sv-SE')}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-slate-400 text-xs">Senast uppdaterad:</span>
-                                  <span className="text-white text-xs font-medium">
-                                    {formatDate(lead.updated_at)}
                                   </span>
                                 </div>
                               </div>
