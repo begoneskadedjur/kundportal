@@ -288,7 +288,10 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('sv-SE', {
+    if (!dateString) return 'Ej angivet'
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'Ogiltigt datum'
+    return date.toLocaleDateString('sv-SE', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -531,10 +534,15 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   {/* SNI Classification */}
                   {currentLead.sni07_label && (
                     <div className="mb-6">
-                      <div className="text-slate-300 font-medium mb-2">SNI-kod (Branschklassning)</div>
-                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
-                        {currentLead.sni07_label.split(',').map((sni, index) => (
-                          <div key={index} className="py-1">{sni.trim()}</div>
+                      <div className="text-slate-300 font-medium mb-2 flex items-center gap-1">
+                        <Factory className="w-4 h-4" />
+                        SNI-kod (Branschklassning)
+                      </div>
+                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 space-y-1">
+                        {currentLead.sni07_label.split(/[,;]/).filter(sni => sni.trim()).map((sni, index) => (
+                          <div key={index} className="text-sm leading-relaxed border-l-2 border-blue-400/30 pl-3">
+                            {sni.trim()}
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -555,12 +563,6 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                           <div>
                             <div className="text-slate-300 font-medium">Beslutsfattare</div>
                             <div className="text-white">{currentLead.decision_maker}</div>
-                          </div>
-                        )}
-                        {currentLead.contract_with && (
-                          <div>
-                            <div className="text-slate-300 font-medium">Nuvarande leverantör</div>
-                            <div className="text-white">{currentLead.contract_with}</div>
                           </div>
                         )}
                       </div>
@@ -610,25 +612,41 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               )}
 
               {/* Contract Information Section */}
-              {(currentLead.contract_status || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || technician) && (
+              {(currentLead.contract_status !== null || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || currentLead.contract_with || assignedTechnicians.length > 0 || technician) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-yellow-400" />
                     Avtalsinfo
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    {currentLead.contract_status && (
+                  
+                  {/* Contract Status Section */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
+                    {currentLead.contract_status !== null && (
                       <div>
-                        <div className="text-slate-300 font-medium">Avtalsstatus</div>
-                        <div className="text-white">{currentLead.contract_status}</div>
+                        <div className="text-slate-300 font-medium">Befintligt avtal hos kunden</div>
+                        <div className={`font-medium ${currentLead.contract_status ? 'text-green-400' : 'text-red-400'}`}>
+                          {currentLead.contract_status ? 'Ja' : 'Nej'}
+                        </div>
                       </div>
                     )}
+                    
+                    {currentLead.contract_with && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Nuvarande leverantör</div>
+                        <div className="text-white">{currentLead.contract_with}</div>
+                      </div>
+                    )}
+                    
                     {currentLead.contract_end_date && (
                       <div>
-                        <div className="text-slate-300 font-medium">Avtal slutar</div>
+                        <div className="text-slate-300 font-medium">Avtal löper ut</div>
                         <div className="text-white">{formatDate(currentLead.contract_end_date)}</div>
                       </div>
                     )}
+                  </div>
+                  
+                  {/* Quote & Procurement Section */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-6">
                     {currentLead.interested_in_quote !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Intresserad av offert</div>
@@ -637,6 +655,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                       </div>
                     )}
+                    
                     {currentLead.procurement !== null && (
                       <div>
                         <div className="text-slate-300 font-medium">Upphandling</div>
@@ -645,13 +664,48 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                       </div>
                     )}
-                    {technician && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Tilldelad kollega</div>
-                        <div className="text-white">{technician}</div>
-                      </div>
-                    )}
                   </div>
+                  
+                  {/* Assigned Colleagues Section */}
+                  {(assignedTechnicians.length > 0 || technician) && (
+                    <div>
+                      <div className="text-slate-300 font-medium mb-3">Tilldelade kollegor</div>
+                      <div className="space-y-2">
+                        {assignedTechnicians.map((assignment) => (
+                          <div key={assignment.id} className="flex items-center justify-between bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 bg-green-600/10 rounded-full">
+                                <Users className="w-4 h-4 text-green-400" />
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">
+                                  {assignment.technicians?.name || 'Okänd tekniker'}
+                                </div>
+                                {assignment.technicians?.email && (
+                                  <div className="text-slate-400 text-xs">{assignment.technicians.email}</div>
+                                )}
+                              </div>
+                            </div>
+                            {assignment.is_primary && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                Primär
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        
+                        {/* Legacy technician display if no assignments but technician exists */}
+                        {assignedTechnicians.length === 0 && technician && (
+                          <div className="flex items-center gap-3 bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                            <div className="flex items-center justify-center w-8 h-8 bg-green-600/10 rounded-full">
+                              <Users className="w-4 h-4 text-green-400" />
+                            </div>
+                            <div className="text-white font-medium">{technician}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )}
 
