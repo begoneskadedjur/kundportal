@@ -184,7 +184,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
           .from('lead_events')
           .insert({
             lead_id: leadId,
-            event_type: 'unassigned',
+            event_type: 'updated',
             title: `Kollega borttagen: ${techName}`,
             description: `Kollega ${techName} har tagits bort från tilldelningen`,
             data: {
