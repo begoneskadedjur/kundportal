@@ -698,6 +698,8 @@ const Leads: React.FC = () => {
         <PageHeader 
           title="Lead Pipeline" 
           description="Hantera potentiella kunder och lead-processen"
+          showBackButton={true}
+          backPath="/admin/dashboard"
         />
 
         {/* KPI Cards */}
