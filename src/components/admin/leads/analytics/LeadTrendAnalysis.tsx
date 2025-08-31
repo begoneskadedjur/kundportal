@@ -59,6 +59,8 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     revenueEntries: revenueByMonth
   })
 
+  console.log('🔍 Month keys received:', Object.keys(leadsByMonth))
+
   // Prepare data for volume trend chart - ensure we have data
   const volumeTrendData = Object.entries(leadsByMonth)
     .sort(([a], [b]) => {
@@ -107,6 +109,8 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
     }))
     // CRITICAL FIX: Show months that have leads even if no revenue
     .filter(item => item.leads > 0) // Show any month with leads, revenue is optional
+
+  console.log('✅ Final volumeTrendData after processing:', volumeTrendData)
 
   // Debug source data
   console.log('🔍 Source Data Debug:', {
