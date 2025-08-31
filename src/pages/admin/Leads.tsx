@@ -45,7 +45,8 @@ import StaggeredGrid from '../../components/shared/StaggeredGrid'
 
 import { 
   Lead, 
-  LeadStatus, 
+  LeadStatus,
+  LeadPriority,
   LEAD_STATUS_DISPLAY, 
   CONTACT_METHOD_DISPLAY,
   COMPANY_SIZE_DISPLAY,
@@ -348,9 +349,50 @@ const Leads: React.FC = () => {
   const getStatusBadge = (status: LeadStatus) => {
     const config = LEAD_STATUS_DISPLAY[status]
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-${config.color}/10 text-${config.color} border border-${config.color}/20`}>
-        {config.label}
-      </span>
+      <div className="flex items-center gap-1.5" title={config.label}>
+        <div className={`w-2.5 h-2.5 rounded-full bg-${config.color}`} />
+        <span className={`text-xs font-medium text-${config.color}`}>
+          {config.label}
+        </span>
+      </div>
+    )
+  }
+
+  const getPriorityIndicator = (priority: LeadPriority | null) => {
+    if (!priority) {
+      return (
+        <div className="flex items-center justify-center w-6 h-6" title="Ej angiven">
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+        </div>
+      )
+    }
+
+    const config = getPriorityColor(priority)
+    const label = getPriorityLabel(priority)
+    
+    // Use different icons based on priority level
+    const getIcon = () => {
+      switch (priority) {
+        case 'urgent':
+          return <Flame className="w-4 h-4" />
+        case 'high':
+          return <Star className="w-4 h-4" />
+        case 'medium':
+          return <Clock className="w-4 h-4" />
+        case 'low':
+          return <CheckCircle className="w-4 h-4" />
+        default:
+          return <Star className="w-4 h-4" />
+      }
+    }
+
+    return (
+      <div 
+        className={`flex items-center justify-center w-6 h-6 rounded-full bg-${config}/20 text-${config} border border-${config}/30`}
+        title={label}
+      >
+        {getIcon()}
+      </div>
     )
   }
 
@@ -602,11 +644,11 @@ const Leads: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px]">
+              <table className="w-full min-w-[1000px]">
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-48"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-44"
                       onClick={() => handleSort('company_name')}
                     >
                       <div className="flex items-center gap-2">
@@ -614,9 +656,9 @@ const Leads: React.FC = () => {
                         {getSortIcon('company_name')}
                       </div>
                     </th>
-                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-40">Kontakt</th>
+                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-36">Kontakt</th>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-16"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-2">
@@ -625,16 +667,17 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-20"
+                      className="text-center p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-12"
                       onClick={() => handleSort('priority')}
+                      title="Prioritet: Urgent (🔥) | Hög (⭐) | Medium (🕐) | Låg (✅)"
                     >
-                      <div className="flex items-center gap-2">
-                        Prioritet
+                      <div className="flex items-center justify-center gap-1">
+                        <Star className="w-4 h-4" />
                         {getSortIcon('priority')}
                       </div>
                     </th>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-20"
                       onClick={() => handleSort('lead_score')}
                       title={`Lead Score Kalkyl (0-100 poäng):
 
@@ -662,18 +705,18 @@ const Leads: React.FC = () => {
 80-100p: Utmärkt | 60-79p: Bra | 40-59p: Medel | 20-39p: Svag | 0-19p: Mycket svag`}
                     >
                       <div className="flex items-center gap-2">
-                        Lead Score
+                        Score
                         {getSortIcon('lead_score')}
                       </div>
                     </th>
-                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-36">
+                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-32 hidden xl:table-cell">
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-green-400" />
-                        Tilldelade kollegor
+                        Kollegor
                       </div>
                     </th>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
                       onClick={() => handleSort('estimated_value')}
                     >
                       <div className="flex items-center gap-2">
@@ -682,7 +725,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-28"
+                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24 hidden md:table-cell"
                       onClick={() => handleSort('updated_at')}
                     >
                       <div className="flex items-center gap-2">
@@ -690,7 +733,7 @@ const Leads: React.FC = () => {
                         {getSortIcon('updated_at')}
                       </div>
                     </th>
-                    <th className="text-center p-2.5 text-sm font-medium text-slate-300 w-20">Åtgärder</th>
+                    <th className="text-center p-2.5 text-sm font-medium text-slate-300 w-16">Åtgärder</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
@@ -768,14 +811,9 @@ const Leads: React.FC = () => {
                         {getStatusBadge(lead.status)}
                       </td>
                       <td className="p-2.5 hidden lg:table-cell">
-                        {lead.priority ? (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${getPriorityColor(lead.priority)}/10 text-${getPriorityColor(lead.priority)} border border-${getPriorityColor(lead.priority)}/20`}>
-                            <Star className="w-3 h-3 mr-1" />
-                            {getPriorityLabel(lead.priority)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">-</span>
-                        )}
+                        <div className="flex justify-center">
+                          {getPriorityIndicator(lead.priority)}
+                        </div>
                       </td>
                       <td className="p-2.5">
                         <div className="text-sm">
@@ -788,25 +826,22 @@ const Leads: React.FC = () => {
                         </div>
                       </td>
                       {/* Tilldelade kollegor Column */}
-                      <td className="p-2.5">
+                      <td className="p-2.5 hidden xl:table-cell">
                         <div className="flex items-center gap-1">
                           {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
                             <div className="flex items-center gap-1 flex-wrap">
-                              {lead.lead_technicians.slice(0, 2).map((assignment, idx) => (
+                              {lead.lead_technicians.slice(0, 1).map((assignment, idx) => (
                                 <div key={assignment.id} className="flex items-center gap-1">
                                   <div className={`w-2 h-2 rounded-full ${
                                     assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
                                   }`}></div>
-                                  <span className="text-white text-xs">
-                                    {assignment.technicians?.name}
+                                  <span className="text-white text-xs truncate">
+                                    {assignment.technicians?.name?.split(' ')[0]}
                                   </span>
-                                  {idx < Math.min(lead.lead_technicians.length - 1, 1) && (
-                                    <span className="text-slate-500">,</span>
-                                  )}
                                 </div>
                               ))}
-                              {lead.lead_technicians.length > 2 && (
-                                <span className="text-slate-400 text-xs">+{lead.lead_technicians.length - 2}</span>
+                              {lead.lead_technicians.length > 1 && (
+                                <span className="text-slate-400 text-xs">+{lead.lead_technicians.length - 1}</span>
                               )}
                             </div>
                           ) : (
@@ -826,7 +861,7 @@ const Leads: React.FC = () => {
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="p-2.5">
+                      <td className="p-2.5 hidden md:table-cell">
                         <div className="text-sm text-white" 
                              title={`${formatDate(lead.updated_at)} av ${lead.updated_by_profile?.display_name || 
                                      lead.updated_by_profile?.email || 
@@ -865,7 +900,7 @@ const Leads: React.FC = () => {
                     {/* Expanderbar rad för intern information */}
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
-                        <td colSpan={9} className="px-2 py-2 border-l-2 border-l-purple-400">
+                        <td colSpan={10} className="px-2 py-2 border-l-2 border-l-purple-400">
                           <div className="grid grid-cols-2 gap-3 max-w-4xl">
 
                             {/* Leverantör/Affärsinfo sektion - kompakt */}
