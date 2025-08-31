@@ -58,13 +58,13 @@ import {
 import CreateLeadModal from '../../components/admin/leads/CreateLeadModal'
 import LeadDetailModal from '../../components/admin/leads/LeadDetailModal'
 import EditLeadModal from '../../components/admin/leads/EditLeadModal'
+import LeadFilterPanel, { LeadFilters } from '../../components/admin/leads/LeadFilterPanel'
 
 interface LeadStats {
   totalLeads: number
-  hotLeads: number
-  warmLeads: number
-  coldLeads: number
-  dealsWon: number
+  myActiveLeads: number
+  leadsThisWeek: number
+  followUpsToday: number
   conversionRate: number
   totalEstimatedValue: number
   avgLeadScore: number
@@ -78,8 +78,38 @@ const Leads: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([])
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([])
   const [stats, setStats] = useState<LeadStats | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
+  // Load filters from localStorage or use defaults
+  const [filters, setFilters] = useState<LeadFilters>(() => {
+    const saved = localStorage.getItem('leadFilters')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.warn('Failed to parse saved filters:', e)
+      }
+    }
+    return {
+      search: '',
+      status: 'all',
+      priority: 'all',
+      assignedTo: 'all',
+      createdBy: 'all',
+      companySize: 'all',
+      contactMethod: 'all',
+      source: 'all',
+      estimatedValueMin: null,
+      estimatedValueMax: null,
+      dateRange: 'all',
+      customStartDate: '',
+      customEndDate: '',
+      followUpToday: false,
+      hasEstimatedValue: 'all'
+    }
+  })
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => {
+    const saved = localStorage.getItem('showAdvancedLeadFilters')
+    return saved ? JSON.parse(saved) : false
+  })
   const [error, setError] = useState<string | null>(null)
   
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -169,7 +199,7 @@ const Leads: React.FC = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [leads, searchTerm, statusFilter, sortField, sortDirection])
+  }, [leads, filters, sortField, sortDirection])
 
   const fetchLeads = async () => {
     try {
@@ -232,21 +262,34 @@ const Leads: React.FC = () => {
   const calculateStats = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
     
-    // More accurate hot leads calculation - include both hot leads AND deals
-    const hotLeads = leadsData.filter(lead => 
-      lead.status === 'orange_hot' || lead.status === 'green_deal'
+    // My active leads (assigned to current user and not lost/closed)
+    const myActiveLeads = leadsData.filter(lead => 
+      lead.assigned_to === user?.id && lead.status !== 'red_lost'
     ).length
     
-    const warmLeads = leadsData.filter(lead => lead.status === 'yellow_warm').length
-    const coldLeads = leadsData.filter(lead => lead.status === 'blue_cold').length
-    const dealsWon = leadsData.filter(lead => lead.status === 'green_deal').length
+    // Leads created this week
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    weekStart.setHours(0, 0, 0, 0)
     
-    // More accurate conversion rate calculation
+    const leadsThisWeek = leadsData.filter(lead => {
+      const createdDate = new Date(lead.created_at)
+      return createdDate >= weekStart
+    }).length
+    
+    // Follow-ups due today
+    const today = new Date().toISOString().split('T')[0]
+    const followUpsToday = leadsData.filter(lead => 
+      lead.follow_up_date && lead.follow_up_date.startsWith(today)
+    ).length
+    
+    // Conversion rate (deals / total leads)
+    const dealsWon = leadsData.filter(lead => lead.status === 'green_deal').length
     const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100) : 0
     
     // Calculate total estimated value - only from active leads (not lost)
     const totalEstimatedValue = leadsData
-      .filter(lead => lead.status !== 'red_lost')
+      .filter(lead => lead.status !== 'red_lost' && lead.estimated_value)
       .reduce((sum, lead) => {
         return sum + (lead.estimated_value || 0)
       }, 0)
@@ -257,10 +300,9 @@ const Leads: React.FC = () => {
 
     setStats({
       totalLeads,
-      hotLeads,
-      warmLeads,
-      coldLeads,
-      dealsWon,
+      myActiveLeads,
+      leadsThisWeek,
+      followUpsToday,
       conversionRate,
       totalEstimatedValue,
       avgLeadScore
@@ -270,19 +312,121 @@ const Leads: React.FC = () => {
   const applyFilters = () => {
     let filtered = leads
 
-    // Sökfilter
-    if (searchTerm) {
+    // Search filter
+    if (filters.search) {
       filtered = filtered.filter(lead =>
-        lead.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.contact_person.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (lead.organization_number && lead.organization_number.includes(searchTerm))
+        lead.company_name.toLowerCase().includes(filters.search.toLowerCase()) ||
+        lead.contact_person.toLowerCase().includes(filters.search.toLowerCase()) ||
+        lead.email.toLowerCase().includes(filters.search.toLowerCase()) ||
+        (lead.organization_number && lead.organization_number.includes(filters.search))
       )
     }
 
     // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(lead => lead.status === statusFilter)
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(lead => lead.status === filters.status)
+    }
+
+    // Priority filter
+    if (filters.priority !== 'all') {
+      filtered = filtered.filter(lead => lead.priority === filters.priority)
+    }
+
+    // Assigned to filter
+    if (filters.assignedTo !== 'all') {
+      if (filters.assignedTo === 'me') {
+        filtered = filtered.filter(lead => lead.assigned_to === user?.id)
+      } else if (filters.assignedTo === 'unassigned') {
+        filtered = filtered.filter(lead => !lead.assigned_to)
+      }
+    }
+
+    // Created by filter
+    if (filters.createdBy !== 'all') {
+      if (filters.createdBy === 'me') {
+        filtered = filtered.filter(lead => lead.created_by === user?.id)
+      }
+    }
+
+    // Company size filter
+    if (filters.companySize !== 'all') {
+      filtered = filtered.filter(lead => lead.company_size === filters.companySize)
+    }
+
+    // Contact method filter
+    if (filters.contactMethod !== 'all') {
+      filtered = filtered.filter(lead => lead.contact_method === filters.contactMethod)
+    }
+
+    // Source filter
+    if (filters.source !== 'all' && filters.source) {
+      filtered = filtered.filter(lead => 
+        lead.source && lead.source.toLowerCase().includes(filters.source.toLowerCase())
+      )
+    }
+
+    // Estimated value range
+    if (filters.estimatedValueMin !== null) {
+      filtered = filtered.filter(lead => 
+        lead.estimated_value && lead.estimated_value >= filters.estimatedValueMin!
+      )
+    }
+    if (filters.estimatedValueMax !== null) {
+      filtered = filtered.filter(lead => 
+        lead.estimated_value && lead.estimated_value <= filters.estimatedValueMax!
+      )
+    }
+
+    // Date range filter
+    if (filters.dateRange !== 'all') {
+      const now = new Date()
+      let startDate: Date
+      
+      switch (filters.dateRange) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          break
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+          break
+        case 'custom':
+          if (filters.customStartDate) {
+            startDate = new Date(filters.customStartDate)
+            const endDate = filters.customEndDate ? new Date(filters.customEndDate) : now
+            filtered = filtered.filter(lead => {
+              const leadDate = new Date(lead.created_at)
+              return leadDate >= startDate && leadDate <= endDate
+            })
+          }
+          break
+        default:
+          startDate = new Date(0)
+      }
+      
+      if (filters.dateRange !== 'custom') {
+        filtered = filtered.filter(lead => {
+          const leadDate = new Date(lead.created_at)
+          return leadDate >= startDate
+        })
+      }
+    }
+
+    // Follow-up today filter
+    if (filters.followUpToday) {
+      const today = new Date().toISOString().split('T')[0]
+      filtered = filtered.filter(lead => 
+        lead.follow_up_date && lead.follow_up_date.startsWith(today)
+      )
+    }
+
+    // Has estimated value filter
+    if (filters.hasEstimatedValue !== 'all') {
+      filtered = filtered.filter(lead => 
+        filters.hasEstimatedValue ? lead.estimated_value && lead.estimated_value > 0 : !lead.estimated_value
+      )
     }
 
     // Sortering
@@ -344,6 +488,43 @@ const Leads: React.FC = () => {
     }
 
     setFilteredLeads(filtered)
+  }
+
+  // Filter helper functions
+  const handleFiltersChange = (newFilters: LeadFilters) => {
+    setFilters(newFilters)
+    localStorage.setItem('leadFilters', JSON.stringify(newFilters))
+  }
+
+  const handleFiltersReset = () => {
+    const defaultFilters = {
+      search: '',
+      status: 'all',
+      priority: 'all',
+      assignedTo: 'all',
+      createdBy: 'all',
+      companySize: 'all',
+      contactMethod: 'all',
+      source: 'all',
+      estimatedValueMin: null,
+      estimatedValueMax: null,
+      dateRange: 'all',
+      customStartDate: '',
+      customEndDate: '',
+      followUpToday: false,
+      hasEstimatedValue: 'all'
+    } as LeadFilters
+    setFilters(defaultFilters)
+    localStorage.setItem('leadFilters', JSON.stringify(defaultFilters))
+    setShowAdvancedFilters(false)
+    localStorage.setItem('showAdvancedLeadFilters', 'false')
+  }
+
+  // Save advanced filters toggle state
+  const handleAdvancedFiltersToggle = () => {
+    const newState = !showAdvancedFilters
+    setShowAdvancedFilters(newState)
+    localStorage.setItem('showAdvancedLeadFilters', JSON.stringify(newState))
   }
 
   const getStatusBadge = (status: LeadStatus) => {
@@ -521,95 +702,71 @@ const Leads: React.FC = () => {
         {/* KPI Cards */}
         <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <EnhancedKpiCard
-            title="Totala Leads"
-            value={stats?.totalLeads || 0}
-            icon={Users}
+            title="Mina aktiva leads"
+            value={stats?.myActiveLeads || 0}
+            icon={User}
             trend="neutral"
+            trendValue={`av ${stats?.totalLeads || 0} totalt`}
             delay={0}
-            onClick={() => setStatusFilter('all')}
-            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'all' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => setFilters(prev => ({ ...prev, assignedTo: 'me', status: 'all' }))}
+            className="cursor-pointer hover:scale-105 transition-transform"
           />
           
           <EnhancedKpiCard
-            title="Heta Leads"
-            value={stats?.hotLeads || 0}
-            icon={Flame}
+            title="Leads denna vecka"
+            value={stats?.leadsThisWeek || 0}
+            icon={Calendar}
             trend="up"
-            trendValue={`av ${stats?.totalLeads || 0}`}
+            trendValue="nya leads"
             delay={0.1}
-            onClick={() => setStatusFilter('orange_hot')}
-            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'orange_hot' ? 'ring-2 ring-orange-500' : ''}`}
+            onClick={() => setFilters(prev => ({ ...prev, dateRange: 'week' }))}
+            className="cursor-pointer hover:scale-105 transition-transform"
           />
           
           <EnhancedKpiCard
-            title="Uppskattat värde"
-            value={stats?.totalEstimatedValue ? formatNumber(Math.round(stats.totalEstimatedValue / 1000)) : 0}
-            suffix="k SEK"
-            icon={DollarSign}
-            trend={stats?.totalEstimatedValue > 500000 ? "up" : "neutral"}
-            trendValue={stats?.totalEstimatedValue ? formatCurrency(stats.totalEstimatedValue) : '0 SEK'}
+            title="Uppföljningar idag"
+            value={stats?.followUpsToday || 0}
+            icon={Target}
+            trend={stats?.followUpsToday > 0 ? "up" : "neutral"}
+            trendValue="att genomföra"
             delay={0.2}
-            onClick={() => setStatusFilter('green_deal')}
-            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'green_deal' ? 'ring-2 ring-green-500' : ''}`}
+            onClick={() => setFilters(prev => ({ ...prev, followUpToday: true }))}
+            className="cursor-pointer hover:scale-105 transition-transform"
           />
           
           <EnhancedKpiCard
-            title="Avg Lead Score"
-            value={stats?.avgLeadScore || 0}
-            suffix="/100"
-            icon={BarChart3}
-            trend={stats?.avgLeadScore > 60 ? "up" : stats?.avgLeadScore > 30 ? "neutral" : "down"}
-            trendValue={`${stats?.avgLeadScore || 0} poäng`}
+            title="Konverteringsgrad"
+            value={stats?.conversionRate || 0}
+            suffix="%"
+            icon={TrendingUp}
+            trend={stats?.conversionRate > 10 ? "up" : stats?.conversionRate > 5 ? "neutral" : "down"}
+            trendValue="affärsavslut"
             delay={0.3}
-            onClick={() => setStatusFilter('all')}
-            className={`cursor-pointer hover:scale-105 transition-transform ${statusFilter === 'all' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => setFilters(prev => ({ ...prev, status: 'green_deal' }))}
+            className="cursor-pointer hover:scale-105 transition-transform"
           />
         </StaggeredGrid>
 
-        {/* Controls */}
-        <Card className="p-6 mb-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1">
-              {/* Search */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Sök företag, kontaktperson, email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                />
-              </div>
+        {/* Filter Panel */}
+        <LeadFilterPanel
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onReset={handleFiltersReset}
+          isOpen={showAdvancedFilters}
+          onToggle={handleAdvancedFiltersToggle}
+          resultCount={filteredLeads.length}
+        />
 
-              {/* Status Filter */}
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as LeadStatus | 'all')}
-                  className="pl-10 pr-8 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                >
-                  <option value="all">Alla status</option>
-                  <option value="green_deal">Affär</option>
-                  <option value="orange_hot">Het</option>
-                  <option value="yellow_warm">Ljummen</option>
-                  <option value="blue_cold">Kall</option>
-                  <option value="red_lost">Tappad</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Add Lead Button */}
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Skapa Lead
-            </Button>
-          </div>
-        </Card>
+        {/* Create Button */}
+        <div className="flex justify-end mb-6">
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Nytt Lead
+          </Button>
+        </div>
 
         {/* Leads Table */}
         <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 overflow-hidden">
@@ -624,15 +781,15 @@ const Leads: React.FC = () => {
             <div className="p-12 text-center">
               <Target className="w-16 h-16 text-slate-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-slate-300 mb-2">
-                {searchTerm || statusFilter !== 'all' ? 'Inga leads matchar filtren' : 'Inga leads än'}
+                {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all' ? 'Inga leads matchar filtren' : 'Inga leads än'}
               </h3>
               <p className="text-slate-400 mb-6">
-                {searchTerm || statusFilter !== 'all' 
+                {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all'
                   ? 'Prova att justera dina sökkriterier'
                   : 'Skapa din första lead för att komma igång'
                 }
               </p>
-              {!searchTerm && statusFilter === 'all' && (
+              {!filters.search && filters.status === 'all' && filters.assignedTo === 'all' && (
                 <Button
                   onClick={() => setShowCreateModal(true)}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
