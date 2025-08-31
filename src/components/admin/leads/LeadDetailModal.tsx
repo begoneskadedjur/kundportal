@@ -436,14 +436,16 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
               </Card>
 
-              {/* Lead Details Section */}
-              {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address) && (
+              {/* Customer Information Section - Consolidated */}
+              {(currentLead.phone_number || currentLead.email || currentLead.organization_number || currentLead.business_type || currentLead.problem_type || currentLead.company_size || currentLead.website || currentLead.address || currentLead.business_description || currentLead.sni07_label || currentLead.source || currentLead.decision_maker || currentLead.contract_with) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <Building className="w-5 h-5 text-blue-400" />
-                    Lead-detaljer
+                    Kunduppgifter
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  
+                  {/* Basic Contact Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-6">
                     {currentLead.phone_number && (
                       <div>
                         <div className="text-slate-300 font-medium flex items-center gap-1">
@@ -515,6 +517,55 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* Business Description */}
+                  {currentLead.business_description && (
+                    <div className="mb-6">
+                      <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
+                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 whitespace-pre-wrap">
+                        {currentLead.business_description}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SNI Classification */}
+                  {currentLead.sni07_label && (
+                    <div className="mb-6">
+                      <div className="text-slate-300 font-medium mb-2">SNI-kod (Branschklassning)</div>
+                      <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
+                        {currentLead.sni07_label.split(',').map((sni, index) => (
+                          <div key={index} className="py-1">{sni.trim()}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Customer Info */}
+                  {(currentLead.source || currentLead.decision_maker || currentLead.contract_with) && (
+                    <div>
+                      <div className="text-slate-300 font-medium mb-3">Övrig information</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        {currentLead.source && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Källa</div>
+                            <div className="text-white">{currentLead.source}</div>
+                          </div>
+                        )}
+                        {currentLead.decision_maker && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Beslutsfattare</div>
+                            <div className="text-white">{currentLead.decision_maker}</div>
+                          </div>
+                        )}
+                        {currentLead.contract_with && (
+                          <div>
+                            <div className="text-slate-300 font-medium">Nuvarande leverantör</div>
+                            <div className="text-white">{currentLead.contract_with}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )}
 
@@ -559,7 +610,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               )}
 
               {/* Contract Information Section */}
-              {(currentLead.contract_status || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null) && (
+              {(currentLead.contract_status || currentLead.contract_end_date || currentLead.interested_in_quote !== null || currentLead.procurement !== null || technician) && (
                 <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-yellow-400" />
@@ -568,7 +619,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     {currentLead.contract_status && (
                       <div>
-                        <div className="text-slate-300 font-medium">Avtalssstatus</div>
+                        <div className="text-slate-300 font-medium">Avtalsstatus</div>
                         <div className="text-white">{currentLead.contract_status}</div>
                       </div>
                     )}
@@ -594,6 +645,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                       </div>
                     )}
+                    {technician && (
+                      <div>
+                        <div className="text-slate-300 font-medium">Tilldelad kollega</div>
+                        <div className="text-white">{technician}</div>
+                      </div>
+                    )}
                   </div>
                 </Card>
               )}
@@ -613,72 +670,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </Card>
               )}
 
-              {/* Industry & Classification Section */}
-              {(currentLead.business_description || currentLead.sni07_label) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Factory className="w-5 h-5 text-purple-400" />
-                    Bransch & Klassificering
-                  </h3>
-                  <div className="space-y-4 text-sm">
-                    {currentLead.business_description && (
-                      <div>
-                        <div className="text-slate-300 font-medium mb-2">Verksamhetsbeskrivning</div>
-                        <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30 whitespace-pre-wrap">
-                          {currentLead.business_description}
-                        </div>
-                      </div>
-                    )}
-                    {currentLead.sni07_label && (
-                      <div>
-                        <div className="text-slate-300 font-medium mb-2">SNI-kod (Branschklassning)</div>
-                        <div className="text-white bg-slate-700/30 rounded-lg p-3 border border-slate-600/30">
-                          {currentLead.sni07_label}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
 
-              {/* Additional Info */}
-              {(currentLead.source || currentLead.decision_maker || currentLead.competitor || currentLead.contract_with || technician) && (
-                <Card className="p-4 bg-slate-800/50 border-slate-700/50 mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4">Ytterligare Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    {currentLead.source && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Källa</div>
-                        <div className="text-white">{currentLead.source}</div>
-                      </div>
-                    )}
-                    {technician && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Tilldelad kollega</div>
-                        <div className="text-white">{technician}</div>
-                      </div>
-                    )}
-                    {currentLead.decision_maker && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Beslutsfattare</div>
-                        <div className="text-white">{currentLead.decision_maker}</div>
-                      </div>
-                    )}
-                    {currentLead.contract_with && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Konkurrent</div>
-                        <div className="text-white">{currentLead.contract_with}</div>
-                      </div>
-                    )}
-                    {currentLead.competitor && (
-                      <div>
-                        <div className="text-slate-300 font-medium">Avtalsdetaljer</div>
-                        <div className="text-white">{currentLead.competitor}</div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              )}
 
               {/* Management Components */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
