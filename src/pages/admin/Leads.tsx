@@ -613,9 +613,7 @@ const Leads: React.FC = () => {
                     </th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Kollegor</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Leverantör</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Adress</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Postnr</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Ort</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Aktivitet</th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('estimated_value')}
@@ -625,7 +623,6 @@ const Leads: React.FC = () => {
                         {getSortIcon('estimated_value')}
                       </div>
                     </th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Aktivitet</th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('updated_at')}
@@ -762,29 +759,14 @@ const Leads: React.FC = () => {
                       <td className="p-4">
                         <div className="text-sm">
                           <div className="text-white">
-                            {lead.current_supplier || 'Finns ej'}
+                            {lead.contract_with || 'Finns ej'}
                           </div>
-                          {lead.current_supplier && (
+                          {lead.contract_with && (
                             <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
                               <Building className="w-3 h-3" />
                               Leverantör
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">
-                          <div className="text-white">{lead.street_address || '-'}</div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">
-                          <div className="text-white font-mono">{lead.postal_code || '-'}</div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">
-                          <div className="text-white">{lead.city || '-'}</div>
                         </div>
                       </td>
                       <td className="p-4">
