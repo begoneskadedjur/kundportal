@@ -587,7 +587,7 @@ const Leads: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1600px]">
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th 
@@ -599,9 +599,9 @@ const Leads: React.FC = () => {
                         {getSortIcon('company_name')}
                       </div>
                     </th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Kontakt</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Prioritet</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Kontakt</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Status</th>
+                    <th className="text-left p-3 text-sm font-medium text-slate-300">Prioritet</th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('lead_score')}
@@ -612,7 +612,10 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Kollegor</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Leverantör</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Nuvarande Leverantör</th>
+                    <th className="text-left p-2 text-xs font-medium text-slate-300">Adress</th>
+                    <th className="text-left p-2 text-xs font-medium text-slate-300">Postnr</th>
+                    <th className="text-left p-2 text-xs font-medium text-slate-300">Ort</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Aktivitet</th>
                     <th 
                       className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
@@ -767,6 +770,25 @@ const Leads: React.FC = () => {
                               Leverantör
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-xs">
+                          <div className="text-white truncate max-w-[100px]" title={lead.street_address || '-'}>
+                            {lead.street_address || '-'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-xs">
+                          <div className="text-white font-mono">{lead.postal_code || '-'}</div>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-xs">
+                          <div className="text-white truncate max-w-[80px]" title={lead.city || '-'}>
+                            {lead.city || '-'}
+                          </div>
                         </div>
                       </td>
                       <td className="p-4">
