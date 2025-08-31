@@ -674,14 +674,14 @@ const Leads: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
                   {filteredLeads.map((lead, index) => (
-                    <tr 
-                      key={lead.id} 
-                      className={`hover:bg-slate-800/30 transition-colors ${
-                        lead.priority === 'high' ? 'border-l-4 border-l-red-400' :
-                        lead.priority === 'medium' ? 'border-l-4 border-l-yellow-400' :
-                        lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
-                      }`}
-                    >
+                    <React.Fragment key={lead.id}>
+                      <tr 
+                        className={`hover:bg-slate-800/30 transition-colors ${
+                          lead.priority === 'high' ? 'border-l-4 border-l-red-400' :
+                          lead.priority === 'medium' ? 'border-l-4 border-l-yellow-400' :
+                          lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
+                        }`}
+                      >
                       <td className="p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -958,6 +958,7 @@ const Leads: React.FC = () => {
                         </td>
                       </tr>
                     )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
