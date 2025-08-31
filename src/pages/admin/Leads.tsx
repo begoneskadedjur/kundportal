@@ -646,7 +646,9 @@ const Leads: React.FC = () => {
                         <div className="text-sm">
                           <div className="text-white">{formatDate(lead.updated_at)}</div>
                           <div className="text-slate-400">
-                            av {lead.updated_by_profile?.display_name || 'Okänd'}
+                            av {lead.updated_by_profile?.display_name || 
+                                lead.updated_by_profile?.email || 
+                                'Okänd användare'}
                           </div>
                         </div>
                       </td>
