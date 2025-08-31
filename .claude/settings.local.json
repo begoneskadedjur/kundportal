@@ -54,7 +54,8 @@
       "mcp__supabase__deploy_edge_function",
       "WebFetch(domain:localhost)",
       "mcp__supabase__generate_typescript_types",
-      "WebSearch"
+      "WebSearch",
+      "mcp__ide__executeCode"
     ],
     "deny": [],
     "additionalDirectories": [

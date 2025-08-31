@@ -104,6 +104,15 @@ const LeadAnalytics: React.FC = () => {
         throw new Error(`Database error: ${leadsError.message}`)
       }
 
+      // EXTENSIVE DEBUG - Log raw database results
+      console.log('🔍 RAW DATABASE RESULTS:', {
+        totalRecords: (leads || []).length,
+        dateRange: `${startDate.toISOString()} to ${now.toISOString()}`,
+        firstLead: leads?.[0],
+        allLeadIds: (leads || []).map(l => l.id),
+        allLeadDates: (leads || []).map(l => ({ id: l.id, created_at: l.created_at }))
+      })
+
       // Validate and clean the data
       const validLeads = (leads || []).filter(lead => {
         if (!lead.id) {
@@ -117,10 +126,33 @@ const LeadAnalytics: React.FC = () => {
         return true
       })
 
-      console.log(`Processed ${validLeads.length} valid leads out of ${(leads || []).length} total leads`)
+      console.log(`✅ Processed ${validLeads.length} valid leads out of ${(leads || []).length} total leads`)
+      
+      // DEBUG: Check date filtering
+      if (validLeads.length === 0 && (leads || []).length > 0) {
+        console.warn('⚠️ ALL LEADS FILTERED OUT - Check date filtering logic!')
+        console.log('Raw leads:', (leads || []).map(l => ({ 
+          id: l.id, 
+          created_at: l.created_at, 
+          isInRange: new Date(l.created_at) >= startDate 
+        })))
+      }
+
+      // DEBUG: Log startDate for verification
+      console.log(`📅 Date range: ${daysBack} days back from now`)
+      console.log(`📅 Start date: ${startDate.toISOString()}`)
+      console.log(`📅 Now: ${now.toISOString()}`)
 
       // Process analytics data with validated leads
       const processedData = processAnalyticsData(validLeads)
+      
+      // DEBUG: Log processed data
+      console.log('📊 Processed analytics data:', {
+        totalLeads: processedData.totalLeads,
+        leadsByMonth: processedData.leadsByMonth,
+        leadsBySource: processedData.leadsBySource,
+        leadsByStatus: processedData.leadsByStatus
+      })
       setAnalyticsData(processedData)
     } catch (err) {
       console.error('Error fetching analytics data:', err)
@@ -179,21 +211,25 @@ const LeadAnalytics: React.FC = () => {
       return acc
     }, {} as Record<string, number>)
 
-    // Group by month with improved date handling
+    // Group by month with improved date handling - ensure consistent format
     const leadsByMonth = leads.reduce((acc, lead) => {
       try {
         const date = new Date(lead.created_at)
         if (isNaN(date.getTime())) {
-          console.warn('Invalid date for lead:', lead.id)
+          console.warn('Invalid date for lead:', lead.id, 'date:', lead.created_at)
           return acc
         }
+        // Use consistent Swedish month format that matches LeadTrendAnalysis
         const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
         acc[month] = (acc[month] || 0) + 1
+        console.log('Processed lead date:', lead.created_at, '-> month key:', month)
       } catch (error) {
         console.warn('Error processing date for lead:', lead.id, error)
       }
       return acc
     }, {} as Record<string, number>)
+    
+    console.log('📅 Final leadsByMonth:', leadsByMonth)
 
     // Team performance (placeholder, but with structure)
     const teamPerformance = {
@@ -208,7 +244,7 @@ const LeadAnalytics: React.FC = () => {
       topRegion: null
     }
 
-    // Revenue by month with improved validation
+    // Revenue by month with improved validation and debug info
     const revenueByMonth = leads.reduce((acc, lead) => {
       if (lead.estimated_value && lead.status !== 'red_lost') {
         try {
@@ -218,12 +254,22 @@ const LeadAnalytics: React.FC = () => {
           }
           const month = date.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short' })
           acc[month] = (acc[month] || 0) + lead.estimated_value
+          console.log('Revenue processing:', {
+            leadId: lead.id,
+            month,
+            value: lead.estimated_value,
+            status: lead.status
+          })
         } catch (error) {
           console.warn('Error processing revenue date for lead:', lead.id, error)
         }
+      } else if (!lead.estimated_value && lead.status !== 'red_lost') {
+        console.log('Lead without estimated_value:', lead.id, 'status:', lead.status)
       }
       return acc
     }, {} as Record<string, number>)
+    
+    console.log('💰 Final revenueByMonth:', revenueByMonth)
 
     return {
       leads,

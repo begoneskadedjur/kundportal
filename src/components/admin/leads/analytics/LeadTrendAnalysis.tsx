@@ -50,34 +50,93 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
   
   const { leadsByMonth, leadsBySource, leadsByStatus, revenueByMonth } = data
 
+  // Debug: Log raw data to identify issues
+  console.log('🔍 LeadTrendAnalysis Debug Data:', {
+    totalLeads: data.totalLeads,
+    leadsByMonth: Object.keys(leadsByMonth).length,
+    leadsByMonthEntries: leadsByMonth,
+    revenueByMonth: Object.keys(revenueByMonth).length,
+    revenueEntries: revenueByMonth
+  })
+
   // Prepare data for volume trend chart - ensure we have data
   const volumeTrendData = Object.entries(leadsByMonth)
     .sort(([a], [b]) => {
-      // Improved date parsing for Swedish month format
-      const dateA = new Date(a.includes(' ') ? a : `${a} 1`)
-      const dateB = new Date(b.includes(' ') ? b : `${b} 1`)
-      return dateA.getTime() - dateB.getTime()
+      // Robust date parsing for Swedish month format (jan 2024, feb 2024, etc.)
+      try {
+        // Handle both "jan 2024" and "2024-01" formats
+        let dateA, dateB
+        
+        if (a.includes(' ')) {
+          // Swedish format: "jan 2024"
+          const [monthStr, year] = a.split(' ')
+          const monthMap: Record<string, number> = {
+            'jan': 0, 'jan.': 0, 'feb': 1, 'feb.': 1, 'mar': 2, 'mar.': 2, 
+            'apr': 3, 'apr.': 3, 'maj': 4, 'maj.': 4, 'jun': 5, 'jun.': 5,
+            'jul': 6, 'jul.': 6, 'aug': 7, 'aug.': 7, 'sep': 8, 'sep.': 8, 
+            'okt': 9, 'okt.': 9, 'nov': 10, 'nov.': 10, 'dec': 11, 'dec.': 11
+          }
+          dateA = new Date(parseInt(year), monthMap[monthStr.toLowerCase()] || 0, 1)
+        } else {
+          dateA = new Date(a.includes('-') ? a + '-01' : `${a}-01-01`)
+        }
+        
+        if (b.includes(' ')) {
+          const [monthStr, year] = b.split(' ')
+          const monthMap: Record<string, number> = {
+            'jan': 0, 'jan.': 0, 'feb': 1, 'feb.': 1, 'mar': 2, 'mar.': 2, 
+            'apr': 3, 'apr.': 3, 'maj': 4, 'maj.': 4, 'jun': 5, 'jun.': 5,
+            'jul': 6, 'jul.': 6, 'aug': 7, 'aug.': 7, 'sep': 8, 'sep.': 8, 
+            'okt': 9, 'okt.': 9, 'nov': 10, 'nov.': 10, 'dec': 11, 'dec.': 11
+          }
+          dateB = new Date(parseInt(year), monthMap[monthStr.toLowerCase()] || 0, 1)
+        } else {
+          dateB = new Date(b.includes('-') ? b + '-01' : `${b}-01-01`)
+        }
+        
+        return dateA.getTime() - dateB.getTime()
+      } catch (error) {
+        console.warn('Date parsing error:', error, 'dates:', a, b)
+        return a.localeCompare(b) // Fallback to string comparison
+      }
     })
     .map(([month, count]) => ({
-      month: month.length > 10 ? month.substring(0, 10) : month, // Truncate long month names
+      month: month.length > 10 ? month.substring(0, 10) : month,
       leads: count || 0,
       revenue: revenueByMonth[month] || 0
     }))
-    .filter(item => item.leads > 0 || item.revenue > 0) // Only show months with data
+    // CRITICAL FIX: Show months that have leads even if no revenue
+    .filter(item => item.leads > 0) // Show any month with leads, revenue is optional
+
+  // Debug source data
+  console.log('🔍 Source Data Debug:', {
+    leadsBySourceEntries: Object.entries(leadsBySource),
+    totalLeads: data.totalLeads
+  })
 
   // Prepare data for source performance - ensure we have data
   const sourceData = Object.entries(leadsBySource)
     .filter(([source, count]) => count > 0) // Filter out zero counts
-    .map(([source, count]) => ({
-      source: source.length > 15 ? source.substring(0, 15) + '...' : source || 'Okänd källa',
-      fullSource: source || 'Okänd källa',
-      count,
-      percentage: data.totalLeads > 0 ? ((count / data.totalLeads) * 100).toFixed(1) : '0.0'
-    }))
+    .map(([source, count]) => {
+      // Handle empty/null sources better
+      const displaySource = source && source.trim() ? source : 'Okänd källa'
+      return {
+        source: displaySource.length > 15 ? displaySource.substring(0, 15) + '...' : displaySource,
+        fullSource: displaySource,
+        count,
+        percentage: data.totalLeads > 0 ? ((count / data.totalLeads) * 100).toFixed(1) : '0.0'
+      }
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, 8) // Top 8 sources
 
-  // Prepare data for status distribution
+  // Debug status data
+  console.log('🔍 Status Data Debug:', {
+    leadsByStatusEntries: Object.entries(leadsByStatus),
+    totalLeads: data.totalLeads
+  })
+
+  // Prepare data for status distribution - show all statuses for better insight
   const statusData = Object.entries(leadsByStatus).map(([status, count]) => {
     let label = status
     let color = '#64748b'
@@ -103,15 +162,19 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
         label = 'Förlorade'
         color = '#ef4444'
         break
+      default:
+        label = status || 'Okänd status'
+        color = '#64748b'
+        break
     }
     
     return {
       status: label,
       count,
-      percentage: ((count / data.totalLeads) * 100).toFixed(1),
+      percentage: data.totalLeads > 0 ? ((count / data.totalLeads) * 100).toFixed(1) : '0.0',
       color
     }
-  }).filter(item => item.count > 0)
+  }).filter(item => item.count > 0) // Only show statuses that have leads
 
   const CHART_COLORS = ['#3b82f6', '#eab308', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b']
 
@@ -188,7 +251,15 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             <div className="mb-4">
               <p className="text-slate-400">Lead-volym och pipeline-värde över tid</p>
               {volumeTrendData.length === 0 && (
-                <p className="text-slate-500 text-sm mt-2">Ingen data tillgänglig för vald tidsperiod</p>
+                <div className="text-slate-500 text-sm mt-2">
+                  <p>Ingen data tillgänglig för vald tidsperiod</p>
+                  <p className="text-xs mt-1">
+                    Debug: {data.totalLeads} totala leads, {Object.keys(data.leadsByMonth).length} månader med data
+                  </p>
+                  <p className="text-xs">
+                    Månader: {Object.keys(data.leadsByMonth).join(', ')}
+                  </p>
+                </div>
               )}
             </div>
             {volumeTrendData.length > 0 ? (
@@ -251,7 +322,15 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             <div className="mb-4">
               <p className="text-slate-400">Topp lead-källor efter volym</p>
               {sourceData.length === 0 && (
-                <p className="text-slate-500 text-sm mt-2">Ingen källdata tillgänglig</p>
+                <div className="text-slate-500 text-sm mt-2">
+                  <p>Ingen källdata tillgänglig</p>
+                  <p className="text-xs mt-1">
+                    Debug: {Object.keys(data.leadsBySource).length} källor totalt
+                  </p>
+                  <p className="text-xs">
+                    Källor: {Object.entries(data.leadsBySource).map(([k,v]) => `${k}:${v}`).join(', ')}
+                  </p>
+                </div>
               )}
             </div>
             {sourceData.length > 0 ? (
@@ -295,7 +374,15 @@ const LeadTrendAnalysis: React.FC<LeadTrendAnalysisProps> = ({ data }) => {
             <div className="mb-4">
               <p className="text-slate-400">Fördelning av lead-status</p>
               {statusData.length === 0 && (
-                <p className="text-slate-500 text-sm mt-2">Ingen statusdata tillgänglig</p>
+                <div className="text-slate-500 text-sm mt-2">
+                  <p>Ingen statusdata tillgänglig</p>
+                  <p className="text-xs mt-1">
+                    Debug: {Object.keys(data.leadsByStatus).length} statuser totalt
+                  </p>
+                  <p className="text-xs">
+                    Status: {Object.entries(data.leadsByStatus).map(([k,v]) => `${k}:${v}`).join(', ')}
+                  </p>
+                </div>
               )}
             </div>
             {statusData.length > 0 ? (
