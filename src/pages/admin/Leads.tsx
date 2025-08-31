@@ -11,6 +11,7 @@ import {
   Filter,
   TrendingUp,
   Users,
+  User,
   Phone,
   Mail,
   MapPin,
