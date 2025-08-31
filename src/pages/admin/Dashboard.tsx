@@ -309,11 +309,11 @@ const AdminDashboard: React.FC = () => {
           {/* Navigation Grid */}
           <div className="space-y-16">
             
-            {/* Kommandocentral - Primary Functions */}
+            {/* Marknadsöversikt & Pipelines - Primary Functions */}
             <div>
               <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
                 <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
-                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Kommandocentral</span>
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Marknadsöversikt & Pipelines</span>
                 <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
               </h2>
               <StaggeredGrid 
@@ -324,8 +324,8 @@ const AdminDashboard: React.FC = () => {
                 <AdminDashboardCard
                   href="/admin/customers"
                   icon={Users}
-                  title="Avtalspipeline - Översikt"
-                  description="Avtalskunder & ClickUp-listor"
+                  title="Avtalsöversikt"
+                  description="Skickade & bearbetade avtalsförslag, 9 aktiva kunder"
                   stats={`${stats?.totalCustomers} aktiva kunder`}
                   tag="Pipeline"
                   iconColor="text-[#20c58f]"
@@ -344,8 +344,8 @@ const AdminDashboard: React.FC = () => {
                 <AdminDashboardCard
                   href="/admin/leads"
                   icon={Target}
-                  title="Lead Pipeline - Översikt"
-                  description="Hantera potentiella kunder"
+                  title="Leadshantering"
+                  description="Lista & hantera potentiella kunder"
                   stats="Manuell leadhantering"
                   tag="Pipeline"
                   iconColor="text-purple-400"
@@ -354,8 +354,8 @@ const AdminDashboard: React.FC = () => {
                 <AdminDashboardCard
                   href="/admin/contracts-overview"
                   icon={Receipt}
-                  title="Försäljningspipeline - Översikt"
-                  description="Alla avtal & offerter"
+                  title="Försäljning"
+                  description="Alla avtal & offerter, Status & värdeanalys"
                   stats="Status & värdeanalys"
                   tag="Pipeline"
                   iconColor="text-emerald-400"
@@ -373,11 +373,11 @@ const AdminDashboard: React.FC = () => {
               </StaggeredGrid>
             </div>
 
-            {/* Affärsintelligens - Analytics */}
+            {/* Detaljerad data - Analytics & Detailed Information */}
             <div>
               <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
                 <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
-                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Affärsintelligens</span>
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Detaljerad data</span>
                 <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
               </h2>
               <StaggeredGrid 
@@ -389,9 +389,9 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/technicians"
                   icon={BarChart3}
                   title="Tekniker Statistik"
-                  description="Prestanda & ranking"
+                  description="Prestanda & ranking, 5 aktiva tekniker"
                   stats={`${stats?.activeTechnicians} aktiva tekniker`}
-                  tag="Analytics"
+                  tag="Detaljerad data"
                   iconColor="text-blue-400"
                 />
                 
@@ -399,10 +399,20 @@ const AdminDashboard: React.FC = () => {
                   href="/admin/economics"
                   icon={TrendingUp}
                   title="Ekonomisk Översikt"
-                  description="Intäktsanalys & KPI"
+                  description="Intäktsanalys & KPI, 3 941 575 kr"
                   stats={formatCurrency(stats?.totalRevenue || 0)}
-                  tag="Rapporter"
+                  tag="Detaljerad data"
                   iconColor="text-green-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/sales-opportunities"
+                  icon={Target}
+                  title="Försäljningsmöjligheter"
+                  description="Identifierade flergångskunder utan avtal"
+                  stats="BeGone → Avtal"
+                  tag="Leads"
+                  iconColor="text-emerald-400"
                 />
                 
                 <AdminDashboardCard
@@ -414,7 +424,21 @@ const AdminDashboard: React.FC = () => {
                   tag="Finans"
                   iconColor="text-yellow-400"
                 />
-                
+              </StaggeredGrid>
+            </div>
+
+            {/* Affärsintelligens - Remaining Analytics */}
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
+                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Affärsintelligens</span>
+                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
+              </h2>
+              <StaggeredGrid 
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                staggerDelay={0.08}
+                initialDelay={0.8}
+              >
                 <AdminDashboardCard
                   href="/admin/commissions"
                   icon={Wallet}
@@ -458,16 +482,6 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/sales-opportunities"
-                  icon={Target}
-                  title="Försäljningsmöjligheter"
-                  description="Potentiella avtalskunder"
-                  stats="BeGone → Avtal"
-                  tag="Leads"
-                  iconColor="text-emerald-400"
-                />
-                
-                <AdminDashboardCard
                   href="/admin/product-management"
                   icon={Package}
                   title="Produkthantering"
@@ -489,7 +503,7 @@ const AdminDashboard: React.FC = () => {
               <StaggeredGrid 
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
                 staggerDelay={0.05}
-                initialDelay={1.4}
+                initialDelay={1.2}
               >
                 <AdminDashboardCard
                   href="#"
