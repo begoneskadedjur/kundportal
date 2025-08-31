@@ -878,48 +878,7 @@ const Leads: React.FC = () => {
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
                         <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
-                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                            
-                            {/* Team/Kollegor sektion */}
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                                <Users className="w-4 h-4 text-green-400" />
-                                Tilldelade kollegor
-                              </h4>
-                              {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                                <div className="space-y-2">
-                                  {lead.lead_technicians.map((assignment) => (
-                                    <div key={assignment.id} className={`flex items-center gap-3 p-2 rounded-md ${
-                                      assignment.is_primary 
-                                        ? 'bg-yellow-500/10 border border-yellow-500/20' 
-                                        : 'bg-slate-700/30 border border-slate-600/30'
-                                    }`}>
-                                      <div className={`w-3 h-3 rounded-full ${
-                                        assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
-                                      }`}></div>
-                                      <div className="flex-1">
-                                        <div className="text-white text-sm font-medium">
-                                          {assignment.technicians?.name || 'Okänd kollega'}
-                                        </div>
-                                        <div className="text-slate-400 text-xs">
-                                          Tilldelad {new Date(assignment.assigned_at).toLocaleDateString('sv-SE')}
-                                        </div>
-                                      </div>
-                                      {assignment.is_primary && (
-                                        <div className="flex items-center gap-1 text-yellow-400 text-xs">
-                                          <Star className="w-3 h-3" />
-                                          Primär
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-slate-400 text-sm italic">
-                                  Inget team tilldelat än
-                                </div>
-                              )}
-                            </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                             {/* Leverantör/Affärsinfo sektion */}
                             <div className="space-y-3">
