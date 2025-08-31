@@ -729,18 +729,6 @@ const Leads: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-slate-400" />
                             <span className="text-sm font-medium text-white">{lead.contact_person}</span>
-                            {(lead.email || lead.phone_number) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => toggleExpandRow(lead.id)}
-                                className="text-slate-400 hover:text-white p-1 ml-auto"
-                              >
-                                <ChevronDown className={`w-3 h-3 transition-transform ${
-                                  expandedRows.has(lead.id) ? 'rotate-180' : ''
-                                }`} />
-                              </Button>
-                            )}
                           </div>
                           
                           {expandedRows.has(lead.id) && (
@@ -878,7 +866,7 @@ const Leads: React.FC = () => {
                     {expandedRows.has(lead.id) && (
                       <tr className="bg-slate-800/30">
                         <td colSpan={9} className="p-4 border-l-2 border-l-purple-400">
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
                             {/* Leverantör/Affärsinfo sektion */}
                             <div className="space-y-3">
