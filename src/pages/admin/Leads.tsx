@@ -26,7 +26,14 @@ import {
   Edit3,
   Eye,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Activity,
+  Building,
+  MapPin,
+  Hash,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -80,6 +87,8 @@ const Leads: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [technicians, setTechnicians] = useState<{[key: string]: string}>({})
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [sortField, setSortField] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     fetchLeads()
@@ -159,7 +168,7 @@ const Leads: React.FC = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [leads, searchTerm, statusFilter])
+  }, [leads, searchTerm, statusFilter, sortField, sortDirection])
 
   const fetchLeads = async () => {
     try {
@@ -181,7 +190,9 @@ const Leads: React.FC = () => {
               name,
               email
             )
-          )
+          ),
+          lead_comments(count),
+          lead_events(count)
         `)
         .order('created_at', { ascending: false })
 
@@ -273,6 +284,49 @@ const Leads: React.FC = () => {
       filtered = filtered.filter(lead => lead.status === statusFilter)
     }
 
+    // Sortering
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let aValue: any
+        let bValue: any
+
+        switch (sortField) {
+          case 'lead_score':
+            aValue = calculateLeadScore(a)
+            bValue = calculateLeadScore(b)
+            break
+          case 'company_name':
+            aValue = a.company_name?.toLowerCase() || ''
+            bValue = b.company_name?.toLowerCase() || ''
+            break
+          case 'estimated_value':
+            aValue = a.estimated_value || 0
+            bValue = b.estimated_value || 0
+            break
+          case 'updated_at':
+            aValue = new Date(a.updated_at).getTime()
+            bValue = new Date(b.updated_at).getTime()
+            break
+          case 'comments_count':
+            aValue = a.lead_comments?.length || 0
+            bValue = b.lead_comments?.length || 0
+            break
+          case 'events_count':
+            aValue = a.lead_events?.length || 0
+            bValue = b.lead_events?.length || 0
+            break
+          default:
+            return 0
+        }
+
+        if (sortDirection === 'asc') {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
+        }
+      })
+    }
+
     setFilteredLeads(filtered)
   }
 
@@ -337,6 +391,26 @@ const Leads: React.FC = () => {
         ? { ...lead, ...updates, updated_at: new Date().toISOString() }
         : lead
     ))
+  }
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New field, default to desc
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-slate-400" />
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 text-purple-400" />
+      : <ArrowDown className="w-4 h-4 text-purple-400" />
   }
 
   if (loading) {
@@ -516,13 +590,51 @@ const Leads: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-800/50">
                   <tr>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Företag</th>
+                    <th 
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('company_name')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Företag
+                        {getSortIcon('company_name')}
+                      </div>
+                    </th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Kontakt</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Status</th>
                     <th className="text-left p-4 text-sm font-medium text-slate-300">Prioritet</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Tekniker</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Uppskattat värde</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-300">Uppdaterad</th>
+                    <th 
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('lead_score')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Lead Score
+                        {getSortIcon('lead_score')}
+                      </div>
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Kollegor</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Leverantör</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Adress</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Postnr</th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Ort</th>
+                    <th 
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('estimated_value')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Värde
+                        {getSortIcon('estimated_value')}
+                      </div>
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-slate-300">Aktivitet</th>
+                    <th 
+                      className="text-left p-4 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('updated_at')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Uppdaterad
+                        {getSortIcon('updated_at')}
+                      </div>
+                    </th>
                     <th className="text-right p-4 text-sm font-medium text-slate-300">Åtgärder</th>
                   </tr>
                 </thead>
@@ -610,25 +722,86 @@ const Leads: React.FC = () => {
                         )}
                       </td>
                       <td className="p-4">
+                        <div className="text-sm">
+                          <div className="font-mono text-lg font-bold text-white">
+                            {calculateLeadScore(lead)}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {getLeadQuality(calculateLeadScore(lead)).label}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
                         {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                          <div className="text-sm space-y-1">
-                            {lead.lead_technicians.map((assignment) => (
-                              <div key={assignment.id} className="flex items-center gap-2">
-                                <div className="text-white">
+                          <div className="text-sm space-y-2">
+                            {lead.lead_technicians.map((assignment, idx) => (
+                              <div key={assignment.id} className={`flex items-center gap-2 p-2 rounded-md ${
+                                assignment.is_primary 
+                                  ? 'bg-yellow-500/10 border border-yellow-500/20' 
+                                  : 'bg-slate-700/30 border border-slate-600/30'
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full ${
+                                  assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                }`}></div>
+                                <div className="text-white text-xs font-medium">
                                   {assignment.technicians?.name || 'Okänd kollega'}
                                 </div>
                                 {assignment.is_primary && (
-                                  <Star className="w-3 h-3 text-yellow-400" title="Primär kollega" />
+                                  <Star className="w-3 h-3 text-yellow-400 ml-auto" title="Primär kollega" />
                                 )}
                               </div>
                             ))}
-                            <div className="text-slate-400 text-xs">
+                            <div className="text-slate-400 text-xs mt-1 text-center">
                               {lead.lead_technicians.length} kollega{lead.lead_technicians.length !== 1 ? 'r' : ''}
                             </div>
                           </div>
                         ) : (
                           <span className="text-slate-400">Ej tilldelad</span>
                         )}
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm">
+                          <div className="text-white">
+                            {lead.current_supplier || 'Finns ej'}
+                          </div>
+                          {lead.current_supplier && (
+                            <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                              <Building className="w-3 h-3" />
+                              Leverantör
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm">
+                          <div className="text-white">{lead.street_address || '-'}</div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm">
+                          <div className="text-white font-mono">{lead.postal_code || '-'}</div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm">
+                          <div className="text-white">{lead.city || '-'}</div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 text-sm">
+                            <MessageSquare className="w-4 h-4 text-blue-400" />
+                            <span className="text-white font-medium">
+                              {lead.lead_comments?.[0]?.count || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Activity className="w-4 h-4 text-green-400" />
+                            <span className="text-white font-medium">
+                              {lead.lead_events?.[0]?.count || 0}
+                            </span>
+                          </div>
+                        </div>
                       </td>
                       <td className="p-4">
                         {lead.estimated_value ? (
