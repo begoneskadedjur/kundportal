@@ -706,9 +706,9 @@ const Leads: React.FC = () => {
                       <td className="p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="font-medium text-white">{lead.company_name}</div>
+                            <div className="text-sm font-medium text-white">{lead.company_name}</div>
                             {lead.organization_number && (
-                              <div className="text-sm text-slate-400">{lead.organization_number}</div>
+                              <div className="text-xs text-slate-400">{lead.organization_number}</div>
                             )}
                           </div>
                           <Button
@@ -728,7 +728,7 @@ const Leads: React.FC = () => {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-slate-400" />
-                            <span className="font-medium text-white">{lead.contact_person}</span>
+                            <span className="text-sm font-medium text-white">{lead.contact_person}</span>
                             {(lead.email || lead.phone_number) && (
                               <Button
                                 size="sm"
@@ -809,7 +809,7 @@ const Leads: React.FC = () => {
                                   <div className={`w-2 h-2 rounded-full ${
                                     assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
                                   }`}></div>
-                                  <span className="text-white text-xs truncate max-w-[80px]">
+                                  <span className="text-white text-xs">
                                     {assignment.technicians?.name}
                                   </span>
                                   {idx < Math.min(lead.lead_technicians.length - 1, 1) && (
