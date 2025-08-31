@@ -616,7 +616,7 @@ const Leads: React.FC = () => {
                     </th>
                     <th className="text-left p-3 text-sm font-medium text-slate-300 w-40">Kontakt</th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-32"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-2">
@@ -625,7 +625,7 @@ const Leads: React.FC = () => {
                       </div>
                     </th>
                     <th 
-                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-24"
+                      className="text-left p-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-20"
                       onClick={() => handleSort('priority')}
                     >
                       <div className="flex items-center gap-2">
@@ -851,7 +851,7 @@ const Leads: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex flex-col gap-1 items-center justify-center">
                           <Button
                             size="sm"
                             variant="ghost"
