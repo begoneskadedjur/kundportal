@@ -331,15 +331,6 @@ const AdminDashboard: React.FC = () => {
                   iconColor="text-[#20c58f]"
                 />
                 
-                <AdminDashboardCard
-                  href="/admin/oneflow-contract-creator"
-                  icon={FileText}
-                  title="Skapa avtalskund & skicka avtal"
-                  description="Oneflow-avtal för signering"
-                  stats="6 tillgängliga mallar"
-                  tag="Skapa"
-                  iconColor="text-emerald-400"
-                />
                 
                 <AdminDashboardCard
                   href="/admin/leads"
@@ -419,6 +410,16 @@ const AdminDashboard: React.FC = () => {
                 staggerDelay={0.08}
                 initialDelay={0.8}
               >
+                <AdminDashboardCard
+                  href="/admin/oneflow-contract-creator"
+                  icon={FileText}
+                  title="Skapa avtalsförslag"
+                  description="Skapa & skicka avtal för signering, Skickas via Oneflow"
+                  stats="6 tillgängliga mallar"
+                  tag="Skapa"
+                  iconColor="text-emerald-400"
+                />
+                
                 <AdminDashboardCard
                   href="/admin/organisation/organizations"
                   icon={Building2}
