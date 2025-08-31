@@ -362,13 +362,13 @@ const AdminDashboard: React.FC = () => {
                 />
                 
                 <AdminDashboardCard
-                  href="/admin/organisation/register"
-                  icon={Building2}
-                  title="Lägg upp Multi-Site kund & konton"
-                  description="Ny multisite-kund wizard"
-                  stats="Steg-för-steg guide"
-                  tag="Multisite"
-                  iconColor="text-blue-400"
+                  href="/admin/sales-opportunities"
+                  icon={Target}
+                  title="Försäljningsmöjligheter"
+                  description="Identifierade flergångskunder utan avtal, För att konvertera engångsjobb till avtalskunder"
+                  stats="BeGone → Avtal"
+                  tag="Leads"
+                  iconColor="text-emerald-400"
                 />
               </StaggeredGrid>
             </div>
@@ -404,49 +404,6 @@ const AdminDashboard: React.FC = () => {
                   tag="Detaljerad data"
                   iconColor="text-green-400"
                 />
-                
-                <AdminDashboardCard
-                  href="/admin/sales-opportunities"
-                  icon={Target}
-                  title="Försäljningsmöjligheter"
-                  description="Identifierade flergångskunder utan avtal"
-                  stats="BeGone → Avtal"
-                  tag="Leads"
-                  iconColor="text-emerald-400"
-                />
-                
-                <AdminDashboardCard
-                  href="/admin/billing"
-                  icon={DollarSign}
-                  title="Fakturering"
-                  description="BeGone-ärenden"
-                  stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
-                  tag="Finans"
-                  iconColor="text-yellow-400"
-                />
-              </StaggeredGrid>
-            </div>
-
-            {/* Affärsintelligens - Remaining Analytics */}
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
-                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
-                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Affärsintelligens</span>
-                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
-              </h2>
-              <StaggeredGrid 
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
-                staggerDelay={0.08}
-                initialDelay={0.8}
-              >
-                <AdminDashboardCard
-                  href="/admin/commissions"
-                  icon={Wallet}
-                  title="Provisioner"
-                  description="Beräkna tekniker-provision"
-                  tag="Löner"
-                  iconColor="text-emerald-400"
-                />
               </StaggeredGrid>
             </div>
 
@@ -460,35 +417,64 @@ const AdminDashboard: React.FC = () => {
               <StaggeredGrid 
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
                 staggerDelay={0.08}
-                initialDelay={1.0}
+                initialDelay={0.8}
               >
                 <AdminDashboardCard
                   href="/admin/organisation/organizations"
                   icon={Building2}
-                  title="Hantera kundkonton & användare"
-                  description="Multisite-organisationer & access"
+                  title="Kundkonton"
+                  description="Hantera kundkonton & användare, Hantering av både multi-site kunder & vanliga avtalskunder, 0 organisationer"
                   stats="0 organisationer"
-                  tag="Konton"
+                  tag="Kundkonton"
                   iconColor="text-purple-400"
                 />
                 
                 <AdminDashboardCard
                   href="/admin/technician-management"
                   icon={UserCheck}
-                  title="Hantera Tekniker"
-                  description="Lägg till & redigera personal"
-                  tag="Personal"
+                  title="Personalkonton"
+                  description="Hantering av våra användare, Lägg till bilar, kompetenser, arbetstid & kontohantering"
+                  tag="Personalkonton"
                   iconColor="text-teal-400"
                 />
                 
                 <AdminDashboardCard
                   href="/admin/product-management"
                   icon={Package}
-                  title="Produkthantering"
-                  description="Skapa & redigera tjänster"
+                  title="Tjänsteutbud"
+                  description="Produktkatalog, Skapa & redigera produkter & tjänster, Används som val i offerter och avtalsförslag vi skapar"
                   stats="Dynamisk prissättning"
-                  tag="Katalog"
+                  tag="Tjänsteutbud"
                   iconColor="text-blue-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/organisation/register"
+                  icon={Building2}
+                  title="Registrering"
+                  description="Registrera Multi-Site kund & användarkonton, Ny multisite-kund wizard"
+                  stats="Steg-för-steg guide"
+                  tag="Registrering"
+                  iconColor="text-blue-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/billing"
+                  icon={DollarSign}
+                  title="Fakturering"
+                  description="Sluthantering av avslutade ärenden, 462 ärenden"
+                  stats={`${(stats?.totalPrivateCases || 0) + (stats?.totalBusinessCases || 0)} ärenden`}
+                  tag="Fakturering"
+                  iconColor="text-yellow-400"
+                />
+                
+                <AdminDashboardCard
+                  href="/admin/commissions"
+                  icon={Wallet}
+                  title="Provisioner"
+                  description="Redovisning av samtliga provisionsuppgifter"
+                  tag="Provisioner"
+                  iconColor="text-emerald-400"
                 />
               </StaggeredGrid>
             </div>
@@ -503,7 +489,7 @@ const AdminDashboard: React.FC = () => {
               <StaggeredGrid 
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
                 staggerDelay={0.05}
-                initialDelay={1.2}
+                initialDelay={1.0}
               >
                 <AdminDashboardCard
                   href="#"
