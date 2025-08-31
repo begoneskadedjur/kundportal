@@ -758,8 +758,17 @@ const Leads: React.FC = () => {
           resultCount={filteredLeads.length}
         />
 
-        {/* Create Button */}
-        <div className="flex justify-end mb-6">
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center mb-6">
+          <Button
+            onClick={() => navigate('/admin/leads/analytics')}
+            variant="outline"
+            className="border-slate-600 text-slate-300 hover:text-white hover:border-slate-500"
+          >
+            <BarChart3 className="w-5 h-5 mr-2" />
+            Analysera Leads
+          </Button>
+          
           <Button
             onClick={() => setShowCreateModal(true)}
             className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0"

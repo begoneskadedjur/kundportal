@@ -27,6 +27,7 @@ import TechnicianCommissions from './pages/admin/TechnicianCommissions';
 import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 import Leads from './pages/admin/Leads';
+import LeadAnalytics from './pages/admin/LeadAnalytics';
 
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
@@ -117,6 +118,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole={["admin", "koordinator", "technician"]}>
                   <Leads />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/leads/analytics" 
+              element={
+                <ProtectedRoute requiredRole={["admin", "koordinator", "technician"]}>
+                  <LeadAnalytics />
                 </ProtectedRoute>
               } 
             />
