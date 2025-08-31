@@ -17,20 +17,29 @@ interface LeadTagsManagerProps {
 }
 
 const PREDEFINED_TAGS = [
-  'Snabbköp',
-  'Återkommande kund',
-  'Stor order',
-  'VIP-kund',
-  'Pris-sensitiv',
-  'Teknisk support',
-  'Upphandling',
-  'Konkurrensutsatt',
-  'Ny marknad',
-  'Referenskund',
-  'Branschspecifik',
-  'Säsongsbaserad',
-  'Akut behov',
-  'Långsiktig relation'
+  'Prisdriven kund',
+  'Stororder / ramavtal',
+  'Långsiktig relation',
+  'Ny marknad / ny kundkategori',
+  'Förebyggande insats',
+  'Offertförfrågan',
+  'Inspektionsbehov',
+  'Uppföljningsjobb',
+  'Specialsanering',
+  'Bygg & entreprenad',
+  'Livsmedelsbutik / restaurang',
+  'Industri & lager',
+  'Vård & omsorg',
+  'Bostadsrättsförening / fastighetsbolag',
+  'Avtalskund',
+  'Återkommande sanering',
+  'Förebyggande avtal',
+  'Utgående avtal',
+  'Ny avtalsförfrågan',
+  'Akut angrepp',
+  'Pågående skadedjursproblem',
+  'Boendeakut (hem, lägenhet, förening)',
+  'Företagskritisk driftstörning'
 ]
 
 const TAG_COLORS = [

@@ -13,6 +13,7 @@ import {
   LeadContact, 
   LeadComment, 
   LeadEvent,
+  LeadTechnician,
   LeadWithRelations,
   calculateLeadScore,
   getLeadQuality,
@@ -25,6 +26,7 @@ import LeadContactsManager from './LeadContactsManager'
 import LeadCommentsSystem from './LeadCommentsSystem'
 import LeadTimeline from './LeadTimeline'
 import LeadTagsManager from './LeadTagsManager'
+import LeadTechnicianManager from './LeadTechnicianManager'
 import EditLeadModal from './EditLeadModal'
 
 interface LeadDetailModalProps {
@@ -45,6 +47,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [contacts, setContacts] = useState<LeadContact[]>([])
   const [comments, setComments] = useState<LeadComment[]>([])
   const [events, setEvents] = useState<LeadEvent[]>([])
+  const [assignedTechnicians, setAssignedTechnicians] = useState<LeadTechnician[]>([])
   const [technician, setTechnician] = useState<string | null>(null)
   const [currentLead, setCurrentLead] = useState<Lead | null>(null)
 
@@ -118,12 +121,29 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           }
         )
         .subscribe()
+
+      const technicianSubscription = supabase
+        .channel(`lead_technicians_${lead.id}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'lead_technicians',
+            filter: `lead_id=eq.${lead.id}`
+          },
+          () => {
+            // Remove setTimeout delay for immediate updates
+            fetchLeadDetails()
+          }
+        )
+        .subscribe()
         
       return () => {
         contactsSubscription.unsubscribe()
         commentsSubscription.unsubscribe()
         eventsSubscription.unsubscribe()
         leadSubscription.unsubscribe()
+        technicianSubscription.unsubscribe()
       }
     }
   }, [lead, isOpen])
@@ -142,7 +162,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       setLoading(true)
 
       // Fetch all data in parallel for better performance and consistency
-      const [contactsResponse, commentsResponse, eventsResponse, technicianResponse] = await Promise.allSettled([
+      const [contactsResponse, commentsResponse, eventsResponse, technicianAssignmentsResponse, technicianResponse] = await Promise.allSettled([
         supabase
           .from('lead_contacts')
           .select('*')
@@ -166,6 +186,20 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           `)
           .eq('lead_id', leadToFetch.id)
           .order('created_at', { ascending: false }),
+        
+        supabase
+          .from('lead_technicians')
+          .select(`
+            *,
+            technicians:technician_id(
+              id,
+              name,
+              email,
+              phone
+            )
+          `)
+          .eq('lead_id', leadToFetch.id)
+          .order('is_primary', { ascending: false }),
         
         leadToFetch.assigned_to 
           ? supabase
@@ -200,6 +234,14 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         setEvents([]) // Ensure we clear stale data
       }
 
+      // Process technician assignments with error handling
+      if (technicianAssignmentsResponse.status === 'fulfilled' && !technicianAssignmentsResponse.value.error) {
+        setAssignedTechnicians(technicianAssignmentsResponse.value.data || [])
+      } else {
+        console.error('Error fetching technician assignments:', technicianAssignmentsResponse.status === 'rejected' ? technicianAssignmentsResponse.reason : technicianAssignmentsResponse.value.error)
+        setAssignedTechnicians([]) // Ensure we clear stale data
+      }
+
       // Process technician with error handling
       if (technicianResponse.status === 'fulfilled' && !technicianResponse.value.error && technicianResponse.value.data) {
         setTechnician(technicianResponse.value.data.name)
@@ -214,6 +256,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       setContacts([])
       setComments([])
       setEvents([])
+      setAssignedTechnicians([])
       setTechnician(null)
     } finally {
       setLoading(false)
@@ -231,6 +274,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     setContacts([])
     setComments([])
     setEvents([])
+    setAssignedTechnicians([])
     setTechnician(null)
   }
 
@@ -435,6 +479,12 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* Left Column */}
                 <div className="space-y-6">
+                  <LeadTechnicianManager
+                    leadId={currentLead.id}
+                    assignedTechnicians={assignedTechnicians}
+                    onTechniciansChange={fetchLeadDetails}
+                  />
+                  
                   <LeadContactsManager
                     leadId={currentLead.id}
                     contacts={contacts}
