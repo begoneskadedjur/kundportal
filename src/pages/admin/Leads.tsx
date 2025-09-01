@@ -689,13 +689,7 @@ const Leads: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Premium Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-slate-900/50 to-purple-500/5" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent" />
-      
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-6">
         <PageHeader 
           title="Lead Pipeline" 
           description="Hantera potentiella kunder och lead-processen"
@@ -1298,7 +1292,6 @@ const Leads: React.FC = () => {
             }
           }}
         />
-      </div>
     </div>
   )
 }
