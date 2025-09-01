@@ -531,9 +531,9 @@ const Leads: React.FC = () => {
   const getStatusBadge = (status: LeadStatus) => {
     const config = LEAD_STATUS_DISPLAY[status]
     return (
-      <div className="flex items-center gap-1.5" title={config.label}>
-        <div className={`w-2.5 h-2.5 rounded-full bg-${config.color}`} />
-        <span className={`text-xs font-medium text-${config.color}`}>
+      <div className="flex items-center gap-2" title={config.label}>
+        <div className={`w-3 h-3 rounded-full bg-${config.color}`} />
+        <span className={`text-sm font-medium text-${config.color}`}>
           {config.label}
         </span>
       </div>
@@ -543,7 +543,7 @@ const Leads: React.FC = () => {
   const getPriorityIndicator = (priority: LeadPriority | null) => {
     if (!priority) {
       return (
-        <span className="text-xs text-slate-400" title="Ej angiven">
+        <span className="text-sm text-slate-400" title="Ej angiven">
           Ej angiven
         </span>
       )
@@ -552,29 +552,30 @@ const Leads: React.FC = () => {
     const config = getPriorityColor(priority)
     const label = getPriorityLabel(priority)
     
-    // Get priority color classes based on priority level
-    const getColorClass = () => {
+    // Get priority color classes and icons based on priority level
+    const getPriorityDisplay = () => {
       switch (priority) {
         case 'urgent':
-          return 'text-red-400'
+          return { color: 'text-red-400', icon: '🔥', label }
         case 'high':
-          return 'text-orange-400'
+          return { color: 'text-orange-400', icon: '⭐', label }
         case 'medium':
-          return 'text-yellow-400'
+          return { color: 'text-yellow-400', icon: '🕐', label }
         case 'low':
-          return 'text-green-400'
+          return { color: 'text-green-400', icon: '✅', label }
         default:
-          return 'text-slate-400'
+          return { color: 'text-slate-400', icon: '', label }
       }
     }
 
+    const display = getPriorityDisplay()
     return (
-      <span 
-        className={`text-xs font-medium ${getColorClass()}`}
-        title={label}
-      >
-        {label}
-      </span>
+      <div className="flex items-center justify-center gap-1" title={display.label}>
+        <span className="text-sm">{display.icon}</span>
+        <span className={`text-sm font-medium ${display.color}`}>
+          {display.label}
+        </span>
+      </div>
     )
   }
 
@@ -781,362 +782,438 @@ const Leads: React.FC = () => {
         </div>
 
         {/* Leads Table */}
-        <Card className="backdrop-blur-sm bg-slate-800/70 border-slate-700/50 overflow-hidden">
-          <div className="p-6 border-b border-slate-700/50">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-              <Target className="w-6 h-6 text-purple-400" />
-              Leads ({filteredLeads.length})
-            </h3>
-          </div>
-
-          {filteredLeads.length === 0 ? (
-            <div className="p-12 text-center">
-              <Target className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-slate-300 mb-2">
-                {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all' ? 'Inga leads matchar filtren' : 'Inga leads än'}
-              </h3>
-              <p className="text-slate-400 mb-6">
-                {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all'
-                  ? 'Prova att justera dina sökkriterier'
-                  : 'Skapa din första lead för att komma igång'
-                }
-              </p>
-              {!filters.search && filters.status === 'all' && filters.assignedTo === 'all' && (
-                <Button
-                  onClick={() => setShowCreateModal(true)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Skapa din första lead
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                <thead className="bg-slate-800/50">
-                  <tr>
-                    <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-44"
-                      onClick={() => handleSort('company_name')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Företag
-                        {getSortIcon('company_name')}
-                      </div>
-                    </th>
-                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-36">Kontakt</th>
-                    <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-16"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Status
-                        {getSortIcon('status')}
-                      </div>
-                    </th>
-                    <th 
-                      className="text-center p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors hidden lg:table-cell w-12"
-                      onClick={() => handleSort('priority')}
-                      title="Prioritet: Urgent (🔥) | Hög (⭐) | Medium (🕐) | Låg (✅)"
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        Prioritet
-                        {getSortIcon('priority')}
-                      </div>
-                    </th>
-                    <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-20"
-                      onClick={() => handleSort('lead_score')}
-                      title={`Lead Score Kalkyl (0-100 poäng):
-
-📊 STATUS (grundpoäng):
-• Förlorad: 0p (automatiskt)
-• Kall: 30p 
-• Ljummen: 40p
-• Het: 50p
-• Affär: 100p (automatiskt)
-
-🎯 BANT-KRITERIER (0-30p):
-• Budget bekräftad: +7.5p
-• Befogenhet bekräftad: +7.5p  
-• Behov bekräftat: +7.5p
-• Tidslinje bekräftad: +7.5p
-
-🎲 SANNOLIKHET (modifierare):
-• 0-20%: -20p
-• 21-40%: -10p
-• 41-60%: 0p (neutral)
-• 61-80%: +10p  
-• 81-100%: +20p
-
-🏆 KVALITET:
-80-100p: Utmärkt | 60-79p: Bra | 40-59p: Medel | 20-39p: Svag | 0-19p: Mycket svag`}
-                    >
-                      <div className="flex items-center gap-2">
-                        Score
-                        {getSortIcon('lead_score')}
-                      </div>
-                    </th>
-                    <th className="text-left p-2.5 text-sm font-medium text-slate-300 w-32 hidden xl:table-cell">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-green-400" />
-                        Kollegor
-                      </div>
-                    </th>
-                    <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24"
-                      onClick={() => handleSort('estimated_value')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Värde
-                        {getSortIcon('estimated_value')}
-                      </div>
-                    </th>
-                    <th 
-                      className="text-left p-2.5 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors w-24 hidden md:table-cell"
-                      onClick={() => handleSort('updated_at')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Uppdaterad
-                        {getSortIcon('updated_at')}
-                      </div>
-                    </th>
-                    <th className="text-center p-2.5 text-sm font-medium text-slate-300 w-16">Åtgärder</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/50">
-                  {filteredLeads.map((lead, index) => (
+        <Card className="overflow-hidden border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/70 border-b border-slate-600">
+                <tr>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company_name')}>
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-blue-400" />
+                      Lead & Kontakt
+                      {getSortIcon('company_name')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('status')}>
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-purple-400" />
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden lg:table-cell" onClick={() => handleSort('priority')}>
+                    <div className="flex items-center justify-center gap-2">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      Prioritet
+                      {getSortIcon('priority')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider hidden xl:table-cell">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-green-400" />
+                      Tilldelad
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-right text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('estimated_value')}>
+                    <div className="flex items-center justify-end gap-2">
+                      <DollarSign className="w-4 h-4 text-yellow-400" />
+                      Estimerat Värde
+                      {getSortIcon('estimated_value')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('lead_score')}>
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-400" />
+                      Lead Score
+                      {getSortIcon('lead_score')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider hidden md:table-cell">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-purple-400" />
+                      Förhoppning slutförande
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('updated_at')}>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-400" />
+                      Senast Uppdaterad
+                      {getSortIcon('updated_at')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider hidden sm:table-cell">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-green-400" />
+                      Nästa Aktivitet
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    <div className="flex items-center justify-center gap-2">
+                      <Edit3 className="w-4 h-4 text-slate-400" />
+                      Åtgärder
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLeads.map((lead, index) => {
+                  const isExpanded = expandedRows.has(lead.id)
+                  return (
                     <React.Fragment key={lead.id}>
-                      <tr 
-                        className={`hover:bg-slate-800/30 transition-colors ${
-                          lead.priority === 'high' ? 'border-l-4 border-l-red-400' :
-                          lead.priority === 'medium' ? 'border-l-4 border-l-yellow-400' :
-                          lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
-                        }`}
-                      >
-                      <td className="p-2.5">
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium text-white">{lead.company_name}</div>
-                          {lead.organization_number && (
-                            <div className="text-xs text-slate-400">{lead.organization_number}</div>
+                      {/* Main lead row */}
+                      <tr className={`hover:bg-slate-800/30 transition-colors border-b border-slate-700/30 ${
+                        lead.priority === 'urgent' ? 'border-l-4 border-l-red-500' :
+                        lead.priority === 'high' ? 'border-l-4 border-l-orange-400' :
+                        lead.priority === 'medium' ? 'border-l-4 border-l-yellow-400' :
+                        lead.priority === 'low' ? 'border-l-4 border-l-green-400' : ''
+                      }`}>
+                        {/* Lead & Kontakt */}
+                        <td className="px-4 py-4">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-semibold text-white">{lead.company_name}</div>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => toggleExpandRow(lead.id)}
+                                    className="text-slate-400 hover:text-white p-1"
+                                    title="Visa mer information"
+                                  >
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${
+                                      isExpanded ? 'rotate-180' : ''
+                                    }`} />
+                                  </Button>
+                                </div>
+                                {lead.organization_number && (
+                                  <div className="text-xs text-slate-400 font-mono">{lead.organization_number}</div>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4 text-slate-400" />
+                                  <span className="text-sm text-white">{lead.contact_person}</span>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-slate-400">
+                                  {lead.email && (
+                                    <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-blue-400">
+                                      <Mail className="w-3 h-3" />
+                                      {lead.email}
+                                    </a>
+                                  )}
+                                  {lead.phone_number && (
+                                    <a href={`tel:${lead.phone_number}`} className="flex items-center gap-1 hover:text-blue-400">
+                                      <Phone className="w-3 h-3" />
+                                      {lead.phone_number}
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-4">
+                          {getStatusBadge(lead.status)}
+                        </td>
+
+                        {/* Prioritet */}
+                        <td className="px-4 py-4 hidden lg:table-cell text-center">
+                          {getPriorityIndicator(lead.priority)}
+                        </td>
+
+                        {/* Tilldelad */}
+                        <td className="px-4 py-4 hidden xl:table-cell">
+                          <div className="space-y-1">
+                            {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
+                              lead.lead_technicians.map((assignment, idx) => (
+                                <div key={assignment.id} className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
+                                  }`} />
+                                  <span className="text-sm text-white truncate">
+                                    {assignment.technicians?.name || 'Okänd'}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-sm text-slate-400 italic">Ej tilldelad</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Estimerat Värde */}
+                        <td className="px-4 py-4 text-right">
+                          {lead.estimated_value ? (
+                            <div className="space-y-1">
+                              <div className="text-sm font-semibold text-white font-mono">
+                                {formatCurrency(lead.estimated_value)}
+                              </div>
+                              {lead.probability && (
+                                <div className="text-xs text-slate-400">{lead.probability}% sannolikhet</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-400">-</span>
                           )}
-                          <div className="flex justify-start">
+                        </td>
+
+                        {/* Lead Score */}
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="text-lg font-bold font-mono text-white">
+                              {calculateLeadScore(lead)}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {getLeadQuality(calculateLeadScore(lead)).label}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Förhoppning slutförande */}
+                        <td className="px-4 py-4 hidden md:table-cell">
+                          {lead.closing_date_estimate ? (
+                            <div className="text-sm text-white">
+                              {new Date(lead.closing_date_estimate).toLocaleDateString('sv-SE')}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-400">Ej angiven</span>
+                          )}
+                        </td>
+
+                        {/* Senast Uppdaterad */}
+                        <td className="px-4 py-4 hidden md:table-cell">
+                          <div className="space-y-1">
+                            <div className="text-sm text-white">
+                              {new Date(lead.updated_at).toLocaleDateString('sv-SE')}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {lead.updated_by_profile?.display_name || 'Okänd'}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Nästa Aktivitet */}
+                        <td className="px-4 py-4 hidden sm:table-cell">
+                          {lead.follow_up_date ? (
+                            <div className="space-y-1">
+                              <div className={`text-sm font-medium ${
+                                new Date(lead.follow_up_date) < new Date() ? 'text-red-400' :
+                                new Date(lead.follow_up_date).toDateString() === new Date().toDateString() ? 'text-yellow-400' :
+                                'text-white'
+                              }`}>
+                                {new Date(lead.follow_up_date).toLocaleDateString('sv-SE')}
+                              </div>
+                              <div className="text-xs text-slate-400">Uppföljning</div>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-400">Ej schemalagd</span>
+                          )}
+                        </td>
+
+                        {/* Åtgärder */}
+                        <td className="px-4 py-4">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => toggleExpandRow(lead.id)}
-                              className="text-slate-400 hover:text-white p-1 -ml-1"
-                              title="Visa mer information"
+                              onClick={() => handleEditLead(lead)}
+                              className="text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-200 p-2 rounded-md"
+                              title="Redigera lead"
                             >
-                              <ChevronDown className={`w-3 h-3 transition-transform ${
-                                expandedRows.has(lead.id) ? 'rotate-180' : ''
-                              }`} />
+                              <Edit3 className="w-4 h-4" />
                             </Button>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm font-medium text-white">{lead.contact_person}</span>
-                          </div>
-                          
-                          {expandedRows.has(lead.id) && (
-                            <div className="space-y-1 text-sm text-slate-400">
-                              {lead.email && (
-                                <div className="flex items-center gap-2">
-                                  <Mail className="w-3 h-3" />
-                                  <a href={`mailto:${lead.email}`} className="hover:text-white">
-                                    {lead.email}
-                                  </a>
-                                </div>
-                              )}
-                              {lead.phone_number && (
-                                <div className="flex items-center gap-2">
-                                  <Phone className="w-3 h-3" />
-                                  <a href={`tel:${lead.phone_number}`} className="hover:text-white">
-                                    {lead.phone_number}
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Activity indicators */}
-                          <div className="flex items-center gap-2 text-xs">
-                            {lead.tags && lead.tags.length > 0 && (
-                              <span className="flex items-center gap-1 text-green-400">
-                                <Tag className="w-3 h-3" />
-                                {lead.tags.length}
-                              </span>
-                            )}
-                            {/* Add more activity indicators here based on available data */}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        {getStatusBadge(lead.status)}
-                      </td>
-                      <td className="p-2.5 hidden lg:table-cell">
-                        <div className="flex justify-center">
-                          {getPriorityIndicator(lead.priority)}
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        <div className="text-sm">
-                          <div className="font-mono text-base font-bold text-white">
-                            {calculateLeadScore(lead)}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {getLeadQuality(calculateLeadScore(lead)).label}
-                          </div>
-                        </div>
-                      </td>
-                      {/* Tilldelade kollegor Column */}
-                      <td className="p-2.5 hidden xl:table-cell">
-                        <div className="flex flex-col gap-1">
-                          {lead.lead_technicians && lead.lead_technicians.length > 0 ? (
-                            lead.lead_technicians.map((assignment, idx) => (
-                              <div key={assignment.id} className="flex items-center gap-1">
-                                <div className={`w-2 h-2 rounded-full ${
-                                  assignment.is_primary ? 'bg-yellow-400' : 'bg-green-400'
-                                }`}></div>
-                                <span className="text-white text-xs truncate">
-                                  {assignment.technicians?.name?.split(' ')[0]}
-                                </span>
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 text-xs italic">Ej tilldelad</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        {lead.estimated_value ? (
-                          <div className="text-sm">
-                            <div className="text-white font-mono">{formatCurrency(lead.estimated_value)}</div>
-                            {lead.probability && (
-                              <div className="text-slate-400 text-xs">{lead.probability}%</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="p-2.5 hidden md:table-cell">
-                        <div className="text-sm text-white" 
-                             title={`${formatDate(lead.updated_at)} av ${lead.updated_by_profile?.display_name || 
-                                     lead.updated_by_profile?.email || 
-                                     'Okänd användare'}`}>
-                          {new Date(lead.updated_at).toLocaleDateString('sv-SE', { 
-                            year: 'numeric',
-                            month: '2-digit', 
-                            day: '2-digit'
-                          })}
-                        </div>
-                      </td>
-                      <td className="p-2.5">
-                        <div className="flex flex-col gap-1 items-center justify-center">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditLead(lead)}
-                            className="text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 transition-all duration-200 p-2 rounded-md group"
-                            title="Redigera lead"
-                          >
-                            <Edit3 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewLead(lead)}
-                            className="text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 transition-all duration-200 p-2 rounded-md group"
-                            title="Visa detaljer"
-                          >
-                            <Eye className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Expanderbar rad för intern information */}
-                    {expandedRows.has(lead.id) && (
-                      <tr className="bg-slate-800/30">
-                        <td colSpan={10} className="px-2 py-2 border-l-2 border-l-purple-400">
-                          <div className="grid grid-cols-2 gap-3 max-w-4xl">
-
-                            {/* Leverantör/Affärsinfo sektion - kompakt */}
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-semibold text-white flex items-center gap-1">
-                                <Building className="w-3 h-3 text-blue-400" />
-                                Affärsinformation
-                              </h4>
-                              <div className="space-y-0.5 text-xs">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Leverantör:</span>
-                                  <span className="text-white font-medium ml-2 truncate">
-                                    {lead.contract_with || 'Ingen'}
-                                  </span>
-                                </div>
-                                {lead.contract_expires && (
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Avtal ut:</span>
-                                    <span className="text-white font-medium ml-2">
-                                      {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
-                                    </span>
-                                  </div>
-                                )}
-                                {lead.company_size && (
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Storlek:</span>
-                                    <span className="text-white font-medium ml-2">
-                                      {COMPANY_SIZE_DISPLAY[lead.company_size]?.label || lead.company_size}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Aktivitetsdetaljer sektion - kompakt */}
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-semibold text-white flex items-center gap-1">
-                                <Activity className="w-3 h-3 text-purple-400" />
-                                Aktivitet
-                              </h4>
-                              <div className="space-y-0.5 text-xs">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Kommentarer:</span>
-                                  <span className="text-white font-medium">
-                                    {lead.lead_comments?.[0]?.count || 0}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Händelser:</span>
-                                  <span className="text-white font-medium">
-                                    {lead.lead_events?.[0]?.count || 0}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Skapad:</span>
-                                  <span className="text-white font-medium">
-                                    {new Date(lead.created_at).toLocaleDateString('sv-SE')}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewLead(lead)}
+                              className="text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 transition-all duration-200 p-2 rounded-md"
+                              title="Visa detaljer"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
-                    )}
+
+                      {/* Expandable details row */}
+                      {isExpanded && (
+                        <tr className="bg-slate-800/30 border-b border-slate-700/30">
+                          <td colSpan={11} className="px-6 py-4 border-l-4 border-purple-400/50">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {/* Affärsinformation */}
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                                  <Building className="w-4 h-4 text-blue-400" />
+                                  Affärsinformation
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Källa:</span>
+                                    <span className="text-white">{lead.source || 'Ej angiven'}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Kontaktmetod:</span>
+                                    <span className="text-white">
+                                      {lead.contact_method ? CONTACT_METHOD_DISPLAY[lead.contact_method]?.label || lead.contact_method : 'Ej angiven'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Företagsstorlek:</span>
+                                    <span className="text-white">
+                                      {lead.company_size ? COMPANY_SIZE_DISPLAY[lead.company_size]?.label || lead.company_size : 'Ej angiven'}
+                                    </span>
+                                  </div>
+                                  {lead.contract_with && (
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Nuvarande leverantör:</span>
+                                      <span className="text-white">{lead.contract_with}</span>
+                                    </div>
+                                  )}
+                                  {lead.contract_expires && (
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Avtal löper ut:</span>
+                                      <span className="text-white">
+                                        {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* BANT-kriterier och kvalifikation */}
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  Kvalifikation (BANT)
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Budget bekräftad:</span>
+                                    <span className={lead.budget_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                                      {lead.budget_confirmed ? '✓' : '✗'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Befogenhet bekräftad:</span>
+                                    <span className={lead.authority_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                                      {lead.authority_confirmed ? '✓' : '✗'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Behov bekräftat:</span>
+                                    <span className={lead.need_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                                      {lead.need_confirmed ? '✓' : '✗'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">Tidslinje bekräftad:</span>
+                                    <span className={lead.timeline_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                                      {lead.timeline_confirmed ? '✓' : '✗'}
+                                    </span>
+                                  </div>
+                                  {lead.probability && (
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Sannolikhet:</span>
+                                      <span className="text-white font-mono">{lead.probability}%</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Aktivitet och tidslinje */}
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                                  <Activity className="w-4 h-4 text-purple-400" />
+                                  Aktivitet & Tidslinje
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Kommentarer:</span>
+                                    <span className="text-white">{lead.lead_comments?.[0]?.count || 0}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Händelser:</span>
+                                    <span className="text-white">{lead.lead_events?.[0]?.count || 0}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Skapad:</span>
+                                    <span className="text-white">
+                                      {new Date(lead.created_at).toLocaleDateString('sv-SE')}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Skapad av:</span>
+                                    <span className="text-white">
+                                      {lead.created_by_profile?.display_name || lead.created_by_profile?.email || 'Okänd'}
+                                    </span>
+                                  </div>
+                                  {lead.tags && lead.tags.length > 0 && (
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-slate-400">Taggar:</span>
+                                      <div className="flex flex-wrap gap-1 max-w-32">
+                                        {lead.tags.map((tag, idx) => (
+                                          <span key={idx} className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded">
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Anteckningar */}
+                            {lead.notes && (
+                              <div className="mt-4 pt-4 border-t border-slate-700">
+                                <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                                  <MessageSquare className="w-4 h-4 text-blue-400" />
+                                  Anteckningar
+                                </h4>
+                                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                  {lead.notes}
+                                </p>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
                     </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {filteredLeads.length === 0 && (
+              <div className="text-center py-20 bg-slate-800/20">
+                <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
+                  <Target className="w-16 h-16 text-slate-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-300 mb-2">
+                  {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all' ? 'Inga leads matchar filtren' : 'Inga leads än'}
+                </h3>
+                <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
+                  {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all'
+                    ? 'Prova att justera dina sökkriterier för att hitta leads.'
+                    : 'Leads kommer att visas här när de läggs till i systemet.'
+                  }
+                </p>
+                {!filters.search && filters.status === 'all' && filters.assignedTo === 'all' && (
+                  <Button
+                    onClick={() => setShowCreateModal(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Skapa din första lead
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Modals */}
