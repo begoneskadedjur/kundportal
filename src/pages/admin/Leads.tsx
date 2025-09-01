@@ -889,15 +889,15 @@ const Leads: React.FC = () => {
                                   <User className="w-4 h-4 text-slate-400" />
                                   <span className="text-sm text-white">{lead.contact_person}</span>
                                 </div>
-                                <div className="flex items-center gap-4 text-xs text-slate-400">
+                                <div className="space-y-1 text-xs text-slate-400">
                                   {lead.email && (
-                                    <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-blue-400">
+                                    <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-blue-400 transition-colors duration-200">
                                       <Mail className="w-3 h-3" />
                                       {lead.email}
                                     </a>
                                   )}
                                   {lead.phone_number && (
-                                    <a href={`tel:${lead.phone_number}`} className="flex items-center gap-1 hover:text-blue-400">
+                                    <a href={`tel:${lead.phone_number}`} className="flex items-center gap-1 hover:text-blue-400 transition-colors duration-200">
                                       <Phone className="w-3 h-3" />
                                       {lead.phone_number}
                                     </a>
