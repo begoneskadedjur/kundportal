@@ -33,7 +33,8 @@ import {
   Hash,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  HelpCircle
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -43,6 +44,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { PageHeader } from '../../components/shared'
 import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
+import TooltipWrapper from '../../components/ui/TooltipWrapper'
 
 import { 
   Lead, 
@@ -847,18 +849,89 @@ const Leads: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('deal_velocity')}>
-                    <div className="flex items-center gap-2">
-                      <Flame className="w-4 h-4 text-orange-400" />
-                      Deal Velocity
-                      {getSortIcon('deal_velocity')}
-                    </div>
+                    <TooltipWrapper
+                      content={
+                        <div className="space-y-2">
+                          <div className="font-semibold text-orange-400">Deal Velocity - Leadålder</div>
+                          <div className="text-sm space-y-1">
+                            <p>Visar hur länge leadet har varit aktivt i systemet.</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-white"></div>
+                                <span>0-14 dagar: Aktiv (Vit text)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                <span>15-30 dagar: Långsam (Gul text)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                <span>30+ dagar + kall/förlorad: Stagnerad (Röd text)</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Flame className="w-3 h-3 text-red-400" />
+                                <span>Flamikonen: Deadline inom 7 dagar</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-2">
+                              Hjälper dig identifiera leads som behöver omedelbar uppmärksamhet eller riskerar att stagnera.
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      position="bottom"
+                      delay={300}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-orange-400" />
+                        Deal Velocity
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-slate-300 transition-colors" />
+                        {getSortIcon('deal_velocity')}
+                      </div>
+                    </TooltipWrapper>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('activity_pulse')}>
-                    <div className="flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-green-400" />
-                      Activity Pulse
-                      {getSortIcon('activity_pulse')}
-                    </div>
+                    <TooltipWrapper
+                      content={
+                        <div className="space-y-2">
+                          <div className="font-semibold text-green-400">Activity Pulse - Aktivitetspuls</div>
+                          <div className="text-sm space-y-1">
+                            <p>Visar hur många dagar sedan leadet senast uppdaterades.</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                                <span>0-1 dag: Aktiv (Grön text)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                <span>2-7 dagar: Nylig aktivitet (Gul text)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                                <span>8-30 dagar: Tyst period (Orange text)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                <span>30+ dagar: Inaktiv (Röd text)</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-2">
+                              Aktivitet inkluderar kommentarer, händelser och uppdateringar. 
+                              Siffran i parenteserna visar totalt antal aktiviteter.
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      position="bottom"
+                      delay={300}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-green-400" />
+                        Activity Pulse
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-slate-300 transition-colors" />
+                        {getSortIcon('activity_pulse')}
+                      </div>
+                    </TooltipWrapper>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('updated_at')}>
                     <div className="flex items-center gap-2">
@@ -990,14 +1063,72 @@ const Leads: React.FC = () => {
 
                         {/* Lead Score */}
                         <td className="px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="text-lg font-bold font-mono text-white">
-                              {calculateLeadScore(lead)}
-                            </div>
-                            <div className="text-xs text-slate-400">
-                              {getLeadQuality(calculateLeadScore(lead)).label}
-                            </div>
-                          </div>
+                          {(() => {
+                            const score = calculateLeadScore(lead)
+                            const quality = getLeadQuality(score)
+                            
+                            const getScoreStyle = (score: number) => {
+                              if (score >= 80) return {
+                                bgColor: 'bg-green-500/20',
+                                borderColor: 'border-green-400',
+                                textColor: 'text-green-400',
+                                labelColor: 'text-green-300'
+                              }
+                              if (score >= 60) return {
+                                bgColor: 'bg-blue-500/20',
+                                borderColor: 'border-blue-400',
+                                textColor: 'text-blue-400',
+                                labelColor: 'text-blue-300'
+                              }
+                              if (score >= 40) return {
+                                bgColor: 'bg-yellow-500/20',
+                                borderColor: 'border-yellow-400',
+                                textColor: 'text-yellow-400',
+                                labelColor: 'text-yellow-300'
+                              }
+                              if (score >= 20) return {
+                                bgColor: 'bg-orange-500/20',
+                                borderColor: 'border-orange-400',
+                                textColor: 'text-orange-400',
+                                labelColor: 'text-orange-300'
+                              }
+                              return {
+                                bgColor: 'bg-red-500/20',
+                                borderColor: 'border-red-400',
+                                textColor: 'text-red-400',
+                                labelColor: 'text-red-300'
+                              }
+                            }
+                            
+                            const style = getScoreStyle(score)
+                            
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                {/* Score Badge */}
+                                <div className={`
+                                  relative px-4 py-2 rounded-lg border-2 transition-all duration-200
+                                  ${style.bgColor} ${style.borderColor}
+                                  hover:scale-105 hover:shadow-lg
+                                `}>
+                                  <div className={`text-2xl font-bold font-mono ${style.textColor}`}>
+                                    {score}
+                                  </div>
+                                  {/* Score progress indicator */}
+                                  <div className="absolute bottom-0 left-0 h-1 bg-slate-700 rounded-b-md overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all duration-500 ${style.textColor.replace('text-', 'bg-')}`}
+                                      style={{ width: `${score}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Quality Label */}
+                                <div className={`text-xs font-medium ${style.labelColor} text-center px-2 py-1 rounded-md ${style.bgColor}`}>
+                                  {quality.label}
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </td>
 
                         {/* Förhoppning slutförande */}
