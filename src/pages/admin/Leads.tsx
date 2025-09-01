@@ -552,26 +552,25 @@ const Leads: React.FC = () => {
     const config = getPriorityColor(priority)
     const label = getPriorityLabel(priority)
     
-    // Get priority color classes and icons based on priority level
+    // Get priority color classes based on priority level
     const getPriorityDisplay = () => {
       switch (priority) {
         case 'urgent':
-          return { color: 'text-red-400', icon: '🔥', label }
+          return { color: 'text-red-400', label }
         case 'high':
-          return { color: 'text-orange-400', icon: '⭐', label }
+          return { color: 'text-orange-400', label }
         case 'medium':
-          return { color: 'text-yellow-400', icon: '🕐', label }
+          return { color: 'text-yellow-400', label }
         case 'low':
-          return { color: 'text-green-400', icon: '✅', label }
+          return { color: 'text-green-400', label }
         default:
-          return { color: 'text-slate-400', icon: '', label }
+          return { color: 'text-slate-400', label }
       }
     }
 
     const display = getPriorityDisplay()
     return (
-      <div className="flex items-center justify-center gap-1" title={display.label}>
-        <span className="text-sm">{display.icon}</span>
+      <div className="flex items-center justify-center" title={display.label}>
         <span className={`text-sm font-medium ${display.color}`}>
           {display.label}
         </span>
@@ -985,7 +984,11 @@ const Leads: React.FC = () => {
                               {new Date(lead.updated_at).toLocaleDateString('sv-SE')}
                             </div>
                             <div className="text-xs text-slate-400">
-                              {lead.updated_by_profile?.display_name || 'Okänd'}
+                              {lead.updated_by_profile?.display_name || 
+                               lead.updated_by_profile?.email || 
+                               lead.created_by_profile?.display_name || 
+                               lead.created_by_profile?.email || 
+                               'Okänd'}
                             </div>
                           </div>
                         </td>
@@ -1010,7 +1013,7 @@ const Leads: React.FC = () => {
 
                         {/* Åtgärder */}
                         <td className="px-4 py-4">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex flex-col items-center justify-center gap-1">
                             <Button
                               size="sm"
                               variant="ghost"
