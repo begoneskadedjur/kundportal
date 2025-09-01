@@ -128,6 +128,18 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
     e.preventDefault()
     
     if (!validateForm()) {
+      // Show toast with specific missing fields
+      const missingFields = Object.keys(errors).map(field => {
+        switch (field) {
+          case 'company_name': return 'Företagsnamn'
+          case 'contact_person': return 'Kontaktperson'
+          case 'phone_number': return 'Telefonnummer'
+          case 'email': return 'E-post'
+          case 'website': return 'Hemsida'
+          default: return field
+        }
+      })
+      toast.error(`Fyll i alla obligatoriska fält: ${missingFields.join(', ')}`)
       return
     }
 
@@ -284,11 +296,41 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
         <form onSubmit={handleSubmit} className="space-y-8">
           
+          {/* Validation errors summary */}
+          {Object.keys(errors).length > 0 && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                <h4 className="text-red-400 font-medium">Formuläret innehåller fel</h4>
+              </div>
+              <ul className="text-sm text-red-300 space-y-1">
+                {Object.entries(errors).map(([field, error]) => (
+                  <li key={field}>• {error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
           {/* Obligatorisk huvudinformation */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-400" />
+          <Card className={`p-6 bg-slate-800/50 ${
+            (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
+              ? 'border-red-500/50' 
+              : 'border-slate-700/50'
+          }`}>
+            <h3 className={`text-lg font-semibold mb-6 flex items-center gap-2 ${
+              (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
+                ? 'text-red-300' 
+                : 'text-white'
+            }`}>
+              <Building2 className={`w-5 h-5 ${
+                (errors.company_name || errors.contact_person || errors.phone_number || errors.email) 
+                  ? 'text-red-400' 
+                  : 'text-purple-400'
+              }`} />
               Obligatorisk huvudinformation
+              {(errors.company_name || errors.contact_person || errors.phone_number || errors.email) && (
+                <AlertCircle className="w-5 h-5 text-red-400 ml-2" />
+              )}
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -300,7 +342,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   value={formData.company_name || ''}
                   onChange={(e) => handleInputChange('company_name', e.target.value)}
                   placeholder="Företagsnamn"
-                  className={errors.company_name ? 'border-red-500' : ''}
+                  className={errors.company_name ? 'border-red-500 focus:ring-red-500/50 focus:border-red-500' : ''}
                 />
                 {errors.company_name && (
                   <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
@@ -330,7 +372,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   value={formData.contact_person || ''}
                   onChange={(e) => handleInputChange('contact_person', e.target.value)}
                   placeholder="Namn på kontaktperson"
-                  className={errors.contact_person ? 'border-red-500' : ''}
+                  className={errors.contact_person ? 'border-red-500 focus:ring-red-500/50 focus:border-red-500' : ''}
                 />
                 {errors.contact_person && (
                   <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
@@ -351,7 +393,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   value={formData.phone_number || ''}
                   onChange={(e) => handleInputChange('phone_number', e.target.value)}
                   placeholder="07X-XXX XX XX"
-                  className={errors.phone_number ? 'border-red-500' : ''}
+                  className={errors.phone_number ? 'border-red-500 focus:ring-red-500/50 focus:border-red-500' : ''}
                 />
                 {errors.phone_number && (
                   <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
@@ -370,7 +412,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   value={formData.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="kontakt@företag.se"
-                  className={errors.email ? 'border-red-500' : ''}
+                  className={errors.email ? 'border-red-500 focus:ring-red-500/50 focus:border-red-500' : ''}
                 />
                 {errors.email && (
                   <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
@@ -400,10 +442,13 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
           </Card>
 
           {/* Företagsinformation */}
-          <Card className="p-6 bg-slate-800/50 border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-400" />
+          <Card className={`p-6 bg-slate-800/50 ${errors.website ? 'border-red-500/50' : 'border-slate-700/50'}`}>
+            <h3 className={`text-lg font-semibold mb-6 flex items-center gap-2 ${errors.website ? 'text-red-300' : 'text-white'}`}>
+              <Building2 className={`w-5 h-5 ${errors.website ? 'text-red-400' : 'text-blue-400'}`} />
               Företagsinformation
+              {errors.website && (
+                <AlertCircle className="w-5 h-5 text-red-400 ml-2" />
+              )}
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -455,7 +500,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                   value={formData.website || ''}
                   onChange={(e) => handleInputChange('website', e.target.value)}
                   placeholder="https://www.företag.se"
-                  className={errors.website ? 'border-red-500' : ''}
+                  className={errors.website ? 'border-red-500 focus:ring-red-500/50 focus:border-red-500' : ''}
                 />
                 {errors.website && (
                   <p className="text-red-400 text-sm mt-1 flex items-center gap-1">

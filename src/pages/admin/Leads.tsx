@@ -476,6 +476,24 @@ const Leads: React.FC = () => {
             aValue = a.lead_events?.length || 0
             bValue = b.lead_events?.length || 0
             break
+          case 'closing_date_estimate':
+            aValue = a.closing_date_estimate ? new Date(a.closing_date_estimate).getTime() : 0
+            bValue = b.closing_date_estimate ? new Date(b.closing_date_estimate).getTime() : 0
+            break
+          case 'follow_up_date':
+            aValue = a.follow_up_date ? new Date(a.follow_up_date).getTime() : 0
+            bValue = b.follow_up_date ? new Date(b.follow_up_date).getTime() : 0
+            break
+          case 'deal_velocity':
+            // Sort by lead age (days since created)
+            aValue = Math.floor((new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24))
+            bValue = Math.floor((new Date().getTime() - new Date(b.created_at).getTime()) / (1000 * 60 * 60 * 24))
+            break
+          case 'activity_pulse':
+            // Sort by days since last activity (updated_at)
+            aValue = Math.floor((new Date().getTime() - new Date(a.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+            bValue = Math.floor((new Date().getTime() - new Date(b.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+            break
           default:
             return 0
         }
@@ -821,10 +839,25 @@ const Leads: React.FC = () => {
                       {getSortIcon('lead_score')}
                     </div>
                   </th>
-                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('closing_date_estimate')}>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-purple-400" />
-                      Förhoppning slutförande
+                      Uppskattad deadline
+                      {getSortIcon('closing_date_estimate')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('deal_velocity')}>
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      Deal Velocity
+                      {getSortIcon('deal_velocity')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('activity_pulse')}>
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-green-400" />
+                      Activity Pulse
+                      {getSortIcon('activity_pulse')}
                     </div>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('updated_at')}>
@@ -834,10 +867,11 @@ const Leads: React.FC = () => {
                       {getSortIcon('updated_at')}
                     </div>
                   </th>
-                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden sm:table-cell" onClick={() => handleSort('follow_up_date')}>
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-green-400" />
                       Nästa Aktivitet
+                      {getSortIcon('follow_up_date')}
                     </div>
                   </th>
                   <th className="px-4 py-4 text-center text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -977,6 +1011,75 @@ const Leads: React.FC = () => {
                           )}
                         </td>
 
+                        {/* Deal Velocity */}
+                        <td className="px-4 py-4 hidden md:table-cell">
+                          {(() => {
+                            const leadAge = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                            const isUrgent = lead.closing_date_estimate && 
+                              Math.floor((new Date(lead.closing_date_estimate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7 &&
+                              Math.floor((new Date(lead.closing_date_estimate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) >= 0;
+                            const isStagnant = leadAge > 30 && (lead.status === 'blue_cold' || lead.status === 'red_lost');
+                            
+                            return (
+                              <div className="flex items-center gap-2">
+                                {isUrgent && <Flame className="w-4 h-4 text-red-400" title="Deadline inom 7 dagar!" />}
+                                <div className="space-y-1">
+                                  <div className={`text-sm font-medium ${
+                                    isStagnant ? 'text-red-400' :
+                                    leadAge > 14 ? 'text-yellow-400' :
+                                    'text-white'
+                                  }`}>
+                                    {leadAge} dagar
+                                  </div>
+                                  <div className="text-xs text-slate-400">
+                                    {isStagnant ? 'Stagnerad' :
+                                     leadAge > 14 ? 'Långsam' :
+                                     'Aktiv'}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+
+                        {/* Activity Pulse */}
+                        <td className="px-4 py-4 hidden md:table-cell">
+                          {(() => {
+                            const daysSinceUpdate = Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+                            const commentCount = (lead.lead_comments?.[0]?.count || 0);
+                            const eventCount = (lead.lead_events?.[0]?.count || 0);
+                            const totalActivity = commentCount + eventCount;
+                            
+                            const getActivityColor = (days: number) => {
+                              if (days <= 1) return 'text-green-400';
+                              if (days <= 7) return 'text-yellow-400';
+                              if (days <= 30) return 'text-orange-400';
+                              return 'text-red-400';
+                            };
+                            
+                            const getActivityStatus = (days: number) => {
+                              if (days <= 1) return 'Aktiv';
+                              if (days <= 7) return 'Nylig';
+                              if (days <= 30) return 'Tyst';
+                              return 'Inaktiv';
+                            };
+                            
+                            return (
+                              <div className="space-y-1">
+                                <div className={`text-sm font-medium ${getActivityColor(daysSinceUpdate)}`}>
+                                  {daysSinceUpdate === 0 ? 'Idag' : 
+                                   daysSinceUpdate === 1 ? 'Igår' : 
+                                   `${daysSinceUpdate} dagar`}
+                                </div>
+                                <div className="text-xs text-slate-400">
+                                  {getActivityStatus(daysSinceUpdate)}
+                                  {totalActivity > 0 && ` (${totalActivity})`}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+
                         {/* Senast Uppdaterad */}
                         <td className="px-4 py-4 hidden md:table-cell">
                           <div className="space-y-1">
@@ -1039,7 +1142,7 @@ const Leads: React.FC = () => {
                       {/* Expandable details row */}
                       {isExpanded && (
                         <tr className="bg-slate-800/30 border-b border-slate-700/30">
-                          <td colSpan={11} className="px-6 py-4 border-l-4 border-purple-400/50">
+                          <td colSpan={13} className="px-6 py-4 border-l-4 border-purple-400/50">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               {/* Affärsinformation */}
                               <div className="space-y-3">
