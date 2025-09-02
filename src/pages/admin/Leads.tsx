@@ -830,21 +830,8 @@ const Leads: React.FC = () => {
           />
         </StaggeredGrid>
 
-        {/* Main Filters Row */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          {/* Show Only Active Toggle */}
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showOnlyActive}
-              onChange={handleShowOnlyActiveToggle}
-              className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500/50"
-            />
-            <span>Visa endast aktiva</span>
-            <span className="text-xs text-slate-400">(exkluderar Affär & Förlorad)</span>
-          </label>
-          
-          {/* Filter Count Badge */}
+        {/* Results Count */}
+        <div className="flex justify-end mb-6">
           <div className="text-sm text-slate-400">
             {filteredLeads.length} av {leads.length} leads
           </div>
@@ -858,6 +845,9 @@ const Leads: React.FC = () => {
           isOpen={showAdvancedFilters}
           onToggle={handleAdvancedFiltersToggle}
           resultCount={filteredLeads.length}
+          showOnlyActive={showOnlyActive}
+          onShowOnlyActiveToggle={handleShowOnlyActiveToggle}
+          onShowOnlyActiveToggle={handleShowOnlyActiveToggle}
         />
 
         {/* Action Buttons */}
@@ -921,11 +911,111 @@ const Leads: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('lead_score')}>
-                    <div className="flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-400" />
-                      Lead Score
-                      {getSortIcon('lead_score')}
-                    </div>
+                    <TooltipWrapper
+                      content={
+                        <div className="space-y-2">
+                          <div className="font-semibold text-yellow-400">Lead Score - Poängberäkning</div>
+                          <div className="text-sm space-y-1">
+                            <p>Lead Score är en sammanvägd bedömning av leadets kvalitet och potential.</p>
+                            
+                            <div className="space-y-2 mt-3">
+                              <div className="font-medium text-white">Poängfördelning:</div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+                                  <span className="font-medium">Status (0-30p):</span>
+                                </div>
+                                <div className="pl-4 text-xs space-y-0.5">
+                                  <div>🟢 Affär: 30p</div>
+                                  <div>🟠 Het: 25p</div>
+                                  <div>🟡 Varm: 15p</div>
+                                  <div>🔵 Kall: 5p</div>
+                                  <div>🔴 Förlorad: 0p</div>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                                  <span className="font-medium">BANT-kriterier (max 60p):</span>
+                                </div>
+                                <div className="pl-4 text-xs">
+                                  <div>Budget bekräftad: +15p</div>
+                                  <div>Befogenhet bekräftad: +15p</div>
+                                  <div>Behov bekräftat: +15p</div>
+                                  <div>Tidslinje bekräftad: +15p</div>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                  <span className="font-medium">Värde & Prioritet (max 35p):</span>
+                                </div>
+                                <div className="pl-4 text-xs">
+                                  <div>Uppskattat värde &gt;100k: +20p</div>
+                                  <div>Uppskattat värde 10-100k: +10p</div>
+                                  <div>Prioritet Brådskande: +15p</div>
+                                  <div>Prioritet Hög: +10p</div>
+                                  <div>Prioritet Medel: +5p</div>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                  <span className="font-medium">Aktivitet (max 10p):</span>
+                                </div>
+                                <div className="pl-4 text-xs">
+                                  <div>Aktivitet senaste 7 dagarna: +10p</div>
+                                  <div>Aktivitet senaste 30 dagarna: +5p</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-1 mt-3 pt-2 border-t border-slate-600">
+                              <div className="font-medium text-white">Kvalitetsnivåer:</div>
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                                  <span>80-100p: Utmärkt</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                  <span>60-79p: Bra</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                  <span>40-59p: Lovande</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                                  <span>20-39p: Behöver arbete</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                  <span>0-19p: Låg potential</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <p className="text-xs text-slate-300 mt-2">
+                              Maximal poäng: 100p. Högre poäng indikerar större sannolikhet för framgångsrik affär.
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      position="bottom"
+                      delay={300}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Star className="w-4 h-4 text-yellow-400" />
+                        Lead Score
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-slate-300 transition-colors" />
+                        {getSortIcon('lead_score')}
+                      </div>
+                    </TooltipWrapper>
                   </th>
                   <th className="px-4 py-4 text-left text-xs font-medium text-slate-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors hidden md:table-cell" onClick={() => handleSort('closing_date_estimate')}>
                     <div className="flex items-center gap-2">

@@ -43,6 +43,8 @@ interface LeadFilterPanelProps {
   isOpen: boolean
   onToggle: () => void
   resultCount: number
+  showOnlyActive: boolean
+  onShowOnlyActiveToggle: () => void
 }
 
 const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
@@ -51,7 +53,9 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
   onReset,
   isOpen,
   onToggle,
-  resultCount
+  resultCount,
+  showOnlyActive,
+  onShowOnlyActiveToggle
 }) => {
   const { user } = useAuth()
   const [localFilters, setLocalFilters] = useState<LeadFilters>(filters)
@@ -86,12 +90,55 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
 
   const activeFilterCount = getActiveFilterCount()
 
+  // Helper function for quick filter actions that may need to reset other filters
+  const handleQuickFilter = (key: keyof LeadFilters, value: any, resetOtherFilters = false) => {
+    if (resetOtherFilters) {
+      // Reset conflicting filters when applying quick filter
+      const resetFilters = { ...localFilters }
+      if (key === 'assignedTo') {
+        // Reset other assignment-related filters
+        resetFilters.assignedTo = value
+      } else if (key === 'status') {
+        // Reset other status-related filters
+        resetFilters.status = value
+      } else if (key === 'followUpToday') {
+        // Reset other follow-up related filters
+        resetFilters.followUpToday = value
+      }
+      setLocalFilters(resetFilters)
+      onFiltersChange(resetFilters)
+    } else {
+      handleFilterChange(key, value)
+    }
+  }
+
   // Quick filter buttons
   const quickFilters = [
-    { label: 'Mina leads', action: () => handleFilterChange('assignedTo', 'me') },
-    { label: 'Heta leads', action: () => handleFilterChange('status', 'orange_hot') },
-    { label: 'Uppföljning idag', action: () => handleFilterChange('followUpToday', true) },
-    { label: 'Ej tilldelade', action: () => handleFilterChange('assignedTo', 'unassigned') }
+    { 
+      label: 'Mina leads', 
+      action: () => handleQuickFilter('assignedTo', filters.assignedTo === 'me' ? 'all' : 'me', true), 
+      active: filters.assignedTo === 'me' 
+    },
+    { 
+      label: 'Heta leads', 
+      action: () => handleQuickFilter('status', filters.status === 'orange_hot' ? 'all' : 'orange_hot', true), 
+      active: filters.status === 'orange_hot' 
+    },
+    { 
+      label: 'Uppföljning idag', 
+      action: () => handleQuickFilter('followUpToday', !filters.followUpToday, true), 
+      active: filters.followUpToday 
+    },
+    { 
+      label: 'Ej tilldelade', 
+      action: () => handleQuickFilter('assignedTo', filters.assignedTo === 'unassigned' ? 'all' : 'unassigned', true), 
+      active: filters.assignedTo === 'unassigned' 
+    },
+    { 
+      label: 'Aktiva leads', 
+      action: onShowOnlyActiveToggle, 
+      active: showOnlyActive 
+    }
   ]
 
   if (!isOpen) {
@@ -103,9 +150,13 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             <Button
               key={filter.label}
               onClick={filter.action}
-              variant="outline"
+              variant={filter.active ? "default" : "outline"}
               size="sm"
-              className="text-xs"
+              className={`text-xs transition-all duration-200 ${
+                filter.active 
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500' 
+                  : 'border-slate-600 text-slate-300 hover:text-white hover:border-slate-500'
+              }`}
             >
               {filter.label}
             </Button>

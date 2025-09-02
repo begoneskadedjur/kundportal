@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(dir \"C:\\Users\\chris\\begone-kundportal\\src\\pages\")",
-      "Bash(dir \"C:\\Users\\chris\\begone-kundportal\\src\\pages\\admin\")"
+      "Bash(dir \"C:\\Users\\chris\\begone-kundportal\\src\\pages\\admin\")",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": [],
