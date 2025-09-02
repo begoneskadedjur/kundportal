@@ -34,7 +34,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  HelpCircle
+  HelpCircle,
+  Trash2
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -109,6 +110,10 @@ const Leads: React.FC = () => {
       hasEstimatedValue: 'all'
     }
   })
+  const [showOnlyActive, setShowOnlyActive] = useState(() => {
+    const saved = localStorage.getItem('showOnlyActiveLeads')
+    return saved ? JSON.parse(saved) : true // Default to true
+  })
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => {
     const saved = localStorage.getItem('showAdvancedLeadFilters')
     return saved ? JSON.parse(saved) : false
@@ -123,6 +128,7 @@ const Leads: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [deletingLead, setDeletingLead] = useState<string | null>(null)
 
   useEffect(() => {
     fetchLeads()
@@ -202,7 +208,7 @@ const Leads: React.FC = () => {
 
   useEffect(() => {
     applyFilters()
-  }, [leads, filters, sortField, sortDirection])
+  }, [leads, filters, sortField, sortDirection, showOnlyActive])
 
   const fetchLeads = async () => {
     try {
@@ -265,10 +271,16 @@ const Leads: React.FC = () => {
   const calculateStats = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
     
-    // My active leads (assigned to current user and not lost/closed)
-    const myActiveLeads = leadsData.filter(lead => 
-      lead.assigned_to === user?.id && lead.status !== 'red_lost'
-    ).length
+    // My active leads - check both assigned_to and lead_technicians table
+    const myActiveLeads = leadsData.filter(lead => {
+      // Check if user is assigned directly via assigned_to field
+      const directlyAssigned = lead.assigned_to === profile?.technician_id
+      // Check if user is in lead_technicians table
+      const technicianAssigned = lead.lead_technicians?.some(
+        assignment => assignment.technician_id === profile?.technician_id
+      )
+      return (directlyAssigned || technicianAssigned) && lead.status !== 'red_lost'
+    }).length
     
     // Leads created this week
     const weekStart = new Date()
@@ -335,12 +347,20 @@ const Leads: React.FC = () => {
       filtered = filtered.filter(lead => lead.priority === filters.priority)
     }
 
-    // Assigned to filter
+    // Assigned to filter - updated to check lead_technicians table
     if (filters.assignedTo !== 'all') {
       if (filters.assignedTo === 'me') {
-        filtered = filtered.filter(lead => lead.assigned_to === user?.id)
+        filtered = filtered.filter(lead => {
+          // Check if user is assigned directly via assigned_to field
+          const directlyAssigned = lead.assigned_to === profile?.technician_id
+          // Check if user is in lead_technicians table
+          const technicianAssigned = lead.lead_technicians?.some(
+            assignment => assignment.technician_id === profile?.technician_id
+          )
+          return directlyAssigned || technicianAssigned
+        })
       } else if (filters.assignedTo === 'unassigned') {
-        filtered = filtered.filter(lead => !lead.assigned_to)
+        filtered = filtered.filter(lead => !lead.assigned_to && (!lead.lead_technicians || lead.lead_technicians.length === 0))
       }
     }
 
@@ -429,6 +449,13 @@ const Leads: React.FC = () => {
     if (filters.hasEstimatedValue !== 'all') {
       filtered = filtered.filter(lead => 
         filters.hasEstimatedValue ? lead.estimated_value && lead.estimated_value > 0 : !lead.estimated_value
+      )
+    }
+
+    // Show only active leads filter (exclude Affär and Förlorad)
+    if (showOnlyActive) {
+      filtered = filtered.filter(lead => 
+        lead.status !== 'green_deal' && lead.status !== 'red_lost'
       )
     }
 
@@ -548,6 +575,13 @@ const Leads: React.FC = () => {
     localStorage.setItem('showAdvancedLeadFilters', JSON.stringify(newState))
   }
 
+  // Save show only active leads toggle state
+  const handleShowOnlyActiveToggle = () => {
+    const newState = !showOnlyActive
+    setShowOnlyActive(newState)
+    localStorage.setItem('showOnlyActiveLeads', JSON.stringify(newState))
+  }
+
   const getStatusBadge = (status: LeadStatus) => {
     const config = LEAD_STATUS_DISPLAY[status]
     return (
@@ -641,6 +675,38 @@ const Leads: React.FC = () => {
   const handleEditLead = (lead: Lead) => {
     setSelectedLead(lead)
     setShowEditModal(true)
+  }
+
+  const handleDeleteLead = async (lead: Lead) => {
+    if (deletingLead) return // Prevent multiple delete attempts
+    
+    const confirmed = window.confirm(
+      `Är du säker på att du vill radera leadet "${lead.company_name}"?\n\nDetta går inte att ångra.`
+    )
+    
+    if (!confirmed) return
+    
+    try {
+      setDeletingLead(lead.id)
+      
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', lead.id)
+      
+      if (error) throw error
+      
+      toast.success(`Lead "${lead.company_name}" har raderats`)
+      
+      // Remove from local state immediately for better UX
+      setLeads(prev => prev.filter(l => l.id !== lead.id))
+      
+    } catch (err) {
+      console.error('Error deleting lead:', err)
+      toast.error('Kunde inte radera leadet')
+    } finally {
+      setDeletingLead(null)
+    }
   }
 
   // Optimistic update for better UX
@@ -763,6 +829,26 @@ const Leads: React.FC = () => {
             className="cursor-pointer hover:scale-105 transition-transform"
           />
         </StaggeredGrid>
+
+        {/* Main Filters Row */}
+        <div className="flex items-center justify-between gap-4 mb-6">
+          {/* Show Only Active Toggle */}
+          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showOnlyActive}
+              onChange={handleShowOnlyActiveToggle}
+              className="rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500/50"
+            />
+            <span>Visa endast aktiva</span>
+            <span className="text-xs text-slate-400">(exkluderar Affär & Förlorad)</span>
+          </label>
+          
+          {/* Filter Count Badge */}
+          <div className="text-sm text-slate-400">
+            {filteredLeads.length} av {leads.length} leads
+          </div>
+        </div>
 
         {/* Filter Panel */}
         <LeadFilterPanel
@@ -1265,6 +1351,16 @@ const Leads: React.FC = () => {
                               title="Visa detaljer"
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteLead(lead)}
+                              disabled={deletingLead === lead.id}
+                              className="text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all duration-200 p-2 rounded-md disabled:opacity-50"
+                              title="Radera lead"
+                            >
+                              <Trash2 className={`w-4 h-4 ${deletingLead === lead.id ? 'animate-pulse' : ''}`} />
                             </Button>
                           </div>
                         </td>
