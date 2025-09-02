@@ -75,7 +75,7 @@ interface LeadStats {
 
 const Leads: React.FC = () => {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile, isAdmin, isKoordinator, isTechnician } = useAuth()
   
   const [loading, setLoading] = useState(true)
   const [leads, setLeads] = useState<Lead[]>([])

@@ -380,6 +380,14 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/coordinator/leads" 
+              element={
+                <ProtectedRoute requiredRole="koordinator">
+                  <Leads />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* --- TEKNIKER ROUTES (UPPDATERADE MED STRIKT BEHÖRIGHET) --- */}
             <Route 
@@ -411,6 +419,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="technician">
                   <TechnicianSchedule />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/technician/leads" 
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <Leads />
                 </ProtectedRoute>
               } 
             />
