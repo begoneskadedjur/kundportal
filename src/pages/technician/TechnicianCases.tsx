@@ -97,7 +97,7 @@ export default function TechnicianCases() {
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
         supabase.from('private_cases').select(selectQuery).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
         supabase.from('business_cases').select(selectQuery).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*').eq('assigned_technician_id', technicianId)
+        supabase.from('cases').select('*').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
       ]);
       
       const allCases = [
