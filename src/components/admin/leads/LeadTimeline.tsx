@@ -47,7 +47,7 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   events, 
   onEventsChange 
 }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -110,9 +110,8 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
       newErrors.title = 'Titel är obligatorisk'
     }
 
-    if (!formData.description.trim()) {
-      newErrors.description = 'Beskrivning är obligatorisk'
-    }
+    // Description is optional according to database schema (nullable)
+    // No validation needed for description
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -121,7 +120,16 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!validateForm() || !user?.id) return
+    if (!validateForm()) {
+      console.log('Validation failed')
+      return
+    }
+    
+    if (!profile?.id) {
+      console.error('No profile ID found', { user, profile })
+      toast.error('Du måste vara inloggad för att lägga till händelser')
+      return
+    }
 
     try {
       setLoading(true)
@@ -129,17 +137,21 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
       const insertData: LeadEventInsert = {
         lead_id: leadId,
         event_type: formData.event_type,
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim() || null, // Ensure empty string becomes null
+        event_date: null, // Set to null for manual events, could be made configurable
         data: formData.data,
-        created_by: user.id
+        created_by: profile.id
       }
 
       const { error } = await supabase
         .from('lead_events')
         .insert(insertData)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error saving event:', error)
+        throw new Error(error.message || 'Kunde inte spara händelse')
+      }
 
       toast.success('Händelse tillagd i timeline')
       resetForm()
@@ -147,7 +159,13 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
     } catch (err) {
       console.error('Error saving event:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte spara händelse')
+      
+      // More specific error handling
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Ett oväntat fel inträffade vid sparande av händelse'
+        
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -262,12 +280,33 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Beskrivning *
+                Titel *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                placeholder="Kort sammanfattning av händelsen..."
+                className={`w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+                  errors.title ? 'border-red-500' : ''
+                }`}
+              />
+              {errors.title && (
+                <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.title}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Beskrivning
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Beskriv vad som hände..."
+                placeholder="Detaljerad beskrivning av vad som hände..."
                 rows={3}
                 className={`w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none ${
                   errors.description ? 'border-red-500' : ''
@@ -342,9 +381,17 @@ const LeadTimeline: React.FC<LeadTimelineProps> = ({
                       </div>
                     </div>
                     
-                    <p className="text-slate-200 mb-2">
-                      {event.description}
-                    </p>
+                    {event.title && (
+                      <h4 className="text-slate-100 font-medium mb-2">
+                        {event.title}
+                      </h4>
+                    )}
+                    
+                    {event.description && (
+                      <p className="text-slate-300 mb-2">
+                        {event.description}
+                      </p>
+                    )}
                     
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <User className="w-3 h-3" />

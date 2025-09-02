@@ -32,7 +32,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
   comments, 
   onCommentsChange 
 }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingComment, setEditingComment] = useState<LeadComment | null>(null)
@@ -118,7 +118,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
                 action: 'updated',
                 updated_by_profile: user.email
               },
-              created_by: user.id
+              created_by: profile?.id || user?.id
             })
         } catch (eventError) {
           // Event logging failed, but don't fail the main operation
@@ -155,7 +155,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
                 action: 'created',
                 created_by_profile: user.email
               },
-              created_by: user.id
+              created_by: profile?.id || user?.id
             })
         } catch (eventError) {
           // Event logging failed, but don't fail the main operation
@@ -205,7 +205,7 @@ const LeadCommentsSystem: React.FC<LeadCommentsSystemProps> = ({
               action: 'deleted',
               deleted_by_profile: user?.email
             },
-            created_by: user?.id
+            created_by: profile?.id || user?.id
           })
       } catch (eventError) {
         // Event logging failed, but don't fail the main operation
