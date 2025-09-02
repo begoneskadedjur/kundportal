@@ -31,7 +31,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
   contacts, 
   onContactsChange 
 }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<LeadContact | null>(null)
@@ -123,7 +123,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
     
     if (!validateForm()) return
 
-    if (!user?.id) {
+    if (!profile?.id && !user?.id) {
       toast.error('Användarsession saknas - logga in igen')
       return
     }
@@ -166,7 +166,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                 is_primary: cleanData.is_primary,
                 action: 'updated'
               },
-              created_by: user.id
+              created_by: profile?.id || user.id
             })
         } catch (eventError) {
           console.warn('Could not log contact update event:', eventError)
@@ -202,7 +202,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
                 is_primary: cleanData.is_primary,
                 action: 'added'
               },
-              created_by: user.id
+              created_by: profile?.id || user.id
             })
         } catch (eventError) {
           console.warn('Could not log contact creation event:', eventError)
@@ -227,7 +227,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
       return
     }
 
-    if (!user?.id) {
+    if (!profile?.id && !user?.id) {
       toast.error('Användarsession saknas - logga in igen')
       return
     }
@@ -258,7 +258,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               is_primary: contact.is_primary,
               action: 'deleted'
             },
-            created_by: user?.id
+            created_by: profile?.id || user?.id
           })
       } catch (eventError) {
         console.warn('Could not log contact deletion event:', eventError)

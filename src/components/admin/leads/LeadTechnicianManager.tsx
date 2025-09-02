@@ -27,7 +27,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   assignedTechnicians, 
   onTechniciansChange 
 }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [availableTechnicians, setAvailableTechnicians] = useState<Technician[]>([])
@@ -87,7 +87,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
   
 
   const handleAddTechnician = async () => {
-    if (!selectedTechnicianId || !user?.id) {
+    if (!selectedTechnicianId || (!profile?.id && !user?.id)) {
       toast.error('Saknade data för att lägga till kollega')
       return
     }
@@ -99,7 +99,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
         lead_id: leadId,
         technician_id: selectedTechnicianId,
         is_primary: assignedTechnicians.length === 0, // First technician becomes primary
-        assigned_by: user.id,
+        assigned_by: profile?.id || user.id,
         notes: assignmentNotes.trim() || null
       }
 
@@ -134,7 +134,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               notes: insertData.notes,
               assigned_by_profile: user.email
             },
-            created_by: user.id
+            created_by: profile?.id || user.id
           })
       } catch (eventError) {
 
@@ -193,7 +193,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               was_primary: removedAssignment?.is_primary || false,
               removed_by_profile: user?.email
             },
-            created_by: user?.id
+            created_by: profile?.id || user?.id
           })
       } catch (eventError) {
 
@@ -244,7 +244,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
               technician_name: techName,
               changed_by_profile: user?.email
             },
-            created_by: user?.id
+            created_by: profile?.id || user?.id
           })
       } catch (eventError) {
 

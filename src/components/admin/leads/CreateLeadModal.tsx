@@ -31,7 +31,7 @@ interface CreateLeadModalProps {
 }
 
 export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [selectedSniCodes, setSelectedSniCodes] = useState<LeadSniCode[]>([])
@@ -143,7 +143,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
       return
     }
 
-    if (!user?.id) {
+    if (!profile?.id && !user?.id) {
       toast.error('Användare ej inloggad')
       return
     }
@@ -162,8 +162,8 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
       // Add audit fields
       const leadData: LeadInsert = {
         ...cleanData,
-        created_by: user.id,
-        updated_by: user.id
+        created_by: profile?.id || user.id,
+        updated_by: profile?.id || user.id
       } as LeadInsert
 
       const { data: insertedLead, error } = await supabase
@@ -181,7 +181,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
           sni_code: sniCode.sni_code,
           sni_description: sniCode.sni_description,
           is_primary: sniCode.is_primary,
-          created_by: user.id
+          created_by: profile?.id || user.id
         }))
 
         const { error: sniError } = await supabase
@@ -213,7 +213,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 source: insertedLead.source,
                 created_by_profile: user.email
               },
-              created_by: user.id
+              created_by: profile?.id || user.id
             })
         } catch (eventError) {
           // Don't fail the main operation if event logging fails

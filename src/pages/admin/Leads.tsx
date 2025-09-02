@@ -916,61 +916,66 @@ const Leads: React.FC = () => {
                         <div className="space-y-2">
                           <div className="font-semibold text-yellow-400">Lead Score - Poängberäkning</div>
                           <div className="text-sm space-y-1">
-                            <p>Lead Score är en sammanvägd bedömning av leadets kvalitet och potential.</p>
+                            <p>Lead Score är en automatisk bedömning av leadets kvalitet och potential baserad på objektiva kriterier.</p>
                             
                             <div className="space-y-2 mt-3">
-                              <div className="font-medium text-white">Poängfördelning:</div>
+                              <div className="font-medium text-white">Poängberäkning:</div>
                               
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                                  <span className="font-medium">Status (0-30p):</span>
+                                  <span className="font-medium">Specialfall:</span>
                                 </div>
                                 <div className="pl-4 text-xs space-y-0.5">
-                                  <div>🟢 Affär: 30p</div>
-                                  <div>🟠 Het: 25p</div>
-                                  <div>🟡 Varm: 15p</div>
-                                  <div>🔵 Kall: 5p</div>
-                                  <div>🔴 Förlorad: 0p</div>
-                                </div>
-                              </div>
-                              
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                                  <span className="font-medium">BANT-kriterier (max 60p):</span>
-                                </div>
-                                <div className="pl-4 text-xs">
-                                  <div>Budget bekräftad: +15p</div>
-                                  <div>Befogenhet bekräftad: +15p</div>
-                                  <div>Behov bekräftat: +15p</div>
-                                  <div>Tidslinje bekräftad: +15p</div>
-                                </div>
-                              </div>
-                              
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                                  <span className="font-medium">Värde & Prioritet (max 35p):</span>
-                                </div>
-                                <div className="pl-4 text-xs">
-                                  <div>Uppskattat värde &gt;100k: +20p</div>
-                                  <div>Uppskattat värde 10-100k: +10p</div>
-                                  <div>Prioritet Brådskande: +15p</div>
-                                  <div>Prioritet Hög: +10p</div>
-                                  <div>Prioritet Medel: +5p</div>
+                                  <div>🟢 Affär: alltid 100p</div>
+                                  <div>🔴 Förlorad: alltid 0p</div>
                                 </div>
                               </div>
                               
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                                  <span className="font-medium">Aktivitet (max 10p):</span>
+                                  <span className="font-medium">Status-poäng (30-50p):</span>
                                 </div>
-                                <div className="pl-4 text-xs">
-                                  <div>Aktivitet senaste 7 dagarna: +10p</div>
-                                  <div>Aktivitet senaste 30 dagarna: +5p</div>
+                                <div className="pl-4 text-xs space-y-0.5">
+                                  <div>🔵 Kall: 30p (basnivå)</div>
+                                  <div>🟡 Varm: 40p</div>
+                                  <div>🟠 Het: 50p</div>
                                 </div>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                                  <span className="font-medium">BANT-kriterier (max 30p):</span>
+                                </div>
+                                <div className="pl-4 text-xs space-y-0.5">
+                                  <div>Budget bekräftad: +7.5p</div>
+                                  <div>Befogenhet bekräftad: +7.5p</div>
+                                  <div>Behov bekräftat: +7.5p</div>
+                                  <div>Tidslinje bekräftad: +7.5p</div>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                  <span className="font-medium">Sannolikhetsmodifierare (-20 till +20p):</span>
+                                </div>
+                                <div className="pl-4 text-xs space-y-0.5">
+                                  <div>0-20%: -20p</div>
+                                  <div>21-40%: -10p</div>
+                                  <div>41-60%: 0p (neutral)</div>
+                                  <div>61-80%: +10p</div>
+                                  <div>81-100%: +20p</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-1 mt-3 pt-2 border-t border-slate-600">
+                              <div className="font-medium text-white">Total poäng: 0-100p (begränsad)</div>
+                              <div className="text-xs text-slate-300 mt-1">
+                                Formeln: Status-poäng + BANT-poäng + Sannolikhetsmodifierare
                               </div>
                             </div>
                             
@@ -987,21 +992,22 @@ const Leads: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                                  <span>40-59p: Lovande</span>
+                                  <span>40-59p: Medel</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-orange-400"></div>
-                                  <span>20-39p: Behöver arbete</span>
+                                  <span>20-39p: Svag</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-red-400"></div>
-                                  <span>0-19p: Låg potential</span>
+                                  <span>0-19p: Mycket svag</span>
                                 </div>
                               </div>
                             </div>
                             
+                            
                             <p className="text-xs text-slate-300 mt-2">
-                              Maximal poäng: 100p. Högre poäng indikerar större sannolikhet för framgångsrik affär.
+                              Automatisk beräkning. Högre poäng = större sannolikhet för framgångsrik affär.
                             </p>
                           </div>
                         </div>

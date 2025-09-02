@@ -35,7 +35,7 @@ interface EditLeadModalProps {
 }
 
 export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: EditLeadModalProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -160,7 +160,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!validateForm() || !lead?.id || !user?.id) {
+    if (!validateForm() || !lead?.id || (!profile?.id && !user?.id)) {
       return
     }
 
@@ -225,7 +225,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       // Add audit fields
       const updateData: LeadUpdate = {
         ...filteredData,
-        updated_by: user.id
+        updated_by: profile?.id || user.id
       } as LeadUpdate
 
       // Debug log the update data
@@ -303,7 +303,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               sni_code: sniCode.sni_code.trim(),
               sni_description: sniCode.sni_description?.trim() || '',
               is_primary: sniCode.is_primary,
-              created_by: user.id
+              created_by: profile?.id || user.id
             }))
 
           if (sniCodeInserts.length > 0) {
@@ -373,7 +373,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_priority_label: newPriorityLabel,
               changed_by_profile: user.email
             },
-            userId: user.id
+            userId: profile?.id || user.id
           })
         }
         
@@ -391,7 +391,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 new_contact_date: updateData.contact_date,
                 changed_by_profile: user.email
               },
-              userId: user.id
+              userId: profile?.id || user.id
             })
           }
           
@@ -407,7 +407,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 new_follow_up_date: updateData.follow_up_date,
                 changed_by_profile: user.email
               },
-              userId: user.id
+              userId: profile?.id || user.id
             })
           }
         }
@@ -425,7 +425,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_quote_date: updateData.quote_provided_date,
               changed_by_profile: user.email
             },
-            userId: user.id
+            userId: profile?.id || user.id
           })
         }
         
@@ -443,7 +443,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_estimated_value: updateData.estimated_value,
               changed_by_profile: user.email
             },
-            userId: user.id
+            userId: profile?.id || user.id
           })
         }
         

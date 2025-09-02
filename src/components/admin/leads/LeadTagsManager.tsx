@@ -58,7 +58,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   tags, 
   onTagsChange 
 }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [newTag, setNewTag] = useState('')
@@ -126,7 +126,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   }
 
   const addTag = async (tag: string) => {
-    if (!validateTag(tag) || !user?.id) return
+    if (!validateTag(tag) || (!profile?.id && !user?.id)) return
 
     try {
       setLoading(true)
@@ -137,7 +137,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
         .from('leads')
         .update({ 
           tags: updatedTags,
-          updated_by: user.id 
+          updated_by: profile?.id || user.id 
         })
         .eq('id', leadId)
 
@@ -156,7 +156,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               tag_added: tag.trim(),
               updated_by_profile: user.email
             },
-            created_by: user.id
+            created_by: profile?.id || user.id
           })
       } catch (eventError) {
         console.warn('Could not log tag addition event:', eventError)
@@ -176,7 +176,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
   }
 
   const removeTag = async (tagToRemove: string) => {
-    if (!user?.id) return
+    if (!profile?.id && !user?.id) return
 
     try {
       setLoading(true)
@@ -187,7 +187,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
         .from('leads')
         .update({ 
           tags: updatedTags,
-          updated_by: user.id 
+          updated_by: profile?.id || user.id 
         })
         .eq('id', leadId)
 
@@ -206,7 +206,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               tag_removed: tagToRemove,
               updated_by_profile: user.email
             },
-            created_by: user.id
+            created_by: profile?.id || user.id
           })
       } catch (eventError) {
         console.warn('Could not log tag removal event:', eventError)
