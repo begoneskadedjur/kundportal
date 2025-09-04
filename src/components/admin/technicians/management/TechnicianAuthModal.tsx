@@ -1,10 +1,11 @@
-// src/components/admin/technicians/management/TechnicianAuthModal.tsx - UPPDATERAD
-import { useState } from 'react'
-import { Key, Eye, EyeOff, User, AlertCircle } from 'lucide-react'
+// src/components/admin/technicians/management/TechnicianAuthModal.tsx - UPPDATERAD MED VÄLKOMSTMAIL
+import { useState, useEffect } from 'react'
+import { Key, User, AlertCircle, Mail, Send } from 'lucide-react'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
 import { supabase } from '../../../../lib/supabase'
+import { useAuth } from '../../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 type TechnicianAuthModalProps = {
@@ -26,31 +27,48 @@ export default function TechnicianAuthModal({
   technician 
 }: TechnicianAuthModalProps) {
   const [formData, setFormData] = useState({
-    display_name: technician.name,
-    password: '',
-    confirm_password: ''
+    display_name: technician.name
   })
   const [loading, setLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [sendWelcomeEmail] = useState(true) // Alltid true för inbjudningar
+  const [autoGeneratePassword] = useState(true) // Alltid true för säkerhet
+  const { user } = useAuth()
+
+  // Generera säkert lösenord automatiskt (dolt för admin)
+  const [generatedPassword] = useState(() => {
+    return !technician.has_login ? generateSecurePassword() : ''
+  })
+
+  // Hjälpfunktion för att generera säkert lösenord
+  const generateSecurePassword = (): string => {
+    const length = 12
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
+    let password = ""
+    
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length))
+    }
+    
+    // Säkerställ komplexitet
+    const hasLower = /[a-z]/.test(password)
+    const hasUpper = /[A-Z]/.test(password)
+    const hasNumber = /\d/.test(password)
+    const hasSpecial = /[!@#$%]/.test(password)
+    
+    if (!hasLower || !hasUpper || !hasNumber || !hasSpecial) {
+      return generateSecurePassword()
+    }
+    
+    return password
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (formData.password !== formData.confirm_password) {
-      toast.error('Lösenorden matchar inte')
-      return
-    }
-
-    if (formData.password.length < 6) {
-      toast.error('Lösenord måste vara minst 6 tecken')
-      return
-    }
-
     setLoading(true)
 
     try {
-      // Använd API route istället för direkt supabase.auth.admin
+      // Använd API route för att skapa konto och skicka inbjudan
       const response = await fetch('/api/enable-technician-auth', {
         method: 'POST',
         headers: {
@@ -59,24 +77,26 @@ export default function TechnicianAuthModal({
         body: JSON.stringify({
           technician_id: technician.id,
           email: technician.email,
-          password: formData.password,
-          display_name: formData.display_name
+          password: generatedPassword, // Använd automatiskt genererat lösenord
+          display_name: formData.display_name,
+          sendWelcomeEmail: sendWelcomeEmail, // Alltid true
+          invitedBy: user?.id
         })
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Kunde inte aktivera inloggning')
+        throw new Error(result.error || 'Kunde inte skicka inbjudan')
       }
 
-      toast.success(`Inloggning aktiverat för ${technician.name}!`)
+      toast.success(`Inbjudan skickad till ${technician.name} via mail!`)
       onSuccess()
       onClose()
 
     } catch (error: any) {
-      console.error('Error enabling technician login:', error)
-      toast.error(error.message || 'Kunde inte aktivera inloggning')
+      console.error('Error sending invitation:', error)
+      toast.error(error.message || 'Kunde inte skicka inbjudan')
     } finally {
       setLoading(false)
     }
@@ -126,10 +146,10 @@ export default function TechnicianAuthModal({
       <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="p-6">
           <h2 className="text-xl font-semibold text-white mb-2">
-            {technician.has_login ? 'Hantera Inloggning' : 'Aktivera Inloggning'}
+            {technician.has_login ? 'Hantera Inloggning' : 'Skicka Inbjudan'}
           </h2>
           <p className="text-slate-400 text-sm mb-6">
-            För: <span className="text-white font-medium">{technician.name}</span>
+            Till: <span className="text-white font-medium">{technician.name}</span> ({technician.email})
           </p>
 
           {technician.has_login ? (
@@ -164,7 +184,7 @@ export default function TechnicianAuthModal({
               </div>
             </div>
           ) : (
-            // Skapa ny inloggning
+            // Skapa ny inbjudan
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
                 label="Visningsnamn"
@@ -175,42 +195,21 @@ export default function TechnicianAuthModal({
                 placeholder="Namn som visas i systemet"
               />
 
-              <div className="relative">
-                <Input
-                  label="Lösenord"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  icon={<Key className="w-4 h-4" />}
-                  placeholder="Minst 6 tecken"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-9 text-slate-400 hover:text-white"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              <div className="relative">
-                <Input
-                  label="Bekräfta lösenord"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirm_password}
-                  onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
-                  required
-                  icon={<Key className="w-4 h-4" />}
-                  placeholder="Upprepa lösenordet"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-9 text-slate-400 hover:text-white"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+              {/* Inbjudningsinformation */}
+              <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Send className="w-5 h-5 text-teal-400" />
+                  <span className="text-white font-medium">Inbjudan via e-post</span>
+                </div>
+                <p className="text-sm text-slate-300 mb-2">
+                  Ett professionellt välkomstmail skickas till <span className="font-medium text-teal-400">{technician.email}</span> med:
+                </p>
+                <ul className="text-xs text-slate-400 space-y-1 ml-4">
+                  <li>• Säkra inloggningsuppgifter (auto-genererat lösenord)</li>
+                  <li>• Rollspecifika instruktioner och behörigheter</li>
+                  <li>• Direktlänk till portalen</li>
+                  <li>• Säkerhetspåminnelser</li>
+                </ul>
               </div>
 
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
@@ -240,16 +239,19 @@ export default function TechnicianAuthModal({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading || !formData.password || formData.password !== formData.confirm_password}
+                  disabled={loading || !formData.display_name}
                   className="flex-1"
                 >
                   {loading ? (
                     <>
                       <LoadingSpinner className="w-4 h-4 mr-2" />
-                      Aktiverar...
+                      Skickar inbjudan...
                     </>
                   ) : (
-                    'Aktivera Inloggning'
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Skicka Inbjudan
+                    </>
                   )}
                 </Button>
               </div>

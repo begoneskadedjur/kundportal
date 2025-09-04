@@ -98,11 +98,45 @@ export default async function handler(req: any, res: any) {
 
     console.log('✅ Profile verified:', createdProfile)
 
+    // 6. Skicka välkomstmail om det begärts
+    if (req.body.sendWelcomeEmail) {
+      try {
+        console.log('📧 Sending welcome email to:', email)
+        
+        const invitationResponse = await fetch(`${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/api/send-staff-invitation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            technicianId: technician_id,
+            email: email,
+            name: display_name || technician.name,
+            role: correctRole,
+            tempPassword: password,
+            invitedBy: req.body.invitedBy || null
+          })
+        })
+
+        if (!invitationResponse.ok) {
+          const errorData = await invitationResponse.json()
+          console.error('Failed to send welcome email:', errorData)
+          // Fortsätt ändå - kontot är skapat
+        } else {
+          console.log('✅ Welcome email sent successfully')
+        }
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError)
+        // Fortsätt ändå - kontot är skapat
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: `Inloggning aktiverat för ${technician.name}`,
       auth_user_id: newAuthUser.user.id,
-      profile: createdProfile
+      profile: createdProfile,
+      welcomeEmailSent: req.body.sendWelcomeEmail || false
     })
 
   } catch (error: any) {

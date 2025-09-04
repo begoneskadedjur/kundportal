@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import { 
   User, Mail, Phone, MapPin, MoreVertical, Edit, 
-  Trash2, Power, Key, UserCheck, UserX, Clock // ✅ NY IKON: Clock
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX // ✅ UserX behövs för varning
 } from 'lucide-react'
 import Button from '../../../ui/Button'
 import Card from '../../../ui/Card'
@@ -133,8 +133,8 @@ export default function TechnicianCard({
                   </>
                 ) : (
                   <>
-                    <UserX className="w-4 h-4" />
-                    Aktivera inloggning
+                    <Send className="w-4 h-4" />
+                    Skicka inbjudan
                   </>
                 )}
               </button>
@@ -239,17 +239,17 @@ export default function TechnicianCard({
             {technician.is_active ? 'Aktiv' : 'Inaktiv'}
           </span>
           
-          {/* Quick Auth Action */}
+          {/* Quick Invitation Action */}
           {!technician.has_login && technician.is_active && (
             <Button
               size="sm"
               variant="outline"
               onClick={() => onManageAuth(technician)}
-              className="text-xs py-1 px-2 h-6 border-green-500/50 text-green-400 hover:bg-green-500/10"
-              title="Aktivera inloggning för denna tekniker"
+              className="text-xs py-1 px-2 h-6 border-teal-500/50 text-teal-400 hover:bg-teal-500/10"
+              title="Skicka inbjudan via mail till denna tekniker"
             >
-              <Key className="w-3 h-3 mr-1" />
-              Aktivera
+              <Send className="w-3 h-3 mr-1" />
+              Bjud in
             </Button>
           )}
         </div>
