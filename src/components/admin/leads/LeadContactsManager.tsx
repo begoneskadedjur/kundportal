@@ -141,7 +141,10 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       if (editingContact) {
         // Update existing contact
-        const updateData: LeadContactUpdate = cleanData as LeadContactUpdate
+        const updateData: LeadContactUpdate = {
+          ...cleanData,
+          updated_by: profile?.id || user.id
+        } as LeadContactUpdate
         
         const { error } = await supabase
           .from('lead_contacts')
@@ -177,7 +180,9 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
         // Create new contact
         const insertData: LeadContactInsert = {
           ...cleanData,
-          lead_id: leadId
+          lead_id: leadId,
+          created_by: profile?.id || user.id,
+          updated_by: profile?.id || user.id
         } as LeadContactInsert
 
         const { error } = await supabase
