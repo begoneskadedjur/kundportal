@@ -89,8 +89,8 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Behov bekräftat:</span>
-                <span className={lead.need_confirmed ? 'text-green-400' : 'text-slate-400'}>
-                  {lead.need_confirmed ? '✓' : '✗'}
+                <span className={lead.needs_confirmed ? 'text-green-400' : 'text-slate-400'}>
+                  {lead.needs_confirmed ? '✓' : '✗'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
