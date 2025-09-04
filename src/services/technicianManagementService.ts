@@ -253,17 +253,23 @@ export const technicianManagementService = {
 
   async deleteTechnician(id: string): Promise<void> {
     try {
-      const { data: technician } = await supabase.from('technicians').select('name, email').eq('id', id).single();
-      if (!technician) throw new Error('Personal hittades inte');
-      
-      const { data: profile } = await supabase.from('profiles').select('user_id').eq('technician_id', id).single();
-      if (profile) {
-        await supabase.from('profiles').delete().eq('technician_id', id);
-        await supabase.auth.admin.deleteUser(profile.user_id);
+      const response = await fetch('/api/delete-technician', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technician_id: id
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte ta bort person');
       }
-      
-      await supabase.from('technicians').delete().eq('id', id);
-      toast.success('Personal borttagen');
+
+      toast.success('Personal borttagen permanent');
     } catch (error: any) {
       toast.error(error.message || 'Kunde inte ta bort person');
       throw error;
