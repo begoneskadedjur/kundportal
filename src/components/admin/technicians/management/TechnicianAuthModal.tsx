@@ -34,12 +34,7 @@ export default function TechnicianAuthModal({
   const [autoGeneratePassword] = useState(true) // Alltid true för säkerhet
   const { user } = useAuth()
 
-  // Generera säkert lösenord automatiskt (dolt för admin)
-  const [generatedPassword] = useState(() => {
-    return !technician.has_login ? generateSecurePassword() : ''
-  })
-
-  // Hjälpfunktion för att generera säkert lösenord
+  // Hjälpfunktion för att generera säkert lösenord (måste definieras först)
   const generateSecurePassword = (): string => {
     const length = 12
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
@@ -61,6 +56,11 @@ export default function TechnicianAuthModal({
     
     return password
   }
+
+  // Generera säkert lösenord automatiskt (dolt för admin)
+  const [generatedPassword] = useState(() => {
+    return !technician.has_login ? generateSecurePassword() : ''
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
