@@ -335,9 +335,13 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         }
       }
 
-      // Step 3: Log automatic events for lead update
+      // Step 3: Log comprehensive events for lead update
       try {
         const updatedFields = Object.keys(updateData).filter(key => key !== 'updated_by')
+        const userId = profile?.id || user.id
+        
+        // Track which fields had events logged to avoid duplicate general events
+        let fieldsWithSpecificEvents: string[] = []
         
         // Check if status was changed to log specific status change event
         if (updatedFields.includes('status') && updateData.status !== lead.status) {
@@ -353,6 +357,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
             user.id,
             user.email
           )
+          fieldsWithSpecificEvents.push('status')
         }
         
         // Check if priority was changed
@@ -372,43 +377,44 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_priority_label: newPriorityLabel,
               changed_by_profile: user.email
             },
-            userId: profile?.id || user.id
+            userId
           })
+          fieldsWithSpecificEvents.push('priority')
         }
         
         // Check if contact dates were changed
-        if (updatedFields.includes('contact_date') || updatedFields.includes('follow_up_date')) {
-          if (updatedFields.includes('contact_date') && updateData.contact_date !== lead.contact_date) {
-            const contactDate = updateData.contact_date ? new Date(updateData.contact_date).toLocaleDateString('sv-SE') : 'Ingen'
-            await logLeadEvent({
-              leadId: lead.id,
-              eventType: 'contacted',
-              title: `Kontaktdatum uppdaterat`,
-              description: `Kontaktdatum har uppdaterats till ${contactDate}`,
-              data: {
-                old_contact_date: lead.contact_date,
-                new_contact_date: updateData.contact_date,
-                changed_by_profile: user.email
-              },
-              userId: profile?.id || user.id
-            })
-          }
-          
-          if (updatedFields.includes('follow_up_date') && updateData.follow_up_date !== lead.follow_up_date) {
-            const followUpDate = updateData.follow_up_date ? new Date(updateData.follow_up_date).toLocaleDateString('sv-SE') : 'Ingen'
-            await logLeadEvent({
-              leadId: lead.id,
-              eventType: 'note_added',
-              title: `Uppföljningsdatum uppdaterat`,
-              description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
-              data: {
-                old_follow_up_date: lead.follow_up_date,
-                new_follow_up_date: updateData.follow_up_date,
-                changed_by_profile: user.email
-              },
-              userId: profile?.id || user.id
-            })
-          }
+        if (updatedFields.includes('contact_date') && updateData.contact_date !== lead.contact_date) {
+          const contactDate = updateData.contact_date ? new Date(updateData.contact_date).toLocaleDateString('sv-SE') : 'Ingen'
+          await logLeadEvent({
+            leadId: lead.id,
+            eventType: 'contacted',
+            title: `Kontaktdatum uppdaterat`,
+            description: `Kontaktdatum har uppdaterats till ${contactDate}`,
+            data: {
+              old_contact_date: lead.contact_date,
+              new_contact_date: updateData.contact_date,
+              changed_by_profile: user.email
+            },
+            userId
+          })
+          fieldsWithSpecificEvents.push('contact_date')
+        }
+        
+        if (updatedFields.includes('follow_up_date') && updateData.follow_up_date !== lead.follow_up_date) {
+          const followUpDate = updateData.follow_up_date ? new Date(updateData.follow_up_date).toLocaleDateString('sv-SE') : 'Ingen'
+          await logLeadEvent({
+            leadId: lead.id,
+            eventType: 'note_added',
+            title: `Uppföljningsdatum uppdaterat`,
+            description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
+            data: {
+              old_follow_up_date: lead.follow_up_date,
+              new_follow_up_date: updateData.follow_up_date,
+              changed_by_profile: user.email
+            },
+            userId
+          })
+          fieldsWithSpecificEvents.push('follow_up_date')
         }
         
         // Check if quote-related fields were changed
@@ -424,8 +430,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_quote_date: updateData.quote_provided_date,
               changed_by_profile: user.email
             },
-            userId: profile?.id || user.id
+            userId
           })
+          fieldsWithSpecificEvents.push('quote_provided_date')
         }
         
         // Check if estimated value was changed (important for sales tracking)
@@ -442,20 +449,114 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               new_estimated_value: updateData.estimated_value,
               changed_by_profile: user.email
             },
-            userId: profile?.id || user.id
+            userId
           })
+          fieldsWithSpecificEvents.push('estimated_value')
         }
-        
-        // General update event (only if no specific status change was logged)
-        if (!updatedFields.includes('status')) {
+
+        // NEW: Check for BANT criteria changes
+        const bantFields = ['budget_confirmed', 'authority_confirmed', 'needs_confirmed', 'timeline_confirmed']
+        const bantMapping = {
+          budget_confirmed: 'budget',
+          authority_confirmed: 'authority', 
+          needs_confirmed: 'needs',
+          timeline_confirmed: 'timeline'
+        } as const
+
+        for (const field of bantFields) {
+          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
+            const criteria = bantMapping[field as keyof typeof bantMapping]
+            const wasConfirmed = lead[field as keyof typeof lead] || false
+            const isConfirmed = updateData[field as keyof typeof updateData] || false
+            
+            await LeadEventHelpers.logBANTChange(
+              lead.id,
+              criteria,
+              wasConfirmed,
+              isConfirmed,
+              userId,
+              user.email
+            )
+            fieldsWithSpecificEvents.push(field)
+          }
+        }
+
+        // NEW: Check for business information changes
+        const businessFields = ['business_type', 'problem_type', 'company_size', 'business_description']
+        for (const field of businessFields) {
+          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
+            await LeadEventHelpers.logBusinessInfoChange(
+              lead.id,
+              field,
+              lead[field as keyof typeof lead],
+              updateData[field as keyof typeof updateData],
+              userId,
+              user.email
+            )
+            fieldsWithSpecificEvents.push(field)
+          }
+        }
+
+        // NEW: Check for contact information changes  
+        const contactFields = ['phone_number', 'email', 'address', 'website']
+        for (const field of contactFields) {
+          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
+            await LeadEventHelpers.logContactInfoChange(
+              lead.id,
+              field,
+              lead[field as keyof typeof lead],
+              updateData[field as keyof typeof updateData],
+              userId,
+              user.email
+            )
+            fieldsWithSpecificEvents.push(field)
+          }
+        }
+
+        // NEW: Check for contract information changes
+        const contractFields = ['contract_status', 'contract_with', 'contract_end_date', 'procurement']
+        for (const field of contractFields) {
+          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
+            await LeadEventHelpers.logContractInfoChange(
+              lead.id,
+              field,
+              lead[field as keyof typeof lead],
+              updateData[field as keyof typeof updateData],
+              userId,
+              user.email
+            )
+            fieldsWithSpecificEvents.push(field)
+          }
+        }
+
+        // NEW: Check for business data changes
+        const businessDataFields = ['probability', 'decision_maker', 'closing_date_estimate', 'source']
+        for (const field of businessDataFields) {
+          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
+            await LeadEventHelpers.logBusinessDataChange(
+              lead.id,
+              field,
+              lead[field as keyof typeof lead],
+              updateData[field as keyof typeof updateData],
+              userId,
+              user.email
+            )
+            fieldsWithSpecificEvents.push(field)
+          }
+        }
+
+        // Log general update event only for fields that didn't get specific events
+        const fieldsForGeneralEvent = updatedFields.filter(field => !fieldsWithSpecificEvents.includes(field))
+        if (fieldsForGeneralEvent.length > 0) {
           await LeadEventHelpers.logGeneralUpdate(
             lead.id,
             'Lead information har uppdaterats',
-            updatedFields,
-            user.id,
+            fieldsForGeneralEvent,
+            userId,
             user.email
           )
         }
+        
       } catch (eventError) {
         console.warn('Could not log lead update event:', eventError)
         // Don't fail the main operation if event logging fails

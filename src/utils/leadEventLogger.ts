@@ -234,5 +234,189 @@ export const LeadEventHelpers = {
       },
       userId
     })
+  },
+
+  /**
+   * Log BANT criteria changes
+   */
+  logBANTChange: async (
+    leadId: string,
+    criteria: 'budget' | 'authority' | 'needs' | 'timeline',
+    wasConfirmed: boolean,
+    isConfirmed: boolean,
+    userId: string,
+    userEmail?: string
+  ) => {
+    const criteriaLabels = {
+      budget: 'Budget',
+      authority: 'Befogenhet', 
+      needs: 'Behov',
+      timeline: 'Tidslinje'
+    }
+    
+    const status = isConfirmed ? 'bekräftad' : 'inte bekräftad'
+    const oldStatus = wasConfirmed ? 'bekräftad' : 'inte bekräftad'
+    
+    return logLeadEvent({
+      leadId,
+      eventType: 'updated',
+      title: `BANT: ${criteriaLabels[criteria]} ${status}`,
+      description: `${criteriaLabels[criteria]} ändrad från "${oldStatus}" till "${status}"`,
+      data: {
+        bant_criteria: criteria,
+        old_confirmed: wasConfirmed,
+        new_confirmed: isConfirmed,
+        changed_by_profile: userEmail
+      },
+      userId
+    })
+  },
+
+  /**
+   * Log business information changes
+   */
+  logBusinessInfoChange: async (
+    leadId: string,
+    field: string,
+    oldValue: any,
+    newValue: any,
+    userId: string,
+    userEmail?: string
+  ) => {
+    const fieldLabels: Record<string, string> = {
+      business_type: 'Verksamhetstyp',
+      problem_type: 'Typ av problem',
+      company_size: 'Företagsstorlek',
+      business_description: 'Verksamhetsbeskrivning'
+    }
+
+    return logLeadEvent({
+      leadId,
+      eventType: 'updated',
+      title: `${fieldLabels[field] || field} uppdaterad`,
+      description: `${fieldLabels[field] || field} ändrad från "${oldValue || 'Ingen'}" till "${newValue || 'Ingen'}"`,
+      data: {
+        field_name: field,
+        field_label: fieldLabels[field] || field,
+        old_value: oldValue,
+        new_value: newValue,
+        changed_by_profile: userEmail
+      },
+      userId
+    })
+  },
+
+  /**
+   * Log contact information changes
+   */
+  logContactInfoChange: async (
+    leadId: string,
+    field: string,
+    oldValue: any,
+    newValue: any,
+    userId: string,
+    userEmail?: string
+  ) => {
+    const fieldLabels: Record<string, string> = {
+      phone_number: 'Telefonnummer',
+      email: 'E-post',
+      address: 'Adress',
+      website: 'Hemsida'
+    }
+
+    return logLeadEvent({
+      leadId,
+      eventType: 'updated',
+      title: `Kontaktinfo: ${fieldLabels[field] || field} uppdaterad`,
+      description: `${fieldLabels[field] || field} ändrad från "${oldValue || 'Ingen'}" till "${newValue || 'Ingen'}"`,
+      data: {
+        field_name: field,
+        field_label: fieldLabels[field] || field,
+        old_value: oldValue,
+        new_value: newValue,
+        changed_by_profile: userEmail
+      },
+      userId
+    })
+  },
+
+  /**
+   * Log contract information changes
+   */
+  logContractInfoChange: async (
+    leadId: string,
+    field: string,
+    oldValue: any,
+    newValue: any,
+    userId: string,
+    userEmail?: string
+  ) => {
+    const fieldLabels: Record<string, string> = {
+      contract_status: 'Avtalsstatus',
+      contract_with: 'Avtal med',
+      contract_end_date: 'Avtal löper ut',
+      procurement: 'Upphandling'
+    }
+
+    return logLeadEvent({
+      leadId,
+      eventType: 'updated',
+      title: `Avtal: ${fieldLabels[field] || field} uppdaterad`,
+      description: `${fieldLabels[field] || field} ändrad från "${oldValue || 'Ingen'}" till "${newValue || 'Ingen'}"`,
+      data: {
+        field_name: field,
+        field_label: fieldLabels[field] || field,
+        old_value: oldValue,
+        new_value: newValue,
+        changed_by_profile: userEmail
+      },
+      userId
+    })
+  },
+
+  /**
+   * Log business data changes (probability, decision_maker, etc.)
+   */
+  logBusinessDataChange: async (
+    leadId: string,
+    field: string,
+    oldValue: any,
+    newValue: any,
+    userId: string,
+    userEmail?: string
+  ) => {
+    const fieldLabels: Record<string, string> = {
+      probability: 'Sannolikhet',
+      decision_maker: 'Beslutsfattare',
+      closing_date_estimate: 'Uppskattat slutdatum',
+      source: 'Källa'
+    }
+
+    let formattedOldValue = oldValue
+    let formattedNewValue = newValue
+
+    // Special formatting for specific fields
+    if (field === 'probability') {
+      formattedOldValue = oldValue ? `${oldValue}%` : 'Ingen'
+      formattedNewValue = newValue ? `${newValue}%` : 'Ingen'
+    } else if (field === 'closing_date_estimate') {
+      formattedOldValue = oldValue ? new Date(oldValue).toLocaleDateString('sv-SE') : 'Ingen'
+      formattedNewValue = newValue ? new Date(newValue).toLocaleDateString('sv-SE') : 'Ingen'
+    }
+
+    return logLeadEvent({
+      leadId,
+      eventType: 'updated',
+      title: `${fieldLabels[field] || field} uppdaterad`,
+      description: `${fieldLabels[field] || field} ändrad från "${formattedOldValue || 'Ingen'}" till "${formattedNewValue || 'Ingen'}"`,
+      data: {
+        field_name: field,
+        field_label: fieldLabels[field] || field,
+        old_value: oldValue,
+        new_value: newValue,
+        changed_by_profile: userEmail
+      },
+      userId
+    })
   }
 }
