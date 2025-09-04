@@ -57,11 +57,11 @@ const LeadsExpandedRow: React.FC<LeadsExpandedRowProps> = ({
                   <span className="text-white">{lead.contract_with}</span>
                 </div>
               )}
-              {lead.contract_expires && (
+              {lead.contract_end_date && (
                 <div className="flex justify-between">
                   <span className="text-slate-400">Avtal löper ut:</span>
                   <span className="text-white">
-                    {new Date(lead.contract_expires).toLocaleDateString('sv-SE')}
+                    {new Date(lead.contract_end_date).toLocaleDateString('sv-SE')}
                   </span>
                 </div>
               )}
