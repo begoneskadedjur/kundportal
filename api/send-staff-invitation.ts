@@ -7,7 +7,7 @@ import { getStaffWelcomeEmailTemplate } from './email-templates/staff-welcome'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
