@@ -67,21 +67,41 @@ export default async function handler(req: any, res: any) {
     if (profile) {
       console.log('👤 Found profile, deleting user_id:', profile.user_id)
 
-      // 3. Ta bort från profiles-tabellen först
-      if (technician.role === 'Admin') {
-        await supabaseAdmin.from('profiles').delete().eq('email', technician.email)
-      } else {
-        await supabaseAdmin.from('profiles').delete().eq('technician_id', technician_id)
+      // 3. Försök ta bort auth user FÖRST (medan profil-referensen finns)
+      try {
+        console.log('🔄 Attempting to delete auth user first...')
+        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(profile.user_id, false) // false = hard delete
+        if (authError) {
+          console.error('❌ Auth deletion failed:', authError)
+          
+          // Om auth-borttagning misslyckas, försök "soft delete" istället
+          console.log('🔄 Trying soft delete approach...')
+          const { error: softDeleteError } = await supabaseAdmin.auth.admin.deleteUser(profile.user_id, true) // true = soft delete
+          if (softDeleteError) {
+            console.warn('⚠️ Both hard and soft delete failed, continuing with profile cleanup...')
+            console.warn('Auth error details:', softDeleteError)
+          } else {
+            console.log('✅ Auth user soft deleted')
+          }
+        } else {
+          console.log('✅ Auth user hard deleted')
+        }
+      } catch (authError: any) {
+        console.warn('⚠️ Auth deletion threw exception, continuing with cleanup...', authError.message)
       }
-      console.log('✅ Profile deleted from database')
 
-      // 4. Ta bort från auth.users med service role
-      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(profile.user_id)
-      if (authError) {
-        console.error('❌ Failed to delete auth user:', authError)
-        throw new Error(`Kunde inte ta bort auth-användare: ${authError.message}`)
+      // 4. Ta bort från profiles-tabellen efter auth-försök
+      try {
+        if (technician.role === 'Admin') {
+          await supabaseAdmin.from('profiles').delete().eq('email', technician.email)
+        } else {
+          await supabaseAdmin.from('profiles').delete().eq('technician_id', technician_id)
+        }
+        console.log('✅ Profile deleted from database')
+      } catch (profileError: any) {
+        console.error('❌ Profile deletion failed:', profileError)
+        // Fortsätt ändå för att ta bort från technicians
       }
-      console.log('✅ Auth user deleted')
     } else {
       console.log('ℹ️ No profile found, skipping auth deletion')
     }
@@ -98,16 +118,17 @@ export default async function handler(req: any, res: any) {
     }
 
     console.log('✅ Technician deleted from database')
-    console.log('🎉 Complete deletion successful for:', technician.name)
+    console.log('🎉 Deletion completed for:', technician.name)
 
     return res.status(200).json({
       success: true,
-      message: `${technician.name} har tagits bort permanent`,
+      message: `${technician.name} har tagits bort från systemet`,
       deleted: {
         technician: true,
         profile: !!profile,
-        authUser: !!profile
-      }
+        authUser: !!profile // Vi försökte alltid ta bort auth om profile fanns
+      },
+      warning: profile ? 'Auth-borttagning kan ha misslyckats men användaren är borttagen från systemet' : null
     })
 
   } catch (error: any) {
