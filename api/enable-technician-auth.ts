@@ -91,12 +91,17 @@ export default async function handler(req: any, res: any) {
 
     // 4. Skapa auth user med ADMIN CLIENT
     // handle_new_user trigger kommer automatiskt skapa profilen
-    const userMetadata = {
-      display_name: display_name,
-      role: correctRole,             // Korrekt roll baserat på technicians.role
-      technician_id: technician_id, // Trigger använder detta för FK
-      technician_name: technician.name
-    }
+    const userMetadata = correctRole === 'admin' 
+      ? {
+          role: correctRole,           // Trigger behöver detta för att identifiera admin
+          display_name: display_name   // Trigger använder detta för display_name i profiles
+        }
+      : {
+          display_name: display_name,
+          role: correctRole,             
+          technician_id: technician_id,
+          technician_name: technician.name
+        }
     
     console.log('🔍 DEBUG: Creating user with metadata:', JSON.stringify(userMetadata, null, 2))
     console.log('🔍 DEBUG: User creation parameters:', {
