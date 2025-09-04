@@ -179,6 +179,94 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       <div className="font-semibold text-yellow-400">Lead Score - Poängberäkning</div>
                       <div className="text-sm space-y-1">
                         <p>Lead Score är en automatisk bedömning av leadets kvalitet och potential baserad på objektiva kriterier.</p>
+                        
+                        <div className="space-y-2 mt-3">
+                          <div className="font-medium text-white">Poängberäkning:</div>
+                          
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+                              <span className="font-medium">Specialfall:</span>
+                            </div>
+                            <div className="pl-4 text-xs space-y-0.5">
+                              <div>🟢 Affär: alltid 100p</div>
+                              <div>🔴 Förlorad: alltid 0p</div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                              <span className="font-medium">Status-poäng (30-50p):</span>
+                            </div>
+                            <div className="pl-4 text-xs space-y-0.5">
+                              <div>🔵 Kall: 30p (basnivå)</div>
+                              <div>🟡 Varm: 40p</div>
+                              <div>🟠 Het: 50p</div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                              <span className="font-medium">BANT-kriterier (max 30p):</span>
+                            </div>
+                            <div className="pl-4 text-xs space-y-0.5">
+                              <div>Budget bekräftad: +7.5p</div>
+                              <div>Befogenhet bekräftad: +7.5p</div>
+                              <div>Behov bekräftat: +7.5p</div>
+                              <div>Tidslinje bekräftad: +7.5p</div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                              <span className="font-medium">Sannolikhetsmodifierare (-20 till +20p):</span>
+                            </div>
+                            <div className="pl-4 text-xs space-y-0.5">
+                              <div>0-20%: -20p</div>
+                              <div>21-40%: -10p</div>
+                              <div>41-60%: 0p (neutral)</div>
+                              <div>61-80%: +10p</div>
+                              <div>81-100%: +20p</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 mt-3 pt-2 border-t border-slate-600">
+                          <div className="font-medium text-white">Total poäng: 0-100p (begränsad)</div>
+                          <div className="text-xs text-slate-300 mt-1">
+                            Formeln: Status-poäng + BANT-poäng + Sannolikhetsmodifierare
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 mt-3 pt-2 border-t border-slate-600">
+                          <div className="font-medium text-white">Kvalitetsnivåer:</div>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                              <span>80-100p: Utmärkt</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                              <span>60-79p: Bra</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                              <span>40-59p: Medel</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                              <span>20-39p: Svag</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                              <span>0-19p: Mycket svag</span>
+                            </div>
+                          </div>
+                        </div>
+                        
                         <p className="text-xs text-slate-300 mt-2">
                           Automatisk beräkning. Högre poäng = större sannolikhet för framgångsrik affär.
                         </p>
@@ -210,6 +298,24 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       <div className="font-semibold text-orange-400">Deal Velocity - Leadålder</div>
                       <div className="text-sm space-y-1">
                         <p>Visar hur länge leadet har varit aktivt i systemet.</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            <span>0-14 dagar: Aktiv (Vit text)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                            <span>15-30 dagar: Långsam (Gul text)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                            <span>30+ dagar + kall/förlorad: Stagnerad (Röd text)</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Flame className="w-3 h-3 text-red-400" />
+                            <span>Flamikonen: Deadline inom 7 dagar</span>
+                          </div>
+                        </div>
                         <p className="text-xs text-slate-300 mt-2">
                           Hjälper dig identifiera leads som behöver omedelbar uppmärksamhet eller riskerar att stagnera.
                         </p>
@@ -234,6 +340,24 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       <div className="font-semibold text-green-400">Activity Pulse - Aktivitetspuls</div>
                       <div className="text-sm space-y-1">
                         <p>Visar hur många dagar sedan leadet senast uppdaterades.</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                            <span>0-1 dag: Aktiv (Grön text)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                            <span>2-7 dagar: Nylig aktivitet (Gul text)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                            <span>8-30 dagar: Tyst period (Orange text)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                            <span>30+ dagar: Inaktiv (Röd text)</span>
+                          </div>
+                        </div>
                         <p className="text-xs text-slate-300 mt-2">
                           Aktivitet inkluderar kommentarer, händelser och uppdateringar. 
                           Siffran i parenteserna visar totalt antal aktiviteter.
