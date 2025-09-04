@@ -54,6 +54,20 @@ export default async function handler(req: any, res: any) {
     const correctRole = roleMapping[technician.role] || 'technician'
     console.log(`🔄 Mapping role: ${technician.role} -> ${correctRole}`)
 
+    // 3.5. Validera email och lösenord innan Supabase-anrop
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      console.error('Invalid email format:', email)
+      return res.status(400).json({ error: 'Ogiltigt e-postformat' })
+    }
+    
+    if (!password || password.length < 6) {
+      console.error('Invalid password length:', password ? password.length : 0)
+      return res.status(400).json({ error: 'Lösenord måste vara minst 6 tecken' })
+    }
+
+    console.log('✅ Email and password validation passed')
+
     // 4. Skapa auth user med ADMIN CLIENT
     // handle_new_user trigger kommer automatiskt skapa profilen
     const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -70,7 +84,28 @@ export default async function handler(req: any, res: any) {
 
     if (authError) {
       console.error('Auth creation error:', authError)
-      return res.status(500).json({ error: `Kunde inte skapa användarkonto: ${authError.message}` })
+      console.error('Full error object:', JSON.stringify(authError, null, 2))
+      console.error('Error details:', {
+        message: authError.message,
+        status: authError.status,
+        code: authError.code,
+        name: authError.name
+      })
+      
+      let errorMessage = `Database error creating new user`
+      if (authError.message.includes('duplicate')) {
+        errorMessage = 'En användare med denna e-postadress existerar redan'
+      } else if (authError.message.includes('invalid')) {
+        errorMessage = 'Ogiltiga användaruppgifter'
+      } else if (authError.status === 422) {
+        errorMessage = 'E-postformat eller lösenord uppfyller inte kraven'
+      }
+      
+      return res.status(500).json({ 
+        error: `Kunde inte skapa användarkonto: ${errorMessage}`,
+        supabaseError: authError.message,
+        errorCode: authError.code
+      })
     }
 
     console.log('✅ Auth user created:', newAuthUser.user.id)
