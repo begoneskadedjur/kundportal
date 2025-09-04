@@ -33,15 +33,17 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ error: 'Tekniker hittades inte' })
     }
 
-    // 2. Kontrollera om auth redan finns
+    // 2. Kontrollera om auth redan finns - för både admins och tekniker
+    // Admins identifieras via email (technician_id är null enligt constraint)
+    // Tekniker identifieras via technician_id
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('user_id')
-      .eq('technician_id', technician_id)
+      .or(`technician_id.eq.${technician_id},email.eq.${email}`)
       .single()
 
     if (existingProfile) {
-      return res.status(400).json({ error: 'Tekniker har redan inloggning aktiverat' })
+      return res.status(400).json({ error: 'Personen har redan inloggning aktiverat' })
     }
 
     // 3. Mappa korrekt roll baserat på technicians.role
