@@ -68,29 +68,73 @@ export default async function handler(req: any, res: any) {
 
     console.log('✅ Email and password validation passed')
 
+    // 3.6 DEBUG: Kontrollera om email redan existerar i auth.users
+    console.log('🔍 Checking if email already exists in auth system...')
+    try {
+      const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+      if (listError) {
+        console.warn('Could not check existing users:', listError)
+      } else {
+        const existingUser = existingUsers.users.find(u => u.email === email)
+        if (existingUser) {
+          console.error('🚨 EMAIL ALREADY EXISTS in auth.users:', existingUser.id)
+          return res.status(400).json({ 
+            error: 'En användare med denna e-postadress existerar redan i auth-systemet',
+            existingUserId: existingUser.id
+          })
+        }
+        console.log('✅ Email is unique in auth system')
+      }
+    } catch (listUsersError) {
+      console.warn('Error checking existing users:', listUsersError)
+    }
+
     // 4. Skapa auth user med ADMIN CLIENT
     // handle_new_user trigger kommer automatiskt skapa profilen
+    const userMetadata = {
+      display_name: display_name,
+      role: correctRole,             // Korrekt roll baserat på technicians.role
+      technician_id: technician_id, // Trigger använder detta för FK
+      technician_name: technician.name
+    }
+    
+    console.log('🔍 DEBUG: Creating user with metadata:', JSON.stringify(userMetadata, null, 2))
+    console.log('🔍 DEBUG: User creation parameters:', {
+      email: email,
+      passwordLength: password ? password.length : 0,
+      email_confirm: true
+    })
+
     const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
       email_confirm: true,
-      user_metadata: {
-        display_name: display_name,
-        role: correctRole,             // Korrekt roll baserat på technicians.role
-        technician_id: technician_id, // Trigger använder detta för FK
-        technician_name: technician.name
-      }
+      user_metadata: userMetadata
     })
 
     if (authError) {
+      console.error('🚨 AUTH CREATION FAILED')
       console.error('Auth creation error:', authError)
       console.error('Full error object:', JSON.stringify(authError, null, 2))
       console.error('Error details:', {
         message: authError.message,
         status: authError.status,
         code: authError.code,
-        name: authError.name
+        name: authError.name,
+        __isAuthError: authError.__isAuthError
       })
+      
+      // DEBUG: Log all properties of the error
+      console.error('🔍 All error properties:', Object.getOwnPropertyNames(authError))
+      console.error('🔍 Error prototype:', Object.getPrototypeOf(authError))
+      
+      // Try to extract any nested error information
+      if (authError.cause) {
+        console.error('🔍 Error cause:', authError.cause)
+      }
+      if (authError.stack) {
+        console.error('🔍 Error stack:', authError.stack)
+      }
       
       let errorMessage = `Database error creating new user`
       if (authError.message.includes('duplicate')) {
@@ -104,7 +148,14 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ 
         error: `Kunde inte skapa användarkonto: ${errorMessage}`,
         supabaseError: authError.message,
-        errorCode: authError.code
+        errorCode: authError.code,
+        debugInfo: {
+          errorName: authError.name,
+          errorStatus: authError.status,
+          isAuthError: authError.__isAuthError,
+          userMetadata: userMetadata,
+          email: email
+        }
       })
     }
 
