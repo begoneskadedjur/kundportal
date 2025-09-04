@@ -865,32 +865,6 @@ const Leads: React.FC = () => {
           onDeleteLead={handleDeleteLead}
         />
 
-        {/* Empty state when no leads match filters */}
-        {filteredLeads.length === 0 && (
-          <div className="text-center py-20">
-            <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
-              <Target className="w-16 h-16 text-slate-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-300 mb-2">
-              {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all' ? 'Inga leads matchar filtren' : 'Inga leads än'}
-            </h3>
-            <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
-              {filters.search || filters.status !== 'all' || filters.assignedTo !== 'all'
-                ? 'Prova att justera dina sökkriterier för att hitta leads.'
-                : 'Leads kommer att visas här när de läggs till i systemet.'
-              }
-            </p>
-            {!filters.search && filters.status === 'all' && filters.assignedTo === 'all' && (
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Skapa din första lead
-              </Button>
-            )}
-          </div>
-        )}
 
         {/* Modals */}
         <CreateLeadModal
