@@ -79,7 +79,8 @@
       "Read(/C:\\Users\\chris\\begone-kundportal\\api/**)",
       "mcp__supabase__get_logs",
       "Bash(git commit:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": [],

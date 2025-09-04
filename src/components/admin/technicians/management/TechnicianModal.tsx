@@ -89,8 +89,45 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         }
       } else {
         // Skapa ny personal
-        const newStaffMember = await technicianManagementService.createTechnician(formData as TechnicianFormData);
-        await technicianManagementService.updateCompetencies(newStaffMember.id, competenciesArray); // Spara kompetenser
+        if (formData.role === 'Admin') {
+          // För admins: skapa admin-konto direkt via Supabase Auth
+          // Detta säkerställer korrekt struktur (endast i auth + profiles, inte i technicians)
+          
+          // Generera säkert lösenord
+          const generateSecurePassword = () => {
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
+            let password = ""
+            for (let i = 0; i < 12; i++) {
+              password += charset.charAt(Math.floor(Math.random() * charset.length))
+            }
+            return password
+          }
+          
+          const adminPassword = generateSecurePassword()
+          
+          // Skapa admin direkt via auth API
+          const response = await fetch('/api/create-admin-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: formData.email,
+              password: adminPassword,
+              display_name: formData.name,
+              sendWelcomeEmail: true
+            })
+          })
+          
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Kunde inte skapa admin-konto')
+          }
+          
+          toast.success(`Admin-konto skapat och välkomstmail skickat till ${formData.email}`)
+        } else {
+          // För tekniker och koordinatorer: använd vanlig createTechnician
+          const newStaffMember = await technicianManagementService.createTechnician(formData as TechnicianFormData);
+          await technicianManagementService.updateCompetencies(newStaffMember.id, competenciesArray); // Spara kompetenser
+        }
       }
       
       toast.success(technician ? 'Personal uppdaterad!' : 'Personal skapad!');
