@@ -93,8 +93,7 @@ export default async function handler(req: any, res: any) {
     // handle_new_user trigger kommer automatiskt skapa profilen
     const userMetadata = correctRole === 'admin' 
       ? {
-          role: correctRole,           // Trigger behöver detta för att identifiera admin
-          display_name: display_name   // Trigger använder detta för display_name i profiles
+          role: correctRole            // Endast role för admin - trigger ska inte sätta display_name
         }
       : {
           display_name: display_name,

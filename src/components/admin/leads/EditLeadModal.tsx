@@ -222,10 +222,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         })
       )
 
-      // Add audit fields
+      // Add audit fields - updated_by hanteras automatiskt av trigger
       const updateData: LeadUpdate = {
-        ...filteredData,
-        updated_by: profile?.id || user.id
+        ...filteredData
       } as LeadUpdate
 
       // Debug log the update data
