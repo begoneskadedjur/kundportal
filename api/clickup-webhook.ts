@@ -99,6 +99,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let payload: ClickUpWebhookPayload
     
+    // Check for ClickUp test webhook FIRST (before signature verification)
+    if (rawBody.includes('test') || rawBody.includes('ping')) {
+      console.log('🧪 Test webhook received from ClickUp')
+      return res.status(200).json({ message: 'Test webhook received successfully' })
+    }
+
     try {
       payload = JSON.parse(rawBody)
       console.log('✅ Payload parsed successfully:', {
@@ -107,17 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         list_id: payload.list_id,
         webhook_id: payload.webhook_id
       })
-      
+
     } catch (parseError) {
       console.error('❌ Failed to parse webhook payload:', parseError)
       return res.status(400).json({ error: 'Invalid JSON payload' })
     }
 
-    if (!payload.event && rawBody.includes('test')) {
-      console.log('🧪 Test webhook received from ClickUp')
-      return res.status(200).json({ message: 'Test webhook received successfully' })
-    }
-
+    // Verify signature for real events
     if (CLICKUP_WEBHOOK_SECRET) {
       const signature = req.headers['x-signature'] as string
       if (!verifyWebhookSignature(rawBody, signature, CLICKUP_WEBHOOK_SECRET)) {
