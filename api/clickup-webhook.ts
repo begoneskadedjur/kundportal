@@ -119,7 +119,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid JSON payload' })
     }
 
-    // Verify signature for real events
+    // Check if this is a test/ping event (no event property or unsupported event)
+    const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted', 'taskStatusUpdated', 'taskAssigneeUpdated']
+    if (!payload.event || !supportedEvents.includes(payload.event)) {
+      console.log(`ℹ️ Ignoring event (likely test webhook): ${payload.event || 'undefined'}`)
+      return res.status(200).json({ message: `Event ${payload.event || 'undefined'} ignored` })
+    }
+
+    // Verify signature for real events ONLY (after confirming it's a supported event)
     if (CLICKUP_WEBHOOK_SECRET) {
       const signature = req.headers['x-signature'] as string
       if (!verifyWebhookSignature(rawBody, signature, CLICKUP_WEBHOOK_SECRET)) {
@@ -127,11 +134,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ error: 'Invalid signature' })
       }
     }
-
-    const supportedEvents = ['taskCreated', 'taskUpdated', 'taskDeleted', 'taskStatusUpdated', 'taskAssigneeUpdated']
-    if (!payload.event || !supportedEvents.includes(payload.event)) {
-      console.log(`ℹ️ Ignoring event: ${payload.event || 'undefined'}`)
-      return res.status(200).json({ message: `Event ${payload.event || 'undefined'} ignored` })
     }
 
     if (!payload.task_id) {
