@@ -134,7 +134,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ error: 'Invalid signature' })
       }
     }
-    }
 
     if (!payload.task_id) {
       console.error('❌ Missing task_id in webhook payload')
