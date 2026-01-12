@@ -150,15 +150,34 @@ export default function ImageBank() {
 
         privateCases?.forEach(c => {
           const key = `private:${c.id}`
-          const adressData = c.adress as { gatuadress?: string; postnummer?: string; postort?: string } | null
+          // Adress kan ha olika format: { gatuadress, postnummer, postort } eller { formatted_address, location }
+          const adressData = c.adress as {
+            gatuadress?: string; postnummer?: string; postort?: string;
+            formatted_address?: string; location?: { lat: number; lng: number }
+          } | null
+
+          // Extrahera adress - använd formatted_address om gatuadress inte finns
+          let address: string | null = null
+          let city: string | null = null
+          let postal_code: string | null = null
+
+          if (adressData?.gatuadress) {
+            address = adressData.gatuadress
+            city = adressData.postort || null
+            postal_code = adressData.postnummer || null
+          } else if (adressData?.formatted_address) {
+            // Formatted address är hela adressen, använd den direkt
+            address = adressData.formatted_address
+          }
+
           casesWithImages.push({
             id: c.id,
             case_type: 'private',
             title: c.title,
             scheduled_date: c.start_date,
-            address: adressData?.gatuadress || null,
-            city: adressData?.postort || null,
-            postal_code: adressData?.postnummer || null,
+            address,
+            city,
+            postal_code,
             pest_type: c.skadedjur,
             status: c.status,
             technician_name: c.primary_assignee_name,
@@ -185,15 +204,34 @@ export default function ImageBank() {
 
         businessCases?.forEach(c => {
           const key = `business:${c.id}`
-          const adressData = c.adress as { gatuadress?: string; postnummer?: string; postort?: string } | null
+          // Adress kan ha olika format: { gatuadress, postnummer, postort } eller { formatted_address, location }
+          const adressData = c.adress as {
+            gatuadress?: string; postnummer?: string; postort?: string;
+            formatted_address?: string; location?: { lat: number; lng: number }
+          } | null
+
+          // Extrahera adress - använd formatted_address om gatuadress inte finns
+          let address: string | null = null
+          let city: string | null = null
+          let postal_code: string | null = null
+
+          if (adressData?.gatuadress) {
+            address = adressData.gatuadress
+            city = adressData.postort || null
+            postal_code = adressData.postnummer || null
+          } else if (adressData?.formatted_address) {
+            // Formatted address är hela adressen, använd den direkt
+            address = adressData.formatted_address
+          }
+
           casesWithImages.push({
             id: c.id,
             case_type: 'business',
             title: c.title,
             scheduled_date: c.start_date,
-            address: adressData?.gatuadress || null,
-            city: adressData?.postort || null,
-            postal_code: adressData?.postnummer || null,
+            address,
+            city,
+            postal_code,
             pest_type: c.skadedjur,
             status: c.status,
             technician_name: c.primary_assignee_name,
@@ -220,15 +258,39 @@ export default function ImageBank() {
 
         contractCases?.forEach(c => {
           const key = `contract:${c.id}`
-          const adressData = c.address as { gatuadress?: string; postnummer?: string; postort?: string; street?: string; postal_code?: string; city?: string } | null
+          // Adress kan ha olika format: { gatuadress, postnummer, postort }, { street, postal_code, city } eller { formatted_address, location }
+          const adressData = c.address as {
+            gatuadress?: string; postnummer?: string; postort?: string;
+            street?: string; postal_code?: string; city?: string;
+            formatted_address?: string; location?: { lat: number; lng: number }
+          } | null
+
+          // Extrahera adress - prova olika format
+          let address: string | null = null
+          let city: string | null = null
+          let postal_code: string | null = null
+
+          if (adressData?.gatuadress) {
+            address = adressData.gatuadress
+            city = adressData.postort || null
+            postal_code = adressData.postnummer || null
+          } else if (adressData?.street) {
+            address = adressData.street
+            city = adressData.city || null
+            postal_code = adressData.postal_code || null
+          } else if (adressData?.formatted_address) {
+            // Formatted address är hela adressen, använd den direkt
+            address = adressData.formatted_address
+          }
+
           casesWithImages.push({
             id: c.id,
             case_type: 'contract',
             title: c.title,
             scheduled_date: c.scheduled_start,
-            address: adressData?.gatuadress || adressData?.street || null,
-            city: adressData?.postort || adressData?.city || null,
-            postal_code: adressData?.postnummer || adressData?.postal_code || null,
+            address,
+            city,
+            postal_code,
             pest_type: c.pest_type,
             status: c.status,
             technician_name: c.primary_technician_name,

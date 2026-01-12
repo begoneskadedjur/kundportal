@@ -41,18 +41,30 @@ const ExpandedCustomerRow = ({ customer }: { customer: any }) => {
   const products = useMemo(() => {
     if (!customer.products) return []
     try {
-      const parsed = typeof customer.products === 'string' 
-        ? JSON.parse(customer.products) 
+      const parsed = typeof customer.products === 'string'
+        ? JSON.parse(customer.products)
         : customer.products
-      
+
       if (Array.isArray(parsed)) {
         const allProducts: any[] = []
         parsed.forEach((group: any) => {
           if (group.products && Array.isArray(group.products)) {
             group.products.forEach((product: any) => {
+              // Quantity kan vara ett objekt {type, amount} eller ett nummer
+              let qty = 1
+              if (product.quantity) {
+                if (typeof product.quantity === 'object' && product.quantity !== null) {
+                  qty = product.quantity.amount || 1
+                } else if (typeof product.quantity === 'number') {
+                  qty = product.quantity
+                } else if (typeof product.quantity === 'string') {
+                  qty = parseInt(product.quantity, 10) || 1
+                }
+              }
+
               allProducts.push({
                 name: product.name || 'Okänd produkt',
-                quantity: product.quantity?.amount || product.quantity || 1,
+                quantity: qty,
                 description: product.description || ''
               })
             })
