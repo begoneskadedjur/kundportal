@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
-import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -24,6 +24,10 @@ import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 
 // Tekniker-dropdown
 import TechnicianDropdown from '../TechnicianDropdown'
+
+// Bildhantering
+import CaseImageUpload from '../../shared/CaseImageUpload'
+import CaseImageGallery from '../../shared/CaseImageGallery'
 
 // Datum-hjälpfunktioner för svensk tidszon
 import { toSwedishISOString } from '../../../utils/dateHelpers'
@@ -324,6 +328,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [error, setError] = useState<string | null>(null)
   const [currentCase, setCurrentCase] = useState<TechnicianCase | null>(null)
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
+  const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
 
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
@@ -1081,12 +1086,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                 </h3>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Rapport & Dokumentation</label>
-                  <textarea 
-                    name="rapport" 
-                    value={formData.rapport || ''} 
-                    onChange={handleChange} 
-                    rows={6} 
-                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                  <textarea
+                    name="rapport"
+                    value={formData.rapport || ''}
+                    onChange={handleChange}
+                    rows={6}
+                    className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
                     placeholder="Skriv en detaljerad rapport över utfört arbete, använda metoder, resultat och eventuella rekommendationer för kunden..."
                   />
                 </div>
@@ -1095,6 +1100,40 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   <p>• Dokumentera resultatet av behandlingen</p>
                   <p>• Ge rekommendationer för framtida förebyggande åtgärder</p>
                   <p>• Notera eventuella uppföljningsbehov</p>
+                </div>
+              </div>
+            )}
+
+            {/* Bilder sektion - visas för alla ärendetyper */}
+            {currentCase && (
+              <div className="space-y-4 pt-6 border-t border-slate-700">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-cyan-400" />Bilder
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
+                </p>
+
+                {/* Bildgalleri */}
+                <CaseImageGallery
+                  caseId={currentCase.id}
+                  caseType={currentCase.case_type}
+                  canDelete={true}
+                  onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
+                  refreshTrigger={imageRefreshTrigger}
+                  showCategories={true}
+                />
+
+                {/* Bilduppladdning */}
+                <div className="pt-4 border-t border-slate-700/50">
+                  <CaseImageUpload
+                    caseId={currentCase.id}
+                    caseType={currentCase.case_type}
+                    defaultCategory="general"
+                    userId={profile?.id}
+                    onUploadComplete={() => setImageRefreshTrigger(prev => prev + 1)}
+                    maxFiles={10}
+                  />
                 </div>
               </div>
             )}

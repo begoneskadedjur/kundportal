@@ -5,11 +5,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { 
-  X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save, 
+import {
+  X, User, Phone, Mail, MapPin, Calendar, AlertCircle, Save,
   Clock, FileText, Users, Crown, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, DollarSign, Lightbulb,
-  Building, Building2
+  Building, Building2, Image as ImageIcon
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -24,6 +24,8 @@ import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
+import CaseImageUpload from '../shared/CaseImageUpload'
+import CaseImageGallery from '../shared/CaseImageGallery'
 
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
@@ -159,6 +161,7 @@ export default function EditContractCaseModal({
   const [regionchefContactInfo, setRegionchefContactInfo] = useState<{contactPerson?: string, contactEmail?: string, contactPhone?: string} | null>(null)
   const [verksamhetschefContactInfo, setVerksamhetschefContactInfo] = useState<{contactPerson?: string, contactEmail?: string, contactPhone?: string} | null>(null)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
 
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
@@ -1406,6 +1409,43 @@ export default function EditContractCaseModal({
                   disabled={isCustomerView}
                 />
               </div>
+
+              {/* Bilder sektion */}
+              {caseData?.id && (
+                <div className="bg-slate-800/30 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-cyan-400" />
+                    Bilder
+                  </h3>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
+                  </p>
+
+                  {/* Bildgalleri */}
+                  <CaseImageGallery
+                    caseId={caseData.id}
+                    caseType="contract"
+                    canDelete={!isCustomerView}
+                    onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
+                    refreshTrigger={imageRefreshTrigger}
+                    showCategories={true}
+                  />
+
+                  {/* Bilduppladdning - endast för staff */}
+                  {!isCustomerView && (
+                    <div className="pt-4 border-t border-slate-700/50 mt-4">
+                      <CaseImageUpload
+                        caseId={caseData.id}
+                        caseType="contract"
+                        defaultCategory="general"
+                        userId={profile?.id}
+                        onUploadComplete={() => setImageRefreshTrigger(prev => prev + 1)}
+                        maxFiles={10}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 🚦 Bedömning & Rekommendationer - Only for contract customers */}
               {caseData.customer_id && (

@@ -1581,6 +1581,33 @@ export const isScheduledCase = (caseData: BeGoneCaseRow | any): boolean => {
   return false;
 }
 
+// 🆕 CASE IMAGES - Bildhantering för ärenden
+export interface CaseImage {
+  id: string
+  case_id: string
+  case_type: 'private' | 'business' | 'contract'
+  file_path: string
+  file_name: string
+  file_size?: number
+  mime_type?: string
+  category: 'before' | 'after' | 'general'
+  description?: string
+  uploaded_by?: string
+  uploaded_at: string
+}
+
+export type CaseImageInsert = Omit<CaseImage, 'id' | 'uploaded_at'>
+export type CaseImageUpdate = Partial<CaseImageInsert>
+
+// Kategori-visningsnamn för bilder
+export const CASE_IMAGE_CATEGORY_DISPLAY = {
+  before: { label: 'Före', color: 'orange-500', icon: 'Camera' },
+  after: { label: 'Efter', color: 'green-500', icon: 'CheckCircle' },
+  general: { label: 'Övrigt', color: 'blue-500', icon: 'Image' }
+} as const
+
+export type CaseImageCategory = keyof typeof CASE_IMAGE_CATEGORY_DISPLAY
+
 // 🆕 LEAD SYSTEM HJÄLPFUNKTIONER
 export const getLeadStatusColor = (status: LeadStatus): string => {
   return LEAD_STATUS_DISPLAY[status]?.color || 'gray-500'

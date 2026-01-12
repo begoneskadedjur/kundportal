@@ -5,10 +5,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck, Building2 } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, AlertCircle, FileText, Users, Star, ThumbsUp, Meh, ThumbsDown, Home, Briefcase, Euro, Percent, FileCheck, Building2, Image as ImageIcon } from 'lucide-react';
 import { PEST_TYPES } from '../../../utils/clickupFieldMapper';
 import { useClickUpSync } from '../../../hooks/useClickUpSync';
 import SiteSelector from '../../shared/SiteSelector';
+import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../shared/CaseImageSelector';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -78,18 +79,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [searchStartDate, setSearchStartDate] = useState<Date | null>(new Date());
   const [numberOfTechnicians, setNumberOfTechnicians] = useState(1);
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
-  
+  const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+
   // ClickUp sync hook
   const { syncAfterCreate } = useClickUpSync();
 
   const handleReset = useCallback(() => {
-    setStep('selectType'); setCaseType(null); setFormData({}); 
+    setStep('selectType'); setCaseType(null); setFormData({});
     setSuggestions([]); setTeamSuggestions([]);
     setError(null); setLoading(false); setSubmitted(false); setSuggestionLoading(false);
     setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
     setSelectedContractCustomer(null);
     setSelectedSiteId(null);
-  }, []);
+    // Städa upp bildförhandsvisningar
+    selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+    setSelectedImages([]);
+  }, [selectedImages]);
 
   // Hämta avtalskunder och multisite-roller när modal öppnas
   useEffect(() => {
@@ -473,35 +478,65 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           case_number: `AVT-${Date.now().toString().slice(-6)}`
         };
         
+        let createdCaseId: string | null = null;
         if (initialCaseData && initialCaseData.case_type === 'contract') {
           // Uppdatera befintligt avtalskundärende
           const { error } = await supabase.from('cases').update(caseData).eq('id', initialCaseData.id);
           if (error) throw error;
+          createdCaseId = initialCaseData.id;
         } else {
           // Skapa nytt avtalskundärende
-          const { error } = await supabase.from('cases').insert([caseData]);
+          const { data, error } = await supabase.from('cases').insert([caseData]).select('id').single();
           if (error) throw error;
+          createdCaseId = data?.id || null;
         }
+
+        // Ladda upp valda bilder om det finns några
+        if (createdCaseId && selectedImages.length > 0) {
+          const { success, failed } = await uploadSelectedImages(selectedImages, createdCaseId, 'contract');
+          if (success > 0) {
+            toast.success(`${success} bild${success > 1 ? 'er' : ''} uppladdade`);
+          }
+          if (failed > 0) {
+            toast.error(`${failed} bild${failed > 1 ? 'er' : ''} kunde inte laddas upp`);
+          }
+        }
+
         toast.success(`Avtalskundärendet "${formData.title}" har bokats in!`);
       } else {
         // Hantera ClickUp-ärenden (private/business)
         const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
+        let createdClickUpCaseId: string | null = null;
+
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
           const { error } = await supabase.from(tableName).update(formData).eq('id', initialCaseData.id);
           if (error) throw error;
+          createdClickUpCaseId = initialCaseData.id;
           toast.success(`Ärendet "${formData.title}" har bokats in!`);
         } else {
-          const { data, error } = await supabase.from(tableName).insert([{ 
-            ...formData, 
-            title: formData.title.trim(), 
-            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` 
+          const { data, error } = await supabase.from(tableName).insert([{
+            ...formData,
+            title: formData.title.trim(),
+            clickup_task_id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           }]).select('id');
           if (error) throw error;
+          createdClickUpCaseId = data?.[0]?.id || null;
           toast.success('Ärendet har skapats!');
-          
+
           // Synka till ClickUp i bakgrunden om case skapades
-          if (data && data[0]?.id && caseType !== 'contract') {
-            syncAfterCreate(data[0].id, caseType);
+          if (createdClickUpCaseId && caseType !== 'contract') {
+            syncAfterCreate(createdClickUpCaseId, caseType);
+          }
+        }
+
+        // Ladda upp valda bilder om det finns några
+        if (createdClickUpCaseId && selectedImages.length > 0) {
+          const { success, failed } = await uploadSelectedImages(selectedImages, createdClickUpCaseId, caseType);
+          if (success > 0) {
+            toast.success(`${success} bild${success > 1 ? 'er' : ''} uppladdade`);
+          }
+          if (failed > 0) {
+            toast.error(`${failed} bild${failed > 1 ? 'er' : ''} kunde inte laddas upp`);
           }
         }
       }
@@ -808,6 +843,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <option value="Nej">Nej</option><option value="JA - Första Klockslaget">JA - Första Klockslaget</option><option value="JA - Tidsspann">JA - Tidsspann</option>
                           </select>
                       </div>
+                  </div>
+                  {/* Bilder sektion */}
+                  <div className="space-y-4">
+                      <h4 className="text-md font-medium text-slate-300 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <ImageIcon size={16} className="text-cyan-400" /> Bilder (valfritt)
+                      </h4>
+                      <p className="text-sm text-slate-400">
+                        Lägg till bilder som dokumenterar ärendet. Kategorisera som "Före", "Efter" eller "Övrigt".
+                      </p>
+                      <CaseImageSelector
+                        selectedImages={selectedImages}
+                        onImagesChange={setSelectedImages}
+                        defaultCategory="before"
+                        maxFiles={10}
+                      />
                   </div>
                 </div>
               </div>
