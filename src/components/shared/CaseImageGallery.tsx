@@ -499,11 +499,35 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     return 'isPending' in img && img.isPending === true
   }
 
+  // Hantera direkt nedladdning av bild
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(blobUrl)
+      toast.success('Nedladdning startad')
+    } catch (error) {
+      console.error('Nedladdning misslyckades:', error)
+      toast.error('Kunde inte ladda ner bilden')
+    }
+  }
+
   // Lightbox-komponent som renderas i portal
   const lightbox = selectedImage && createPortal(
     <div
-      className="fixed inset-0 bg-black/95 flex items-center justify-center"
-      style={{ zIndex: 99999 }}
+      className="fixed inset-0 flex items-center justify-center"
+      style={{
+        zIndex: 2147483647, // Max z-index
+        backgroundColor: 'rgba(0, 0, 0, 0.95)',
+        isolation: 'isolate'
+      }}
       onClick={(e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -642,17 +666,19 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {'url' in selectedImage && !('isPending' in selectedImage) && (
-              <a
-                href={selectedImage.url}
-                download={'file_name' in selectedImage ? selectedImage.file_name : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDownload(
+                    selectedImage.url,
+                    'file_name' in selectedImage ? selectedImage.file_name : 'bild.jpg'
+                  )
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                onClick={(e) => e.stopPropagation()}
               >
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Ladda ner</span>
-              </a>
+              </button>
             )}
             {canDelete && (
               <>
