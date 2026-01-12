@@ -28,6 +28,7 @@ import SalesOpportunities from './pages/admin/SalesOpportunities';
 import ProductManagementPage from './pages/admin/ProductManagement';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
+import ImageBank from './pages/admin/ImageBank';
 
 // Multisite pages
 import AdminOrganizationsPage from './pages/admin/multisite/OrganizationsPage';
@@ -193,15 +194,23 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/admin/product-management" 
+            <Route
+              path="/admin/product-management"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <ProductManagementPage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            
+            <Route
+              path="/admin/image-bank"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <ImageBank />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Organisation Management Routes - Admin */}
             <Route 
               path="/admin/organisation/register" 

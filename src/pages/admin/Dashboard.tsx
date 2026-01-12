@@ -25,7 +25,9 @@ import {
   MapPin,
   AlertCircle,
   UserPlus,
-  Receipt
+  Receipt,
+  Image as ImageIcon,
+  Megaphone
 } from 'lucide-react'
 
 import Card from '../../components/ui/Card'
@@ -476,6 +478,41 @@ const AdminDashboard: React.FC = () => {
                   description="Redovisning av samtliga provisionsuppgifter"
                   tag="Provisioner"
                   iconColor="text-emerald-400"
+                />
+              </StaggeredGrid>
+            </div>
+
+            {/* Marknadsföring & Kommunikation */}
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-4">
+                <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#20c58f]/50" />
+                <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Marknadsföring & Kommunikation</span>
+                <div className="w-full h-px bg-gradient-to-r from-[#20c58f]/50 to-transparent" />
+              </h2>
+              <StaggeredGrid
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                staggerDelay={0.08}
+                initialDelay={0.9}
+              >
+                <AdminDashboardCard
+                  href="/admin/image-bank"
+                  icon={ImageIcon}
+                  title="Bildbank"
+                  description="Ärendebilder för marknadsföring, Före/efter-dokumentation"
+                  stats="Saneringsrapporter"
+                  tag="Material"
+                  iconColor="text-cyan-400"
+                />
+
+                <AdminDashboardCard
+                  href="#"
+                  icon={Megaphone}
+                  title="Mail-kampanjer"
+                  description="Skapa & skicka nyhetsbrev, Kommer snart"
+                  stats="Kommer snart"
+                  tag="Kommunikation"
+                  iconColor="text-purple-400"
+                  className="opacity-60"
                 />
               </StaggeredGrid>
             </div>
