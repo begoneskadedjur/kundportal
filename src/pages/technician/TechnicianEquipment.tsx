@@ -15,7 +15,8 @@ import {
   EquipmentList,
   EquipmentFormData
 } from '../../components/shared/equipment'
-import TechnicianPortalLayout from '../../components/technician/TechnicianPortalLayout'
+import { PageHeader } from '../../components/shared'
+import Card from '../../components/ui/Card'
 import {
   MapPin,
   Plus,
@@ -231,19 +232,19 @@ export default function TechnicianEquipment() {
   }
 
   return (
-    <TechnicianPortalLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <MapPin className="w-7 h-7 text-emerald-400" />
-              Utrustningsplacering
-            </h1>
-            <p className="text-slate-400 mt-1">
+    <div className="min-h-screen bg-slate-950">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <PageHeader
+          title="Utrustningsplacering"
+          backPath="/technician/dashboard"
+        />
+
+        <div className="space-y-6">
+          {/* Header description */}
+          <div className="flex items-center justify-between">
+            <p className="text-slate-400">
               Placera och hantera fällor och stationer hos kunder
             </p>
-          </div>
 
           {/* Uppdateringsknapp */}
           {selectedCustomerId && (
@@ -486,7 +487,8 @@ export default function TechnicianEquipment() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
-    </TechnicianPortalLayout>
+    </div>
   )
 }
