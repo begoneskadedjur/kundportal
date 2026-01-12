@@ -578,17 +578,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
               <div className="flex flex-col md:flex-row gap-4">
-                  <button onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
+                  <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <User className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-blue-400" />
                     <h3 className="text-xl font-bold">Privatperson</h3>
                     <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
                   </button>
-                  <button onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
+                  <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <Building className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-green-400" />
                     <h3 className="text-xl font-bold">Företag</h3>
                     <p className="text-sm text-slate-400 mt-2">Engångsjobb via ClickUp</p>
                   </button>
-                  <button onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30">
+                  <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-6 md:p-8 text-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
                     <FileCheck className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-emerald-400" />
                     <h3 className="text-xl font-bold">Avtalskund</h3>
                     <p className="text-sm text-slate-400 mt-2">Återkommande tjänster</p>
