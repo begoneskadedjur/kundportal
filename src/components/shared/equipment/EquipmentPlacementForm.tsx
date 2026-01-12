@@ -1,6 +1,6 @@
 // src/components/shared/equipment/EquipmentPlacementForm.tsx - Formulär för att skapa/redigera utrustning
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   EquipmentType,
   EquipmentStatus,
@@ -10,6 +10,7 @@ import {
   requiresSerialNumber
 } from '../../../types/database'
 import { useGpsLocation } from '../../../hooks/useGpsLocation'
+import { MapLocationPicker } from './MapLocationPicker'
 import {
   MapPin,
   Crosshair,
@@ -19,7 +20,8 @@ import {
   Loader2,
   AlertCircle,
   Check,
-  X
+  X,
+  Map
 } from 'lucide-react'
 
 interface EquipmentPlacementFormProps {
@@ -73,6 +75,8 @@ export function EquipmentPlacementForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     existingEquipment?.photo_url || null
   )
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [manualLocationSet, setManualLocationSet] = useState(false)
 
   const {
     latitude: gpsLat,
@@ -152,9 +156,22 @@ export function EquipmentPlacementForm({
   const handleCaptureGps = async () => {
     try {
       await captureLocation()
+      setManualLocationSet(false)
     } catch (error) {
       console.error('GPS-fel:', error)
     }
+  }
+
+  // Hantera manuell positionsval från kartan
+  const handleMapPositionSelect = (lat: number, lng: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng
+    }))
+    setManualLocationSet(true)
+    setShowMapPicker(false)
+    onLocationCapture?.(lat, lng)
   }
 
   return (
@@ -229,105 +246,177 @@ export function EquipmentPlacementForm({
           GPS-position *
         </label>
 
-        {/* GPS-knapp */}
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleCaptureGps}
-          disabled={gpsLoading}
-          className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-center gap-3 ${
-            hasLocation
-              ? 'border-green-500 bg-green-500/10'
-              : 'border-slate-700 bg-slate-800/50 hover:border-blue-500'
-          }`}
-        >
-          {gpsLoading ? (
-            <>
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              <span className="text-blue-400">Hämtar position...</span>
-            </>
-          ) : hasLocation ? (
-            <>
-              <Check className="w-5 h-5 text-green-400" />
-              <span className="text-green-400">Position hämtad</span>
-            </>
-          ) : (
-            <>
-              <MapPin className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-300">Hämta GPS-position</span>
-            </>
+        {/* Kartväljare (visas när aktiverad) */}
+        <AnimatePresence>
+          {showMapPicker && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-4 overflow-hidden"
+            >
+              <MapLocationPicker
+                initialPosition={
+                  formData.latitude && formData.longitude
+                    ? { lat: formData.latitude, lng: formData.longitude }
+                    : null
+                }
+                onPositionSelect={handleMapPositionSelect}
+                onCancel={() => setShowMapPicker(false)}
+                height="350px"
+              />
+            </motion.div>
           )}
-        </motion.button>
+        </AnimatePresence>
 
-        {/* Visa koordinater */}
-        {(formData.latitude && formData.longitude) && (
-          <div className={`mt-3 p-3 rounded-lg ${
-            !isHighAccuracy
-              ? 'bg-amber-500/10 border border-amber-500/30'
-              : 'bg-slate-800/50'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400">Koordinater</p>
-                <p className="text-white font-mono">
-                  {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
-                </p>
-              </div>
-              {formattedAccuracy && (
-                <div className="text-right">
-                  <p className="text-sm text-slate-400">Noggrannhet</p>
-                  <p className={`font-medium ${
-                    accuracyLevel === 'excellent' ? 'text-green-400' :
-                    accuracyLevel === 'good' ? 'text-emerald-400' :
-                    accuracyLevel === 'acceptable' ? 'text-yellow-400' :
-                    'text-red-400'
-                  }`}>
-                    {formattedAccuracy}
-                    {accuracyLevel === 'excellent' && ' (Utmärkt)'}
-                    {accuracyLevel === 'good' && ' (Bra)'}
-                    {accuracyLevel === 'acceptable' && ' (OK)'}
-                    {accuracyLevel === 'poor' && ' (Dålig!)'}
-                  </p>
-                  {positionType && (
-                    <p className="text-xs text-slate-500">
-                      {positionType === 'gps' ? 'GPS' :
-                       positionType === 'network' ? 'Nätverksbaserad' :
-                       'Okänd källa'}
+        {/* GPS-knappar (visas när kartväljaren är dold) */}
+        {!showMapPicker && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {/* GPS-knapp */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleCaptureGps}
+                disabled={gpsLoading}
+                className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                  hasLocation && !manualLocationSet
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-blue-500'
+                }`}
+              >
+                {gpsLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                    <span className="text-blue-400 text-sm">Hämtar...</span>
+                  </>
+                ) : hasLocation && !manualLocationSet ? (
+                  <>
+                    <Check className="w-6 h-6 text-green-400" />
+                    <span className="text-green-400 text-sm">GPS hämtad</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-6 h-6 text-slate-400" />
+                    <span className="text-slate-300 text-sm">Hämta GPS</span>
+                  </>
+                )}
+              </motion.button>
+
+              {/* Kartväljare-knapp */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowMapPicker(true)}
+                className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                  manualLocationSet
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-blue-500'
+                }`}
+              >
+                {manualLocationSet ? (
+                  <>
+                    <Check className="w-6 h-6 text-green-400" />
+                    <span className="text-green-400 text-sm">Vald på karta</span>
+                  </>
+                ) : (
+                  <>
+                    <Map className="w-6 h-6 text-slate-400" />
+                    <span className="text-slate-300 text-sm">Välj på karta</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
+
+            {/* Visa koordinater */}
+            {(formData.latitude !== 0 && formData.longitude !== 0) && (
+              <div className={`mt-3 p-3 rounded-lg ${
+                manualLocationSet
+                  ? 'bg-blue-500/10 border border-blue-500/30'
+                  : !isHighAccuracy
+                    ? 'bg-amber-500/10 border border-amber-500/30'
+                    : 'bg-slate-800/50'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-400">
+                      {manualLocationSet ? 'Manuellt vald position' : 'Koordinater'}
                     </p>
+                    <p className="text-white font-mono">
+                      {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                    </p>
+                  </div>
+                  {!manualLocationSet && formattedAccuracy && (
+                    <div className="text-right">
+                      <p className="text-sm text-slate-400">Noggrannhet</p>
+                      <p className={`font-medium ${
+                        accuracyLevel === 'excellent' ? 'text-green-400' :
+                        accuracyLevel === 'good' ? 'text-emerald-400' :
+                        accuracyLevel === 'acceptable' ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {formattedAccuracy}
+                        {accuracyLevel === 'excellent' && ' (Utmärkt)'}
+                        {accuracyLevel === 'good' && ' (Bra)'}
+                        {accuracyLevel === 'acceptable' && ' (OK)'}
+                        {accuracyLevel === 'poor' && ' (Dålig!)'}
+                      </p>
+                      {positionType && (
+                        <p className="text-xs text-slate-500">
+                          {positionType === 'gps' ? 'GPS' :
+                           positionType === 'network' ? 'Nätverksbaserad' :
+                           'Okänd källa'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {manualLocationSet && (
+                    <div className="text-right">
+                      <p className="text-xs text-blue-400">
+                        Markerad manuellt
+                      </p>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* GPS-varning (dålig noggrannhet) */}
-        {gpsWarning && (
-          <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-            <p className="text-sm text-amber-400 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{gpsWarning}</span>
-            </p>
-            <p className="text-xs text-amber-300/70 mt-2 ml-6">
-              Tips: Gå utomhus, aktivera GPS i enhetsinställningar, och vänta några sekunder.
-            </p>
-          </div>
-        )}
+            {/* GPS-varning (dålig noggrannhet) */}
+            {gpsWarning && !manualLocationSet && (
+              <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-sm text-amber-400 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{gpsWarning}</span>
+                </p>
+                <p className="text-xs text-amber-300/70 mt-2 ml-6">
+                  Tips: Gå utomhus, eller använd "Välj på karta" för att markera platsen manuellt.
+                </p>
+              </div>
+            )}
 
-        {/* GPS-fel */}
-        {gpsError && (
-          <p className="mt-2 text-sm text-red-400 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
-            {gpsError}
-          </p>
-        )}
+            {/* GPS-fel */}
+            {gpsError && !manualLocationSet && (
+              <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {gpsError}
+                </p>
+                <p className="text-xs text-red-300/70 mt-2 ml-5">
+                  Alternativ: Använd "Välj på karta" för att markera platsen manuellt.
+                </p>
+              </div>
+            )}
 
-        {errors.latitude && (
-          <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
-            {errors.latitude}
-          </p>
+            {errors.latitude && (
+              <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {errors.latitude}
+              </p>
+            )}
+          </>
         )}
       </div>
 
