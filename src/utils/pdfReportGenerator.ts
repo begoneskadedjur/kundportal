@@ -1,5 +1,7 @@
 // src/utils/pdfReportGenerator.ts - Professional SANERINGSRAPPORT design
 import { jsPDF } from 'jspdf'
+import { CaseImageWithUrl } from '../services/caseImageService'
+import { CASE_IMAGE_CATEGORY_DISPLAY, CaseImageCategory } from '../types/database'
 
 interface TaskDetails {
   task_id: string
@@ -283,8 +285,9 @@ const drawSectionHeader = (
 }
 
 export const generatePDFReport = async (
-  taskDetails: TaskDetails, 
-  customerInfo?: CustomerInfo
+  taskDetails: TaskDetails,
+  customerInfo?: CustomerInfo,
+  caseImages?: CaseImageWithUrl[]
 ): Promise<void> => {
   try {
     const pdf = new jsPDF()
@@ -816,39 +819,161 @@ export const generatePDFReport = async (
       yPosition += costCardHeight + spacing.md // Minska section-avstånd
     }
 
-    // === PROFESSIONAL FOOTER - endast på sista sidan ===
+    // === BILDBILAGA ===
+    if (caseImages && caseImages.length > 0) {
+      // Alltid ny sida för bildbilagor
+      pdf.addPage()
+      yPosition = spacing.xl
+
+      yPosition = drawSectionHeader(pdf, 'BILDBILAGA', margins.left, yPosition, contentWidth, 'accent')
+
+      // Gruppera bilder efter kategori
+      const groupedImages: Record<CaseImageCategory, CaseImageWithUrl[]> = {
+        before: caseImages.filter(img => img.category === 'before'),
+        after: caseImages.filter(img => img.category === 'after'),
+        general: caseImages.filter(img => img.category === 'general')
+      }
+
+      // Bildkonfiguration för rutnät
+      const imagesPerRow = 2
+      const imageWidth = (contentWidth - spacing.md) / imagesPerRow
+      const imageHeight = imageWidth * 0.75 // 4:3 aspect ratio
+      const captionHeight = 12
+
+      // Rita bilder för varje kategori
+      for (const category of ['before', 'after', 'general'] as CaseImageCategory[]) {
+        const categoryImages = groupedImages[category]
+        if (categoryImages.length === 0) continue
+
+        // Kontrollera om vi behöver sidbrytning för kategoriheader
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage()
+          yPosition = spacing.xl
+        }
+
+        // Kategori-header
+        pdf.setFillColor(...beGoneColors.lightGray)
+        pdf.roundedRect(margins.left, yPosition, contentWidth, 18, 3, 3, 'F')
+
+        pdf.setTextColor(...beGoneColors.darkGray)
+        pdf.setFontSize(typography.subheader.size)
+        pdf.setFont(undefined, typography.subheader.weight)
+        pdf.text(CASE_IMAGE_CATEGORY_DISPLAY[category].label, margins.left + spacing.sm, yPosition + 12)
+        pdf.text(`(${categoryImages.length} bilder)`, margins.left + contentWidth - spacing.sm, yPosition + 12, { align: 'right' })
+
+        yPosition += 18 + spacing.sm
+
+        // Rita bilder i rutnät
+        for (let i = 0; i < categoryImages.length; i++) {
+          const image = categoryImages[i]
+          const col = i % imagesPerRow
+          const xPos = margins.left + col * (imageWidth + spacing.sm)
+
+          // Kontrollera sidbrytning
+          if (yPosition + imageHeight + captionHeight > pageHeight - 40) {
+            pdf.addPage()
+            yPosition = spacing.xl
+          }
+
+          try {
+            // Hämta bilden som base64
+            const response = await fetch(image.url)
+            const blob = await response.blob()
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onloadend = () => resolve(reader.result as string)
+              reader.readAsDataURL(blob)
+            })
+
+            // Rita bildens ram
+            drawProfessionalCard(pdf, xPos, yPosition, imageWidth - spacing.xs, imageHeight + captionHeight, {
+              backgroundColor: 'white',
+              shadow: true,
+              radius: 4
+            })
+
+            // Lägg till bilden
+            const imgPadding = 3
+            pdf.addImage(
+              dataUrl,
+              'JPEG',
+              xPos + imgPadding,
+              yPosition + imgPadding,
+              imageWidth - spacing.xs - (imgPadding * 2),
+              imageHeight - (imgPadding * 2)
+            )
+
+            // Bildtext/caption
+            pdf.setTextColor(...beGoneColors.mediumGray)
+            pdf.setFontSize(typography.caption.size)
+            pdf.setFont(undefined, 'normal')
+
+            const captionText = image.description || image.file_name
+            const truncatedCaption = captionText.length > 30
+              ? captionText.substring(0, 27) + '...'
+              : captionText
+            pdf.text(truncatedCaption, xPos + spacing.xs, yPosition + imageHeight + spacing.xs)
+
+          } catch (error) {
+            console.warn('Kunde inte ladda bild för PDF:', image.file_name, error)
+
+            // Placeholder för misslyckad bild
+            drawProfessionalCard(pdf, xPos, yPosition, imageWidth - spacing.xs, imageHeight + captionHeight, {
+              backgroundColor: 'light',
+              shadow: false,
+              radius: 4
+            })
+
+            pdf.setTextColor(...beGoneColors.mediumGray)
+            pdf.setFontSize(typography.caption.size)
+            pdf.text('Bilden kunde inte laddas', xPos + imageWidth/4, yPosition + imageHeight/2)
+          }
+
+          // Flytta till nästa rad efter varannan bild
+          if (col === imagesPerRow - 1 || i === categoryImages.length - 1) {
+            yPosition += imageHeight + captionHeight + spacing.sm
+          }
+        }
+
+        yPosition += spacing.md // Extra mellanrum efter varje kategori
+      }
+    }
+
+    // === PROFESSIONAL FOOTER - på alla sidor ===
     const pageCount = pdf.internal.getNumberOfPages()
     const currentDate = new Date().toLocaleDateString('sv-SE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
     })
-    
-    // Footer bara på sista sidan
-    pdf.setPage(pageCount)
-    
-    // Professional footer separator
-    pdf.setDrawColor(...beGoneColors.divider)
-    pdf.setLineWidth(0.8)
-    pdf.line(margins.left, pageHeight - 28, pageWidth - margins.right, pageHeight - 28)
-    
-    // Footer content med BeGone branding
-    pdf.setTextColor(...beGoneColors.mediumGray)
-    pdf.setFontSize(typography.caption.size)
-    pdf.setFont(undefined, 'normal')
-    
-    // Vänster sida: Företagsinfo
-    pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
-    pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
-    
-    // Mitten: Kontaktinfo
-    const centerX = pageWidth / 2
-    pdf.text('010 280 44 10', centerX, pageHeight - 18, { align: 'center' })
-    pdf.text('info@begone.se', centerX, pageHeight - 12, { align: 'center' })
-    
-    // Höger sida: Datum och sidnummer
-    pdf.text(`Genererad: ${currentDate}`, pageWidth - margins.right, pageHeight - 18, { align: 'right' })
-    pdf.text(`Sida ${pageCount} av ${pageCount}`, pageWidth - margins.right, pageHeight - 12, { align: 'right' })
+
+    // Lägg till footer på varje sida
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i)
+
+      // Professional footer separator
+      pdf.setDrawColor(...beGoneColors.divider)
+      pdf.setLineWidth(0.8)
+      pdf.line(margins.left, pageHeight - 28, pageWidth - margins.right, pageHeight - 28)
+
+      // Footer content med BeGone branding
+      pdf.setTextColor(...beGoneColors.mediumGray)
+      pdf.setFontSize(typography.caption.size)
+      pdf.setFont(undefined, 'normal')
+
+      // Vänster sida: Företagsinfo
+      pdf.text('BeGone Skadedjur & Sanering AB', margins.left, pageHeight - 18)
+      pdf.text('Org.nr: 559378-9208', margins.left, pageHeight - 12)
+
+      // Mitten: Kontaktinfo
+      const centerX = pageWidth / 2
+      pdf.text('010 280 44 10', centerX, pageHeight - 18, { align: 'center' })
+      pdf.text('info@begone.se', centerX, pageHeight - 12, { align: 'center' })
+
+      // Höger sida: Datum och sidnummer
+      pdf.text(`Genererad: ${currentDate}`, pageWidth - margins.right, pageHeight - 18, { align: 'right' })
+      pdf.text(`Sida ${i} av ${pageCount}`, pageWidth - margins.right, pageHeight - 12, { align: 'right' })
+    }
 
     // Professional filnamn för SANERINGSRAPPORT
     const customerName = customerInfo?.company_name || 'Okänd_kund'

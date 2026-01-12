@@ -1676,3 +1676,122 @@ export const getLeadQuality = (score: number): { label: string; color: string; b
   if (score >= 20) return { label: 'Svag', color: 'orange-600', bgColor: 'bg-orange-100' }
   return { label: 'Mycket svag', color: 'red-600', bgColor: 'bg-red-100' }
 }
+
+// ===== EQUIPMENT PLACEMENT TYPES =====
+// System för att spåra utplacerad utrustning med GPS-koordinater
+
+export type EquipmentType = 'mechanical_trap' | 'concrete_station' | 'bait_station'
+export type EquipmentStatus = 'active' | 'removed' | 'missing'
+
+export interface EquipmentPlacement {
+  id: string
+  serial_number: string | null
+  equipment_type: EquipmentType
+  customer_id: string
+  latitude: number
+  longitude: number
+  placed_at: string
+  placed_by_technician_id: string | null
+  status: EquipmentStatus
+  status_updated_at: string
+  status_updated_by: string | null
+  comment: string | null
+  photo_path: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EquipmentPlacementInsert = Omit<EquipmentPlacement, 'id' | 'created_at' | 'updated_at' | 'placed_at' | 'status_updated_at'>
+export type EquipmentPlacementUpdate = Partial<EquipmentPlacementInsert>
+
+// Extended type with relations
+export interface EquipmentPlacementWithRelations extends EquipmentPlacement {
+  customer?: {
+    id: string
+    company_name: string
+    contact_address: string | null
+  }
+  technician?: {
+    id: string
+    name: string
+  }
+  photo_url?: string // Signed URL from storage
+}
+
+// Equipment type configuration for UI
+export const EQUIPMENT_TYPE_CONFIG = {
+  mechanical_trap: {
+    label: 'Mekanisk fälla',
+    labelPlural: 'Mekaniska fällor',
+    color: '#22c55e', // green-500
+    markerColor: 'green',
+    requiresSerialNumber: true,
+    icon: 'Crosshair'
+  },
+  concrete_station: {
+    label: 'Betongstation',
+    labelPlural: 'Betongstationer',
+    color: '#6b7280', // gray-500
+    markerColor: 'gray',
+    requiresSerialNumber: false,
+    icon: 'Box'
+  },
+  bait_station: {
+    label: 'Betesstation',
+    labelPlural: 'Betesstationer',
+    color: '#000000', // black
+    markerColor: 'black',
+    requiresSerialNumber: false,
+    icon: 'Target'
+  }
+} as const
+
+export const EQUIPMENT_STATUS_CONFIG = {
+  active: {
+    label: 'Aktiv',
+    color: 'green-500',
+    bgColor: 'bg-green-500/20',
+    borderColor: 'border-green-500/40'
+  },
+  removed: {
+    label: 'Borttagen',
+    color: 'yellow-500',
+    bgColor: 'bg-yellow-500/20',
+    borderColor: 'border-yellow-500/40'
+  },
+  missing: {
+    label: 'Försvunnen',
+    color: 'red-500',
+    bgColor: 'bg-red-500/20',
+    borderColor: 'border-red-500/40'
+  }
+} as const
+
+// Helper functions for equipment
+export const getEquipmentTypeLabel = (type: EquipmentType): string => {
+  return EQUIPMENT_TYPE_CONFIG[type]?.label || type
+}
+
+export const getEquipmentTypePluralLabel = (type: EquipmentType): string => {
+  return EQUIPMENT_TYPE_CONFIG[type]?.labelPlural || type
+}
+
+export const getEquipmentStatusLabel = (status: EquipmentStatus): string => {
+  return EQUIPMENT_STATUS_CONFIG[status]?.label || status
+}
+
+export const requiresSerialNumber = (type: EquipmentType): boolean => {
+  return EQUIPMENT_TYPE_CONFIG[type]?.requiresSerialNumber || false
+}
+
+export const getEquipmentTypeColor = (type: EquipmentType): string => {
+  return EQUIPMENT_TYPE_CONFIG[type]?.color || '#6b7280'
+}
+
+// Statistics interface for equipment
+export interface EquipmentStats {
+  total: number
+  byType: Record<EquipmentType, number>
+  byStatus: Record<EquipmentStatus, number>
+  recentPlacements: number // Last 30 days
+}

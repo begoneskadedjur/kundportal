@@ -56,7 +56,8 @@ import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
 import TechnicianDashboard from './pages/technician/TechnicianDashboard';
 import TechnicianCommissionsPage from './pages/technician/TechnicianCommissions';
 import TechnicianCases from './pages/technician/TechnicianCases';
-import TechnicianSchedule from './pages/technician/TechnicianSchedule'; 
+import TechnicianSchedule from './pages/technician/TechnicianSchedule';
+import TechnicianEquipment from './pages/technician/TechnicianEquipment'; 
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -439,13 +440,21 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/technician/oneflow" 
+            <Route
+              path="/technician/oneflow"
               element={
                 <ProtectedRoute requiredRole="technician">
                   <OneflowContractCreator />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/technician/equipment"
+              element={
+                <ProtectedRoute requiredRole="technician">
+                  <TechnicianEquipment />
+                </ProtectedRoute>
+              }
             />
 
             {/* Shared routes - accessible by all authenticated users */}
