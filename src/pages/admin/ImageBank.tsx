@@ -105,27 +105,29 @@ export default function ImageBank() {
       if (privateCaseIds.length > 0) {
         const { data: privateCases, error: privateError } = await supabase
           .from('private_cases')
-          .select('id, title, bokad_tid, gatuadress, postnummer, postort, skadedjur, status, tekniker_namn, beskrivning, arbetsbeskrivning')
+          .select('id, title, start_date, adress, skadedjur, status, primary_assignee_name, description, rapport')
           .in('id', privateCaseIds)
-          .order('bokad_tid', { ascending: false })
+          .order('start_date', { ascending: false })
 
         if (privateError) throw privateError
 
         privateCases?.forEach(c => {
           const key = `private:${c.id}`
+          // Adress är JSONB i private_cases
+          const adressData = c.adress as { gatuadress?: string; postnummer?: string; postort?: string } | null
           casesWithImages.push({
             id: c.id,
             case_type: 'private',
             title: c.title,
-            scheduled_date: c.bokad_tid,
-            address: c.gatuadress,
-            city: c.postort,
-            postal_code: c.postnummer,
+            scheduled_date: c.start_date,
+            address: adressData?.gatuadress || null,
+            city: adressData?.postort || null,
+            postal_code: adressData?.postnummer || null,
             pest_type: c.skadedjur,
             status: c.status,
-            technician_name: c.tekniker_namn,
-            description: c.beskrivning,
-            work_description: c.arbetsbeskrivning,
+            technician_name: c.primary_assignee_name,
+            description: c.description,
+            work_description: c.rapport,
             image_count: caseImageCounts.get(key)?.count || 0
           })
         })
@@ -139,27 +141,29 @@ export default function ImageBank() {
       if (businessCaseIds.length > 0) {
         const { data: businessCases, error: businessError } = await supabase
           .from('business_cases')
-          .select('id, title, bokad_tid, gatuadress, postnummer, postort, skadedjur, status, tekniker_namn, beskrivning, arbetsbeskrivning')
+          .select('id, title, start_date, adress, skadedjur, status, primary_assignee_name, description, rapport')
           .in('id', businessCaseIds)
-          .order('bokad_tid', { ascending: false })
+          .order('start_date', { ascending: false })
 
         if (businessError) throw businessError
 
         businessCases?.forEach(c => {
           const key = `business:${c.id}`
+          // Adress är JSONB i business_cases
+          const adressData = c.adress as { gatuadress?: string; postnummer?: string; postort?: string } | null
           casesWithImages.push({
             id: c.id,
             case_type: 'business',
             title: c.title,
-            scheduled_date: c.bokad_tid,
-            address: c.gatuadress,
-            city: c.postort,
-            postal_code: c.postnummer,
+            scheduled_date: c.start_date,
+            address: adressData?.gatuadress || null,
+            city: adressData?.postort || null,
+            postal_code: adressData?.postnummer || null,
             pest_type: c.skadedjur,
             status: c.status,
-            technician_name: c.tekniker_namn,
-            description: c.beskrivning,
-            work_description: c.arbetsbeskrivning,
+            technician_name: c.primary_assignee_name,
+            description: c.description,
+            work_description: c.rapport,
             image_count: caseImageCounts.get(key)?.count || 0
           })
         })
@@ -173,7 +177,7 @@ export default function ImageBank() {
       if (contractCaseIds.length > 0) {
         const { data: contractCases, error: contractError } = await supabase
           .from('cases')
-          .select('id, title, scheduled_start, address, city, postal_code, pest_type, status, primary_technician_name, description, work_description')
+          .select('id, title, scheduled_start, address, pest_type, status, primary_technician_name, description, work_report')
           .in('id', contractCaseIds)
           .order('scheduled_start', { ascending: false })
 
@@ -181,19 +185,21 @@ export default function ImageBank() {
 
         contractCases?.forEach(c => {
           const key = `contract:${c.id}`
+          // Adress är JSONB i cases
+          const adressData = c.address as { gatuadress?: string; postnummer?: string; postort?: string; street?: string; postal_code?: string; city?: string } | null
           casesWithImages.push({
             id: c.id,
             case_type: 'contract',
             title: c.title,
             scheduled_date: c.scheduled_start,
-            address: c.address,
-            city: c.city,
-            postal_code: c.postal_code,
+            address: adressData?.gatuadress || adressData?.street || null,
+            city: adressData?.postort || adressData?.city || null,
+            postal_code: adressData?.postnummer || adressData?.postal_code || null,
             pest_type: c.pest_type,
             status: c.status,
             technician_name: c.primary_technician_name,
             description: c.description,
-            work_description: c.work_description,
+            work_description: c.work_report,
             image_count: caseImageCounts.get(key)?.count || 0
           })
         })
