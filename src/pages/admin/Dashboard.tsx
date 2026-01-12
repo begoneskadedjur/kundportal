@@ -27,8 +27,10 @@ import {
   UserPlus,
   Receipt,
   Image as ImageIcon,
-  Megaphone
+  Megaphone,
+  BookOpen
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -45,6 +47,7 @@ import InteractiveRevenueChart from '../../components/shared/InteractiveRevenueC
 import VisualTimeline from '../../components/shared/VisualTimeline'
 import StaggeredGrid from '../../components/shared/StaggeredGrid'
 import LiveStatusIndicator from '../../components/shared/LiveStatusIndicator'
+import { generateTechnicianGuide } from '../../utils/generateTechnicianGuide'
 
 interface DashboardStats {
   totalCustomers: number
@@ -581,6 +584,27 @@ const AdminDashboard: React.FC = () => {
                   tag="Legacy"
                   iconColor="text-slate-500"
                   className="scale-95 hover:scale-100 transition-transform duration-200"
+                />
+
+                <AdminDashboardCard
+                  onClick={async () => {
+                    try {
+                      toast.loading('Genererar teknikerguide...')
+                      await generateTechnicianGuide()
+                      toast.dismiss()
+                      toast.success('Teknikerguide genererad!')
+                    } catch (error) {
+                      toast.dismiss()
+                      toast.error('Kunde inte generera guide')
+                    }
+                  }}
+                  icon={BookOpen}
+                  title="Teknikerguide"
+                  description="Generera PDF-guide för utrustningsplacering"
+                  stats="Användarmanual"
+                  tag="Docs"
+                  iconColor="text-cyan-500"
+                  className="scale-95 hover:scale-100 transition-transform duration-200 cursor-pointer"
                 />
               </StaggeredGrid>
             </div>

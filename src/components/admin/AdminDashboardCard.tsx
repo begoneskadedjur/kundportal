@@ -4,7 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface AdminDashboardCardProps {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   icon: React.ElementType;
   title: string;
   description: string;
@@ -13,18 +14,21 @@ interface AdminDashboardCardProps {
   iconColor?: string;
   disabled?: boolean;
   delay?: number;
+  className?: string;
 }
 
-export default function AdminDashboardCard({ 
-  href, 
-  icon: Icon, 
-  title, 
+export default function AdminDashboardCard({
+  href,
+  onClick,
+  icon: Icon,
+  title,
   description,
   tag,
   stats,
   iconColor = 'text-[#20c58f]',
   disabled = false,
-  delay = 0
+  delay = 0,
+  className = ''
 }: AdminDashboardCardProps) {
   const content = (
     <motion.div
@@ -98,16 +102,29 @@ export default function AdminDashboardCard({
 
   if (disabled) {
     return (
-      <div className="block h-full cursor-not-allowed">
+      <div className={`block h-full cursor-not-allowed ${className}`}>
         {content}
       </div>
     );
   }
 
+  // Om onClick finns, använd button istället för Link
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className={`group block h-full w-full text-left focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-950 rounded-xl ${className}`}
+        aria-label={`${title} - ${description}`}
+      >
+        {content}
+      </button>
+    );
+  }
+
   return (
-    <Link 
-      to={href} 
-      className="group block h-full focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-950 rounded-xl"
+    <Link
+      to={href || '#'}
+      className={`group block h-full focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-950 rounded-xl ${className}`}
       aria-label={`Öppna ${title} - ${description}`}
     >
       {content}
