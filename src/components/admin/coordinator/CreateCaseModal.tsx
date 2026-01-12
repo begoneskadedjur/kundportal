@@ -574,7 +574,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const showRotRutDetails = formData.r_rot_rut === 'ROT' || formData.r_rot_rut === 'RUT';
 
   return (
-      <Modal isOpen={isOpen} onClose={onClose} title={initialCaseData ? `Boka in: ${initialCaseData.title}` : (step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : caseType === 'business' ? 'Företag' : 'Avtalskund'}`)} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer}>
+      <Modal isOpen={isOpen} onClose={onClose} title={initialCaseData ? `Boka in: ${initialCaseData.title}` : (step === 'selectType' ? 'Välj kundtyp' : `Nytt ärende: ${caseType === 'private' ? 'Privatperson' : caseType === 'business' ? 'Företag' : 'Avtalskund'}`)} size="w-11/12 max-w-4xl" preventClose={loading} footer={footer} usePortal={true}>
         <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           {step === 'selectType' && !initialCaseData && (
               <div className="flex flex-col md:flex-row gap-4">
