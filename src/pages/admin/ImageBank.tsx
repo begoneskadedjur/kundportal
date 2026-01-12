@@ -48,6 +48,40 @@ const PEST_TYPE_DISPLAY: Record<string, string> = Object.fromEntries(
   PEST_TYPES.map(pt => [pt.id, pt.name])
 )
 
+// Hjälpfunktion för att formatera adress från JSON till läsbar sträng (kopierad från ScheduleTimeline)
+const formatAddress = (address: any): string => {
+  if (!address) return ''
+
+  // Om det redan är en sträng, försök parsa som JSON
+  if (typeof address === 'string') {
+    try {
+      const parsed = JSON.parse(address)
+      return parsed.formatted_address || address
+    } catch {
+      // Om det inte går att parsa, returnera ursprungssträngen
+      return address
+    }
+  }
+
+  // Om det är ett objekt med formatted_address
+  if (address.formatted_address) {
+    return address.formatted_address
+  }
+
+  // Om det är ett objekt med separata fält (gatuadress-format)
+  if (address.gatuadress) {
+    const parts = [address.gatuadress, address.postnummer, address.postort].filter(Boolean)
+    return parts.join(', ')
+  }
+
+  // Om det är ett objekt med street/city format
+  if (address.street && address.city) {
+    return `${address.street}, ${address.postal_code || ''} ${address.city}`.trim()
+  }
+
+  return ''
+}
+
 interface CaseWithImages {
   id: string
   case_type: 'private' | 'business' | 'contract'
@@ -150,34 +184,17 @@ export default function ImageBank() {
 
         privateCases?.forEach(c => {
           const key = `private:${c.id}`
-          // Adress kan ha olika format: { gatuadress, postnummer, postort } eller { formatted_address, location }
-          const adressData = c.adress as {
-            gatuadress?: string; postnummer?: string; postort?: string;
-            formatted_address?: string; location?: { lat: number; lng: number }
-          } | null
-
-          // Extrahera adress - använd formatted_address om gatuadress inte finns
-          let address: string | null = null
-          let city: string | null = null
-          let postal_code: string | null = null
-
-          if (adressData?.gatuadress) {
-            address = adressData.gatuadress
-            city = adressData.postort || null
-            postal_code = adressData.postnummer || null
-          } else if (adressData?.formatted_address) {
-            // Formatted address är hela adressen, använd den direkt
-            address = adressData.formatted_address
-          }
+          // Använd den robusta formatAddress-funktionen
+          const formattedAddress = formatAddress(c.adress)
 
           casesWithImages.push({
             id: c.id,
             case_type: 'private',
             title: c.title,
             scheduled_date: c.start_date,
-            address,
-            city,
-            postal_code,
+            address: formattedAddress || null,
+            city: null, // formatAddress ger hela adressen, behöver inte separata fält
+            postal_code: null,
             pest_type: c.skadedjur,
             status: c.status,
             technician_name: c.primary_assignee_name,
@@ -204,34 +221,17 @@ export default function ImageBank() {
 
         businessCases?.forEach(c => {
           const key = `business:${c.id}`
-          // Adress kan ha olika format: { gatuadress, postnummer, postort } eller { formatted_address, location }
-          const adressData = c.adress as {
-            gatuadress?: string; postnummer?: string; postort?: string;
-            formatted_address?: string; location?: { lat: number; lng: number }
-          } | null
-
-          // Extrahera adress - använd formatted_address om gatuadress inte finns
-          let address: string | null = null
-          let city: string | null = null
-          let postal_code: string | null = null
-
-          if (adressData?.gatuadress) {
-            address = adressData.gatuadress
-            city = adressData.postort || null
-            postal_code = adressData.postnummer || null
-          } else if (adressData?.formatted_address) {
-            // Formatted address är hela adressen, använd den direkt
-            address = adressData.formatted_address
-          }
+          // Använd den robusta formatAddress-funktionen
+          const formattedAddress = formatAddress(c.adress)
 
           casesWithImages.push({
             id: c.id,
             case_type: 'business',
             title: c.title,
             scheduled_date: c.start_date,
-            address,
-            city,
-            postal_code,
+            address: formattedAddress || null,
+            city: null,
+            postal_code: null,
             pest_type: c.skadedjur,
             status: c.status,
             technician_name: c.primary_assignee_name,
@@ -258,39 +258,17 @@ export default function ImageBank() {
 
         contractCases?.forEach(c => {
           const key = `contract:${c.id}`
-          // Adress kan ha olika format: { gatuadress, postnummer, postort }, { street, postal_code, city } eller { formatted_address, location }
-          const adressData = c.address as {
-            gatuadress?: string; postnummer?: string; postort?: string;
-            street?: string; postal_code?: string; city?: string;
-            formatted_address?: string; location?: { lat: number; lng: number }
-          } | null
-
-          // Extrahera adress - prova olika format
-          let address: string | null = null
-          let city: string | null = null
-          let postal_code: string | null = null
-
-          if (adressData?.gatuadress) {
-            address = adressData.gatuadress
-            city = adressData.postort || null
-            postal_code = adressData.postnummer || null
-          } else if (adressData?.street) {
-            address = adressData.street
-            city = adressData.city || null
-            postal_code = adressData.postal_code || null
-          } else if (adressData?.formatted_address) {
-            // Formatted address är hela adressen, använd den direkt
-            address = adressData.formatted_address
-          }
+          // Använd den robusta formatAddress-funktionen
+          const formattedAddress = formatAddress(c.address)
 
           casesWithImages.push({
             id: c.id,
             case_type: 'contract',
             title: c.title,
             scheduled_date: c.scheduled_start,
-            address,
-            city,
-            postal_code,
+            address: formattedAddress || null,
+            city: null,
+            postal_code: null,
             pest_type: c.pest_type,
             status: c.status,
             technician_name: c.primary_technician_name,
