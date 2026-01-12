@@ -1119,7 +1119,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   caseId={currentCase.id}
                   caseType={currentCase.case_type}
                   canDelete={true}
+                  canEdit={true}
                   onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
+                  onImageUpdated={() => setImageRefreshTrigger(prev => prev + 1)}
                   refreshTrigger={imageRefreshTrigger}
                   showCategories={true}
                 />

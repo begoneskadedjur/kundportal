@@ -1426,7 +1426,9 @@ export default function EditContractCaseModal({
                     caseId={caseData.id}
                     caseType="contract"
                     canDelete={!isCustomerView}
+                    canEdit={!isCustomerView}
                     onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
+                    onImageUpdated={() => setImageRefreshTrigger(prev => prev + 1)}
                     refreshTrigger={imageRefreshTrigger}
                     showCategories={true}
                   />
