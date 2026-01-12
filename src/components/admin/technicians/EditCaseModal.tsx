@@ -1,7 +1,7 @@
 // 📁 src/components/admin/technicians/EditCaseModal.tsx
 // ⭐ VERSION 2.2 - ANVÄNDER ANPASSAD SVENSK DATUMVÄLJARE ⭐
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useClickUpSync } from '../../../hooks/useClickUpSync'
 import { AlertCircle, CheckCircle, FileText, User, DollarSign, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, Percent, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon } from 'lucide-react'
@@ -25,9 +25,8 @@ import { useWorkReportGeneration } from '../../../hooks/useWorkReportGeneration'
 // Tekniker-dropdown
 import TechnicianDropdown from '../TechnicianDropdown'
 
-// Bildhantering
-import CaseImageUpload from '../../shared/CaseImageUpload'
-import CaseImageGallery from '../../shared/CaseImageGallery'
+// Bildhantering - med draft-läge
+import CaseImageGallery, { CaseImageGalleryRef } from '../../shared/CaseImageGallery'
 
 // Datum-hjälpfunktioner för svensk tidszon
 import { toSwedishISOString } from '../../../utils/dateHelpers'
@@ -329,6 +328,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
   const [currentCase, setCurrentCase] = useState<TechnicianCase | null>(null)
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
+  const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
+
+  // Ref för bildgalleriet så vi kan anropa commitChanges
+  const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
 
   const { displayTime, isRunning } = useRealTimeTimer(currentCase);
   const { lastBackup, pendingRestore, restoreFromBackup, clearBackup } = useTimeBackupSystem(currentCase);
@@ -535,9 +538,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
       if (updateError) throw updateError;
       
       const updatedCaseFromDb = data as TechnicianCase;
-      
+
+      // Spara bildändringar om det finns några
+      if (imageGalleryRef.current?.hasPendingChanges()) {
+        const imageResult = await imageGalleryRef.current.commitChanges()
+        if (!imageResult.success && imageResult.errors.length > 0) {
+          console.warn('Några bildändringar kunde inte sparas:', imageResult.errors)
+          // Fortsätt ändå - ärendet är sparat
+        }
+      }
+
       onSuccess(updatedCaseFromDb);
-      
+
       setSubmitted(true);
       toast.success('Ärendet har uppdaterats!');
       
@@ -1114,29 +1126,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData }: 
                   Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
                 </p>
 
-                {/* Bildgalleri */}
+                {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara ändringar" */}
                 <CaseImageGallery
+                  ref={imageGalleryRef}
                   caseId={currentCase.id}
                   caseType={currentCase.case_type}
                   canDelete={true}
                   canEdit={true}
-                  onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
-                  onImageUpdated={() => setImageRefreshTrigger(prev => prev + 1)}
                   refreshTrigger={imageRefreshTrigger}
                   showCategories={true}
+                  draftMode={true}
+                  userId={profile?.id}
+                  onPendingChangesUpdate={setHasPendingImageChanges}
                 />
-
-                {/* Bilduppladdning */}
-                <div className="pt-4 border-t border-slate-700/50">
-                  <CaseImageUpload
-                    caseId={currentCase.id}
-                    caseType={currentCase.case_type}
-                    defaultCategory="general"
-                    userId={profile?.id}
-                    onUploadComplete={() => setImageRefreshTrigger(prev => prev + 1)}
-                    maxFiles={10}
-                  />
-                </div>
               </div>
             )}
           </div>

@@ -1,7 +1,7 @@
 // src/components/coordinator/EditContractCaseModal.tsx
 // Enhanced modal för avtalsärenden med offert, rapport och tidloggning
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -24,8 +24,7 @@ import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
-import CaseImageUpload from '../shared/CaseImageUpload'
-import CaseImageGallery from '../shared/CaseImageGallery'
+import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 
 // Registrera svensk lokalisering för DatePicker
 registerLocale('sv', sv)
@@ -162,6 +161,8 @@ export default function EditContractCaseModal({
   const [verksamhetschefContactInfo, setVerksamhetschefContactInfo] = useState<{contactPerson?: string, contactEmail?: string, contactPhone?: string} | null>(null)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
+  const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
+  const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
 
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
@@ -922,6 +923,14 @@ export default function EditContractCaseModal({
 
       if (error) throw error
 
+      // Spara bildändringar om det finns några
+      if (imageGalleryRef.current?.hasPendingChanges()) {
+        const imageResult = await imageGalleryRef.current.commitChanges()
+        if (!imageResult.success && imageResult.errors.length > 0) {
+          console.warn('Några bildändringar kunde inte sparas:', imageResult.errors)
+        }
+      }
+
       toast.success('Ärende uppdaterat!')
       onSuccess?.()
       handleClose()
@@ -1421,31 +1430,19 @@ export default function EditContractCaseModal({
                     Dokumentera ärendet med bilder. Kategorisera som "Före" (innan behandling), "Efter" (resultat) eller "Övrigt".
                   </p>
 
-                  {/* Bildgalleri */}
+                  {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara" */}
                   <CaseImageGallery
+                    ref={imageGalleryRef}
                     caseId={caseData.id}
                     caseType="contract"
                     canDelete={!isCustomerView}
                     canEdit={!isCustomerView}
-                    onImageDeleted={() => setImageRefreshTrigger(prev => prev + 1)}
-                    onImageUpdated={() => setImageRefreshTrigger(prev => prev + 1)}
                     refreshTrigger={imageRefreshTrigger}
                     showCategories={true}
+                    draftMode={!isCustomerView}
+                    userId={profile?.id}
+                    onPendingChangesUpdate={setHasPendingImageChanges}
                   />
-
-                  {/* Bilduppladdning - endast för staff */}
-                  {!isCustomerView && (
-                    <div className="pt-4 border-t border-slate-700/50 mt-4">
-                      <CaseImageUpload
-                        caseId={caseData.id}
-                        caseType="contract"
-                        defaultCategory="general"
-                        userId={profile?.id}
-                        onUploadComplete={() => setImageRefreshTrigger(prev => prev + 1)}
-                        maxFiles={10}
-                      />
-                    </div>
-                  )}
                 </div>
               )}
 
