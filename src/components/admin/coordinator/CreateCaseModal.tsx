@@ -92,9 +92,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSelectedContractCustomer(null);
     setSelectedSiteId(null);
     // Städa upp bildförhandsvisningar
-    selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
-    setSelectedImages([]);
-  }, [selectedImages]);
+    setSelectedImages(prev => {
+      prev.forEach(img => URL.revokeObjectURL(img.preview));
+      return [];
+    });
+  }, []);
 
   // Hämta avtalskunder och multisite-roller när modal öppnas
   useEffect(() => {
