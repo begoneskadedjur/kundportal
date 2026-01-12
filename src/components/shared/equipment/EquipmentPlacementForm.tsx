@@ -79,10 +79,14 @@ export function EquipmentPlacementForm({
     longitude: gpsLng,
     loading: gpsLoading,
     error: gpsError,
+    warning: gpsWarning,
     accuracy,
     captureLocation,
     hasLocation,
-    formattedAccuracy
+    formattedAccuracy,
+    accuracyLevel,
+    isHighAccuracy,
+    positionType
   } = useGpsLocation()
 
   // Uppdatera koordinater när GPS fångas
@@ -258,7 +262,11 @@ export function EquipmentPlacementForm({
 
         {/* Visa koordinater */}
         {(formData.latitude && formData.longitude) && (
-          <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
+          <div className={`mt-3 p-3 rounded-lg ${
+            !isHighAccuracy
+              ? 'bg-amber-500/10 border border-amber-500/30'
+              : 'bg-slate-800/50'
+          }`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400">Koordinater</p>
@@ -269,10 +277,41 @@ export function EquipmentPlacementForm({
               {formattedAccuracy && (
                 <div className="text-right">
                   <p className="text-sm text-slate-400">Noggrannhet</p>
-                  <p className="text-white">{formattedAccuracy}</p>
+                  <p className={`font-medium ${
+                    accuracyLevel === 'excellent' ? 'text-green-400' :
+                    accuracyLevel === 'good' ? 'text-emerald-400' :
+                    accuracyLevel === 'acceptable' ? 'text-yellow-400' :
+                    'text-red-400'
+                  }`}>
+                    {formattedAccuracy}
+                    {accuracyLevel === 'excellent' && ' (Utmärkt)'}
+                    {accuracyLevel === 'good' && ' (Bra)'}
+                    {accuracyLevel === 'acceptable' && ' (OK)'}
+                    {accuracyLevel === 'poor' && ' (Dålig!)'}
+                  </p>
+                  {positionType && (
+                    <p className="text-xs text-slate-500">
+                      {positionType === 'gps' ? 'GPS' :
+                       positionType === 'network' ? 'Nätverksbaserad' :
+                       'Okänd källa'}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* GPS-varning (dålig noggrannhet) */}
+        {gpsWarning && (
+          <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <p className="text-sm text-amber-400 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{gpsWarning}</span>
+            </p>
+            <p className="text-xs text-amber-300/70 mt-2 ml-6">
+              Tips: Gå utomhus, aktivera GPS i enhetsinställningar, och vänta några sekunder.
+            </p>
           </div>
         )}
 
