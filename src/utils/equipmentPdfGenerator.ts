@@ -65,7 +65,7 @@ const formatCoordinates = (lat: number, lng: number): string => {
   return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
 }
 
-// Generera statisk karta-URL med OpenStreetMap Static Map API
+// Generera statisk karta-URL med OpenStreetMap Static Map API (ingen API-nyckel krävs)
 const generateStaticMapUrl = (
   equipment: EquipmentPlacementWithRelations[],
   width: number,
@@ -104,28 +104,21 @@ const generateStaticMapUrl = (
     zoom = 16
   }
 
-  // Skapa markörer för varje utrustning
-  // Använder olika färger baserat på typ
-  const markers = equipment.map((e) => {
-    const config = EQUIPMENT_TYPE_CONFIG[e.equipment_type]
-    // Ta bort # från hex-färgen
-    const color = config.color.replace('#', '')
-    return `${e.longitude},${e.latitude}`
+  // Använd staticmap.openstreetmap.de - gratis, ingen API-nyckel krävs
+  // Format: markers=lat,lon,color (t.ex. ol-marker för orange-large)
+  // Markörer: Använder numrerade markörer för att matcha listan
+  const markers = equipment.map((e, index) => {
+    // Skapa markör med nummer (1-baserat index)
+    return `${e.latitude},${e.longitude},lightblue${index + 1}`
   }).join('|')
 
-  // Använd OpenStreetMap Static Map via stadiamaps (gratis för begränsad användning)
-  // Alternativt kan vi använda en enkel approach med geoapify
-  const baseUrl = 'https://maps.geoapify.com/v1/staticmap'
-  const apiKey = 'demo' // Gratis demo-nyckel för begränsad användning
+  // staticmap.openstreetmap.de format
+  return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLng}&zoom=${zoom}&size=${width}x${height}&markers=${markers}&maptype=mapnik`
+}
 
-  // Skapa marker-string för geoapify
-  const markerParams = equipment.map((e, i) => {
-    const config = EQUIPMENT_TYPE_CONFIG[e.equipment_type]
-    const color = config.color.replace('#', '')
-    return `lonlat:${e.longitude},${e.latitude};color:%23${color};size:medium`
-  }).join('&marker=')
-
-  return `${baseUrl}?style=osm-bright&width=${width}&height=${height}&center=lonlat:${centerLng},${centerLat}&zoom=${zoom}&marker=${markerParams}&apiKey=${apiKey}`
+// Generera Google Maps-länk för en koordinat
+const generateGoogleMapsLink = (lat: number, lng: number): string => {
+  return `https://www.google.com/maps?q=${lat},${lng}`
 }
 
 // Professional card system
@@ -412,14 +405,22 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
           })
         }
       } catch (error) {
-        // Om kartan inte kunde laddas, visa meddelande
-        pdf.setTextColor(...beGoneColors.mediumGray)
+        // Om kartan inte kunde laddas, visa meddelande med info om klickbara länkar
+        pdf.setTextColor(...beGoneColors.darkGray)
         pdf.setFontSize(typography.body.size)
-        pdf.setFont(undefined, 'italic')
+        pdf.setFont(undefined, 'normal')
         pdf.text(
-          'Karta kunde inte laddas. Se GPS-koordinater i tabellen nedan.',
+          'Översiktskartan kunde inte laddas.',
           margins.left + contentWidth / 2,
-          yPosition + mapHeight / 2,
+          yPosition + mapHeight / 2 - 8,
+          { align: 'center' }
+        )
+        pdf.setTextColor(59, 130, 246) // Blå
+        pdf.setFont(undefined, 'bold')
+        pdf.text(
+          'Klicka på GPS-koordinaterna i tabellen nedan för att öppna Google Maps.',
+          margins.left + contentWidth / 2,
+          yPosition + mapHeight / 2 + 4,
           { align: 'center' }
         )
       }
@@ -427,33 +428,11 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
       // Lägg till legend under kartan
       yPosition += mapHeight + spacing.sm
 
-      // Liten legend för kartmarkörer
-      const legendY = yPosition
-      let legendX = margins.left
-
+      // Liten legend med info om klickbara koordinater
       pdf.setFontSize(typography.caption.size)
       pdf.setFont(undefined, 'normal')
       pdf.setTextColor(...beGoneColors.mediumGray)
-      pdf.text('Legend:', legendX, legendY + 4)
-      legendX += 20
-
-      Object.entries(EQUIPMENT_TYPE_CONFIG).forEach(([type, config]) => {
-        const hexToRgb = (hex: string): [number, number, number] => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-          return result
-            ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
-            : [107, 114, 128]
-        }
-        const rgb = hexToRgb(config.color)
-
-        pdf.setFillColor(...rgb)
-        pdf.circle(legendX + 3, legendY + 3, 3, 'F')
-
-        pdf.setTextColor(...beGoneColors.darkGray)
-        pdf.text(config.label, legendX + 8, legendY + 5)
-
-        legendX += 45
-      })
+      pdf.text('Tips: GPS-koordinaterna i tabellen är klickbara och öppnar Google Maps.', margins.left, yPosition + 4)
 
       yPosition += spacing.lg
     }
@@ -566,7 +545,12 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         pdf.text(item.serial_number || '-', colX, yPosition + 9)
 
         colX += colWidths.serial
-        pdf.text(formatCoordinates(item.latitude, item.longitude), colX, yPosition + 9)
+        // GPS-koordinater som klickbar Google Maps-länk
+        const coordText = formatCoordinates(item.latitude, item.longitude)
+        const mapsLink = generateGoogleMapsLink(item.latitude, item.longitude)
+        pdf.setTextColor(59, 130, 246) // Blå färg för länk
+        pdf.textWithLink(coordText, colX, yPosition + 9, { url: mapsLink })
+        pdf.setTextColor(...beGoneColors.darkGray) // Återställ färg
 
         colX += colWidths.coordinates
         pdf.text(getEquipmentStatusLabel(item.status), colX, yPosition + 9)
