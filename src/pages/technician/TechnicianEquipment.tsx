@@ -9,7 +9,9 @@ import {
   EquipmentType,
   requiresSerialNumber,
   getEquipmentTypeLabel,
-  EQUIPMENT_TYPE_CONFIG
+  getEquipmentStatusLabel,
+  EQUIPMENT_TYPE_CONFIG,
+  EQUIPMENT_STATUS_CONFIG
 } from '../../types/database'
 import { EquipmentService } from '../../services/equipmentService'
 import {
