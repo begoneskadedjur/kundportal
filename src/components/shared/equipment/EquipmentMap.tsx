@@ -24,7 +24,7 @@ import {
   openInMapsApp,
   MARKER_CSS
 } from '../../../utils/equipmentMapUtils'
-import { MapPin, Navigation, ExternalLink, Edit, Trash2, Image as ImageIcon } from 'lucide-react'
+import { MapPin, Navigation, ExternalLink, Edit, Trash2, Image as ImageIcon, Building } from 'lucide-react'
 
 // Fix för Leaflet standardikoner
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -136,6 +136,14 @@ function EquipmentPopupContent({
           {getEquipmentStatusLabel(item.status)}
         </span>
       </div>
+
+      {/* Kund */}
+      {(item.customer as { company_name?: string } | undefined)?.company_name && (
+        <p className="text-sm text-slate-700 mb-2 flex items-center gap-1.5 font-medium">
+          <Building className="w-3.5 h-3.5 text-slate-500" />
+          {(item.customer as { company_name: string }).company_name}
+        </p>
+      )}
 
       {/* Serienummer */}
       {item.serial_number && (

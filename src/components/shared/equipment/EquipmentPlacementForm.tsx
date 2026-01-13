@@ -1,5 +1,5 @@
 // src/components/shared/equipment/EquipmentPlacementForm.tsx - Formulär för att skapa/redigera utrustning
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   EquipmentType,
@@ -21,8 +21,17 @@ import {
   AlertCircle,
   Check,
   X,
-  Map
+  Map,
+  Building,
+  Search,
+  ChevronDown
 } from 'lucide-react'
+
+// Typ för kund i dropdown
+interface CustomerOption {
+  id: string
+  company_name: string
+}
 
 interface EquipmentPlacementFormProps {
   customerId: string
@@ -32,6 +41,10 @@ interface EquipmentPlacementFormProps {
   onCancel: () => void
   onLocationCapture?: (lat: number, lng: number) => void
   isSubmitting?: boolean
+  // Nya props för kundväljare
+  customers?: CustomerOption[]
+  onCustomerChange?: (customerId: string) => void
+  showCustomerPicker?: boolean
 }
 
 export interface FormData {
@@ -57,9 +70,83 @@ export function EquipmentPlacementForm({
   onSubmit,
   onCancel,
   onLocationCapture,
-  isSubmitting = false
+  isSubmitting = false,
+  customers = [],
+  onCustomerChange,
+  showCustomerPicker = false
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // State för sökbar kundväljare
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+
+  // Filtrera kunder baserat på söktext
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers
+    const search = customerSearch.toLowerCase()
+    return customers.filter(c =>
+      c.company_name.toLowerCase().includes(search)
+    )
+  }, [customers, customerSearch])
+
+  // Hitta vald kunds namn
+  const selectedCustomerName = useMemo(() => {
+    return customers.find(c => c.id === customerId)?.company_name || ''
+  }, [customers, customerId])
+
+  // Stäng dropdown vid klick utanför
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowCustomerDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Hantera tangentbordsnavigering i dropdown
+  const handleCustomerKeyDown = (e: React.KeyboardEvent) => {
+    if (!showCustomerDropdown) {
+      if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setShowCustomerDropdown(true)
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex(prev =>
+          prev < filteredCustomers.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (filteredCustomers[highlightedIndex]) {
+          onCustomerChange?.(filteredCustomers[highlightedIndex].id)
+          setShowCustomerDropdown(false)
+          setCustomerSearch('')
+        }
+        break
+      case 'Escape':
+        setShowCustomerDropdown(false)
+        break
+    }
+  }
+
+  // Återställ highlightedIndex när filtrerade kunder ändras
+  useEffect(() => {
+    setHighlightedIndex(0)
+  }, [filteredCustomers])
 
   const [formData, setFormData] = useState<FormData>({
     equipment_type: existingEquipment?.equipment_type || 'mechanical_trap',
@@ -176,6 +263,95 @@ export function EquipmentPlacementForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Sökbar kundväljare (visas när showCustomerPicker är true) */}
+      {showCustomerPicker && customers.length > 0 && (
+        <div ref={dropdownRef} className="relative">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            <Building className="w-4 h-4 inline mr-1.5" />
+            Välj kund *
+          </label>
+
+          {/* Sökfält */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="w-5 h-5 text-slate-500" />
+            </div>
+            <input
+              type="text"
+              value={showCustomerDropdown ? customerSearch : selectedCustomerName}
+              onChange={(e) => {
+                setCustomerSearch(e.target.value)
+                if (!showCustomerDropdown) setShowCustomerDropdown(true)
+              }}
+              onFocus={() => {
+                setShowCustomerDropdown(true)
+                setCustomerSearch('')
+              }}
+              onKeyDown={handleCustomerKeyDown}
+              placeholder="Sök kund..."
+              className={`w-full pl-10 pr-10 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                selectedCustomerName ? 'border-green-500/50' : 'border-slate-700'
+              }`}
+            />
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${showCustomerDropdown ? 'rotate-180' : ''}`} />
+            </div>
+          </div>
+
+          {/* Dropdown-lista */}
+          <AnimatePresence>
+            {showCustomerDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+              >
+                {filteredCustomers.length === 0 ? (
+                  <div className="px-4 py-3 text-slate-400 text-sm">
+                    Inga kunder hittades
+                  </div>
+                ) : (
+                  filteredCustomers.map((customer, index) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => {
+                        onCustomerChange?.(customer.id)
+                        setShowCustomerDropdown(false)
+                        setCustomerSearch('')
+                      }}
+                      className={`w-full px-4 py-3 text-left flex items-center gap-2 transition-colors ${
+                        index === highlightedIndex
+                          ? 'bg-blue-500/20 text-blue-300'
+                          : customer.id === customerId
+                            ? 'bg-green-500/10 text-green-300'
+                            : 'text-slate-300 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <Building className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{customer.company_name}</span>
+                      {customer.id === customerId && (
+                        <Check className="w-4 h-4 ml-auto text-green-400" />
+                      )}
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Vald kund-indikator */}
+          {selectedCustomerName && !showCustomerDropdown && (
+            <p className="mt-2 text-sm text-green-400 flex items-center gap-1">
+              <Check className="w-4 h-4" />
+              Placerar hos: {selectedCustomerName}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Utrustningstyp */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-3">

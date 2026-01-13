@@ -606,6 +606,9 @@ export default function TechnicianEquipment() {
                     }}
                     onLocationCapture={handleLocationCapture}
                     isSubmitting={isSubmitting}
+                    customers={customers}
+                    onCustomerChange={setSelectedCustomerId}
+                    showCustomerPicker={!editingEquipment} // Visa kundväljare endast för nya placeringar
                   />
                 </div>
               </motion.div>
