@@ -74,6 +74,7 @@ export default function TechnicianEquipment() {
   const [editingEquipment, setEditingEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null) // För fullskärmsvisning av bild
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string
     equipment: EquipmentPlacementWithRelations
@@ -579,9 +580,10 @@ export default function TechnicianEquipment() {
                     <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden">
                       {/* Tabellhuvud */}
                       <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-slate-800/50 border-b border-slate-700/50 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <div className="col-span-1">Foto</div>
                         <div className="col-span-3">Typ</div>
                         <div className="col-span-2">Serienr</div>
-                        <div className="col-span-3">Koordinater</div>
+                        <div className="col-span-2">Koordinater</div>
                         <div className="col-span-2">Status</div>
                         <div className="col-span-2">Åtgärder</div>
                       </div>
@@ -602,8 +604,48 @@ export default function TechnicianEquipment() {
                                 className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-800/30 transition-colors cursor-pointer items-center"
                                 onClick={() => setExpandedEquipmentId(isExpanded ? null : item.id)}
                               >
+                                {/* Foto - endast desktop */}
+                                <div className="hidden md:flex col-span-1 items-center justify-center">
+                                  {item.photo_url ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLightboxImage(item.photo_url!)
+                                      }}
+                                      className="w-10 h-10 rounded-lg overflow-hidden border border-slate-600 hover:border-blue-400 transition-colors"
+                                      title="Visa bild i fullskärm"
+                                    >
+                                      <img
+                                        src={item.photo_url}
+                                        alt="Utrustningsfoto"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </button>
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center">
+                                      <ImageIcon className="w-4 h-4 text-slate-600" />
+                                    </div>
+                                  )}
+                                </div>
+
                                 {/* Typ - mobil & desktop */}
                                 <div className="col-span-12 md:col-span-3 flex items-center gap-3">
+                                  {/* Fotominiatyr på mobil */}
+                                  {item.photo_url && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setLightboxImage(item.photo_url!)
+                                      }}
+                                      className="md:hidden w-10 h-10 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0"
+                                    >
+                                      <img
+                                        src={item.photo_url}
+                                        alt="Utrustningsfoto"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </button>
+                                  )}
                                   <div
                                     className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                                     style={{ backgroundColor: typeConfig.color, opacity: item.status === 'removed' ? 0.5 : 1 }}
@@ -634,7 +676,7 @@ export default function TechnicianEquipment() {
                                 </div>
 
                                 {/* Koordinater - endast desktop */}
-                                <div className="hidden md:block col-span-3">
+                                <div className="hidden md:block col-span-2">
                                   <p className="text-slate-400 text-sm font-mono">
                                     {formatCoordinates(item.latitude, item.longitude)}
                                   </p>
@@ -729,6 +771,26 @@ export default function TechnicianEquipment() {
                                         <div>
                                           <span className="text-sm text-slate-400">Kommentar</span>
                                           <p className="text-sm text-slate-300 mt-1">{item.comment}</p>
+                                        </div>
+                                      )}
+
+                                      {/* Foto - större bild på mobil */}
+                                      {item.photo_url && (
+                                        <div>
+                                          <span className="text-sm text-slate-400 mb-2 block">Foto</span>
+                                          <button
+                                            onClick={() => setLightboxImage(item.photo_url!)}
+                                            className="relative w-full max-w-[200px] aspect-square rounded-xl overflow-hidden border border-slate-600 hover:border-blue-400 transition-colors"
+                                          >
+                                            <img
+                                              src={item.photo_url}
+                                              alt="Utrustningsfoto"
+                                              className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                              <ImageIcon className="w-8 h-8 text-white" />
+                                            </div>
+                                          </button>
                                         </div>
                                       )}
 
@@ -1281,6 +1343,38 @@ export default function TechnicianEquipment() {
                     Avbryt
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Lightbox för fullskärmsvisning av foto */}
+        <AnimatePresence>
+          {lightboxImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              onClick={() => setLightboxImage(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center"
+              >
+                <img
+                  src={lightboxImage}
+                  alt="Utrustningsfoto"
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                />
+                <button
+                  onClick={() => setLightboxImage(null)}
+                  className="absolute top-4 right-4 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </motion.div>
             </motion.div>
           )}
