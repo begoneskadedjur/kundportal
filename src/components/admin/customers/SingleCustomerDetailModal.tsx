@@ -1,13 +1,13 @@
 // src/components/admin/customers/SingleCustomerDetailModal.tsx
 import React from 'react'
-import { 
-  X, 
-  Building2, 
-  Calendar, 
-  TrendingUp, 
-  AlertCircle, 
-  Users, 
-  DollarSign, 
+import {
+  X,
+  Building2,
+  Calendar,
+  TrendingUp,
+  AlertCircle,
+  Users,
+  DollarSign,
   User,
   Mail,
   Phone,
@@ -23,6 +23,7 @@ import HealthScoreBadge from './HealthScoreBadge'
 import ChurnRiskBadge from './ChurnRiskBadge'
 import PortalAccessBadge from './PortalAccessBadge'
 import AdminCasesList from './AdminCasesList'
+import CustomerEquipmentDualView from './CustomerEquipmentDualView'
 import { formatCurrency } from '../../../utils/customerMetrics'
 
 interface SingleCustomerDetailModalProps {
@@ -522,11 +523,29 @@ export default function SingleCustomerDetailModal({
               </div>
 
               <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
-                <AdminCasesList 
+                <AdminCasesList
                   customerId={site.id}
                   organizationId={customer.organizationId || undefined}
                 />
               </div>
+            </section>
+
+            {/* Separator */}
+            <div className="border-t border-slate-700" />
+
+            {/* Equipment Placement Section */}
+            <section className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
+                  <MapPin className="w-5 h-5 text-emerald-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Utrustningsplacering</h3>
+              </div>
+
+              <CustomerEquipmentDualView
+                customerId={site.id}
+                customerName={customer.company_name}
+              />
             </section>
 
             {/* Economic Analysis Section */}
