@@ -65,6 +65,69 @@ const formatCoordinates = (lat: number, lng: number): string => {
   return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
 }
 
+// Generera statisk karta-URL med OpenStreetMap Static Map API
+const generateStaticMapUrl = (
+  equipment: EquipmentPlacementWithRelations[],
+  width: number,
+  height: number
+): string | null => {
+  if (equipment.length === 0) return null
+
+  // Beräkna bounding box för alla koordinater
+  const lats = equipment.map((e) => e.latitude)
+  const lngs = equipment.map((e) => e.longitude)
+
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+
+  // Beräkna center
+  const centerLat = (minLat + maxLat) / 2
+  const centerLng = (minLng + maxLng) / 2
+
+  // Beräkna zoom-nivå baserat på bounding box
+  const latDiff = maxLat - minLat
+  const lngDiff = maxLng - minLng
+  const maxDiff = Math.max(latDiff, lngDiff)
+
+  let zoom = 15
+  if (maxDiff > 0.5) zoom = 10
+  else if (maxDiff > 0.2) zoom = 12
+  else if (maxDiff > 0.1) zoom = 13
+  else if (maxDiff > 0.05) zoom = 14
+  else if (maxDiff > 0.01) zoom = 15
+  else zoom = 16
+
+  // Om bara en punkt, zooma in mer
+  if (equipment.length === 1) {
+    zoom = 16
+  }
+
+  // Skapa markörer för varje utrustning
+  // Använder olika färger baserat på typ
+  const markers = equipment.map((e) => {
+    const config = EQUIPMENT_TYPE_CONFIG[e.equipment_type]
+    // Ta bort # från hex-färgen
+    const color = config.color.replace('#', '')
+    return `${e.longitude},${e.latitude}`
+  }).join('|')
+
+  // Använd OpenStreetMap Static Map via stadiamaps (gratis för begränsad användning)
+  // Alternativt kan vi använda en enkel approach med geoapify
+  const baseUrl = 'https://maps.geoapify.com/v1/staticmap'
+  const apiKey = 'demo' // Gratis demo-nyckel för begränsad användning
+
+  // Skapa marker-string för geoapify
+  const markerParams = equipment.map((e, i) => {
+    const config = EQUIPMENT_TYPE_CONFIG[e.equipment_type]
+    const color = config.color.replace('#', '')
+    return `lonlat:${e.longitude},${e.latitude};color:%23${color};size:medium`
+  }).join('&marker=')
+
+  return `${baseUrl}?style=osm-bright&width=${width}&height=${height}&center=lonlat:${centerLng},${centerLat}&zoom=${zoom}&marker=${markerParams}&apiKey=${apiKey}`
+}
+
 // Professional card system
 const drawProfessionalCard = (
   pdf: jsPDF,
@@ -185,50 +248,14 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
     let yPosition = 50
 
     // === HEADER ===
-    let headerSuccessful = false
+    // Använd enkel header med BeGone-branding (ingen bild som säger "Saneringsrapport")
+    pdf.setFillColor(...beGoneColors.primary)
+    pdf.rect(0, 0, pageWidth, 40, 'F')
 
-    try {
-      const logoPath = '/images/begone-header.png'
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas')
-            const ctx = canvas.getContext('2d')
-            canvas.width = img.width
-            canvas.height = img.height
-            ctx?.drawImage(img, 0, 0)
-
-            const dataURL = canvas.toDataURL('image/png')
-            const headerImageHeight = 40
-
-            pdf.addImage(dataURL, 'PNG', 0, 0, pageWidth, headerImageHeight)
-            headerSuccessful = true
-            resolve(true)
-          } catch (error) {
-            reject(error)
-          }
-        }
-
-        img.onerror = () => reject(new Error('Header image failed'))
-        img.src = logoPath
-      })
-    } catch (error) {
-      console.warn('Header image failed, using minimal background')
-      headerSuccessful = false
-    }
-
-    if (!headerSuccessful) {
-      pdf.setFillColor(...beGoneColors.primary)
-      pdf.rect(0, 0, pageWidth, 40, 'F')
-
-      pdf.setTextColor(...beGoneColors.white)
-      pdf.setFontSize(16)
-      pdf.setFont(undefined, 'bold')
-      pdf.text('BeGone Skadedjur & Sanering', pageWidth / 2, 25, { align: 'center' })
-    }
+    pdf.setTextColor(...beGoneColors.white)
+    pdf.setFontSize(16)
+    pdf.setFont(undefined, 'bold')
+    pdf.text('BeGone Skadedjur & Sanering', pageWidth / 2, 25, { align: 'center' })
 
     // === RAPPORT METADATA ===
     yPosition += spacing.sm
@@ -328,6 +355,108 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
     )
 
     yPosition += statBoxHeight + spacing.section
+
+    // === ÖVERSIKTSKARTA ===
+    if (equipment.length > 0) {
+      // Kontrollera om det finns plats för kartan på denna sida
+      const mapHeight = 80
+      if (yPosition + mapHeight + 40 > pageHeight - 40) {
+        pdf.addPage()
+        yPosition = spacing.xl
+      }
+
+      yPosition = drawSectionHeader(pdf, 'ÖVERSIKTSKARTA', margins.left, yPosition, contentWidth, 'primary')
+      const mapWidth = Math.round(contentWidth * 2.83) // Konvertera mm till ungefärliga pixlar
+      const mapHeightPx = Math.round(mapHeight * 2.83)
+
+      // Rita platshållare för kartan med ljusgrå bakgrund
+      drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, mapHeight, {
+        backgroundColor: 'light',
+        shadow: false,
+        radius: 4
+      })
+
+      // Försök ladda statisk karta
+      try {
+        const mapUrl = generateStaticMapUrl(equipment, mapWidth, mapHeightPx)
+        if (mapUrl) {
+          const mapImg = new Image()
+          mapImg.crossOrigin = 'anonymous'
+
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Map timeout')), 8000)
+
+            mapImg.onload = () => {
+              clearTimeout(timeout)
+              try {
+                const canvas = document.createElement('canvas')
+                const ctx = canvas.getContext('2d')
+                canvas.width = mapImg.width
+                canvas.height = mapImg.height
+                ctx?.drawImage(mapImg, 0, 0)
+
+                const dataURL = canvas.toDataURL('image/png')
+                pdf.addImage(dataURL, 'PNG', margins.left + 2, yPosition + 2, contentWidth - 4, mapHeight - 4)
+                resolve()
+              } catch (error) {
+                reject(error)
+              }
+            }
+
+            mapImg.onerror = () => {
+              clearTimeout(timeout)
+              reject(new Error('Map image failed'))
+            }
+
+            mapImg.src = mapUrl
+          })
+        }
+      } catch (error) {
+        // Om kartan inte kunde laddas, visa meddelande
+        pdf.setTextColor(...beGoneColors.mediumGray)
+        pdf.setFontSize(typography.body.size)
+        pdf.setFont(undefined, 'italic')
+        pdf.text(
+          'Karta kunde inte laddas. Se GPS-koordinater i tabellen nedan.',
+          margins.left + contentWidth / 2,
+          yPosition + mapHeight / 2,
+          { align: 'center' }
+        )
+      }
+
+      // Lägg till legend under kartan
+      yPosition += mapHeight + spacing.sm
+
+      // Liten legend för kartmarkörer
+      const legendY = yPosition
+      let legendX = margins.left
+
+      pdf.setFontSize(typography.caption.size)
+      pdf.setFont(undefined, 'normal')
+      pdf.setTextColor(...beGoneColors.mediumGray)
+      pdf.text('Legend:', legendX, legendY + 4)
+      legendX += 20
+
+      Object.entries(EQUIPMENT_TYPE_CONFIG).forEach(([type, config]) => {
+        const hexToRgb = (hex: string): [number, number, number] => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+          return result
+            ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+            : [107, 114, 128]
+        }
+        const rgb = hexToRgb(config.color)
+
+        pdf.setFillColor(...rgb)
+        pdf.circle(legendX + 3, legendY + 3, 3, 'F')
+
+        pdf.setTextColor(...beGoneColors.darkGray)
+        pdf.text(config.label, legendX + 8, legendY + 5)
+
+        legendX += 45
+      })
+
+      yPosition += spacing.lg
+    }
 
     // === UTRUSTNINGSLISTA ===
     yPosition = drawSectionHeader(pdf, 'UTRUSTNINGSLISTA', margins.left, yPosition, contentWidth, 'primary')
@@ -456,71 +585,14 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
       yPosition += spacing.md
     }
 
-    // === DETALJERAD LISTA MED KOMMENTARER ===
-    const itemsWithComments = equipment.filter((e) => e.comment)
-    if (itemsWithComments.length > 0) {
-      // Kontrollera sidbrytning
-      if (yPosition > pageHeight - 80) {
-        pdf.addPage()
-        yPosition = spacing.xl
-      }
-
-      yPosition = drawSectionHeader(pdf, 'KOMMENTARER', margins.left, yPosition, contentWidth, 'accent')
-
-      itemsWithComments.forEach((item) => {
-        // Kontrollera sidbrytning
-        if (yPosition > pageHeight - 50) {
-          pdf.addPage()
-          yPosition = spacing.xl
-        }
-
-        const commentCardHeight = 35
-        drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, commentCardHeight, {
-          backgroundColor: 'light',
-          shadow: false,
-          radius: 4
-        })
-
-        // Utrustningsinfo
-        pdf.setTextColor(...beGoneColors.darkGray)
-        pdf.setFontSize(typography.body.size)
-        pdf.setFont(undefined, 'bold')
-        pdf.text(
-          `${getEquipmentTypeLabel(item.equipment_type)}${item.serial_number ? ` (${item.serial_number})` : ''}`,
-          margins.left + spacing.sm,
-          yPosition + spacing.md
-        )
-
-        // GPS-länk
-        pdf.setTextColor(...beGoneColors.mediumGray)
-        pdf.setFontSize(typography.caption.size)
-        pdf.setFont(undefined, 'normal')
-        pdf.text(
-          `GPS: ${formatCoordinates(item.latitude, item.longitude)}`,
-          margins.left + contentWidth - spacing.sm,
-          yPosition + spacing.md,
-          { align: 'right' }
-        )
-
-        // Kommentar
-        pdf.setTextColor(...beGoneColors.darkGray)
-        pdf.setFontSize(typography.body.size)
-        pdf.setFont(undefined, 'italic')
-        const commentLines = pdf.splitTextToSize(`"${item.comment}"`, contentWidth - spacing.lg)
-        pdf.text(commentLines.slice(0, 2), margins.left + spacing.sm, yPosition + spacing.xl)
-
-        yPosition += commentCardHeight + spacing.sm
-      })
-    }
-
-    // === DETALJKORT MED FOTON ===
+    // === UTRUSTNINGSDETALJER MED FOTON ===
     const itemsWithPhotos = equipment.filter((e) => e.photo_url)
     if (itemsWithPhotos.length > 0) {
       // Ny sida för bildgalleri
       pdf.addPage()
       yPosition = spacing.xl
 
-      yPosition = drawSectionHeader(pdf, 'BILDGALLERI', margins.left, yPosition, contentWidth, 'primary')
+      yPosition = drawSectionHeader(pdf, 'UTRUSTNINGSDETALJER', margins.left, yPosition, contentWidth, 'primary')
 
       // Ladda och rita bilder
       for (const item of itemsWithPhotos) {
