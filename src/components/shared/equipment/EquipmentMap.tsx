@@ -1,4 +1,5 @@
 // src/components/shared/equipment/EquipmentMap.tsx - Leaflet-karta för utrustningsvisning
+// Uppdaterad: Använder EquipmentDetailSheet istället för Leaflet Popup för bättre UX på mobil
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, useMapEvents, Circle } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
@@ -6,10 +7,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   EquipmentPlacementWithRelations,
-  EQUIPMENT_TYPE_CONFIG,
-  EQUIPMENT_STATUS_CONFIG,
-  getEquipmentTypeLabel,
-  getEquipmentStatusLabel
+  EQUIPMENT_TYPE_CONFIG
 } from '../../../types/database'
 import {
   createEquipmentIcon,
@@ -21,10 +19,10 @@ import {
   MAX_ZOOM,
   calculateBounds,
   formatCoordinates,
-  openInMapsApp,
   MARKER_CSS
 } from '../../../utils/equipmentMapUtils'
-import { MapPin, Navigation, ExternalLink, Edit, Trash2, Image as ImageIcon, Building } from 'lucide-react'
+import { Navigation } from 'lucide-react'
+import { EquipmentDetailSheet } from './EquipmentDetailSheet'
 
 // Fix för Leaflet standardikoner
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -95,131 +93,6 @@ function MapClickHandler({
   return null
 }
 
-// Extraherad popup-komponent för återanvändning
-function EquipmentPopupContent({
-  item,
-  readOnly,
-  onEditEquipment,
-  onDeleteEquipment
-}: {
-  item: EquipmentPlacementWithRelations
-  readOnly: boolean
-  onEditEquipment?: (equipment: EquipmentPlacementWithRelations) => void
-  onDeleteEquipment?: (equipment: EquipmentPlacementWithRelations) => void
-}) {
-  return (
-    <div className="min-w-[220px] p-1">
-      {/* Foto om finns */}
-      {item.photo_url && (
-        <div className="mb-2 -mx-1 -mt-1">
-          <img
-            src={item.photo_url}
-            alt="Utrustningsfoto"
-            className="w-full h-32 object-cover rounded-t-lg"
-            loading="lazy"
-          />
-        </div>
-      )}
-
-      {/* Typ och status */}
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: EQUIPMENT_TYPE_CONFIG[item.equipment_type].color }}
-        />
-        <span className="font-semibold text-slate-800">
-          {getEquipmentTypeLabel(item.equipment_type)}
-        </span>
-        <span
-          className={`text-xs px-2 py-0.5 rounded-full ${
-            EQUIPMENT_STATUS_CONFIG[item.status].bgColor
-          } text-${EQUIPMENT_STATUS_CONFIG[item.status].color}`}
-        >
-          {getEquipmentStatusLabel(item.status)}
-        </span>
-      </div>
-
-      {/* Kund */}
-      {(item.customer as { company_name?: string } | undefined)?.company_name && (
-        <p className="text-sm text-slate-700 mb-2 flex items-center gap-1.5 font-medium">
-          <Building className="w-3.5 h-3.5 text-slate-500" />
-          {(item.customer as { company_name: string }).company_name}
-        </p>
-      )}
-
-      {/* Serienummer */}
-      {item.serial_number && (
-        <p className="text-sm text-slate-600 mb-1">
-          <span className="font-medium">Serienr:</span> {item.serial_number}
-        </p>
-      )}
-
-      {/* Koordinater */}
-      <p className="text-xs text-slate-500 mb-1">
-        <MapPin className="w-3 h-3 inline mr-1" />
-        {formatCoordinates(item.latitude, item.longitude)}
-      </p>
-
-      {/* Placerad av */}
-      {item.technician?.name && (
-        <p className="text-xs text-slate-500 mb-1">
-          Placerad av: {item.technician.name}
-        </p>
-      )}
-
-      {/* Datum */}
-      <p className="text-xs text-slate-500 mb-2">
-        {new Date(item.placed_at).toLocaleDateString('sv-SE')}
-      </p>
-
-      {/* Kommentar */}
-      {item.comment && (
-        <p className="text-xs text-slate-600 italic mb-2 border-t pt-2">
-          "{item.comment}"
-        </p>
-      )}
-
-      {/* Foto-indikator om saknas */}
-      {!item.photo_url && (
-        <p className="text-xs text-slate-400 mb-2 flex items-center gap-1">
-          <ImageIcon className="w-3 h-3" />
-          Inget foto
-        </p>
-      )}
-
-      {/* Åtgärder */}
-      <div className="flex flex-wrap gap-2 pt-2 border-t">
-        <button
-          onClick={() => openInMapsApp(item.latitude, item.longitude)}
-          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 min-h-[44px] px-2"
-        >
-          <ExternalLink className="w-4 h-4" />
-          Öppna i karta
-        </button>
-
-        {!readOnly && onEditEquipment && (
-          <button
-            onClick={() => onEditEquipment(item)}
-            className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 min-h-[44px] px-2"
-          >
-            <Edit className="w-4 h-4" />
-            Redigera
-          </button>
-        )}
-
-        {!readOnly && onDeleteEquipment && (
-          <button
-            onClick={() => onDeleteEquipment(item)}
-            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 min-h-[44px] px-2"
-          >
-            <Trash2 className="w-4 h-4" />
-            Ta bort
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export function EquipmentMap({
   equipment,
@@ -235,7 +108,36 @@ export function EquipmentMap({
   enableClustering = true // Aktiverat som standard
 }: EquipmentMapProps) {
   const mapRef = useRef<L.Map | null>(null)
-  const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
+  // State for den valda utrustningen som visas i detail-sheeten
+  const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
+
+  // Hantera klick pa en markör - öppna detail sheet istället för popup
+  const handleMarkerClick = (item: EquipmentPlacementWithRelations) => {
+    setSelectedEquipmentData(item)
+    setIsDetailSheetOpen(true)
+    onEquipmentClick?.(item)
+  }
+
+  // Stang detail sheet
+  const handleCloseDetailSheet = () => {
+    setIsDetailSheetOpen(false)
+    // Rensa vald utrustning efter animation
+    setTimeout(() => setSelectedEquipmentData(null), 300)
+  }
+
+  // Hantera redigering fran sheeten
+  const handleEditFromSheet = (item: EquipmentPlacementWithRelations) => {
+    handleCloseDetailSheet()
+    // Kort delay for att lata sheeten stanga innan modal oppnas
+    setTimeout(() => onEditEquipment?.(item), 150)
+  }
+
+  // Hantera borttagning fran sheeten
+  const handleDeleteFromSheet = (item: EquipmentPlacementWithRelations) => {
+    handleCloseDetailSheet()
+    setTimeout(() => onDeleteEquipment?.(item), 150)
+  }
 
   // Skapa en unik key för MarkerClusterGroup baserat på alla equipment IDs
   // Detta tvingar React att återskapa komponenten när equipment ändras
@@ -345,6 +247,7 @@ export function EquipmentMap({
 
         {/* Befintlig utrustning - med eller utan klustring */}
         {/* Key tvingar omrendering när equipment ändras (t.ex. efter borttagning) */}
+        {/* UPPDATERAT: Använder EquipmentDetailSheet istället för Leaflet Popup för bättre mobil-UX */}
         {enableClustering && equipment.length >= 2 ? (
           <MarkerClusterGroup
             key={clusterKey}
@@ -364,21 +267,9 @@ export function EquipmentMap({
                 position={[item.latitude, item.longitude]}
                 icon={createEquipmentIcon(item.equipment_type, item.status)}
                 eventHandlers={{
-                  click: () => {
-                    setSelectedEquipment(item.id)
-                    onEquipmentClick?.(item)
-                  }
+                  click: () => handleMarkerClick(item)
                 }}
-              >
-                <Popup>
-                  <EquipmentPopupContent
-                    item={item}
-                    readOnly={readOnly}
-                    onEditEquipment={onEditEquipment}
-                    onDeleteEquipment={onDeleteEquipment}
-                  />
-                </Popup>
-              </Marker>
+              />
             ))}
           </MarkerClusterGroup>
         ) : (
@@ -388,21 +279,9 @@ export function EquipmentMap({
               position={[item.latitude, item.longitude]}
               icon={createEquipmentIcon(item.equipment_type, item.status)}
               eventHandlers={{
-                click: () => {
-                  setSelectedEquipment(item.id)
-                  onEquipmentClick?.(item)
-                }
+                click: () => handleMarkerClick(item)
               }}
-            >
-              <Popup>
-                <EquipmentPopupContent
-                  item={item}
-                  readOnly={readOnly}
-                  onEditEquipment={onEditEquipment}
-                  onDeleteEquipment={onDeleteEquipment}
-                />
-              </Popup>
-            </Marker>
+            />
           ))
         )}
 
@@ -476,6 +355,16 @@ export function EquipmentMap({
           ))}
         </div>
       </div>
+
+      {/* Equipment Detail Sheet - responsiv bottom-sheet/sidopanel */}
+      <EquipmentDetailSheet
+        equipment={selectedEquipmentData}
+        isOpen={isDetailSheetOpen}
+        onClose={handleCloseDetailSheet}
+        onEdit={!readOnly && onEditEquipment ? handleEditFromSheet : undefined}
+        onDelete={!readOnly && onDeleteEquipment ? handleDeleteFromSheet : undefined}
+        readOnly={readOnly}
+      />
     </div>
   )
 }
