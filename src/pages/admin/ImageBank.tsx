@@ -696,15 +696,27 @@ export default function ImageBank() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {/* Visa alla taggar */}
-              {(lightboxImage.tags || ['general']).map(tag => (
-                <span
-                  key={tag}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-${CASE_IMAGE_TAG_DISPLAY[tag]?.color || 'slate-500'}/30 text-${CASE_IMAGE_TAG_DISPLAY[tag]?.color || 'slate-400'}`}
-                >
-                  {getTagIcon(tag)}
-                  {CASE_IMAGE_TAG_DISPLAY[tag]?.label || tag}
-                </span>
-              ))}
+              {(lightboxImage.tags || ['general']).map(tag => {
+                const colorMap: Record<string, { bg: string; text: string }> = {
+                  'orange-500': { bg: 'rgba(249, 115, 22, 0.3)', text: '#fb923c' },
+                  'green-500': { bg: 'rgba(34, 197, 94, 0.3)', text: '#4ade80' },
+                  'blue-500': { bg: 'rgba(59, 130, 246, 0.3)', text: '#60a5fa' },
+                  'purple-500': { bg: 'rgba(168, 85, 247, 0.3)', text: '#c084fc' },
+                  'teal-500': { bg: 'rgba(20, 184, 166, 0.3)', text: '#2dd4bf' }
+                }
+                const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                const colors = colorMap[tagConfig?.color] || colorMap['blue-500']
+                return (
+                  <span
+                    key={tag}
+                    style={{ backgroundColor: colors.bg, color: colors.text }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                  >
+                    {getTagIcon(tag)}
+                    {tagConfig?.label || tag}
+                  </span>
+                )
+              })}
               <span className="text-white/70 text-sm ml-2">
                 {lightboxImages.findIndex(img => img.id === lightboxImage.id) + 1} / {lightboxImages.length}
               </span>

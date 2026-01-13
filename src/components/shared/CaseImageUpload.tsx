@@ -320,6 +320,15 @@ export default function CaseImageUpload({
                     {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => {
                       const isSelected = pending.tags.includes(tag)
                       const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                      // Använd faktiska färgvärden för tydlig visuell feedback
+                      const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                        'orange-500': { bg: 'rgba(249, 115, 22, 0.4)', border: 'rgba(249, 115, 22, 0.7)', text: '#fb923c' },
+                        'green-500': { bg: 'rgba(34, 197, 94, 0.4)', border: 'rgba(34, 197, 94, 0.7)', text: '#4ade80' },
+                        'blue-500': { bg: 'rgba(59, 130, 246, 0.4)', border: 'rgba(59, 130, 246, 0.7)', text: '#60a5fa' },
+                        'purple-500': { bg: 'rgba(168, 85, 247, 0.4)', border: 'rgba(168, 85, 247, 0.7)', text: '#c084fc' },
+                        'teal-500': { bg: 'rgba(20, 184, 166, 0.4)', border: 'rgba(20, 184, 166, 0.7)', text: '#2dd4bf' }
+                      }
+                      const colors = colorMap[tagConfig.color] || colorMap['blue-500']
                       return (
                         <button
                           key={tag}
@@ -328,10 +337,15 @@ export default function CaseImageUpload({
                             e.stopPropagation()
                             toggleFileTag(index, tag)
                           }}
-                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                          style={isSelected ? {
+                            backgroundColor: colors.bg,
+                            borderColor: colors.border,
+                            color: colors.text
+                          } : undefined}
+                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all border ${
                             isSelected
-                              ? `bg-${tagConfig.color}/30 text-${tagConfig.color} ring-1 ring-${tagConfig.color}/50`
-                              : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60'
+                              ? 'border-current'
+                              : 'bg-slate-800/60 text-slate-400 border-transparent hover:bg-slate-700/60'
                           }`}
                         >
                           {getTagIcon(tag, 'w-3 h-3')}
@@ -353,14 +367,26 @@ export default function CaseImageUpload({
 
                 {/* Valda taggar visas som badges längst upp */}
                 <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-40px)]">
-                  {pending.tags.map(tag => (
-                    <span
-                      key={tag}
-                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-${CASE_IMAGE_TAG_DISPLAY[tag].color}/30 text-${CASE_IMAGE_TAG_DISPLAY[tag].color}`}
-                    >
-                      {getTagIcon(tag, 'w-3 h-3')}
-                    </span>
-                  ))}
+                  {pending.tags.map(tag => {
+                    const colorMap: Record<string, { bg: string; text: string }> = {
+                      'orange-500': { bg: 'rgba(249, 115, 22, 0.5)', text: '#fb923c' },
+                      'green-500': { bg: 'rgba(34, 197, 94, 0.5)', text: '#4ade80' },
+                      'blue-500': { bg: 'rgba(59, 130, 246, 0.5)', text: '#60a5fa' },
+                      'purple-500': { bg: 'rgba(168, 85, 247, 0.5)', text: '#c084fc' },
+                      'teal-500': { bg: 'rgba(20, 184, 166, 0.5)', text: '#2dd4bf' }
+                    }
+                    const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                    const colors = colorMap[tagConfig.color] || colorMap['blue-500']
+                    return (
+                      <span
+                        key={tag}
+                        style={{ backgroundColor: colors.bg, color: colors.text }}
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                      >
+                        {getTagIcon(tag, 'w-3 h-3')}
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
             ))}

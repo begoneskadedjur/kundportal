@@ -5,6 +5,7 @@ import {
   Image as ImageIcon,
   Camera,
   CheckCircle,
+  Check,
   Trash2,
   X,
   ChevronLeft,
@@ -648,10 +649,19 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {/* Taggar */}
               {canEdit && editingTags === ('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id) ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => {
                     const isSelected = getSelectedImageTags().includes(tag)
                     const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                    // Använd faktiska färgvärden för tydlig visuell feedback
+                    const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                      'orange-500': { bg: 'rgba(249, 115, 22, 0.4)', border: 'rgba(249, 115, 22, 0.8)', text: '#fb923c' },
+                      'green-500': { bg: 'rgba(34, 197, 94, 0.4)', border: 'rgba(34, 197, 94, 0.8)', text: '#4ade80' },
+                      'blue-500': { bg: 'rgba(59, 130, 246, 0.4)', border: 'rgba(59, 130, 246, 0.8)', text: '#60a5fa' },
+                      'purple-500': { bg: 'rgba(168, 85, 247, 0.4)', border: 'rgba(168, 85, 247, 0.8)', text: '#c084fc' },
+                      'teal-500': { bg: 'rgba(20, 184, 166, 0.4)', border: 'rgba(20, 184, 166, 0.8)', text: '#2dd4bf' }
+                    }
+                    const colors = colorMap[tagConfig.color] || colorMap['blue-500']
                     return (
                       <button
                         key={tag}
@@ -663,14 +673,20 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                             tag
                           )
                         }}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                        style={isSelected ? {
+                          backgroundColor: colors.bg,
+                          borderColor: colors.border,
+                          color: colors.text
+                        } : undefined}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
                           isSelected
-                            ? `bg-${tagConfig.color}/30 text-white ring-1 ring-${tagConfig.color}/50`
-                            : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60'
+                            ? 'border-current'
+                            : 'bg-slate-800/80 text-slate-400 border-transparent hover:bg-slate-700/80 hover:text-slate-300'
                         }`}
                       >
-                        {getTagIcon(tag, 'w-3 h-3')}
+                        {getTagIcon(tag, 'w-3.5 h-3.5')}
                         {tagConfig.label}
+                        {isSelected && <Check className="w-3 h-3 ml-0.5" />}
                       </button>
                     )
                   })}
@@ -679,7 +695,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                       e.stopPropagation()
                       setEditingTags(null)
                     }}
-                    className="ml-2 px-2 py-1 text-xs text-slate-400 hover:text-white"
+                    className="ml-2 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-full transition-colors"
                   >
                     Klar
                   </button>
