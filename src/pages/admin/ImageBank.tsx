@@ -125,6 +125,7 @@ export default function ImageBank() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterDateFrom, setFilterDateFrom] = useState<Date | null>(null)
   const [filterDateTo, setFilterDateTo] = useState<Date | null>(null)
+  const [filterTag, setFilterTag] = useState<CaseImageTag | 'all'>('all')
 
   // Expanderade rader
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -144,19 +145,23 @@ export default function ImageBank() {
   const [uniqueTechnicians, setUniqueTechnicians] = useState<string[]>([])
   const [uniqueStatuses, setUniqueStatuses] = useState<string[]>([])
 
+  // Ärenden med taggar för filtrering (case_id -> tags)
+  const [caseTags, setCaseTags] = useState<Map<string, CaseImageTag[]>>(new Map())
+
   // Hämta alla ärenden som har bilder
   const fetchCasesWithImages = useCallback(async () => {
     setLoading(true)
     try {
-      // Hämta bilder grupperade per ärende
+      // Hämta bilder grupperade per ärende med taggar
       const { data: imageData, error: imageError } = await supabase
         .from('case_images')
-        .select('case_id, case_type')
+        .select('case_id, case_type, tags')
 
       if (imageError) throw imageError
 
-      // Gruppera efter case_id och case_type
+      // Gruppera efter case_id och case_type, samla taggar
       const caseImageCounts = new Map<string, { count: number; type: string }>()
+      const caseTagsMap = new Map<string, Set<CaseImageTag>>()
       imageData?.forEach(img => {
         const key = `${img.case_type}:${img.case_id}`
         const existing = caseImageCounts.get(key)
@@ -164,6 +169,14 @@ export default function ImageBank() {
           existing.count++
         } else {
           caseImageCounts.set(key, { count: 1, type: img.case_type })
+        }
+        // Samla taggar för ärendet
+        if (!caseTagsMap.has(key)) {
+          caseTagsMap.set(key, new Set())
+        }
+        const tags = img.tags as CaseImageTag[] | null
+        if (tags && Array.isArray(tags)) {
+          tags.forEach(tag => caseTagsMap.get(key)!.add(tag))
         }
       })
 
@@ -297,6 +310,13 @@ export default function ImageBank() {
       setUniqueTechnicians(technicians.sort())
       setUniqueStatuses(statuses.sort())
 
+      // Konvertera Set till Array för caseTags
+      const finalCaseTags = new Map<string, CaseImageTag[]>()
+      caseTagsMap.forEach((tags, key) => {
+        finalCaseTags.set(key, Array.from(tags))
+      })
+      setCaseTags(finalCaseTags)
+
     } catch (error) {
       console.error('Fel vid hämtning av ärenden:', error)
       toast.error('Kunde inte hämta ärenden')
@@ -339,9 +359,17 @@ export default function ImageBank() {
         matchesDate = false
       }
 
-      return matchesSearch && matchesPestType && matchesTechnician && matchesStatus && matchesDate
+      // Taggfilter - kontrollera om ärendet har bilder med vald tagg
+      let matchesTag = true
+      if (filterTag !== 'all') {
+        const key = `${c.case_type}:${c.id}`
+        const tags = caseTags.get(key)
+        matchesTag = tags ? tags.includes(filterTag) : false
+      }
+
+      return matchesSearch && matchesPestType && matchesTechnician && matchesStatus && matchesDate && matchesTag
     })
-  }, [cases, searchQuery, filterPestType, filterTechnician, filterStatus, filterDateFrom, filterDateTo])
+  }, [cases, searchQuery, filterPestType, filterTechnician, filterStatus, filterDateFrom, filterDateTo, filterTag, caseTags])
 
   // Paginerade ärenden
   const paginatedCases = useMemo(() => {
@@ -354,7 +382,7 @@ export default function ImageBank() {
   // Återställ till sida 1 när filter ändras
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, filterPestType, filterTechnician, filterStatus, filterDateFrom, filterDateTo])
+  }, [searchQuery, filterPestType, filterTechnician, filterStatus, filterDateFrom, filterDateTo, filterTag])
 
   // Toggle expanderad rad
   const toggleRow = async (caseItem: CaseWithImages) => {
@@ -629,7 +657,7 @@ export default function ImageBank() {
   }, [selectedCases, cases])
 
   // Har aktiva filter?
-  const hasActiveFilters = searchQuery !== '' || filterPestType !== 'all' || filterTechnician !== 'all' || filterStatus !== 'all' || filterDateFrom !== null || filterDateTo !== null
+  const hasActiveFilters = searchQuery !== '' || filterPestType !== 'all' || filterTechnician !== 'all' || filterStatus !== 'all' || filterDateFrom !== null || filterDateTo !== null || filterTag !== 'all'
 
   // Rensa alla filter
   const clearAllFilters = () => {
@@ -639,6 +667,7 @@ export default function ImageBank() {
     setFilterStatus('all')
     setFilterDateFrom(null)
     setFilterDateTo(null)
+    setFilterTag('all')
   }
 
   // Lightbox portal
@@ -882,6 +911,18 @@ export default function ImageBank() {
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
+
+            {/* Tagg */}
+            <select
+              value={filterTag}
+              onChange={(e) => setFilterTag(e.target.value as CaseImageTag | 'all')}
+              className="px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white min-w-[130px] focus:ring-2 focus:ring-teal-500/50"
+            >
+              <option value="all">Alla taggar</option>
+              {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => (
+                <option key={tag} value={tag}>{CASE_IMAGE_TAG_DISPLAY[tag].label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Aktiva filter */}
@@ -916,6 +957,12 @@ export default function ImageBank() {
                 <span className="flex items-center gap-1 px-2 py-1 bg-teal-500/20 text-teal-400 rounded-full text-xs">
                   Datum: {filterDateFrom?.toLocaleDateString('sv-SE') || '...'} - {filterDateTo?.toLocaleDateString('sv-SE') || '...'}
                   <button onClick={() => { setFilterDateFrom(null); setFilterDateTo(null) }}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+              {filterTag !== 'all' && (
+                <span className="flex items-center gap-1 px-2 py-1 bg-teal-500/20 text-teal-400 rounded-full text-xs">
+                  Tagg: {CASE_IMAGE_TAG_DISPLAY[filterTag]?.label || filterTag}
+                  <button onClick={() => setFilterTag('all')}><X className="w-3 h-3" /></button>
                 </span>
               )}
               <button
@@ -1197,14 +1244,18 @@ export default function ImageBank() {
 
                                               {/* Tagg-badges */}
                                               <div className="absolute top-1 left-1 flex flex-wrap gap-0.5 max-w-[calc(100%-8px)]">
-                                                {(image.tags || ['general']).map(tag => (
-                                                  <span
-                                                    key={tag}
-                                                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white`}
-                                                  >
-                                                    {getTagIcon(tag, 'w-2.5 h-2.5')}
-                                                  </span>
-                                                ))}
+                                                {(image.tags || ['general']).map(tag => {
+                                                  const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                                                  return (
+                                                    <span
+                                                      key={tag}
+                                                      className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white"
+                                                    >
+                                                      {getTagIcon(tag, 'w-2.5 h-2.5')}
+                                                      <span className="hidden sm:inline">{tagConfig?.label || tag}</span>
+                                                    </span>
+                                                  )
+                                                })}
                                               </div>
                                             </div>
                                           ))}
