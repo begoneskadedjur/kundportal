@@ -23,6 +23,7 @@ import CustomerStatistics from '../../components/customer/CustomerStatistics'
 import SanitationReports from './SanitationReports'
 import PendingQuoteNotification from '../../components/customer/PendingQuoteNotification'
 import QuoteListView from '../../components/customer/QuoteListView'
+import CustomerEquipmentView from '../../components/customer/CustomerEquipmentView'
 
 // Customer type matching new database structure
 type Customer = {
@@ -61,7 +62,7 @@ const CustomerPortal: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showServiceRequest, setShowServiceRequest] = useState(false)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'statistics' | 'reports' | 'quotes'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'equipment' | 'statistics' | 'reports' | 'quotes'>('dashboard')
   const [pendingQuotes, setPendingQuotes] = useState<any[]>([])
   const [dismissedNotification, setDismissedNotification] = useState(false)
 
@@ -247,6 +248,16 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
+  // Equipment view component
+  const renderEquipmentView = () => (
+    customer ? (
+      <CustomerEquipmentView
+        customerId={customer.id}
+        companyName={customer.company_name}
+      />
+    ) : null
+  )
+
   // Statistics view component
   const renderStatisticsView = () => (
     <CustomerStatistics customer={customer} />
@@ -378,6 +389,7 @@ const CustomerPortal: React.FC = () => {
 
       {/* Content based on current view */}
       {currentView === 'dashboard' && renderDashboardView()}
+      {currentView === 'equipment' && renderEquipmentView()}
       {currentView === 'statistics' && renderStatisticsView()}
       {currentView === 'reports' && renderReportsView()}
       {currentView === 'quotes' && renderQuotesView()}
