@@ -162,9 +162,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Endast signOut från Supabase här. Omdirigering hanteras av onAuthStateChange.
+    // Rensa state först för omedelbar feedback
+    setUser(null);
+    setProfile(null);
+    setLoading(false);
+
+    // Sedan logga ut från Supabase
     await supabase.auth.signOut();
     toast.success('Du har loggats ut.', { id: 'logout-success' });
+
+    // Navigera direkt till login - inte förlita oss på onAuthStateChange
+    navigate('/login', { replace: true });
   };
   
   const isAdmin = profile?.role === 'admin';
