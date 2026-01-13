@@ -513,6 +513,149 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
       })
     }
 
+    // === DETALJKORT MED FOTON ===
+    const itemsWithPhotos = equipment.filter((e) => e.photo_url)
+    if (itemsWithPhotos.length > 0) {
+      // Ny sida för bildgalleri
+      pdf.addPage()
+      yPosition = spacing.xl
+
+      yPosition = drawSectionHeader(pdf, 'BILDGALLERI', margins.left, yPosition, contentWidth, 'primary')
+
+      // Ladda och rita bilder
+      for (const item of itemsWithPhotos) {
+        // Kontrollera sidbrytning (varje bild tar ca 80px)
+        if (yPosition > pageHeight - 100) {
+          pdf.addPage()
+          yPosition = spacing.xl
+        }
+
+        const cardHeight = 75
+        drawProfessionalCard(pdf, margins.left, yPosition, contentWidth, cardHeight, {
+          backgroundColor: 'light',
+          shadow: false,
+          radius: 4
+        })
+
+        // Vänster sida - Info
+        const infoX = margins.left + spacing.md
+
+        // Typ med färgad prick
+        const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
+        const hexToRgb = (hex: string): [number, number, number] => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+          return result
+            ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+            : [107, 114, 128]
+        }
+        const typeRgb = hexToRgb(typeConfig.color)
+
+        pdf.setFillColor(...typeRgb)
+        pdf.circle(infoX + 4, yPosition + 12, 4, 'F')
+
+        pdf.setTextColor(...beGoneColors.darkGray)
+        pdf.setFontSize(typography.subheader.size)
+        pdf.setFont(undefined, 'bold')
+        pdf.text(getEquipmentTypeLabel(item.equipment_type), infoX + 12, yPosition + 14)
+
+        // Serienummer
+        if (item.serial_number) {
+          pdf.setTextColor(...beGoneColors.mediumGray)
+          pdf.setFontSize(typography.caption.size)
+          pdf.setFont(undefined, 'normal')
+          pdf.text(`Serienr: ${item.serial_number}`, infoX + 12, yPosition + 22)
+        }
+
+        // Status
+        pdf.setTextColor(...beGoneColors.darkGray)
+        pdf.setFontSize(typography.body.size)
+        pdf.setFont(undefined, 'normal')
+        pdf.text(`Status: ${getEquipmentStatusLabel(item.status)}`, infoX, yPosition + 35)
+
+        // Datum
+        pdf.text(`Placerad: ${formatDate(item.placed_at)}`, infoX, yPosition + 45)
+
+        // Kommentar (om finns, kort version)
+        if (item.comment) {
+          pdf.setTextColor(...beGoneColors.mediumGray)
+          pdf.setFontSize(typography.caption.size)
+          pdf.setFont(undefined, 'italic')
+          const shortComment = item.comment.length > 60 ? item.comment.substring(0, 57) + '...' : item.comment
+          pdf.text(`"${shortComment}"`, infoX, yPosition + 58)
+        }
+
+        // Höger sida - Bild
+        const imageX = margins.left + contentWidth * 0.60
+        const imageWidth = contentWidth * 0.35
+        const imageHeight = 60
+
+        try {
+          // Försök ladda bilden
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
+
+            img.onload = () => {
+              clearTimeout(timeout)
+              try {
+                const canvas = document.createElement('canvas')
+                const ctx = canvas.getContext('2d')
+
+                // Beräkna aspect ratio
+                const aspectRatio = img.width / img.height
+                let drawWidth = imageWidth
+                let drawHeight = imageWidth / aspectRatio
+
+                if (drawHeight > imageHeight) {
+                  drawHeight = imageHeight
+                  drawWidth = imageHeight * aspectRatio
+                }
+
+                canvas.width = img.width
+                canvas.height = img.height
+                ctx?.drawImage(img, 0, 0)
+
+                const dataURL = canvas.toDataURL('image/jpeg', 0.7)
+
+                // Centrera bilden i det tillgängliga utrymmet
+                const centeredX = imageX + (imageWidth - drawWidth) / 2
+                const centeredY = yPosition + spacing.sm + (imageHeight - drawHeight) / 2
+
+                // Rita en ljusgrå bakgrund för bilden
+                pdf.setFillColor(...beGoneColors.lightGray)
+                pdf.roundedRect(imageX - 2, yPosition + spacing.sm - 2, imageWidth + 4, imageHeight + 4, 3, 3, 'F')
+
+                pdf.addImage(dataURL, 'JPEG', centeredX, centeredY, drawWidth, drawHeight)
+                resolve()
+              } catch (error) {
+                reject(error)
+              }
+            }
+
+            img.onerror = () => {
+              clearTimeout(timeout)
+              reject(new Error('Image load failed'))
+            }
+
+            img.src = item.photo_url!
+          })
+        } catch (error) {
+          // Om bilden inte kunde laddas, rita en placeholder
+          pdf.setFillColor(...beGoneColors.lightGray)
+          pdf.roundedRect(imageX, yPosition + spacing.sm, imageWidth, imageHeight, 3, 3, 'F')
+
+          pdf.setTextColor(...beGoneColors.mediumGray)
+          pdf.setFontSize(typography.caption.size)
+          pdf.setFont(undefined, 'italic')
+          pdf.text('Bild ej tillgänglig', imageX + imageWidth / 2, yPosition + spacing.sm + imageHeight / 2, { align: 'center' })
+        }
+
+        yPosition += cardHeight + spacing.md
+      }
+    }
+
     // === FOOTER PÅ ALLA SIDOR ===
     const pageCount = pdf.internal.getNumberOfPages()
     const currentDate = new Date().toLocaleDateString('sv-SE', {

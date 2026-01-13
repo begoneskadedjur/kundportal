@@ -80,7 +80,10 @@
       "mcp__supabase__get_logs",
       "Bash(git commit:*)",
       "Bash(curl:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": [],

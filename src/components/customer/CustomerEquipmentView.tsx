@@ -32,6 +32,8 @@ import {
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
+import toast from 'react-hot-toast'
 
 interface CustomerEquipmentViewProps {
   customerId: string
@@ -138,10 +140,28 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     })
   }
 
-  // PDF-export (enkel version - kan utvidgas)
-  const handleExportPDF = () => {
-    // For nu - enkel utskrift. Kan integreras med jsPDF senare.
-    window.print()
+  // PDF-export med professionell BeGone-branding
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportPDF = async () => {
+    if (equipment.length === 0) {
+      toast.error('Ingen utrustning att exportera')
+      return
+    }
+
+    setExporting(true)
+    try {
+      await generateEquipmentPdf({
+        customerName: companyName,
+        equipment: filteredEquipment
+      })
+      toast.success('PDF exporterad!')
+    } catch (error) {
+      console.error('Fel vid PDF-export:', error)
+      toast.error('Kunde inte exportera PDF')
+    } finally {
+      setExporting(false)
+    }
   }
 
   // Loading state
@@ -339,10 +359,15 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               </button>
               <button
                 onClick={handleExportPDF}
-                className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2"
+                disabled={exporting || equipment.length === 0}
+                className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FileDown className="w-4 h-4" />
-                Exportera
+                {exporting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileDown className="w-4 h-4" />
+                )}
+                {exporting ? 'Exporterar...' : 'Exportera PDF'}
               </button>
             </div>
           </div>
