@@ -352,6 +352,8 @@ export function EquipmentMap({
             spiderfyOnMaxZoom
             showCoverageOnHover={false}
             zoomToBoundsOnClick
+            spiderfyDistanceMultiplier={2}
+            spiderLegPolylineOptions={{ weight: 2, color: '#3b82f6', opacity: 0.6 }}
           >
             {equipment.map((item) => (
               <Marker
