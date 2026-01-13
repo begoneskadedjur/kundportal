@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx - KORRIGERAD
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -33,6 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Använd ref för att alltid ha senaste navigate-funktionen i callbacks
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -117,22 +123,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Lyssnare för auth-händelser
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth state changed:', event);
       if (event === 'SIGNED_IN' && session) {
         setUser(session.user);
         // fetchProfile anropas redan i signIn-funktionen, så vi undviker dubbla anrop här.
         // Vi säkerställer bara att user-objektet är satt.
       } else if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out - redirecting to login');
         setUser(null);
         setProfile(null);
         setLoading(false);
-        // Detta är den enda platsen som ska hantera navigering vid utloggning.
-        navigate('/login', { replace: true });
+        // Använd navigateRef för att alltid ha senaste referensen
+        navigateRef.current('/login', { replace: true });
       }
     });
 
     return () => subscription.unsubscribe();
-  // ✅ KRITISK FIX: `location.pathname` borttagen från dependencies för att förhindra loopar.
-  }, [initialized, navigate]);
+  // ✅ KRITISK FIX: `navigate` borttagen från dependencies - vi använder ref istället
+  }, [initialized]);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true); // Visa laddning under inloggningsprocessen
