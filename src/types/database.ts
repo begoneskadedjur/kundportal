@@ -1590,7 +1590,7 @@ export interface CaseImage {
   file_name: string
   file_size?: number
   mime_type?: string
-  category: 'before' | 'after' | 'general'
+  tags: CaseImageTag[]  // Ändrat från category till tags (multi-select)
   description?: string
   uploaded_by?: string
   uploaded_at: string
@@ -1599,14 +1599,20 @@ export interface CaseImage {
 export type CaseImageInsert = Omit<CaseImage, 'id' | 'uploaded_at'>
 export type CaseImageUpdate = Partial<CaseImageInsert>
 
-// Kategori-visningsnamn för bilder
-export const CASE_IMAGE_CATEGORY_DISPLAY = {
+// Tagg-visningsnamn för bilder (utökad med PR och Utbildning)
+export const CASE_IMAGE_TAG_DISPLAY = {
   before: { label: 'Före', color: 'orange-500', icon: 'Camera' },
   after: { label: 'Efter', color: 'green-500', icon: 'CheckCircle' },
-  general: { label: 'Övrigt', color: 'blue-500', icon: 'Image' }
+  general: { label: 'Övrigt', color: 'blue-500', icon: 'Image' },
+  pr: { label: 'PR', color: 'purple-500', icon: 'Megaphone' },
+  education: { label: 'Utbildning', color: 'teal-500', icon: 'GraduationCap' }
 } as const
 
-export type CaseImageCategory = keyof typeof CASE_IMAGE_CATEGORY_DISPLAY
+export type CaseImageTag = keyof typeof CASE_IMAGE_TAG_DISPLAY
+
+// Legacy-alias för bakåtkompatibilitet
+export const CASE_IMAGE_CATEGORY_DISPLAY = CASE_IMAGE_TAG_DISPLAY
+export type CaseImageCategory = CaseImageTag
 
 // 🆕 LEAD SYSTEM HJÄLPFUNKTIONER
 export const getLeadStatusColor = (status: LeadStatus): string => {

@@ -1,6 +1,6 @@
 // src/services/caseImageService.ts - Service för ärendebilder
 import { supabase } from '../lib/supabase'
-import { CaseImage, CaseImageInsert, CaseImageCategory } from '../types/database'
+import { CaseImage, CaseImageInsert, CaseImageTag } from '../types/database'
 import {
   CASE_IMAGES_BUCKET,
   generateImagePath,
@@ -9,6 +9,9 @@ import {
   MAX_IMAGE_SIZE,
   MAX_IMAGE_DIMENSION
 } from '../lib/setupCaseImagesStorage'
+
+// Legacy-typ för bakåtkompatibilitet
+export type CaseImageCategory = CaseImageTag
 
 // Interface för uppladdningsresultat
 export interface ImageUploadResult {
@@ -68,7 +71,7 @@ export class CaseImageService {
   }
 
   /**
-   * Hämta bilder grupperade efter kategori
+   * Hämta bilder grupperade efter tagg
    */
   static async getCaseImagesGrouped(
     caseId: string,
@@ -77,13 +80,17 @@ export class CaseImageService {
     before: CaseImageWithUrl[]
     after: CaseImageWithUrl[]
     general: CaseImageWithUrl[]
+    pr: CaseImageWithUrl[]
+    education: CaseImageWithUrl[]
   }> {
     const images = await this.getCaseImages(caseId, caseType)
 
     return {
-      before: images.filter(img => img.category === 'before'),
-      after: images.filter(img => img.category === 'after'),
-      general: images.filter(img => img.category === 'general')
+      before: images.filter(img => img.tags.includes('before')),
+      after: images.filter(img => img.tags.includes('after')),
+      general: images.filter(img => img.tags.includes('general')),
+      pr: images.filter(img => img.tags.includes('pr')),
+      education: images.filter(img => img.tags.includes('education'))
     }
   }
 
@@ -94,7 +101,7 @@ export class CaseImageService {
     caseId: string,
     caseType: 'private' | 'business' | 'contract',
     file: File,
-    category: CaseImageCategory = 'general',
+    tags: CaseImageTag[] = ['general'],
     description?: string,
     userId?: string
   ): Promise<ImageUploadResult> {
@@ -147,7 +154,7 @@ export class CaseImageService {
         file_name: file.name,
         file_size: processedFile.size,
         mime_type: file.type,
-        category: category,
+        tags: tags.length > 0 ? tags : ['general'],
         description: description,
         uploaded_by: userId
       }
@@ -190,7 +197,7 @@ export class CaseImageService {
     caseId: string,
     caseType: 'private' | 'business' | 'contract',
     files: File[],
-    category: CaseImageCategory = 'general',
+    tags: CaseImageTag[] = ['general'],
     userId?: string
   ): Promise<{
     successful: CaseImage[]
@@ -204,7 +211,7 @@ export class CaseImageService {
         caseId,
         caseType,
         file,
-        category,
+        tags,
         undefined,
         userId
       )
@@ -405,31 +412,46 @@ export class CaseImageService {
   }
 
   /**
-   * Uppdatera bildkategori
+   * Uppdatera bildtaggar
    */
-  static async updateImageCategory(
+  static async updateImageTags(
     imageId: string,
-    category: CaseImageCategory
+    tags: CaseImageTag[]
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      if (tags.length === 0) {
+        return { success: false, error: 'Minst en tagg måste väljas' }
+      }
+
       const { error } = await supabase
         .from('case_images')
-        .update({ category })
+        .update({ tags })
         .eq('id', imageId)
 
       if (error) {
-        console.error('Fel vid uppdatering av kategori:', error)
+        console.error('Fel vid uppdatering av taggar:', error)
         return { success: false, error: error.message }
       }
 
       return { success: true }
     } catch (error) {
-      console.error('CaseImageService.updateImageCategory fel:', error)
+      console.error('CaseImageService.updateImageTags fel:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Ett oväntat fel uppstod'
       }
     }
+  }
+
+  /**
+   * Uppdatera bildkategori (legacy - för bakåtkompatibilitet)
+   * @deprecated Använd updateImageTags istället
+   */
+  static async updateImageCategory(
+    imageId: string,
+    category: CaseImageTag
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.updateImageTags(imageId, [category])
   }
 
   /**
@@ -502,8 +524,8 @@ export const formatFileSize = (bytes: number | undefined): string => {
   return `${Math.round(bytes / Math.pow(1024, i) * 100) / 100} ${sizes[i]}`
 }
 
-// Hjälpfunktion för att få kategori-display
-export const getCategoryDisplay = (category: CaseImageCategory): {
+// Hjälpfunktion för att få tagg-display
+export const getTagDisplay = (tag: CaseImageTag): {
   label: string
   color: string
   icon: string
@@ -511,7 +533,12 @@ export const getCategoryDisplay = (category: CaseImageCategory): {
   const displays = {
     before: { label: 'Före', color: 'orange-500', icon: 'Camera' },
     after: { label: 'Efter', color: 'green-500', icon: 'CheckCircle' },
-    general: { label: 'Övrigt', color: 'blue-500', icon: 'Image' }
+    general: { label: 'Övrigt', color: 'blue-500', icon: 'Image' },
+    pr: { label: 'PR', color: 'purple-500', icon: 'Megaphone' },
+    education: { label: 'Utbildning', color: 'teal-500', icon: 'GraduationCap' }
   }
-  return displays[category] || displays.general
+  return displays[tag] || displays.general
 }
+
+// Legacy-alias för bakåtkompatibilitet
+export const getCategoryDisplay = getTagDisplay

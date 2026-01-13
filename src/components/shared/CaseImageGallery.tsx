@@ -15,12 +15,14 @@ import {
   ZoomIn,
   Edit3,
   Plus,
-  AlertCircle
+  AlertCircle,
+  Megaphone,
+  GraduationCap
 } from 'lucide-react'
 import { CaseImageService, formatFileSize } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
-import type { CaseImageCategory } from '../../types/database'
-import { CASE_IMAGE_CATEGORY_DISPLAY } from '../../types/database'
+import type { CaseImageTag } from '../../types/database'
+import { CASE_IMAGE_TAG_DISPLAY } from '../../types/database'
 import toast from 'react-hot-toast'
 import { createPortal } from 'react-dom'
 import { isValidImageType, isValidImageSize, MAX_IMAGE_SIZE, ALLOWED_MIME_TYPES } from '../../lib/setupCaseImagesStorage'
@@ -30,14 +32,14 @@ export interface PendingImage {
   id: string // Temporärt ID för tracking
   file: File
   preview: string
-  category: CaseImageCategory
+  tags: CaseImageTag[]
 }
 
 // Interface för pending ändringar
 export interface PendingImageChanges {
   toUpload: PendingImage[]
   toDelete: string[] // ID:n på bilder som ska tas bort
-  categoryChanges: { imageId: string; newCategory: CaseImageCategory }[]
+  tagChanges: { imageId: string; newTags: CaseImageTag[] }[]
 }
 
 // Interface för ref-methods som parent kan anropa
@@ -82,14 +84,14 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<CaseImageWithUrl | PendingImage | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [activeCategory, setActiveCategory] = useState<CaseImageCategory | 'all'>('all')
+  const [activeTag, setActiveTag] = useState<CaseImageTag | 'all'>('all')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
-  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [editingTags, setEditingTags] = useState<string | null>(null)
 
   // Draft mode state
   const [pendingUploads, setPendingUploads] = useState<PendingImage[]>([])
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([])
-  const [pendingCategoryChanges, setPendingCategoryChanges] = useState<Map<string, CaseImageCategory>>(new Map())
+  const [pendingTagChanges, setPendingTagChanges] = useState<Map<string, CaseImageTag[]>>(new Map())
   const [isCommitting, setIsCommitting] = useState(false)
 
   // Notifiera parent om pending changes
@@ -97,10 +99,10 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     if (draftMode && onPendingChangesUpdate) {
       const hasPending = pendingUploads.length > 0 ||
                         pendingDeletes.length > 0 ||
-                        pendingCategoryChanges.size > 0
+                        pendingTagChanges.size > 0
       onPendingChangesUpdate(hasPending)
     }
-  }, [draftMode, pendingUploads, pendingDeletes, pendingCategoryChanges, onPendingChangesUpdate])
+  }, [draftMode, pendingUploads, pendingDeletes, pendingTagChanges, onPendingChangesUpdate])
 
   // Hämta bilder
   const fetchImages = useCallback(async () => {
@@ -123,12 +125,12 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   // Helper för att kolla om en bild är markerad för borttagning
   const isMarkedForDeletion = (imageId: string) => pendingDeletes.includes(imageId)
 
-  // Helper för att få aktuell kategori (med pending changes)
-  const getDisplayCategory = (image: CaseImageWithUrl): CaseImageCategory => {
-    if (draftMode && pendingCategoryChanges.has(image.id)) {
-      return pendingCategoryChanges.get(image.id)!
+  // Helper för att få aktuella taggar (med pending changes)
+  const getDisplayTags = (image: CaseImageWithUrl): CaseImageTag[] => {
+    if (draftMode && pendingTagChanges.has(image.id)) {
+      return pendingTagChanges.get(image.id)!
     }
-    return image.category
+    return image.tags
   }
 
   // Kombinera existerande bilder med pending uploads för visning
@@ -144,14 +146,14 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     }))
   ]
 
-  // Filtrera bilder efter kategori
-  const filteredImages = activeCategory === 'all'
+  // Filtrera bilder efter tagg
+  const filteredImages = activeTag === 'all'
     ? displayImages
     : displayImages.filter(img => {
         if ('isPending' in img && img.isPending) {
-          return (img as unknown as PendingImage).category === activeCategory
+          return (img as unknown as PendingImage).tags.includes(activeTag)
         }
-        return getDisplayCategory(img as CaseImageWithUrl) === activeCategory
+        return getDisplayTags(img as CaseImageWithUrl).includes(activeTag)
       })
 
   // Ta bort bild (draft mode vs direkt)
@@ -214,60 +216,82 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     toast.success('Ångrat borttagning')
   }
 
-  // Ändra kategori (draft mode vs direkt)
-  const handleCategoryChange = async (imageId: string, newCategory: CaseImageCategory) => {
+  // Toggle tagg (draft mode vs direkt)
+  const handleTagToggle = async (imageId: string, tag: CaseImageTag) => {
     if (draftMode) {
       // Kolla om det är en pending upload
       const pendingIndex = pendingUploads.findIndex(p => p.id === imageId)
       if (pendingIndex !== -1) {
         setPendingUploads(prev => {
           const newPending = [...prev]
-          newPending[pendingIndex] = { ...newPending[pendingIndex], category: newCategory }
+          const currentTags = newPending[pendingIndex].tags
+          const hasTag = currentTags.includes(tag)
+          let newTags: CaseImageTag[]
+          if (hasTag) {
+            newTags = currentTags.filter(t => t !== tag)
+            if (newTags.length === 0) newTags = ['general']
+          } else {
+            newTags = [...currentTags, tag]
+          }
+          newPending[pendingIndex] = { ...newPending[pendingIndex], tags: newTags }
           return newPending
         })
       } else {
-        // Spara kategoriändring för existerande bild
-        setPendingCategoryChanges(prev => {
+        // Spara taggändring för existerande bild
+        setPendingTagChanges(prev => {
           const newMap = new Map(prev)
           const originalImage = images.find(img => img.id === imageId)
-          if (originalImage && originalImage.category === newCategory) {
-            // Om vi ändrar tillbaka till original, ta bort från pending
+          const currentTags = newMap.get(imageId) || originalImage?.tags || ['general']
+          const hasTag = currentTags.includes(tag)
+          let newTags: CaseImageTag[]
+          if (hasTag) {
+            newTags = currentTags.filter(t => t !== tag)
+            if (newTags.length === 0) newTags = ['general']
+          } else {
+            newTags = [...currentTags, tag]
+          }
+
+          // Om tillbaka till original, ta bort från pending
+          if (originalImage && JSON.stringify(originalImage.tags.sort()) === JSON.stringify(newTags.sort())) {
             newMap.delete(imageId)
           } else {
-            newMap.set(imageId, newCategory)
+            newMap.set(imageId, newTags)
           }
           return newMap
         })
       }
-      toast.success('Kategori ändrad (sparas när du klickar Spara)')
-
-      // Uppdatera selectedImage om den är öppen
-      if (selectedImage && 'id' in selectedImage && selectedImage.id === imageId) {
-        if ('isPending' in selectedImage) {
-          setSelectedImage(prev => prev ? { ...prev, category: newCategory } as PendingImage : null)
-        }
-      }
+      toast.success('Tagg ändrad (sparas när du klickar Spara)')
     } else {
-      // Direkt uppdatering (legacy behavior)
+      // Direkt uppdatering
       try {
-        const result = await CaseImageService.updateImageCategory(imageId, newCategory)
+        const currentImage = images.find(img => img.id === imageId)
+        if (!currentImage) return
+
+        const currentTags = currentImage.tags
+        const hasTag = currentTags.includes(tag)
+        let newTags: CaseImageTag[]
+        if (hasTag) {
+          newTags = currentTags.filter(t => t !== tag)
+          if (newTags.length === 0) newTags = ['general']
+        } else {
+          newTags = [...currentTags, tag]
+        }
+
+        const result = await CaseImageService.updateImageTags(imageId, newTags)
         if (result.success) {
           setImages(prev => prev.map(img =>
-            img.id === imageId ? { ...img, category: newCategory } : img
+            img.id === imageId ? { ...img, tags: newTags } : img
           ))
-          if (selectedImage && 'id' in selectedImage && selectedImage.id === imageId) {
-            setSelectedImage(prev => prev ? { ...prev, category: newCategory } as CaseImageWithUrl : null)
-          }
-          toast.success('Kategori uppdaterad')
+          toast.success('Taggar uppdaterade')
           onImageUpdated?.()
         } else {
-          toast.error(result.error || 'Kunde inte uppdatera kategori')
+          toast.error(result.error || 'Kunde inte uppdatera taggar')
         }
       } catch (error) {
         console.error('Fel vid uppdatering:', error)
         toast.error('Ett fel uppstod')
       } finally {
-        setEditingCategory(null)
+        setEditingTags(null)
       }
     }
   }
@@ -291,10 +315,10 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
       const preview = URL.createObjectURL(file)
       newPendingFiles.push({
-        id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `pending-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         file,
         preview,
-        category: 'general'
+        tags: ['general']
       })
     })
 
@@ -316,7 +340,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
           caseId,
           caseType,
           pending.file,
-          pending.category,
+          pending.tags,
           undefined,
           userId
         )
@@ -334,18 +358,18 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         }
       }
 
-      // 3. Uppdatera kategorier
-      for (const [imageId, newCategory] of pendingCategoryChanges) {
-        const result = await CaseImageService.updateImageCategory(imageId, newCategory)
+      // 3. Uppdatera taggar
+      for (const [imageId, newTags] of pendingTagChanges) {
+        const result = await CaseImageService.updateImageTags(imageId, newTags)
         if (!result.success) {
-          errors.push(`Kunde inte uppdatera kategori: ${result.error}`)
+          errors.push(`Kunde inte uppdatera taggar: ${result.error}`)
         }
       }
 
       // Rensa pending state
       setPendingUploads([])
       setPendingDeletes([])
-      setPendingCategoryChanges(new Map())
+      setPendingTagChanges(new Map())
 
       // Hämta uppdaterade bilder
       await fetchImages()
@@ -369,7 +393,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     pendingUploads.forEach(p => URL.revokeObjectURL(p.preview))
     setPendingUploads([])
     setPendingDeletes([])
-    setPendingCategoryChanges(new Map())
+    setPendingTagChanges(new Map())
   }
 
   // Exponera metoder via ref
@@ -377,13 +401,13 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     getPendingChanges: () => ({
       toUpload: pendingUploads,
       toDelete: pendingDeletes,
-      categoryChanges: Array.from(pendingCategoryChanges).map(([imageId, newCategory]) => ({
+      tagChanges: Array.from(pendingTagChanges).map(([imageId, newTags]) => ({
         imageId,
-        newCategory
+        newTags
       }))
     }),
     commitChanges,
-    hasPendingChanges: () => pendingUploads.length > 0 || pendingDeletes.length > 0 || pendingCategoryChanges.size > 0,
+    hasPendingChanges: () => pendingUploads.length > 0 || pendingDeletes.length > 0 || pendingTagChanges.size > 0,
     resetChanges
   }))
 
@@ -415,7 +439,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   const closeLightbox = useCallback(() => {
     setSelectedImage(null)
     setShowDeleteConfirm(null)
-    setEditingCategory(null)
+    setEditingTags(null)
   }, [])
 
   // Tangentbordsnavigering
@@ -448,43 +472,59 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
     }
   }, [selectedImage, navigateImage, closeLightbox])
 
-  // Kategori-ikon
-  const getCategoryIcon = (category: CaseImageCategory) => {
-    switch (category) {
+  // Tagg-ikon
+  const getTagIcon = (tag: CaseImageTag, size: string = 'w-3 h-3') => {
+    switch (tag) {
       case 'before':
-        return <Camera className="w-3 h-3" />
+        return <Camera className={size} />
       case 'after':
-        return <CheckCircle className="w-3 h-3" />
+        return <CheckCircle className={size} />
+      case 'pr':
+        return <Megaphone className={size} />
+      case 'education':
+        return <GraduationCap className={size} />
       default:
-        return <ImageIcon className="w-3 h-3" />
+        return <ImageIcon className={size} />
     }
   }
 
-  // Räkna bilder per kategori
-  const categoryCounts = {
+  // Räkna bilder per tagg
+  const tagCounts: Record<CaseImageTag | 'all', number> = {
     all: displayImages.length,
     before: displayImages.filter(img => {
       if ('isPending' in img && img.isPending) {
-        return (img as unknown as PendingImage).category === 'before'
+        return (img as unknown as PendingImage).tags.includes('before')
       }
-      return getDisplayCategory(img as CaseImageWithUrl) === 'before'
+      return getDisplayTags(img as CaseImageWithUrl).includes('before')
     }).length,
     after: displayImages.filter(img => {
       if ('isPending' in img && img.isPending) {
-        return (img as unknown as PendingImage).category === 'after'
+        return (img as unknown as PendingImage).tags.includes('after')
       }
-      return getDisplayCategory(img as CaseImageWithUrl) === 'after'
+      return getDisplayTags(img as CaseImageWithUrl).includes('after')
     }).length,
     general: displayImages.filter(img => {
       if ('isPending' in img && img.isPending) {
-        return (img as unknown as PendingImage).category === 'general'
+        return (img as unknown as PendingImage).tags.includes('general')
       }
-      return getDisplayCategory(img as CaseImageWithUrl) === 'general'
+      return getDisplayTags(img as CaseImageWithUrl).includes('general')
+    }).length,
+    pr: displayImages.filter(img => {
+      if ('isPending' in img && img.isPending) {
+        return (img as unknown as PendingImage).tags.includes('pr')
+      }
+      return getDisplayTags(img as CaseImageWithUrl).includes('pr')
+    }).length,
+    education: displayImages.filter(img => {
+      if ('isPending' in img && img.isPending) {
+        return (img as unknown as PendingImage).tags.includes('education')
+      }
+      return getDisplayTags(img as CaseImageWithUrl).includes('education')
     }).length
   }
 
   // Pending changes summary
-  const pendingChangesCount = pendingUploads.length + pendingDeletes.length + pendingCategoryChanges.size
+  const pendingChangesCount = pendingUploads.length + pendingDeletes.length + pendingTagChanges.size
 
   if (loading) {
     return (
@@ -492,11 +532,6 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
       </div>
     )
-  }
-
-  // Helper för att avgöra om ett objekt är en pending image
-  const isPendingImage = (img: any): img is PendingImage => {
-    return 'isPending' in img && img.isPending === true
   }
 
   // Hantera direkt nedladdning av bild
@@ -517,6 +552,13 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       console.error('Nedladdning misslyckades:', error)
       toast.error('Kunde inte ladda ner bilden')
     }
+  }
+
+  // Hämta taggar för vald bild
+  const getSelectedImageTags = (): CaseImageTag[] => {
+    if (!selectedImage) return ['general']
+    if ('tags' in selectedImage) return selectedImage.tags
+    return ['general']
   }
 
   // Lightbox-komponent som renderas i portal
@@ -589,7 +631,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
           alt={'file_name' in selectedImage ? selectedImage.file_name : selectedImage.file.name}
           className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
         />
-        {'isPending' in selectedImage || pendingUploads.some(p => p.id === (selectedImage as PendingImage).id) ? (
+        {'file' in selectedImage ? (
           <div className="absolute top-4 left-4 px-3 py-1 bg-amber-500 text-black text-sm font-medium rounded-full">
             Ej sparad
           </div>
@@ -604,43 +646,68 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         <div className="max-w-4xl mx-auto flex items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              {/* Kategori */}
-              {canEdit && editingCategory === ('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id) ? (
-                <select
-                  value={'category' in selectedImage ? selectedImage.category : 'general'}
-                  onChange={(e) => handleCategoryChange(
-                    'id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id,
-                    e.target.value as CaseImageCategory
-                  )}
-                  onBlur={() => setEditingCategory(null)}
-                  autoFocus
-                  className="px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {(Object.keys(CASE_IMAGE_CATEGORY_DISPLAY) as CaseImageCategory[]).map(cat => (
-                    <option key={cat} value={cat}>
-                      {CASE_IMAGE_CATEGORY_DISPLAY[cat].label}
-                    </option>
-                  ))}
-                </select>
+              {/* Taggar */}
+              {canEdit && editingTags === ('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id) ? (
+                <div className="flex flex-wrap gap-1">
+                  {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => {
+                    const isSelected = getSelectedImageTags().includes(tag)
+                    const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleTagToggle(
+                            'id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id,
+                            tag
+                          )
+                        }}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                          isSelected
+                            ? `bg-${tagConfig.color}/30 text-white ring-1 ring-${tagConfig.color}/50`
+                            : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60'
+                        }`}
+                      >
+                        {getTagIcon(tag, 'w-3 h-3')}
+                        {tagConfig.label}
+                      </button>
+                    )
+                  })}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditingTags(null)
+                    }}
+                    className="ml-2 px-2 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    Klar
+                  </button>
+                </div>
               ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (canEdit) setEditingCategory('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id)
-                  }}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    canEdit ? 'hover:ring-2 hover:ring-white/30 cursor-pointer' : 'cursor-default'
-                  }`}
-                  style={{
-                    backgroundColor: `rgb(var(--${CASE_IMAGE_CATEGORY_DISPLAY['category' in selectedImage ? selectedImage.category : 'general'].color})/0.2)`,
-                  }}
-                  title={canEdit ? 'Klicka för att ändra kategori' : undefined}
-                >
-                  {getCategoryIcon('category' in selectedImage ? selectedImage.category : 'general')}
-                  {CASE_IMAGE_CATEGORY_DISPLAY['category' in selectedImage ? selectedImage.category : 'general'].label}
-                  {canEdit && <Edit3 className="w-3 h-3 ml-1 opacity-60" />}
-                </button>
+                <div className="flex items-center gap-1">
+                  {getSelectedImageTags().map(tag => (
+                    <span
+                      key={tag}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-${CASE_IMAGE_TAG_DISPLAY[tag].color}/20 text-white`}
+                    >
+                      {getTagIcon(tag, 'w-3 h-3')}
+                      {CASE_IMAGE_TAG_DISPLAY[tag].label}
+                    </span>
+                  ))}
+                  {canEdit && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingTags('id' in selectedImage ? selectedImage.id : (selectedImage as PendingImage).id)
+                      }}
+                      className="ml-1 p-1 text-white/60 hover:text-white transition-colors"
+                      title="Redigera taggar"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               )}
               <span className="text-white/70 text-sm">
                 {filteredImages.findIndex(img => {
@@ -665,7 +732,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            {'url' in selectedImage && !('isPending' in selectedImage) && (
+            {'url' in selectedImage && !('file' in selectedImage) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -764,7 +831,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
         </div>
       )}
 
-      {/* Kategori-filter */}
+      {/* Tagg-filter */}
       {showCategories && displayImages.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -772,34 +839,34 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setActiveCategory('all')
+              setActiveTag('all')
             }}
             className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-              activeCategory === 'all'
+              activeTag === 'all'
                 ? 'bg-slate-700 text-white'
                 : 'bg-slate-800 text-slate-400 hover:text-slate-300'
             }`}
           >
-            Alla ({categoryCounts.all})
+            Alla ({tagCounts.all})
           </button>
-          {(Object.keys(CASE_IMAGE_CATEGORY_DISPLAY) as CaseImageCategory[]).map(cat => (
-            categoryCounts[cat] > 0 && (
+          {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => (
+            tagCounts[tag] > 0 && (
               <button
                 type="button"
-                key={cat}
+                key={tag}
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  setActiveCategory(cat)
+                  setActiveTag(tag)
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full transition-colors ${
-                  activeCategory === cat
-                    ? `bg-${CASE_IMAGE_CATEGORY_DISPLAY[cat].color}/20 text-${CASE_IMAGE_CATEGORY_DISPLAY[cat].color}`
+                  activeTag === tag
+                    ? `bg-${CASE_IMAGE_TAG_DISPLAY[tag].color}/20 text-${CASE_IMAGE_TAG_DISPLAY[tag].color}`
                     : 'bg-slate-800 text-slate-400 hover:text-slate-300'
                 }`}
               >
-                {getCategoryIcon(cat)}
-                {CASE_IMAGE_CATEGORY_DISPLAY[cat].label} ({categoryCounts[cat]})
+                {getTagIcon(tag)}
+                {CASE_IMAGE_TAG_DISPLAY[tag].label} ({tagCounts[tag]})
               </button>
             )
           ))}
@@ -837,9 +904,9 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
           {filteredImages.map((image) => {
             const isPending = 'isPending' in image && image.isPending
             const imageId = isPending ? (image as unknown as PendingImage).id : (image as CaseImageWithUrl).id
-            const category = isPending
-              ? (image as unknown as PendingImage).category
-              : getDisplayCategory(image as CaseImageWithUrl)
+            const imageTags = isPending
+              ? (image as unknown as PendingImage).tags
+              : getDisplayTags(image as CaseImageWithUrl)
             const isDeleted = !isPending && isMarkedForDeletion(imageId)
 
             return (
@@ -904,13 +971,25 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
                   </div>
                 )}
 
-                {/* Kategori-badge */}
+                {/* Tagg-badges */}
                 {!compact && !isPending && !isDeleted && (
-                  <div className={`absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-black/50 text-white`}>
-                    {getCategoryIcon(category)}
-                    <span>{CASE_IMAGE_CATEGORY_DISPLAY[category].label}</span>
-                    {pendingCategoryChanges.has(imageId) && (
-                      <span className="ml-1 text-amber-400">*</span>
+                  <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-40px)]">
+                    {imageTags.slice(0, 3).map(tag => (
+                      <span
+                        key={tag}
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white`}
+                      >
+                        {getTagIcon(tag, 'w-3 h-3')}
+                        {CASE_IMAGE_TAG_DISPLAY[tag].label}
+                      </span>
+                    ))}
+                    {imageTags.length > 3 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white">
+                        +{imageTags.length - 3}
+                      </span>
+                    )}
+                    {pendingTagChanges.has(imageId) && (
+                      <span className="text-amber-400 text-xs">*</span>
                     )}
                   </div>
                 )}

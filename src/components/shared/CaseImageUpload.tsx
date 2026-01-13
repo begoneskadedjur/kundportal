@@ -1,21 +1,21 @@
 // src/components/shared/CaseImageUpload.tsx
 import { useState, useRef, useCallback } from 'react'
-import { Upload, X, Image as ImageIcon, Camera, CheckCircle, Loader2 } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, Camera, CheckCircle, Loader2, Megaphone, GraduationCap } from 'lucide-react'
 import { CaseImageService } from '../../services/caseImageService'
-import { CaseImageCategory, CASE_IMAGE_CATEGORY_DISPLAY } from '../../types/database'
+import { CaseImageTag, CASE_IMAGE_TAG_DISPLAY } from '../../types/database'
 import { isValidImageType, isValidImageSize, MAX_IMAGE_SIZE, ALLOWED_MIME_TYPES } from '../../lib/setupCaseImagesStorage'
 import toast from 'react-hot-toast'
 
 interface PendingFile {
   file: File
   preview: string
-  category: CaseImageCategory
+  tags: CaseImageTag[]
 }
 
 interface CaseImageUploadProps {
   caseId: string
   caseType: 'private' | 'business' | 'contract'
-  defaultCategory?: CaseImageCategory
+  defaultTags?: CaseImageTag[]
   userId?: string
   onUploadComplete?: () => void
   disabled?: boolean
@@ -26,7 +26,7 @@ interface CaseImageUploadProps {
 export default function CaseImageUpload({
   caseId,
   caseType,
-  defaultCategory = 'general',
+  defaultTags = ['general'],
   userId,
   onUploadComplete,
   disabled = false,
@@ -68,12 +68,12 @@ export default function CaseImageUpload({
       newPendingFiles.push({
         file,
         preview,
-        category: defaultCategory
+        tags: [...defaultTags]
       })
     })
 
     setPendingFiles(prev => [...prev, ...newPendingFiles])
-  }, [pendingFiles.length, maxFiles, defaultCategory])
+  }, [pendingFiles.length, maxFiles, defaultTags])
 
   // Hantera drag & drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -110,11 +110,26 @@ export default function CaseImageUpload({
     })
   }
 
-  // Ändra kategori för väntande fil
-  const updateFileCategory = (index: number, category: CaseImageCategory) => {
+  // Toggle en tagg för väntande fil
+  const toggleFileTag = (index: number, tag: CaseImageTag) => {
     setPendingFiles(prev => {
       const newFiles = [...prev]
-      newFiles[index] = { ...newFiles[index], category }
+      const currentTags = newFiles[index].tags
+      const hasTag = currentTags.includes(tag)
+
+      let newTags: CaseImageTag[]
+      if (hasTag) {
+        // Ta bort taggen om den finns (men behåll minst en)
+        newTags = currentTags.filter(t => t !== tag)
+        if (newTags.length === 0) {
+          newTags = ['general'] // Fallback om inga taggar kvar
+        }
+      } else {
+        // Lägg till taggen
+        newTags = [...currentTags, tag]
+      }
+
+      newFiles[index] = { ...newFiles[index], tags: newTags }
       return newFiles
     })
   }
@@ -133,7 +148,7 @@ export default function CaseImageUpload({
           caseId,
           caseType,
           pending.file,
-          pending.category,
+          pending.tags,
           undefined,
           userId
         )
@@ -167,15 +182,19 @@ export default function CaseImageUpload({
     }
   }
 
-  // Kategori-ikon
-  const getCategoryIcon = (category: CaseImageCategory) => {
-    switch (category) {
+  // Tagg-ikon
+  const getTagIcon = (tag: CaseImageTag, size: string = 'w-4 h-4') => {
+    switch (tag) {
       case 'before':
-        return <Camera className="w-4 h-4" />
+        return <Camera className={size} />
       case 'after':
-        return <CheckCircle className="w-4 h-4" />
+        return <CheckCircle className={size} />
+      case 'pr':
+        return <Megaphone className={size} />
+      case 'education':
+        return <GraduationCap className={size} />
       default:
-        return <ImageIcon className="w-4 h-4" />
+        return <ImageIcon className={size} />
     }
   }
 
@@ -295,19 +314,32 @@ export default function CaseImageUpload({
                   />
                 </div>
 
-                {/* Kategori-väljare */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                  <select
-                    value={pending.category}
-                    onChange={(e) => updateFileCategory(index, e.target.value as CaseImageCategory)}
-                    className="w-full text-xs bg-slate-900/80 border border-slate-700 rounded px-2 py-1 text-slate-300"
-                  >
-                    {(Object.keys(CASE_IMAGE_CATEGORY_DISPLAY) as CaseImageCategory[]).map(cat => (
-                      <option key={cat} value={cat}>
-                        {CASE_IMAGE_CATEGORY_DISPLAY[cat].label}
-                      </option>
-                    ))}
-                  </select>
+                {/* Tagg-väljare (multi-select) */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
+                  <div className="flex flex-wrap gap-1">
+                    {(Object.keys(CASE_IMAGE_TAG_DISPLAY) as CaseImageTag[]).map(tag => {
+                      const isSelected = pending.tags.includes(tag)
+                      const tagConfig = CASE_IMAGE_TAG_DISPLAY[tag]
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleFileTag(index, tag)
+                          }}
+                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                            isSelected
+                              ? `bg-${tagConfig.color}/30 text-${tagConfig.color} ring-1 ring-${tagConfig.color}/50`
+                              : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60'
+                          }`}
+                        >
+                          {getTagIcon(tag, 'w-3 h-3')}
+                          {tagConfig.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {/* Ta bort-knapp */}
@@ -319,9 +351,16 @@ export default function CaseImageUpload({
                   <X className="w-4 h-4 text-white" />
                 </button>
 
-                {/* Kategori-badge */}
-                <div className={`absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${CASE_IMAGE_CATEGORY_DISPLAY[pending.category].color}/20 text-${CASE_IMAGE_CATEGORY_DISPLAY[pending.category].color}`}>
-                  {getCategoryIcon(pending.category)}
+                {/* Valda taggar visas som badges längst upp */}
+                <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-40px)]">
+                  {pending.tags.map(tag => (
+                    <span
+                      key={tag}
+                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-${CASE_IMAGE_TAG_DISPLAY[tag].color}/30 text-${CASE_IMAGE_TAG_DISPLAY[tag].color}`}
+                    >
+                      {getTagIcon(tag, 'w-3 h-3')}
+                    </span>
+                  ))}
                 </div>
               </div>
             ))}

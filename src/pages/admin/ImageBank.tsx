@@ -24,15 +24,17 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Package,
-  ZoomIn
+  ZoomIn,
+  Megaphone,
+  GraduationCap
 } from 'lucide-react'
 import { PageHeader } from '../../components/shared'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import { CaseImageService, formatFileSize } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
-import type { CaseImageCategory } from '../../types/database'
-import { CASE_IMAGE_CATEGORY_DISPLAY } from '../../types/database'
+import type { CaseImageTag } from '../../types/database'
+import { CASE_IMAGE_TAG_DISPLAY } from '../../types/database'
 import { PEST_TYPES } from '../../utils/clickupFieldMapper'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
@@ -437,7 +439,9 @@ export default function ImageBank() {
 
         const response = await fetch(image.url)
         const blob = await response.blob()
-        const fileName = `${image.category}_${image.file_name}`
+        // Använd tags-array, join med underscore om flera
+        const tagsPrefix = image.tags?.join('_') || 'general'
+        const fileName = `${tagsPrefix}_${image.file_name}`
         folder?.file(fileName, blob)
       }
 
@@ -487,7 +491,9 @@ export default function ImageBank() {
         for (const image of images) {
           const response = await fetch(image.url)
           const blob = await response.blob()
-          const fileName = `${image.category}_${image.file_name}`
+          // Använd tags-array, join med underscore om flera
+          const tagsPrefix = image.tags?.join('_') || 'general'
+          const fileName = `${tagsPrefix}_${image.file_name}`
           folder?.file(fileName, blob)
         }
       }
@@ -597,12 +603,14 @@ export default function ImageBank() {
     }
   }
 
-  // Kategori-ikon
-  const getCategoryIcon = (category: CaseImageCategory) => {
-    switch (category) {
-      case 'before': return <Camera className="w-3 h-3" />
-      case 'after': return <CheckCircle className="w-3 h-3" />
-      default: return <ImageIcon className="w-3 h-3" />
+  // Tagg-ikon
+  const getTagIcon = (tag: CaseImageTag, size: string = 'w-3 h-3') => {
+    switch (tag) {
+      case 'before': return <Camera className={size} />
+      case 'after': return <CheckCircle className={size} />
+      case 'pr': return <Megaphone className={size} />
+      case 'education': return <GraduationCap className={size} />
+      default: return <ImageIcon className={size} />
     }
   }
 
@@ -686,12 +694,18 @@ export default function ImageBank() {
       >
         <div className="max-w-4xl mx-auto flex items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700">
-                {getCategoryIcon(lightboxImage.category)}
-                {CASE_IMAGE_CATEGORY_DISPLAY[lightboxImage.category].label}
-              </span>
-              <span className="text-white/70 text-sm">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {/* Visa alla taggar */}
+              {(lightboxImage.tags || ['general']).map(tag => (
+                <span
+                  key={tag}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-${CASE_IMAGE_TAG_DISPLAY[tag]?.color || 'slate-500'}/30 text-${CASE_IMAGE_TAG_DISPLAY[tag]?.color || 'slate-400'}`}
+                >
+                  {getTagIcon(tag)}
+                  {CASE_IMAGE_TAG_DISPLAY[tag]?.label || tag}
+                </span>
+              ))}
+              <span className="text-white/70 text-sm ml-2">
                 {lightboxImages.findIndex(img => img.id === lightboxImage.id) + 1} / {lightboxImages.length}
               </span>
             </div>
@@ -1169,12 +1183,16 @@ export default function ImageBank() {
                                                 </button>
                                               </div>
 
-                                              {/* Kategori-badge */}
-                                              <div className="absolute top-1 left-1">
-                                                <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/50 text-white`}>
-                                                  {getCategoryIcon(image.category)}
-                                                  {CASE_IMAGE_CATEGORY_DISPLAY[image.category].label}
-                                                </span>
+                                              {/* Tagg-badges */}
+                                              <div className="absolute top-1 left-1 flex flex-wrap gap-0.5 max-w-[calc(100%-8px)]">
+                                                {(image.tags || ['general']).map(tag => (
+                                                  <span
+                                                    key={tag}
+                                                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white`}
+                                                  >
+                                                    {getTagIcon(tag, 'w-2.5 h-2.5')}
+                                                  </span>
+                                                ))}
                                               </div>
                                             </div>
                                           ))}
